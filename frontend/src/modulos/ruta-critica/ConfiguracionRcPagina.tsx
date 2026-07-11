@@ -60,7 +60,7 @@ export function ConfiguracionRcPagina(): React.JSX.Element {
   }, [empresas.data, idEmpresa]);
 
   return (
-    <div className="flex flex-col gap-5 p-4" data-testid="config-rc-pagina">
+    <div className="flex h-full flex-col gap-5 overflow-y-auto p-4" data-testid="config-rc-pagina">
       {/* page-head del proto: título + sub, SIN icono. */}
       <header>
         <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

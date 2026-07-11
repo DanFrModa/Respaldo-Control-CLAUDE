@@ -17,6 +17,8 @@ import {
   type Styles,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 /** Un estilo de react-pdf (los valores de `StyleSheet.create`). */
 type Style = Styles[string];
 
@@ -101,6 +103,18 @@ export async function impresoHojaConteo(
 ): Promise<{ buffer: Buffer }> {
   const datos = await leerConteoParaHoja(sesion, idInventarioCiclico, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return { buffer: await renderizarPdfEnWorker('hoja-conteo', { pagador, datos }) };
+}
+
+/** Payload YA resuelto de la hoja de conteo (para el render en worker). */
+export interface PayloadPdfHojaConteo {
+  pagador: string;
+  datos: Awaited<ReturnType<typeof leerConteoParaHoja>>;
+}
+
+/** Render PURO de la hoja de conteo ciega (datos ya resueltos → Buffer). */
+export async function generarPdfHojaConteo(payload: PayloadPdfHojaConteo): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = `Hoja de conteo — Cíclico #${String(datos.folio)}`;
 
   const enc = h(
@@ -168,5 +182,5 @@ export async function impresoHojaConteo(
     ),
   );
 
-  return { buffer: await renderToBuffer(documento) };
+  return renderToBuffer(documento);
 }

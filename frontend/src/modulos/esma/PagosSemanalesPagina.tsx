@@ -35,7 +35,7 @@ export function PagosSemanalesPagina(): React.JSX.Element {
   const filas = consulta.data?.filas ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="pagos-semanales">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="pagos-semanales">
       <header className="flex items-center gap-3">
         <div>
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

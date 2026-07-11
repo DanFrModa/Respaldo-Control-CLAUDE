@@ -22,6 +22,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import {
   ETIQUETAS_TIPO_AUDITORIA,
   type ResultadoAuditoriaClave,
@@ -444,5 +446,5 @@ export async function impresoAuditoria(
   deps: DepsImpresoAuditoria = {},
 ): Promise<ImpresoAuditoria> {
   const datos = await armarDatosImpresoAuditoria(sesion, idAuditoria, bd, deps);
-  return { buffer: await generarPdfAuditoria(datos), folio: datos.numAuditoria };
+  return { buffer: await renderizarPdfEnWorker('auditoria', datos), folio: datos.numAuditoria };
 }

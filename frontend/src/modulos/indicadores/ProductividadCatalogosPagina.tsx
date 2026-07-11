@@ -47,7 +47,10 @@ export function ProductividadCatalogosPagina(): React.JSX.Element {
   const [area, setArea] = useState<Area>('ip');
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="productividad-catalogos">
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid="productividad-catalogos"
+    >
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

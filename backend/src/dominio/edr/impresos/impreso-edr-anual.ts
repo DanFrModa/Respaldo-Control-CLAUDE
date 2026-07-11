@@ -15,6 +15,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import type { EdrPorAnioSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
@@ -195,5 +197,5 @@ export async function impresoEdrAnual(
   deps: DepsImpresoEdrAnual = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoEdrAnual(sesion, anio, bd, deps);
-  return { buffer: await generarPdfEdrAnual(datos) };
+  return { buffer: await renderizarPdfEnWorker('edr-anual', datos) };
 }

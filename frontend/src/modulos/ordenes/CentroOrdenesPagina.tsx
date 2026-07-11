@@ -335,8 +335,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
       </header>
 
       {/* ── Filtros (server-side) ────────────────────────────────────────── */}
+      {/* Los 7 controles caben en UNA sola línea a 1440px (petición de Gabriel): el buscador
+          FLEXIONA (flex-1) para llenar el hueco y encogerse cuando falta espacio, con topes
+          razonables; los selects/comboboxes llevan anchos modestos. En pantallas angostas la barra
+          envuelve como el resto del sistema. */}
       <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2">
-        <div className="relative w-[280px]">
+        <div className="relative min-w-[180px] max-w-[320px] flex-1">
           <Search
             className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
@@ -370,7 +374,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             testid="centro-filtro-cliente"
           />
         </div>
-        <div className="w-44 [&_input]:h-8 [&_input]:text-sm">
+        <div className="w-40 [&_input]:h-8 [&_input]:text-sm">
           <ComboboxBuscable
             opciones={(maquileros.data?.datos ?? []).map((p) => ({ id: p.id, nombre: p.nombre }))}
             valor={idMaquilero}
@@ -385,7 +389,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             testid="centro-filtro-maquilero"
           />
         </div>
-        <div className="w-44 [&_input]:h-8 [&_input]:text-sm">
+        <div className="w-40 [&_input]:h-8 [&_input]:text-sm">
           <ComboboxBuscable
             opciones={aplicadores}
             valor={idEstampador}
@@ -403,7 +407,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         {/* SelectNativo envuelve el <select> en un div w-full: SIN un ancho fijo alrededor, cada
             filtro se roba un renglón completo de la barra (visto en la foto de fidelidad R9). */}
         <SelectNativo
-          className="w-36 h-8 text-sm"
+          className="w-32 h-8 text-sm"
           aria-label="Filtrar por empresa"
           value={idEmpresa}
           onChange={(e) => {
@@ -452,11 +456,8 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             </option>
           ))}
         </SelectNativo>
-        {/* `shrink-0 whitespace-nowrap`: con muchas órdenes ("2,907 órdenes") el conteo no debe
-            brincar de renglón ni empujar la barra (feedback de Gabriel). */}
-        <span className="ml-auto shrink-0 whitespace-nowrap text-[12px] text-faint">
-          {total.toLocaleString('es-MX')} órdenes
-        </span>
+        {/* El conteo total ya vive en la paginación de abajo ("Página X de Y · N órdenes"), así que
+            NO se repite aquí arriba (petición de Gabriel). */}
       </div>
 
       {/* ── Split: tabla (izq) + panel persistente (der) ─────────────────── */}

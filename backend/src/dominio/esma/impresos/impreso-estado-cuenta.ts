@@ -24,6 +24,8 @@ import {
 import type { DesglosadoSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF } from '../../../comun/impreso-topes.js';
 import { estadoCuentaDesglosado } from '../estado-cuenta.js';
 import type { z } from 'zod';
 import type { esquemaEstadoCuentaQuery } from '../../../contrato/index.js';
@@ -32,11 +34,22 @@ import { pagadorDeEmpresa } from './impreso-recibo-pago.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
 
+/** Conteos del universo COMPLETO por sección (para el aviso de truncado; el saldo NO depende de esto). */
+export interface TotalesDesglosado {
+  cargos: number;
+  abonos: number;
+  descuentos: number;
+  pagos: number;
+}
+
 /** Todo lo que necesita el documento del estado de cuenta, ya resuelto (sin BD) → función pura. */
 export interface DatosImpresoEstadoCuenta {
   /** Pagador: razón social o nombre de la empresa (A9) — nunca hardcodeado. */
   pagador: string;
+  /** Desglosado con cada sección YA topada a `MAX_FILAS_PDF` (el saldo sigue siendo del universo). */
   desglosado: DesglosadoSalida;
+  /** Conteos completos por sección (para avisar cuando alguna se truncó). */
+  totales: TotalesDesglosado;
 }
 
 /** Dependencias inyectables (los tests inyectan `estadoCuentaDesglosado` fake para no tocar BD). */
@@ -67,7 +80,23 @@ export async function armarDatosImpresoEstadoCuenta(
     empresa ?? { razonSocial: null, nombre: sesion.nombreEmpresaActiva },
   );
 
-  return { pagador, desglosado };
+  // Blindaje: cada sección se DIBUJA a lo más `MAX_FILAS_PDF`; el saldo (all-time) NO cambia porque lo
+  // calcula el dominio sobre el universo completo.
+  const totales: TotalesDesglosado = {
+    cargos: desglosado.cargos.length,
+    abonos: desglosado.abonos.length,
+    descuentos: desglosado.descuentos.length,
+    pagos: desglosado.pagos.length,
+  };
+  const desglosadoTopado: DesglosadoSalida = {
+    ...desglosado,
+    cargos: desglosado.cargos.slice(0, MAX_FILAS_PDF),
+    abonos: desglosado.abonos.slice(0, MAX_FILAS_PDF),
+    descuentos: desglosado.descuentos.slice(0, MAX_FILAS_PDF),
+    pagos: desglosado.pagos.slice(0, MAX_FILAS_PDF),
+  };
+
+  return { pagador, desglosado: desglosadoTopado, totales };
 }
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
@@ -150,6 +179,7 @@ const estilos = StyleSheet.create({
   saldoItem: { alignItems: 'flex-end' },
   saldoValor: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
   saldoTotal: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: TEAL },
+  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 10 },
   vacio: { fontSize: 8, color: GRIS, marginTop: 2 },
   pie: {
     position: 'absolute',
@@ -340,6 +370,29 @@ function bloqueSaldo(datos: DatosImpresoEstadoCuenta): ReactElement {
   );
 }
 
+/**
+ * Aviso de truncado (o `null`): lista las secciones que se topó a `MAX_FILAS_PDF`. El saldo del pie NO
+ * se ve afectado (es del universo completo). Pura, para testearse sin react-pdf.
+ */
+export function avisoTruncadoTexto(datos: DatosImpresoEstadoCuenta): string | null {
+  const d = datos.desglosado;
+  const t = datos.totales;
+  const partes: string[] = [];
+  const revisar = (nombre: string, mostrados: number, total: number): void => {
+    if (total > mostrados) {
+      partes.push(`${nombre} ${String(mostrados)} de ${String(total)}`);
+    }
+  };
+  revisar('cargos', d.cargos.length, t.cargos);
+  revisar('abonos', d.abonos.length, t.abonos);
+  revisar('descuentos', d.descuentos.length, t.descuentos);
+  revisar('pagos', d.pagos.length, t.pagos);
+  if (partes.length === 0) {
+    return null;
+  }
+  return `Detalle truncado (${partes.join('; ')}) — usa el export a Excel para el detalle completo.`;
+}
+
 /** Una página del estado de cuenta. */
 function paginaEstadoCuenta(datos: DatosImpresoEstadoCuenta): ReactElement {
   const d = datos.desglosado;
@@ -374,6 +427,10 @@ function paginaEstadoCuenta(datos: DatosImpresoEstadoCuenta): ReactElement {
     tablaMovimientos('Abonos', d.abonos),
     tablaMovimientos('Descuentos', d.descuentos),
     tablaPagos(datos),
+    ...(() => {
+      const texto = avisoTruncadoTexto(datos);
+      return texto === null ? [] : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, texto)];
+    })(),
     bloqueSaldo(datos),
     h(
       Text,
@@ -416,5 +473,5 @@ export async function impresoEstadoCuenta(
   deps: DepsImpresoEstadoCuenta = {},
 ): Promise<ImpresoEstadoCuenta> {
   const datos = await armarDatosImpresoEstadoCuenta(sesion, idMaquilero, query, bd, deps);
-  return { buffer: await generarPdfEstadoCuenta(datos), idMaquilero };
+  return { buffer: await renderizarPdfEnWorker('esma-estado-cuenta', datos), idMaquilero };
 }

@@ -109,7 +109,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
   const unitPreview = cantBase > 0 ? totalPreview / cantBase : null;
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="costeo-orden">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="costeo-orden">
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

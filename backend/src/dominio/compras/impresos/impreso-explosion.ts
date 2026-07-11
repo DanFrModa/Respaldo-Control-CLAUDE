@@ -28,6 +28,7 @@ import {
 
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
 import { explosionarOrden } from '../mrp.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
@@ -304,6 +305,6 @@ export async function impresoExplosion(
   deps: DepsImpresoExplosion = {},
 ): Promise<ImpresoExplosion> {
   const datos = await armarDatosImpresoExplosion(sesion, idOrden, bd, deps);
-  const buffer = await generarPdfExplosion(datos);
+  const buffer = await renderizarPdfEnWorker('explosion', datos);
   return { buffer, folioOrden: datos.folioOrden };
 }

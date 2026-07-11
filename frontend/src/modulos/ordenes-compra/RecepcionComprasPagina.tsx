@@ -273,7 +273,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     !recibir.isPending;
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

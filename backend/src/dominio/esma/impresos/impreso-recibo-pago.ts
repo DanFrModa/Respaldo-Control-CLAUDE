@@ -19,6 +19,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerPagoMaquilero } from '../pagos.js';
@@ -318,5 +320,5 @@ export async function impresoReciboPago(
   deps: DepsImpresoReciboPago = {},
 ): Promise<ImpresoReciboPago> {
   const datos = await armarDatosImpresoReciboPago(sesion, idPago, bd, deps);
-  return { buffer: await generarPdfReciboPago(datos), folio: datos.folioPago };
+  return { buffer: await renderizarPdfEnWorker('esma-recibo-pago', datos), folio: datos.folioPago };
 }

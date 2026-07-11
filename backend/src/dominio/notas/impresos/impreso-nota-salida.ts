@@ -37,6 +37,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerNotaSalida } from '../notas-salida.js';
@@ -368,6 +370,6 @@ export async function impresoNotaSalida(
   deps: DepsImpresoNotaSalida = {},
 ): Promise<ImpresoNotaSalida> {
   const datos = await armarDatosImpresoNotaSalida(sesion, id, bd, deps);
-  const buffer = await generarPdfNotaSalida(datos);
+  const buffer = await renderizarPdfEnWorker('nota-salida', datos);
   return { buffer, numNota: datos.numNota };
 }

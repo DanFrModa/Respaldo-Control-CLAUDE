@@ -25,6 +25,7 @@ import {
 import type { EstatusMaterial } from '../../../contrato/index.js';
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
 import { estatusMaterialesOrden } from '../mrp.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
@@ -280,6 +281,6 @@ export async function impresoEstatusMateriales(
   deps: DepsImpresoEstatus = {},
 ): Promise<ImpresoEstatusMateriales> {
   const datos = await armarDatosImpresoEstatus(sesion, idOrden, bd, deps);
-  const buffer = await generarPdfEstatusMateriales(datos);
+  const buffer = await renderizarPdfEnWorker('estatus-materiales', datos);
   return { buffer, folioOrden: datos.folioOrden };
 }
