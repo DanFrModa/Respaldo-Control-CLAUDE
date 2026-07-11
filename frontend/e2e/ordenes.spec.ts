@@ -23,7 +23,9 @@ async function crearPedidoF2(
   renglones = 1,
 ): Promise<void> {
   await page.goto('/pedidos/administrar');
-  await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+  // `exact`: al reintentar, el detalle auto-selecciona un pedido y muestra un <h3>"Pedidos
+  // reales"</h3> → sin exact el matcher substring caza 2 headings (flaky).
+  await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible();
   await page.getByTestId('nuevo-pedido').click();
   const dialogoPedido = page.getByRole('dialog');
   await dialogoPedido.getByLabel('Cliente').selectOption({ label: nombres.cliente });
@@ -75,11 +77,20 @@ async function generarOp(
  * Abre la edición de una orden por folio en el DIÁLOGO del mosaico "Modificar" (centro de comando):
  * el panel viejo `/produccion/ordenes/captura` fue retirado. Deja visible el detalle editable.
  */
-async function abrirOrdenEnCaptura(page: Page, folio: string): Promise<void> {
+async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: string): Promise<void> {
   await page.goto('/produccion/ordenes');
   await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
+  // La búsqueda del centro filtra en SERVIDOR con debounce: si se clickea al instante, la lista
+  // aún trae TODAS las órdenes y `hasText: folio` (substring de un número corto) caza una celda de
+  // OTRA fila (cantidades/fechas) — el run cazó "OP 5" por "OP 4". Se acota la fila al MODELO de la
+  // corrida (texto único) y al folio EXACTO de su celda (no substring), así no importa si el filtro
+  // del servidor ya aplicó.
   await page.getByTestId('centro-busqueda').fill(folio);
-  await page.getByTestId('centro-fila').filter({ hasText: folio }).first().click();
+  const fila = page
+    .getByTestId('centro-fila')
+    .filter({ hasText: codigoModelo })
+    .filter({ has: page.getByText(folio, { exact: true }) });
+  await fila.first().click();
   // El panel persistente (escritorio) hospeda los mosaicos; se espera a que cargue la orden.
   const panel = page.getByTestId('centro-panel');
   await expect(panel.getByText(`OP ${folio}`)).toBeVisible();
@@ -163,7 +174,7 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
     // ── La OP nace COMPLETA (matriz al crear, R3) y la matriz se puede RE-guardar ─
-    await abrirOrdenEnCaptura(page, folio1);
+    await abrirOrdenEnCaptura(page, folio1, codigoModelo);
     const detalle = page.getByTestId('detalle-orden');
     await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Completa');
     const matriz = detalle.getByTestId('matriz-orden');
@@ -172,7 +183,7 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await expect(page.getByText('Matriz guardada.')).toBeVisible();
 
     // ── Copiar la matriz de la OP 1 sobre la OP 2 ───────────────────────────────
-    await abrirOrdenEnCaptura(page, folio2);
+    await abrirOrdenEnCaptura(page, folio2, codigoModelo);
     await detalle.getByTestId('abrir-copiar-matriz').click();
     // El panel de edición también es un `dialog`: se acota el de copiar por su nombre accesible.
     const dialogoCopiar = page.getByRole('dialog', { name: /Copiar matriz/ });
