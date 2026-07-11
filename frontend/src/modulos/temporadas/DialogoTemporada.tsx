@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -90,11 +96,15 @@ export function DialogoTemporada({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="temporada-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="temporada-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="temporada-nombre"
                 autoFocus
+                placeholder="Ej. Otoño-Invierno 2026"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={guardando}
                 {...formulario.register('nombre')}
@@ -112,7 +122,12 @@ export function DialogoTemporada({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-temporada">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-temporada"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear temporada'}
             </Button>

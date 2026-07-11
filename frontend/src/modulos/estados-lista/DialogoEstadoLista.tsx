@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Esquema de captura de un estado de lista (solo UX; el backend re-valida, A1). */
@@ -146,8 +153,11 @@ export function DialogoEstadoLista({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.codigo)}>
-              <FieldLabel htmlFor="el-codigo">Código</FieldLabel>
+              <FieldLabel htmlFor="el-codigo" required>
+                Código
+              </FieldLabel>
               <Input
                 id="el-codigo"
                 autoFocus
@@ -161,7 +171,9 @@ export function DialogoEstadoLista({
             </Field>
 
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="el-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="el-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="el-nombre"
                 aria-invalid={Boolean(errors.nombre)}
@@ -211,7 +223,12 @@ export function DialogoEstadoLista({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-estado-lista">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-estado-lista"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear estado'}
             </Button>

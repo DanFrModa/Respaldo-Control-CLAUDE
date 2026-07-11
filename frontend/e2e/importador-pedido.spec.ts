@@ -92,7 +92,7 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
       const dialogoDes = page.getByRole('dialog');
       await dialogoDes.getByLabel('Modelo del catálogo').selectOption({ label: modelo.codigo });
       if (modelo.numCliente !== '') {
-        await dialogoDes.getByLabel('Número del cliente (opcional)').fill(modelo.numCliente);
+        await dialogoDes.getByLabel('Número del cliente').fill(modelo.numCliente);
       }
       await page.getByTestId('guardar-desarrollo').click();
       // Señal DETERMINISTA del alta (NO el toast genérico "Desarrollo agregado.", que se ACUMULA

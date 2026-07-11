@@ -182,7 +182,7 @@ describe('<ColoresPagina>', () => {
 
     await usuario.click(screen.getByTestId('nuevo-color'));
     const dialogo = await screen.findByRole('dialog');
-    const campo = within(dialogo).getByLabelText('Nombre');
+    const campo = within(dialogo).getByLabelText(/^Nombre/);
 
     await usuario.type(campo, 'Rojo');
     await usuario.click(screen.getByTestId('guardar-color'));
@@ -192,10 +192,10 @@ describe('<ColoresPagina>', () => {
 
     // El dialogo NO se cierra y el campo queda vacio para el siguiente color.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await waitFor(() => expect(within(dialogo).getByLabelText('Nombre')).toHaveValue(''));
+    await waitFor(() => expect(within(dialogo).getByLabelText(/^Nombre/)).toHaveValue(''));
 
     // Se puede capturar otro color de corrido.
-    await usuario.type(within(dialogo).getByLabelText('Nombre'), 'Azul');
+    await usuario.type(within(dialogo).getByLabelText(/^Nombre/), 'Azul');
     await usuario.click(screen.getByTestId('guardar-color'));
     expect(crearMutate).toHaveBeenCalledTimes(2);
     expect(crearMutate.mock.calls[1]?.[0]).toEqual({ nombre: 'Azul' });

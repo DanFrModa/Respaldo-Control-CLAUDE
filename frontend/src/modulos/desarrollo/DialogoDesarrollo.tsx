@@ -15,7 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -127,6 +133,7 @@ export function DialogoDesarrollo({
           </DialogHeader>
 
           <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
             {/* Selector de modo (existente / nuevo). */}
             <Field>
               <FieldLabel htmlFor="desarrollo-modo">Modelo</FieldLabel>
@@ -138,7 +145,9 @@ export function DialogoDesarrollo({
 
             {modo === 'existente' ? (
               <Field data-invalid={Boolean(errors.idModelo)}>
-                <FieldLabel htmlFor="desarrollo-modelo">Modelo del catálogo</FieldLabel>
+                <FieldLabel htmlFor="desarrollo-modelo" required>
+                  Modelo del catálogo
+                </FieldLabel>
                 <SelectNativo
                   id="desarrollo-modelo"
                   disabled={guardando}
@@ -158,18 +167,23 @@ export function DialogoDesarrollo({
             ) : (
               <>
                 <Field data-invalid={Boolean(errors.codigoNuevo)}>
-                  <FieldLabel htmlFor="desarrollo-codigo">Código del modelo nuevo</FieldLabel>
+                  <FieldLabel htmlFor="desarrollo-codigo" required>
+                    Código del modelo nuevo
+                  </FieldLabel>
                   <Input
                     id="desarrollo-codigo"
-                    placeholder="Nuestro número (código del modelo)"
+                    placeholder="Ej. 4522"
                     disabled={guardando}
                     aria-invalid={Boolean(errors.codigoNuevo)}
                     {...registrar('codigoNuevo')}
                   />
+                  <FieldDescription>
+                    Nuestro número interno (el código del modelo).
+                  </FieldDescription>
                   <FieldError errors={[errors.codigoNuevo]} />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="desarrollo-descripcion">Descripción (opcional)</FieldLabel>
+                  <FieldLabel htmlFor="desarrollo-descripcion">Descripción</FieldLabel>
                   <Input
                     id="desarrollo-descripcion"
                     disabled={guardando}
@@ -180,19 +194,20 @@ export function DialogoDesarrollo({
             )}
 
             <Field>
-              <FieldLabel htmlFor="desarrollo-numero-cliente">
-                Número del cliente (opcional)
-              </FieldLabel>
+              <FieldLabel htmlFor="desarrollo-numero-cliente">Número del cliente</FieldLabel>
               <Input
                 id="desarrollo-numero-cliente"
-                placeholder="El otro número (del cliente)"
+                placeholder="Ej. SKU-99812"
                 disabled={guardando}
                 {...registrar('numeroCliente')}
               />
+              <FieldDescription>
+                El número con el que el cliente identifica el modelo.
+              </FieldDescription>
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="desarrollo-notas">Notas (opcional)</FieldLabel>
+              <FieldLabel htmlFor="desarrollo-notas">Notas</FieldLabel>
               <textarea
                 id="desarrollo-notas"
                 rows={2}
@@ -212,7 +227,12 @@ export function DialogoDesarrollo({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-desarrollo">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-desarrollo"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               Agregar desarrollo
             </Button>

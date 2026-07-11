@@ -241,9 +241,9 @@ describe('<UsuariosPagina>', () => {
     expect(within(dialogo).getByTestId('selector-roles')).toBeInTheDocument();
     expect(within(dialogo).getByText('Administrador')).toBeInTheDocument();
 
-    await u.type(within(dialogo).getByLabelText('Usuario'), 'nuevo');
-    await u.type(within(dialogo).getByLabelText('Nombre'), 'Persona Nueva');
-    await u.type(within(dialogo).getByLabelText('Contraseña'), 'secreto-largo');
+    await u.type(within(dialogo).getByLabelText(/^Usuario/), 'nuevo');
+    await u.type(within(dialogo).getByLabelText(/^Nombre/), 'Persona Nueva');
+    await u.type(within(dialogo).getByLabelText(/^Contraseña/), 'secreto-largo');
     // Marca el rol "Básico" (id 2).
     await u.click(within(dialogo).getByTestId('rol-opcion-2'));
 

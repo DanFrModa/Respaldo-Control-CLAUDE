@@ -208,7 +208,7 @@ describe('<EmpresasPagina>', () => {
     await u.click(screen.getByTestId('editar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
-    const identificador = within(dialogo).getByLabelText('Identificador (folios)');
+    const identificador = within(dialogo).getByLabelText('Identificador');
     expect(identificador).toHaveValue('MS-01');
 
     await u.clear(identificador);

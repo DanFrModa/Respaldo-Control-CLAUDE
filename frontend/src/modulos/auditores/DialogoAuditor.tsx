@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -104,11 +111,15 @@ export function DialogoAuditor({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="auditor-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="auditor-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="auditor-nombre"
                 autoFocus
+                placeholder="Ej. José Ramírez"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={guardando}
                 {...formulario.register('nombre')}
@@ -147,6 +158,9 @@ export function DialogoAuditor({
                   </option>
                 ))}
               </SelectNativo>
+              <FieldDescription>
+                Qué tan estricto certifica: 1.0 estricto · 2.5 estándar · 10 laxo.
+              </FieldDescription>
               <FieldError errors={[errors.nivelAql]} />
             </Field>
           </FieldGroup>
@@ -160,7 +174,12 @@ export function DialogoAuditor({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-auditor">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-auditor"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear auditor'}
             </Button>
