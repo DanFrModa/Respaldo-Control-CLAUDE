@@ -207,7 +207,9 @@ export function PedidosMesPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      {/* En angosto (<sm) el título toma toda la línea y la barra de botones ENVUELVE
+          debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha. */}
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Pedidos</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
@@ -215,7 +217,7 @@ export function PedidosMesPagina(): React.JSX.Element {
             en insumos y entrega)
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"

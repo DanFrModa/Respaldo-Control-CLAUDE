@@ -76,7 +76,9 @@ export function TableroWipPagina(): React.JSX.Element {
     <div className="h-full overflow-y-auto" data-testid="tablero-wip">
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-        <header className="flex shrink-0 flex-wrap items-center gap-3">
+        {/* En angosto (<sm) el título toma toda la línea y la barra (filtro + botones) ENVUELVE
+            debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha. */}
+        <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="min-w-0 flex-1">
             <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
               WIP analítico
@@ -85,50 +87,52 @@ export function TableroWipPagina(): React.JSX.Element {
               {selloDatosAl(datos?.datosAl)}
             </p>
           </div>
-          <SelectNativo
-            className="h-8 w-auto text-sm"
-            value={soloPendientes}
-            onChange={(e) => {
-              setSoloPendientes(e.target.value);
-              setPagina(1);
-            }}
-            aria-label="Órdenes"
-            data-testid="wip-pendientes"
-          >
-            <option value="true">Solo con pendientes</option>
-            <option value="false">Todas</option>
-          </SelectNativo>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refrescar.mutate()}
-            disabled={refrescar.isPending}
-            data-testid="wip-refrescar"
-          >
-            <RefreshCw aria-hidden />
-            Refrescar
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => imprimirKpisWip(query)}
-            data-testid="wip-pdf"
-          >
-            <Printer aria-hidden />
-            PDF
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => descargarExcelKpisWip(query)}
-            data-testid="wip-excel"
-          >
-            <Download aria-hidden />
-            Excel
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectNativo
+              className="h-8 w-auto text-sm"
+              value={soloPendientes}
+              onChange={(e) => {
+                setSoloPendientes(e.target.value);
+                setPagina(1);
+              }}
+              aria-label="Órdenes"
+              data-testid="wip-pendientes"
+            >
+              <option value="true">Solo con pendientes</option>
+              <option value="false">Todas</option>
+            </SelectNativo>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => refrescar.mutate()}
+              disabled={refrescar.isPending}
+              data-testid="wip-refrescar"
+            >
+              <RefreshCw aria-hidden />
+              Refrescar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => imprimirKpisWip(query)}
+              data-testid="wip-pdf"
+            >
+              <Printer aria-hidden />
+              PDF
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => descargarExcelKpisWip(query)}
+              data-testid="wip-excel"
+            >
+              <Download aria-hidden />
+              Excel
+            </Button>
+          </div>
         </header>
 
         {consulta.isError ? (

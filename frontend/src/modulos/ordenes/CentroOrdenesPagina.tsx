@@ -286,7 +286,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado de página ─────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      {/* En angosto (<sm) el título toma toda la línea y la barra de botones ENVUELVE
+          debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha. */}
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Órdenes de producción
@@ -299,7 +301,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             maquilero…
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -483,92 +485,164 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                 No hay órdenes que coincidan con los filtros.
               </p>
             ) : (
-              <TablaDensa data-testid="centro-tabla">
-                <TablaDensaEncabezado>
-                  <TablaDensaFila>
-                    <TablaDensaHead>Emp.</TablaDensaHead>
-                    <TablaDensaHead>OP</TablaDensaHead>
-                    <TablaDensaHead>Modelo</TablaDensaHead>
-                    <TablaDensaHead>Pedido cliente</TablaDensaHead>
-                    <TablaDensaHead numerica>Ordenada</TablaDensaHead>
-                    <TablaDensaHead numerica>Cortada</TablaDensaHead>
-                    <TablaDensaHead>Maquilero</TablaDensaHead>
-                    <TablaDensaHead>Estampador</TablaDensaHead>
-                    <TablaDensaHead numerica>P. int.</TablaDensaHead>
-                    <TablaDensaHead>OC tela</TablaDensaHead>
-                    <TablaDensaHead>Entrega</TablaDensaHead>
-                    <TablaDensaHead>Cliente</TablaDensaHead>
-                    <TablaDensaHead>Estatus</TablaDensaHead>
-                  </TablaDensaFila>
-                </TablaDensaEncabezado>
-                <TablaDensaCuerpo>
+              <>
+                {/* Móvil (<lg): tarjetas apiladas — la tabla densa de 13 columnas solo
+                    cabe en escritorio. Mismo clic (selecciona → panel) y doble clic
+                    (registrar avance) que la fila de la tabla. */}
+                <div className="space-y-2 p-3 lg:hidden" data-testid="centro-tarjetas">
                   {filas.map((fila) => {
                     const estatus = estatusDeFila(fila);
                     return (
-                      <TablaDensaFila
+                      <button
+                        type="button"
                         key={fila.id}
-                        seleccionada={fila.id === idSeleccionada}
                         onClick={() => alClicFila(fila)}
                         onDoubleClick={() => abrirAvance(fila)}
-                        className="cursor-pointer"
-                        data-testid="centro-fila"
+                        data-testid="centro-tarjeta"
+                        className={cn(
+                          'w-full rounded-lg border bg-card p-3 text-left',
+                          fila.id === idSeleccionada && 'ring-2 ring-primary',
+                        )}
                       >
-                        <TablaDensaCelda className="text-xs text-muted-foreground">
-                          {identificadorEmpresa.get(fila.idEmpresa) ?? fila.empresa}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda className="font-semibold text-primary">
-                          {fila.folio}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda className="num">{fila.codigoModelo}</TablaDensaCelda>
-                        <TablaDensaCelda className="num text-xs">
-                          {fila.pedidoCliente ?? '—'}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda numerica>
-                          {fila.cantOrdenada.toLocaleString('es-MX')}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda numerica className={claseCortada(fila)}>
-                          {fila.cantCortada.toLocaleString('es-MX')}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>
-                          {fila.maquilero !== null ? (
-                            <span className="inline-flex items-center gap-1.5">
-                              {fila.maquilero}
-                              {fila.numMaquileros > 1 ? (
-                                <span
-                                  className="rounded-full bg-info-soft px-1.5 text-[10px] font-semibold text-info"
-                                  data-testid="centro-badge-maquileros"
-                                >
-                                  ×{fila.numMaquileros}
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            <span className="text-faint">—</span>
-                          )}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>
-                          {fila.estampador ?? <span className="text-faint">—</span>}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda numerica className="text-xs">
-                          {fila.folioPedido ?? '—'}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>
-                          {fila.ocTelaFolio !== null ? (
-                            <span className="num text-ok">✓ {fila.ocTelaFolio}</span>
-                          ) : (
-                            <span className="text-warn">falta</span>
-                          )}
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>{mesDeFila(fila)}</TablaDensaCelda>
-                        <TablaDensaCelda className="font-medium">{fila.cliente}</TablaDensaCelda>
-                        <TablaDensaCelda>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-primary">
+                              OP {fila.folio}
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                {identificadorEmpresa.get(fila.idEmpresa) ?? fila.empresa}
+                              </span>
+                            </p>
+                            <p className="num text-sm">{fila.codigoModelo}</p>
+                          </div>
                           <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
-                        </TablaDensaCelda>
-                      </TablaDensaFila>
+                        </div>
+                        <p className="mt-1 truncate text-sm font-medium">{fila.cliente}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          Pedido cliente: {fila.pedidoCliente ?? '—'}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                          <span>
+                            Ordenada{' '}
+                            <span className="num font-semibold">
+                              {fila.cantOrdenada.toLocaleString('es-MX')}
+                            </span>
+                          </span>
+                          <span>
+                            Cortada{' '}
+                            <span className={cn('num font-semibold', claseCortada(fila))}>
+                              {fila.cantCortada.toLocaleString('es-MX')}
+                            </span>
+                          </span>
+                          <span>
+                            OC tela{' '}
+                            {fila.ocTelaFolio !== null ? (
+                              <span className="num text-ok">✓ {fila.ocTelaFolio}</span>
+                            ) : (
+                              <span className="text-warn">falta</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>Maquilero: {fila.maquilero ?? '—'}</span>
+                          <span>Estampador: {fila.estampador ?? '—'}</span>
+                          <span>Entrega: {mesDeFila(fila)}</span>
+                        </div>
+                      </button>
                     );
                   })}
-                </TablaDensaCuerpo>
-              </TablaDensa>
+                </div>
+                {/* Escritorio (≥lg): tabla densa completa. */}
+                <div className="hidden lg:block">
+                  <TablaDensa data-testid="centro-tabla">
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Emp.</TablaDensaHead>
+                        <TablaDensaHead>OP</TablaDensaHead>
+                        <TablaDensaHead>Modelo</TablaDensaHead>
+                        <TablaDensaHead>Pedido cliente</TablaDensaHead>
+                        <TablaDensaHead numerica>Ordenada</TablaDensaHead>
+                        <TablaDensaHead numerica>Cortada</TablaDensaHead>
+                        <TablaDensaHead>Maquilero</TablaDensaHead>
+                        <TablaDensaHead>Estampador</TablaDensaHead>
+                        <TablaDensaHead numerica>P. int.</TablaDensaHead>
+                        <TablaDensaHead>OC tela</TablaDensaHead>
+                        <TablaDensaHead>Entrega</TablaDensaHead>
+                        <TablaDensaHead>Cliente</TablaDensaHead>
+                        <TablaDensaHead>Estatus</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
+                      {filas.map((fila) => {
+                        const estatus = estatusDeFila(fila);
+                        return (
+                          <TablaDensaFila
+                            key={fila.id}
+                            seleccionada={fila.id === idSeleccionada}
+                            onClick={() => alClicFila(fila)}
+                            onDoubleClick={() => abrirAvance(fila)}
+                            className="cursor-pointer"
+                            data-testid="centro-fila"
+                          >
+                            <TablaDensaCelda className="text-xs text-muted-foreground">
+                              {identificadorEmpresa.get(fila.idEmpresa) ?? fila.empresa}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda className="font-semibold text-primary">
+                              {fila.folio}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda className="num">{fila.codigoModelo}</TablaDensaCelda>
+                            <TablaDensaCelda className="num text-xs">
+                              {fila.pedidoCliente ?? '—'}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda numerica>
+                              {fila.cantOrdenada.toLocaleString('es-MX')}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda numerica className={claseCortada(fila)}>
+                              {fila.cantCortada.toLocaleString('es-MX')}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>
+                              {fila.maquilero !== null ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  {fila.maquilero}
+                                  {fila.numMaquileros > 1 ? (
+                                    <span
+                                      className="rounded-full bg-info-soft px-1.5 text-[10px] font-semibold text-info"
+                                      data-testid="centro-badge-maquileros"
+                                    >
+                                      ×{fila.numMaquileros}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <span className="text-faint">—</span>
+                              )}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>
+                              {fila.estampador ?? <span className="text-faint">—</span>}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda numerica className="text-xs">
+                              {fila.folioPedido ?? '—'}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>
+                              {fila.ocTelaFolio !== null ? (
+                                <span className="num text-ok">✓ {fila.ocTelaFolio}</span>
+                              ) : (
+                                <span className="text-warn">falta</span>
+                              )}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>{mesDeFila(fila)}</TablaDensaCelda>
+                            <TablaDensaCelda className="font-medium">
+                              {fila.cliente}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>
+                              <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
+                            </TablaDensaCelda>
+                          </TablaDensaFila>
+                        );
+                      })}
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
+                </div>
+              </>
             )}
           </div>
           {/* Paginación de servidor. */}
