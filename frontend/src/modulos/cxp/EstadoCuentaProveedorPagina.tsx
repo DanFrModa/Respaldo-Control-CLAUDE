@@ -54,16 +54,24 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [vista, setVista] = useState<'operativa' | 'fiscal'>('operativa');
+  const [pagina, setPagina] = useState(1);
 
   const [capturaAbierta, setCapturaAbierta] = useState(false);
   const [movACancelar, setMovACancelar] = useState<CxpEstadoCuentaMovimiento | null>(null);
 
+  // Cambiar de proveedor, periodo o vista siempre vuelve a la página 1 (si no, se pediría una página
+  // fuera de rango del proveedor nuevo → tabla vacía).
+  function reiniciarPagina(): void {
+    setPagina(1);
+  }
+
+  // Los filtros (sin paginación) alimentan el PDF (que igual imprime hasta 100 movimientos).
   const query: CxpEstadoCuentaQuery = {
     vista,
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
   };
-  const consulta = useEstadoCuentaProveedor(idProveedor, query);
+  const consulta = useEstadoCuentaProveedor(idProveedor, { ...query, pagina });
   const cuenta = consulta.data;
   const movimientos = cuenta?.movimientos ?? [];
 
@@ -112,8 +120,15 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
               <FieldLabel htmlFor="cxp-edc-proveedor-busqueda">Proveedor</FieldLabel>
               <SelectorProveedor
                 idSeleccionado={idProveedor ?? undefined}
-                alSeleccionar={(p) => setIdProveedor(p.id)}
-                alLimpiar={() => setIdProveedor(null)}
+                nombreSeleccionado={cuenta?.tercero}
+                alSeleccionar={(p) => {
+                  setIdProveedor(p.id);
+                  reiniciarPagina();
+                }}
+                alLimpiar={() => {
+                  setIdProveedor(null);
+                  reiniciarPagina();
+                }}
                 testid="cxp-edc-proveedor"
               />
             </Field>
@@ -123,7 +138,10 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                 id="cxp-edc-desde"
                 type="date"
                 value={desde}
-                onChange={(e) => setDesde(e.target.value)}
+                onChange={(e) => {
+                  setDesde(e.target.value);
+                  reiniciarPagina();
+                }}
                 data-testid="cxp-edc-desde"
               />
             </Field>
@@ -133,7 +151,10 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                 id="cxp-edc-hasta"
                 type="date"
                 value={hasta}
-                onChange={(e) => setHasta(e.target.value)}
+                onChange={(e) => {
+                  setHasta(e.target.value);
+                  reiniciarPagina();
+                }}
                 data-testid="cxp-edc-hasta"
               />
             </Field>
@@ -142,7 +163,10 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
               <SelectNativo
                 id="cxp-edc-vista"
                 value={vista}
-                onChange={(e) => setVista(e.target.value as 'operativa' | 'fiscal')}
+                onChange={(e) => {
+                  setVista(e.target.value as 'operativa' | 'fiscal');
+                  reiniciarPagina();
+                }}
                 data-testid="cxp-edc-vista"
               >
                 <option value="operativa">Operativa (todo)</option>
@@ -238,6 +262,35 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                   </TablaDensa>
                 </div>
               )}
+
+              {/* ── Paginación de movimientos (el motor pagina; sin esto solo se veía la 1ª página) ── */}
+              {cuenta && cuenta.totalPaginas > 1 ? (
+                <div className="mt-3 flex items-center justify-end gap-2 border-t pt-3 text-xs">
+                  <span className="text-faint">
+                    Página {cuenta.pagina} de {cuenta.totalPaginas} · {cuenta.total} movimientos
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cuenta.pagina <= 1}
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    data-testid="cxp-mov-anterior"
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cuenta.pagina >= cuenta.totalPaginas}
+                    onClick={() => setPagina((p) => p + 1)}
+                    data-testid="cxp-mov-siguiente"
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </>

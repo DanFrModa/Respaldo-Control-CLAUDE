@@ -54,16 +54,24 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [vista, setVista] = useState<'operativa' | 'fiscal'>('operativa');
+  const [pagina, setPagina] = useState(1);
 
   const [capturaAbierta, setCapturaAbierta] = useState(false);
   const [movACancelar, setMovACancelar] = useState<CxcEstadoCuentaMovimiento | null>(null);
 
+  // Cambiar de cliente, periodo o vista siempre vuelve a la página 1 (si no, se pediría una página
+  // fuera de rango del cliente nuevo → tabla vacía).
+  function reiniciarPagina(): void {
+    setPagina(1);
+  }
+
+  // Los filtros (sin paginación) alimentan el PDF (que igual imprime hasta 100 movimientos).
   const query: CxcEstadoCuentaQuery = {
     vista,
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
   };
-  const consulta = useEstadoCuentaCliente(idCliente, query);
+  const consulta = useEstadoCuentaCliente(idCliente, { ...query, pagina });
   const cuenta = consulta.data;
   const movimientos = cuenta?.movimientos ?? [];
 
@@ -112,8 +120,15 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
               <FieldLabel htmlFor="cxc-edc-cliente-busqueda">Cliente</FieldLabel>
               <SelectorCliente
                 idSeleccionado={idCliente ?? undefined}
-                alSeleccionar={(c) => setIdCliente(c.id)}
-                alLimpiar={() => setIdCliente(null)}
+                nombreSeleccionado={cuenta?.tercero}
+                alSeleccionar={(c) => {
+                  setIdCliente(c.id);
+                  reiniciarPagina();
+                }}
+                alLimpiar={() => {
+                  setIdCliente(null);
+                  reiniciarPagina();
+                }}
                 testid="cxc-edc-cliente"
               />
             </Field>
@@ -123,7 +138,10 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
                 id="cxc-edc-desde"
                 type="date"
                 value={desde}
-                onChange={(e) => setDesde(e.target.value)}
+                onChange={(e) => {
+                  setDesde(e.target.value);
+                  reiniciarPagina();
+                }}
                 data-testid="cxc-edc-desde"
               />
             </Field>
@@ -133,7 +151,10 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
                 id="cxc-edc-hasta"
                 type="date"
                 value={hasta}
-                onChange={(e) => setHasta(e.target.value)}
+                onChange={(e) => {
+                  setHasta(e.target.value);
+                  reiniciarPagina();
+                }}
                 data-testid="cxc-edc-hasta"
               />
             </Field>
@@ -142,7 +163,10 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
               <SelectNativo
                 id="cxc-edc-vista"
                 value={vista}
-                onChange={(e) => setVista(e.target.value as 'operativa' | 'fiscal')}
+                onChange={(e) => {
+                  setVista(e.target.value as 'operativa' | 'fiscal');
+                  reiniciarPagina();
+                }}
                 data-testid="cxc-edc-vista"
               >
                 <option value="operativa">Operativa (todo)</option>
@@ -237,6 +261,35 @@ export function EstadoCuentaClientePagina(): React.JSX.Element {
                   </TablaDensa>
                 </div>
               )}
+
+              {/* ── Paginación de movimientos (el motor pagina; sin esto solo se veía la 1ª página) ── */}
+              {cuenta && cuenta.totalPaginas > 1 ? (
+                <div className="mt-3 flex items-center justify-end gap-2 border-t pt-3 text-xs">
+                  <span className="text-faint">
+                    Página {cuenta.pagina} de {cuenta.totalPaginas} · {cuenta.total} movimientos
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cuenta.pagina <= 1}
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    data-testid="cxc-mov-anterior"
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cuenta.pagina >= cuenta.totalPaginas}
+                    onClick={() => setPagina((p) => p + 1)}
+                    data-testid="cxc-mov-siguiente"
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </>

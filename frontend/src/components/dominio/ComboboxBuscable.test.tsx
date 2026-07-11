@@ -119,6 +119,20 @@ describe('<ComboboxBuscable>', () => {
     expect(alCambiar).toHaveBeenCalledWith(2);
   });
 
+  it('la lista se PORTA al body (no la recorta un ancestro con overflow)', async () => {
+    const usuario = userEvent.setup();
+    render(
+      <div style={{ overflow: 'hidden', height: 40 }} data-testid="jaula">
+        <Arnes />
+      </div>,
+    );
+    await usuario.click(screen.getByTestId('combo-input'));
+    // La lista existe pero NO cuelga del ancestro con overflow: es hija directa del <body>.
+    const lista = screen.getByTestId('combo-lista');
+    expect(lista.parentElement).toBe(document.body);
+    expect(screen.getByTestId('jaula').contains(lista)).toBe(false);
+  });
+
   it('con `accionCrear` muestra el atajo y lo dispara', async () => {
     const usuario = userEvent.setup();
     const alCrear = vi.fn();

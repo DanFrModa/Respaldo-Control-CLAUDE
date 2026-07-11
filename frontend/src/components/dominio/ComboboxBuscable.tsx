@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Loader2Icon, Search, X } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -89,6 +90,14 @@ export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox
   opciones: readonly O[];
   /** Id seleccionado, o null si no hay selección. Controlado por el padre. */
   valor: number | null;
+  /**
+   * Etiqueta a mostrar para `valor` cuando la opción NO está en `opciones` (típico al llegar de
+   * OTRA pantalla con un id ya fijado: en typeahead server-side la primera página no lo trae). El
+   * padre, que sí conoce el nombre (p. ej. por el estado de cuenta ya cargado), lo pasa para que el
+   * input no se vea vacío. En cuanto la opción aparezca en `opciones` o el usuario elija, esa fuente
+   * manda. Sin esto, `valor` sin opción en la página dejaba el input en blanco.
+   */
+  etiquetaSeleccion?: string | undefined;
   /** Emite el id elegido (o null al limpiar). */
   onChange: (id: number | null) => void;
   /**
@@ -156,6 +165,7 @@ export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox
 export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   opciones,
   valor,
+  etiquetaSeleccion,
   onChange,
   alCambiarTexto,
   busquedaServidor = false,
@@ -174,6 +184,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
 }: PropsComboboxBuscable<O>): React.JSX.Element {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
   const idLista = useId();
 
   // La opción del `valor` en la página ACTUAL (con typeahead server-side puede no venir en ella).
@@ -183,12 +194,18 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   );
 
   // Etiqueta de la selección, PERSISTIDA aparte de `opciones`: si la búsqueda server-side deja a
-  // la opción elegida fuera de la página, la última etiqueta conocida sobrevive.
-  const [etiquetaValor, setEtiquetaValor] = useState(opcionDeValor?.nombre ?? '');
-  const [texto, setTexto] = useState(opcionDeValor?.nombre ?? '');
+  // la opción elegida fuera de la página, la última etiqueta conocida sobrevive. Al montar sin la
+  // opción en la página (llegada desde otra pantalla), arranca con la `etiquetaSeleccion` del padre.
+  const [etiquetaValor, setEtiquetaValor] = useState(
+    opcionDeValor?.nombre ?? etiquetaSeleccion ?? '',
+  );
+  const [texto, setTexto] = useState(opcionDeValor?.nombre ?? etiquetaSeleccion ?? '');
   const [abierto, setAbierto] = useState(false);
   const [enfocado, setEnfocado] = useState(false);
   const [activo, setActivo] = useState(0);
+  // Estilo (posición FIJA) de la lista PORTADA a `document.body`: así ningún ancestro con overflow
+  // (tarjeta, wrapper de scroll) la recorta. Se recalcula al abrir y en scroll/resize.
+  const [estiloLista, setEstiloLista] = useState<React.CSSProperties | null>(null);
   // Tras enfocar con selección se selecciona todo el texto; el mouseup del mismo clic NO debe
   // colapsar esa selección (comportamiento default del navegador).
   const conservarSeleccionRef = useRef(false);
@@ -198,8 +215,11 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
       setEtiquetaValor('');
     } else if (opcionDeValor !== null) {
       setEtiquetaValor(opcionDeValor.nombre);
+    } else if (etiquetaSeleccion !== undefined && etiquetaSeleccion !== '') {
+      // La opción no está en la página cargada, pero el padre conoce su nombre: úsalo.
+      setEtiquetaValor(etiquetaSeleccion);
     }
-  }, [valor, opcionDeValor]);
+  }, [valor, opcionDeValor, etiquetaSeleccion]);
 
   // Sincroniza el texto visible con la selección SOLO cuando el usuario NO está editando. (Causa
   // raíz del "borro y reaparece": el efecto anterior colgaba del objeto derivado de `opciones`,
@@ -227,16 +247,57 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   const activoSeguro = filtradas.length === 0 ? 0 : Math.min(activo, filtradas.length - 1);
 
   // Clic fuera: cierra VÍA blur (una sola ruta de salida) — cubre overlays que hacen
-  // preventDefault del mousedown y no moverían el foco por sí solos.
+  // preventDefault del mousedown y no moverían el foco por sí solos. La lista vive en un PORTAL
+  // (fuera del contenedor), así que también cuenta como "dentro" para no cerrar al clickearla.
   useEffect(() => {
     function alClicFuera(evento: MouseEvent): void {
-      if (contenedorRef.current && !contenedorRef.current.contains(evento.target as Node)) {
+      const objetivo = evento.target as Node;
+      const dentroContenedor = contenedorRef.current?.contains(objetivo) ?? false;
+      const dentroLista = listaRef.current?.contains(objetivo) ?? false;
+      if (!dentroContenedor && !dentroLista) {
         inputRef.current?.blur();
       }
     }
     document.addEventListener('mousedown', alClicFuera);
     return () => document.removeEventListener('mousedown', alClicFuera);
   }, []);
+
+  // Posiciona la lista PORTADA bajo (o sobre, si abajo no cabe) el input, anclada en coordenadas de
+  // viewport (`position: fixed`). `useLayoutEffect` mide antes del paint → sin parpadeo. Se recalcula
+  // con `scroll` en captura (cualquier ancestro scrolleable mueve el input) y con `resize`.
+  useLayoutEffect(() => {
+    if (!abierto || deshabilitado) {
+      setEstiloLista(null);
+      return;
+    }
+    function recalcular(): void {
+      const el = contenedorRef.current;
+      if (el === null) {
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const margen = 4;
+      const espacioAbajo = window.innerHeight - r.bottom - margen;
+      const espacioArriba = r.top - margen;
+      // Abre hacia arriba solo si abajo no cabe un mínimo razonable y arriba hay más aire.
+      const arriba = espacioAbajo < 200 && espacioArriba > espacioAbajo;
+      const alto = Math.min(288, Math.max(120, arriba ? espacioArriba : espacioAbajo));
+      setEstiloLista({
+        position: 'fixed',
+        left: r.left,
+        width: r.width,
+        maxHeight: alto,
+        ...(arriba ? { bottom: window.innerHeight - r.top + margen } : { top: r.bottom + margen }),
+      });
+    }
+    recalcular();
+    window.addEventListener('scroll', recalcular, true);
+    window.addEventListener('resize', recalcular);
+    return () => {
+      window.removeEventListener('scroll', recalcular, true);
+      window.removeEventListener('resize', recalcular);
+    };
+  }, [abierto, deshabilitado]);
 
   function elegir(opcion: O): void {
     onChange(opcion.id);
@@ -385,69 +446,82 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
         />
       )}
 
-      {abierto && !deshabilitado ? (
-        <div
-          id={idLista}
-          role="listbox"
-          className="absolute top-full left-0 z-50 mt-1 max-h-64 w-full min-w-56 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md"
-          data-testid={`${testid}-lista`}
-        >
-          {mensajeError !== undefined ? (
-            <p className="px-3 py-2 text-sm text-destructive" role="alert">
-              {mensajeError}
-            </p>
-          ) : filtradas.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-muted-foreground">
-              {cargando ? 'Buscando…' : textoVacio}
-            </p>
-          ) : (
-            filtradas.map((opcion, indice) => (
-              <button
-                key={opcion.id}
-                type="button"
-                role="option"
-                aria-selected={opcion.id === valor}
-                onMouseEnter={() => setActivo(indice)}
-                // mousedown (no click): gana antes del blur del input.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  elegir(opcion);
-                }}
-                data-testid={`${testid}-opcion`}
-                className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-sm',
-                  indice === activoSeguro
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/60',
-                )}
-              >
-                {renderOpcion !== undefined ? (
-                  renderOpcion(opcion)
-                ) : (
-                  <span className="min-w-0 truncate">{opcion.nombre}</span>
-                )}
-                {opcion.id === valor ? (
-                  <Check className="size-3.5 shrink-0 text-primary" aria-hidden />
-                ) : null}
-              </button>
-            ))
-          )}
-          {accionCrear !== undefined ? (
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setAbierto(false);
-                accionCrear.onCrear();
-              }}
-              data-testid={`${testid}-crear`}
-              className="mt-1 flex w-full items-center gap-2 rounded-md border-t px-3 py-1.5 pt-2 text-left text-sm text-primary hover:bg-accent/60"
+      {abierto && !deshabilitado && estiloLista !== null
+        ? createPortal(
+            <div
+              ref={listaRef}
+              id={idLista}
+              role="listbox"
+              style={estiloLista}
+              // La lista está PORTADA al body: para un Dialog/Sheet de radix eso es "fuera" y cerraría
+              // el overlay al elegir una opción. Cortar aquí la propagación del `pointerdown` (el
+              // listener de dismiss de radix vive en `document`, fase bubble) evita ese cierre sin tocar
+              // el `mousedown` de las opciones (que elige) ni el click-fuera del combobox.
+              onPointerDown={(e) => e.stopPropagation()}
+              // `pointer-events-auto`: un Dialog MODAL de radix bloquea (`pointer-events:none`) todo lo
+              // que vive fuera de su contenido; como la lista se porta al body, hay que re-habilitarla
+              // o las opciones no serían clickeables dentro de un diálogo.
+              className="pointer-events-auto z-[60] min-w-56 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md"
+              data-testid={`${testid}-lista`}
             >
-              {accionCrear.etiqueta}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+              {mensajeError !== undefined ? (
+                <p className="px-3 py-2 text-sm text-destructive" role="alert">
+                  {mensajeError}
+                </p>
+              ) : filtradas.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">
+                  {cargando ? 'Buscando…' : textoVacio}
+                </p>
+              ) : (
+                filtradas.map((opcion, indice) => (
+                  <button
+                    key={opcion.id}
+                    type="button"
+                    role="option"
+                    aria-selected={opcion.id === valor}
+                    onMouseEnter={() => setActivo(indice)}
+                    // mousedown (no click): gana antes del blur del input.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      elegir(opcion);
+                    }}
+                    data-testid={`${testid}-opcion`}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-sm',
+                      indice === activoSeguro
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent/60',
+                    )}
+                  >
+                    {renderOpcion !== undefined ? (
+                      renderOpcion(opcion)
+                    ) : (
+                      <span className="min-w-0 truncate">{opcion.nombre}</span>
+                    )}
+                    {opcion.id === valor ? (
+                      <Check className="size-3.5 shrink-0 text-primary" aria-hidden />
+                    ) : null}
+                  </button>
+                ))
+              )}
+              {accionCrear !== undefined ? (
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setAbierto(false);
+                    accionCrear.onCrear();
+                  }}
+                  data-testid={`${testid}-crear`}
+                  className="mt-1 flex w-full items-center gap-2 rounded-md border-t px-3 py-1.5 pt-2 text-left text-sm text-primary hover:bg-accent/60"
+                >
+                  {accionCrear.etiqueta}
+                </button>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

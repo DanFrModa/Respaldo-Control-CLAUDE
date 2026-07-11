@@ -13,11 +13,17 @@ import { useDebounce } from '@/lib/useDebounce';
  */
 export function SelectorCliente({
   idSeleccionado,
+  nombreSeleccionado,
   alSeleccionar,
   alLimpiar,
   testid = 'selector-cliente',
 }: {
   idSeleccionado: number | undefined;
+  /**
+   * Nombre del cliente ya seleccionado cuando NO viene de la primera página de la búsqueda (p. ej.
+   * al llegar desde la bandeja con un id fijado): sin esto el input se veía vacío pese a tener saldo.
+   */
+  nombreSeleccionado?: string | undefined;
   alSeleccionar: (cliente: Cliente) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección. */
   alLimpiar?: () => void;
@@ -42,6 +48,7 @@ export function SelectorCliente({
     <ComboboxBuscable
       opciones={clientes.map((c) => ({ ...c, nombre: c.nombre }))}
       valor={idSeleccionado ?? null}
+      etiquetaSeleccion={nombreSeleccionado}
       onChange={(id) => {
         if (id === null) {
           alLimpiar?.();

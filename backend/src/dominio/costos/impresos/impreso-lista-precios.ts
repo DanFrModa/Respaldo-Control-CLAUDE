@@ -22,6 +22,14 @@ import type { ListaPreciosSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  LeyendaTruncado,
+} from '../../../comun/impresos-estilos.js';
 import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 
 import { listaPrecios, type ParametrosListaPrecios } from '../pre-costo.js';
@@ -69,11 +77,6 @@ export async function armarDatosImpresoListaPrecios(
   };
 }
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 /** Formatea un importe en pesos (o "—" si es null). */
 function pesos(n: number | null): string {
   if (n === null) return '—';
@@ -81,68 +84,37 @@ function pesos(n: number | null): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  bloqueDerecha: { alignItems: 'flex-end' },
-  etiqueta: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorFuerte: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
+  // Estilos PROPIOS de la lista (lo compartido vive en `estilosDoc`).
   tituloGenero: {
     fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
+    fontFamily: FUENTE.negrita,
+    color: PALETA.marca,
     marginTop: 12,
     marginBottom: 4,
   },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
   colCodigo: { width: 70 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colNum: { width: 72, textAlign: 'right' },
-  inactivo: { color: GRIS },
-  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 10 },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  inactivo: { color: PALETA.muted },
 });
 
 /** Encabezado de la tabla de un género. */
 function encabezadoTabla(): ReactElement {
   return h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colCodigo] }, 'Modelo'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Descripción'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Costo'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Precio sug.'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colCodigo] }, 'Modelo'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] },
+      'Descripción',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Costo'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] },
+      'Precio sug.',
+    ),
   );
 }
 
@@ -151,19 +123,19 @@ function seccionGenero(genero: string, filas: ListaPreciosSalida['filas']): Reac
   const cuerpo = filas.map((f, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `f-${i}`, wrap: false },
+      { style: estilosDoc.filaTabla, key: `f-${i}`, wrap: false },
       h(
         Text,
-        { style: [estilos.celda, estilos.colCodigo, ...(f.activo ? [] : [estilos.inactivo])] },
+        { style: [estilosDoc.celda, estilos.colCodigo, ...(f.activo ? [] : [estilos.inactivo])] },
         f.codigo,
       ),
       h(
         Text,
-        { style: [estilos.celda, estilos.colFlex, ...(f.activo ? [] : [estilos.inactivo])] },
+        { style: [estilosDoc.celda, estilos.colFlex, ...(f.activo ? [] : [estilos.inactivo])] },
         `${f.descripcion ?? ''}${f.activo ? '' : ' (inactivo)'}`,
       ),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(f.costo)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(f.precioSugerido)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(f.costo)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(f.precioSugerido)),
     ),
   );
   return h(
@@ -199,39 +171,27 @@ function paginaLista(datos: DatosImpresoListaPrecios): ReactElement {
   const grupos = agruparPorGenero(l.filas);
   const secciones = [...grupos.entries()].map(([g, filas]) => seccionGenero(g, filas));
   const textoTruncado = leyendaTruncado(l.filas.length, datos.totalFilas);
-  const aviso =
-    textoTruncado === null
-      ? []
-      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
+  const aviso = textoTruncado === null ? [] : [LeyendaTruncado(textoTruncado)];
 
   return h(
     Page,
-    { size: 'A4', style: estilos.pagina },
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.pagador),
-        h(Text, { style: estilos.subtitulo }, 'Lista de precios sugeridos — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.bloqueDerecha },
-        h(Text, { style: estilos.etiqueta }, 'Parámetros'),
-        h(Text, { style: estilos.valorFuerte }, params),
-      ),
-    ),
+    { size: 'A4', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.pagador,
+      titulo: 'Lista de precios sugeridos — CONTROL v2',
+      derecha: { etiqueta: 'Parámetros', valor: params },
+    }),
     ...(secciones.length === 0
-      ? [h(Text, { key: 'vacio', style: estilos.subtitulo }, 'Sin modelos para los filtros dados.')]
+      ? [
+          h(
+            Text,
+            { key: 'vacio', style: estilosDoc.subtitulo },
+            'Sin modelos para los filtros dados.',
+          ),
+        ]
       : secciones),
     ...aviso,
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.pagador} · Lista de precios · ${params}`,
-    ),
+    PieDocumento({ contexto: `CONTROL v2 · ${datos.pagador} · Lista de precios · ${params}` }),
   );
 }
 

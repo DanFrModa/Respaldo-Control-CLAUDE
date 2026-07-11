@@ -353,7 +353,7 @@ function DetalleConsultaNota({
         <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           Encabezado
         </h4>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
           <Campo k="Maquilero" v={nota.maquilero} />
           <Campo k="Empresa" v={empresa} />
           <Campo k="Almacén origen (avíos)" v={nota.almacen} />

@@ -254,6 +254,7 @@ export function BitacoraPagina(): React.JSX.Element {
           alCambiarAbierto={(abierto) => {
             if (!abierto) setDetalle(null);
           }}
+          ancho="amplio"
           titulo={detalle === null ? '' : `${detalle.entidad} · ${detalle.idEntidad}`}
           subtitulo={
             detalle === null

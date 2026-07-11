@@ -439,7 +439,7 @@ export function ModelosPagina(): React.JSX.Element {
 
       {/* ── Cajón de detalle del modelo (ancho: fotos + BOM necesitan espacio) ── */}
       <CajonDetalle
-        className="sm:max-w-2xl lg:max-w-3xl"
+        ancho="amplio"
         abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
