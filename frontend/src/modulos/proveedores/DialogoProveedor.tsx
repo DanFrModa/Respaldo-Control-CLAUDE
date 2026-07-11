@@ -34,7 +34,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -385,7 +392,8 @@ export function DialogoProveedor({
           </DialogHeader>
 
           {/* Cuerpo desplazable: el formulario es largo, las secciones se pliegan. */}
-          <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
             <Accordion
               type="multiple"
               defaultValue={['general', 'roles']}
@@ -397,10 +405,13 @@ export function DialogoProveedor({
                 <AccordionContent>
                   <FieldGroup>
                     <Field data-invalid={Boolean(errors.nombre)}>
-                      <FieldLabel htmlFor="proveedor-nombre">Nombre</FieldLabel>
+                      <FieldLabel htmlFor="proveedor-nombre" required>
+                        Nombre
+                      </FieldLabel>
                       <Input
                         id="proveedor-nombre"
                         autoFocus
+                        placeholder="Ej. Textiles del Bajío, S.A. de C.V."
                         aria-invalid={Boolean(errors.nombre)}
                         disabled={guardando}
                         {...registrar('nombre')}
@@ -477,6 +488,7 @@ export function DialogoProveedor({
                       <FieldLabel htmlFor="proveedor-rfc">RFC</FieldLabel>
                       <Input
                         id="proveedor-rfc"
+                        placeholder="Ej. TBA980101AB1"
                         aria-invalid={Boolean(errors.rfc)}
                         disabled={guardando}
                         {...registrar('rfc')}
@@ -677,6 +689,7 @@ export function DialogoProveedor({
                       <Input
                         id="proveedor-clabe"
                         inputMode="numeric"
+                        placeholder="Ej. 012180001234567895"
                         aria-invalid={Boolean(errors.clabe)}
                         disabled={guardando}
                         {...registrar('clabe')}
@@ -820,7 +833,12 @@ export function DialogoProveedor({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-proveedor">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-proveedor"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear proveedor'}
             </Button>

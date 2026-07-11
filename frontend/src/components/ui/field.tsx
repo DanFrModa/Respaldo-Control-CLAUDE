@@ -90,7 +90,19 @@ function FieldContent({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
+function FieldLabel({
+  className,
+  required,
+  children,
+  ...props
+}: React.ComponentProps<typeof Label> & {
+  /**
+   * Marca el campo como OBLIGATORIO: agrega un asterisco rojo decorativo y un texto
+   * solo-para-lectores "(obligatorio)". Debe coincidir SIEMPRE con la validación `min(1)`
+   * del formulario (regla de oro del rediseño de altas). No usar junto con `asChild`.
+   */
+  required?: boolean;
+}) {
   return (
     <Label
       data-slot="field-label"
@@ -100,7 +112,55 @@ function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>)
         className,
       )}
       {...props}
-    />
+    >
+      {/* Cuando NO es obligatorio se renderiza `children` solo (un único hijo), para no
+          romper el `asChild` de los que envuelven un <span> (Slot exige un hijo único). */}
+      {required ? (
+        <>
+          {children}
+          <MarcaObligatoria />
+        </>
+      ) : (
+        children
+      )}
+    </Label>
+  );
+}
+
+/**
+ * Marca visual + accesible de "campo obligatorio": un asterisco rojo decorativo
+ * (`aria-hidden`, no lo lee el lector de pantalla) y un texto solo-para-lectores
+ * "(obligatorio)" que SÍ se anuncia como parte de la etiqueta. Se expone aparte para los
+ * selectores que arman su etiqueta a mano (p. ej. el selector de roles del proveedor).
+ */
+function MarcaObligatoria(): React.JSX.Element {
+  return (
+    <>
+      <span aria-hidden="true" className="text-destructive">
+        *
+      </span>
+      <span className="sr-only"> (obligatorio)</span>
+    </>
+  );
+}
+
+/**
+ * Micro-leyenda del pie de un formulario con campos obligatorios: "Los campos con *
+ * son obligatorios." Se pone una sola vez por diálogo (arriba del grupo de campos)
+ * para explicar la convención del asterisco.
+ */
+function LeyendaObligatorios({
+  className,
+  ...props
+}: React.ComponentProps<'p'>): React.JSX.Element {
+  return (
+    <p
+      data-slot="leyenda-obligatorios"
+      className={cn('text-sm text-muted-foreground', className)}
+      {...props}
+    >
+      Los campos con <span className="font-medium text-destructive">*</span> son obligatorios.
+    </p>
   );
 }
 
@@ -219,4 +279,6 @@ export {
   FieldSet,
   FieldContent,
   FieldTitle,
+  LeyendaObligatorios,
+  MarcaObligatoria,
 };

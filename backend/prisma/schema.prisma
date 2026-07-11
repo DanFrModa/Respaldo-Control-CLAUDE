@@ -152,10 +152,10 @@ model ConfiguracionEmpresa {
   /// valor caen en "1–N". Antes era la constante 30 (`LIMITES_AGING_*`); en v2 es parámetro por
   /// empresa. Default 30 (el valor histórico); el `ADD COLUMN … DEFAULT` rellena las filas ya
   /// sembradas. CxP y CxC (bandejas) leen los límites de aquí; `agingLimite1 < agingLimite2`.
-  agingLimite1       Int      @default(30) @map("aging_limite1")
+  agingLimite1 Int @default(30) @map("aging_limite1")
   /// Fin de la segunda cubeta de antigüedad de saldos (aging, F9-E5/D15d): días de atraso ≤ este
   /// valor caen en "1er límite+1 – N"; más allá, en "+N". Antes era la constante 60. Default 60.
-  agingLimite2       Int      @default(60) @map("aging_limite2")
+  agingLimite2 Int @default(60) @map("aging_limite2")
 
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
@@ -971,12 +971,15 @@ enum TipoCampoCliente {
 /// (doc 02-Pedidos §2); v2 agrega contacto básico. Los VALORES de los campos de
 /// referencia (OrdenReferencia) son de F2; aquí: catálogo + DEFINICIÓN de campos (D7).
 model Cliente {
-  id        Int     @id @default(autoincrement())
-  nombre    String  @unique
-  contacto  String?
-  telefono  String?
-  email     String?
-  direccion String?
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique
+  /// Razón social (nombre legal para la factura si difiere del comercial). Opcional; espejo de
+  /// `Proveedor.razonSocial`. Se usará al conciliar el receptor de un CFDI de venta (F9).
+  razonSocial String? @map("razon_social")
+  contacto    String?
+  telefono    String?
+  email       String?
+  direccion   String?
   /// RFC fiscal del cliente (F9-E4, R12). Se usa para conciliar el RECEPTOR de un CFDI de VENTA
   /// importado con el cliente al que se le carga. Validado en Zod si viene (forma del RFC mexicano).
   /// NULL si no se ha capturado (el match del cliente entonces va por elección manual).
@@ -984,7 +987,7 @@ model Cliente {
   /// Días de crédito del cliente (F9-E4, D15d): base del aging de CxC (fecha de la venta + días de
   /// crédito = vencimiento). NULL o 0 = contado. Espejo de `Proveedor.diasCredito` para CxP.
   diasCredito Int?    @map("dias_credito")
-  activo    Boolean @default(true)
+  activo      Boolean @default(true)
 
   campos                 ClienteCampo[]
   /// Pedidos internos del cliente (F2-E1, Restrict hacia el cliente).

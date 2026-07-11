@@ -16,7 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { AvisoAlta } from '@/components/ui/aviso-alta';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -31,6 +41,10 @@ const esquemaClienteFormulario = z.object({
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
+  razonSocial: z
+    .string()
+    .trim()
+    .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
   contacto: z
     .string()
     .trim()
@@ -69,6 +83,7 @@ type DatosClienteFormulario = z.infer<typeof esquemaClienteFormulario>;
 /** Valores por defecto de un alta: todos los campos vacíos. */
 const VALORES_INICIALES: DatosClienteFormulario = {
   nombre: '',
+  razonSocial: '',
   contacto: '',
   telefono: '',
   email: '',
@@ -137,6 +152,7 @@ export function DialogoCliente({
     if (cliente) {
       formulario.reset({
         nombre: cliente.nombre,
+        razonSocial: texto(cliente.razonSocial),
         contacto: texto(cliente.contacto),
         telefono: texto(cliente.telefono),
         email: texto(cliente.email),
@@ -154,6 +170,7 @@ export function DialogoCliente({
       // Edición: los opcionales vacíos viajan como `null` para BORRARLOS (M1).
       const cuerpo: ClienteEditar = {
         nombre: datos.nombre,
+        razonSocial: textoONull(datos.razonSocial),
         contacto: textoONull(datos.contacto),
         telefono: textoONull(datos.telefono),
         email: textoONull(datos.email),
@@ -176,6 +193,7 @@ export function DialogoCliente({
 
     // Alta: los opcionales vacíos se OMITEN (el backend los deja en null).
     const cuerpo: ClienteCrear = { nombre: datos.nombre };
+    if (datos.razonSocial.length > 0) cuerpo.razonSocial = datos.razonSocial;
     if (datos.contacto.length > 0) cuerpo.contacto = datos.contacto;
     if (datos.telefono.length > 0) cuerpo.telefono = datos.telefono;
     if (datos.email.length > 0) cuerpo.email = datos.email;
@@ -207,92 +225,143 @@ export function DialogoCliente({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <FieldGroup>
-              <Field data-invalid={Boolean(errors.nombre)}>
-                <FieldLabel htmlFor="cliente-nombre">Nombre</FieldLabel>
-                <Input
-                  id="cliente-nombre"
-                  autoFocus
-                  aria-invalid={Boolean(errors.nombre)}
-                  disabled={guardando}
-                  {...registrar('nombre')}
-                />
-                <FieldError errors={[errors.nombre]} />
-              </Field>
+          <div className="max-h-[60vh] space-y-6 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
 
-              <Field data-invalid={Boolean(errors.contacto)}>
-                <FieldLabel htmlFor="cliente-contacto">Contacto</FieldLabel>
-                <Input
-                  id="cliente-contacto"
-                  aria-invalid={Boolean(errors.contacto)}
-                  disabled={guardando}
-                  {...registrar('contacto')}
-                />
-                <FieldError errors={[errors.contacto]} />
-              </Field>
+            {/* ── Identidad (comercial + legal) ────────────────────────────── */}
+            <FieldSet>
+              <FieldLegend variant="label">Identidad</FieldLegend>
+              <FieldGroup>
+                <Field data-invalid={Boolean(errors.nombre)}>
+                  <FieldLabel htmlFor="cliente-nombre" required>
+                    Nombre
+                  </FieldLabel>
+                  <Input
+                    id="cliente-nombre"
+                    autoFocus
+                    placeholder="Ej. Distribuidora Liverpool, S.A. de C.V."
+                    aria-invalid={Boolean(errors.nombre)}
+                    disabled={guardando}
+                    {...registrar('nombre')}
+                  />
+                  <FieldError errors={[errors.nombre]} />
+                </Field>
 
-              <Field data-invalid={Boolean(errors.telefono)}>
-                <FieldLabel htmlFor="cliente-telefono">Teléfono</FieldLabel>
-                <Input
-                  id="cliente-telefono"
-                  aria-invalid={Boolean(errors.telefono)}
-                  disabled={guardando}
-                  {...registrar('telefono')}
-                />
-                <FieldError errors={[errors.telefono]} />
-              </Field>
+                <Field data-invalid={Boolean(errors.razonSocial)}>
+                  <FieldLabel htmlFor="cliente-razon-social">Razón social</FieldLabel>
+                  <Input
+                    id="cliente-razon-social"
+                    placeholder="Ej. El Puerto de Liverpool, S.A.B. de C.V."
+                    aria-invalid={Boolean(errors.razonSocial)}
+                    disabled={guardando}
+                    {...registrar('razonSocial')}
+                  />
+                  <FieldDescription>
+                    Nombre legal para la factura si difiere del comercial.
+                  </FieldDescription>
+                  <FieldError errors={[errors.razonSocial]} />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
 
-              <Field data-invalid={Boolean(errors.email)}>
-                <FieldLabel htmlFor="cliente-email">Email</FieldLabel>
-                <Input
-                  id="cliente-email"
-                  type="email"
-                  aria-invalid={Boolean(errors.email)}
-                  disabled={guardando}
-                  {...registrar('email')}
-                />
-                <FieldError errors={[errors.email]} />
-              </Field>
+            {/* ── Contacto ─────────────────────────────────────────────────── */}
+            <FieldSet>
+              <FieldLegend variant="label">Contacto</FieldLegend>
+              <FieldGroup>
+                <Field data-invalid={Boolean(errors.contacto)}>
+                  <FieldLabel htmlFor="cliente-contacto">Contacto</FieldLabel>
+                  <Input
+                    id="cliente-contacto"
+                    placeholder="Ej. Laura Méndez (Compras)"
+                    aria-invalid={Boolean(errors.contacto)}
+                    disabled={guardando}
+                    {...registrar('contacto')}
+                  />
+                  <FieldError errors={[errors.contacto]} />
+                </Field>
 
-              <Field data-invalid={Boolean(errors.direccion)}>
-                <FieldLabel htmlFor="cliente-direccion">Dirección</FieldLabel>
-                <Input
-                  id="cliente-direccion"
-                  aria-invalid={Boolean(errors.direccion)}
-                  disabled={guardando}
-                  {...registrar('direccion')}
-                />
-                <FieldError errors={[errors.direccion]} />
-              </Field>
+                <Field data-invalid={Boolean(errors.telefono)}>
+                  <FieldLabel htmlFor="cliente-telefono">Teléfono</FieldLabel>
+                  <Input
+                    id="cliente-telefono"
+                    placeholder="Ej. 55 1234 5678"
+                    aria-invalid={Boolean(errors.telefono)}
+                    disabled={guardando}
+                    {...registrar('telefono')}
+                  />
+                  <FieldError errors={[errors.telefono]} />
+                </Field>
 
-              <Field data-invalid={Boolean(errors.rfc)}>
-                <FieldLabel htmlFor="cliente-rfc">RFC</FieldLabel>
-                <Input
-                  id="cliente-rfc"
-                  aria-invalid={Boolean(errors.rfc)}
-                  disabled={guardando}
-                  placeholder="Para conciliar el CFDI de venta (F9)"
-                  {...registrar('rfc')}
-                />
-                <FieldError errors={[errors.rfc]} />
-              </Field>
+                <Field data-invalid={Boolean(errors.email)}>
+                  <FieldLabel htmlFor="cliente-email">Email</FieldLabel>
+                  <Input
+                    id="cliente-email"
+                    type="email"
+                    placeholder="Ej. compras@liverpool.com.mx"
+                    aria-invalid={Boolean(errors.email)}
+                    disabled={guardando}
+                    {...registrar('email')}
+                  />
+                  <FieldError errors={[errors.email]} />
+                </Field>
 
-              <Field data-invalid={Boolean(errors.diasCredito)}>
-                <FieldLabel htmlFor="cliente-dias-credito">Días de crédito</FieldLabel>
-                <Input
-                  id="cliente-dias-credito"
-                  type="number"
-                  min="0"
-                  step="1"
-                  aria-invalid={Boolean(errors.diasCredito)}
-                  disabled={guardando}
-                  placeholder="Vacío = contado"
-                  {...registrar('diasCredito')}
-                />
-                <FieldError errors={[errors.diasCredito]} />
-              </Field>
-            </FieldGroup>
+                <Field data-invalid={Boolean(errors.direccion)}>
+                  <FieldLabel htmlFor="cliente-direccion">Dirección</FieldLabel>
+                  <Input
+                    id="cliente-direccion"
+                    placeholder="Ej. Av. Insurgentes Sur 1234, CDMX"
+                    aria-invalid={Boolean(errors.direccion)}
+                    disabled={guardando}
+                    {...registrar('direccion')}
+                  />
+                  <FieldError errors={[errors.direccion]} />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+
+            {/* ── Fiscal y crédito ─────────────────────────────────────────── */}
+            <FieldSet>
+              <FieldLegend variant="label">Fiscal y crédito</FieldLegend>
+              <FieldGroup>
+                <Field data-invalid={Boolean(errors.rfc)}>
+                  <FieldLabel htmlFor="cliente-rfc">RFC</FieldLabel>
+                  <Input
+                    id="cliente-rfc"
+                    placeholder="Ej. DLI950101ABC"
+                    aria-invalid={Boolean(errors.rfc)}
+                    disabled={guardando}
+                    {...registrar('rfc')}
+                  />
+                  <FieldDescription>Para conciliar el CFDI de venta (F9).</FieldDescription>
+                  <FieldError errors={[errors.rfc]} />
+                </Field>
+
+                <Field data-invalid={Boolean(errors.diasCredito)}>
+                  <FieldLabel htmlFor="cliente-dias-credito">Días de crédito</FieldLabel>
+                  <Input
+                    id="cliente-dias-credito"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="Ej. 30"
+                    aria-invalid={Boolean(errors.diasCredito)}
+                    disabled={guardando}
+                    {...registrar('diasCredito')}
+                  />
+                  <FieldDescription>
+                    Base del vencimiento en CxC. Vacío o 0 = de contado.
+                  </FieldDescription>
+                  <FieldError errors={[errors.diasCredito]} />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+
+            {!esEdicion ? (
+              <AvisoAlta>
+                Después, en el detalle, agrega sus departamentos (NIÑOS, DAMAS…), sus campos propios
+                (p. ej. &quot;No. de pedido del cliente&quot;) y sus listas de precios.
+              </AvisoAlta>
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -304,7 +373,12 @@ export function DialogoCliente({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-cliente">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-cliente"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear cliente'}
             </Button>

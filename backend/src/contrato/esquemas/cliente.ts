@@ -105,6 +105,11 @@ export type ClienteCamposLista = z.infer<typeof esquemaClienteCamposLista>;
  * del aging de CxC; null o 0 = contado.
  */
 const camposContacto = {
+  razonSocial: z
+    .string()
+    .trim()
+    .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
+    .optional(),
   contacto: z
     .string()
     .trim()
@@ -148,6 +153,7 @@ const camposContacto = {
  * conservando sus reglas. Omitir = no tocar; `null` = borrar.
  */
 const camposContactoEditar = {
+  razonSocial: camposContacto.razonSocial.nullable(),
   contacto: camposContacto.contacto.nullable(),
   telefono: camposContacto.telefono.nullable(),
   email: camposContacto.email.nullable(),
@@ -207,6 +213,7 @@ export const esquemaClienteSalida = z
   .object({
     id: z.number().int().describe('Id del cliente.'),
     nombre: z.string().describe('Nombre del cliente.'),
+    razonSocial: z.string().nullable().describe('Razón social (nombre legal), o null.'),
     contacto: z.string().nullable().describe('Persona de contacto, o null.'),
     telefono: z.string().nullable().describe('Teléfono, o null.'),
     email: z.string().nullable().describe('Email, o null.'),

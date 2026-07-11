@@ -6792,6 +6792,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre del cliente. */
                 nombre: string;
+                /** @description Razón social (nombre legal), o null. */
+                razonSocial: string | null;
                 /** @description Persona de contacto, o null. */
                 contacto: string | null;
                 /** @description Teléfono, o null. */
@@ -6959,6 +6961,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre: string;
+            razonSocial?: string;
             contacto?: string;
             telefono?: string;
             /** Format: email */
@@ -6981,6 +6984,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Razón social (nombre legal), o null. */
+              razonSocial: string | null;
               /** @description Persona de contacto, o null. */
               contacto: string | null;
               /** @description Teléfono, o null. */
@@ -7163,6 +7168,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Razón social (nombre legal), o null. */
+              razonSocial: string | null;
               /** @description Persona de contacto, o null. */
               contacto: string | null;
               /** @description Teléfono, o null. */
@@ -7334,6 +7341,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Razón social (nombre legal), o null. */
+              razonSocial: string | null;
               /** @description Persona de contacto, o null. */
               contacto: string | null;
               /** @description Teléfono, o null. */
@@ -7496,6 +7505,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre?: string;
+            razonSocial?: string | null;
             contacto?: string | null;
             telefono?: string | null;
             email?: string | null;
@@ -7518,6 +7528,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Razón social (nombre legal), o null. */
+              razonSocial: string | null;
               /** @description Persona de contacto, o null. */
               contacto: string | null;
               /** @description Teléfono, o null. */

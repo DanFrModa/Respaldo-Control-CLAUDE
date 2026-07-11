@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -187,8 +193,12 @@ export function DialogoPedido({
           </DialogHeader>
 
           <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
+
             <Field data-invalid={Boolean(errors.idCliente)}>
-              <FieldLabel htmlFor="pedido-cliente">Cliente</FieldLabel>
+              <FieldLabel htmlFor="pedido-cliente" required>
+                Cliente
+              </FieldLabel>
               <SelectNativo
                 id="pedido-cliente"
                 disabled={guardando}
@@ -218,6 +228,7 @@ export function DialogoPedido({
               <Field>
                 <FieldLabel htmlFor="pedido-de">Entrega desde</FieldLabel>
                 <Input id="pedido-de" type="date" disabled={guardando} {...registrar('fechaDe')} />
+                <FieldDescription>Ventana comprometida al cliente.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-hasta">Entrega hasta</FieldLabel>
@@ -227,6 +238,7 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaHasta')}
                 />
+                <FieldDescription>Ventana comprometida al cliente.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-tela">Fecha de tela</FieldLabel>
@@ -236,6 +248,7 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaTela')}
                 />
+                <FieldDescription>Cuándo debe estar la tela para arrancar.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-elaboracion">Fecha de elaboración</FieldLabel>
@@ -245,6 +258,7 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaElaboracion')}
                 />
+                <FieldDescription>Inicio planeado.</FieldDescription>
               </Field>
             </div>
 
@@ -266,7 +280,12 @@ export function DialogoPedido({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-pedido">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-pedido"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear pedido'}
             </Button>

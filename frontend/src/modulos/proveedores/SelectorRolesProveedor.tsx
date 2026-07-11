@@ -1,5 +1,11 @@
 import type { RolProveedor } from '@/api/tipos';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  MarcaObligatoria,
+} from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -46,7 +52,9 @@ export function SelectorRolesProveedor({
       data-invalid={Boolean(mensajeError)}
     >
       <FieldLabel id="selector-roles-proveedor-titulo" asChild>
-        <span>Roles / servicios</span>
+        <span>
+          Roles / servicios <MarcaObligatoria />
+        </span>
       </FieldLabel>
       <FieldDescription>Qué hace este proveedor (elige al menos uno).</FieldDescription>
 

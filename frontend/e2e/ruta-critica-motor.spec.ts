@@ -129,7 +129,10 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.goto('/produccion/ordenes');
     await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
     await page.getByTestId('centro-busqueda').fill(folioOrden);
-    await page.getByTestId('centro-fila').filter({ hasText: folioOrden }).first().click();
+    // La búsqueda del centro filtra en SERVIDOR con debounce; `hasText: folioOrden` (substring de un
+    // número corto) puede cazar otra fila antes de que aplique. Se acota al MODELO de la corrida
+    // (texto único; esta prueba crea una sola orden de ese modelo).
+    await page.getByTestId('centro-fila').filter({ hasText: codigoModelo }).first().click();
     const panelCentro = page.getByTestId('centro-panel');
     await expect(panelCentro.getByText(`OP ${folioOrden}`)).toBeVisible();
     await panelCentro.getByTestId('mosaico-modificar').click();

@@ -17,6 +17,13 @@ import { useDificultad } from '@/api/dificultad';
 import { useProveedores, useRolesProveedor } from '@/api/proveedores';
 import { useCurvas } from '@/api/tallas';
 import { useTemporadas } from '@/api/temporadas';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { AvisoAlta } from '@/components/ui/aviso-alta';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,7 +33,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -243,183 +257,232 @@ export function DialogoModelo({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
-            <FieldGroup>
-              <Field data-invalid={Boolean(errors.codigo)}>
-                <FieldLabel htmlFor="modelo-codigo">Código</FieldLabel>
-                <Input
-                  id="modelo-codigo"
-                  autoFocus
-                  aria-invalid={Boolean(errors.codigo)}
-                  disabled={guardando}
-                  {...registrar('codigo')}
-                />
-                <FieldError errors={[errors.codigo]} />
-              </Field>
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
+            <Accordion
+              type="multiple"
+              defaultValue={['identidad', 'costos']}
+              className="flex flex-col gap-2"
+            >
+              {/* ── Identidad ────────────────────────────────────────────────── */}
+              <AccordionItem value="identidad">
+                <AccordionTrigger>Identidad</AccordionTrigger>
+                <AccordionContent>
+                  <FieldGroup>
+                    <Field data-invalid={Boolean(errors.codigo)}>
+                      <FieldLabel htmlFor="modelo-codigo" required>
+                        Código
+                      </FieldLabel>
+                      <Input
+                        id="modelo-codigo"
+                        autoFocus
+                        placeholder="Ej. 4521"
+                        aria-invalid={Boolean(errors.codigo)}
+                        disabled={guardando}
+                        {...registrar('codigo')}
+                      />
+                      <FieldError errors={[errors.codigo]} />
+                    </Field>
 
-              <Field data-invalid={Boolean(errors.descripcion)}>
-                <FieldLabel htmlFor="modelo-descripcion">Descripción</FieldLabel>
-                <Input
-                  id="modelo-descripcion"
-                  placeholder="Opcional"
-                  aria-invalid={Boolean(errors.descripcion)}
-                  disabled={guardando}
-                  {...registrar('descripcion')}
-                />
-                <FieldError errors={[errors.descripcion]} />
-              </Field>
+                    <Field data-invalid={Boolean(errors.descripcion)}>
+                      <FieldLabel htmlFor="modelo-descripcion">Descripción</FieldLabel>
+                      <Input
+                        id="modelo-descripcion"
+                        placeholder="Ej. Sudadera cerrada con capucha"
+                        aria-invalid={Boolean(errors.descripcion)}
+                        disabled={guardando}
+                        {...registrar('descripcion')}
+                      />
+                      <FieldError errors={[errors.descripcion]} />
+                    </Field>
+                  </FieldGroup>
+                </AccordionContent>
+              </AccordionItem>
 
-              <Field data-invalid={Boolean(errors.maquilaBase)}>
-                <FieldLabel htmlFor="modelo-maquila">Maquila base</FieldLabel>
-                <Input
-                  id="modelo-maquila"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  placeholder="Opcional"
-                  aria-invalid={Boolean(errors.maquilaBase)}
-                  disabled={guardando}
-                  {...registrar('maquilaBase')}
-                />
-                <FieldDescription>Costo de maquila base que heredan las órdenes.</FieldDescription>
-                <FieldError errors={[errors.maquilaBase]} />
-              </Field>
+              {/* ── Costos y costura ─────────────────────────────────────────── */}
+              <AccordionItem value="costos">
+                <AccordionTrigger>Costos y costura</AccordionTrigger>
+                <AccordionContent>
+                  <FieldGroup>
+                    <Field data-invalid={Boolean(errors.maquilaBase)}>
+                      <FieldLabel htmlFor="modelo-maquila">Maquila base</FieldLabel>
+                      <Input
+                        id="modelo-maquila"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        placeholder="Ej. 45.00"
+                        aria-invalid={Boolean(errors.maquilaBase)}
+                        disabled={guardando}
+                        {...registrar('maquilaBase')}
+                      />
+                      <FieldDescription>
+                        Costo de maquila base que heredan las órdenes.
+                      </FieldDescription>
+                      <FieldError errors={[errors.maquilaBase]} />
+                    </Field>
 
-              <Field data-invalid={Boolean(errors.corteBase)}>
-                <FieldLabel htmlFor="modelo-corte">Corte</FieldLabel>
-                <Input
-                  id="modelo-corte"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  placeholder="Opcional"
-                  aria-invalid={Boolean(errors.corteBase)}
-                  disabled={guardando}
-                  {...registrar('corteBase')}
-                />
-                <FieldDescription>
-                  Costo de corte por prenda, separado de la maquila (sin proveedor).
-                </FieldDescription>
-                <FieldError errors={[errors.corteBase]} />
-              </Field>
+                    <Field data-invalid={Boolean(errors.corteBase)}>
+                      <FieldLabel htmlFor="modelo-corte">Corte</FieldLabel>
+                      <Input
+                        id="modelo-corte"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        placeholder="Ej. 8.50"
+                        aria-invalid={Boolean(errors.corteBase)}
+                        disabled={guardando}
+                        {...registrar('corteBase')}
+                      />
+                      <FieldDescription>
+                        Costo de corte por prenda, separado de la maquila (sin proveedor).
+                      </FieldDescription>
+                      <FieldError errors={[errors.corteBase]} />
+                    </Field>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-maquilero">Maquilero cotizado (costura)</FieldLabel>
-                <SelectNativo
-                  id="modelo-maquilero"
-                  disabled={guardando}
-                  {...registrar('idMaquileroCotizado')}
-                >
-                  <option value="">Sin definir</option>
-                  {(maquileros.data?.datos ?? []).map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-                <FieldDescription>
-                  Con quién se coteó la costura; siembra el default del maquilero de producción.
-                </FieldDescription>
-              </Field>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-maquilero">
+                        Maquilero cotizado (costura)
+                      </FieldLabel>
+                      <SelectNativo
+                        id="modelo-maquilero"
+                        disabled={guardando}
+                        {...registrar('idMaquileroCotizado')}
+                      >
+                        <option value="">Sin definir</option>
+                        {(maquileros.data?.datos ?? []).map((p) => (
+                          <option key={p.id} value={String(p.id)}>
+                            {p.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                      <FieldDescription>
+                        Con quién se coteó la costura; siembra el default del maquilero de
+                        producción.
+                      </FieldDescription>
+                    </Field>
 
-              <Field data-invalid={Boolean(errors.numOperaciones)}>
-                <FieldLabel htmlFor="modelo-num-operaciones">
-                  # de operaciones de costura
-                </FieldLabel>
-                <Input
-                  id="modelo-num-operaciones"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step="1"
-                  placeholder="Opcional"
-                  aria-invalid={Boolean(errors.numOperaciones)}
-                  disabled={guardando}
-                  {...registrar('numOperaciones')}
-                />
-                <FieldDescription data-testid="dificultad-derivada">
-                  {opsNum === null
-                    ? 'Deriva la dificultad y los días de costura del CPM.'
-                    : dificultad.data?.rango
-                      ? `${String(opsNum)} ops → ${dificultad.data.rango.nombre} → costura ≈ ${String(dificultad.data.rango.diasCostura)} d`
-                      : dificultad.isPending
-                        ? 'Calculando dificultad…'
-                        : 'Ningún rango cubre ese # de operaciones (revisa la tabla de dificultad).'}
-                </FieldDescription>
-                <FieldError errors={[errors.numOperaciones]} />
-              </Field>
+                    <Field data-invalid={Boolean(errors.numOperaciones)}>
+                      <FieldLabel htmlFor="modelo-num-operaciones">
+                        # de operaciones de costura
+                      </FieldLabel>
+                      <Input
+                        id="modelo-num-operaciones"
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        step="1"
+                        placeholder="Ej. 22"
+                        aria-invalid={Boolean(errors.numOperaciones)}
+                        disabled={guardando}
+                        {...registrar('numOperaciones')}
+                      />
+                      <FieldDescription data-testid="dificultad-derivada">
+                        {opsNum === null
+                          ? 'Deriva la dificultad y los días de costura del CPM.'
+                          : dificultad.data?.rango
+                            ? `${String(opsNum)} ops → ${dificultad.data.rango.nombre} → costura ≈ ${String(dificultad.data.rango.diasCostura)} d`
+                            : dificultad.isPending
+                              ? 'Calculando dificultad…'
+                              : 'Ningún rango cubre ese # de operaciones (revisa la tabla de dificultad).'}
+                      </FieldDescription>
+                      <FieldError errors={[errors.numOperaciones]} />
+                    </Field>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-secuencia-estampado">Secuencia de estampado</FieldLabel>
-                <SelectNativo
-                  id="modelo-secuencia-estampado"
-                  disabled={guardando}
-                  {...registrar('secuenciaEstampado')}
-                >
-                  <option value="antes">Antes de coser</option>
-                  <option value="despues">Después de coser</option>
-                  <option value="flexible">Flexible (se decide por orden)</option>
-                </SelectNativo>
-              </Field>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-secuencia-estampado">
+                        Secuencia de estampado
+                      </FieldLabel>
+                      <SelectNativo
+                        id="modelo-secuencia-estampado"
+                        disabled={guardando}
+                        {...registrar('secuenciaEstampado')}
+                      >
+                        <option value="antes">Antes de coser</option>
+                        <option value="despues">Después de coser</option>
+                        <option value="flexible">Flexible (se decide por orden)</option>
+                      </SelectNativo>
+                    </Field>
+                  </FieldGroup>
+                </AccordionContent>
+              </AccordionItem>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-temporada">Temporada</FieldLabel>
-                <SelectNativo
-                  id="modelo-temporada"
-                  disabled={guardando}
-                  {...registrar('idTemporada')}
-                >
-                  <option value="">Sin temporada</option>
-                  {(temporadas.data?.datos ?? []).map((t) => (
-                    <option key={t.id} value={String(t.id)}>
-                      {t.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
+              {/* ── Clasificación ────────────────────────────────────────────── */}
+              <AccordionItem value="clasificacion">
+                <AccordionTrigger>Clasificación</AccordionTrigger>
+                <AccordionContent>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-temporada">Temporada</FieldLabel>
+                      <SelectNativo
+                        id="modelo-temporada"
+                        disabled={guardando}
+                        {...registrar('idTemporada')}
+                      >
+                        <option value="">Sin temporada</option>
+                        {(temporadas.data?.datos ?? []).map((t) => (
+                          <option key={t.id} value={String(t.id)}>
+                            {t.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                    </Field>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-curva">Curva de tallas</FieldLabel>
-                <SelectNativo id="modelo-curva" disabled={guardando} {...registrar('idCurvaTalla')}>
-                  <option value="">Sin curva</option>
-                  {(curvas.data?.datos ?? []).map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-curva">Curva de tallas</FieldLabel>
+                      <SelectNativo
+                        id="modelo-curva"
+                        disabled={guardando}
+                        {...registrar('idCurvaTalla')}
+                      >
+                        <option value="">Sin curva</option>
+                        {(curvas.data?.datos ?? []).map((c) => (
+                          <option key={c.id} value={String(c.id)}>
+                            {c.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                    </Field>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-genero">Género</FieldLabel>
-                <SelectNativo id="modelo-genero" disabled={guardando} {...registrar('idGenero')}>
-                  <option value="">Sin género</option>
-                  {(generos.data ?? []).map((g) => (
-                    <option key={g.id} value={String(g.id)}>
-                      {g.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-genero">Género</FieldLabel>
+                      <SelectNativo
+                        id="modelo-genero"
+                        disabled={guardando}
+                        {...registrar('idGenero')}
+                      >
+                        <option value="">Sin género</option>
+                        {(generos.data ?? []).map((g) => (
+                          <option key={g.id} value={String(g.id)}>
+                            {g.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                    </Field>
 
-              <Field>
-                <FieldLabel htmlFor="modelo-tipo-producto">Tipo de producto</FieldLabel>
-                <SelectNativo
-                  id="modelo-tipo-producto"
-                  disabled={guardando}
-                  {...registrar('idTipoProducto')}
-                >
-                  <option value="">Sin tipo de producto</option>
-                  {(tiposProducto.data?.datos ?? []).map((t) => (
-                    <option key={t.id} value={String(t.id)}>
-                      {t.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
-            </FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="modelo-tipo-producto">Tipo de producto</FieldLabel>
+                      <SelectNativo
+                        id="modelo-tipo-producto"
+                        disabled={guardando}
+                        {...registrar('idTipoProducto')}
+                      >
+                        <option value="">Sin tipo de producto</option>
+                        {(tiposProducto.data?.datos ?? []).map((t) => (
+                          <option key={t.id} value={String(t.id)}>
+                            {t.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                    </Field>
+                  </FieldGroup>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {!esEdicion ? <AvisoAlta>Después arma la receta y sube las fotos.</AvisoAlta> : null}
           </div>
 
           <DialogFooter>
@@ -431,7 +494,12 @@ export function DialogoModelo({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-modelo">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-modelo"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear modelo'}
             </Button>

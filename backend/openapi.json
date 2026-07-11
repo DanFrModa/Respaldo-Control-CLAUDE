@@ -14837,6 +14837,17 @@
                             "type": "string",
                             "description": "Nombre del cliente."
                           },
+                          "razonSocial": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Razón social (nombre legal), o null."
+                          },
                           "contacto": {
                             "anyOf": [
                               {
@@ -15039,6 +15050,7 @@
                         "required": [
                           "id",
                           "nombre",
+                          "razonSocial",
                           "contacto",
                           "telefono",
                           "email",
@@ -15259,6 +15271,10 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "razonSocial": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
                   "contacto": {
                     "type": "string",
                     "maxLength": 150
@@ -15316,6 +15332,17 @@
                     "nombre": {
                       "type": "string",
                       "description": "Nombre del cliente."
+                    },
+                    "razonSocial": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Razón social (nombre legal), o null."
                     },
                     "contacto": {
                       "anyOf": [
@@ -15519,6 +15546,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "razonSocial",
                     "contacto",
                     "telefono",
                     "email",
@@ -15728,6 +15756,17 @@
                       "type": "string",
                       "description": "Nombre del cliente."
                     },
+                    "razonSocial": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Razón social (nombre legal), o null."
+                    },
                     "contacto": {
                       "anyOf": [
                         {
@@ -15930,6 +15969,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "razonSocial",
                     "contacto",
                     "telefono",
                     "email",
@@ -16113,6 +16153,17 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "razonSocial": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "contacto": {
                     "anyOf": [
                       {
@@ -16225,6 +16276,17 @@
                     "nombre": {
                       "type": "string",
                       "description": "Nombre del cliente."
+                    },
+                    "razonSocial": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Razón social (nombre legal), o null."
                     },
                     "contacto": {
                       "anyOf": [
@@ -16428,6 +16490,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "razonSocial",
                     "contacto",
                     "telefono",
                     "email",
@@ -16635,6 +16698,17 @@
                       "type": "string",
                       "description": "Nombre del cliente."
                     },
+                    "razonSocial": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Razón social (nombre legal), o null."
+                    },
                     "contacto": {
                       "anyOf": [
                         {
@@ -16837,6 +16911,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "razonSocial",
                     "contacto",
                     "telefono",
                     "email",

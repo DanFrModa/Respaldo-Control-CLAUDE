@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel, LeyendaObligatorios, MarcaObligatoria } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { CapturaRenglonesTela, type RenglonTela } from '@/modulos/inventarios/CapturaRenglonesTela';
@@ -110,7 +110,7 @@ export function DialogoNotaTela({
 
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Nueva nota de salida de telas</DialogTitle>
           <DialogDescription>
@@ -119,11 +119,15 @@ export function DialogoNotaTela({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        {/* Cuerpo desplazable: el footer queda FIJO fuera de este scroll (patrón transversal). */}
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto py-2 pr-1">
+          <LeyendaObligatorios />
           {/* Orden destino (aporta su maquilero) + almacén de telas + fecha. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field className="sm:col-span-2">
-              <FieldLabel htmlFor="nota-tela-orden">Orden destino</FieldLabel>
+              <FieldLabel htmlFor="nota-tela-orden" required>
+                Orden destino
+              </FieldLabel>
               <SelectorOrden idSeleccionada={orden?.id} alSeleccionar={setOrden} />
             </Field>
             <Field>
@@ -136,7 +140,9 @@ export function DialogoNotaTela({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="nota-tela-almacen">Almacén de telas (origen)</FieldLabel>
+              <FieldLabel htmlFor="nota-tela-almacen" required>
+                Almacén de telas (origen)
+              </FieldLabel>
               <SelectNativo
                 id="nota-tela-almacen"
                 disabled={almacenes.isPending}
@@ -171,7 +177,7 @@ export function DialogoNotaTela({
                 id="nota-tela-obs"
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Opcional"
+                placeholder="Ej. Entrega parcial para arranque de costura"
                 data-testid="nota-tela-obs"
               />
             </Field>
@@ -179,8 +185,8 @@ export function DialogoNotaTela({
 
           {/* Renglones tela×lote con existencia (reusa la captura de F4). */}
           <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-              Telas a enviar (por lote)
+            <h3 className="mb-2 flex items-center gap-1 text-sm font-medium text-muted-foreground">
+              Telas a enviar (por lote) <MarcaObligatoria />
             </h3>
             <CapturaRenglonesTela
               idAlmacen={idAlmacen === '' ? undefined : Number(idAlmacen)}
@@ -209,6 +215,7 @@ export function DialogoNotaTela({
             onClick={confirmar}
             disabled={!puedeGuardar}
             data-testid="confirmar-nota-tela"
+            className="w-full sm:w-auto"
           >
             {crear.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
             Registrar nota de telas
