@@ -19,6 +19,8 @@ import {
 import type { MargenesSalida, MargenesQuery } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 import type { z } from 'zod';
 import type { esquemaMargenesQuery } from '../../../contrato/index.js';
 
@@ -29,7 +31,10 @@ import { pagadorDeEmpresa } from './impreso-lista-precios.js';
 /** Datos resueltos del impreso (forma PURA). */
 export interface DatosImpresoMargenes {
   pagador: string;
+  /** Márgenes con las filas YA topadas a `MAX_FILAS_PDF` (los totales siguen siendo del universo). */
   margenes: MargenesSalida;
+  /** Conteo de pedidos del universo COMPLETO del filtro (para el aviso de truncado). */
+  totalFilas: number;
 }
 
 /** Dependencias inyectables (tests inyectan `margenesPorPedido` fake). */
@@ -53,7 +58,13 @@ export async function armarDatosImpresoMargenes(
   const pagador = pagadorDeEmpresa(
     empresa ?? { razonSocial: null, nombre: sesion.nombreEmpresaActiva },
   );
-  return { pagador, margenes };
+  // Blindaje: se DIBUJAN a lo más `MAX_FILAS_PDF` pedidos; los totales (piezas/importe) siguen siendo
+  // del universo COMPLETO del filtro (los calcula el dominio sobre todas las filas).
+  return {
+    pagador,
+    margenes: { ...margenes, filas: margenes.filas.slice(0, MAX_FILAS_PDF) },
+    totalFilas: margenes.filas.length,
+  };
 }
 
 const TEAL = '#0d9488';
@@ -102,6 +113,7 @@ const estilos = StyleSheet.create({
   colChica: { width: 44 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colNum: { width: 62, textAlign: 'right' },
+  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 8 },
   totalBloque: {
     marginTop: 14,
     flexDirection: 'row',
@@ -152,6 +164,12 @@ function pagina(datos: DatosImpresoMargenes): ReactElement {
       h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(f.margenPesosPorPieza)),
     ),
   );
+  const textoTruncado = leyendaTruncado(m.filas.length, datos.totalFilas);
+  const aviso =
+    textoTruncado === null
+      ? []
+      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
+
   return h(
     Page,
     { size: 'A4', orientation: 'landscape', style: estilos.pagina },
@@ -169,6 +187,7 @@ function pagina(datos: DatosImpresoMargenes): ReactElement {
     ...(filas.length === 0
       ? [h(Text, { key: 'v', style: estilos.subtitulo }, 'Sin pedidos costeados en el periodo.')]
       : filas),
+    ...aviso,
     h(
       View,
       { style: estilos.totalBloque, key: 'tot' },
@@ -218,7 +237,7 @@ export async function impresoMargenes(
   deps: DepsImpresoMargenes = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoMargenes(sesion, query, bd, deps);
-  return { buffer: await generarPdfMargenes(datos) };
+  return { buffer: await renderizarPdfEnWorker('costos-margenes', datos) };
 }
 
 /** Reexporta el tipo del filtro para la ruta (comodidad). */

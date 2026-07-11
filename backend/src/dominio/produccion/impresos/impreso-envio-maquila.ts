@@ -27,6 +27,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { ErrorValidacion } from '../../../comun/errores.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
@@ -461,7 +463,7 @@ export async function impresoEnvioMaquila(
   deps: DepsImpresoEnvio = {},
 ): Promise<ImpresoEnvio> {
   const datos = await armarDatosImpresoEnvio(sesion, idEtapa, bd, deps);
-  return { buffer: await generarPdfEnvio(datos), folio: datos.folio };
+  return { buffer: await renderizarPdfEnWorker('envio-maquila', datos), folio: datos.folio };
 }
 
 /** Resuelve los datos del envío (A9) y devuelve la ficha de estampado (PDF) + el folio. */
@@ -472,5 +474,5 @@ export async function impresoFichaEstampado(
   deps: DepsImpresoEnvio = {},
 ): Promise<ImpresoEnvio> {
   const datos = await armarDatosImpresoEnvio(sesion, idEtapa, bd, deps);
-  return { buffer: await generarPdfFichaEstampado(datos), folio: datos.folio };
+  return { buffer: await renderizarPdfEnWorker('ficha-estampado', datos), folio: datos.folio };
 }

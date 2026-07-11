@@ -15,6 +15,12 @@ export default defineConfig({
           name: 'unit',
           include: ['src/**/*.test.ts', 'migracion/**/*.test.ts'],
           exclude: ['src/**/*.int.test.ts', 'migracion/**/*.int.test.ts'],
+          // Los unit de impresos generan PDFs de verdad (@react-pdf/renderer) y algunos cruzan por el
+          // pool de workers de PDF: bajo la carga en paralelo del suite eso satura CPU. `PDF_WORKER_POOL=1`
+          // baja los hilos por archivo y un timeout holgado absorbe el arranque en frío del pool y la
+          // contención (el grueso de los unit siguen siendo pruebas puras que terminan en ms).
+          env: { PDF_WORKER_POOL: '1' },
+          testTimeout: 30_000,
         },
       },
       {

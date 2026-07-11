@@ -21,6 +21,8 @@ import {
 import type { ListaPreciosSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 
 import { listaPrecios, type ParametrosListaPrecios } from '../pre-costo.js';
 
@@ -32,7 +34,10 @@ export function pagadorDeEmpresa(empresa: { razonSocial: string | null; nombre: 
 /** Datos resueltos del impreso (forma PURA, ya sin BD). */
 export interface DatosImpresoListaPrecios {
   pagador: string;
+  /** Lista con las filas YA topadas a `MAX_FILAS_PDF` (los parámetros y el pie siguen completos). */
   lista: ListaPreciosSalida;
+  /** Conteo de modelos del universo COMPLETO del filtro (para el aviso de truncado). */
+  totalFilas: number;
 }
 
 /** Dependencias inyectables (los tests inyectan `listaPrecios` fake para no tocar BD). */
@@ -56,7 +61,12 @@ export async function armarDatosImpresoListaPrecios(
   const pagador = pagadorDeEmpresa(
     empresa ?? { razonSocial: null, nombre: sesion.nombreEmpresaActiva },
   );
-  return { pagador, lista };
+  // Blindaje: se DIBUJAN a lo más `MAX_FILAS_PDF` modelos; el conteo completo va aparte (aviso).
+  return {
+    pagador,
+    lista: { ...lista, filas: lista.filas.slice(0, MAX_FILAS_PDF) },
+    totalFilas: lista.filas.length,
+  };
 }
 
 const TEAL = '#0d9488';
@@ -112,6 +122,7 @@ const estilos = StyleSheet.create({
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colNum: { width: 72, textAlign: 'right' },
   inactivo: { color: GRIS },
+  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 10 },
   pie: {
     position: 'absolute',
     bottom: 24,
@@ -187,6 +198,11 @@ function paginaLista(datos: DatosImpresoListaPrecios): ReactElement {
       : `Utilidad ${l.utilidadSugerida}% · Regalías ${l.regaliasBase}% · redondeo al alza`;
   const grupos = agruparPorGenero(l.filas);
   const secciones = [...grupos.entries()].map(([g, filas]) => seccionGenero(g, filas));
+  const textoTruncado = leyendaTruncado(l.filas.length, datos.totalFilas);
+  const aviso =
+    textoTruncado === null
+      ? []
+      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
 
   return h(
     Page,
@@ -210,6 +226,7 @@ function paginaLista(datos: DatosImpresoListaPrecios): ReactElement {
     ...(secciones.length === 0
       ? [h(Text, { key: 'vacio', style: estilos.subtitulo }, 'Sin modelos para los filtros dados.')]
       : secciones),
+    ...aviso,
     h(
       Text,
       { style: estilos.pie, key: 'pie', fixed: true },
@@ -240,5 +257,5 @@ export async function impresoListaPrecios(
   deps: DepsImpresoListaPrecios = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoListaPrecios(sesion, query, bd, deps);
-  return { buffer: await generarPdfListaPrecios(datos) };
+  return { buffer: await renderizarPdfEnWorker('costos-lista-precios', datos) };
 }

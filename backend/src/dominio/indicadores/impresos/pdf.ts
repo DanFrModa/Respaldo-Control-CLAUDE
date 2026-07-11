@@ -23,6 +23,8 @@ import type { KpisRc, KpisCalidad, KpisWip } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import { kpisRutaCritica, kpisCalidadMaquilero, kpisWip } from '../kpis.js';
 import type { ParametrosKpisRc, ParametrosKpisCalidad, ParametrosKpisWip } from '../kpis.js';
 
@@ -172,6 +174,18 @@ export async function impresoKpisRc(
   const obtener = deps.kpisRutaCritica ?? kpisRutaCritica;
   const datos: KpisRc = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return { buffer: await renderizarPdfEnWorker('kpis-rc', { pagador, datos }) };
+}
+
+/** Payload YA resuelto del tablero de RC (para el render en worker). */
+export interface PayloadPdfKpisRc {
+  pagador: string;
+  datos: KpisRc;
+}
+
+/** Render PURO del tablero de KPIs de Ruta Crítica (datos ya resueltos → Buffer). */
+export async function generarPdfKpisRc(payload: PayloadPdfKpisRc): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — Ruta Crítica';
 
   const et = datos.entregasATiempo;
@@ -235,7 +249,7 @@ export async function impresoKpisRc(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }
 
 // ── Calidad por maquilero ───────────────────────────────────────────────────────────────────────
@@ -255,6 +269,18 @@ export async function impresoKpisCalidad(
   const obtener = deps.kpisCalidadMaquilero ?? kpisCalidadMaquilero;
   const datos: KpisCalidad = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return { buffer: await renderizarPdfEnWorker('kpis-calidad', { pagador, datos }) };
+}
+
+/** Payload YA resuelto del tablero de calidad por maquilero (para el render en worker). */
+export interface PayloadPdfKpisCalidad {
+  pagador: string;
+  datos: KpisCalidad;
+}
+
+/** Render PURO del tablero de calidad por maquilero (datos ya resueltos → Buffer). */
+export async function generarPdfKpisCalidad(payload: PayloadPdfKpisCalidad): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — Calidad por maquilero';
 
   const contenido: ReactElement[] = [
@@ -310,7 +336,7 @@ export async function impresoKpisCalidad(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }
 
 // ── WIP analítico ─────────────────────────────────────────────────────────────────────────────────
@@ -328,8 +354,21 @@ export async function impresoKpisWip(
   deps: DepsPdfWip = {},
 ): Promise<{ buffer: Buffer }> {
   const obtener = deps.kpisWip ?? kpisWip;
+  // `porPagina: 100` topa la lista de órdenes con avance (el tablero es un concentrado directivo).
   const datos: KpisWip = await obtener(sesion, { ...parametros, porPagina: 100 }, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return { buffer: await renderizarPdfEnWorker('kpis-wip', { pagador, datos }) };
+}
+
+/** Payload YA resuelto del tablero WIP analítico (para el render en worker). */
+export interface PayloadPdfKpisWip {
+  pagador: string;
+  datos: KpisWip;
+}
+
+/** Render PURO del tablero WIP analítico (datos ya resueltos → Buffer). */
+export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — WIP analítico';
   const t = datos.totales;
 
@@ -382,5 +421,5 @@ export async function impresoKpisWip(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }

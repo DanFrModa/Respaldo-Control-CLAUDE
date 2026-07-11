@@ -27,6 +27,8 @@ import {
 } from '../../../../contrato/index.js';
 import type { SesionUsuario } from '../../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../../comun/pdf-worker.js';
+import { leyendaTruncado } from '../../../../comun/impreso-topes.js';
 import { estadoCuentaProveedorCxp } from '../cxp.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
@@ -149,6 +151,7 @@ const estilos = StyleSheet.create({
   saldoItem: { alignItems: 'flex-end' },
   saldoValor: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
   saldoTotal: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: TEAL },
+  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 10 },
   vacio: { fontSize: 8, color: GRIS, marginTop: 2 },
   pie: {
     position: 'absolute',
@@ -251,6 +254,11 @@ function paginaCxp(datos: DatosImpresoCxp): ReactElement {
   const c = datos.cuenta;
   const periodo = `${c.desde ?? '—'} a ${c.hasta ?? '—'}`;
   const vista = c.vista === 'fiscal' ? 'Fiscal (solo CFDI)' : 'Operativa (todo)';
+  const textoTruncado = leyendaTruncado(c.movimientos.length, c.total);
+  const aviso =
+    textoTruncado === null
+      ? []
+      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
   return h(
     Page,
     { size: 'A4', style: estilos.pagina },
@@ -278,6 +286,7 @@ function paginaCxp(datos: DatosImpresoCxp): ReactElement {
       campo('Proveedor', c.tercero),
     ),
     tablaMovimientos(datos),
+    ...aviso,
     bloqueSaldo(datos),
     h(
       Text,
@@ -320,5 +329,5 @@ export async function impresoEstadoCuentaCxp(
   deps: DepsImpresoCxp = {},
 ): Promise<ImpresoCxp> {
   const datos = await armarDatosImpresoCxp(sesion, idProveedor, query, bd, deps);
-  return { buffer: await generarPdfCxp(datos), idProveedor };
+  return { buffer: await renderizarPdfEnWorker('cxp-estado-cuenta', datos), idProveedor };
 }

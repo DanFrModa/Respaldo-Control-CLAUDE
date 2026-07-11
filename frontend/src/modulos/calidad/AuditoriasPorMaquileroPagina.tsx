@@ -79,7 +79,7 @@ export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
         ];
 
   return (
-    <div className="space-y-4 p-4 md:p-5">
+    <div className="h-full overflow-y-auto space-y-4 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">

@@ -100,7 +100,7 @@ export function ReportesFiscalesPagina(): React.JSX.Element {
   ];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="reportes-fiscales">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="reportes-fiscales">
       {/* ── Encabezado + exports ─────────────────────────────────────────────── */}
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">

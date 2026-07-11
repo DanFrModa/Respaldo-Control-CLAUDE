@@ -34,6 +34,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerOC } from '../ordenes-compra.js';
@@ -457,6 +459,6 @@ export async function impresoOrdenCompra(
   deps: DepsImpresoOC = {},
 ): Promise<ImpresoOC> {
   const datos = await armarDatosImpresoOC(sesion, id, bd, deps);
-  const buffer = await generarPdfOrdenCompra(datos);
+  const buffer = await renderizarPdfEnWorker('orden-compra', datos);
   return { buffer, numCompra: datos.numCompra };
 }

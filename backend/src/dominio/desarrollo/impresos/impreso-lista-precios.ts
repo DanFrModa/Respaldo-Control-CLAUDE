@@ -22,6 +22,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerLista } from '../listas-precios.js';
@@ -289,5 +291,8 @@ export async function impresoListaPrecios(
   deps: DepsImpresoListaPrecios = {},
 ): Promise<ImpresoListaPrecios> {
   const datos = await armarDatosImpresoListaPrecios(sesion, idLista, bd, deps);
-  return { buffer: await generarPdfListaPrecios(datos), folio: datos.folio };
+  return {
+    buffer: await renderizarPdfEnWorker('desarrollo-lista-precios', datos),
+    folio: datos.folio,
+  };
 }

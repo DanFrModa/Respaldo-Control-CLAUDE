@@ -35,7 +35,11 @@ import { useSesion } from '@/sesion/useSesion';
  * puntito de marca, campana de alertas RC y alternador de tema.
  *
  * La raiz ocupa el alto de la ventana y NO scrollea (`h-svh overflow-hidden`):
- * el `<main>` llena el resto y cada pantalla maneja su propio scroll.
+ * el `<main>` llena el resto y es `overflow-hidden` a proposito, asi que CADA
+ * pantalla es duena de su propio scroll. Toda pagina nueva DEBE envolver su
+ * contenido en el wrapper estandar `<div className="h-full overflow-y-auto">`
+ * (o construirse sobre un motor que ya lo hace por dentro: `ListaDetalle`,
+ * `TablaCatalogo`). Sin eso, el contenido bajo el pliegue queda inalcanzable.
  *
  * El menu lista SOLO lo que los permisos del usuario hacen visible (A4); la
  * sesion la provee `ProveedorSesion` (`GET /api/sesion`). El guard

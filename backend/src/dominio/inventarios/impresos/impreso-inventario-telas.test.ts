@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
+import { MAX_FILAS_PDF } from '../../../comun/impreso-topes.js';
 import type { ExistenciasTelaLista } from '../../../contrato/index.js';
 import {
   armarDatosImpresoInventarioTelas,
@@ -66,10 +67,38 @@ describe('impreso inventario de telas (F4-E1, R9)', () => {
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
+  it('topa las filas a MAX_FILAS_PDF pero conserva el conteo y la Σ del universo completo', async () => {
+    const n = MAX_FILAS_PDF + 25;
+    const listaGrande: ExistenciasTelaLista = {
+      filas: Array.from({ length: n }, (_, i) => ({
+        idTela: i + 1,
+        tela: `Tela ${String(i)}`,
+        idLote: i + 1,
+        loteClave: `L-${String(i)}`,
+        idColor: 1,
+        color: 'Rojo',
+        idProveedor: 1,
+        proveedor: 'Proveedor',
+        factura: `F-${String(i)}`,
+        idAlmacen: 1,
+        almacen: 'Bodega',
+        existencia: 1,
+        componentes: [],
+      })),
+      totalExistencia: n,
+    };
+    const datos = await armarDatosImpresoInventarioTelas(sesion, {}, undefined, {
+      consultarExistenciasTela: () => Promise.resolve(listaGrande),
+    });
+    expect(datos.filas).toHaveLength(MAX_FILAS_PDF);
+    expect(datos.totalRenglones).toBe(n);
+    expect(datos.totalExistencia).toBe(n);
+  });
+
   it('impresoInventarioTelas devuelve un Buffer PDF (end-to-end con fake)', async () => {
     const buffer = await impresoInventarioTelas(sesion, {}, undefined, {
       consultarExistenciasTela: () => Promise.resolve(listaFake),
     });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  });
+  }, 20_000); // orquestador → render en worker (arranque en frío del pool bajo carga de tests).
 });

@@ -80,7 +80,7 @@ describe('impresoListaPrecios (PDF)', () => {
     expect(folio).toBe(7);
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  });
+  }, 20_000); // orquestador → render en worker (arranque en frío del pool bajo carga de tests).
 });
 
 describe('excelListaPrecios (Excel)', () => {

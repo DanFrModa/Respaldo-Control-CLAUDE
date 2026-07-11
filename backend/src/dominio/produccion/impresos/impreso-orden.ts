@@ -37,6 +37,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import { servicioArchivos, type ServicioArchivos } from '../../../comun/archivos.js';
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
@@ -591,7 +593,7 @@ export async function impresoOrden(
   deps: DepsImpreso = {},
 ): Promise<ImpresoOrden> {
   const datos = await armarDatosImpresoOrden(sesion, id, bd, deps);
-  const buffer = await generarPdfOrden(datos);
+  const buffer = await renderizarPdfEnWorker('orden', datos);
   return { buffer, folio: datos.folio };
 }
 
@@ -611,5 +613,5 @@ export async function impresoOrdenes(
   for (const id of ids) {
     ordenes.push(await armarDatosImpresoOrden(sesion, id, bd, deps));
   }
-  return generarPdfOrdenes(ordenes);
+  return renderizarPdfEnWorker('ordenes', ordenes);
 }

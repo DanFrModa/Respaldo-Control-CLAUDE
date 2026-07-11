@@ -138,7 +138,7 @@ export function ImportarCfdiVentaPagina(): React.JSX.Element {
   const yaImportado = prev?.yaImportado ?? false;
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="cfdi-venta-importar">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="cfdi-venta-importar">
       {/* ── Encabezado (page-head sin icono) ─────────────────────────────────── */}
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">

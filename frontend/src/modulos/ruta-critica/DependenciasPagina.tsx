@@ -83,7 +83,10 @@ export function DependenciasPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4" data-testid="dependencias-pagina">
+    <div
+      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      data-testid="dependencias-pagina"
+    >
       <header className="flex items-center gap-3">
         <GitBranch className="size-6 text-primary" aria-hidden />
         <div>

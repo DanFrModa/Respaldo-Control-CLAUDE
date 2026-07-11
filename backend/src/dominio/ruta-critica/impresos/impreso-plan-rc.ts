@@ -27,6 +27,8 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+
 import { ErrorNoEncontrado, ErrorValidacion } from '../../../comun/errores.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
@@ -406,5 +408,5 @@ export async function impresoPlanRc(
   deps: DepsImpresoPlanRc = {},
 ): Promise<ImpresoPlanRc> {
   const datos = await armarDatosImpresoPlanRc(sesion, idOrden, bd, deps);
-  return { buffer: await generarPdfPlanRc(datos), folioOrden: datos.folioOrden };
+  return { buffer: await renderizarPdfEnWorker('plan-rc', datos), folioOrden: datos.folioOrden };
 }

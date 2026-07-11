@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { DesglosadoSalida } from '../../../contrato/index.js';
 
-import { generarPdfEstadoCuenta, type DatosImpresoEstadoCuenta } from './impreso-estado-cuenta.js';
+import {
+  avisoTruncadoTexto,
+  generarPdfEstadoCuenta,
+  type DatosImpresoEstadoCuenta,
+} from './impreso-estado-cuenta.js';
 
 /**
  * Unit del impreso del ESTADO DE CUENTA (F6-E5, R9) — SIN Postgres. Cubre que el PDF se genera con el
@@ -65,9 +69,31 @@ describe('impreso estado de cuenta (F6-E5)', () => {
     const datos: DatosImpresoEstadoCuenta = {
       pagador: 'FR MODA SA DE CV',
       desglosado: desglosadoDePrueba(),
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0 },
     };
     const buffer = await generarPdfEstadoCuenta(datos);
     expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
     expect(buffer.length).toBeGreaterThan(500);
+  });
+
+  it('no avisa truncado cuando cada sección se muestra completa', () => {
+    const datos: DatosImpresoEstadoCuenta = {
+      pagador: 'FR MODA SA DE CV',
+      desglosado: desglosadoDePrueba(),
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0 },
+    };
+    expect(avisoTruncadoTexto(datos)).toBeNull();
+  });
+
+  it('avisa las secciones truncadas y remite al Excel (totales del universo)', () => {
+    // Se dibujó 1 cargo pero el universo tenía 300 → el aviso lo dice; el saldo NO se toca.
+    const datos: DatosImpresoEstadoCuenta = {
+      pagador: 'FR MODA SA DE CV',
+      desglosado: desglosadoDePrueba(),
+      totales: { cargos: 300, abonos: 1, descuentos: 0, pagos: 0 },
+    };
+    const aviso = avisoTruncadoTexto(datos);
+    expect(aviso).toContain('cargos 1 de 300');
+    expect(aviso).toContain('Excel');
   });
 });

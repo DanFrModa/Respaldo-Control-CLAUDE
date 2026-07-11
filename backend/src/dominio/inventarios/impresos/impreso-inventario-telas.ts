@@ -23,6 +23,8 @@ import {
 
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 import { consultarExistenciasTela, type ParametrosExistenciasTela } from '../telas.js';
 import type { ExistenciasTelaLista } from '../../../contrato/index.js';
 
@@ -78,12 +80,14 @@ export async function armarDatosImpresoInventarioTelas(
 ): Promise<DatosImpresoInventarioTelas> {
   const consultar = deps.consultarExistenciasTela ?? consultarExistenciasTela;
   const lista = await consultar(sesion, parametros, bd);
-  const filas = armarFilasImpreso(lista);
+  const todas = armarFilasImpreso(lista);
+  // Blindaje: se DIBUJAN a lo más `MAX_FILAS_PDF` renglones (miles bloquearían el render), pero el
+  // conteo y la Σ existencia siguen siendo del universo COMPLETO del filtro (no del truncado).
   return {
     empresa: sesion.nombreEmpresaActiva,
     fecha: new Date().toISOString().slice(0, 10),
-    filas,
-    totalRenglones: filas.length,
+    filas: todas.slice(0, MAX_FILAS_PDF),
+    totalRenglones: todas.length,
     totalExistencia: lista.totalExistencia,
   };
 }
@@ -135,6 +139,7 @@ const estilos = StyleSheet.create({
   cExistencia: { width: '10%', textAlign: 'right' },
   cComponentes: { width: '10%' },
   filaTotales: { backgroundColor: '#f8fafc' },
+  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 8 },
   vacio: { fontSize: 9, color: GRIS, marginTop: 12 },
   pie: {
     position: 'absolute',
@@ -209,12 +214,18 @@ function paginaInventario(datos: DatosImpresoInventarioTelas): ReactElement {
       ? [h(Text, { style: estilos.vacio, key: 'vacio' }, 'Sin existencias de tela para mostrar.')]
       : [filaEncabezado(), ...datos.filas.map((f, i) => filaTela(f, i)), filaTotal(datos)];
 
+  const textoTruncado = leyendaTruncado(datos.filas.length, datos.totalRenglones);
+  const aviso =
+    textoTruncado === null
+      ? []
+      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
+
   return h(
     Page,
     { key: 'pagina', size: 'A4', orientation: 'landscape', style: estilos.pagina },
     h(
       View,
-      { style: estilos.encabezado, key: 'enc' },
+      { style: estilos.encabezado, key: 'cab' },
       h(
         View,
         {},
@@ -233,6 +244,7 @@ function paginaInventario(datos: DatosImpresoInventarioTelas): ReactElement {
       ),
     ),
     ...cuerpo,
+    ...aviso,
     h(
       Text,
       { style: estilos.pie, key: 'pie', fixed: true },
@@ -265,5 +277,5 @@ export async function impresoInventarioTelas(
   deps: DepsImpresoInventarioTelas = {},
 ): Promise<Buffer> {
   const datos = await armarDatosImpresoInventarioTelas(sesion, parametros, bd, deps);
-  return generarPdfInventarioTelas(datos);
+  return renderizarPdfEnWorker('inventario-telas', datos);
 }

@@ -28,6 +28,7 @@ import {
 import type { z } from 'zod';
 import type { SesionUsuario } from '../../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../../comun/pdf-worker.js';
 
 import { reporteFiscal } from '../reportes-fiscales.js';
 
@@ -330,5 +331,5 @@ export async function impresoReporteFiscal(
   deps: DepsImpresoReporteFiscal = {},
 ): Promise<ImpresoReporteFiscal> {
   const datos = await armarDatosImpresoReporteFiscal(sesion, query, bd, deps);
-  return { buffer: await generarPdfReporteFiscal(datos) };
+  return { buffer: await renderizarPdfEnWorker('reporte-fiscal', datos) };
 }

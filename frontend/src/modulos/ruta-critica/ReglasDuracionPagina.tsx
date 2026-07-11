@@ -57,7 +57,10 @@ export function ReglasDuracionPagina(): React.JSX.Element {
   ];
 
   return (
-    <div className="flex flex-col gap-4 p-4" data-testid="reglas-duracion-pagina">
+    <div
+      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      data-testid="reglas-duracion-pagina"
+    >
       <header>
         <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
           Reglas de duración de la Ruta Crítica
