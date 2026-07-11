@@ -284,7 +284,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
     );
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
       {/* ── Encabezado de página ─────────────────────────────────────────── */}
       {/* En angosto (<sm) el título toma toda la línea y la barra de botones ENVUELVE
           debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha. */}
@@ -463,9 +463,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
       </div>
 
       {/* ── Split: tabla (izq) + panel persistente (der) ─────────────────── */}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card">
-          <div className="min-h-0 flex-1 overflow-auto">
+      <div className="grid shrink-0 gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0">
+          <div className="overflow-auto lg:min-h-0 lg:flex-1">
             {consulta.isPending ? (
               <p className="p-6 text-sm text-muted-foreground">Cargando órdenes…</p>
             ) : consulta.isError ? (

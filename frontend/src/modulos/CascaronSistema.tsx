@@ -215,6 +215,17 @@ export function CascaronSistema(): React.JSX.Element {
                 <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-primary" />
                 {sesion.empresaActiva.nombre}
               </span>
+              {/* Lupa SOLO en móvil (<md): la topbar de teléfono no muestra el buscador ancho
+                  (ese es `hidden md:flex`); este botón abre la MISMA paleta ⌘K. */}
+              <button
+                type="button"
+                onClick={() => setPaletaAbierta(true)}
+                className={cn(claseBotonIcono, 'md:hidden')}
+                aria-label="Buscar pantalla, módulo u orden (Ctrl+K)"
+                data-testid="abrir-paleta-movil"
+              >
+                <Search className="size-[17px]" aria-hidden />
+              </button>
               <BadgeAlertasRc />
               <AlternadorTema />
             </div>
