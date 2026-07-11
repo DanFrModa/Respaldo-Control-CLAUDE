@@ -9,16 +9,24 @@ import ExcelJS from 'exceljs';
 import type { VentaLinea, VentasQuery } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 
 import { listarVentas } from '../ventas.js';
 
 import { etiquetaPeriodo, MESES_ES } from './comun-edr.js';
 
-const TEAL = 'FF0D9488';
-
 /** Dependencias inyectables (los tests inyectan un `listarVentas` fake para no tocar BD). */
 export interface DepsExcelVentas {
   listarVentas?: typeof listarVentas;
+}
+
+/** Datos PLANOS de ventas (cruzan al worker por structured clone). */
+export interface DatosExcelVentas {
+  lineas: VentaLinea[];
+  /** Año/mes del filtro, para el título del archivo (`mes` = 0 cuando el filtro es anual). */
+  anio: number;
+  mes: number;
 }
 
 /** Trae TODAS las líneas del filtro paginando internamente con el tope del backend (100). */
@@ -40,16 +48,23 @@ async function todasLasLineas(
   return lineas;
 }
 
-/** Genera el `.xlsx` de ventas del período (una hoja "Ventas" con el detalle + fila total). */
-export async function excelVentas(
+/**
+ * Resuelve TODAS las líneas del filtro (paginando internamente). Corre en el HILO PRINCIPAL. Conserva
+ * año/mes del filtro para el título del archivo.
+ */
+export async function armarDatosExcelVentas(
   sesion: SesionUsuario,
   parametros: VentasQuery,
   bd?: ContextoBd,
   deps: DepsExcelVentas = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<DatosExcelVentas> {
   const consultar = deps.listarVentas ?? listarVentas;
   const lineas = await todasLasLineas(sesion, parametros, bd, consultar);
+  return { lineas, anio: parametros.anio, mes: parametros.mes ?? 0 };
+}
 
+/** Construye el `.xlsx` de ventas a partir de datos ya resueltos. PURO: corre en el WORKER. */
+export async function construirExcelVentas(datos: DatosExcelVentas): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -66,10 +81,10 @@ export async function excelVentas(
     { header: 'Mes', key: 'mes', width: 12 },
   ];
 
-  // Encabezado teal en negrita, texto blanco.
+  // Encabezado verde de marca en negrita, texto blanco.
   const encabezado = hoja.getRow(1);
   encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   encabezado.alignment = { vertical: 'middle' };
   for (const col of ['precio', 'importe']) {
     hoja.getColumn(col).numFmt = '#,##0.00';
@@ -77,7 +92,7 @@ export async function excelVentas(
 
   let totalCantidad = 0;
   let totalImporte = 0;
-  for (const l of lineas) {
+  for (const l of datos.lineas) {
     totalCantidad += l.cantidad;
     totalImporte += l.importe;
     hoja.addRow({
@@ -100,8 +115,22 @@ export async function excelVentas(
   filaTotal.font = { bold: true };
 
   // El título del período va como propiedad del archivo (el nombre lo pone la ruta).
-  libro.title = `Ventas — ${etiquetaPeriodo(parametros.anio, parametros.mes ?? 0)}`;
+  libro.title = `Ventas — ${etiquetaPeriodo(datos.anio, datos.mes)}`;
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` de ventas del período (una hoja "Ventas" con el detalle + fila total). Datos en el
+ * hilo principal, libro en un worker (blindaje del event loop).
+ */
+export async function excelVentas(
+  sesion: SesionUsuario,
+  parametros: VentasQuery,
+  bd?: ContextoBd,
+  deps: DepsExcelVentas = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelVentas(sesion, parametros, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-ventas', datos) };
 }

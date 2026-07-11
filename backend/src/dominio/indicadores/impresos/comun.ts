@@ -6,9 +6,6 @@
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 
-/** Color de marca para exceljs (ARGB). El export a Excel se atiende aparte (blindaje/consistencia). */
-export const TEAL_XLSX = 'FF0D9488';
-
 /** Razón social (o nombre) de la empresa activa para el encabezado del impreso. */
 export async function razonSocialEmpresa(sesion: SesionUsuario, bd?: ContextoBd): Promise<string> {
   const empresa = await clienteLectura(bd).empresa.findUnique({

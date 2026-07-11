@@ -8,13 +8,13 @@
  */
 import ExcelJS from 'exceljs';
 
-import type { BadgeDesempeno } from '../../../contrato/index.js';
+import type { BadgeDesempeno, PersonaDesempeno } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 
 import { desempenoRc } from '../analisisRc.js';
-
-const TEAL = 'FF0D9488';
 
 /** Etiqueta legible del badge de desempeño. */
 const ETIQUETA_BADGE: Record<BadgeDesempeno, string> = {
@@ -42,27 +42,36 @@ export interface ExcelDesempeno {
   buffer: Buffer;
 }
 
+/** Datos PLANOS del desempeño (cruzan al worker por structured clone). */
+export interface DatosExcelDesempeno {
+  personas: PersonaDesempeno[];
+}
+
 /** Un valor numérico o '—' si es null (para celdas que pueden no tener dato). */
 function oGuion(valor: number | null): number | string {
   return valor === null ? '—' : valor;
 }
 
 /**
- * Genera el `.xlsx` del desempeño del equipo (A9: scope por la empresa activa, ya lo impone
- * `desempenoRc`). MISMO resultado que el tablero.
+ * Resuelve los datos del desempeño (A9: scope por la empresa activa, ya lo impone `desempenoRc`). Corre
+ * en el HILO PRINCIPAL.
  */
-export async function excelDesempenoRc(
+export async function armarDatosExcelDesempeno(
   sesion: SesionUsuario,
   bd?: ContextoBd,
   ahora?: Date,
   deps: DepsExcelDesempeno = {},
-): Promise<ExcelDesempeno> {
+): Promise<DatosExcelDesempeno> {
   const calcular = deps.desempenoRc ?? desempenoRc;
   const { personas } = await calcular(sesion, bd, ahora);
+  return { personas };
+}
 
+/** Construye el `.xlsx` del desempeño a partir de datos ya resueltos. PURO: corre en el WORKER. */
+export async function construirExcelDesempeno(datos: DatosExcelDesempeno): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
-  libro.created = ahora ?? new Date();
+  libro.created = new Date();
   const hoja = libro.addWorksheet('Desempeño RC', { views: [{ state: 'frozen', ySplit: 1 }] });
 
   hoja.columns = [
@@ -81,10 +90,10 @@ export async function excelDesempenoRc(
 
   const encabezado = hoja.getRow(1);
   encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   encabezado.alignment = { vertical: 'middle' };
 
-  for (const p of personas) {
+  for (const p of datos.personas) {
     const renglon = hoja.addRow({
       persona: p.nombre,
       area: p.area,
@@ -107,6 +116,20 @@ export async function excelDesempenoRc(
     }
   }
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` del desempeño del equipo (A9: scope por la empresa activa, ya lo impone
+ * `desempenoRc`). MISMO resultado que el tablero. Datos en el hilo principal, libro en un worker.
+ */
+export async function excelDesempenoRc(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+  ahora?: Date,
+  deps: DepsExcelDesempeno = {},
+): Promise<ExcelDesempeno> {
+  const datos = await armarDatosExcelDesempeno(sesion, bd, ahora, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-desempeno-rc', datos) };
 }

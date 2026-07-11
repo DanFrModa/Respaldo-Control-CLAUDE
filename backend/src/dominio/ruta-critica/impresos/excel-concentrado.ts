@@ -16,6 +16,8 @@ import ExcelJS from 'exceljs';
 import type { ConcentradoFila, ConcentradoProceso } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 
 import { consultarConcentrado, type ParametrosConcentrado } from '../concentrado.js';
 import type { EstadoSemaforo } from '../semaforoYRiesgo.js';
@@ -33,8 +35,6 @@ const RELLENO_SEMAFORO: Record<EstadoSemaforo, string> = {
   enRiesgo: 'FFFEF3C7',
   aTiempo: 'FFDCFCE7',
 };
-
-const TEAL = 'FF0D9488';
 
 /** `YYYY-MM-DD` a partir de un datetime ISO (o '—' si null). Solo el día calendario. */
 function fechaCorta(iso: string | null): string {
@@ -95,23 +95,32 @@ export interface ExcelConcentrado {
   buffer: Buffer;
 }
 
+/** Datos PLANOS del concentrado (cruzan al worker por structured clone). */
+export interface DatosExcelConcentrado {
+  filas: ConcentradoFila[];
+}
+
 /**
- * Genera el `.xlsx` del concentrado (A9: scope por la empresa activa, ya lo impone
- * `consultarConcentrado`). MISMO resultado que el tablero; trae todas las órdenes del filtro.
+ * Resuelve los datos del concentrado (A9: scope por la empresa activa, ya lo impone
+ * `consultarConcentrado`). Corre en el HILO PRINCIPAL: pagina y trae todas las órdenes del filtro.
  */
-export async function excelConcentrado(
+export async function armarDatosExcelConcentrado(
   sesion: SesionUsuario,
   parametros: ParametrosConcentrado = {},
   bd?: ContextoBd,
   ahora?: Date,
   deps: DepsExcelConcentrado = {},
-): Promise<ExcelConcentrado> {
+): Promise<DatosExcelConcentrado> {
   const consultar = deps.consultarConcentrado ?? consultarConcentrado;
   const filas = await todasLasFilas(sesion, parametros, bd, ahora, consultar);
+  return { filas };
+}
 
+/** Construye el `.xlsx` del concentrado a partir de datos ya resueltos. PURO: corre en el WORKER. */
+export async function construirExcelConcentrado(datos: DatosExcelConcentrado): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
-  libro.created = ahora ?? new Date();
+  libro.created = new Date();
   const hoja = libro.addWorksheet('Concentrado RC', {
     views: [{ state: 'frozen', ySplit: 1 }],
   });
@@ -129,13 +138,13 @@ export async function excelConcentrado(
     { header: 'Procesos (plan→real)', key: 'procesos', width: 70 },
   ];
 
-  // Encabezado teal en negrita, texto blanco.
+  // Encabezado verde de marca en negrita, texto blanco.
   const encabezado = hoja.getRow(1);
   encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   encabezado.alignment = { vertical: 'middle' };
 
-  for (const fila of filas) {
+  for (const fila of datos.filas) {
     const modelo =
       fila.descripcionModelo !== null && fila.descripcionModelo !== ''
         ? `${fila.codigoModelo} — ${fila.descripcionModelo}`
@@ -161,6 +170,22 @@ export async function excelConcentrado(
   }
 
   // `exceljs` devuelve un ArrayBuffer-like; lo normalizamos a Buffer de Node.
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` del concentrado (A9: scope por la empresa activa, ya lo impone
+ * `consultarConcentrado`). MISMO resultado que el tablero; trae todas las órdenes del filtro. Los datos
+ * se resuelven en el hilo principal y el libro se construye en un worker (blindaje del event loop).
+ */
+export async function excelConcentrado(
+  sesion: SesionUsuario,
+  parametros: ParametrosConcentrado = {},
+  bd?: ContextoBd,
+  ahora?: Date,
+  deps: DepsExcelConcentrado = {},
+): Promise<ExcelConcentrado> {
+  const datos = await armarDatosExcelConcentrado(sesion, parametros, bd, ahora, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-concentrado', datos) };
 }

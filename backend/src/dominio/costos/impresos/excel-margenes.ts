@@ -7,37 +7,43 @@
  */
 import ExcelJS from 'exceljs';
 
-import type { esquemaMargenesQuery } from '../../../contrato/index.js';
+import type { esquemaMargenesQuery, MargenesSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 import type { z } from 'zod';
 
 import { margenesPorPedido } from '../margenes.js';
-
-const TEAL = 'FF0D9488';
 
 /** Dependencias inyectables (tests inyectan `margenesPorPedido` fake). */
 export interface DepsExcelMargenes {
   margenesPorPedido?: typeof margenesPorPedido;
 }
 
-/** Aplica el estilo teal a la fila de encabezado. */
+/** Aplica el estilo de marca a la fila de encabezado. */
 function estilarEncabezado(fila: ExcelJS.Row): void {
   fila.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   fila.alignment = { vertical: 'middle' };
 }
 
-/** Genera el `.xlsx` de márgenes por pedido (A9 + ocultamiento de importes ya en el dominio). */
-export async function excelMargenes(
+/**
+ * Resuelve los datos de márgenes (A9 + ocultamiento de importes ya en el dominio). Corre en el HILO
+ * PRINCIPAL. Devuelve el resultado plano de `margenesPorPedido`, listo para el worker.
+ */
+export async function armarDatosExcelMargenes(
   sesion: SesionUsuario,
   query: z.input<typeof esquemaMargenesQuery> = {},
   bd?: ContextoBd,
   deps: DepsExcelMargenes = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<MargenesSalida> {
   const obtener = deps.margenesPorPedido ?? margenesPorPedido;
-  const m = await obtener(sesion, query, bd);
+  return obtener(sesion, query, bd);
+}
 
+/** Construye el `.xlsx` de márgenes a partir de datos ya resueltos. PURO: corre en el WORKER. */
+export async function construirExcelMargenes(m: MargenesSalida): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -87,5 +93,19 @@ export async function excelMargenes(
   filaTotal.font = { bold: true };
 
   const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  return Buffer.from(datos);
+}
+
+/**
+ * Genera el `.xlsx` de márgenes por pedido (A9 + ocultamiento de importes ya en el dominio). Datos en el
+ * hilo principal, libro en un worker (blindaje del event loop).
+ */
+export async function excelMargenes(
+  sesion: SesionUsuario,
+  query: z.input<typeof esquemaMargenesQuery> = {},
+  bd?: ContextoBd,
+  deps: DepsExcelMargenes = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelMargenes(sesion, query, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-margenes', datos) };
 }

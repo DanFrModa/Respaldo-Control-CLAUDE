@@ -6,10 +6,11 @@
  *  • el contenido vuelca folio de OP, cliente, importe y mes; una línea manual (sin folio) sale "—".
  */
 import ExcelJS from 'exceljs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import type { VentaLinea, VentasSalida } from '../../../contrato/index.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
+import { cerrarPoolPdf } from '../../../comun/pdf-worker.js';
 
 import { excelVentas } from './excel-ventas.js';
 
@@ -62,6 +63,10 @@ function fakeListar(lineas: VentaLinea[]): (...args: unknown[]) => Promise<Venta
 
 const sesion = sesionDePrueba({ permisos: ['edr.ver'] });
 
+afterAll(async () => {
+  await cerrarPoolPdf();
+});
+
 describe('excelVentas', () => {
   it('genera un .xlsx (buffer con firma OOXML/ZIP)', async () => {
     const consultar = vi.fn(fakeListar([linea(1), linea(2)]));
@@ -76,7 +81,7 @@ describe('excelVentas', () => {
     expect(buffer.length).toBeGreaterThan(0);
     // Un .xlsx es un ZIP: empieza por "PK".
     expect(buffer.subarray(0, 2).toString('latin1')).toBe('PK');
-  });
+  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
 
   it('pagina internamente y trae TODAS las líneas (no solo la primera página)', async () => {
     // 250 líneas con tope interno de 100 → 3 páginas.
@@ -90,7 +95,7 @@ describe('excelVentas', () => {
         listarVentas: consultar,
       },
     );
-    // Se pidieron 3 páginas (100 + 100 + 50).
+    // Se pidieron 3 páginas (100 + 100 + 50) — la paginación corre en el hilo principal.
     expect(consultar).toHaveBeenCalledTimes(3);
 
     const libro = new ExcelJS.Workbook();
@@ -99,7 +104,7 @@ describe('excelVentas', () => {
     expect(hoja).toBeDefined();
     // 1 encabezado + 250 líneas + 1 fila total.
     expect(hoja?.rowCount).toBe(252);
-  });
+  }, 20_000);
 
   it('vuelca folio de OP, cliente, importe y mes; la línea manual sin folio sale "—"', async () => {
     const consultar = vi.fn(
@@ -131,5 +136,5 @@ describe('excelVentas', () => {
     const segunda = hoja?.getRow(3);
     expect(segunda?.getCell(1).value).toBe('—');
     expect(segunda?.getCell(8).value).toBe('Junio 2026');
-  });
+  }, 20_000);
 });

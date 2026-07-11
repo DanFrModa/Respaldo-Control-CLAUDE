@@ -16,13 +16,13 @@ import {
 import type { z } from 'zod';
 import type { SesionUsuario } from '../../../../comun/permisos.js';
 import type { ContextoBd } from '../../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../../comun/pdf-worker.js';
 
 import { reporteFiscal } from '../reportes-fiscales.js';
 
 /** Filtros del reporte (forma de ENTRADA: la ruta pasa su query ya validada, aquí se acepta amplia). */
 type FiltrosReporte = z.input<typeof esquemaReporteFiscalQuery>;
-
-const TEAL = 'FF0D9488';
 
 /** Etiqueta legible de un origen (usa el catálogo del motor; cae al valor crudo si no lo conoce). */
 function origenTexto(origen: string): string {
@@ -34,16 +34,19 @@ export interface DepsExcelReporteFiscal {
   reporteFiscal?: typeof reporteFiscal;
 }
 
+/** Datos PLANOS del reporte fiscal (cruzan al worker por structured clone). */
+export interface DatosExcelReporteFiscal {
+  filas: ReporteFiscalFila[];
+  totales: Awaited<ReturnType<typeof reporteFiscal>>['totales'];
+}
+
 /** Trae TODAS las filas del filtro paginando internamente con el tope del backend (100). */
 async function todasLasFilas(
   sesion: SesionUsuario,
   parametros: FiltrosReporte,
   bd: ContextoBd | undefined,
   consultar: typeof reporteFiscal,
-): Promise<{
-  filas: ReporteFiscalFila[];
-  totales: Awaited<ReturnType<typeof reporteFiscal>>['totales'];
-}> {
+): Promise<DatosExcelReporteFiscal> {
   const TOPE = 100;
   // La 1ª página trae ya los totales del periodo (idénticos en cada página); las demás solo suman filas.
   const primera = await consultar(sesion, { ...parametros, pagina: 1, porPagina: TOPE }, bd);
@@ -66,18 +69,27 @@ function celdaImporte(v: number | null): number | string {
 }
 
 /**
- * Genera el `.xlsx` del reporte fiscal (A9: scope por la empresa activa, ya lo impone `reporteFiscal`).
- * MISMO resultado que la pantalla; trae todos los movimientos del filtro + una fila de totales.
+ * Resuelve el reporte fiscal completo (A9: scope por la empresa activa, ya lo impone `reporteFiscal`).
+ * Corre en el HILO PRINCIPAL: pagina y trae todos los movimientos del filtro + los totales del periodo.
  */
-export async function excelReporteFiscal(
+export async function armarDatosExcelReporteFiscal(
   sesion: SesionUsuario,
   parametros: FiltrosReporte,
   bd?: ContextoBd,
   deps: DepsExcelReporteFiscal = {},
-): Promise<ExcelReporteFiscal> {
+): Promise<DatosExcelReporteFiscal> {
   const consultar = deps.reporteFiscal ?? reporteFiscal;
-  const { filas, totales } = await todasLasFilas(sesion, parametros, bd, consultar);
+  return todasLasFilas(sesion, parametros, bd, consultar);
+}
 
+/**
+ * Construye el `.xlsx` del reporte fiscal a partir de datos ya resueltos. PURO: corre en el WORKER.
+ * MISMO resultado que la pantalla; todos los movimientos del filtro + una fila de totales.
+ */
+export async function construirExcelReporteFiscal({
+  filas,
+  totales,
+}: DatosExcelReporteFiscal): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -98,7 +110,7 @@ export async function excelReporteFiscal(
 
   const encabezado = hoja.getRow(1);
   encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   encabezado.alignment = { vertical: 'middle' };
 
   for (const f of filas) {
@@ -127,6 +139,20 @@ export async function excelReporteFiscal(
   });
   filaTotales.font = { bold: true };
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` del reporte fiscal. Datos en el hilo principal, libro en un worker (blindaje del
+ * event loop).
+ */
+export async function excelReporteFiscal(
+  sesion: SesionUsuario,
+  parametros: FiltrosReporte,
+  bd?: ContextoBd,
+  deps: DepsExcelReporteFiscal = {},
+): Promise<ExcelReporteFiscal> {
+  const datos = await armarDatosExcelReporteFiscal(sesion, parametros, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-reporte-fiscal', datos) };
 }

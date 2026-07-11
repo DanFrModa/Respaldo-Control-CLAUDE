@@ -7,16 +7,23 @@ import ExcelJS from 'exceljs';
 
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 
 import { kpisRutaCritica, kpisCalidadMaquilero, kpisWip } from '../kpis.js';
 import type { ParametrosKpisRc, ParametrosKpisCalidad, ParametrosKpisWip } from '../kpis.js';
 
-import { TEAL_XLSX, etiquetaMes } from './comun.js';
+import { etiquetaMes } from './comun.js';
 
-/** Aplica el estilo teal a una fila de encabezado. */
+/** Datos PLANOS de cada tablero (cruzan al worker por structured clone). */
+export type DatosExcelKpisRc = Awaited<ReturnType<typeof kpisRutaCritica>>;
+export type DatosExcelKpisCalidad = Awaited<ReturnType<typeof kpisCalidadMaquilero>>;
+export type DatosExcelKpisWip = Awaited<ReturnType<typeof kpisWip>>;
+
+/** Aplica el estilo de marca a una fila de encabezado. */
 function estilarEncabezado(fila: ExcelJS.Row): void {
   fila.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL_XLSX } };
+  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   fila.alignment = { vertical: 'middle' };
 }
 
@@ -33,15 +40,19 @@ export interface DepsExcelRc {
   kpisRutaCritica?: typeof kpisRutaCritica;
 }
 
-/** Genera el `.xlsx` del tablero de KPIs de Ruta Crítica. */
-export async function excelKpisRc(
+/** Resuelve el tablero de KPIs de Ruta Crítica (A9 + permiso en el dominio). En el HILO PRINCIPAL. */
+export async function armarDatosExcelKpisRc(
   sesion: SesionUsuario,
   parametros: ParametrosKpisRc = {},
   bd?: ContextoBd,
   deps: DepsExcelRc = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<DatosExcelKpisRc> {
   const obtener = deps.kpisRutaCritica ?? kpisRutaCritica;
-  const datos = await obtener(sesion, parametros, bd);
+  return obtener(sesion, parametros, bd);
+}
+
+/** Construye el `.xlsx` del tablero de KPIs de Ruta Crítica. PURO: corre en el WORKER. */
+export async function construirExcelKpisRc(datos: DatosExcelKpisRc): Promise<Buffer> {
   const libro = nuevoLibro();
 
   const resumen = libro.addWorksheet('Resumen');
@@ -117,7 +128,20 @@ export async function excelKpisRc(
   }
 
   const datosBuf = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datosBuf) };
+  return Buffer.from(datosBuf);
+}
+
+/**
+ * Genera el `.xlsx` del tablero de KPIs de Ruta Crítica. Datos en el hilo principal, libro en un worker.
+ */
+export async function excelKpisRc(
+  sesion: SesionUsuario,
+  parametros: ParametrosKpisRc = {},
+  bd?: ContextoBd,
+  deps: DepsExcelRc = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelKpisRc(sesion, parametros, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-kpis-rc', datos) };
 }
 
 /** Dependencias inyectables (tests). */
@@ -125,15 +149,19 @@ export interface DepsExcelCalidad {
   kpisCalidadMaquilero?: typeof kpisCalidadMaquilero;
 }
 
-/** Genera el `.xlsx` del tablero de calidad por maquilero. */
-export async function excelKpisCalidad(
+/** Resuelve el tablero de calidad por maquilero (A9 + permiso en el dominio). En el HILO PRINCIPAL. */
+export async function armarDatosExcelKpisCalidad(
   sesion: SesionUsuario,
   parametros: ParametrosKpisCalidad = {},
   bd?: ContextoBd,
   deps: DepsExcelCalidad = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<DatosExcelKpisCalidad> {
   const obtener = deps.kpisCalidadMaquilero ?? kpisCalidadMaquilero;
-  const datos = await obtener(sesion, parametros, bd);
+  return obtener(sesion, parametros, bd);
+}
+
+/** Construye el `.xlsx` del tablero de calidad por maquilero. PURO: corre en el WORKER. */
+export async function construirExcelKpisCalidad(datos: DatosExcelKpisCalidad): Promise<Buffer> {
   const libro = nuevoLibro();
 
   const mq = libro.addWorksheet('Maquileros');
@@ -189,7 +217,20 @@ export async function excelKpisCalidad(
   }
 
   const datosBuf = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datosBuf) };
+  return Buffer.from(datosBuf);
+}
+
+/**
+ * Genera el `.xlsx` del tablero de calidad por maquilero. Datos en el hilo principal, libro en un worker.
+ */
+export async function excelKpisCalidad(
+  sesion: SesionUsuario,
+  parametros: ParametrosKpisCalidad = {},
+  bd?: ContextoBd,
+  deps: DepsExcelCalidad = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelKpisCalidad(sesion, parametros, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-kpis-calidad', datos) };
 }
 
 /** Dependencias inyectables (tests). */
@@ -197,15 +238,22 @@ export interface DepsExcelWip {
   kpisWip?: typeof kpisWip;
 }
 
-/** Genera el `.xlsx` del tablero WIP analítico. */
-export async function excelKpisWip(
+/**
+ * Resuelve el tablero WIP analítico (A9 + permiso en el dominio). En el HILO PRINCIPAL. Fuerza
+ * `porPagina: 100` (el export trae el detalle completo del tablero, igual que la pantalla).
+ */
+export async function armarDatosExcelKpisWip(
   sesion: SesionUsuario,
   parametros: ParametrosKpisWip = {},
   bd?: ContextoBd,
   deps: DepsExcelWip = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<DatosExcelKpisWip> {
   const obtener = deps.kpisWip ?? kpisWip;
-  const datos = await obtener(sesion, { ...parametros, porPagina: 100 }, bd);
+  return obtener(sesion, { ...parametros, porPagina: 100 }, bd);
+}
+
+/** Construye el `.xlsx` del tablero WIP analítico. PURO: corre en el WORKER. */
+export async function construirExcelKpisWip(datos: DatosExcelKpisWip): Promise<Buffer> {
   const libro = nuevoLibro();
   const t = datos.totales;
 
@@ -249,5 +297,16 @@ export async function excelKpisWip(
   }
 
   const datosBuf = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datosBuf) };
+  return Buffer.from(datosBuf);
+}
+
+/** Genera el `.xlsx` del tablero WIP analítico. Datos en el hilo principal, libro en un worker. */
+export async function excelKpisWip(
+  sesion: SesionUsuario,
+  parametros: ParametrosKpisWip = {},
+  bd?: ContextoBd,
+  deps: DepsExcelWip = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelKpisWip(sesion, parametros, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-kpis-wip', datos) };
 }
