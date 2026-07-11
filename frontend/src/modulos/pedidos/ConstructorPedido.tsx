@@ -203,6 +203,7 @@ export function ConstructorPedido({
                   cargando={clientes.isFetching}
                   placeholder="Escribe para buscar…"
                   etiqueta="Cliente del pedido"
+                  autoFocus
                   testid="constructor-cliente"
                 />
               </label>

@@ -328,6 +328,7 @@ export function DialogoCliente({
                   <Input
                     id="cliente-rfc"
                     placeholder="Ej. DLI950101ABC"
+                    className="uppercase"
                     aria-invalid={Boolean(errors.rfc)}
                     disabled={guardando}
                     {...registrar('rfc')}

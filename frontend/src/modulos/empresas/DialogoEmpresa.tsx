@@ -206,6 +206,7 @@ export function DialogoEmpresa({
                   <Input
                     id="empresa-rfc"
                     placeholder="Ej. XAXX010101000"
+                    className="uppercase"
                     aria-invalid={Boolean(errors.rfc)}
                     disabled={guardando}
                     {...formulario.register('rfc')}

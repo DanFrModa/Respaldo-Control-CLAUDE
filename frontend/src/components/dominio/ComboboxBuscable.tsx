@@ -146,6 +146,12 @@ export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox
    */
   accionCrear?: { etiqueta: string; onCrear: () => void };
   deshabilitado?: boolean;
+  /**
+   * Enfoca el input al montar: para el PRIMER campo de un panel/diálogo de alta que no vive en
+   * un Dialog de radix (que ya mueve el foco solo). Default false → los selectores embebidos NO
+   * roban el foco. Al enfocar, el combobox abre su lista (comportamiento normal del foco).
+   */
+  autoFocus?: boolean;
   /** Base de los `data-testid` (default "combobox"). */
   testid?: string;
   /**
@@ -178,6 +184,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   cargando = false,
   accionCrear,
   deshabilitado = false,
+  autoFocus = false,
   testid = 'combobox',
   testidInput,
   etiqueta,
@@ -371,6 +378,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
         ref={inputRef}
         type="text"
         role="combobox"
+        autoFocus={autoFocus}
         value={texto}
         disabled={deshabilitado}
         onChange={(e) => {

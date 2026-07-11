@@ -20,7 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Valores por defecto de un alta (todo vacio). */
@@ -115,8 +121,11 @@ export function DialogoTalla({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.etiqueta)}>
-              <FieldLabel htmlFor="talla-etiqueta">Etiqueta</FieldLabel>
+              <FieldLabel htmlFor="talla-etiqueta" required>
+                Etiqueta
+              </FieldLabel>
               <Input
                 id="talla-etiqueta"
                 autoFocus
