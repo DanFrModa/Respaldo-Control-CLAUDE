@@ -812,6 +812,17 @@ export type CumplimientoRcCuerpo =
 export type ChecklistRcCuerpo =
   paths['/api/ruta-critica/checklist/{idItem}']['put']['requestBody']['content']['application/json'];
 
+/** Hitos VIVOS de una orden (revisión OP, fit, tono, avíos, empaque, arte). */
+export type HitosOrden =
+  paths['/api/ruta-critica/ordenes/{id}/hitos']['get']['responses']['200']['content']['application/json'];
+/** Un hito de la orden. */
+export type HitoOrden = HitosOrden[number];
+/** Tipo de hito de la orden. */
+export type TipoHitoOrden = HitoOrden['tipo'];
+/** Cuerpo para registrar un hito de la orden. */
+export type RegistrarHitoCuerpo =
+  paths['/api/ruta-critica/ordenes/{id}/hitos']['post']['requestBody']['content']['application/json'];
+
 /** Página de la bandeja "mis tareas" de la RC (`GET /api/ruta-critica/bandeja`). */
 export type BandejaRcPagina =
   paths['/api/ruta-critica/bandeja']['get']['responses']['200']['content']['application/json'];

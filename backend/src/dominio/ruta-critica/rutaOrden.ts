@@ -84,7 +84,16 @@ export type TipoEventoRc =
   | 'auditoria'
   | 'autorizacionArte'
   | 'entregaCliente'
-  | 'manual';
+  | 'manual'
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  | 'revisionOp'
+  | 'autorizacionFit'
+  | 'autorizacionTono'
+  | 'autorizacionAvios'
+  | 'compraTela'
+  | 'surtidoAvios'
+  | 'auditoriaCorte'
+  | 'empaque';
 
 /** Un renglón de la ruta viva tal como lo devuelve el dominio. */
 export interface RutaOrdenProcesoDto {

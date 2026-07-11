@@ -103815,7 +103815,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Evento de negocio que representa."
                           },
@@ -104216,7 +104224,15 @@
                       "auditoria",
                       "autorizacionArte",
                       "entregaCliente",
-                      "manual"
+                      "manual",
+                      "revisionOp",
+                      "autorizacionFit",
+                      "autorizacionTono",
+                      "autorizacionAvios",
+                      "compraTela",
+                      "surtidoAvios",
+                      "auditoriaCorte",
+                      "empaque"
                     ]
                   },
                   "tipoDuracion": {
@@ -104297,7 +104313,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -104689,7 +104713,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -105053,7 +105085,15 @@
                       "auditoria",
                       "autorizacionArte",
                       "entregaCliente",
-                      "manual"
+                      "manual",
+                      "revisionOp",
+                      "autorizacionFit",
+                      "autorizacionTono",
+                      "autorizacionAvios",
+                      "compraTela",
+                      "surtidoAvios",
+                      "auditoriaCorte",
+                      "empaque"
                     ]
                   },
                   "tipoDuracion": {
@@ -105146,7 +105186,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -105536,7 +105584,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -105952,7 +106008,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -106368,7 +106432,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -106798,7 +106870,15 @@
                         "auditoria",
                         "autorizacionArte",
                         "entregaCliente",
-                        "manual"
+                        "manual",
+                        "revisionOp",
+                        "autorizacionFit",
+                        "autorizacionTono",
+                        "autorizacionAvios",
+                        "compraTela",
+                        "surtidoAvios",
+                        "auditoriaCorte",
+                        "empaque"
                       ],
                       "description": "Evento de negocio que representa."
                     },
@@ -117480,7 +117560,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -118211,7 +118299,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -118851,7 +118947,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -119518,7 +119622,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -120360,7 +120472,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -121023,7 +121143,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -121432,6 +121560,811 @@
         }
       }
     },
+    "/api/ruta-critica/ordenes/{id}/hitos": {
+      "get": {
+        "summary": "Hitos vivos de una orden (revisión OP, fit, tono, avíos, empaque, arte)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hitos vivos de la orden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del hito."
+                      },
+                      "idOrden": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Orden a la que pertenece."
+                      },
+                      "tipo": {
+                        "type": "string",
+                        "enum": [
+                          "revisionOp",
+                          "fit",
+                          "tonoTela",
+                          "avios",
+                          "empaque",
+                          "arte"
+                        ],
+                        "description": "Tipo de hito."
+                      },
+                      "registradoPorId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Usuario que registró el hito (o null)."
+                      },
+                      "fecha": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                        "description": "Fecha física del hito (YYYY-MM-DD)."
+                      },
+                      "creadoEn": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "description": "Sello de creación."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "idOrden",
+                      "tipo",
+                      "registradoPorId",
+                      "fecha",
+                      "creadoEn"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Hito vivo de una orden."
+                  },
+                  "description": "Hitos vivos de la orden."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrar un hito de la orden (auto-completa su proceso de la Ruta Crítica)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "revisionOp",
+                      "fit",
+                      "tonoTela",
+                      "avios",
+                      "empaque",
+                      "arte"
+                    ],
+                    "description": "Tipo de hito a registrar."
+                  },
+                  "fecha": {
+                    "description": "Fecha física del hito (YYYY-MM-DD); por defecto hoy.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "tipo"
+                ],
+                "description": "Datos para registrar un hito de la orden."
+              }
+            }
+          },
+          "description": "Datos para registrar un hito de la orden."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hitos vivos de la orden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del hito."
+                      },
+                      "idOrden": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Orden a la que pertenece."
+                      },
+                      "tipo": {
+                        "type": "string",
+                        "enum": [
+                          "revisionOp",
+                          "fit",
+                          "tonoTela",
+                          "avios",
+                          "empaque",
+                          "arte"
+                        ],
+                        "description": "Tipo de hito."
+                      },
+                      "registradoPorId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Usuario que registró el hito (o null)."
+                      },
+                      "fecha": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                        "description": "Fecha física del hito (YYYY-MM-DD)."
+                      },
+                      "creadoEn": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "description": "Sello de creación."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "idOrden",
+                      "tipo",
+                      "registradoPorId",
+                      "fecha",
+                      "creadoEn"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Hito vivo de una orden."
+                  },
+                  "description": "Hitos vivos de la orden."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/ordenes/{id}/hitos/{idHito}/cancelar": {
+      "post": {
+        "summary": "Cancelar un hito de la orden (cancelación suave, con motivo)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "description": "Motivo de la cancelación del hito."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Datos para cancelar un hito de la orden."
+              }
+            }
+          },
+          "description": "Datos para cancelar un hito de la orden."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idHito",
+            "required": true,
+            "description": "Id del hito a cancelar."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hitos vivos de la orden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del hito."
+                      },
+                      "idOrden": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Orden a la que pertenece."
+                      },
+                      "tipo": {
+                        "type": "string",
+                        "enum": [
+                          "revisionOp",
+                          "fit",
+                          "tonoTela",
+                          "avios",
+                          "empaque",
+                          "arte"
+                        ],
+                        "description": "Tipo de hito."
+                      },
+                      "registradoPorId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Usuario que registró el hito (o null)."
+                      },
+                      "fecha": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                        "description": "Fecha física del hito (YYYY-MM-DD)."
+                      },
+                      "creadoEn": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "description": "Sello de creación."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "idOrden",
+                      "tipo",
+                      "registradoPorId",
+                      "fecha",
+                      "creadoEn"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Hito vivo de una orden."
+                  },
+                  "description": "Hitos vivos de la orden."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ruta-critica/bandeja": {
       "get": {
         "summary": "Bandeja \"mis tareas\": procesos activos a capturar de la Ruta Crítica (por urgencia)",
@@ -121606,7 +122539,15 @@
                               "auditoria",
                               "autorizacionArte",
                               "entregaCliente",
-                              "manual"
+                              "manual",
+                              "revisionOp",
+                              "autorizacionFit",
+                              "autorizacionTono",
+                              "autorizacionAvios",
+                              "compraTela",
+                              "surtidoAvios",
+                              "auditoriaCorte",
+                              "empaque"
                             ],
                             "description": "Cómo se completa el proceso (R4): manual = a mano; el resto, auto por su evento de sistema."
                           },
@@ -131503,7 +132444,8 @@
               "enum": [
                 "en_piso",
                 "final",
-                "no_definida"
+                "no_definida",
+                "corte"
               ]
             },
             "in": "query",
@@ -131660,7 +132602,8 @@
                             "enum": [
                               "en_piso",
                               "final",
-                              "no_definida"
+                              "no_definida",
+                              "corte"
                             ],
                             "description": "Tipo de auditoría."
                           },
@@ -131955,7 +132898,8 @@
                     "enum": [
                       "en_piso",
                       "final",
-                      "no_definida"
+                      "no_definida",
+                      "corte"
                     ]
                   }
                 },
@@ -132114,7 +133058,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },
@@ -132593,7 +133538,8 @@
               "enum": [
                 "en_piso",
                 "final",
-                "no_definida"
+                "no_definida",
+                "corte"
               ]
             },
             "in": "query",
@@ -133020,7 +133966,8 @@
                             "enum": [
                               "en_piso",
                               "final",
-                              "no_definida"
+                              "no_definida",
+                              "corte"
                             ],
                             "description": "Tipo de auditoría."
                           },
@@ -133411,7 +134358,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },
@@ -133883,7 +134831,8 @@
                     "enum": [
                       "en_piso",
                       "final",
-                      "no_definida"
+                      "no_definida",
+                      "corte"
                     ]
                   },
                   "observaciones": {
@@ -134064,7 +135013,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },
@@ -134727,7 +135677,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },
@@ -135400,7 +136351,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },
@@ -136018,7 +136970,8 @@
                       "enum": [
                         "en_piso",
                         "final",
-                        "no_definida"
+                        "no_definida",
+                        "corte"
                       ],
                       "description": "Tipo de auditoría."
                     },

@@ -95,6 +95,15 @@ export const esquemaTipoEventoRc = z.enum([
   'autorizacionArte',
   'entregaCliente',
   'manual',
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  'revisionOp',
+  'autorizacionFit',
+  'autorizacionTono',
+  'autorizacionAvios',
+  'compraTela',
+  'surtidoAvios',
+  'auditoriaCorte',
+  'empaque',
 ]);
 /** Tipo de evento de un proceso RC. */
 export type TipoEventoRcContrato = z.infer<typeof esquemaTipoEventoRc>;

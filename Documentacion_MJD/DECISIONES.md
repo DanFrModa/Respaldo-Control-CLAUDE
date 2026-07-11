@@ -595,3 +595,13 @@ Tomadas por el equipo al construir el ETL del histórico de **Costos + Indicador
 - **Aplica en:** F7-E6 (todos los loaders de indicadores).
 
 - **Fecha (F7-E6.1–F7-E6.4):** 2026-07-03.
+
+#### (Post-F9.1) — Auto-avance RC completo: momentos de disparo de los eventos nuevos (defaults, a ratificar con Daniel)
+Al cerrar los emisores que faltaban (los ~18/20 automáticos del prototipo §4.9), se fijaron estos **momentos de disparo** como default:
+- **"Orden de compra tela" (`compraTela`) se completa al AUTORIZAR la OC** (no al crearla ni al recibir el material — recibir ya tiene su propio proceso `recepcion-tela`). Cancelar la OC lo des-completa.
+- **"Surtido de avíos" (`surtidoAvios`) se completa al CONFIRMAR la nota de salida** con líneas de avío de esa orden. Cancelar la nota lo des-completa.
+- **"Auditoría de Corte" (`auditoriaCorte`):** se agregó el tipo **`corte`** al catálogo de tipos de auditoría de Calidad (antes solo en-piso/final); el proceso se completa cuando hay una auditoría de corte APROBADA viva de la orden.
+- **Hitos capturados a mano (`HitoOrden`):** revisión de OP, autorización de fit, tono de tela, avíos, empaque y **autorización de arte** no nacen de ningún documento del sistema → se capturan como **hito de la orden** (quién/cuándo, cancelación con motivo) en el detalle de la orden, y ese registro dispara el auto-avance. La completitud es **por presencia** (sin cantidades). El hito de ARTE cierra el hueco latente de F5-E1 (`autorizacion-arte` era automático pero nadie emitía su evento).
+- Todo con la mecánica vigente de F5-E6: evento en la MISMA tx (outbox), re-evaluación idempotente del estado físico, cancelar des-completa (decisión f), el automático manda sobre lo manual (decisión e).
+- **Aplica en:** remate post-F9 "emisores de eventos RC" (11-jul-2026).
+- **Fecha:** 2026-07-11.

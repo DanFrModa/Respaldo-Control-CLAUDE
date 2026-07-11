@@ -104,6 +104,27 @@ La completitud/cancelación se resuelven por **RE-EVALUACIÓN del estado físico
 vs `OrdenLineaTalla`) → idempotente gratis. La RC **nunca** modifica `Orden.fechaEntrega` (decisión
 (c): a diferencia del viejo, donde el proceso 'C' la sobre-escribía en silencio).
 
+### Emisores completados en el remate post-F9 (11-jul-2026)
+
+Con estos el catálogo queda **~18/26 procesos automáticos** (el objetivo del prototipo §4.9 de
+Daniel). Defaults de negocio en `DECISIONES.md §(Post-F9.1)`; misma mecánica E6 (outbox en la tx,
+re-lectura física binaria, cancelar des-completa):
+
+- **`compraTela`** — "Orden de compra tela": `autorizarOC`/`cancelarOC` emiten por cada orden de
+  producción ligada en líneas de TELA. Físico: ¿hay OC viva autorizada/recibida con línea de tela de
+  la orden?
+- **`surtidoAvios`** — "Surtido de avíos": confirmar/cancelar la **nota de salida** emite por cada
+  orden con líneas de AVÍO. Físico: ¿hay nota confirmada viva con avío de la orden?
+- **`auditoriaCorte`** — "Auditoría de Corte": sin emisor nuevo; `auditoria-calidad-resuelta` ya se
+  emitía en toda captura y el consumidor ahora re-evalúa también este tipo (se agregó **`corte`** a
+  `TipoAuditoria`). Físico: ¿hay auditoría de corte APROBADA viva?
+- **Hitos de la orden (`HitoOrden` + `dominio/ruta-critica/hitosOrden.ts`)** — revisión de OP,
+  autorización de fit / tono de tela / avíos, empaque y **arte** no nacen de ningún documento del
+  sistema: se capturan como hito (quién/cuándo; un vivo por orden+tipo con **unique parcial**;
+  cancelación suave con motivo) en el detalle de Producción › Órdenes (`PanelHitosOrden`), permisos
+  reusados `rc.ruta-ver`/`rc.capturar`. El hito de ARTE emite `autorizacionArte` y cierra el hueco
+  latente de F5-E1. Completitud **por presencia** (sin cantidades).
+
 ## Migración del histórico (F5-E7)
 
 ETL idempotente, por lotes, **CP850** (`comun/csv.ts`), vía dominio modo-migración

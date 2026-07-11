@@ -3,6 +3,7 @@ import {
   Calendar,
   Factory,
   Grid3x3,
+  ListChecks,
   MessageSquare,
   Paperclip,
   Route,
@@ -30,6 +31,7 @@ import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
 import { EditorEncabezadoOrden } from './EditorEncabezadoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelComentarios } from './PanelComentarios';
+import { PanelHitosOrden } from './PanelHitosOrden';
 import { PanelMatriz } from './PanelMatriz';
 import { PanelReferencias } from './PanelReferencias';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
@@ -108,6 +110,8 @@ export function OrdenesPagina(): React.JSX.Element {
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
+  // Hitos de la orden (post-F9): capturar/cancelar exige `rc.capturar` (es un avance de RC).
+  const puedeCapturarRc = tienePermiso('rc.capturar');
   // Enganche Desarrollo↔orden (F8-E6): ver el expediente/sugerencia (desarrollo.ver), ligar/quitar
   // (desarrollo.administrar) y ver importes (consultas.ver-importes). El backend re-decide (A1).
   const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
@@ -245,6 +249,7 @@ export function OrdenesPagina(): React.JSX.Element {
             puedeAdministrar={puedeAdministrar}
             puedeRutaVer={puedeRutaVer}
             puedeProgramar={puedeProgramar}
+            puedeCapturarRc={puedeCapturarRc}
             puedeVerDesarrollo={puedeVerDesarrollo}
             puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
             verImportes={verImportes}
@@ -287,6 +292,7 @@ function DetalleOrden({
   puedeAdministrar,
   puedeRutaVer,
   puedeProgramar,
+  puedeCapturarRc,
   puedeVerDesarrollo,
   puedeAdministrarDesarrollo,
   verImportes,
@@ -298,6 +304,7 @@ function DetalleOrden({
   puedeAdministrar: boolean;
   puedeRutaVer: boolean;
   puedeProgramar: boolean;
+  puedeCapturarRc: boolean;
   puedeVerDesarrollo: boolean;
   puedeAdministrarDesarrollo: boolean;
   verImportes: boolean;
@@ -369,6 +376,15 @@ function DetalleOrden({
       <SeccionDetalle titulo="Referencias del cliente" icono={Tags}>
         <PanelReferencias orden={orden} puedeAdministrar={puedeAdministrar} />
       </SeccionDetalle>
+
+      {/* Hitos de la orden (post-F9): actos puntuales (revisión OP, fit, tono, avíos, empaque, arte)
+          que auto-completan su proceso de la Ruta Crítica. Se muestra a quien puede ver la RC;
+          registrar/cancelar exige `rc.capturar`. El backend re-decide (A1). */}
+      {puedeRutaVer ? (
+        <SeccionDetalle titulo="Hitos de la orden" icono={ListChecks}>
+          <PanelHitosOrden orden={orden} puedeCapturar={puedeCapturarRc} />
+        </SeccionDetalle>
+      ) : null}
 
       {/* Enganche Desarrollo↔Producción (F8-E6): sugerencia+ligar o vista 360 del expediente. Solo
           para quien puede ver Desarrollo; el backend re-decide (A1). */}

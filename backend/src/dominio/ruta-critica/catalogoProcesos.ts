@@ -89,7 +89,16 @@ export interface ProcesoCompletoDto {
     | 'auditoria'
     | 'autorizacionArte'
     | 'entregaCliente'
-    | 'manual';
+    | 'manual'
+    // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+    | 'revisionOp'
+    | 'autorizacionFit'
+    | 'autorizacionTono'
+    | 'autorizacionAvios'
+    | 'compraTela'
+    | 'surtidoAvios'
+    | 'auditoriaCorte'
+    | 'empaque';
   tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion' | 'porDificultad';
   activo: boolean;
   roles: { idRol: number; nombre: string }[];

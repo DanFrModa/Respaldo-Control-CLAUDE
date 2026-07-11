@@ -102,9 +102,17 @@ export const EVENTO_RC_DESCRIPCION: Record<TipoEventoProceso, string> = {
   envioEstampado: 'el envío a estampado (Avance)',
   reciboEstampado: 'el recibo de estampado (Avance)',
   auditoria: 'la auditoría AQL (Calidad)',
-  autorizacionArte: 'el arte autorizado',
+  autorizacionArte: 'el arte autorizado (hito de la orden)',
   entregaCliente: 'la entrega a cliente (Almacén)',
   manual: 'se marca a mano',
+  revisionOp: 'la revisión de la orden (hito de la orden)',
+  autorizacionFit: 'la autorización de fit (hito de la orden)',
+  autorizacionTono: 'la autorización de tono de tela (hito de la orden)',
+  autorizacionAvios: 'la autorización de avíos (hito de la orden)',
+  compraTela: 'la orden de compra de tela autorizada (Compras)',
+  surtidoAvios: 'la nota de salida de avíos confirmada (Producción)',
+  auditoriaCorte: 'la auditoría de corte aprobada (Calidad)',
+  empaque: 'el empaque (hito de la orden)',
 };
 
 /**
@@ -122,4 +130,14 @@ export const RUTA_PANTALLA_EVENTO: Record<TipoEventoProceso, string | null> = {
   autorizacionArte: null,
   entregaCliente: '/produccion/entregas',
   manual: null,
+  // Hitos de la orden (post-F9): se registran en el detalle de la orden (sin pantalla propia estática
+  // → "Marcar hecho"); compra de tela / surtido de avíos / auditoría de corte sí tienen su pantalla.
+  revisionOp: null,
+  autorizacionFit: null,
+  autorizacionTono: null,
+  autorizacionAvios: null,
+  compraTela: '/compras/autorizacion',
+  surtidoAvios: '/produccion/notas-salida',
+  auditoriaCorte: '/calidad/auditorias/nueva',
+  empaque: null,
 };

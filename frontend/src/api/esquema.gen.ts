@@ -43557,7 +43557,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /**
                  * @description Cómo se estima su duración.
                  * @enum {string}
@@ -43733,7 +43741,15 @@ export interface paths {
               | 'auditoria'
               | 'autorizacionArte'
               | 'entregaCliente'
-              | 'manual';
+              | 'manual'
+              | 'revisionOp'
+              | 'autorizacionFit'
+              | 'autorizacionTono'
+              | 'autorizacionAvios'
+              | 'compraTela'
+              | 'surtidoAvios'
+              | 'auditoriaCorte'
+              | 'empaque';
             /** @enum {string} */
             tipoDuracion?:
               | 'fija'
@@ -43783,7 +43799,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -43984,7 +44008,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -44174,7 +44206,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -44345,7 +44385,15 @@ export interface paths {
               | 'auditoria'
               | 'autorizacionArte'
               | 'entregaCliente'
-              | 'manual';
+              | 'manual'
+              | 'revisionOp'
+              | 'autorizacionFit'
+              | 'autorizacionTono'
+              | 'autorizacionAvios'
+              | 'compraTela'
+              | 'surtidoAvios'
+              | 'auditoriaCorte'
+              | 'empaque';
             /** @enum {string} */
             tipoDuracion?:
               | 'fija'
@@ -44396,7 +44444,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -44601,7 +44657,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -44811,7 +44875,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -45024,7 +45096,15 @@ export interface paths {
                 | 'auditoria'
                 | 'autorizacionArte'
                 | 'entregaCliente'
-                | 'manual';
+                | 'manual'
+                | 'revisionOp'
+                | 'autorizacionFit'
+                | 'autorizacionTono'
+                | 'autorizacionAvios'
+                | 'compraTela'
+                | 'surtidoAvios'
+                | 'auditoriaCorte'
+                | 'empaque';
               /**
                * @description Cómo se estima su duración.
                * @enum {string}
@@ -50249,7 +50329,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -50470,7 +50558,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -50710,7 +50806,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -50940,7 +51044,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -51285,7 +51397,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -51516,7 +51636,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
                 /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
@@ -51650,6 +51778,439 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ruta-critica/ordenes/{id}/hitos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Hitos vivos de una orden (revisión OP, fit, tono, avíos, empaque, arte) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Hitos vivos de la orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del hito. */
+              id: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /**
+               * @description Tipo de hito.
+               * @enum {string}
+               */
+              tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
+              /** @description Usuario que registró el hito (o null). */
+              registradoPorId: string | null;
+              /**
+               * Format: date
+               * @description Fecha física del hito (YYYY-MM-DD).
+               */
+              fecha: string;
+              /**
+               * Format: date-time
+               * @description Sello de creación.
+               */
+              creadoEn: string;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Registrar un hito de la orden (auto-completa su proceso de la Ruta Crítica) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para registrar un hito de la orden. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Tipo de hito a registrar.
+             * @enum {string}
+             */
+            tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
+            /**
+             * Format: date
+             * @description Fecha física del hito (YYYY-MM-DD); por defecto hoy.
+             */
+            fecha?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Hitos vivos de la orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del hito. */
+              id: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /**
+               * @description Tipo de hito.
+               * @enum {string}
+               */
+              tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
+              /** @description Usuario que registró el hito (o null). */
+              registradoPorId: string | null;
+              /**
+               * Format: date
+               * @description Fecha física del hito (YYYY-MM-DD).
+               */
+              fecha: string;
+              /**
+               * Format: date-time
+               * @description Sello de creación.
+               */
+              creadoEn: string;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/ordenes/{id}/hitos/{idHito}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar un hito de la orden (cancelación suave, con motivo) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+          /** @description Id del hito a cancelar. */
+          idHito: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para cancelar un hito de la orden. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo de la cancelación del hito. */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Hitos vivos de la orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del hito. */
+              id: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /**
+               * @description Tipo de hito.
+               * @enum {string}
+               */
+              tipo: 'revisionOp' | 'fit' | 'tonoTela' | 'avios' | 'empaque' | 'arte';
+              /** @description Usuario que registró el hito (o null). */
+              registradoPorId: string | null;
+              /**
+               * Format: date
+               * @description Fecha física del hito (YYYY-MM-DD).
+               */
+              fecha: string;
+              /**
+               * Format: date-time
+               * @description Sello de creación.
+               */
+              creadoEn: string;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ruta-critica/bandeja': {
     parameters: {
       query?: never;
@@ -51727,7 +52288,15 @@ export interface paths {
                   | 'auditoria'
                   | 'autorizacionArte'
                   | 'entregaCliente'
-                  | 'manual';
+                  | 'manual'
+                  | 'revisionOp'
+                  | 'autorizacionFit'
+                  | 'autorizacionTono'
+                  | 'autorizacionAvios'
+                  | 'compraTela'
+                  | 'surtidoAvios'
+                  | 'auditoriaCorte'
+                  | 'empaque';
                 /** @description Fecha de entrega comprometida de la orden, o null. */
                 fechaEntrega: string | null;
                 /** @description Fecha planeada vigente del proceso (CPM, E4), o null si aún no se ha fechado. */
@@ -56345,7 +56914,7 @@ export interface paths {
           /** @description Filtra por resultado. */
           resultado?: 'aprobado' | 'reprobado' | 'no_calificado';
           /** @description Filtra por tipo de auditoría. */
-          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida' | 'corte';
           /** @description Fecha de auditoría mínima (YYYY-MM-DD, inclusive). */
           desde?: string;
           /** @description Fecha de auditoría máxima (YYYY-MM-DD, inclusive). */
@@ -56393,7 +56962,7 @@ export interface paths {
                  * @description Tipo de auditoría.
                  * @enum {string}
                  */
-                tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+                tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
                 /**
                  * @description Veredicto manual del auditor.
                  * @enum {string}
@@ -56532,7 +57101,7 @@ export interface paths {
              * @default no_definida
              * @enum {string}
              */
-            tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+            tipoAuditoria?: 'en_piso' | 'final' | 'no_definida' | 'corte';
           };
         };
       };
@@ -56588,7 +57157,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */
@@ -56766,7 +57335,7 @@ export interface paths {
           /** @description Filtra por resultado. */
           resultado?: 'aprobado' | 'reprobado' | 'no_calificado';
           /** @description Filtra por tipo de auditoría. */
-          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida' | 'corte';
           /** @description Fecha de auditoría mínima (YYYY-MM-DD, inclusive). */
           desde?: string;
           /** @description Fecha de auditoría máxima (YYYY-MM-DD, inclusive). */
@@ -56960,7 +57529,7 @@ export interface paths {
                  * @description Tipo de auditoría.
                  * @enum {string}
                  */
-                tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+                tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
                 /**
                  * @description Veredicto manual del auditor.
                  * @enum {string}
@@ -57139,7 +57708,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */
@@ -57329,7 +57898,7 @@ export interface paths {
              * @description Tipo de auditoría (en piso / final / sin definir).
              * @enum {string}
              */
-            tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+            tipoAuditoria?: 'en_piso' | 'final' | 'no_definida' | 'corte';
             /** @description Observaciones (texto libre), o null. */
             observaciones?: string | null;
           };
@@ -57387,7 +57956,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */
@@ -57640,7 +58209,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */
@@ -57894,7 +58463,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */
@@ -58135,7 +58704,7 @@ export interface paths {
                * @description Tipo de auditoría.
                * @enum {string}
                */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida' | 'corte';
               /** @description Observaciones del auditor. */
               observaciones: string | null;
               /** @description Si la auditoría está cancelada (borrado suave). */

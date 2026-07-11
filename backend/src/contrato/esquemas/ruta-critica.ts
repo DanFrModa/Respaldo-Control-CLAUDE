@@ -34,6 +34,15 @@ export const TIPOS_EVENTO_PROCESO = [
   'autorizacionArte',
   'entregaCliente',
   'manual',
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  'revisionOp',
+  'autorizacionFit',
+  'autorizacionTono',
+  'autorizacionAvios',
+  'compraTela',
+  'surtidoAvios',
+  'auditoriaCorte',
+  'empaque',
 ] as const;
 /** Clave de tipo de evento de proceso. */
 export type TipoEventoProcesoClave = (typeof TIPOS_EVENTO_PROCESO)[number];
@@ -49,6 +58,14 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   autorizacionArte: 'Autorización de arte',
   entregaCliente: 'Entrega a cliente',
   manual: 'Manual (sin evento del sistema)',
+  revisionOp: 'Revisión de la orden',
+  autorizacionFit: 'Autorización de fit',
+  autorizacionTono: 'Autorización de tono de tela',
+  autorizacionAvios: 'Autorización de avíos',
+  compraTela: 'Orden de compra de tela',
+  surtidoAvios: 'Surtido de avíos',
+  auditoriaCorte: 'Auditoría de corte',
+  empaque: 'Empaque',
 };
 
 /** Cómo se calcula la duración estimada de un proceso (TIPADO; la fórmula vive en el motor). */

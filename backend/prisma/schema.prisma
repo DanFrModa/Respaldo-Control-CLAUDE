@@ -121,6 +121,8 @@ model Empresa {
   listasPrecios          ListaPrecios[]
   /// Movimientos de cuenta corriente de terceros (CxC/CxP, F9-E1, A9 — folio por empresa). Restrict.
   movimientosTerceros    MovimientoTercero[]
+  /// Hitos de orden capturados en esta empresa (post-F9, A9). Restrict.
+  hitosOrden             HitoOrden[]
 
   @@map("empresas")
 }
@@ -2221,6 +2223,9 @@ model Orden {
   archivos             OrdenArchivo[]
   /// Historial INMUTABLE de cambios de precio maquila/aplicación (rediseño R2, §4.4.3). Cascade.
   precioEventos        OrdenPrecioEvento[]
+  /// Hitos capturados a mano de esta orden (post-F9): revisión OP, fit, tono, avíos, empaque, arte.
+  /// Cada hito vivo auto-completa su proceso RC vía el auto-avance. Restrict (nunca se borra, D3).
+  hitos                HitoOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3751,6 +3756,73 @@ model NotaSalidaLinea {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HITOS de la orden (cierre del hueco de emisores, post-F9). Varios procesos que
+// Daniel dictó AUTOMÁTICOS no tienen un HECHO estructurado de v2 que los dispare
+// (revisión de la OP, autorización de fit, de tono de tela, de avíos, empaque, y la
+// autorización de arte). Un HITO es ese hecho: un acto puntual que se captura a mano
+// en el detalle de la orden y que —vía el evento `hito-orden-resuelto`— auto-completa
+// el proceso RC correspondiente (mismo motor de auto-avance que corte/recibo). Es la
+// contraparte "sin submódulo propio" de los eventos que sí nacen de OC/nota/auditoría.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tipo de HITO de una orden. Cada valor mapea a un `TipoEventoProceso` en el dominio
+/// (`hitosOrden.tipoEventoDeHito`): revisionOp→revisionOp, fit→autorizacionFit,
+/// tonoTela→autorizacionTono, avios→autorizacionAvios, empaque→empaque, arte→
+/// autorizacionArte (este último cierra el proceso `autorizacion-arte` que YA era auto
+/// pero nadie emitía). Enum GLOBAL (los hitos son de la orden, no del catálogo).
+enum TipoHitoOrden {
+  revisionOp
+  fit
+  tonoTela
+  avios
+  empaque
+  arte
+
+  @@map("tipo_hito_orden")
+}
+
+/// HITO capturado en una orden (post-F9). Un acto puntual (p. ej. "autorización de fit
+/// OK") que dispara el auto-avance del proceso RC ligado. NO lleva cantidades (es
+/// binario: existe/no existe un hito vivo del tipo). Cancelación SUAVE (D3/A7): nunca
+/// se borra ni se edita — un hito cancelado deja de contar y se puede re-registrar. El
+/// índice UNIQUE PARCIAL `hito_orden_vivo_unico` (creado a mano en la migración, como las
+/// vistas: Prisma no expresa el WHERE) garantiza UN hito VIVO por orden+tipo. A9: sellado
+/// por empresa. Referencias de usuario SIN FK física (ADR-0005, patrón `autorizadaPorId`).
+model HitoOrden {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del hito (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Orden a la que pertenece el hito. Restrict.
+  idOrden   Int     @map("id_orden")
+  orden     Orden   @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Tipo de hito (ver enum). Su mapeo a proceso RC vive en el dominio.
+  tipo TipoHitoOrden
+
+  /// Quién registró el hito (usuario de sesión). Sin FK física (ADR-0005).
+  registradoPorId String?  @map("registrado_por_id")
+  /// Fecha FÍSICA del acto (date-only). Es la que se escribe como `fechaReal` del proceso
+  /// RC si el hito lo auto-completa (KPI D11 "cuándo": la fecha del hecho, no el reloj).
+  fecha           DateTime @db.Date
+
+  /// Cancelación SUAVE (D3/A7): NULL = vivo. Motivo OBLIGATORIO al cancelar (lo exige el dominio).
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idOrden])
+  @@index([tipo])
+  @@map("hito_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RUTA CRÍTICA — catálogo configurable de procesos (Módulo 8, F5-E1; doc
 // 08-Ruta-Critica.md; D10/D11). El "corazón configurable" del motor de workflow:
 // el catálogo de procesos como DATOS (`ProcesoDef`), sus roles responsables N:M
@@ -3783,6 +3855,15 @@ enum CondicionAplicabilidad {
 /// cliente). El motor de E2+ podrá auto-completar el cumplimiento de un proceso a
 /// partir del evento de dominio correspondiente (gancho RC, F3-E1). `manual` = el
 /// proceso no tiene evento del sistema y se cumple a mano.
+///
+/// Los 8 valores del bloque final (revisionOp…empaque) se AGREGARON al cerrar el
+/// hueco de emisores (post-F9, hallazgo de Gabriel: Daniel dictó ~18/20 procesos
+/// AUTOMÁTICOS pero v2 no emitía sus eventos). `compraTela`/`surtidoAvios`/
+/// `auditoriaCorte` los completan la OC de tela autorizada, la nota de salida de
+/// avíos confirmada y la auditoría de corte aprobada; `revisionOp`/`autorizacionFit`/
+/// `autorizacionTono`/`autorizacionAvios`/`empaque` los completa un HITO capturado a
+/// mano (`HitoOrden`) — el gancho es el mismo motor de auto-avance (`autoAvance.ts`).
+/// Van AL FINAL del enum (BD == schema) para que el `ADD VALUE` no requiera reordenar.
 enum TipoEventoProceso {
   recepcionTela
   corte
@@ -3794,6 +3875,14 @@ enum TipoEventoProceso {
   autorizacionArte
   entregaCliente
   manual
+  revisionOp
+  autorizacionFit
+  autorizacionTono
+  autorizacionAvios
+  compraTela
+  surtidoAvios
+  auditoriaCorte
+  empaque
 
   @@map("tipo_evento_proceso")
 }
@@ -4555,12 +4644,14 @@ enum ResultadoAuditoria {
 }
 
 /// Tipo de auditoría (doc 09 §1: en piso durante la producción, o final al recibir).
-/// `no_definida` para los casos viejos/sin clasificar. Solo una auditoría `final`
-/// `aprobado` gatilla el auto-avance de la RC (la de piso es un control intermedio).
+/// `no_definida` para los casos viejos/sin clasificar. Una auditoría `final` `aprobado`
+/// gatilla el auto-avance del proceso RC `auditoria`; una `corte` `aprobado` gatilla el
+/// proceso RC `auditoriaCorte` (la de piso es un control intermedio que no auto-completa).
 enum TipoAuditoria {
   en_piso
   final
   no_definida
+  corte
 
   @@map("tipo_auditoria")
 }

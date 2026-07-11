@@ -89,6 +89,7 @@ import { rutasAnalisisRc } from './api/ruta-critica/analisis.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
 import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
+import { rutasHitosRc } from './api/ruta-critica/hitos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasResumen } from './api/resumen/resumen.rutas.js';
@@ -322,6 +323,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // plantilla, D10) y consultarla. Encola el recálculo del CPM (pg-boss); las FECHAS las calcula
   // E4. RBAC por ruta (rc.programar muta, rc.ruta-ver consulta).
   await app.register(rutasProgramacionRc, { prefix: '/api' });
+  // RUTA CRÍTICA (post-F9) — HITOS de la orden: actos puntuales capturados a mano (revisión OP, fit,
+  // tono de tela, avíos, empaque, arte) que auto-completan su proceso RC vía el auto-avance (cierre
+  // del hueco de emisores). RBAC rc.ruta-ver (listar) / rc.capturar (registrar/cancelar); A9.
+  await app.register(rutasHitosRc, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E5) — BANDEJA "mis tareas" (procesos activos a capturar, por urgencia,
   // de los que el usuario es responsable; o todas con supervisión) + CONTEO de alertas (atrasados/
   // enRiesgo) para el badge del header. Solo lectura; RBAC rc.ruta-ver; semáforo/atraso DERIVADOS.

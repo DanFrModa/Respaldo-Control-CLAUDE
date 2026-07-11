@@ -1625,6 +1625,21 @@ export {
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 
+// ── Ruta Crítica: hitos de la orden (cierre del hueco de emisores, post-F9) ──
+export {
+  TIPOS_HITO_ORDEN,
+  esquemaParamOrdenHito,
+  esquemaRegistrarHitoCuerpo,
+  esquemaCancelarHitoCuerpo,
+  esquemaHitoOrdenSalida,
+  esquemaHitosOrdenSalida,
+  type TipoHitoOrdenClave,
+  type DatosRegistrarHito,
+  type DatosCancelarHito,
+  type HitoOrdenSalida,
+  type HitosOrdenSalida,
+} from './esquemas/ruta-critica-hitos.js';
+
 // ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5; R4) ──
 export {
   esquemaBandejaRcQuery,
