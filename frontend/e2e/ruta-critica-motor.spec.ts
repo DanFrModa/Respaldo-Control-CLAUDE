@@ -165,15 +165,30 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     // AISLA las filas de ESTA corrida: el admin ve TODO y la página trae 100 tareas por consulta —
     // con la BD del CI llena de órdenes de otros specs, la fila podía quedar FUERA de la página
     // (el flaky de la 1ª corrida). El filtro por cliente es SERVER-SIDE (parámetro de la bandeja).
-    await page.getByTestId('pendientes-buscar-cliente').fill(cliente);
+    //
+    // Además, la RUTA VIVA (renglones + fechas del CPM) se materializa ASÍNCRONO en el backend del
+    // compose (outbox → pg-boss); con este PR la cola trae MÁS mensajes (OCs y notas ahora emiten;
+    // cada auditoría re-evalúa 2 tipos), así que la fila puede tardar y la página NO re-consulta sola.
+    // Se reintenta RECARGANDO y re-aplicando el filtro hasta que la fila del proc1 exista. `toPass`
+    // reintenta el callback COMPLETO aunque una aserción interna lance (mismo patrón que pedidos.spec).
+    await expect(async () => {
+      await page.reload();
+      await page.getByTestId('pendientes-buscar-cliente').fill(cliente);
+      await expect(
+        page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre }),
+      ).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000, intervals: [2_000] });
+
     const fila1 = page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre });
-    await expect(fila1).toBeVisible();
     // Los procesos del test no tienen evento de sistema → tag "✋ manual" + botón "Marcar hecho".
     await expect(fila1.getByTestId('pendientes-tag-evento')).toHaveText('✋ manual');
 
     // ── 7) "Marcar hecho" saca al primero; el otro (raíz independiente) sigue ahí ──────────────
     await fila1.getByTestId('pendientes-marcar-hecho').click();
-    await expect(page.getByText(/marcado como hecho\./)).toBeVisible();
+    // Toast ESPECÍFICO por nombre: el toast del paso 8 (proc2) puede solaparse con este mientras se
+    // desvanece; un `/marcado como hecho\./` genérico casaría 2 elementos (strict mode). El texto real
+    // es `"<nombre>" de la orden <folio> marcado como hecho.` (MisPendientesPagina).
+    await expect(page.getByText(new RegExp(`"${proc1Nombre}".*marcado como hecho`))).toBeVisible();
     await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre })).toHaveCount(
       0,
     );
@@ -182,7 +197,7 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
 
     // ── 8) Marcar el último: la orden queda al día (sale de Mis pendientes) ─────
     await fila2.getByTestId('pendientes-marcar-hecho').click();
-    await expect(page.getByText(/marcado como hecho\./)).toBeVisible();
+    await expect(page.getByText(new RegExp(`"${proc2Nombre}".*marcado como hecho`))).toBeVisible();
     await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc2Nombre })).toHaveCount(
       0,
     );

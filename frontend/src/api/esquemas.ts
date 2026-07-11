@@ -687,6 +687,15 @@ export const TIPOS_EVENTO_PROCESO = [
   'autorizacionArte',
   'entregaCliente',
   'manual',
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  'revisionOp',
+  'autorizacionFit',
+  'autorizacionTono',
+  'autorizacionAvios',
+  'compraTela',
+  'surtidoAvios',
+  'auditoriaCorte',
+  'empaque',
 ] as const;
 /** Clave de tipo de evento. */
 export type TipoEventoProcesoClave = (typeof TIPOS_EVENTO_PROCESO)[number];
@@ -702,6 +711,14 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   autorizacionArte: 'Autorización de arte',
   entregaCliente: 'Entrega a cliente',
   manual: 'Manual (sin evento del sistema)',
+  revisionOp: 'Revisión de la orden',
+  autorizacionFit: 'Autorización de fit',
+  autorizacionTono: 'Autorización de tono de tela',
+  autorizacionAvios: 'Autorización de avíos',
+  compraTela: 'Orden de compra de tela',
+  surtidoAvios: 'Surtido de avíos',
+  auditoriaCorte: 'Auditoría de corte',
+  empaque: 'Empaque',
 };
 
 /** Tipos de duración de proceso (espejo del backend). */
@@ -784,8 +801,8 @@ export const ETIQUETAS_RESULTADO_AUDITORIA: Record<ResultadoAuditoriaClave, stri
   no_calificado: 'Sin calificar',
 };
 
-/** Tipos de auditoría (en piso / final / sin definir). */
-export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida'] as const;
+/** Tipos de auditoría (en piso / final / de corte / sin definir). */
+export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida', 'corte'] as const;
 /** Clave de tipo de auditoría. */
 export type TipoAuditoriaClave = (typeof TIPOS_AUDITORIA)[number];
 /** Etiquetas para UI de cada tipo. */
@@ -793,6 +810,7 @@ export const ETIQUETAS_TIPO_AUDITORIA: Record<TipoAuditoriaClave, string> = {
   en_piso: 'En piso',
   final: 'Final',
   no_definida: 'Sin definir',
+  corte: 'De corte',
 };
 
 /** Etiquetas de la accion de bitacora (espejo del backend, A7). */

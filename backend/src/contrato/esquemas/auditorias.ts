@@ -33,8 +33,11 @@ export const ETIQUETAS_RESULTADO_AUDITORIA: Record<ResultadoAuditoriaClave, stri
   no_calificado: 'Sin calificar',
 };
 
-/** Tipo de auditoría (en piso durante la producción / final al recibir / sin definir). */
-export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida'] as const;
+/**
+ * Tipo de auditoría (en piso durante la producción / final al recibir / de corte / sin definir). Una
+ * `final` `aprobado` completa el proceso RC `auditoria`; una `corte` `aprobado` completa `auditoriaCorte`.
+ */
+export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida', 'corte'] as const;
 
 /** Clave de tipo de auditoría. */
 export type TipoAuditoriaClave = (typeof TIPOS_AUDITORIA)[number];
@@ -44,6 +47,7 @@ export const ETIQUETAS_TIPO_AUDITORIA: Record<TipoAuditoriaClave, string> = {
   en_piso: 'En piso',
   final: 'Final',
   no_definida: 'Sin definir',
+  corte: 'De corte',
 };
 
 /** Sugerencia informativa por defecto: aprobar (≤ Ac) o reprobar (≥ Re) según el plan. */

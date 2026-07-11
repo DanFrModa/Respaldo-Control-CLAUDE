@@ -63,7 +63,16 @@ type TipoEventoProceso =
   | 'auditoria'
   | 'autorizacionArte'
   | 'entregaCliente'
-  | 'manual';
+  | 'manual'
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  | 'revisionOp'
+  | 'autorizacionFit'
+  | 'autorizacionTono'
+  | 'autorizacionAvios'
+  | 'compraTela'
+  | 'surtidoAvios'
+  | 'auditoriaCorte'
+  | 'empaque';
 type TipoDuracionProceso = 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
 
 interface ProcesoSeed {
@@ -95,6 +104,11 @@ interface ProcesoSeed {
  *    `auditoria` (la AQL final de F6 la completa) y `entrega-cdis` → `entregaCliente` (F3-E5). Para
  *    BDs YA sembradas (el upsert de abajo NO pisa filas existentes) el backfill vive en la migración
  *    `20260710150000_r9_rc_tipo_evento_backfill`.
+ *  • Cierre del hueco de EMISORES (post-F9): 8 procesos que Daniel dictó AUTOMÁTICOS y cuyo evento v2
+ *    ya emite: `revision-orden`→revisionOp, `autorizacion-fit`→autorizacionFit, `orden-compra-tela`→
+ *    compraTela, `autorizacion-tono-tela`→autorizacionTono, `autorizacion-avios`→autorizacionAvios,
+ *    `surtido-avios`→surtidoAvios, `auditoria-corte`→auditoriaCorte, `empaque`→empaque. Para BDs YA
+ *    sembradas el backfill vive en `20260710250000_rc_hitos_orden` (mismo criterio anti-pisado).
  *  • `AntecesorRef → antecesor` (dependencia genérica; un antecesor por proceso).
  */
 const PROCESOS_RC: ProcesoSeed[] = [
@@ -105,7 +119,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'revisionOp',
     tipoDuracion: 'fija',
     antecesor: null,
     roles: ['Administrador', 'Gerencia'],
@@ -141,7 +155,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: true,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionFit',
     tipoDuracion: 'fija',
     antecesor: 'revision-orden',
     roles: ['Administrador', 'Ingenieria del Producto'],
@@ -165,7 +179,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'compraTela',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Gerencia'],
@@ -177,7 +191,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionTono',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Gerencia'],
@@ -189,7 +203,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: true,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionAvios',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Compra Avios'],
@@ -237,7 +251,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'surtidoAvios',
     tipoDuracion: 'fija',
     antecesor: 'orden-compra-habilitaciones',
     roles: ['Administrador', 'Produccion'],
@@ -285,7 +299,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'auditoriaCorte',
     tipoDuracion: 'fija',
     antecesor: 'entrega-moldes-corte',
     roles: ['Administrador', 'Calidad'],
@@ -383,7 +397,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'empaque',
     tipoDuracion: 'fija',
     antecesor: 'auditoria-calidad-interna',
     roles: ['Administrador', 'Calidad'],

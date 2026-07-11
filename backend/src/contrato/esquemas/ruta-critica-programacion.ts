@@ -191,6 +191,15 @@ export const esquemaRutaProcesoSalida = z
         'autorizacionArte',
         'entregaCliente',
         'manual',
+        // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+        'revisionOp',
+        'autorizacionFit',
+        'autorizacionTono',
+        'autorizacionAvios',
+        'compraTela',
+        'surtidoAvios',
+        'auditoriaCorte',
+        'empaque',
       ])
       .describe('Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.'),
     rolesResponsables: z

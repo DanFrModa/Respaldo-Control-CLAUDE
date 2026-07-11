@@ -51,6 +51,13 @@ import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_RC_ORDEN,
+  registrarEventoOutbox,
+  type EventoRcOrden,
+} from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -466,6 +473,33 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
   return valor;
 }
 
+/**
+ * Emite `oc-tela-resuelta` (post-F9, cierre del hueco de emisores) para CADA orden de producción
+ * ligada a una línea de TELA de esta OC — dentro de la MISMA tx del hecho (A2). El auto-avance de la
+ * RC re-evalúa el proceso `compraTela` de esas órdenes: relee el estado físico (¿hay una OC de tela
+ * VIVA autorizada/recibida ligada a la orden?) y auto-completa o des-completa (idempotente). Se llama
+ * al AUTORIZAR y al CANCELAR una OC; el consumidor decide el efecto según el estado actual.
+ */
+async function emitirOcTelaResuelta(tx: Tx, idEmpresa: number, idOC: number): Promise<void> {
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: { idOrdenCompra: idOC, idTela: { not: null }, idOrden: { not: null } },
+    select: { idOrden: true },
+  });
+  const idsOrden = [
+    ...new Set(lineas.map((l) => l.idOrden).filter((x): x is number => x !== null)),
+  ];
+  for (const idOrden of idsOrden) {
+    const payload: EventoRcOrden = { idEmpresa, idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.ocTelaResuelta,
+      VERSION_EVENTO_RC_ORDEN,
+      idEmpresa,
+      payload,
+    );
+  }
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
@@ -630,13 +664,13 @@ export async function autorizarOC(
       accion: 'OTRO',
       datos: { autorizada: true, numCompra: Number(actual.numCompra) },
     });
-    // F5-E6: NO se emite evento de auto-avance al autorizar una OC. El catálogo de procesos de la RC
-    // no tiene un `tipoEvento` para "autorización de OC": el único `autorizacionArte` es de ARTE, no
-    // de OC (ver seed-ruta-critica). El gancho de compras con la RC es `recepcionTela` (al RECIBIR el
-    // material, en recepciones.ts), no al autorizar la compra. Si algún día existe un proceso RC
-    // ligado a la autorización de OC, se añade aquí el `registrarEventoOutbox` correspondiente.
+    // OUTBOX (post-F9): la autorización de la OC de tela completa el proceso RC `compraTela` de las
+    // órdenes ligadas. (El otro gancho de compras con la RC es `recepcionTela` al RECIBIR el material,
+    // en recepciones.ts.) El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 
@@ -699,8 +733,12 @@ export async function cancelarOC(
       accion: 'CANCELAR',
       datos: { numCompra: Number(actual.numCompra), motivo: datos.motivo },
     });
+    // OUTBOX (post-F9): al cancelar la OC, la RC re-evalúa `compraTela` de las órdenes ligadas (si ya
+    // no queda una OC de tela viva autorizada para la orden, el proceso se des-completa — decisión (f)).
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 

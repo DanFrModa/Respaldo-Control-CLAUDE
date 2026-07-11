@@ -51,6 +51,13 @@ import { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_RC_ORDEN,
+  registrarEventoOutbox,
+  type EventoRcOrden,
+} from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   bloquearAvio,
@@ -448,6 +455,31 @@ function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
   };
 }
 
+/**
+ * Emite `surtido-avios-resuelto` (post-F9, cierre del hueco de emisores) para CADA orden de producción
+ * de una línea de AVÍO de la nota — dentro de la MISMA tx del hecho (A2). El auto-avance de la RC
+ * re-evalúa el proceso `surtidoAvios` de esas órdenes: relee el estado físico (¿hay una nota CONFIRMADA
+ * viva con línea de avío para la orden?) y auto-completa o des-completa (idempotente). Se llama al
+ * CONFIRMAR y al CANCELAR una nota; el consumidor decide el efecto según el estado actual.
+ */
+async function emitirSurtidoAvios(tx: Tx, idEmpresa: number, idNota: number): Promise<void> {
+  const lineas = await tx.notaSalidaLinea.findMany({
+    where: { idNotaSalida: idNota, idAvio: { not: null } },
+    select: { idOrden: true },
+  });
+  const idsOrden = [...new Set(lineas.map((l) => l.idOrden))];
+  for (const idOrden of idsOrden) {
+    const payload: EventoRcOrden = { idEmpresa, idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.surtidoAviosResuelto,
+      VERSION_EVENTO_RC_ORDEN,
+      idEmpresa,
+      payload,
+    );
+  }
+}
+
 // ── Operaciones de ESCRITURA ───────────────────────────────────────────────────────────────────
 
 /**
@@ -708,8 +740,13 @@ export async function confirmarNotaSalida(
         idAlmacen,
       },
     });
+
+    // OUTBOX (post-F9): la confirmación de la nota completa el proceso RC `surtidoAvios` de las órdenes
+    // de sus líneas de avío. El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirSurtidoAvios(tx, idEmpresa, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerNotaSalida(sesion, id, bd);
 }
 
@@ -782,8 +819,13 @@ export async function cancelarNotaSalida(
       accion: 'CANCELAR',
       datos: { numNota: Number(nota.numNota), motivo: datos.motivo, aviosReversados: invertidos },
     });
+
+    // OUTBOX (post-F9): al cancelar la nota, la RC re-evalúa `surtidoAvios` de las órdenes de sus
+    // líneas de avío (si ya no queda una nota de avíos confirmada viva, se des-completa — decisión (f)).
+    await emitirSurtidoAvios(tx, idEmpresa, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerNotaSalida(sesion, id, bd);
 }
 

@@ -12,7 +12,7 @@
  *  • El payload lleva lo MÍNIMO para que un consumidor reaccione (ids + material); el consumidor
  *    relee de la BD lo que necesite. `version` permite evolucionar el contrato sin romper.
  */
-import type { Prisma } from '../datos/index.js';
+import type { Prisma, TipoHitoOrden } from '../datos/index.js';
 
 import type { Tx } from './transaccion.js';
 
@@ -50,6 +50,26 @@ export const EVENTOS_OUTBOX = {
    * espera al CPM. El modo migración (`crearOrdenMigrada`) NO lo publica: el histórico no programa RC.
    */
   ordenCreada: 'orden-creada',
+  /**
+   * Una OC con línea de TELA ligada a una orden se AUTORIZÓ o se CANCELÓ (cierre del hueco de
+   * emisores, post-F9): la RC re-evalúa el proceso `compraTela` de la orden. El consumidor relee el
+   * estado físico (¿hay una OC VIVA autorizada/recibida con línea de tela ligada a la orden?) →
+   * auto-completa o des-completa (idempotente; el evento no es un delta). Se emite POR ORDEN afectada.
+   */
+  ocTelaResuelta: 'oc-tela-resuelta',
+  /**
+   * Una nota de salida con línea de AVÍO ligada a una orden se CONFIRMÓ o se CANCELÓ (post-F9): la RC
+   * re-evalúa el proceso `surtidoAvios` de la orden. El consumidor relee el estado físico (¿hay una
+   * nota CONFIRMADA viva con línea de avío para la orden?) → completa o des-completa. Por orden afectada.
+   */
+  surtidoAviosResuelto: 'surtido-avios-resuelto',
+  /**
+   * Un HITO de la orden se REGISTRÓ o se CANCELÓ (post-F9): la RC re-evalúa el proceso ligado al tipo
+   * de hito (`hitosOrden.tipoEventoDeHito`). El consumidor relee el estado físico (¿hay un hito VIVO
+   * de ese tipo en la orden?) → completa o des-completa. El payload lleva el `tipo` para saber qué
+   * proceso re-evaluar; el resto lo relee de la BD (idempotente).
+   */
+  hitoOrdenResuelto: 'hito-orden-resuelto',
 } as const;
 
 /** Nombre válido de evento de outbox. */
@@ -63,6 +83,12 @@ export const VERSION_AUDITORIA_CALIDAD = 1;
 
 /** Versión actual del contrato del evento `orden-creada` (rediseño R3, B5). */
 export const VERSION_ORDEN_CREADA = 1;
+
+/** Versión actual de los eventos `oc-tela-resuelta` y `surtido-avios-resuelto` (post-F9). */
+export const VERSION_EVENTO_RC_ORDEN = 1;
+
+/** Versión actual del evento `hito-orden-resuelto` (post-F9). */
+export const VERSION_HITO_ORDEN = 1;
 
 /**
  * Carga del evento `orden-creada` (R3, B5). Lo MÍNIMO para que el consumidor programe la RC
@@ -176,6 +202,33 @@ export type EventoMaterialRecibidoCancelado = {
   idRecepcion: number;
   /** Órdenes de PRODUCCIÓN ligadas a la OC (de sus líneas con `idOrden`), sin repetir. */
   idsOrden: number[];
+};
+
+/**
+ * Carga COMÚN de los eventos `oc-tela-resuelta` y `surtido-avios-resuelto` (post-F9). Lo MÍNIMO para
+ * que el auto-avance re-evalúe el proceso (`compraTela`/`surtidoAvios`) de la orden: a qué orden
+ * apunta. El consumidor RELEE de la BD el estado físico (¿hay una OC de tela viva autorizada / una
+ * nota de avíos confirmada viva para la orden?) — idempotente, no confía en el evento como delta.
+ */
+export type EventoRcOrden = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden de producción cuyo proceso RC se re-evalúa. */
+  idOrden: number;
+};
+
+/**
+ * Carga del evento `hito-orden-resuelto` (post-F9). Además de la orden, lleva el `tipo` de hito para
+ * que el consumidor sepa qué proceso RC re-evaluar (`hitosOrden.tipoEventoDeHito`); el resto (¿hay un
+ * hito vivo de ese tipo?) lo relee de la BD. Idempotente.
+ */
+export type EventoHitoOrden = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden a la que pertenece el hito. */
+  idOrden: number;
+  /** Tipo del hito que se registró/canceló (mapea al `TipoEventoProceso` en el consumidor). */
+  tipo: TipoHitoOrden;
 };
 
 /**
