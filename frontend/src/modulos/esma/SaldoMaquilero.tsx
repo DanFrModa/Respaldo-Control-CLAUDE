@@ -78,11 +78,15 @@ function Metrica({
 }): React.JSX.Element {
   return (
     <div
-      className="rounded-lg border bg-muted/30 p-3"
+      className="rounded-lg border bg-card px-3.5 py-3"
       data-testid={`saldo-${etiqueta.toLowerCase()}`}
     >
-      <p className="text-xs text-muted-foreground">{etiqueta}</p>
-      <p className={destacado ? 'text-xl font-semibold text-primary' : 'text-xl font-semibold'}>
+      <span className="text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">
+        {etiqueta}
+      </span>
+      <p
+        className={`num mt-1 ${destacado ? 'text-xl font-bold text-primary' : 'text-lg font-semibold'}`}
+      >
         {valor}
       </p>
     </div>

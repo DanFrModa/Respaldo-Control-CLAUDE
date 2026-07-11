@@ -5,19 +5,19 @@ import { toast } from 'sonner';
 
 import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa, useMaquilerosEsMa } from '@/api/esma';
 import type { CargosEsMaQuery } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
@@ -223,23 +223,23 @@ export function CapturaPagosPagina(): React.JSX.Element {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <Table data-testid="pago-cargos-tabla">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10" />
-                      <TableHead>Orden</TableHead>
-                      <TableHead>Proceso</TableHead>
-                      <TableHead className="text-right">Por pagar</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      <TableHead className="text-right">A pagar (pzas)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa data-testid="pago-cargos-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead className="w-10" />
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Proceso</TablaDensaHead>
+                      <TablaDensaHead numerica>Por pagar</TablaDensaHead>
+                      <TablaDensaHead numerica>Precio</TablaDensaHead>
+                      <TablaDensaHead numerica>A pagar (pzas)</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {pagables.map((c) => {
                       const incluido = c.id in seleccion;
                       return (
-                        <TableRow key={c.id} data-testid="pago-cargo-fila">
-                          <TableCell>
+                        <TablaDensaFila key={c.id} data-testid="pago-cargo-fila">
+                          <TablaDensaCelda>
                             <input
                               type="checkbox"
                               className="size-4"
@@ -248,16 +248,14 @@ export function CapturaPagosPagina(): React.JSX.Element {
                               aria-label={`Incluir cargo ${String(c.id)}`}
                               data-testid={`pago-cargo-check-${String(c.id)}`}
                             />
-                          </TableCell>
-                          <TableCell>#{c.folioOrden}</TableCell>
-                          <TableCell>{c.tipoProceso}</TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>#{c.folioOrden}</TablaDensaCelda>
+                          <TablaDensaCelda>{c.tipoProceso}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {c.porPagar.toLocaleString('es-MX')}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {moneda(c.precioReal)}
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(c.precioReal)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             <Input
                               type="number"
                               min={1}
@@ -269,12 +267,12 @@ export function CapturaPagosPagina(): React.JSX.Element {
                               onChange={(e) => ajustarCantidad(c.id, e.target.value)}
                               data-testid={`pago-cargo-cant-${String(c.id)}`}
                             />
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
             )}
 

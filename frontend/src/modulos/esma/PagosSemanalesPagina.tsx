@@ -2,16 +2,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePagosSemanales } from '@/api/esma';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { finSemana, inicioSemana, moneda } from './comun';
 
@@ -105,36 +105,34 @@ export function PagosSemanalesPagina(): React.JSX.Element {
                 <strong>{moneda(consulta.data?.total ?? null)}</strong>.
               </p>
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Maquilero</TableHead>
-                      <TableHead>Facturación</TableHead>
-                      <TableHead className="text-right">Cargos</TableHead>
-                      <TableHead>Revisión</TableHead>
-                      <TableHead className="text-right">Importe</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Fecha</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead>Facturación</TablaDensaHead>
+                      <TablaDensaHead numerica>Cargos</TablaDensaHead>
+                      <TablaDensaHead>Revisión</TablaDensaHead>
+                      <TablaDensaHead numerica>Importe</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {filas.map((p) => (
-                      <TableRow key={p.id} data-testid="pagsem-fila">
-                        <TableCell>{p.fecha}</TableCell>
-                        <TableCell className="font-medium">{p.maquilero}</TableCell>
-                        <TableCell>
+                      <TablaDensaFila key={p.id} data-testid="pagsem-fila">
+                        <TablaDensaCelda>{p.fecha}</TablaDensaCelda>
+                        <TablaDensaCelda className="font-medium">{p.maquilero}</TablaDensaCelda>
+                        <TablaDensaCelda>
                           {p.conFactura === null ? '—' : p.conFactura ? 'Con' : 'Sin'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {p.numAplicaciones}
-                        </TableCell>
-                        <TableCell>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{p.numAplicaciones}</TablaDensaCelda>
+                        <TablaDensaCelda>
                           {p.estadoRevision === 'revisado' ? 'Revisado' : 'Capturado'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{moneda(p.monto)}</TableCell>
-                      </TableRow>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(p.monto)}</TablaDensaCelda>
+                      </TablaDensaFila>
                     ))}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
             </>
           )}

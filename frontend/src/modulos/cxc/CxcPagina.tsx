@@ -97,7 +97,7 @@ export function CxcPagina(): React.JSX.Element {
             Cuentas por cobrar
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Finanzas · cuenta corriente de clientes (D12)
+            Finanzas · cuenta corriente de clientes (D12) · saldo = Σ cargos − Σ pagos
           </p>
         </div>
         {puedeAdministrar ? (
