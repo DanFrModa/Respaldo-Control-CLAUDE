@@ -124,6 +124,9 @@ export function PanelGenerarOP({
     const cuerpo: SalidaProduccionCuerpo = {
       lineas: lineas.map((linea) => ({
         idColor: linea.idColor,
+        ...(linea.pantone !== undefined && linea.pantone !== null && linea.pantone.trim() !== ''
+          ? { pantone: linea.pantone.trim() }
+          : {}),
         tallas: columnas
           .map((col) => ({ idTalla: col.idTalla, cantidad: linea.cantidades[col.idTalla] ?? 0 }))
           .filter((t) => t.cantidad > 0),
@@ -249,6 +252,9 @@ export function PanelGenerarOP({
             tallasDisponibles={tallasDisponibles}
             onLineasChange={setLineas}
             onTallasChange={setColumnas}
+            onPantoneChange={(idColor, pantone) =>
+              setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l)))
+            }
             testid="matriz-op"
           />
 

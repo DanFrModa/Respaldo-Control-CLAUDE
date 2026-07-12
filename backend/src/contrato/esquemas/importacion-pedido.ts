@@ -90,6 +90,72 @@ export const esquemaMapeoImportacion = z
 /** Mapeo completo validado. */
 export type MapeoImportacion = z.infer<typeof esquemaMapeoImportacion>;
 
+// ── Formato de la plantilla y campos variables por cliente (importador de OC) ─
+
+/**
+ * FORMATO del archivo del cliente: `excel` (OC en Excel con mapeo de columnas, R8) o `pdf-cya` (OC en
+ * PDF de C&A, parseada por un extractor EN CÓDIGO por anclas de etiqueta). Nuevos formatos = nuevo
+ * valor aquí + su extractor, sin migración (el `formato` es texto libre en BD).
+ */
+export const esquemaFormatoImportacion = z
+  .enum(['excel', 'pdf-cya'])
+  .describe(
+    'Formato de la OC del cliente: Excel (mapeo de columnas) o PDF de C&A (extractor en código).',
+  );
+
+/** Formato validado. */
+export type FormatoImportacion = z.infer<typeof esquemaFormatoImportacion>;
+
+/**
+ * Campo del PDF de C&A que se puede CAPTURAR como referencia del cliente (D7) en cada OP. Es el
+ * catálogo de "variables por cliente" (Daniel: "poder poner más variables por cliente"): la plantilla
+ * elige cuáles y con qué etiqueta. Los colores van a la MATRIZ y el nº de orden a `Orden.ocCliente`
+ * (no son referencias); el resto son metadatos capturables.
+ */
+export const esquemaCampoPdfCya = z
+  .enum([
+    'numeroOrden',
+    'modeloCliente',
+    'division',
+    'subDivision',
+    'descripcionArticulo',
+    'codigoUnico',
+    'semanaCliente',
+    'idColorCliente',
+    'colorGenerico',
+  ])
+  .describe('Campo del PDF de C&A capturable como referencia del cliente.');
+
+/** Campo del PDF validado. */
+export type CampoPdfCya = z.infer<typeof esquemaCampoPdfCya>;
+
+/** Un campo variable por cliente: qué campo del PDF se captura y con qué etiqueta de referencia (D7). */
+export const esquemaCampoVariableImportacion = z
+  .object({
+    campo: esquemaCampoPdfCya,
+    etiqueta: z
+      .string()
+      .trim()
+      .min(1, { error: 'La etiqueta del campo variable es obligatoria' })
+      .max(80)
+      .describe('Etiqueta con la que se guarda como referencia del cliente (D7).'),
+  })
+  .describe('Campo variable por cliente (PDF → referencia D7 de la OP).');
+
+/** Un campo variable validado. */
+export type CampoVariableImportacion = z.infer<typeof esquemaCampoVariableImportacion>;
+
+/**
+ * % ADICIONAL de producción por cliente (petición Daniel): C&A acepta entregar hasta 5% de más y Daniel
+ * fabrica ese 5% + 2% de merma → ~7% arriba. Al importar, la matriz de la OP usa `ceil(cant × (1+pct/100))`
+ * por talla; el renglón del pedido conserva la cantidad ORIGINAL. Entre 0 y 100 (el negocio ronda 7).
+ */
+export const esquemaPorcentajeAdicional = z
+  .number({ error: 'El % adicional debe ser un número' })
+  .min(0, { error: 'El % adicional no puede ser negativo' })
+  .max(100, { error: 'El % adicional no puede pasar de 100' })
+  .describe('% adicional de producción del cliente (0 = sin adicional; C&A=7).');
+
 // ── Plantilla de importación (versionada, una vigente por cliente) ───────────
 
 /** Una plantilla de importación tal como sale a la API. */
@@ -100,7 +166,15 @@ export const esquemaPlantillaImportacionSalida = z
     nombre: z.string().describe('Nombre descriptivo del formato.'),
     version: z.number().int().describe('Nº de versión dentro del cliente.'),
     vigente: z.boolean().describe('Si es la versión que se aplica hoy.'),
-    mapeo: z.array(esquemaMapeoColumna).describe('Mapeo columna→rol guardado.'),
+    formato: esquemaFormatoImportacion.describe('Formato del archivo (excel | pdf-cya).'),
+    mapeo: z.array(esquemaMapeoColumna).describe('Mapeo columna→rol guardado (vacío en pdf-cya).'),
+    camposVariables: z
+      .array(esquemaCampoVariableImportacion)
+      .nullable()
+      .describe('Campos variables por cliente (pdf-cya); null en excel.'),
+    porcentajeAdicional: z
+      .number()
+      .describe('% adicional de producción del cliente (C&A=7); 0 = sin adicional.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Usuario que la guardó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
@@ -121,7 +195,12 @@ export const esquemaPlantillaImportacionVigente = z
 /** Forma de la respuesta de plantilla vigente. */
 export type PlantillaImportacionVigente = z.infer<typeof esquemaPlantillaImportacionVigente>;
 
-/** Cuerpo de guardar una plantilla (versión NUEVA — no edita la vieja). */
+/**
+ * Cuerpo de guardar una plantilla (versión NUEVA — no edita la vieja). `formato` decide qué se exige:
+ * en `excel` el `mapeo` debe ser completo (modelo/color/talla/cantidad); en `pdf-cya` el `mapeo` va
+ * vacío (el extractor es en código) y se guardan los `camposVariables`. La regla condicional vive en el
+ * `superRefine` para que el mismo endpoint sirva a los dos formatos.
+ */
 export const esquemaPlantillaImportacionGuardar = z
   .object({
     nombre: z
@@ -131,12 +210,41 @@ export const esquemaPlantillaImportacionGuardar = z
       .max(200)
       .optional()
       .describe('Nombre descriptivo (default "Formato del cliente vN").'),
-    mapeo: esquemaMapeoImportacion,
+    formato: esquemaFormatoImportacion
+      .default('excel')
+      .describe('Formato del archivo (default excel — compat. con R8).'),
+    mapeo: z
+      .array(esquemaMapeoColumna)
+      .default([])
+      .describe('Mapeo columna→rol (obligatorio y completo en excel; vacío en pdf-cya).'),
+    camposVariables: z
+      .array(esquemaCampoVariableImportacion)
+      .nullable()
+      .optional()
+      .describe('Campos variables por cliente (pdf-cya); ignorado en excel.'),
+    porcentajeAdicional: esquemaPorcentajeAdicional
+      .optional()
+      .describe('% adicional de producción del cliente (default 0; C&A=7).'),
+  })
+  .superRefine((datos, ctx) => {
+    if (datos.formato === 'excel') {
+      // En Excel el mapeo debe cumplir TODAS las reglas (modelo/color/talla/cantidad, sin duplicados).
+      const parseado = esquemaMapeoImportacion.safeParse(datos.mapeo);
+      if (!parseado.success) {
+        for (const issue of parseado.error.issues) {
+          ctx.addIssue({ code: 'custom', message: issue.message, path: ['mapeo'] });
+        }
+      }
+    }
   })
   .describe('Datos para guardar (versionar) la plantilla de un cliente.');
 
-/** Datos validados de guardar plantilla. */
-export type DatosPlantillaImportacionGuardar = z.infer<typeof esquemaPlantillaImportacionGuardar>;
+/**
+ * Datos de guardar plantilla — tipo de ENTRADA (lo que mandan el cliente/las rutas): `formato`,
+ * `mapeo` y `camposVariables` son opcionales (tienen default/son nullables). El dominio los normaliza
+ * con `validarEntrada` antes de usarlos.
+ */
+export type DatosPlantillaImportacionGuardar = z.input<typeof esquemaPlantillaImportacionGuardar>;
 
 // ── Campos del archivo (base64) compartidos por analizar/confirmar ───────────
 

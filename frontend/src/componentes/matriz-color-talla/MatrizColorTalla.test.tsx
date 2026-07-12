@@ -22,10 +22,12 @@ function Anfitrion({
   tallasIniciales = TALLAS,
   lineasIniciales = [],
   soloLectura = false,
+  conPantone = false,
 }: {
   tallasIniciales?: MatrizTalla[];
   lineasIniciales?: MatrizLinea[];
   soloLectura?: boolean;
+  conPantone?: boolean;
 }): React.JSX.Element {
   const [tallas, setTallas] = useState<MatrizTalla[]>(tallasIniciales);
   const [lineas, setLineas] = useState<MatrizLinea[]>(lineasIniciales);
@@ -37,6 +39,12 @@ function Anfitrion({
       tallasDisponibles={[...TALLAS, { idTalla: 4, etiqueta: 'XG' }]}
       onTallasChange={setTallas}
       onLineasChange={setLineas}
+      {...(conPantone
+        ? {
+            onPantoneChange: (idColor: number, pantone: string) =>
+              setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l))),
+          }
+        : {})}
       soloLectura={soloLectura}
       testid="m"
     />
@@ -167,5 +175,28 @@ describe('<MatrizColorTalla>', () => {
     const celdas = screen.getAllByTestId('m-celda');
     expect(celdas[0]?.tagName).not.toBe('INPUT');
     expect(celdas[0]).toHaveTextContent('2');
+  });
+
+  it('captura el PANTONE por color cuando el flujo lo habilita (petición Daniel)', async () => {
+    const usuario = userEvent.setup();
+    render(<Anfitrion lineasIniciales={[lineaRojo()]} conPantone />);
+    const pantone = screen.getByTestId('m-pantone');
+    expect(pantone.tagName).toBe('INPUT');
+    await usuario.type(pantone, '11-0601 TCX');
+    expect(pantone).toHaveValue('11-0601 TCX');
+  });
+
+  it('en solo lectura muestra el PANTONE de la fila como texto (sin input)', () => {
+    render(
+      <Anfitrion
+        lineasIniciales={[
+          { idColor: 10, color: 'Rojo', cantidades: { 1: 2 }, pantone: '19-3920 TCX' },
+        ]}
+        soloLectura
+      />,
+    );
+    const pantone = screen.getByTestId('m-pantone');
+    expect(pantone.tagName).not.toBe('INPUT');
+    expect(pantone).toHaveTextContent('PANTONE 19-3920 TCX');
   });
 });

@@ -1010,6 +1010,8 @@ model Cliente {
   listasPrecios          ListaPrecios[]
   /// Plantillas de importación del pedido del cliente (rediseño R8, B15 — mapeo de su Excel). Restrict.
   plantillasImportacion  PlantillaImportacion[]
+  /// Ligas APRENDIDAS modelo-del-cliente → nuestro modelo (importador de OC por PDF). Cascade.
+  modeloLigas            ClienteModeloLiga[]
   /// Movimientos de cuenta corriente (CxC) de este cliente (F9-E1). Restrict.
   movimientosTerceros    MovimientoTercero[]
 
@@ -1039,8 +1041,24 @@ model PlantillaImportacion {
   version   Int
   /// La versión que se aplica hoy. A lo más UNA `true` por cliente (lo garantiza el dominio en tx).
   vigente   Boolean @default(true)
+  /// FORMATO del archivo del cliente (importador de OC, petición Daniel): `excel` = OC en Excel con
+  /// mapeo de columnas (R8, el histórico); `pdf-cya` = OC en PDF de C&A, parseada por un extractor EN
+  /// CÓDIGO (por anclas de etiqueta) — ahí `mapeo` va vacío y la config viva vive en `camposVariables`.
+  /// Default `excel` (las plantillas R8 existentes lo son). Nuevos formatos por cliente = nuevo valor
+  /// aquí + su extractor, sin migración.
+  formato   String  @default("excel")
   /// Mapeo de columnas: `[{ indice, columna, rol }]` — `rol` ∈ modeloCliente|color|talla|cantidad|precio|ignorar.
+  /// Sólo para `formato='excel'`; en `pdf-cya` es `[]` (el extractor es por-cliente en código).
   mapeo     Json
+  /// CAMPOS VARIABLES por cliente (Daniel: "poder poner más variables por cliente" sin migración):
+  /// `[{ campo, etiqueta }]` — qué campo del PDF (p. ej. `subDivision`, `semanaCliente`) se captura como
+  /// REFERENCIA del cliente (D7) en cada OP, y con qué etiqueta. NULL en `excel`. JSON para crecer sin migrar.
+  camposVariables Json? @map("campos_variables")
+  /// % ADICIONAL de producción por cliente (petición Daniel): C&A acepta entregar hasta 5% de más;
+  /// Daniel fabrica ese 5% + 2% de merma → ~7% arriba. Al importar, la MATRIZ de cada OP se genera con
+  /// `ceil(cantidad_cliente × (1 + pct/100))` por talla; el RENGLÓN del pedido conserva la cantidad
+  /// ORIGINAL (lo contractual) y el precio unitario NO cambia. Default 0 (sin adicional). C&A queda en 7.
+  porcentajeAdicional Decimal @default(0) @map("porcentaje_adicional") @db.Decimal(5, 2)
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1050,6 +1068,32 @@ model PlantillaImportacion {
   @@unique([idCliente, version])
   @@index([idCliente])
   @@map("plantilla_importacion")
+}
+
+/// Liga APRENDIDA modelo-del-cliente → nuestro modelo (importador de OC por PDF, petición Daniel): el
+/// "Modelo ID" que trae la OC del cliente (p. ej. C&A `3138277`) NO es nuestro código de modelo; la
+/// PRIMERA vez el usuario lo liga a mano en la vista previa, y aquí queda GUARDADO para que la próxima
+/// importación lo proponga solo. Clave de negocio = `(idCliente, modeloCliente)` (@@unique). Cascade
+/// hacia Cliente (config del cliente); Restrict hacia Modelo (un modelo ligado no se borra físico).
+/// `modeloCliente` se guarda tal cual viene en el PDF; la comparación normaliza (trim/minúsculas) en
+/// el dominio. Auditoría uniforme (A7).
+model ClienteModeloLiga {
+  id            Int     @id @default(autoincrement())
+  idCliente     Int     @map("id_cliente")
+  cliente       Cliente @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  /// Identificador del modelo TAL COMO viene en la OC del cliente (C&A: "Modelo ID").
+  modeloCliente String  @map("modelo_cliente")
+  idModelo      Int     @map("id_modelo")
+  modelo        Modelo  @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCliente, modeloCliente])
+  @@index([idModelo])
+  @@map("cliente_modelo_liga")
 }
 
 /// Definición de un campo de referencia POR cliente (D7 — PLANMAESTRO §4). Cada
@@ -1600,6 +1644,8 @@ model Modelo {
   inventarioCiclicoDet InventarioCiclicoDet[]
   /// Desarrollos (proyectos de cotización) de este modelo (F8-E2, D13/R16). Restrict.
   desarrollos          Desarrollo[]
+  /// Ligas APRENDIDAS modelo-del-cliente → este modelo (importador de OC por PDF). Restrict.
+  clienteLigas         ClienteModeloLiga[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2110,6 +2156,15 @@ model Orden {
   /// aunque el pedido interno se reorganice). Ningún endpoint lo edita.
   ocCliente String? @map("oc_cliente")
 
+  /// DESGLOSE SKU/packs del cliente (importador de OC por PDF, petición Daniel): la tabla SKU/Talla/
+  /// Piezas de la OC + los grupos "Detalles PACK / SKU" (Pack/tipo/unidades por pack/total packs/
+  /// desglose por talla) TAL COMO vienen en el papel. HOY es informativo (no interviene en fabricar);
+  /// será la base del futuro módulo de EMPAQUE (decisión de Daniel: guardarlo desde ya). Estructura
+  /// jsonb (consultable), forma `{ tabla:[{sku,talla,piezas}], grupos:[{grupo,packId,tipo,unidadesPack,
+  /// totalPacks,totalUnidades,desglose:[{talla,cantidad}]}] }`. Se escribe en la MISMA tx del alta de
+  /// la OP (revierte con el rollback, A2). Null en órdenes que no nacen de un PDF con packs.
+  packsCliente Json? @map("packs_cliente")
+
   /// Costo de maquila de la orden (viejo: `MaquilaOrd`). DATO conservado de v1; su motor (costeo)
   /// llega en F3/F6 — sin lógica en F2.
   maquilaOrd    Decimal? @map("maquila_ord") @db.Decimal(12, 2)
@@ -2317,6 +2372,12 @@ model OrdenLinea {
   orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
   idColor Int   @map("id_color")
   color   Color @relation(fields: [idColor], references: [id], onDelete: Restrict)
+
+  /// Código PANTONE de ESTE color en la orden (petición Daniel: antes iba en observaciones, ahora es
+  /// campo propio). POR color (una orden multi-color lleva un pantone por renglón). Opcional siempre
+  /// (muchas OC no lo traen), editable a mano en la captura de la matriz; el importador de OC lo
+  /// PREFILLEA cuando la OC lo trae. Texto libre (formato del cliente, p. ej. "11-0601 TCX").
+  pantone String?
 
   tallas OrdenLineaTalla[]
 

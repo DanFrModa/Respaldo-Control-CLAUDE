@@ -605,3 +605,21 @@ Al cerrar los emisores que faltaban (los ~18/20 automáticos del prototipo §4.9
 - Todo con la mecánica vigente de F5-E6: evento en la MISMA tx (outbox), re-evaluación idempotente del estado físico, cancelar des-completa (decisión f), el automático manda sobre lo manual (decisión e).
 - **Aplica en:** remate post-F9 "emisores de eventos RC" (11-jul-2026).
 - **Fecha:** 2026-07-11.
+
+#### (Post-F9.2) — Importador de OC del cliente por PDF: reglas de C&A (dictadas por DANIEL en vivo, 12-jul-2026)
+Daniel entró a la sesión simulando la operación real y dictó el flujo del importador por PDF (empezando por **C&A**, con su OC real 620884 como caso). **Estas NO son defaults del equipo: las definió el dueño en persona.**
+
+- **La OC del cliente VIVE en la orden:** cada PDF importado queda **adjunto a su orden de producción** ("deja esas órdenes de compra viviendo siempre en la OP y/o en el pedido"). **Varios PDFs subidos juntos = UN pedido interno**; cada PDF = **1 renglón del pedido + 1 orden de producción**.
+- **Referencia del cliente (D7) para C&A = el NÚMERO DE ORDEN de su OC** (ej. 620884) — es LA referencia principal (columna "Pedido cliente" del Centro, panel, búsqueda e impreso). El **Modelo ID** de C&A (ej. 3138277), el Código único, la Semana y la **Sub División** quedan como referencias/campos **adicionales** informativos. La **División ES el departamento** del cliente; la Sub División es un campo **variable solo de C&A** (cada cliente tendrá sus propios campos variables).
+- **Liga de modelos:** el Modelo ID de C&A ≠ modelo interno. El usuario liga la primera vez y el sistema **APRENDE** (`ClienteModeloLiga`); en importaciones siguientes lo propone solo (solo modelos activos).
+- **Fecha de entrega** = el **INICIO** de la ventana de entrega de la OC.
+- **Sobre-pedido POR CLIENTE (C&A = 7%):** C&A permite entregar hasta **+5%** del pedido; Daniel fabrica ese 5% **+2% de merma** → **~7%**, configurable por cliente (`PlantillaImportacion.porcentajeAdicional`, C&A=7, default 0). Reglas de cálculo:
+  - **Tipo PACK** (la OC trae "Detalles PACK / SKU"): el 7% se aplica **al número de packs** — `round` al MÁS CERCANO — y la corrida se reconstruye con la **proporción del pack** (ej. Pack A 2-1-1-3-3-2: 119 packs ×1.07 = 127.33 → 127 packs → 254-127-127-381-381-254). **NUNCA talla por talla en tipo PACK** (rompería los packs completos).
+  - **Tipo SKU** (piezas sueltas): round al más cercano **talla por talla**.
+  - **SKU chico:** Daniel lo integra a mano al Pack A "según mida la situación" → la **vista previa es EDITABLE celda por celda** (el sistema propone; él decide). Con la 620884: propuesta 2,032 pzas vs 1,903 pedidas.
+  - **El renglón del pedido interno conserva las cantidades ORIGINALES del cliente** (lo contractual); el sobre-pedido vive **SOLO en la matriz de la OP** (lo que se manda fabricar).
+- **SKU por talla SE GUARDA desde ya** (`Orden.packsCliente` jsonb: tabla SKU/talla/piezas + grupos de packs): no se usa para fabricar; es la base del futuro **módulo de EMPAQUE** (decisión explícita: guardarlo aunque empaque aún no exista).
+- **Pantone = campo especial de la OP, por color** (`OrdenLinea.pantone`; antes Daniel lo metía en observaciones): opcional (muchas OCs no lo traen — la 620884 lo trae VACÍO), editable a mano, prefill del parser cuando la OC lo trae, visible en el impreso junto al color. A futuro, el **TechPack (TP) subido en Desarrollo** traerá el pantone (tarea aparte).
+- **Fixture de pruebas:** la **OC real 620884 de C&A (con precios) SE QUEDA en el repo** como muestra del sistema — Daniel: "me da igual que la tengas" (repo privado).
+- **Aplica en:** importador de OC por PDF (rama `tarea/importador-pdf-cya`); las plantillas de otros clientes se definirán igual, cliente por cliente.
+- **Fecha:** 2026-07-12.

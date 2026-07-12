@@ -70,6 +70,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     fecha: '2026-06-16',
     fechaEntrega: '2026-06-30',
     cliente: 'Cliente Demo',
+    pedidoCliente: '620884',
     etiquetaMarca: 'Marilyn',
     maquilero: 'Maquila Norte',
     codigoModelo: 'MOD-501',
@@ -113,9 +114,19 @@ describe('armarTabla', () => {
     // Columnas en orden de primera aparición.
     expect(tabla.tallas).toEqual(['CH', 'M', 'G']);
     // Renglón Rojo: CH=3, M=5, G=0 → 8.
-    expect(tabla.renglones[0]).toEqual({ color: 'Rojo', cantidades: [3, 5, 0], totalFila: 8 });
+    expect(tabla.renglones[0]).toEqual({
+      color: 'Rojo',
+      pantone: null,
+      cantidades: [3, 5, 0],
+      totalFila: 8,
+    });
     // Renglón Azul: CH=0, M=2, G=4 → 6.
-    expect(tabla.renglones[1]).toEqual({ color: 'Azul', cantidades: [0, 2, 4], totalFila: 6 });
+    expect(tabla.renglones[1]).toEqual({
+      color: 'Azul',
+      pantone: null,
+      cantidades: [0, 2, 4],
+      totalFila: 6,
+    });
     // Totales por columna y total general.
     expect(tabla.totalesColumna).toEqual([3, 7, 4]);
     expect(tabla.totalPiezas).toBe(14);
@@ -125,6 +136,16 @@ describe('armarTabla', () => {
     const sumaColumnas = tabla.totalesColumna.reduce((s, c) => s + c, 0);
     expect(sumaFilas).toBe(tabla.totalPiezas);
     expect(sumaColumnas).toBe(tabla.totalPiezas);
+  });
+
+  it('lleva el pantone de cada color a su renglón (petición Daniel)', () => {
+    const tabla = armarTabla([
+      { color: 'Blanco', pantone: '11-0601 TCX', tallas: [{ etiquetaTalla: 'M', cantidad: 2 }] },
+      { color: 'Rojo', tallas: [{ etiquetaTalla: 'M', cantidad: 3 }] },
+    ]);
+    expect(tabla.renglones[0]?.pantone).toBe('11-0601 TCX');
+    // Sin pantone (no lo mandó la matriz) → null.
+    expect(tabla.renglones[1]?.pantone).toBeNull();
   });
 
   it('cuadra con una matriz GRANDE (muchos colores y tallas)', () => {
@@ -202,6 +223,10 @@ describe('armarDatosImpresoOrden', () => {
       fecha: '2026-06-16',
       fechaEntrega: '2026-06-30',
       cliente: 'Cliente',
+      // Como la devuelve `obtenerOrden`: referencias del cliente (D7) + snapshot `ocCliente`. El impreso
+      // deriva `pedidoCliente` de la 1ª referencia (o del `ocCliente` si no hay ninguna).
+      ocCliente: 'OC-2',
+      referencias: [{ valor: '620884' }],
       etiquetaMarca: 'Marca',
       maquilero: 'Maquila',
       codigoModelo: 'MOD-7',
@@ -301,6 +326,19 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.totalPiezas).toBe(5);
     expect(datos.empresa).toBe('FR Moda');
     expect(datos.folio).toBe(999);
+    // El "Pedido cliente" del impreso sale de la referencia PRINCIPAL del cliente (D7).
+    expect(datos.pedidoCliente).toBe('620884');
+  });
+
+  it('el "Pedido cliente" cae al snapshot ocCliente cuando la orden no tiene referencias', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida({ referencias: [], ocCliente: 'OC-99' }), bom, []),
+    );
+    expect(datos.pedidoCliente).toBe('OC-99');
   });
 
   it('descarta fotos que no se pudieron descargar (best-effort) y conserva las buenas', async () => {

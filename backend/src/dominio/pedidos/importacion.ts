@@ -27,10 +27,12 @@ import ExcelJS from 'exceljs';
 
 import type {
   AnalizarImportacionSalida,
+  CampoVariableImportacion,
   ConfirmarImportacionSalida,
   DatosAnalizarImportacion,
   DatosConfirmarImportacion,
   DatosPlantillaImportacionGuardar,
+  FormatoImportacion,
   GrupoImportacion,
   MapeoColumna,
   MapeoImportacion,
@@ -41,12 +43,15 @@ import type {
 } from '../../contrato/index.js';
 import {
   esquemaAnalizarImportacionCuerpo,
+  esquemaCampoVariableImportacion,
   esquemaConfirmarImportacionCuerpo,
+  esquemaFormatoImportacion,
   esquemaMapeoColumna,
   esquemaMapeoImportacion,
   esquemaPlantillaImportacionGuardar,
 } from '../../contrato/index.js';
-import type { Prisma, PrismaClient } from '../../datos/index.js';
+import { Prisma } from '../../datos/index.js';
+import type { PrismaClient } from '../../datos/index.js';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
@@ -439,23 +444,32 @@ interface FilaPlantilla {
   nombre: string;
   version: number;
   vigente: boolean;
+  formato: string;
   mapeo: Prisma.JsonValue;
+  camposVariables: Prisma.JsonValue;
+  porcentajeAdicional: Prisma.Decimal;
   creadoEn: Date;
   creadoPorId: string | null;
   modificadoEn: Date;
   modificadoPorId: string | null;
 }
 
-/** Proyecta una plantilla a la salida del contrato (validando el JSON del mapeo). */
+/** Proyecta una plantilla a la salida del contrato (validando los JSON de mapeo y campos variables). */
 function aPlantillaSalida(fila: FilaPlantilla): PlantillaImportacionSalida {
   const mapeo = leerMapeoJson(fila.mapeo);
+  // `formato` es texto en BD (para crecer sin migrar); si viniera un valor desconocido, cae a 'excel'.
+  const formatoParseado = esquemaFormatoImportacion.safeParse(fila.formato);
+  const formato: FormatoImportacion = formatoParseado.success ? formatoParseado.data : 'excel';
   return {
     id: fila.id,
     idCliente: fila.idCliente,
     nombre: fila.nombre,
     version: fila.version,
     vigente: fila.vigente,
+    formato,
     mapeo,
+    camposVariables: leerCamposVariablesJson(fila.camposVariables),
+    porcentajeAdicional: fila.porcentajeAdicional.toNumber(),
     creadoEn: fila.creadoEn.toISOString(),
     creadoPorId: fila.creadoPorId,
     modificadoEn: fila.modificadoEn.toISOString(),
@@ -474,7 +488,23 @@ function leerMapeoJson(json: Prisma.JsonValue): MapeoColumna[] {
   return salida;
 }
 
+/** Lee/valida el JSON `camposVariables` (null si vacío/ausente; descarta entradas corruptas). */
+export function leerCamposVariablesJson(json: Prisma.JsonValue): CampoVariableImportacion[] | null {
+  if (!Array.isArray(json)) return null;
+  const salida: CampoVariableImportacion[] = [];
+  for (const item of json) {
+    const parseado = esquemaCampoVariableImportacion.safeParse(item);
+    if (parseado.success) salida.push(parseado.data);
+  }
+  return salida.length === 0 ? null : salida;
+}
+
 // ── Operaciones: plantilla ───────────────────────────────────────────────────
+
+/** Nombre por defecto de una plantilla según su formato (cuando el usuario no da uno). */
+function nombreDefault(formato: FormatoImportacion, version: number): string {
+  return formato === 'pdf-cya' ? `OC en PDF (C&A) v${version}` : `Formato del cliente v${version}`;
+}
 
 /** Obtiene la plantilla VIGENTE de un cliente (o null). Requiere `pedidos.ver`. */
 export async function obtenerPlantillaVigente(
@@ -524,10 +554,17 @@ export async function guardarPlantilla(
     const creada = await tx.plantillaImportacion.create({
       data: {
         idCliente,
-        nombre: datos.nombre ?? `Formato del cliente v${version}`,
+        nombre: datos.nombre ?? nombreDefault(datos.formato, version),
         version,
         vigente: true,
+        formato: datos.formato,
         mapeo: datos.mapeo,
+        // Los campos variables sólo aplican a pdf-cya; en excel se guardan como null (JSON nullable).
+        camposVariables:
+          datos.formato === 'pdf-cya' && datos.camposVariables != null
+            ? datos.camposVariables
+            : Prisma.DbNull,
+        porcentajeAdicional: datos.porcentajeAdicional ?? 0,
         ...datosCreacion(sesion),
       },
     });

@@ -99,6 +99,11 @@ export interface DatosImpresoOrden {
   fecha: string | null;
   fechaEntrega: string | null;
   cliente: string;
+  /**
+   * Pedido/OC del cliente (petición Daniel): la referencia PRINCIPAL (`referencias[0]`) o el `ocCliente`.
+   * OPCIONAL: hay órdenes capturadas a mano SIN referencia del cliente (el encabezado muestra "—").
+   */
+  pedidoCliente?: string | null;
   etiquetaMarca: string | null;
   maquilero: string | null;
   codigoModelo: string;
@@ -109,7 +114,7 @@ export interface DatosImpresoOrden {
   /** Etiquetas de talla en el orden en que aparecen en la matriz (columnas de la tabla). */
   tallas: string[];
   /** Renglones color × talla; `cantidades[i]` alinea con `tallas[i]` (0 si la talla no aplica). */
-  renglones: { color: string; cantidades: number[]; totalFila: number }[];
+  renglones: { color: string; pantone: string | null; cantidades: number[]; totalFila: number }[];
   /** Total por columna (alinea con `tallas`). */
   totalesColumna: number[];
   /** Total general de la orden (debe CUADRAR con `OrdenSalida.totalPiezas`). */
@@ -166,7 +171,11 @@ export interface DepsImpreso {
  * orden en que se ven), filas = colores, con totales por fila, por columna y total general.
  */
 export function armarTabla(
-  lineas: { color: string; tallas: { etiquetaTalla: string; cantidad: number }[] }[],
+  lineas: {
+    color: string;
+    pantone?: string | null;
+    tallas: { etiquetaTalla: string; cantidad: number }[];
+  }[],
 ): Pick<DatosImpresoOrden, 'tallas' | 'renglones' | 'totalesColumna' | 'totalPiezas'> {
   // Columnas: primera aparición de cada etiqueta de talla, en orden.
   const tallas: string[] = [];
@@ -190,7 +199,7 @@ export function armarTabla(
       totalesColumna[i] = (totalesColumna[i] ?? 0) + cantidad;
     });
     totalPiezas += totalFila;
-    return { color: linea.color, cantidades, totalFila };
+    return { color: linea.color, pantone: linea.pantone ?? null, cantidades, totalFila };
   });
 
   return { tallas, renglones, totalesColumna, totalPiezas };
@@ -241,6 +250,9 @@ export async function armarDatosImpresoOrden(
     fecha: orden.fecha,
     fechaEntrega: orden.fechaEntrega,
     cliente: orden.cliente,
+    // Pedido/OC del cliente: la referencia PRINCIPAL (la 1ª D7 — "Pedido cliente" de C&A) o, si no hay
+    // referencias, el snapshot `ocCliente`. Así la OC del cliente "vive" también en el impreso (Daniel).
+    pedidoCliente: orden.referencias[0]?.valor ?? orden.ocCliente,
     etiquetaMarca: orden.etiquetaMarca,
     maquilero: orden.maquilero,
     codigoModelo: orden.codigoModelo,
@@ -340,7 +352,11 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
     h(
       View,
       { style: estilosDoc.filaTabla, key: `fila-${fila}` },
-      h(Text, { style: [estilosDoc.celda, estilos.colColor] }, r.color),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.colColor] },
+        r.pantone ? `${r.color}  ·  PANTONE ${r.pantone}` : r.color,
+      ),
       ...r.cantidades.map((c, i) =>
         h(
           Text,
@@ -406,6 +422,7 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
       View,
       { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Cliente', datos.cliente),
+      campo('Pedido cliente', datos.pedidoCliente ?? null),
       campo('Etiqueta de marca', datos.etiquetaMarca),
       campo('Maquilero', datos.maquilero),
       campo('Fecha', datos.fecha),
