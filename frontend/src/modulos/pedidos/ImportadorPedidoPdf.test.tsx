@@ -1,8 +1,8 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnalizarPdf } from '@/api/tipos';
-import { renderConProveedores } from '@/pruebas/utilidades';
+import type { AnalizarPdf, ClavePermiso } from '@/api/tipos';
+import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
 
@@ -42,6 +42,32 @@ vi.mock('@/api/modelos', () => ({
 }));
 vi.mock('@/api/importacion-pedido', () => ({
   archivoABase64: vi.fn(() => Promise.resolve('QkFTRTY0')),
+}));
+// El alta de modelo se reusa como caja negra: aquí se stub-ea para ejercitar el CABLEADO del
+// importador (prefill que recibe + `alCrear` que dispara la liga). El comportamiento del alta en
+// sí se prueba en `DialogoModelo.test.tsx`.
+vi.mock('@/modulos/modelos/DialogoModelo', () => ({
+  DialogoModelo: ({
+    abierto,
+    prellenadoAlta,
+    alCrear,
+  }: {
+    abierto: boolean;
+    prellenadoAlta?: { descripcion?: string };
+    alCrear?: (m: { id: number; codigo: string }) => void;
+  }) =>
+    abierto ? (
+      <div data-testid="stub-dialogo-modelo">
+        <span data-testid="stub-prefill-desc">{prellenadoAlta?.descripcion}</span>
+        <button
+          type="button"
+          data-testid="stub-crear-modelo"
+          onClick={() => alCrear?.({ id: 999, codigo: 'CYA-NUEVO' })}
+        >
+          simular crear
+        </button>
+      </div>
+    ) : null,
 }));
 
 /** Renglón canónico: un PDF con liga aprendida (modelo 42), color nuevo y una talla nueva (sin % adicional). */
@@ -126,12 +152,31 @@ const PREVIEW_7: AnalizarPdf = {
   ],
 };
 
+/** Un PDF sin liga aprendida (Modelo ID desconocido): `sin ligar`, sin sugerencia. */
+const PREVIEW_SIN_LIGA: AnalizarPdf = {
+  ...PREVIEW,
+  totalReconocidos: 0,
+  renglones: [
+    {
+      ...RENGLON,
+      idModeloSugerido: null,
+      codigoModeloSugerido: null,
+      descripcionModeloSugerido: null,
+    },
+  ],
+};
+
 /** Lleva la pantalla del paso 1 (cliente + PDF) al paso 2 (vista previa) con el preview indicado. */
-async function irAVistaPrevia(preview: AnalizarPdf = PREVIEW): Promise<void> {
+async function irAVistaPrevia(
+  preview: AnalizarPdf = PREVIEW,
+  permisos: ClavePermiso[] = [],
+): Promise<void> {
   analizarMock.mockImplementation((_body, opciones: { onSuccess: (r: AnalizarPdf) => void }) => {
     opciones.onSuccess(preview);
   });
-  renderConProveedores(<ImportadorPedidoPdf alCerrar={vi.fn()} alImportado={vi.fn()} />);
+  renderConProveedores(<ImportadorPedidoPdf alCerrar={vi.fn()} alImportado={vi.fn()} />, {
+    sesion: estadoSesionDePrueba(permisos),
+  });
 
   // Elige el cliente en el combobox (la opción se elige con mousedown, gana antes del blur).
   fireEvent.change(screen.getByTestId('importador-pdf-cliente-input'), { target: { value: 'C' } });
@@ -215,5 +260,47 @@ describe('ImportadorPedidoPdf', () => {
     expect(archivo?.matriz).toContainEqual({ talla: '5-6', cantidad: 300 }); // el total editado
     expect(archivo?.matriz).toContainEqual({ talla: '6-7', cantidad: 134 }); // el propuesto, sin tocar
     expect(archivo?.pantone).toBe('11-0601 TCX');
+  });
+
+  it('sin permiso modelos.administrar, no ofrece crear un modelo nuevo', async () => {
+    await irAVistaPrevia(PREVIEW, []);
+    expect(screen.queryByTestId('importador-pdf-crear-modelo')).not.toBeInTheDocument();
+  });
+
+  it('con permiso: crear modelo advierte si el Modelo ID ya está ligado, y tras crear lo liga', async () => {
+    await irAVistaPrevia(PREVIEW, ['modelos.administrar']);
+    // Arranca con la liga aprendida (sugerida) al modelo DEV-1.
+    expect(screen.getByText('liga aprendida')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+    // 3b: advierte (no bloquea) porque el Modelo ID ya está ligado a DEV-1.
+    expect(await screen.findByText(/ya está ligado al modelo/i)).toBeInTheDocument();
+    expect(screen.getByText('DEV-1')).toBeInTheDocument();
+
+    // Confirma la advertencia → abre el alta prellenada con la descripción de la OC.
+    fireEvent.click(screen.getByTestId('confirmar-accion'));
+    const stub = await screen.findByTestId('stub-dialogo-modelo');
+    expect(within(stub).getByTestId('stub-prefill-desc')).toHaveTextContent(
+      'PLAYERA ML SINGLE JERSEY',
+    );
+
+    // Simula la creación → el PDF queda LIGADO A MANO al modelo nuevo (ya no "liga aprendida").
+    fireEvent.click(screen.getByTestId('stub-crear-modelo'));
+    expect(await screen.findByText('ligado a mano')).toBeInTheDocument();
+    expect(screen.queryByText('liga aprendida')).not.toBeInTheDocument();
+  });
+
+  it('sin liga aprendida, crear modelo abre el alta directo (sin advertencia) y liga al crear', async () => {
+    await irAVistaPrevia(PREVIEW_SIN_LIGA, ['modelos.administrar']);
+    expect(screen.getByText('sin ligar')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('importador-pdf-crear-modelo'));
+    // No hay liga previa → NO advierte; abre el alta directo.
+    expect(screen.queryByText(/ya está ligado al modelo/i)).not.toBeInTheDocument();
+    expect(await screen.findByTestId('stub-dialogo-modelo')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('stub-crear-modelo'));
+    expect(await screen.findByText('ligado a mano')).toBeInTheDocument();
+    expect(screen.queryByText('sin ligar')).not.toBeInTheDocument();
   });
 });

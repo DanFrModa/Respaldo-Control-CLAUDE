@@ -1,18 +1,30 @@
-import { CheckIcon, ChevronRight, FileText, InfoIcon, Loader2Icon, Upload, X } from 'lucide-react';
+import {
+  CheckIcon,
+  ChevronRight,
+  FileText,
+  InfoIcon,
+  Loader2Icon,
+  Plus,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { archivoABase64 } from '@/api/importacion-pedido';
 import { useAnalizarPdf, useConfirmarPdf, usePlantillaVigente } from '@/api/importacion-pdf';
 import { useClientes } from '@/api/clientes';
-import { useModelos } from '@/api/modelos';
+import { useModelos, type Modelo } from '@/api/modelos';
 import type { AnalizarPdf, RenglonPdfPreview } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
+import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
+import { DialogoModelo } from '@/modulos/modelos/DialogoModelo';
+import { useSesion } from '@/sesion/useSesion';
 
 /**
  * IMPORTADOR de OC del cliente por PDF (petición Daniel — plantilla C&A): asistente de 2 pasos que toma
@@ -492,6 +504,43 @@ function PasoVistaPrevia({
   onLigar: (modeloCliente: string, id: number | null) => void;
   onBuscarModelo: (texto: string) => void;
 }): React.JSX.Element {
+  const { tienePermiso } = useSesion();
+  const puedeCrearModelo = tienePermiso('modelos.administrar');
+  // Alta de modelo NUEVO desde el preview (petición Daniel): abrir el alta ESTÁNDAR prellenada y, al
+  // crear, dejar el modelo ligado a ese PDF. La creación es el POST normal (FUERA de la tx del
+  // confirmar). `modelosCreados` recuerda el código para etiquetar el combobox (aún no está en la
+  // búsqueda paginada). `advertirPara` sostiene la advertencia blanda cuando el Modelo ID ya está
+  // ligado a otro modelo (3b: no bloquea, Daniel decide).
+  const [crearPara, setCrearPara] = useState<{ modeloCliente: string; descripcion: string } | null>(
+    null,
+  );
+  const [advertirPara, setAdvertirPara] = useState<{
+    modeloCliente: string;
+    descripcion: string;
+    codigoLigado: string;
+  } | null>(null);
+  const [modelosCreados, setModelosCreados] = useState<
+    Record<string, { id: number; codigo: string }>
+  >({});
+
+  function solicitarCrearModelo(r: RenglonPdfPreview): void {
+    const base = { modeloCliente: r.modeloCliente, descripcion: r.descripcionArticulo };
+    if (r.idModeloSugerido !== null && r.codigoModeloSugerido !== null) {
+      setAdvertirPara({ ...base, codigoLigado: r.codigoModeloSugerido });
+    } else {
+      setCrearPara(base);
+    }
+  }
+
+  function alModeloCreado(modeloCliente: string, modelo: Modelo): void {
+    setModelosCreados((prev) => ({
+      ...prev,
+      [modeloCliente]: { id: modelo.id, codigo: modelo.codigo },
+    }));
+    onLigar(modeloCliente, modelo.id);
+    setCrearPara(null);
+  }
+
   const totalPiezas = renglones.reduce(
     (s, r) => s + r.tallas.reduce((ss, t) => ss + t.piezas, 0),
     0,
@@ -521,23 +570,31 @@ function PasoVistaPrevia({
       </p>
 
       <div className="space-y-3">
-        {renglones.map((r, i) => (
-          <FilaPdf
-            key={`${r.nombreArchivo}-${i}`}
-            r={r}
-            indice={i}
-            matriz={matrices[i] ?? {}}
-            pantone={pantones[i] ?? ''}
-            onCelda={(talla, cantidad) => onCelda(i, talla, cantidad)}
-            onPantone={(valor) => onPantone(i, valor)}
-            valorLiga={idModeloDe(r)}
-            usaSugerencia={ligas[r.modeloCliente] === undefined && r.idModeloSugerido !== null}
-            opcionesModelo={opcionesModelo}
-            cargandoModelos={cargandoModelos}
-            onLigar={(id) => onLigar(r.modeloCliente, id)}
-            onBuscarModelo={onBuscarModelo}
-          />
-        ))}
+        {renglones.map((r, i) => {
+          const creado = modelosCreados[r.modeloCliente];
+          const etiquetaModeloCreado =
+            creado !== undefined && idModeloDe(r) === creado.id ? `#${creado.codigo}` : undefined;
+          return (
+            <FilaPdf
+              key={`${r.nombreArchivo}-${i}`}
+              r={r}
+              indice={i}
+              matriz={matrices[i] ?? {}}
+              pantone={pantones[i] ?? ''}
+              onCelda={(talla, cantidad) => onCelda(i, talla, cantidad)}
+              onPantone={(valor) => onPantone(i, valor)}
+              valorLiga={idModeloDe(r)}
+              usaSugerencia={ligas[r.modeloCliente] === undefined && r.idModeloSugerido !== null}
+              etiquetaModeloCreado={etiquetaModeloCreado}
+              opcionesModelo={opcionesModelo}
+              cargandoModelos={cargandoModelos}
+              onLigar={(id) => onLigar(r.modeloCliente, id)}
+              onBuscarModelo={onBuscarModelo}
+              puedeCrearModelo={puedeCrearModelo}
+              onCrearModelo={() => solicitarCrearModelo(r)}
+            />
+          );
+        })}
       </div>
 
       <p className="text-[11px] text-faint" data-testid="importador-pdf-total">
@@ -552,6 +609,45 @@ function PasoVistaPrevia({
         ) : null}
         .
       </p>
+
+      {/* 3b · Advertencia blanda: el Modelo ID ya está ligado a otro modelo (no bloquea). */}
+      {advertirPara !== null ? (
+        <DialogoConfirmacion
+          abierto
+          alCambiarAbierto={(a) => {
+            if (!a) setAdvertirPara(null);
+          }}
+          titulo="Este Modelo ID ya está ligado"
+          descripcion={
+            <>
+              El Modelo ID <b>{advertirPara.modeloCliente}</b> ya está ligado al modelo{' '}
+              <b>{advertirPara.codigoLigado}</b>. ¿Crear de todas formas un modelo nuevo y ligarlo a
+              este PDF?
+            </>
+          }
+          textoConfirmar="Sí, crear nuevo"
+          alConfirmar={() => {
+            setCrearPara({
+              modeloCliente: advertirPara.modeloCliente,
+              descripcion: advertirPara.descripcion,
+            });
+            setAdvertirPara(null);
+          }}
+        />
+      ) : null}
+
+      {/* Alta ESTÁNDAR de modelo (reuso), prellenada con la descripción de la OC; al crear queda ligado. */}
+      {crearPara !== null ? (
+        <DialogoModelo
+          abierto
+          alCambiarAbierto={(a) => {
+            if (!a) setCrearPara(null);
+          }}
+          modelo={undefined}
+          prellenadoAlta={{ descripcion: crearPara.descripcion }}
+          alCrear={(m) => alModeloCreado(crearPara.modeloCliente, m)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -566,10 +662,13 @@ function FilaPdf({
   onPantone,
   valorLiga,
   usaSugerencia,
+  etiquetaModeloCreado,
   opcionesModelo,
   cargandoModelos,
   onLigar,
   onBuscarModelo,
+  puedeCrearModelo,
+  onCrearModelo,
 }: {
   r: RenglonPdfPreview;
   indice: number;
@@ -579,10 +678,14 @@ function FilaPdf({
   onPantone: (valor: string) => void;
   valorLiga: number | null;
   usaSugerencia: boolean;
+  /** Etiqueta del modelo recién creado desde el preview (aún no está en la búsqueda paginada). */
+  etiquetaModeloCreado: string | undefined;
   opcionesModelo: { id: number; nombre: string }[];
   cargandoModelos: boolean;
   onLigar: (id: number | null) => void;
   onBuscarModelo: (texto: string) => void;
+  puedeCrearModelo: boolean;
+  onCrearModelo: () => void;
 }): React.JSX.Element {
   const [abierto, setAbierto] = useState(false);
   if (r.error !== null) {
@@ -629,9 +732,10 @@ function FilaPdf({
             opciones={opcionesModelo}
             valor={valorLiga}
             etiquetaSeleccion={
-              usaSugerencia && r.codigoModeloSugerido !== null
+              etiquetaModeloCreado ??
+              (usaSugerencia && r.codigoModeloSugerido !== null
                 ? `#${r.codigoModeloSugerido}`
-                : undefined
+                : undefined)
             }
             onChange={onLigar}
             alCambiarTexto={onBuscarModelo}
@@ -640,6 +744,17 @@ function FilaPdf({
             etiqueta={`Ligar ${r.modeloCliente} a un modelo`}
             testid="importador-pdf-ligar"
           />
+          {puedeCrearModelo ? (
+            <button
+              type="button"
+              onClick={onCrearModelo}
+              className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              data-testid="importador-pdf-crear-modelo"
+            >
+              <Plus className="size-3" aria-hidden />
+              Crear modelo nuevo
+            </button>
+          ) : null}
         </div>
       </div>
 
