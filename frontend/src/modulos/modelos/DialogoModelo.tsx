@@ -156,11 +156,20 @@ export function DialogoModelo({
   abierto,
   alCambiarAbierto,
   modelo,
+  prellenadoAlta,
+  alCrear,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
   /** Modelo a editar; `undefined` -> alta. */
   modelo: Modelo | undefined;
+  /**
+   * Valores con los que precargar el formulario en ALTA (p. ej. el importador de OC propone la
+   * descripción del artículo del cliente). Se ignora en edición; el código lo captura el usuario.
+   */
+  prellenadoAlta?: { codigo?: string; descripcion?: string };
+  /** Se invoca con el modelo recién creado, para que el llamador lo use (p. ej. dejarlo ligado). */
+  alCrear?: (modelo: Modelo) => void;
 }): React.JSX.Element {
   const esEdicion = modelo !== undefined;
   const crear = useCrearModelo();
@@ -188,6 +197,9 @@ export function DialogoModelo({
     defaultValues: VALORES_INICIALES,
   });
 
+  // Se depende de los primitivos del prefill (no del objeto) para no re-resetear en cada render.
+  const prellenadoCodigo = prellenadoAlta?.codigo;
+  const prellenadoDescripcion = prellenadoAlta?.descripcion;
   useEffect(() => {
     if (abierto) {
       formulario.reset(
@@ -205,10 +217,16 @@ export function DialogoModelo({
               idTipoProducto: idTexto(modelo.idTipoProducto),
               idMaquileroCotizado: idTexto(modelo.idMaquileroCotizado),
             }
-          : VALORES_INICIALES,
+          : {
+              ...VALORES_INICIALES,
+              ...(prellenadoCodigo !== undefined ? { codigo: prellenadoCodigo } : {}),
+              ...(prellenadoDescripcion !== undefined
+                ? { descripcion: prellenadoDescripcion }
+                : {}),
+            },
       );
     }
-  }, [abierto, modelo, formulario]);
+  }, [abierto, modelo, formulario, prellenadoCodigo, prellenadoDescripcion]);
 
   // Dificultad EN VIVO (R5/B7): deriva del # de operaciones capturado contra la tabla de rangos (R4).
   const numOpsTexto = formulario.watch('numOperaciones');
@@ -236,6 +254,7 @@ export function DialogoModelo({
       onSuccess: (resultado) => {
         toast.success(`Modelo "${resultado.codigo}" creado.`);
         alCambiarAbierto(false);
+        alCrear?.(resultado);
       },
       onError: (error) => toast.error(error.message),
     });

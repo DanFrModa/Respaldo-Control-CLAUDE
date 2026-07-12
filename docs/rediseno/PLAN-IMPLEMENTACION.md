@@ -232,6 +232,8 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 
 **Diferido con razón:** panel read-only "Packs / SKUs del cliente" en el cajón de la orden → módulo de EMPAQUE (persistencia lista y consultable). **Siguiente:** plantillas de más clientes conforme Daniel suba sus OCs; TechPack en Desarrollo (pantone) = tarea #72.
 
+**Extensión (mismo 12-jul, 2º PR): crear modelo desde la vista previa.** Daniel: "cuando hago nuevos pedidos, normalmente ahí es cuando genero los modelos internos" → en el preview, botón **"Crear modelo nuevo"** (gate `modelos.administrar`, front+back) que REUSA `DialogoModelo` (+2 props opcionales retrocompatibles `prellenadoAlta`/`alCrear`; prellenado con la Descripción Cliente, el usuario captura su código interno); **advertencia blanda** vía `DialogoConfirmacion` si el Modelo ID ya está ligado a otro modelo (nombra el código ligado, no bloquea); duplicado de código bloqueado por el alta existente (`exigirCodigoLibre`/P2002→409, surfaceado por toast); el creado queda ligado vía `onLigar` y se aprende al confirmar (mecánica existente, tx A2 intacta). **FRONTEND-ONLY** (4 archivos; `git diff origin/prueba -- backend/` = 0, verificado por el reviewer). Reviewer APROBADO; e2e dictaminado NO requerido (unit 706/706 cubre gate/advertencia/crear→liga). El importador **Excel** queda fuera con razón: liga a **Desarrollo**, no a Modelo (su análogo = "crear desarrollo", consideración futura).
+
 ---
 
 ## 3. Arquitectura de implementación (decisiones del lead)
