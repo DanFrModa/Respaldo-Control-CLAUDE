@@ -40021,6 +40021,18 @@
                           "maximum": 9007199254740991,
                           "description": "Color del catálogo (F1; en v1 era texto libre)."
                         },
+                        "pantone": {
+                          "description": "Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "tallas": {
                           "default": [],
                           "description": "Cantidades por talla de este color.",
@@ -40472,6 +40484,17 @@
                                 "type": "string",
                                 "description": "Nombre del color (para la UI)."
                               },
+                              "pantone": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Código PANTONE de este color, o null."
+                              },
                               "tallas": {
                                 "type": "array",
                                 "items": {
@@ -40515,6 +40538,7 @@
                               "id",
                               "idColor",
                               "color",
+                              "pantone",
                               "tallas",
                               "totalPiezas"
                             ],
@@ -40943,6 +40967,14 @@
                               "type": "boolean",
                               "description": "Si es la versión que se aplica hoy."
                             },
+                            "formato": {
+                              "type": "string",
+                              "enum": [
+                                "excel",
+                                "pdf-cya"
+                              ],
+                              "description": "Formato del archivo (excel | pdf-cya)."
+                            },
                             "mapeo": {
                               "type": "array",
                               "items": {
@@ -40980,7 +41012,54 @@
                                 "additionalProperties": false,
                                 "description": "Cómo se interpreta una columna del archivo del cliente."
                               },
-                              "description": "Mapeo columna→rol guardado."
+                              "description": "Mapeo columna→rol guardado (vacío en pdf-cya)."
+                            },
+                            "camposVariables": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "campo": {
+                                        "type": "string",
+                                        "enum": [
+                                          "numeroOrden",
+                                          "modeloCliente",
+                                          "division",
+                                          "subDivision",
+                                          "descripcionArticulo",
+                                          "codigoUnico",
+                                          "semanaCliente",
+                                          "idColorCliente",
+                                          "colorGenerico"
+                                        ],
+                                        "description": "Campo del PDF de C&A capturable como referencia del cliente."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80,
+                                        "description": "Etiqueta con la que se guarda como referencia del cliente (D7)."
+                                      }
+                                    },
+                                    "required": [
+                                      "campo",
+                                      "etiqueta"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Campo variable por cliente (PDF → referencia D7 de la OP)."
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Campos variables por cliente (pdf-cya); null en excel."
+                            },
+                            "porcentajeAdicional": {
+                              "type": "number",
+                              "description": "% adicional de producción del cliente (C&A=7); 0 = sin adicional."
                             },
                             "creadoEn": {
                               "type": "string",
@@ -41023,7 +41102,10 @@
                             "nombre",
                             "version",
                             "vigente",
+                            "formato",
                             "mapeo",
+                            "camposVariables",
+                            "porcentajeAdicional",
                             "creadoEn",
                             "creadoPorId",
                             "modificadoEn",
@@ -41212,8 +41294,18 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "formato": {
+                    "default": "excel",
+                    "description": "Formato del archivo (default excel — compat. con R8).",
+                    "type": "string",
+                    "enum": [
+                      "excel",
+                      "pdf-cya"
+                    ]
+                  },
                   "mapeo": {
-                    "minItems": 1,
+                    "default": [],
+                    "description": "Mapeo columna→rol (obligatorio y completo en excel; vacío en pdf-cya).",
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -41248,13 +41340,57 @@
                         "rol"
                       ],
                       "description": "Cómo se interpreta una columna del archivo del cliente."
-                    },
-                    "description": "Mapeo columna→rol del archivo del cliente (Modelo/Color/Talla/Cantidad obligatorios)."
+                    }
+                  },
+                  "camposVariables": {
+                    "description": "Campos variables por cliente (pdf-cya); ignorado en excel.",
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "campo": {
+                              "type": "string",
+                              "enum": [
+                                "numeroOrden",
+                                "modeloCliente",
+                                "division",
+                                "subDivision",
+                                "descripcionArticulo",
+                                "codigoUnico",
+                                "semanaCliente",
+                                "idColorCliente",
+                                "colorGenerico"
+                              ],
+                              "description": "Campo del PDF de C&A capturable como referencia del cliente."
+                            },
+                            "etiqueta": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80,
+                              "description": "Etiqueta con la que se guarda como referencia del cliente (D7)."
+                            }
+                          },
+                          "required": [
+                            "campo",
+                            "etiqueta"
+                          ],
+                          "description": "Campo variable por cliente (PDF → referencia D7 de la OP)."
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "porcentajeAdicional": {
+                    "description": "% adicional de producción del cliente (default 0; C&A=7).",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
-                "required": [
-                  "mapeo"
-                ],
                 "description": "Datos para guardar (versionar) la plantilla de un cliente."
               }
             }
@@ -41313,6 +41449,14 @@
                       "type": "boolean",
                       "description": "Si es la versión que se aplica hoy."
                     },
+                    "formato": {
+                      "type": "string",
+                      "enum": [
+                        "excel",
+                        "pdf-cya"
+                      ],
+                      "description": "Formato del archivo (excel | pdf-cya)."
+                    },
                     "mapeo": {
                       "type": "array",
                       "items": {
@@ -41350,7 +41494,54 @@
                         "additionalProperties": false,
                         "description": "Cómo se interpreta una columna del archivo del cliente."
                       },
-                      "description": "Mapeo columna→rol guardado."
+                      "description": "Mapeo columna→rol guardado (vacío en pdf-cya)."
+                    },
+                    "camposVariables": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "campo": {
+                                "type": "string",
+                                "enum": [
+                                  "numeroOrden",
+                                  "modeloCliente",
+                                  "division",
+                                  "subDivision",
+                                  "descripcionArticulo",
+                                  "codigoUnico",
+                                  "semanaCliente",
+                                  "idColorCliente",
+                                  "colorGenerico"
+                                ],
+                                "description": "Campo del PDF de C&A capturable como referencia del cliente."
+                              },
+                              "etiqueta": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80,
+                                "description": "Etiqueta con la que se guarda como referencia del cliente (D7)."
+                              }
+                            },
+                            "required": [
+                              "campo",
+                              "etiqueta"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Campo variable por cliente (PDF → referencia D7 de la OP)."
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Campos variables por cliente (pdf-cya); null en excel."
+                    },
+                    "porcentajeAdicional": {
+                      "type": "number",
+                      "description": "% adicional de producción del cliente (C&A=7); 0 = sin adicional."
                     },
                     "creadoEn": {
                       "type": "string",
@@ -41393,7 +41584,10 @@
                     "nombre",
                     "version",
                     "vigente",
+                    "formato",
                     "mapeo",
+                    "camposVariables",
+                    "porcentajeAdicional",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -41702,6 +41896,14 @@
                               "type": "boolean",
                               "description": "Si es la versión que se aplica hoy."
                             },
+                            "formato": {
+                              "type": "string",
+                              "enum": [
+                                "excel",
+                                "pdf-cya"
+                              ],
+                              "description": "Formato del archivo (excel | pdf-cya)."
+                            },
                             "mapeo": {
                               "type": "array",
                               "items": {
@@ -41739,7 +41941,54 @@
                                 "additionalProperties": false,
                                 "description": "Cómo se interpreta una columna del archivo del cliente."
                               },
-                              "description": "Mapeo columna→rol guardado."
+                              "description": "Mapeo columna→rol guardado (vacío en pdf-cya)."
+                            },
+                            "camposVariables": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "campo": {
+                                        "type": "string",
+                                        "enum": [
+                                          "numeroOrden",
+                                          "modeloCliente",
+                                          "division",
+                                          "subDivision",
+                                          "descripcionArticulo",
+                                          "codigoUnico",
+                                          "semanaCliente",
+                                          "idColorCliente",
+                                          "colorGenerico"
+                                        ],
+                                        "description": "Campo del PDF de C&A capturable como referencia del cliente."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80,
+                                        "description": "Etiqueta con la que se guarda como referencia del cliente (D7)."
+                                      }
+                                    },
+                                    "required": [
+                                      "campo",
+                                      "etiqueta"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Campo variable por cliente (PDF → referencia D7 de la OP)."
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Campos variables por cliente (pdf-cya); null en excel."
+                            },
+                            "porcentajeAdicional": {
+                              "type": "number",
+                              "description": "% adicional de producción del cliente (C&A=7); 0 = sin adicional."
                             },
                             "creadoEn": {
                               "type": "string",
@@ -41782,7 +42031,10 @@
                             "nombre",
                             "version",
                             "vigente",
+                            "formato",
                             "mapeo",
+                            "camposVariables",
+                            "porcentajeAdicional",
                             "creadoEn",
                             "creadoPorId",
                             "modificadoEn",
@@ -42501,6 +42753,1015 @@
         }
       }
     },
+    "/api/pedidos/importacion-pdf/analizar": {
+      "post": {
+        "summary": "Analizar los PDFs de C&A: un renglón por PDF con su liga sugerida y advertencias",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente del pedido."
+                  },
+                  "archivos": {
+                    "minItems": 1,
+                    "maxItems": 40,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nombreArchivo": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255,
+                          "description": "Nombre del PDF del cliente (para mostrar y adjuntar)."
+                        },
+                        "archivoBase64": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 14680064,
+                          "description": "Contenido del PDF en base64 (acepta prefijo data: URL)."
+                        }
+                      },
+                      "required": [
+                        "nombreArchivo",
+                        "archivoBase64"
+                      ],
+                      "description": "Un PDF de orden de compra del cliente."
+                    },
+                    "description": "PDFs de las órdenes de compra del cliente."
+                  },
+                  "porcentajeAdicional": {
+                    "description": "% adicional para la vista previa; si se omite, se usa el de la plantilla del cliente.",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "idCliente",
+                  "archivos"
+                ],
+                "description": "Analiza los PDFs de C&A y arma la vista previa (un renglón por PDF)."
+              }
+            }
+          },
+          "description": "Analiza los PDFs de C&A y arma la vista previa (un renglón por PDF)."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vista previa de la importación por PDF.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "renglones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombreArchivo": {
+                            "type": "string",
+                            "description": "Nombre del PDF (para identificar la fila)."
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Mensaje de error si el PDF no se pudo parsear, o null."
+                          },
+                          "numeroOrden": {
+                            "type": "string",
+                            "description": "Nº de orden de compra del cliente (C&A \"Numero de Orden\")."
+                          },
+                          "modeloCliente": {
+                            "type": "string",
+                            "description": "Modelo ID del cliente (C&A \"Modelo ID\")."
+                          },
+                          "descripcionArticulo": {
+                            "type": "string",
+                            "description": "Descripción del artículo del PDF."
+                          },
+                          "division": {
+                            "type": "string",
+                            "description": "División del PDF (→ departamento del cliente)."
+                          },
+                          "subDivision": {
+                            "type": "string",
+                            "description": "Sub División del PDF (campo variable; puede venir vacía)."
+                          },
+                          "idColorCliente": {
+                            "type": "string",
+                            "description": "ID Color del cliente."
+                          },
+                          "colorGenerico": {
+                            "type": "string",
+                            "description": "Color genérico del PDF (color de la OP)."
+                          },
+                          "pantone": {
+                            "type": "string",
+                            "description": "Código PANTONE de la OC (vacío si el papel no lo trae; editable)."
+                          },
+                          "codigoUnico": {
+                            "type": "string",
+                            "description": "Código único del PDF."
+                          },
+                          "semanaCliente": {
+                            "type": "string",
+                            "description": "Semana C&A del PDF."
+                          },
+                          "costoUnitario": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario (FOB) — null sin `pedidos.importes`."
+                          },
+                          "piezasTotales": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas totales que pidió el cliente (del PDF)."
+                          },
+                          "piezasFabricar": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas totales PROPUESTAS a fabricar (Σ del sobre-pedido por packs con el % adicional)."
+                          },
+                          "montoTotal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Monto total de la OC — null sin `pedidos.importes`."
+                          },
+                          "fechaEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Inicio de la ventana \"Entrega en DC\" (YYYY-MM-DD)."
+                          },
+                          "tallas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "talla": {
+                                  "type": "string",
+                                  "description": "Etiqueta de la talla del PDF (5-6, 6-7, …)."
+                                },
+                                "piezas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas que pidió el cliente para esa talla."
+                                },
+                                "piezasFabricar": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Propuesta a fabricar de esa talla (suma de la propuesta de todos los packs/SKU)."
+                                }
+                              },
+                              "required": [
+                                "talla",
+                                "piezas",
+                                "piezasFabricar"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Talla del PDF: pedidas por el cliente y propuestas a fabricar (sobre-pedido por packs)."
+                            },
+                            "description": "Matriz de tallas del PDF (color único × tallas): pedidas y propuestas a fabricar."
+                          },
+                          "grupos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "grupo": {
+                                  "type": "string",
+                                  "description": "Letra del grupo (A, B, C…)."
+                                },
+                                "tipo": {
+                                  "type": "string",
+                                  "description": "\"PACK\" (proporción por pack) o \"SKU\" (piezas sueltas)."
+                                },
+                                "packsOriginales": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Total de packs del grupo en la OC."
+                                },
+                                "packsPropuestos": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Packs propuestos = round(packsOriginales × (1+%/100)) en los PACK."
+                                },
+                                "desglose": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "talla": {
+                                        "type": "string",
+                                        "description": "Etiqueta de la talla."
+                                      },
+                                      "original": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Piezas de esa talla en el grupo (original del cliente)."
+                                      },
+                                      "propuesta": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Piezas propuestas a fabricar de esa talla en el grupo."
+                                      }
+                                    },
+                                    "required": [
+                                      "talla",
+                                      "original",
+                                      "propuesta"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Celda del desglose de un grupo de packs."
+                                  },
+                                  "description": "Desglose por talla del grupo."
+                                },
+                                "advertencia": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Aviso si la proporción del pack no era entera (cayó a redondeo por talla), o null."
+                                }
+                              },
+                              "required": [
+                                "grupo",
+                                "tipo",
+                                "packsOriginales",
+                                "packsPropuestos",
+                                "desglose",
+                                "advertencia"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Propuesta de sobre-pedido de un grupo de packs."
+                            },
+                            "description": "Grupos de la sección \"Detalles PACK / SKU\" con su propuesta de sobre-pedido (de dónde sale la matriz propuesta). Vacío si el PDF no trae packs."
+                          },
+                          "idModeloSugerido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Modelo NUESTRO sugerido por la liga aprendida (o null si es la primera vez)."
+                          },
+                          "codigoModeloSugerido": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo sugerido, o null."
+                          },
+                          "descripcionModeloSugerido": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo sugerido, o null."
+                          },
+                          "colorNuevo": {
+                            "type": "boolean",
+                            "description": "true si el color no existe en el catálogo (se creará al confirmar)."
+                          },
+                          "tallasNuevas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Tallas del PDF que no existen en el catálogo (se crearán al confirmar)."
+                          },
+                          "advertencias": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "tipo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "suma-tallas",
+                                    "suma-monto",
+                                    "sin-tallas",
+                                    "parseo",
+                                    "liga-inactiva",
+                                    "sobrepedido"
+                                  ],
+                                  "description": "Qué validación falló (incluye \"liga-inactiva\" y \"sobrepedido\": packs que no cuadran / proporción no entera)."
+                                },
+                                "mensaje": {
+                                  "type": "string",
+                                  "description": "Mensaje legible para la vista previa."
+                                }
+                              },
+                              "required": [
+                                "tipo",
+                                "mensaje"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Advertencia de validación de un renglón (no bloquea)."
+                            },
+                            "description": "Advertencias de validación (no bloquean)."
+                          }
+                        },
+                        "required": [
+                          "nombreArchivo",
+                          "error",
+                          "numeroOrden",
+                          "modeloCliente",
+                          "descripcionArticulo",
+                          "division",
+                          "subDivision",
+                          "idColorCliente",
+                          "colorGenerico",
+                          "pantone",
+                          "codigoUnico",
+                          "semanaCliente",
+                          "costoUnitario",
+                          "piezasTotales",
+                          "piezasFabricar",
+                          "montoTotal",
+                          "fechaEntrega",
+                          "tallas",
+                          "grupos",
+                          "idModeloSugerido",
+                          "codigoModeloSugerido",
+                          "descripcionModeloSugerido",
+                          "colorNuevo",
+                          "tallasNuevas",
+                          "advertencias"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un PDF parseado en la vista previa."
+                      },
+                      "description": "Un renglón por PDF subido."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Suma de piezas PEDIDAS por el cliente (PDFs válidos)."
+                    },
+                    "totalPiezasFabricar": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Suma de piezas PROPUESTAS a fabricar (sobre-pedido por packs) de todos los PDFs válidos."
+                    },
+                    "porcentajeAdicional": {
+                      "type": "number",
+                      "description": "% adicional aplicado a la vista previa (de la plantilla o del override)."
+                    },
+                    "totalReconocidos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos PDFs tienen una liga de modelo sugerida (aprendida)."
+                    }
+                  },
+                  "required": [
+                    "renglones",
+                    "totalPiezas",
+                    "totalPiezasFabricar",
+                    "porcentajeAdicional",
+                    "totalReconocidos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Vista previa de la importación por PDF."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/importacion-pdf/confirmar": {
+      "post": {
+        "summary": "Confirmar la importación por PDF: pedido interno + una OP por PDF (matriz + RC + adjunto)",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente del pedido (empresa activa de la sesión, A9)."
+                  },
+                  "referenciaGeneral": {
+                    "description": "Referencia general del pedido (opcional; cada OP guarda su propio nº de orden).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "archivos": {
+                    "minItems": 1,
+                    "maxItems": 40,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "nombreArchivo": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255,
+                          "description": "Nombre del PDF del cliente (para mostrar y adjuntar)."
+                        },
+                        "archivoBase64": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 14680064,
+                          "description": "Contenido del PDF en base64 (acepta prefijo data: URL)."
+                        },
+                        "matriz": {
+                          "description": "Matriz EDITADA (total por talla) que reemplaza la propuesta; si se omite, se propone.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "talla": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Etiqueta de la talla ajustada."
+                              },
+                              "cantidad": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Total EDITADO a fabricar de esa talla (reemplaza la propuesta)."
+                              }
+                            },
+                            "required": [
+                              "talla",
+                              "cantidad"
+                            ],
+                            "description": "Ajuste manual del total a fabricar de una talla."
+                          }
+                        },
+                        "pantone": {
+                          "description": "Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone.",
+                          "type": "string",
+                          "maxLength": 60
+                        }
+                      },
+                      "required": [
+                        "nombreArchivo",
+                        "archivoBase64"
+                      ],
+                      "description": "Un PDF con su ajuste manual opcional al confirmar."
+                    },
+                    "description": "PDFs de las órdenes de compra del cliente (con ajuste manual opcional)."
+                  },
+                  "ligas": {
+                    "default": [],
+                    "description": "Ligas modelo-del-cliente → nuestro modelo (aprendidas o elegidas a mano).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "modeloCliente": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Modelo ID del cliente tal como viene en el PDF."
+                        },
+                        "idModelo": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Modelo NUESTRO al que se liga."
+                        }
+                      },
+                      "required": [
+                        "modeloCliente",
+                        "idModelo"
+                      ],
+                      "description": "Liga modelo-del-cliente → nuestro modelo."
+                    }
+                  },
+                  "porcentajeAdicional": {
+                    "description": "% adicional de producción a aplicar en la matriz; si se omite, se usa el de la plantilla del cliente. Se RECUERDA en la plantilla.",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "idCliente",
+                  "archivos"
+                ],
+                "description": "Confirma la importación por PDF: crea pedido interno + OPs + RC + adjuntos."
+              }
+            }
+          },
+          "description": "Confirma la importación por PDF: crea pedido interno + OPs + RC + adjuntos."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de la importación por PDF (pedido + OPs + no reconocidos).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idPedido": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del pedido interno creado."
+                    },
+                    "folioPedido": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio del pedido (por empresa)."
+                    },
+                    "ordenes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OP creada."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la OP (por empresa)."
+                          },
+                          "numeroProduccion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº interno de producción minteado/reusado."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Nº de desarrollo de NUESTRO modelo."
+                          },
+                          "modeloCliente": {
+                            "type": "string",
+                            "description": "Modelo ID del cliente (del PDF)."
+                          },
+                          "numeroOrden": {
+                            "type": "string",
+                            "description": "Nº de orden de compra del cliente (del PDF)."
+                          },
+                          "nombreArchivo": {
+                            "type": "string",
+                            "description": "Nombre del PDF de origen (adjunto a esta OP)."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas de la OP (Σ de la matriz)."
+                          },
+                          "adjuntado": {
+                            "type": "boolean",
+                            "description": "true si el PDF se adjuntó a la OP."
+                          }
+                        },
+                        "required": [
+                          "idOrden",
+                          "folio",
+                          "numeroProduccion",
+                          "codigoModelo",
+                          "modeloCliente",
+                          "numeroOrden",
+                          "nombreArchivo",
+                          "totalPiezas",
+                          "adjuntado"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una OP creada por la importación de un PDF."
+                      },
+                      "description": "OPs creadas (una por PDF ligado)."
+                    },
+                    "noReconocidos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombreArchivo": {
+                            "type": "string",
+                            "description": "Nombre del PDF que no se importó."
+                          },
+                          "modeloCliente": {
+                            "type": "string",
+                            "description": "Modelo ID del cliente sin ligar."
+                          },
+                          "motivo": {
+                            "type": "string",
+                            "description": "Por qué quedó fuera (sin liga / error de parseo)."
+                          }
+                        },
+                        "required": [
+                          "nombreArchivo",
+                          "modeloCliente",
+                          "motivo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un PDF que no se importó."
+                      },
+                      "description": "PDFs que quedaron sin importar."
+                    },
+                    "ligasAprendidas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas ligas modelo-del-cliente se aprendieron/actualizaron."
+                    }
+                  },
+                  "required": [
+                    "idPedido",
+                    "folioPedido",
+                    "ordenes",
+                    "noReconocidos",
+                    "ligasAprendidas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de la importación por PDF (pedido + OPs + no reconocidos)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes": {
       "get": {
         "summary": "Listar órdenes de producción",
@@ -42990,6 +44251,17 @@
                                   "type": "string",
                                   "description": "Nombre del color (para la UI)."
                                 },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Código PANTONE de este color, o null."
+                                },
                                 "tallas": {
                                   "type": "array",
                                   "items": {
@@ -43033,6 +44305,7 @@
                                 "id",
                                 "idColor",
                                 "color",
+                                "pantone",
                                 "tallas",
                                 "totalPiezas"
                               ],
@@ -43541,6 +44814,18 @@
                           "maximum": 9007199254740991,
                           "description": "Color del catálogo (F1; en v1 era texto libre)."
                         },
+                        "pantone": {
+                          "description": "Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "tallas": {
                           "default": [],
                           "description": "Cantidades por talla de este color.",
@@ -43937,6 +45222,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -43980,6 +45276,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -44682,6 +45979,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -44725,6 +46033,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -45546,6 +46855,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -45589,6 +46909,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -45945,6 +47266,18 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991,
                           "description": "Color del catálogo (F1; en v1 era texto libre)."
+                        },
+                        "pantone": {
+                          "description": "Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "tallas": {
                           "default": [],
@@ -46356,6 +47689,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -46399,6 +47743,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -47122,6 +48467,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -47165,6 +48521,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -47888,6 +49245,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -47931,6 +49299,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -48672,6 +50041,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -48715,6 +50095,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -51004,6 +52385,17 @@
                             "type": "string",
                             "description": "Nombre del color (para la UI)."
                           },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE de este color, o null."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -51047,6 +52439,7 @@
                           "id",
                           "idColor",
                           "color",
+                          "pantone",
                           "tallas",
                           "totalPiezas"
                         ],

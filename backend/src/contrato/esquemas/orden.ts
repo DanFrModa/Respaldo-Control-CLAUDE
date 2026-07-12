@@ -82,6 +82,14 @@ export const esquemaOrdenLineaEntrada = z.object({
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' })
     .describe('Color del catálogo (F1; en v1 era texto libre).'),
+  pantone: z
+    .string()
+    .trim()
+    .max(60)
+    .nullish()
+    .describe(
+      'Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).',
+    ),
   tallas: z
     .array(esquemaOrdenTallaEntrada)
     .default([])
@@ -314,6 +322,7 @@ export const esquemaOrdenLineaSalida = z
     id: z.number().int().describe('Id del renglón (color).'),
     idColor: z.number().int().describe('Id del color.'),
     color: z.string().describe('Nombre del color (para la UI).'),
+    pantone: z.string().nullable().describe('Código PANTONE de este color, o null.'),
     tallas: z.array(esquemaOrdenTallaSalida).describe('Cantidades por talla.'),
     totalPiezas: z.number().int().describe('Suma de las cantidades de las tallas de este color.'),
   })

@@ -331,6 +331,23 @@ export type ConfirmarImportacion =
 /** Una OP creada por la importacion. */
 export type OrdenImportada = ConfirmarImportacion['ordenes'][number];
 
+// ── Importador de OC del cliente por PDF (peticion Daniel — plantilla C&A) ──
+
+/** Cuerpo de analizar los PDFs del cliente (`POST .../importacion-pdf/analizar`). */
+export type AnalizarPdfCuerpo =
+  paths['/api/pedidos/importacion-pdf/analizar']['post']['requestBody']['content']['application/json'];
+/** Resultado de analizar por PDF (un renglon por PDF + totales). */
+export type AnalizarPdf =
+  paths['/api/pedidos/importacion-pdf/analizar']['post']['responses']['200']['content']['application/json'];
+/** Un renglon de la vista previa (un PDF parseado con su liga sugerida y advertencias). */
+export type RenglonPdfPreview = AnalizarPdf['renglones'][number];
+/** Cuerpo de confirmar la importacion por PDF (`POST .../importacion-pdf/confirmar`). */
+export type ConfirmarPdfCuerpo =
+  paths['/api/pedidos/importacion-pdf/confirmar']['post']['requestBody']['content']['application/json'];
+/** Resultado de confirmar por PDF (pedido + OPs creadas + PDFs no reconocidos). */
+export type ConfirmarPdf =
+  paths['/api/pedidos/importacion-pdf/confirmar']['post']['responses']['201']['content']['application/json'];
+
 /** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
 export type PedidoRealesLista =
   paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];

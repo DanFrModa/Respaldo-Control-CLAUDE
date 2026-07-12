@@ -17,6 +17,7 @@ import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
 import { rutasAdjuntosPedido } from './api/pedidos/adjuntos-pedido.rutas.js';
 import { rutasSalidaProduccion } from './api/pedidos/salida-produccion.rutas.js';
 import { rutasImportacionPedido } from './api/pedidos/importacion-pedido.rutas.js';
+import { rutasImportacionPdf } from './api/pedidos/importacion-pdf.rutas.js';
 // Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1) — catálogos de configuración +
 // sub-recursos de Tela/Cliente/Modelo. Los módulos de Proyecto/Precosto/Lista/Negociación llegan
 // en E2–E6 (su modelo de datos ya nace en la migración de E1).
@@ -199,6 +200,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // analizar/preview del Excel y confirmar (crea pedido + OPs con matriz + RC, reusa salidaAProduccion).
   // Paths estáticos `/pedidos/importacion/...` con prioridad sobre `/pedidos/:id`. Sin permisos nuevos.
   await app.register(rutasImportacionPedido, { prefix: '/api' });
+  // Pedidos — IMPORTADOR de OC del cliente por PDF (petición Daniel — plantilla C&A): analizar N PDFs
+  // (vista previa) y confirmar (pedido + una OP por PDF con matriz + RC + adjunto). Paths estáticos
+  // `/pedidos/importacion-pdf/...` con prioridad sobre `/pedidos/:id`. Sin permisos nuevos.
+  await app.register(rutasImportacionPdf, { prefix: '/api' });
   // Órdenes de producción (Módulo ÓRDENES, F2-E2) — alta desde un renglón de pedido, encabezado,
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.

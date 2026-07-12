@@ -776,7 +776,7 @@ function Mosaico({
 }
 
 /** Matriz color×talla COMPACTA de solo lectura (proto `opDetalle` — totales fila/columna/general). */
-function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
+export function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
   const tallas = useMemo(() => {
     const vistas = new Map<number, string>();
     for (const linea of orden.lineas) {
@@ -819,7 +819,17 @@ function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
         <tbody>
           {orden.lineas.map((linea) => (
             <tr key={linea.id} className="border-b">
-              <td className="px-2 py-1 font-medium whitespace-nowrap">{linea.color}</td>
+              <td className="px-2 py-1 whitespace-nowrap">
+                <span className="font-medium">{linea.color}</span>
+                {linea.pantone !== null && linea.pantone !== '' ? (
+                  <span
+                    className="block text-[10px] font-normal text-muted-foreground"
+                    data-testid="centro-matriz-pantone"
+                  >
+                    PANTONE {linea.pantone}
+                  </span>
+                ) : null}
+              </td>
               {tallas.map((t) => {
                 const cantidad = linea.tallas.find((x) => x.idTalla === t.idTalla)?.cantidad ?? 0;
                 return (

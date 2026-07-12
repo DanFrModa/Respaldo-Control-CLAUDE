@@ -82,6 +82,7 @@ const orden: Orden = {
       id: 1,
       idColor: 3,
       color: 'Rojo',
+      pantone: null,
       tallas: [{ idTalla: 4, etiquetaTalla: 'CH', cantidad: 10 }],
       totalPiezas: 10,
     },

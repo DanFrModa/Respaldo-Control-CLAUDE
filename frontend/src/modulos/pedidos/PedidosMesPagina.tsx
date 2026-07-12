@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  FileText,
   Pencil,
   Plus,
   Printer,
@@ -33,6 +34,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { AdjuntosPedido } from './AdjuntosPedido';
 import { ConstructorPedido } from './ConstructorPedido';
 import { ImportadorPedido } from './ImportadorPedido';
+import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
 import { PanelGenerarOP } from './PanelGenerarOP';
 
 /**
@@ -179,6 +181,7 @@ export function PedidosMesPagina(): React.JSX.Element {
   // ── Overlays: constructor + importador + Generar OP ────────────────────────
   const [constructorAbierto, setConstructorAbierto] = useState(false);
   const [importadorAbierto, setImportadorAbierto] = useState(false);
+  const [importadorPdfAbierto, setImportadorPdfAbierto] = useState(false);
   const [generarOpDe, setGenerarOpDe] = useState<{
     pedido: PedidoMesFila;
     renglon: PedidoMesRenglon;
@@ -248,7 +251,20 @@ export function PedidosMesPagina(): React.JSX.Element {
                   data-testid="importar-de-cliente"
                 >
                   <Upload aria-hidden />
-                  Importar de cliente
+                  Importar (Excel)
+                </Button>
+              ) : null}
+              {/* Importador de OC en PDF (petición Daniel — C&A): varios PDFs → un pedido + una OP por
+                  PDF. Mismo gate que el de Excel (`ordenes.administrar`). */}
+              {puedeCrearOp ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImportadorPdfAbierto(true)}
+                  data-testid="importar-pdf-cya"
+                >
+                  <FileText aria-hidden />
+                  Importar OC (PDF)
                 </Button>
               ) : null}
               <Button
@@ -737,6 +753,15 @@ export function PedidosMesPagina(): React.JSX.Element {
           alCerrar={() => setImportadorAbierto(false)}
           alImportado={() => {
             setImportadorAbierto(false);
+            void consulta.refetch();
+          }}
+        />
+      ) : null}
+      {importadorPdfAbierto ? (
+        <ImportadorPedidoPdf
+          alCerrar={() => setImportadorPdfAbierto(false)}
+          alImportado={() => {
+            setImportadorPdfAbierto(false);
             void consulta.refetch();
           }}
         />

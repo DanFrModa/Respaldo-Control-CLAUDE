@@ -17529,6 +17529,8 @@ export interface paths {
               id?: number;
               /** @description Color del catálogo (F1; en v1 era texto libre). */
               idColor: number;
+              /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
+              pantone?: string | null;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -17647,6 +17649,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color (para la UI). */
                   color: string;
+                  /** @description Código PANTONE de este color, o null. */
+                  pantone: string | null;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -17838,7 +17842,12 @@ export interface paths {
                 version: number;
                 /** @description Si es la versión que se aplica hoy. */
                 vigente: boolean;
-                /** @description Mapeo columna→rol guardado. */
+                /**
+                 * @description Formato del archivo (excel | pdf-cya).
+                 * @enum {string}
+                 */
+                formato: 'excel' | 'pdf-cya';
+                /** @description Mapeo columna→rol guardado (vacío en pdf-cya). */
                 mapeo: {
                   /** @description Posición (0-based) de la columna en el archivo. */
                   indice: number;
@@ -17850,6 +17859,29 @@ export interface paths {
                    */
                   rol: 'modeloCliente' | 'color' | 'talla' | 'cantidad' | 'precio' | 'ignorar';
                 }[];
+                /** @description Campos variables por cliente (pdf-cya); null en excel. */
+                camposVariables:
+                  | {
+                      /**
+                       * @description Campo del PDF de C&A capturable como referencia del cliente.
+                       * @enum {string}
+                       */
+                      campo:
+                        | 'numeroOrden'
+                        | 'modeloCliente'
+                        | 'division'
+                        | 'subDivision'
+                        | 'descripcionArticulo'
+                        | 'codigoUnico'
+                        | 'semanaCliente'
+                        | 'idColorCliente'
+                        | 'colorGenerico';
+                      /** @description Etiqueta con la que se guarda como referencia del cliente (D7). */
+                      etiqueta: string;
+                    }[]
+                  | null;
+                /** @description % adicional de producción del cliente (C&A=7); 0 = sin adicional. */
+                porcentajeAdicional: number;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -17968,8 +18000,17 @@ export interface paths {
           'application/json': {
             /** @description Nombre descriptivo (default "Formato del cliente vN"). */
             nombre?: string;
-            /** @description Mapeo columna→rol del archivo del cliente (Modelo/Color/Talla/Cantidad obligatorios). */
-            mapeo: {
+            /**
+             * @description Formato del archivo (default excel — compat. con R8).
+             * @default excel
+             * @enum {string}
+             */
+            formato?: 'excel' | 'pdf-cya';
+            /**
+             * @description Mapeo columna→rol (obligatorio y completo en excel; vacío en pdf-cya).
+             * @default []
+             */
+            mapeo?: {
               /** @description Posición (0-based) de la columna en el archivo. */
               indice: number;
               /** @description Encabezado de la columna (para mostrar; el índice manda al aplicar). */
@@ -17980,6 +18021,29 @@ export interface paths {
                */
               rol: 'modeloCliente' | 'color' | 'talla' | 'cantidad' | 'precio' | 'ignorar';
             }[];
+            /** @description Campos variables por cliente (pdf-cya); ignorado en excel. */
+            camposVariables?:
+              | {
+                  /**
+                   * @description Campo del PDF de C&A capturable como referencia del cliente.
+                   * @enum {string}
+                   */
+                  campo:
+                    | 'numeroOrden'
+                    | 'modeloCliente'
+                    | 'division'
+                    | 'subDivision'
+                    | 'descripcionArticulo'
+                    | 'codigoUnico'
+                    | 'semanaCliente'
+                    | 'idColorCliente'
+                    | 'colorGenerico';
+                  /** @description Etiqueta con la que se guarda como referencia del cliente (D7). */
+                  etiqueta: string;
+                }[]
+              | null;
+            /** @description % adicional de producción del cliente (default 0; C&A=7). */
+            porcentajeAdicional?: number;
           };
         };
       };
@@ -18001,7 +18065,12 @@ export interface paths {
               version: number;
               /** @description Si es la versión que se aplica hoy. */
               vigente: boolean;
-              /** @description Mapeo columna→rol guardado. */
+              /**
+               * @description Formato del archivo (excel | pdf-cya).
+               * @enum {string}
+               */
+              formato: 'excel' | 'pdf-cya';
+              /** @description Mapeo columna→rol guardado (vacío en pdf-cya). */
               mapeo: {
                 /** @description Posición (0-based) de la columna en el archivo. */
                 indice: number;
@@ -18013,6 +18082,29 @@ export interface paths {
                  */
                 rol: 'modeloCliente' | 'color' | 'talla' | 'cantidad' | 'precio' | 'ignorar';
               }[];
+              /** @description Campos variables por cliente (pdf-cya); null en excel. */
+              camposVariables:
+                | {
+                    /**
+                     * @description Campo del PDF de C&A capturable como referencia del cliente.
+                     * @enum {string}
+                     */
+                    campo:
+                      | 'numeroOrden'
+                      | 'modeloCliente'
+                      | 'division'
+                      | 'subDivision'
+                      | 'descripcionArticulo'
+                      | 'codigoUnico'
+                      | 'semanaCliente'
+                      | 'idColorCliente'
+                      | 'colorGenerico';
+                    /** @description Etiqueta con la que se guarda como referencia del cliente (D7). */
+                    etiqueta: string;
+                  }[]
+                | null;
+              /** @description % adicional de producción del cliente (C&A=7); 0 = sin adicional. */
+              porcentajeAdicional: number;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -18186,7 +18278,12 @@ export interface paths {
                 version: number;
                 /** @description Si es la versión que se aplica hoy. */
                 vigente: boolean;
-                /** @description Mapeo columna→rol guardado. */
+                /**
+                 * @description Formato del archivo (excel | pdf-cya).
+                 * @enum {string}
+                 */
+                formato: 'excel' | 'pdf-cya';
+                /** @description Mapeo columna→rol guardado (vacío en pdf-cya). */
                 mapeo: {
                   /** @description Posición (0-based) de la columna en el archivo. */
                   indice: number;
@@ -18198,6 +18295,29 @@ export interface paths {
                    */
                   rol: 'modeloCliente' | 'color' | 'talla' | 'cantidad' | 'precio' | 'ignorar';
                 }[];
+                /** @description Campos variables por cliente (pdf-cya); null en excel. */
+                camposVariables:
+                  | {
+                      /**
+                       * @description Campo del PDF de C&A capturable como referencia del cliente.
+                       * @enum {string}
+                       */
+                      campo:
+                        | 'numeroOrden'
+                        | 'modeloCliente'
+                        | 'division'
+                        | 'subDivision'
+                        | 'descripcionArticulo'
+                        | 'codigoUnico'
+                        | 'semanaCliente'
+                        | 'idColorCliente'
+                        | 'colorGenerico';
+                      /** @description Etiqueta con la que se guarda como referencia del cliente (D7). */
+                      etiqueta: string;
+                    }[]
+                  | null;
+                /** @description % adicional de producción del cliente (C&A=7); 0 = sin adicional. */
+                porcentajeAdicional: number;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -18516,6 +18636,433 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/pedidos/importacion-pdf/analizar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Analizar los PDFs de C&A: un renglón por PDF con su liga sugerida y advertencias */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Analiza los PDFs de C&A y arma la vista previa (un renglón por PDF). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Cliente del pedido. */
+            idCliente: number;
+            /** @description PDFs de las órdenes de compra del cliente. */
+            archivos: {
+              /** @description Nombre del PDF del cliente (para mostrar y adjuntar). */
+              nombreArchivo: string;
+              /** @description Contenido del PDF en base64 (acepta prefijo data: URL). */
+              archivoBase64: string;
+            }[];
+            /** @description % adicional para la vista previa; si se omite, se usa el de la plantilla del cliente. */
+            porcentajeAdicional?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Vista previa de la importación por PDF. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Un renglón por PDF subido. */
+              renglones: {
+                /** @description Nombre del PDF (para identificar la fila). */
+                nombreArchivo: string;
+                /** @description Mensaje de error si el PDF no se pudo parsear, o null. */
+                error: string | null;
+                /** @description Nº de orden de compra del cliente (C&A "Numero de Orden"). */
+                numeroOrden: string;
+                /** @description Modelo ID del cliente (C&A "Modelo ID"). */
+                modeloCliente: string;
+                /** @description Descripción del artículo del PDF. */
+                descripcionArticulo: string;
+                /** @description División del PDF (→ departamento del cliente). */
+                division: string;
+                /** @description Sub División del PDF (campo variable; puede venir vacía). */
+                subDivision: string;
+                /** @description ID Color del cliente. */
+                idColorCliente: string;
+                /** @description Color genérico del PDF (color de la OP). */
+                colorGenerico: string;
+                /** @description Código PANTONE de la OC (vacío si el papel no lo trae; editable). */
+                pantone: string;
+                /** @description Código único del PDF. */
+                codigoUnico: string;
+                /** @description Semana C&A del PDF. */
+                semanaCliente: string;
+                /** @description Costo unitario (FOB) — null sin `pedidos.importes`. */
+                costoUnitario: number | null;
+                /** @description Piezas totales que pidió el cliente (del PDF). */
+                piezasTotales: number;
+                /** @description Piezas totales PROPUESTAS a fabricar (Σ del sobre-pedido por packs con el % adicional). */
+                piezasFabricar: number;
+                /** @description Monto total de la OC — null sin `pedidos.importes`. */
+                montoTotal: number | null;
+                /** @description Inicio de la ventana "Entrega en DC" (YYYY-MM-DD). */
+                fechaEntrega: string | null;
+                /** @description Matriz de tallas del PDF (color único × tallas): pedidas y propuestas a fabricar. */
+                tallas: {
+                  /** @description Etiqueta de la talla del PDF (5-6, 6-7, …). */
+                  talla: string;
+                  /** @description Piezas que pidió el cliente para esa talla. */
+                  piezas: number;
+                  /** @description Propuesta a fabricar de esa talla (suma de la propuesta de todos los packs/SKU). */
+                  piezasFabricar: number;
+                }[];
+                /** @description Grupos de la sección "Detalles PACK / SKU" con su propuesta de sobre-pedido (de dónde sale la matriz propuesta). Vacío si el PDF no trae packs. */
+                grupos: {
+                  /** @description Letra del grupo (A, B, C…). */
+                  grupo: string;
+                  /** @description "PACK" (proporción por pack) o "SKU" (piezas sueltas). */
+                  tipo: string;
+                  /** @description Total de packs del grupo en la OC. */
+                  packsOriginales: number;
+                  /** @description Packs propuestos = round(packsOriginales × (1+%/100)) en los PACK. */
+                  packsPropuestos: number;
+                  /** @description Desglose por talla del grupo. */
+                  desglose: {
+                    /** @description Etiqueta de la talla. */
+                    talla: string;
+                    /** @description Piezas de esa talla en el grupo (original del cliente). */
+                    original: number;
+                    /** @description Piezas propuestas a fabricar de esa talla en el grupo. */
+                    propuesta: number;
+                  }[];
+                  /** @description Aviso si la proporción del pack no era entera (cayó a redondeo por talla), o null. */
+                  advertencia: string | null;
+                }[];
+                /** @description Modelo NUESTRO sugerido por la liga aprendida (o null si es la primera vez). */
+                idModeloSugerido: number | null;
+                /** @description Código del modelo sugerido, o null. */
+                codigoModeloSugerido: string | null;
+                /** @description Descripción del modelo sugerido, o null. */
+                descripcionModeloSugerido: string | null;
+                /** @description true si el color no existe en el catálogo (se creará al confirmar). */
+                colorNuevo: boolean;
+                /** @description Tallas del PDF que no existen en el catálogo (se crearán al confirmar). */
+                tallasNuevas: string[];
+                /** @description Advertencias de validación (no bloquean). */
+                advertencias: {
+                  /**
+                   * @description Qué validación falló (incluye "liga-inactiva" y "sobrepedido": packs que no cuadran / proporción no entera).
+                   * @enum {string}
+                   */
+                  tipo:
+                    | 'suma-tallas'
+                    | 'suma-monto'
+                    | 'sin-tallas'
+                    | 'parseo'
+                    | 'liga-inactiva'
+                    | 'sobrepedido';
+                  /** @description Mensaje legible para la vista previa. */
+                  mensaje: string;
+                }[];
+              }[];
+              /** @description Suma de piezas PEDIDAS por el cliente (PDFs válidos). */
+              totalPiezas: number;
+              /** @description Suma de piezas PROPUESTAS a fabricar (sobre-pedido por packs) de todos los PDFs válidos. */
+              totalPiezasFabricar: number;
+              /** @description % adicional aplicado a la vista previa (de la plantilla o del override). */
+              porcentajeAdicional: number;
+              /** @description Cuántos PDFs tienen una liga de modelo sugerida (aprendida). */
+              totalReconocidos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/pedidos/importacion-pdf/confirmar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirmar la importación por PDF: pedido interno + una OP por PDF (matriz + RC + adjunto) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Confirma la importación por PDF: crea pedido interno + OPs + RC + adjuntos. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Cliente del pedido (empresa activa de la sesión, A9). */
+            idCliente: number;
+            /** @description Referencia general del pedido (opcional; cada OP guarda su propio nº de orden). */
+            referenciaGeneral?: string | null;
+            /** @description PDFs de las órdenes de compra del cliente (con ajuste manual opcional). */
+            archivos: {
+              /** @description Nombre del PDF del cliente (para mostrar y adjuntar). */
+              nombreArchivo: string;
+              /** @description Contenido del PDF en base64 (acepta prefijo data: URL). */
+              archivoBase64: string;
+              /** @description Matriz EDITADA (total por talla) que reemplaza la propuesta; si se omite, se propone. */
+              matriz?: {
+                /** @description Etiqueta de la talla ajustada. */
+                talla: string;
+                /** @description Total EDITADO a fabricar de esa talla (reemplaza la propuesta). */
+                cantidad: number;
+              }[];
+              /** @description Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone. */
+              pantone?: string;
+            }[];
+            /**
+             * @description Ligas modelo-del-cliente → nuestro modelo (aprendidas o elegidas a mano).
+             * @default []
+             */
+            ligas?: {
+              /** @description Modelo ID del cliente tal como viene en el PDF. */
+              modeloCliente: string;
+              /** @description Modelo NUESTRO al que se liga. */
+              idModelo: number;
+            }[];
+            /** @description % adicional de producción a aplicar en la matriz; si se omite, se usa el de la plantilla del cliente. Se RECUERDA en la plantilla. */
+            porcentajeAdicional?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de la importación por PDF (pedido + OPs + no reconocidos). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del pedido interno creado. */
+              idPedido: number;
+              /** @description Folio del pedido (por empresa). */
+              folioPedido: number;
+              /** @description OPs creadas (una por PDF ligado). */
+              ordenes: {
+                /** @description Id de la OP creada. */
+                idOrden: number;
+                /** @description Folio de la OP (por empresa). */
+                folio: number;
+                /** @description Nº interno de producción minteado/reusado. */
+                numeroProduccion: number;
+                /** @description Nº de desarrollo de NUESTRO modelo. */
+                codigoModelo: string;
+                /** @description Modelo ID del cliente (del PDF). */
+                modeloCliente: string;
+                /** @description Nº de orden de compra del cliente (del PDF). */
+                numeroOrden: string;
+                /** @description Nombre del PDF de origen (adjunto a esta OP). */
+                nombreArchivo: string;
+                /** @description Piezas de la OP (Σ de la matriz). */
+                totalPiezas: number;
+                /** @description true si el PDF se adjuntó a la OP. */
+                adjuntado: boolean;
+              }[];
+              /** @description PDFs que quedaron sin importar. */
+              noReconocidos: {
+                /** @description Nombre del PDF que no se importó. */
+                nombreArchivo: string;
+                /** @description Modelo ID del cliente sin ligar. */
+                modeloCliente: string;
+                /** @description Por qué quedó fuera (sin liga / error de parseo). */
+                motivo: string;
+              }[];
+              /** @description Cuántas ligas modelo-del-cliente se aprendieron/actualizaron. */
+              ligasAprendidas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes': {
     parameters: {
       query?: never;
@@ -18640,6 +19187,8 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color (para la UI). */
                   color: string;
+                  /** @description Código PANTONE de este color, o null. */
+                  pantone: string | null;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -18827,6 +19376,8 @@ export interface paths {
               id?: number;
               /** @description Color del catálogo (F1; en v1 era texto libre). */
               idColor: number;
+              /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
+              pantone?: string | null;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -18926,6 +19477,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -19174,6 +19727,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -19439,6 +19994,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -19607,6 +20164,8 @@ export interface paths {
               id?: number;
               /** @description Color del catálogo (F1; en v1 era texto libre). */
               idColor: number;
+              /** @description Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone). */
+              pantone?: string | null;
               /**
                * @description Cantidades por talla de este color.
                * @default []
@@ -19706,6 +20265,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -19964,6 +20525,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -20221,6 +20784,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -20482,6 +21047,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -21404,6 +21971,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color (para la UI). */
                 color: string;
+                /** @description Código PANTONE de este color, o null. */
+                pantone: string | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */

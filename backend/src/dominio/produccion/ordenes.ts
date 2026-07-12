@@ -386,15 +386,18 @@ async function sincronizarMatriz(
   }
 
   for (const linea of set) {
+    // Pantone POR color (petición Daniel): sólo se toca si viene en el set (undefined = no lo mandó,
+    // se conserva; null = limpiarlo; string = capturarlo).
+    const datosPantone = linea.pantone !== undefined ? { pantone: linea.pantone } : {};
     if (linea.id !== undefined && idsActuales.has(linea.id)) {
       await tx.ordenLinea.update({
         where: { id: linea.id },
-        data: { idColor: linea.idColor, ...datosModificacion(sesion) },
+        data: { idColor: linea.idColor, ...datosPantone, ...datosModificacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, linea.id, linea.tallas);
     } else {
       const creada = await tx.ordenLinea.create({
-        data: { idOrden, idColor: linea.idColor, ...datosCreacion(sesion) },
+        data: { idOrden, idColor: linea.idColor, ...datosPantone, ...datosCreacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, creada.id, linea.tallas);
     }
@@ -468,6 +471,7 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
       id: l.id,
       idColor: l.idColor,
       color: l.color.nombre,
+      pantone: l.pantone,
       tallas,
       totalPiezas: totalLinea,
     };
