@@ -2,7 +2,13 @@ import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
 import type { Talla } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  MarcaObligatoria,
+} from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -76,7 +82,9 @@ export function ArmadorCurva({
   return (
     <Field role="group" aria-labelledby="armador-curva-titulo" data-invalid={Boolean(mensajeError)}>
       <FieldLabel id="armador-curva-titulo" asChild>
-        <span>Tallas de la curva</span>
+        <span>
+          Tallas de la curva <MarcaObligatoria />
+        </span>
       </FieldLabel>
       <FieldDescription>
         Agrega las tallas en el orden de la curva (de la más chica a la más grande).

@@ -165,7 +165,7 @@ describe('<EtiquetasMarcaPagina>', () => {
 
     await usuario.click(screen.getByTestId('nuevo-etiqueta-marca'));
     const dialogo = await screen.findByRole('dialog');
-    await usuario.type(within(dialogo).getByLabelText('Nombre'), 'Marca X');
+    await usuario.type(within(dialogo).getByLabelText(/Nombre/), 'Marca X');
     await usuario.type(within(dialogo).getByLabelText('Regalías (%)'), '150');
     await usuario.click(screen.getByTestId('guardar-etiqueta-marca'));
 

@@ -489,6 +489,7 @@ export function DialogoProveedor({
                       <Input
                         id="proveedor-rfc"
                         placeholder="Ej. TBA980101AB1"
+                        className="uppercase"
                         aria-invalid={Boolean(errors.rfc)}
                         disabled={guardando}
                         {...registrar('rfc')}
