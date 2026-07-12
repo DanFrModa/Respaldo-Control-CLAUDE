@@ -49,6 +49,30 @@ describe('esquemaClienteCrear', () => {
       false,
     );
   });
+
+  it('acepta departamentos opcionales y recorta cada nombre (D13/R16)', () => {
+    const datos = esquemaClienteCrear.parse({
+      nombre: 'C&A',
+      departamentos: ['  NIÑOS  ', 'DAMAS'],
+    });
+    expect(datos.departamentos).toEqual(['NIÑOS', 'DAMAS']);
+  });
+
+  it('permite crear sin departamentos (queda undefined)', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A' }).departamentos).toBeUndefined();
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A', departamentos: [] }).departamentos).toEqual(
+      [],
+    );
+  });
+
+  it('rechaza un nombre de departamento vacío o demasiado largo', () => {
+    expect(esquemaClienteCrear.safeParse({ nombre: 'C&A', departamentos: ['   '] }).success).toBe(
+      false,
+    );
+    expect(
+      esquemaClienteCrear.safeParse({ nombre: 'C&A', departamentos: ['a'.repeat(101)] }).success,
+    ).toBe(false);
+  });
 });
 
 describe('esquemaClienteEditar (semántica del PATCH parcial, M1)', () => {

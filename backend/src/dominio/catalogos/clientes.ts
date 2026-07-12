@@ -53,6 +53,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { agregarDepartamentoCliente } from './cliente-departamentos.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearCliente = z.input<typeof esquemaClienteCrear>;
@@ -201,13 +202,44 @@ function datosContactoCrear(
 }
 
 /**
+ * Deduplica los nombres de departamento del alta (D13/R16), insensible a mayúsculas y
+ * conservando el orden de la primera aparición. Los nombres ya vienen recortados del
+ * esquema; el `@@unique([idCliente, nombre])` de la base es el respaldo final, pero
+ * dedup aquí evita que dos entradas que solo difieren en mayúsculas ("NIÑOS"/"niños")
+ * choquen contra la unicidad y aborten toda el alta.
+ */
+function dedupNombresDepartamento(nombres: readonly string[] | undefined): string[] {
+  if (nombres === undefined) {
+    return [];
+  }
+  const vistos = new Set<string>();
+  const unicos: string[] = [];
+  for (const nombre of nombres) {
+    const clave = nombre.toLocaleLowerCase();
+    if (vistos.has(clave)) {
+      continue;
+    }
+    vistos.add(clave);
+    unicos.push(nombre);
+  }
+  return unicos;
+}
+
+/**
  * Crea un cliente (catálogo global). Reglas: permiso `clientes.administrar`; nombre
  * único global → `ErrorConflicto`; nace activo y SIN campos de referencia (se agregan
  * después con `agregarCampoCliente`); auditoría y bitácora en la misma transacción
  * (A2/A7).
  *
+ * Si el alta trae `departamentos` (D13/R16), se dan de alta EN LA MISMA transacción
+ * (A2) reutilizando `agregarDepartamentoCliente` — así cada uno queda con su misma
+ * unicidad, auditoría y bitácora (`MODIFICAR` con `departamento: 'agregar'`), y si
+ * cualquiera falla se revierte también el cliente. Los nombres se deduplican antes
+ * (insensible a mayúsculas). La salida NO embebe los departamentos (se leen por su
+ * propio sub-recurso `GET /clientes/:id/departamentos`).
+ *
  * @example
- * const c = await crearCliente(sesion, { nombre: "Liverpool", email: "compras@liverpool.mx" });
+ * const c = await crearCliente(sesion, { nombre: "C&A", departamentos: ["NIÑOS", "DAMAS"] });
  */
 export async function crearCliente(
   sesion: SesionUsuario,
@@ -216,6 +248,7 @@ export async function crearCliente(
 ): Promise<ClienteConCampos> {
   verificarPermiso(sesion, 'clientes.administrar');
   const datos = validarEntrada(esquemaClienteCrear, entrada);
+  const departamentos = dedupNombresDepartamento(datos.departamentos);
 
   try {
     return await enTransaccion(async (tx) => {
@@ -235,6 +268,11 @@ export async function crearCliente(
         accion: 'CREAR',
         datos: { nombre: cliente.nombre },
       });
+
+      // Departamentos opcionales (D13/R16): en la MISMA tx, con su unicidad/bitácora propias.
+      for (const nombre of departamentos) {
+        await agregarDepartamentoCliente(sesion, cliente.id, { nombre }, { tx });
+      }
 
       return tx.cliente.findUniqueOrThrow({ where: { id: cliente.id }, include: incluirCampos });
     }, bd);

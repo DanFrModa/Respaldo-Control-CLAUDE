@@ -15301,6 +15301,15 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 3650
+                  },
+                  "departamentos": {
+                    "description": "Departamentos a dar de alta junto con el cliente (D13/R16); se deduplican por nombre.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
                   }
                 },
                 "required": [
