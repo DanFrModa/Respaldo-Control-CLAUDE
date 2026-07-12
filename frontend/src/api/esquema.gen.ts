@@ -6969,6 +6969,8 @@ export interface paths {
             direccion?: string;
             rfc?: string;
             diasCredito?: number;
+            /** @description Departamentos a dar de alta junto con el cliente (D13/R16); se deduplican por nombre. */
+            departamentos?: string[];
           };
         };
       };

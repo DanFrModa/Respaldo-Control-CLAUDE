@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2Icon } from 'lucide-react';
-import { useEffect } from 'react';
+import { Loader2Icon, XIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -144,11 +144,18 @@ export function DialogoCliente({
     defaultValues: VALORES_INICIALES,
   });
 
+  // Departamentos capturados en el alta (D13/R16). Viven FUERA de react-hook-form (lista dinámica) y
+  // solo aplican en modo CREAR; en edición se gestionan en el detalle. `nuevoDepto` es el texto del input.
+  const [departamentos, setDepartamentos] = useState<string[]>([]);
+  const [nuevoDepto, setNuevoDepto] = useState('');
+
   // Al abrir, sincroniza el formulario con el cliente en edición (o limpia para alta).
   useEffect(() => {
     if (!abierto) {
       return;
     }
+    setDepartamentos([]);
+    setNuevoDepto('');
     if (cliente) {
       formulario.reset({
         nombre: cliente.nombre,
@@ -164,6 +171,29 @@ export function DialogoCliente({
       formulario.reset(VALORES_INICIALES);
     }
   }, [abierto, cliente, formulario]);
+
+  /**
+   * Agrega el departamento tecleado a la lista del alta. Recorta, ignora vacíos y evita duplicados
+   * (insensible a mayúsculas, con aviso suave); el backend re-valida y es la autoridad (A1).
+   */
+  function agregarDepartamento(): void {
+    const nombre = nuevoDepto.trim();
+    if (nombre === '') {
+      return;
+    }
+    const yaEsta = departamentos.some((d) => d.toLocaleLowerCase() === nombre.toLocaleLowerCase());
+    if (yaEsta) {
+      toast.info(`El departamento "${nombre}" ya está en la lista.`);
+      return;
+    }
+    setDepartamentos((previos) => [...previos, nombre]);
+    setNuevoDepto('');
+  }
+
+  /** Quita un departamento capturado de la lista del alta. */
+  function quitarDepartamento(nombre: string): void {
+    setDepartamentos((previos) => previos.filter((d) => d !== nombre));
+  }
 
   const enviar = formulario.handleSubmit((datos) => {
     if (esEdicion) {
@@ -200,6 +230,7 @@ export function DialogoCliente({
     if (datos.direccion.length > 0) cuerpo.direccion = datos.direccion;
     if (datos.rfc.length > 0) cuerpo.rfc = datos.rfc;
     if (datos.diasCredito.trim().length > 0) cuerpo.diasCredito = Number(datos.diasCredito);
+    if (departamentos.length > 0) cuerpo.departamentos = departamentos;
     crear.mutate(cuerpo, {
       onSuccess: (resultado) => {
         toast.success(`Cliente "${resultado.nombre}" creado.`);
@@ -357,10 +388,75 @@ export function DialogoCliente({
               </FieldGroup>
             </FieldSet>
 
+            {/* ── Departamentos (solo alta, D13/R16) ───────────────────────── */}
+            {!esEdicion ? (
+              <FieldSet>
+                <FieldLegend variant="label">Departamentos</FieldLegend>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="cliente-departamento">Agregar departamento</FieldLabel>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cliente-departamento"
+                        value={nuevoDepto}
+                        onChange={(e) => setNuevoDepto(e.target.value)}
+                        onKeyDown={(e) => {
+                          // Enter agrega el departamento SIN enviar el formulario del cliente.
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            agregarDepartamento();
+                          }
+                        }}
+                        placeholder="Ej. NIÑOS"
+                        disabled={guardando}
+                        data-testid="cliente-departamento-input"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={agregarDepartamento}
+                        disabled={guardando || nuevoDepto.trim() === ''}
+                        data-testid="agregar-departamento-alta"
+                      >
+                        Agregar
+                      </Button>
+                    </div>
+                    <FieldDescription>
+                      Opcional. Divisiones del cliente (NIÑOS, DAMAS, CABALLEROS…); base de los
+                      proyectos de desarrollo. Podrás editarlos después en el detalle.
+                    </FieldDescription>
+                  </Field>
+
+                  {departamentos.length > 0 ? (
+                    <ul className="flex flex-wrap gap-2" data-testid="lista-departamentos-alta">
+                      {departamentos.map((nombre) => (
+                        <li
+                          key={nombre}
+                          data-testid="chip-departamento"
+                          className="inline-flex items-center gap-1 rounded-full border bg-muted/40 py-1 pr-1 pl-3 text-sm"
+                        >
+                          <span className="font-medium">{nombre}</span>
+                          <button
+                            type="button"
+                            onClick={() => quitarDepartamento(nombre)}
+                            disabled={guardando}
+                            aria-label={`Quitar departamento ${nombre}`}
+                            className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <XIcon className="size-3.5" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </FieldGroup>
+              </FieldSet>
+            ) : null}
+
             {!esEdicion ? (
               <AvisoAlta>
-                Después, en el detalle, agrega sus departamentos (NIÑOS, DAMAS…), sus campos propios
-                (p. ej. &quot;No. de pedido del cliente&quot;) y sus listas de precios.
+                Después, en el detalle, agrega sus campos propios (p. ej. &quot;No. de pedido del
+                cliente&quot;) y sus listas de precios.
               </AvisoAlta>
             ) : null}
           </div>

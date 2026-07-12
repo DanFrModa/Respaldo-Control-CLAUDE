@@ -156,4 +156,85 @@ describe('<DialogoCliente>', () => {
     expect(args.cuerpo.telefono).toBeNull();
     expect(args.cuerpo.contacto).toBe('Ana');
   });
+
+  it('captura departamentos en el alta y los envía en el POST (D13/R16)', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ClienteCrear, opciones?: { onSuccess?: (r: Cliente) => void }) => {
+        opciones?.onSuccess?.(clienteEjemplo({ nombre: 'C&A' }));
+      },
+    );
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'C&A');
+    const inputDepto = screen.getByTestId('cliente-departamento-input');
+    await usuario.type(inputDepto, 'NIÑOS');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+    await usuario.type(inputDepto, 'DAMAS');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+
+    expect(screen.getAllByTestId('chip-departamento')).toHaveLength(2);
+
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.departamentos).toEqual(['NIÑOS', 'DAMAS']);
+  });
+
+  it('quita un departamento capturado antes de enviar', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ClienteCrear, opciones?: { onSuccess?: (r: Cliente) => void }) => {
+        opciones?.onSuccess?.(clienteEjemplo({ nombre: 'C&A' }));
+      },
+    );
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'C&A');
+    const inputDepto = screen.getByTestId('cliente-departamento-input');
+    await usuario.type(inputDepto, 'NIÑOS');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+    await usuario.type(inputDepto, 'DAMAS');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+
+    await usuario.click(screen.getByLabelText('Quitar departamento NIÑOS'));
+    expect(screen.getAllByTestId('chip-departamento')).toHaveLength(1);
+
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.departamentos).toEqual(['DAMAS']);
+  });
+
+  it('Enter en el input de departamento lo agrega SIN enviar el formulario', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'C&A');
+    await usuario.type(screen.getByTestId('cliente-departamento-input'), 'NIÑOS{Enter}');
+
+    expect(screen.getByTestId('chip-departamento')).toHaveTextContent('NIÑOS');
+    // El Enter agregó el departamento pero NO disparó el submit del cliente.
+    expect(crearMutate).not.toHaveBeenCalled();
+  });
+
+  it('no duplica un departamento ya capturado (insensible a mayúsculas)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    const inputDepto = screen.getByTestId('cliente-departamento-input');
+    await usuario.type(inputDepto, 'NIÑOS');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+    await usuario.type(inputDepto, 'niños');
+    await usuario.click(screen.getByTestId('agregar-departamento-alta'));
+
+    expect(screen.getAllByTestId('chip-departamento')).toHaveLength(1);
+  });
+
+  it('en edición NO muestra la sección de departamentos (solo en alta)', () => {
+    renderConProveedores(
+      <DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={clienteEjemplo()} />,
+    );
+    expect(screen.queryByTestId('cliente-departamento-input')).not.toBeInTheDocument();
+  });
 });

@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearCliente, desactivarCliente } from './clientes.js';
@@ -217,6 +222,55 @@ describe('Departamentos del cliente (F8-E1a D13/R16 — sub-recurso del Cliente)
       await expect(
         listarDepartamentosCliente(sesionAdmin(), 9999, {}, bd()),
       ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+  });
+
+  describe('alta del cliente CON departamentos (A2 — misma transacción)', () => {
+    it('crea el cliente y sus 2 departamentos juntos (mismo idCliente, activos)', async () => {
+      const sesion = sesionAdmin();
+      const c = await crearCliente(
+        sesion,
+        { nombre: 'C&A', departamentos: ['NIÑOS', 'DAMAS'] },
+        bd(),
+      );
+
+      const deps = await listarDepartamentosCliente(sesion, c.id, {}, bd());
+      expect(deps.map((d) => d.nombre)).toEqual(['DAMAS', 'NIÑOS']); // listar ordena por nombre
+      expect(deps.every((d) => d.activo && d.idCliente === c.id)).toBe(true);
+      expect(await cliente.clienteDepartamento.count()).toBe(2);
+
+      // Cada departamento deja su bitácora MODIFICAR (entidad Cliente), como el alta manual.
+      const bitacoras = await cliente.bitacora.findMany({
+        where: { entidad: 'Cliente', idEntidad: String(c.id), accion: 'MODIFICAR' },
+      });
+      expect(bitacoras).toHaveLength(2);
+    });
+
+    it('sin departamentos se comporta igual que antes (ninguno en BD)', async () => {
+      const sesion = sesionAdmin();
+      const c = await crearCliente(sesion, { nombre: 'Liverpool' }, bd());
+      expect(await listarDepartamentosCliente(sesion, c.id, {}, bd())).toEqual([]);
+      expect(await cliente.clienteDepartamento.count()).toBe(0);
+    });
+
+    it('deduplica los nombres insensible a mayúsculas (conserva el primero)', async () => {
+      const sesion = sesionAdmin();
+      const c = await crearCliente(
+        sesion,
+        { nombre: 'C&A', departamentos: ['NIÑOS', 'niños', 'DAMAS'] },
+        bd(),
+      );
+      const deps = await listarDepartamentosCliente(sesion, c.id, { incluirInactivos: true }, bd());
+      expect(deps.map((d) => d.nombre)).toEqual(['DAMAS', 'NIÑOS']);
+      expect(await cliente.clienteDepartamento.count()).toBe(2);
+    });
+
+    it('un departamento inválido aborta TODA el alta: ni cliente ni departamentos (A2)', async () => {
+      await expect(
+        crearCliente(sesionAdmin(), { nombre: 'C&A', departamentos: ['NIÑOS', '   '] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      expect(await cliente.cliente.count()).toBe(0);
+      expect(await cliente.clienteDepartamento.count()).toBe(0);
     });
   });
 });

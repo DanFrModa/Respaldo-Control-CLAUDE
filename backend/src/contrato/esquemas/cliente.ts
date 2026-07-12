@@ -164,7 +164,13 @@ const camposContactoEditar = {
 
 // ── Cliente ─────────────────────────────────────────────────────────────────────
 
-/** Alta de cliente (catálogo global F1-E2). El `nombre` es la clave de negocio (único global). */
+/**
+ * Alta de cliente (catálogo global F1-E2). El `nombre` es la clave de negocio (único global).
+ * `departamentos` (D13/R16) es opcional: nombres de los departamentos (NIÑOS, DAMAS…) a dar de
+ * alta EN LA MISMA transacción que el cliente (A2). El dominio los deduplica por nombre (insensible
+ * a mayúsculas); cada nombre sigue las mismas reglas que `ClienteDepartamento` (obligatorio, ≤100).
+ * Su gestión posterior (editar/desactivar) vive en el detalle del cliente, no en el alta.
+ */
 export const esquemaClienteCrear = z.object({
   nombre: z
     .string({ error: 'El nombre es obligatorio' })
@@ -172,6 +178,18 @@ export const esquemaClienteCrear = z.object({
     .min(1, { error: 'El nombre es obligatorio' })
     .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
   ...camposContacto,
+  departamentos: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, { error: 'El nombre del departamento es obligatorio' })
+        .max(100, { error: 'El nombre del departamento no puede tener más de 100 caracteres' }),
+    )
+    .optional()
+    .describe(
+      'Departamentos a dar de alta junto con el cliente (D13/R16); se deduplican por nombre.',
+    ),
 });
 
 /** Datos validados de alta de cliente. */
