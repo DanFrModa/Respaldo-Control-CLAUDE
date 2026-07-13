@@ -50,18 +50,44 @@ export const esquemaAjusteTallaPdf = z
   .describe('Ajuste manual del total a fabricar de una talla.');
 
 /**
+ * Un RENGLÓN-PACK de la matriz de la OP: su letra (A/B/C…, la del PDF) y su corrida editada. Las OCs de
+ * C&A traen UN renglón POR PACK (convención `{color} {letra}`); por eso la matriz es una lista de packs,
+ * no un total sumado. `letra` null/vacía = un solo pack (color SIN sufijo, como los pedidos históricos de
+ * un solo pack). Un renglón cuyas tallas queden todas en 0 no genera línea (así se "integra" un pack en
+ * otro: el usuario mueve los números entre renglones).
+ */
+export const esquemaRenglonMatrizPdf = z
+  .object({
+    letra: z
+      .string()
+      .trim()
+      .max(8)
+      .nullable()
+      .describe(
+        'Letra del pack que sufija el color (A/B/C…); null/vacía = un solo pack sin sufijo.',
+      ),
+    tallas: z
+      .array(esquemaAjusteTallaPdf)
+      .describe('Corrida EDITADA de ese pack (total por talla).'),
+  })
+  .describe('Un renglón-pack de la matriz de la OP (su letra + su corrida).');
+
+/** Forma de un renglón-pack de la matriz. */
+export type RenglonMatrizPdf = z.infer<typeof esquemaRenglonMatrizPdf>;
+
+/**
  * Un PDF al CONFIRMAR: el PDF + (opcional) la matriz EDITADA en la vista previa y el pantone. Si `matriz`
- * viene, la OP se fabrica con ESOS totales (Daniel: el sistema propone el sobre-pedido por packs, el
- * usuario decide celda por celda); si se omite, se usa la propuesta calculada. `pantone` PREFILLEA/edita
- * el pantone del color de la OP (vacío = sin pantone).
+ * viene, la OP se fabrica con ESOS renglones-pack (Daniel: el sistema propone el sobre-pedido por packs,
+ * el usuario decide celda por celda y renglón por renglón); si se omite, se usa la propuesta calculada.
+ * `pantone` PREFILLEA/edita el pantone del color de la OP (vacío = sin pantone).
  */
 export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
   .extend({
     matriz: z
-      .array(esquemaAjusteTallaPdf)
+      .array(esquemaRenglonMatrizPdf)
       .optional()
       .describe(
-        'Matriz EDITADA (total por talla) que reemplaza la propuesta; si se omite, se propone.',
+        'Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs.',
       ),
     pantone: z
       .string()

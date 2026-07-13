@@ -18903,12 +18903,17 @@ export interface paths {
               nombreArchivo: string;
               /** @description Contenido del PDF en base64 (acepta prefijo data: URL). */
               archivoBase64: string;
-              /** @description Matriz EDITADA (total por talla) que reemplaza la propuesta; si se omite, se propone. */
+              /** @description Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. */
               matriz?: {
-                /** @description Etiqueta de la talla ajustada. */
-                talla: string;
-                /** @description Total EDITADO a fabricar de esa talla (reemplaza la propuesta). */
-                cantidad: number;
+                /** @description Letra del pack que sufija el color (A/B/C…); null/vacía = un solo pack sin sufijo. */
+                letra: string | null;
+                /** @description Corrida EDITADA de ese pack (total por talla). */
+                tallas: {
+                  /** @description Etiqueta de la talla ajustada. */
+                  talla: string;
+                  /** @description Total EDITADO a fabricar de esa talla (reemplaza la propuesta). */
+                  cantidad: number;
+                }[];
               }[];
               /** @description Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone. */
               pantone?: string;

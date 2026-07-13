@@ -624,3 +624,12 @@ Daniel entró a la sesión simulando la operación real y dictó el flujo del im
 - **Fixture de pruebas:** la **OC real 620884 de C&A (con precios) SE QUEDA en el repo** como muestra del sistema — Daniel: "me da igual que la tengas" (repo privado).
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-pdf-cya`); las plantillas de otros clientes se definirán igual, cliente por cliente.
 - **Fecha:** 2026-07-12.
+
+#### (Post-F9.3) — Importador PDF: UN RENGLÓN POR PACK + formato del nombre de color (DANIEL, 12-jul-2026)
+Revisando el importador en operación, Daniel precisó cómo deben nacer los renglones de la OP y cómo se escribe el color. **Definido por el dueño sobre datos reales.**
+
+- **Un renglón por pack (A, B, C…):** cada pack va en **su propio renglón** de la matriz color×talla, **NO** todo junto — porque **se corta por separado** (cada pack lleva **distintas proporciones** de tallas). Referencia que dio Daniel: la orden vieja **4868**, que trae `Azul Indigo A` y `Azul Indigo B` como dos renglones con corridas distintas (A = corrida completa; B = solo tallas de en medio). El sobre-pedido (Post-F9.2) NO cambia la ESTRUCTURA de renglones, solo las cantidades → una OC con 3 packs siempre produce 3 renglones, aun a 0%.
+- **Formato del nombre de color = `{Base} {LETRA}`:** el nombre del color en **Título** (primera letra de **cada palabra** en Mayúscula, el resto en minúscula: `AZUL INDIGO` → `Azul Indigo`) y la **letra del pack SIEMPRE en MAYÚSCULA** (A, B, C…). Preserva acentos (`MARRÓN` → `Marrón`) y guiones (`AZUL-MARINO` → `Azul-Marino`). Motivo de Daniel: "me gusta más cómo se ve".
+- **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor` en `componerColor`/`componerColorUI`, backend y frontend en espejo). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
+- **Aplica en:** importador de OC por PDF (rama `tarea/importador-renglon-por-pack`).
+- **Fecha:** 2026-07-12.

@@ -48,6 +48,67 @@ async function archivosABase64(
   );
 }
 
+/** Un renglón-pack editable: su letra (o null = sin sufijo) y su corrida por talla. */
+type RenglonPackEditable = { letra: string | null; tallas: Record<string, number> };
+
+/**
+ * Título del color (primera letra de cada palabra en Mayúscula, resto minúscula): "AZUL INDIGO" → "Azul
+ * Indigo". Espeja `tituloColor` del backend para que la vista previa coincida con lo que se guarda.
+ */
+function tituloColor(base: string): string {
+  return base
+    .toLowerCase()
+    .replace(/\p{L}[\p{L}'’]*/gu, (p) => p.charAt(0).toUpperCase() + p.slice(1));
+}
+
+/** Compone el color de un renglón-pack para mostrarlo: `{Base} {LETRA}` (o sólo `Base`). */
+function componerColorUI(base: string, letra: string | null): string {
+  const nombre = tituloColor(base);
+  return letra !== null && letra !== '' ? `${nombre} ${letra.toUpperCase()}` : nombre;
+}
+
+/**
+ * Deriva los RENGLONES-PACK editables de un renglón del análisis: un renglón por grupo (si la OC trae ≥2
+ * packs, color `{color} {letra}`) o uno solo SIN sufijo (0/1 pack). Espeja `filasDesdePropuesta` del
+ * backend para que la propuesta prefilleada coincida con lo que se crea si el usuario no edita.
+ */
+function filasDesdePreview(r: RenglonPdfPreview): RenglonPackEditable[] {
+  if (r.grupos.length >= 2) {
+    return r.grupos.map((g) => ({
+      letra: g.grupo,
+      tallas: Object.fromEntries(g.desglose.map((c) => [c.talla, c.propuesta])),
+    }));
+  }
+  return [
+    { letra: null, tallas: Object.fromEntries(r.tallas.map((t) => [t.talla, t.piezasFabricar])) },
+  ];
+}
+
+/** Columnas (tallas) de la matriz por packs: las del PDF primero, luego cualquier extra de los packs. */
+function columnasTallas(r: RenglonPdfPreview, filas: RenglonPackEditable[]): string[] {
+  const vistas = new Set<string>();
+  const orden: string[] = [];
+  const registrar = (talla: string): void => {
+    if (!vistas.has(talla)) {
+      vistas.add(talla);
+      orden.push(talla);
+    }
+  };
+  for (const t of r.tallas) registrar(t.talla);
+  for (const f of filas) for (const talla of Object.keys(f.tallas)) registrar(talla);
+  return orden;
+}
+
+/** Suma de las tallas de un renglón-pack. */
+function totalFila(fila: RenglonPackEditable): number {
+  return Object.values(fila.tallas).reduce((s, n) => s + n, 0);
+}
+
+/** Suma de todos los renglones-pack de un PDF (total a fabricar). */
+function totalFilas(filas: RenglonPackEditable[] | undefined): number {
+  return (filas ?? []).reduce((s, f) => s + totalFila(f), 0);
+}
+
 export function ImportadorPedidoPdf({
   alCerrar,
   alImportado,
@@ -71,9 +132,10 @@ export function ImportadorPedidoPdf({
   const [analisis, setAnalisis] = useState<AnalizarPdf | null>(null);
   // Ligas modelo-del-cliente → nuestro modelo (pre-cargadas con la sugerencia aprendida).
   const [ligas, setLigas] = useState<Record<string, number>>({});
-  // Matriz EDITABLE por PDF (índice → talla → total a fabricar) prefilleada con la propuesta por packs, y
-  // el pantone por PDF. Daniel: el sistema PROPONE el sobre-pedido, el usuario DECIDE celda por celda.
-  const [matrices, setMatrices] = useState<Record<number, Record<string, number>>>({});
+  // Matriz EDITABLE por PDF (índice → RENGLONES-PACK) prefilleada con la propuesta por packs, y el pantone
+  // por PDF. Daniel: cada OC de C&A trae un renglón POR PACK; el sistema PROPONE, el usuario DECIDE celda
+  // por celda y renglón por renglón (para integrar un pack en otro, mueve los números entre renglones).
+  const [matrices, setMatrices] = useState<Record<number, RenglonPackEditable[]>>({});
   const [pantones, setPantones] = useState<Record<number, string>>({});
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const busquedaModeloDeb = useDebounce(busquedaModelo.trim(), 250);
@@ -150,11 +212,11 @@ export function ImportadorPedidoPdf({
             // manual → el backend usa la liga aprendida (`ClienteModeloLiga`). Sólo lo que el usuario
             // cambia queda en `ligas`.
             setLigas({});
-            // Prefill de la matriz editable (propuesta a fabricar por talla) y del pantone, por PDF.
-            const m: Record<number, Record<string, number>> = {};
+            // Prefill de la matriz editable (renglones-pack con la propuesta) y del pantone, por PDF.
+            const m: Record<number, RenglonPackEditable[]> = {};
             const p: Record<number, string> = {};
             res.renglones.forEach((r, i) => {
-              m[i] = Object.fromEntries(r.tallas.map((t) => [t.talla, t.piezasFabricar]));
+              m[i] = filasDesdePreview(r);
               p[i] = r.pantone;
             });
             setMatrices(m);
@@ -175,11 +237,14 @@ export function ImportadorPedidoPdf({
         modeloCliente,
         idModelo,
       }));
-      // Cada PDF viaja con su matriz EDITADA (total por talla) y su pantone. El orden de `archivosB64`
-      // coincide 1:1 con las filas de la vista previa (mismo orden que se analizó), así que el índice liga.
+      // Cada PDF viaja con su matriz EDITADA como RENGLONES-PACK ({letra, corrida}) y su pantone. El orden
+      // de `archivosB64` coincide 1:1 con las filas de la vista previa (mismo orden analizado) → el índice liga.
       const archivosConAjuste = archivosB64.map((a, i) => ({
         ...a,
-        matriz: Object.entries(matrices[i] ?? {}).map(([talla, cantidad]) => ({ talla, cantidad })),
+        matriz: (matrices[i] ?? []).map((fila) => ({
+          letra: fila.letra,
+          tallas: Object.entries(fila.tallas).map(([talla, cantidad]) => ({ talla, cantidad })),
+        })),
         pantone: (pantones[i] ?? '').trim(),
       }));
       confirmar.mutate(
@@ -291,11 +356,14 @@ export function ImportadorPedidoPdf({
               porcentajeAdicional={analisis?.porcentajeAdicional ?? 0}
               matrices={matrices}
               pantones={pantones}
-              onCelda={(i, talla, cantidad) =>
-                setMatrices((prev) => ({
-                  ...prev,
-                  [i]: { ...(prev[i] ?? {}), [talla]: cantidad },
-                }))
+              onCelda={(i, filaIdx, talla, cantidad) =>
+                setMatrices((prev) => {
+                  const filas = prev[i] ?? [];
+                  const nuevas = filas.map((f, fi) =>
+                    fi === filaIdx ? { ...f, tallas: { ...f.tallas, [talla]: cantidad } } : f,
+                  );
+                  return { ...prev, [i]: nuevas };
+                })
               }
               onPantone={(i, valor) => setPantones((prev) => ({ ...prev, [i]: valor }))}
               ligas={ligas}
@@ -471,12 +539,7 @@ function PasoOrigen({
   );
 }
 
-/** Suma de una matriz editable (talla → cantidad). */
-function sumaMatriz(matriz: Record<string, number> | undefined): number {
-  return Object.values(matriz ?? {}).reduce((s, n) => s + n, 0);
-}
-
-/** Paso 2 · Vista previa: un renglón por PDF (liga a modelo + matriz EDITABLE + packs + advertencias). */
+/** Paso 2 · Vista previa: un renglón por PDF (liga a modelo + matriz EDITABLE por packs + advertencias). */
 function PasoVistaPrevia({
   renglones,
   porcentajeAdicional,
@@ -493,9 +556,9 @@ function PasoVistaPrevia({
 }: {
   renglones: RenglonPdfPreview[];
   porcentajeAdicional: number;
-  matrices: Record<number, Record<string, number>>;
+  matrices: Record<number, RenglonPackEditable[]>;
   pantones: Record<number, string>;
-  onCelda: (i: number, talla: string, cantidad: number) => void;
+  onCelda: (i: number, filaIdx: number, talla: string, cantidad: number) => void;
   onPantone: (i: number, valor: string) => void;
   ligas: Record<string, number>;
   idModeloDe: (r: RenglonPdfPreview) => number | null;
@@ -545,8 +608,8 @@ function PasoVistaPrevia({
     (s, r) => s + r.tallas.reduce((ss, t) => ss + t.piezas, 0),
     0,
   );
-  // Total a fabricar = suma de las matrices EDITADAS (refleja lo que el usuario decidió).
-  const totalFabricar = renglones.reduce((s, _r, i) => s + sumaMatriz(matrices[i]), 0);
+  // Total a fabricar = suma de las matrices EDITADAS por packs (refleja lo que el usuario decidió).
+  const totalFabricar = renglones.reduce((s, _r, i) => s + totalFilas(matrices[i]), 0);
   const aImportar = renglones.filter((r) => idModeloDe(r) !== null).length;
   const conAdicional = porcentajeAdicional > 0;
   const cambio = totalFabricar !== totalPiezas;
@@ -579,9 +642,9 @@ function PasoVistaPrevia({
               key={`${r.nombreArchivo}-${i}`}
               r={r}
               indice={i}
-              matriz={matrices[i] ?? {}}
+              filas={matrices[i] ?? []}
               pantone={pantones[i] ?? ''}
-              onCelda={(talla, cantidad) => onCelda(i, talla, cantidad)}
+              onCelda={(filaIdx, talla, cantidad) => onCelda(i, filaIdx, talla, cantidad)}
               onPantone={(valor) => onPantone(i, valor)}
               valorLiga={idModeloDe(r)}
               usaSugerencia={ligas[r.modeloCliente] === undefined && r.idModeloSugerido !== null}
@@ -652,11 +715,11 @@ function PasoVistaPrevia({
   );
 }
 
-/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable + desglose de packs + pantone. */
+/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable POR PACK + pantone. */
 function FilaPdf({
   r,
   indice,
-  matriz,
+  filas,
   pantone,
   onCelda,
   onPantone,
@@ -672,9 +735,9 @@ function FilaPdf({
 }: {
   r: RenglonPdfPreview;
   indice: number;
-  matriz: Record<string, number>;
+  filas: RenglonPackEditable[];
   pantone: string;
-  onCelda: (talla: string, cantidad: number) => void;
+  onCelda: (filaIdx: number, talla: string, cantidad: number) => void;
   onPantone: (valor: string) => void;
   valorLiga: number | null;
   usaSugerencia: boolean;
@@ -704,7 +767,7 @@ function FilaPdf({
     );
   }
   const totalPiezas = r.tallas.reduce((s, t) => s + t.piezas, 0);
-  const totalFabricar = sumaMatriz(matriz);
+  const totalFabricar = totalFilas(filas);
   const cambio = totalFabricar !== totalPiezas;
   return (
     <div className="rounded-lg border" data-testid="importador-pdf-fila">
@@ -771,7 +834,7 @@ function FilaPdf({
         </button>
         {r.colorGenerico !== '' ? (
           <span className="text-muted-foreground">
-            Color <b>{r.colorGenerico}</b>
+            Color <b>{tituloColor(r.colorGenerico)}</b>
             {r.colorNuevo ? <span className="text-warn"> (nuevo)</span> : null}
           </span>
         ) : null}
@@ -794,8 +857,7 @@ function FilaPdf({
 
       {abierto ? (
         <div className="space-y-3 border-t px-3 py-3">
-          <MatrizEditable r={r} matriz={matriz} onCelda={onCelda} />
-          {r.grupos.length > 0 ? <DesglosePacks grupos={r.grupos} /> : null}
+          <MatrizPacksEditable r={r} filas={filas} onCelda={onCelda} />
           <label className="flex items-center gap-2 text-[11px]">
             <span className="font-medium text-muted-foreground">PANTONE del color</span>
             <Input
@@ -822,27 +884,35 @@ function FilaPdf({
   );
 }
 
-/** Matriz EDITABLE por talla: fila "pidió" (solo lectura) + fila "a fabricar" (inputs) con su total. */
-function MatrizEditable({
+/**
+ * Matriz EDITABLE POR PACK: una fila "Cliente pidió" (solo lectura, agregada) + una fila EDITABLE por pack
+ * (`{color} {letra}`) con inputs por talla y su total, más el total general. Cada OC de C&A trae un renglón
+ * POR PACK; para "integrar" un pack en otro el usuario mueve los números entre renglones (vaciar un pack =
+ * ponerlo en 0 → no genera línea en la OP).
+ */
+function MatrizPacksEditable({
   r,
-  matriz,
+  filas,
   onCelda,
 }: {
   r: RenglonPdfPreview;
-  matriz: Record<string, number>;
-  onCelda: (talla: string, cantidad: number) => void;
+  filas: RenglonPackEditable[];
+  onCelda: (filaIdx: number, talla: string, cantidad: number) => void;
 }): React.JSX.Element {
+  const columnas = columnasTallas(r, filas);
+  const colorBase = r.colorGenerico;
+  const pidioPorTalla = new Map(r.tallas.map((t) => [t.talla, t.piezas] as const));
   const totalPidio = r.tallas.reduce((s, t) => s + t.piezas, 0);
-  const totalFabricar = sumaMatriz(matriz);
+  const granTotal = totalFilas(filas);
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" data-testid="importador-pdf-matriz">
       <table className="w-full min-w-max border-collapse text-[11px]">
         <thead>
           <tr className="text-muted-foreground">
-            <th className="px-1.5 py-1 text-left font-medium"> </th>
-            {r.tallas.map((t) => (
-              <th key={t.talla} className="px-1.5 py-1 text-center font-medium num">
-                {t.talla}
+            <th className="px-1.5 py-1 text-left font-medium">Pack</th>
+            {columnas.map((talla) => (
+              <th key={talla} className="num px-1.5 py-1 text-center font-medium">
+                {talla}
               </th>
             ))}
             <th className="px-1.5 py-1 text-center font-medium">Total</th>
@@ -851,65 +921,53 @@ function MatrizEditable({
         <tbody>
           <tr className="text-muted-foreground">
             <td className="px-1.5 py-1 whitespace-nowrap">Cliente pidió</td>
-            {r.tallas.map((t) => (
-              <td key={t.talla} className="px-1.5 py-1 text-center num">
-                {t.piezas.toLocaleString('es-MX')}
+            {columnas.map((talla) => (
+              <td key={talla} className="num px-1.5 py-1 text-center">
+                {(pidioPorTalla.get(talla) ?? 0).toLocaleString('es-MX')}
               </td>
             ))}
-            <td className="px-1.5 py-1 text-center num font-medium">
+            <td className="num px-1.5 py-1 text-center font-medium">
               {totalPidio.toLocaleString('es-MX')}
             </td>
           </tr>
-          <tr>
-            <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">A fabricar</td>
-            {r.tallas.map((t) => (
-              <td key={t.talla} className="px-1 py-1 text-center">
-                <input
-                  type="number"
-                  min={0}
-                  value={matriz[t.talla] ?? 0}
-                  onChange={(e) =>
-                    onCelda(t.talla, Math.max(0, Math.round(Number(e.target.value) || 0)))
-                  }
-                  className="h-7 w-14 rounded border bg-background px-1 text-center num tabular-nums"
-                  aria-label={`A fabricar talla ${t.talla}`}
-                  data-testid={`importador-pdf-celda-${t.talla}`}
-                />
+          {filas.map((fila, fi) => (
+            <tr key={fila.letra ?? `fila-${fi}`}>
+              <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
+                {componerColorUI(colorBase, fila.letra)}
+              </td>
+              {columnas.map((talla) => (
+                <td key={talla} className="px-1 py-1 text-center">
+                  <input
+                    type="number"
+                    min={0}
+                    value={fila.tallas[talla] ?? 0}
+                    onChange={(e) =>
+                      onCelda(fi, talla, Math.max(0, Math.round(Number(e.target.value) || 0)))
+                    }
+                    className="num h-7 w-14 rounded border bg-background px-1 text-center tabular-nums"
+                    aria-label={`A fabricar ${componerColorUI(colorBase, fila.letra)} talla ${talla}`}
+                    data-testid={`importador-pdf-celda-${fi}-${talla}`}
+                  />
+                </td>
+              ))}
+              <td className="num px-1.5 py-1 text-center font-semibold text-primary">
+                {totalFila(fila).toLocaleString('es-MX')}
+              </td>
+            </tr>
+          ))}
+          <tr className="border-t">
+            <td className="px-1.5 py-1 font-medium whitespace-nowrap">A fabricar</td>
+            {columnas.map((talla) => (
+              <td key={talla} className="num px-1.5 py-1 text-center text-muted-foreground">
+                {filas.reduce((s, f) => s + (f.tallas[talla] ?? 0), 0).toLocaleString('es-MX')}
               </td>
             ))}
-            <td className="px-1.5 py-1 text-center num font-semibold text-primary">
-              {totalFabricar.toLocaleString('es-MX')}
+            <td className="num px-1.5 py-1 text-center font-semibold text-primary">
+              {granTotal.toLocaleString('es-MX')}
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
-  );
-}
-
-/** Desglose de los packs (de dónde sale la propuesta): un renglón por grupo A/B/C. */
-function DesglosePacks({ grupos }: { grupos: RenglonPdfPreview['grupos'] }): React.JSX.Element {
-  return (
-    <div
-      className="space-y-1 rounded-md bg-muted/40 px-2 py-1.5"
-      data-testid="importador-pdf-packs"
-    >
-      <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-        Propuesta por packs
-      </p>
-      {grupos.map((g) => (
-        <div key={g.grupo} className="flex flex-wrap items-center gap-x-2 text-[11px]">
-          <span className="font-medium">
-            {g.tipo === 'SKU' ? `Sueltas ${g.grupo}` : `Pack ${g.grupo}`}
-          </span>
-          <span className="text-muted-foreground">
-            {g.tipo === 'SKU'
-              ? `${g.desglose.reduce((s, c) => s + c.original, 0)} pz → ${g.desglose.reduce((s, c) => s + c.propuesta, 0)} pz`
-              : `${g.packsOriginales} → ${g.packsPropuestos} packs`}
-          </span>
-          {g.advertencia !== null ? <span className="text-warn">· {g.advertencia}</span> : null}
-        </div>
-      ))}
     </div>
   );
 }

@@ -43394,28 +43394,54 @@
                           "description": "Contenido del PDF en base64 (acepta prefijo data: URL)."
                         },
                         "matriz": {
-                          "description": "Matriz EDITADA (total por talla) que reemplaza la propuesta; si se omite, se propone.",
+                          "description": "Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs.",
                           "type": "array",
                           "items": {
                             "type": "object",
                             "properties": {
-                              "talla": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "Etiqueta de la talla ajustada."
+                              "letra": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 8
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Letra del pack que sufija el color (A/B/C…); null/vacía = un solo pack sin sufijo."
                               },
-                              "cantidad": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991,
-                                "description": "Total EDITADO a fabricar de esa talla (reemplaza la propuesta)."
+                              "tallas": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "talla": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "description": "Etiqueta de la talla ajustada."
+                                    },
+                                    "cantidad": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991,
+                                      "description": "Total EDITADO a fabricar de esa talla (reemplaza la propuesta)."
+                                    }
+                                  },
+                                  "required": [
+                                    "talla",
+                                    "cantidad"
+                                  ],
+                                  "description": "Ajuste manual del total a fabricar de una talla."
+                                },
+                                "description": "Corrida EDITADA de ese pack (total por talla)."
                               }
                             },
                             "required": [
-                              "talla",
-                              "cantidad"
+                              "letra",
+                              "tallas"
                             ],
-                            "description": "Ajuste manual del total a fabricar de una talla."
+                            "description": "Un renglón-pack de la matriz de la OP (su letra + su corrida)."
                           }
                         },
                         "pantone": {

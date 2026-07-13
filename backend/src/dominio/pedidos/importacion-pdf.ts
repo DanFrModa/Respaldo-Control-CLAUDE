@@ -628,13 +628,22 @@ async function catalogoTallasPorEtiqueta(
 
 // ── Operación: confirmar la importación ──────────────────────────────────────
 
+/** Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = sin sufijo) y su corrida por talla. */
+interface RenglonMatrizEditada {
+  letra: string | null;
+  tallas: { talla: string; cantidad: number }[];
+}
+
 /** Un PDF LISTO para importar (parseado, ligado y con su objeto R2 ya subido). */
 interface PdfAImportar {
   nombreArchivo: string;
   r: RenglonPdfCyaParseado;
   idModelo: number;
-  /** Matriz EDITADA en la vista previa (total por talla); si no viene, se usa la propuesta por packs. */
-  matrizEditada: { talla: string; cantidad: number }[] | null;
+  /**
+   * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack, `{color} {letra}`); si no
+   * viene, se derivan de la propuesta por packs. Cada OC de C&A trae un renglón por pack (convención).
+   */
+  matrizEditada: RenglonMatrizEditada[] | null;
   /** Pantone editado/prefilleado del color de la OP; null = sin pantone. */
   pantone: string | null;
   subido: {
@@ -732,13 +741,19 @@ export async function confirmarImportacionPdf(
       carpeta: CARPETA_ADJUNTOS,
       contenido: p.buffer,
     });
-    // Ajuste manual de la vista previa: la matriz editada (si el usuario la tocó) y el pantone. La
-    // matriz sólo cuenta las tallas con cantidad > 0 (una celda en 0 no entra a la OP).
+    // Ajuste manual de la vista previa: la matriz editada como RENGLONES-PACK (si el usuario la tocó) y
+    // el pantone. Cada renglón sólo cuenta sus tallas con cantidad > 0; un renglón que queda todo en 0 se
+    // descarta (así se "integra" un pack en otro: el usuario mueve los números entre renglones).
     const matrizEditada =
       ajuste?.matriz !== undefined
         ? ajuste.matriz
-            .filter((t) => t.cantidad > 0)
-            .map((t) => ({ talla: t.talla, cantidad: t.cantidad }))
+            .map((fila) => ({
+              letra: fila.letra !== null && fila.letra.trim() !== '' ? fila.letra.trim() : null,
+              tallas: fila.tallas
+                .filter((t) => t.cantidad > 0)
+                .map((t) => ({ talla: t.talla, cantidad: t.cantidad })),
+            }))
+            .filter((fila) => fila.tallas.length > 0)
         : null;
     const pantone =
       ajuste?.pantone !== undefined && ajuste.pantone !== ''
@@ -858,9 +873,49 @@ export async function confirmarImportacionPdf(
 }
 
 /**
- * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz), departamento y campos
- * de referencia (D7), crea el renglón, la OP (reusa `salidaAProduccion` → RC), sella el nº de orden C&A
- * y la composición en la OP, y adjunta el PDF (ya subido) a la orden. Devuelve la traza de la OP.
+ * Título del color (petición Daniel): primera letra de CADA palabra en Mayúscula y el resto en minúscula
+ * ("AZUL INDIGO" → "Azul Indigo"), como se ve mejor en el catálogo. Preserva acentos y separadores
+ * (guiones): "AZUL-MARINO" → "Azul-Marino".
+ */
+function tituloColor(base: string): string {
+  return base
+    .toLowerCase()
+    .replace(/\p{L}[\p{L}'’]*/gu, (p) => p.charAt(0).toUpperCase() + p.slice(1));
+}
+
+/**
+ * Compone el color de un renglón-pack: `{Base} {LETRA}` (o sólo `Base` si no hay letra). El nombre del
+ * color va en Título y la letra del pack SIEMPRE en MAYÚSCULA (A, B, C…), como los pide Daniel.
+ */
+function componerColor(base: string, letra: string | null): string {
+  const nombre = tituloColor(base);
+  return letra !== null && letra.trim() !== '' ? `${nombre} ${letra.trim().toUpperCase()}` : nombre;
+}
+
+/**
+ * Deriva los RENGLONES-PACK de la matriz cuando el usuario NO editó la vista previa: un renglón por grupo
+ * (color `{color} {letra}`) si la OC trae ≥2 packs; un solo renglón SIN sufijo si trae 0 o 1 pack (la
+ * convención histórica de los pedidos de un solo pack). Las cantidades ya vienen con el sobre-pedido.
+ */
+function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEditada[] {
+  if (propuesta.grupos.length >= 2) {
+    return propuesta.grupos.map((g) => ({
+      letra: g.grupo,
+      tallas: g.desglose.map((c) => ({ talla: c.talla, cantidad: c.propuesta })),
+    }));
+  }
+  return [
+    {
+      letra: null,
+      tallas: propuesta.totalPorTalla.map((c) => ({ talla: c.talla, cantidad: c.propuesta })),
+    },
+  ];
+}
+
+/**
+ * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz, UN renglón por pack),
+ * departamento y campos de referencia (D7), crea el renglón, la OP (reusa `salidaAProduccion` → RC), sella
+ * el nº de orden C&A y la composición en la OP, y adjunta el PDF (ya subido) a la orden. Devuelve la traza.
  */
 async function crearOrdenDesdePdf(
   tx: Tx,
@@ -872,8 +927,8 @@ async function crearOrdenDesdePdf(
     r: RenglonPdfCyaParseado;
     camposVariables: CampoVariableImportacion[];
     porcentajeAdicional: number;
-    /** Matriz editada por el usuario (total por talla); null = usar la propuesta por packs. */
-    matrizEditada: { talla: string; cantidad: number }[] | null;
+    /** Matriz editada como RENGLONES-PACK; null = derivar los renglones de la propuesta por packs. */
+    matrizEditada: RenglonMatrizEditada[] | null;
     /** Pantone del color de la OP (editado/prefilleado), o null. */
     pantone: string | null;
     subido: PdfAImportar['subido'];
@@ -881,34 +936,40 @@ async function crearOrdenDesdePdf(
 ): Promise<Omit<OrdenPdfImportada, 'nombreArchivo' | 'modeloCliente'>> {
   const { r } = args;
 
-  // FABRICAR por talla: si el usuario EDITÓ la matriz en la vista previa manda su edición; si no, la
-  // PROPUESTA de sobre-pedido por packs (petición Daniel: el % se aplica al nº de packs, no talla por
-  // talla). El renglón del pedido conserva la cantidad ORIGINAL del cliente (lo contractual).
+  // FABRICAR: UN renglón de matriz POR PACK (convención C&A `{color} {letra}`). Si el usuario EDITÓ la
+  // matriz en la vista previa mandan SUS renglones-pack; si no, se derivan de la PROPUESTA de sobre-pedido
+  // por packs (petición Daniel: el % se aplica al nº de packs, no talla por talla, y NO cambia la
+  // ESTRUCTURA de renglones — sólo las cantidades). El renglón del pedido conserva la cantidad ORIGINAL.
   const propuesta = propuestaDe(r, args.porcentajeAdicional);
-  const fabricarPorTalla = new Map<string, number>(
-    args.matrizEditada !== null
-      ? args.matrizEditada.map((t) => [t.talla.trim(), t.cantidad])
-      : propuesta.totalPorTalla.map((c) => [c.talla, c.propuesta]),
-  );
+  const filas = args.matrizEditada ?? filasDesdePropuesta(propuesta);
   const totalCliente = r.tallas.reduce((s, t) => s + Math.max(0, t.piezas), 0);
 
-  // Matriz: un color (abierto, D14c) × las tallas a fabricar (resolver-o-crear cada una). Se recorren
-  // TODAS las tallas involucradas (las del PDF + cualquier talla extra que la edición manual agregue).
-  const idColor = await resolverOCrearColor(tx, sesion, r.colorGenerico);
-  const etiquetasTalla = [
-    ...new Set([...r.tallas.map((t) => t.talla), ...fabricarPorTalla.keys()]),
-  ];
-  const tallas: { idTalla: number; cantidad: number }[] = [];
-  for (const etiqueta of etiquetasTalla) {
-    const cantidad = fabricarPorTalla.get(etiqueta) ?? 0;
-    if (cantidad <= 0) continue;
-    const idTalla = await resolverOCrearTalla(tx, sesion, etiqueta);
-    tallas.push({ idTalla, cantidad });
+  // Un color (abierto, D14c) POR renglón-pack: `{colorGenerico} {letra}` (sin sufijo si es un solo pack).
+  // El pantone viaja EN cada línea del color; `sincronizarMatriz` lo sella en el `OrdenLinea`. Un renglón
+  // sin tallas con piezas (p. ej. un pack que el usuario vació al integrarlo en otro) no genera línea.
+  const matriz: {
+    idColor: number;
+    tallas: { idTalla: number; cantidad: number }[];
+    pantone: string | null;
+  }[] = [];
+  for (const fila of filas) {
+    const idColor = await resolverOCrearColor(
+      tx,
+      sesion,
+      componerColor(r.colorGenerico, fila.letra),
+    );
+    const tallas: { idTalla: number; cantidad: number }[] = [];
+    for (const t of fila.tallas) {
+      if (t.cantidad <= 0) continue;
+      const idTalla = await resolverOCrearTalla(tx, sesion, t.talla.trim());
+      tallas.push({ idTalla, cantidad: t.cantidad });
+    }
+    if (tallas.length > 0) matriz.push({ idColor, tallas, pantone: args.pantone });
   }
-  // El pantone viaja EN la línea de la matriz (mismo camino que la captura general): `sincronizarMatriz`
-  // lo sella en el `OrdenLinea` del color. Null si la OC no lo trae ni el usuario lo capturó.
-  const matriz = [{ idColor, tallas, pantone: args.pantone }];
-  const totalFabricar = tallas.reduce((s, t) => s + t.cantidad, 0);
+  const totalFabricar = matriz.reduce(
+    (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
+    0,
+  );
 
   // Departamento del cliente (División) + referencias configuradas (D7).
   if (r.division !== '') {

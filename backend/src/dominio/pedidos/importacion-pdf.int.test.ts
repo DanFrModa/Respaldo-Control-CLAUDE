@@ -1,9 +1,10 @@
 /**
  * Tests de INTEGRACIÓN del IMPORTADOR de OC por PDF (petición Daniel — plantilla C&A) contra el
  * Postgres efímero (testcontainers), usando el fixture REAL `__fixtures__/cya-620884.pdf`. Cubre:
- *  • CONFIRMAR 1 PDF: nace el pedido + su OP con matriz (color BLANCO × 6 tallas, resuelto-o-creado),
- *    el nº de orden de C&A en `Orden.ocCliente`, el departamento (División) + las referencias (D7)
- *    configuradas, el PDF ADJUNTO a la OP, y la LIGA aprendida (modelo del cliente → nuestro modelo),
+ *  • CONFIRMAR 1 PDF: nace el pedido + su OP con matriz UN RENGLÓN POR PACK (Blanco A/B/C, convención
+ *    C&A `{color} {letra}`, resuelto-o-creado), el nº de orden de C&A en `Orden.ocCliente`, el
+ *    departamento (División) + las referencias (D7) configuradas, el PDF ADJUNTO a la OP, y la LIGA
+ *    aprendida (modelo del cliente → nuestro modelo),
  *  • MULTI-PDF → UN pedido con 2 OPs (resurtido), catálogos REUSADOS (color/talla no se duplican),
  *  • APRENDIZAJE: con la liga ya guardada, `analizar` la PROPONE y `confirmar` corre sin liga manual,
  *  • SIN liga (ni aprendida ni manual) → no se importa nada (error claro),
@@ -120,29 +121,42 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     expect(orden0.totalPiezas).toBe(1903);
     expect(orden0.adjuntado).toBe(true);
 
-    // La OP: nº de orden de C&A en ocCliente, composición del PDF, matriz color×talla.
+    // La OP: nº de orden de C&A en ocCliente, composición del PDF, matriz color×talla POR PACK.
     const orden = await cliente.orden.findUniqueOrThrow({
       where: { id: orden0.idOrden },
-      include: { lineas: { include: { tallas: true } }, archivos: true, referencias: true },
+      include: {
+        lineas: { include: { tallas: true, color: true } },
+        archivos: true,
+        referencias: true,
+      },
     });
     expect(orden.ocCliente).toBe('620884');
     expect(orden.composicion).toContain('ALGOD');
-    expect(orden.lineas).toHaveLength(1); // un solo color (BLANCO)
-    expect(orden.lineas[0]!.tallas).toHaveLength(6);
-    const piezas = orden.lineas[0]!.tallas.reduce((s, t) => s + t.cantidad, 0);
-    expect(piezas).toBe(1903);
-    // La OC real de C&A NO trae pantone → el color de la OP queda sin pantone.
-    expect(orden.lineas[0]!.pantone).toBeNull();
+    // UN renglón por pack (convención C&A `{color} {letra}`): la OC 620884 trae 3 packs (A/B/C). El
+    // sobre-pedido NO cambia la ESTRUCTURA de renglones (sólo las cantidades) → 3 líneas aun a pct 0.
+    expect(orden.lineas).toHaveLength(3);
+    expect([...orden.lineas.map((l) => l.color.nombre)].sort()).toEqual([
+      'Blanco A',
+      'Blanco B',
+      'Blanco C',
+    ]);
+    const totalMatriz = orden.lineas.reduce(
+      (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
+      0,
+    );
+    expect(totalMatriz).toBe(1903);
+    // La OC real de C&A NO trae pantone → cada renglón-pack del color queda sin pantone.
+    for (const l of orden.lineas) expect(l.pantone).toBeNull();
     // El desglose SKU/packs del cliente quedó persistido con la orden (aun sin % adicional).
     expect(orden.packsCliente).not.toBeNull();
     // El PDF quedó adjunto a SU orden.
     expect(orden.archivos).toHaveLength(1);
 
-    // Color y tallas se resolvieron-o-crearon (D14c: colores abiertos capturados en la OP).
-    const color = await cliente.color.findFirst({
-      where: { nombre: { equals: 'BLANCO', mode: 'insensitive' } },
+    // Colores POR PACK y tallas se resolvieron-o-crearon (D14c: colores abiertos capturados en la OP).
+    const coloresPack = await cliente.color.count({
+      where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
     });
-    expect(color).not.toBeNull();
+    expect(coloresPack).toBe(3);
     const tallas = await cliente.talla.findMany({ where: { etiqueta: { in: ['5-6', '13-14'] } } });
     expect(tallas).toHaveLength(2);
 
@@ -227,11 +241,12 @@ describe('confirmar importación por PDF (multi-PDF)', () => {
     const adjuntos = await cliente.ordenArchivo.count();
     expect(adjuntos).toBe(2);
 
-    // El color BLANCO y la talla 5-6 se crearon UNA vez y se reusaron en la 2ª OP.
+    // Los 3 colores por pack (BLANCO A/B/C) y la talla 5-6 se crearon UNA vez y se reusaron en la 2ª OP
+    // (no se duplican: 3 colores, no 6).
     const colores = await cliente.color.count({
-      where: { nombre: { equals: 'BLANCO', mode: 'insensitive' } },
+      where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
     });
-    expect(colores).toBe(1);
+    expect(colores).toBe(3);
     const tallas56 = await cliente.talla.count({ where: { etiqueta: '5-6' } });
     expect(tallas56).toBe(1);
   });
@@ -258,19 +273,55 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
 
     const orden = await cliente.orden.findUniqueOrThrow({
       where: { id: res.ordenes[0]!.idOrden },
-      include: { lineas: { include: { tallas: { include: { talla: true } } } } },
+      include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    const porTalla = new Map(
-      orden.lineas[0]!.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const),
+    // UN renglón por pack: Blanco A/B/C con la corrida propuesta de SU pack (canónicos, NO sumados).
+    const porColor = new Map(
+      orden.lineas.map(
+        (l) =>
+          [
+            l.color.nombre,
+            new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const)),
+          ] as const,
+      ),
     );
-    // Totales por talla del sobre-pedido por packs (packs A 119→127, B 57→61, SKU +7%).
-    expect(porTalla.get('5-6')).toBe(326);
-    expect(porTalla.get('6-7')).toBe(134);
-    expect(porTalla.get('7-8')).toBe(138);
-    expect(porTalla.get('9-10')).toBe(521);
-    expect(porTalla.get('11-12')).toBe(523);
-    expect(porTalla.get('13-14')).toBe(390);
-    const totalMatriz = orden.lineas[0]!.tallas.reduce((s, t) => s + t.cantidad, 0);
+    expect([...porColor.keys()].sort()).toEqual(['Blanco A', 'Blanco B', 'Blanco C']);
+    // Pack A 119→127: 254-127-127-381-381-254 (= 1524).
+    const a = porColor.get('Blanco A')!;
+    expect(['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map((t) => a.get(t) ?? 0)).toEqual([
+      254, 127, 127, 381, 381, 254,
+    ]);
+    // Pack B 57→61: 61-0-0-122-122-122 (las tallas en 0 no generan celda) (= 427).
+    const b = porColor.get('Blanco B')!;
+    expect(b.get('5-6')).toBe(61);
+    expect(b.get('9-10')).toBe(122);
+    expect(b.get('11-12')).toBe(122);
+    expect(b.get('13-14')).toBe(122);
+    expect(b.get('6-7')).toBeUndefined();
+    expect(b.get('7-8')).toBeUndefined();
+    expect([...b.values()].reduce((s, n) => s + n, 0)).toBe(427);
+    // Pack C (SKU) +7%: 11-7-11-18-20-14 (= 81).
+    const c = porColor.get('Blanco C')!;
+    expect(['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map((t) => c.get(t) ?? 0)).toEqual([
+      11, 7, 11, 18, 20, 14,
+    ]);
+
+    // Reconciliación: el TOTAL por talla (suma de los 3 packs) reproduce los canónicos 326-134-…-390.
+    const sumaTalla = (etq: string): number =>
+      orden.lineas.reduce(
+        (s, l) => s + (l.tallas.find((t) => t.talla.etiqueta === etq)?.cantidad ?? 0),
+        0,
+      );
+    expect(sumaTalla('5-6')).toBe(326);
+    expect(sumaTalla('6-7')).toBe(134);
+    expect(sumaTalla('7-8')).toBe(138);
+    expect(sumaTalla('9-10')).toBe(521);
+    expect(sumaTalla('11-12')).toBe(523);
+    expect(sumaTalla('13-14')).toBe(390);
+    const totalMatriz = orden.lineas.reduce(
+      (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
+      0,
+    );
     expect(totalMatriz).toBe(2032);
 
     // El RENGLÓN del pedido conserva la cantidad ORIGINAL del cliente (lo contractual) y el precio.
@@ -318,7 +369,7 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
     ]);
   });
 
-  it('respeta la MATRIZ editada por el usuario en la vista previa (el sistema propone, él decide)', async () => {
+  it('respeta los RENGLONES-PACK editados; un pack vaciado se integra en otro (el usuario decide)', async () => {
     const idModelo = await crearModelo('DEV-CYA-EDIT');
 
     const res = await confirmarImportacionPdf(
@@ -328,12 +379,26 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
         archivos: [
           {
             ...archivoPdf(),
-            // El usuario integró todo a mano: 4 tallas, total 500 (ignora la propuesta por packs).
+            // El usuario edita a mano: deja A y B con corridas propias e INTEGRA el pack C en A (C en 0).
             matriz: [
-              { talla: '5-6', cantidad: 100 },
-              { talla: '6-7', cantidad: 100 },
-              { talla: '9-10', cantidad: 150 },
-              { talla: '13-14', cantidad: 150 },
+              {
+                letra: 'A',
+                tallas: [
+                  { talla: '5-6', cantidad: 100 },
+                  { talla: '6-7', cantidad: 100 },
+                  { talla: '9-10', cantidad: 150 },
+                  { talla: '13-14', cantidad: 150 },
+                ],
+              },
+              {
+                letra: 'B',
+                tallas: [
+                  { talla: '5-6', cantidad: 50 },
+                  { talla: '9-10', cantidad: 50 },
+                ],
+              },
+              // Pack C vaciado (todo en 0): NO genera línea (se integró en A).
+              { letra: 'C', tallas: [{ talla: '5-6', cantidad: 0 }] },
             ],
             pantone: '11-0601 TCX',
           },
@@ -345,15 +410,23 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
       archivosFalsos(),
     );
 
-    // La OP se fabrica con los totales EDITADOS (500), no con la propuesta (2032).
-    expect(res.ordenes[0]!.totalPiezas).toBe(500);
+    // La OP se fabrica con los renglones EDITADOS: A(500) + B(100) = 600 (ignora la propuesta 2032).
+    expect(res.ordenes[0]!.totalPiezas).toBe(600);
     const orden = await cliente.orden.findUniqueOrThrow({
       where: { id: res.ordenes[0]!.idOrden },
-      include: { lineas: { include: { tallas: { include: { talla: true } } } } },
+      include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    expect(orden.lineas[0]!.tallas).toHaveLength(4);
-    // El pantone editado quedó sellado en el color de la OP.
-    expect(orden.lineas[0]!.pantone).toBe('11-0601 TCX');
+    // 2 renglones (Blanco A, Blanco B); el pack C vaciado NO generó línea.
+    expect([...orden.lineas.map((l) => l.color.nombre)].sort()).toEqual(['Blanco A', 'Blanco B']);
+    const porColor = new Map(
+      orden.lineas.map(
+        (l) => [l.color.nombre, l.tallas.reduce((s, t) => s + t.cantidad, 0)] as const,
+      ),
+    );
+    expect(porColor.get('Blanco A')).toBe(500);
+    expect(porColor.get('Blanco B')).toBe(100);
+    // El pantone editado quedó sellado en CADA renglón del color de la OP.
+    for (const l of orden.lineas) expect(l.pantone).toBe('11-0601 TCX');
     // El renglón del pedido SIGUE conservando lo pedido (1903).
     const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido: res.idPedido } });
     expect(linea.cantidadPedida).toBe(1903);
@@ -479,7 +552,9 @@ describe('sin reconocer y transaccionalidad', () => {
     expect(await cliente.pedido.count()).toBe(0);
     expect(await cliente.orden.count()).toBe(0);
     expect(
-      await cliente.color.count({ where: { nombre: { equals: 'BLANCO', mode: 'insensitive' } } }),
+      await cliente.color.count({
+        where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
+      }),
     ).toBe(0);
     expect(await cliente.talla.count({ where: { etiqueta: '5-6' } })).toBe(0);
     expect(await cliente.clienteDepartamento.count()).toBe(0);
@@ -490,7 +565,10 @@ describe('sin reconocer y transaccionalidad', () => {
 describe('idempotencia de catálogos', () => {
   it('reusa color/talla/departamento/campo ya existentes (no los duplica)', async () => {
     const idModelo = await crearModelo('DEV-CYA-IDEM');
-    await cliente.color.create({ data: { nombre: 'BLANCO' } });
+    // Los colores por pack ya existen (BLANCO A/B/C) → se reusan, no se duplican.
+    await cliente.color.create({ data: { nombre: 'BLANCO A' } });
+    await cliente.color.create({ data: { nombre: 'BLANCO B' } });
+    await cliente.color.create({ data: { nombre: 'BLANCO C' } });
     await cliente.talla.create({ data: { etiqueta: '5-6', orden: 5 } });
     await cliente.clienteDepartamento.create({
       data: { idCliente: idClienteNegocio, nombre: '3- KIDS' },
@@ -511,8 +589,10 @@ describe('idempotencia de catálogos', () => {
     );
 
     expect(
-      await cliente.color.count({ where: { nombre: { equals: 'BLANCO', mode: 'insensitive' } } }),
-    ).toBe(1);
+      await cliente.color.count({
+        where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
+      }),
+    ).toBe(3);
     expect(await cliente.talla.count({ where: { etiqueta: '5-6' } })).toBe(1);
     expect(
       await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
