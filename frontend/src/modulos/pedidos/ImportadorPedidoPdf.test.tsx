@@ -135,6 +135,7 @@ const PREVIEW_7: AnalizarPdf = {
         { talla: '11-12', piezas: 490, piezasFabricar: 523 },
         { talla: '13-14', piezas: 365, piezasFabricar: 390 },
       ],
+      // La OC 620884 trae 3 packs (A/B/C) → 3 renglones-pack (canónicos, suman 2032; per-talla 326-…-390).
       grupos: [
         {
           grupo: 'A',
@@ -143,7 +144,41 @@ const PREVIEW_7: AnalizarPdf = {
           packsPropuestos: 127,
           desglose: [
             { talla: '5-6', original: 238, propuesta: 254 },
+            { talla: '6-7', original: 119, propuesta: 127 },
+            { talla: '7-8', original: 119, propuesta: 127 },
+            { talla: '9-10', original: 357, propuesta: 381 },
+            { talla: '11-12', original: 357, propuesta: 381 },
             { talla: '13-14', original: 238, propuesta: 254 },
+          ],
+          advertencia: null,
+        },
+        {
+          grupo: 'B',
+          tipo: 'PACK',
+          packsOriginales: 57,
+          packsPropuestos: 61,
+          desglose: [
+            { talla: '5-6', original: 57, propuesta: 61 },
+            { talla: '6-7', original: 0, propuesta: 0 },
+            { talla: '7-8', original: 0, propuesta: 0 },
+            { talla: '9-10', original: 114, propuesta: 122 },
+            { talla: '11-12', original: 114, propuesta: 122 },
+            { talla: '13-14', original: 114, propuesta: 122 },
+          ],
+          advertencia: null,
+        },
+        {
+          grupo: 'C',
+          tipo: 'SKU',
+          packsOriginales: 1,
+          packsPropuestos: 1,
+          desglose: [
+            { talla: '5-6', original: 10, propuesta: 11 },
+            { talla: '6-7', original: 7, propuesta: 7 },
+            { talla: '7-8', original: 10, propuesta: 11 },
+            { talla: '9-10', original: 17, propuesta: 18 },
+            { talla: '11-12', original: 19, propuesta: 20 },
+            { talla: '13-14', original: 13, propuesta: 14 },
           ],
           advertencia: null,
         },
@@ -237,15 +272,15 @@ describe('ImportadorPedidoPdf', () => {
     expect(screen.getAllByText(/\+7%/).length).toBeGreaterThan(0);
   });
 
-  it('la matriz es EDITABLE y el confirm manda los totales editados + el pantone', async () => {
+  it('la matriz es EDITABLE POR PACK y el confirm manda los renglones-pack editados + el pantone', async () => {
     await irAVistaPrevia(PREVIEW_7);
     confirmarMock.mockImplementation(() => {});
 
-    // Abre el desglose de la fila (matriz editable) y cambia el total a fabricar de la talla 5-6.
+    // Abre la matriz por packs (A/B/C) y cambia la talla 5-6 del PACK A (primer renglón) a 300.
     fireEvent.click(screen.getByTestId('importador-pdf-toggle-tallas'));
-    const celda = await screen.findByTestId('importador-pdf-celda-5-6');
-    fireEvent.change(celda, { target: { value: '300' } });
-    // Captura un pantone a mano.
+    const celdaA56 = await screen.findByTestId('importador-pdf-celda-0-5-6');
+    fireEvent.change(celdaA56, { target: { value: '300' } });
+    // Captura un pantone a mano (aplica a todos los renglones del mismo color).
     fireEvent.change(screen.getByTestId('importador-pdf-pantone-0'), {
       target: { value: '11-0601 TCX' },
     });
@@ -254,11 +289,20 @@ describe('ImportadorPedidoPdf', () => {
     await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
 
     const cuerpo = confirmarMock.mock.calls[0]?.[0] as {
-      archivos: { matriz: { talla: string; cantidad: number }[]; pantone: string }[];
+      archivos: {
+        matriz: { letra: string | null; tallas: { talla: string; cantidad: number }[] }[];
+        pantone: string;
+      }[];
     };
     const archivo = cuerpo.archivos[0];
-    expect(archivo?.matriz).toContainEqual({ talla: '5-6', cantidad: 300 }); // el total editado
-    expect(archivo?.matriz).toContainEqual({ talla: '6-7', cantidad: 134 }); // el propuesto, sin tocar
+    // 3 renglones-pack (A/B/C); NO se suman en uno.
+    expect(archivo?.matriz.map((f) => f.letra)).toEqual(['A', 'B', 'C']);
+    const packA = archivo?.matriz.find((f) => f.letra === 'A');
+    expect(packA?.tallas).toContainEqual({ talla: '5-6', cantidad: 300 }); // editado en el pack A
+    expect(packA?.tallas).toContainEqual({ talla: '6-7', cantidad: 127 }); // propuesto, sin tocar
+    // El pack B conserva su corrida propuesta (no se mezcla con A).
+    const packB = archivo?.matriz.find((f) => f.letra === 'B');
+    expect(packB?.tallas).toContainEqual({ talla: '9-10', cantidad: 122 });
     expect(archivo?.pantone).toBe('11-0601 TCX');
   });
 
