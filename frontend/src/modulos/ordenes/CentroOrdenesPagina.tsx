@@ -15,7 +15,7 @@ import {
   Send,
   Shirt,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useClientes } from '@/api/clientes';
@@ -207,6 +207,73 @@ export function CentroOrdenesPagina(): React.JSX.Element {
     }
   }
 
+  // ── Navegación de la lista con las flechas del teclado (↑/↓) ────────────────
+  // La selección sigue el MISMO camino que un clic (`idSeleccionada` es la única fuente de verdad):
+  // las flechas solo mueven el índice dentro de `filas`, con clamp (sin envolver). Se guardan refs
+  // a los renglones (escritorio) y a las tarjetas (móvil) para llevar el foco y desplazar la vista
+  // al seleccionado. Se IGNORAN las flechas cuando el foco está en un control de texto (buscador,
+  // combobox, selects) para no romper la captura.
+  const refsFilaEscritorio = useRef(new Map<number, HTMLElement | null>());
+  const refsFilaMovil = useRef(new Map<number, HTMLElement | null>());
+
+  function enfocarFila(id: number): void {
+    const mapa = window.innerWidth < 1024 ? refsFilaMovil : refsFilaEscritorio;
+    const el = mapa.current.get(id);
+    if (el === null || el === undefined) {
+      return;
+    }
+    el.focus({ preventScroll: true });
+    // jsdom no implementa `scrollIntoView`: se protege para no truncar las pruebas.
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  useEffect(() => {
+    function alTecla(evento: KeyboardEvent): void {
+      if (evento.key !== 'ArrowDown' && evento.key !== 'ArrowUp') {
+        return;
+      }
+      // No actuar si hay un diálogo/sheet/overlay abierto (AvanceProduccion, DialogoOrden,
+      // DialogoCancelarOrden, DialogoCopiarMatriz, cajón móvil…): si no, con el foco en un botón del
+      // modal (no-input) la flecha cambiaría EN SILENCIO la orden del fondo. Radix marca sus
+      // overlays con `role="dialog"` + `data-state="open"`. Se aborta SIN preventDefault: (a) si el
+      // foco vive dentro de un diálogo, y (b) si existe cualquier diálogo abierto en el DOM (cubre
+      // overlays de Radix que puedan no tener el foco).
+      if (document.activeElement?.closest('[role="dialog"]') != null) {
+        return;
+      }
+      if (document.querySelector('[role="dialog"][data-state="open"]') !== null) {
+        return;
+      }
+      // No secuestrar las flechas si se está escribiendo en un campo (buscador/combobox/selects).
+      const etiqueta = document.activeElement?.tagName;
+      if (etiqueta === 'INPUT' || etiqueta === 'TEXTAREA' || etiqueta === 'SELECT') {
+        return;
+      }
+      if (filas.length === 0) {
+        return;
+      }
+      evento.preventDefault();
+      const indiceActual = filas.findIndex((f) => f.id === idSeleccionada);
+      // Sin selección previa (p. ej. deep-link fuera de la página): la primera flecha ancla arriba.
+      const siguiente =
+        indiceActual === -1
+          ? 0
+          : evento.key === 'ArrowDown'
+            ? Math.min(filas.length - 1, indiceActual + 1)
+            : Math.max(0, indiceActual - 1);
+      const objetivo = filas[siguiente];
+      if (objetivo === undefined) {
+        return;
+      }
+      setIdSeleccionada(objetivo.id);
+      enfocarFila(objetivo.id);
+    }
+    window.addEventListener('keydown', alTecla);
+    return () => window.removeEventListener('keydown', alTecla);
+  }, [filas, idSeleccionada]);
+
   // ── Catálogos de los filtros (typeahead server-side: `busqueda` va al API) ──
   const clientes = useClientes({
     pagina: 1,
@@ -277,6 +344,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         fila={filaSeleccionada}
         puedeVerDesarrollo={puedeVerDesarrollo}
         puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
+        puedeAdministrarOrden={puedeAdministrar}
         puedeVerHabilitacion={puedeVerHabilitacion}
         verImportes={verImportes}
         alRegistrarAvance={(folioPedido) =>
@@ -473,7 +541,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
       </div>
 
       {/* ── Split: tabla (izq) + panel persistente (der) ─────────────────── */}
-      <div className="grid shrink-0 gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* El detalle de la derecha es más ANCHO (420px) y el centro se angosta a lo que resta
+          (petición de Daniel): la tabla iba muy ancha y el detalle apretado. */}
+      <div className="grid shrink-0 gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="flex flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0">
           <div className="overflow-auto lg:min-h-0 lg:flex-1">
             {consulta.isPending ? (
@@ -506,6 +576,13 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                       <button
                         type="button"
                         key={fila.id}
+                        ref={(el) => {
+                          if (el === null) {
+                            refsFilaMovil.current.delete(fila.id);
+                          } else {
+                            refsFilaMovil.current.set(fila.id, el);
+                          }
+                        }}
                         onClick={() => alClicFila(fila)}
                         onDoubleClick={() => abrirAvance(fila)}
                         data-testid="centro-tarjeta"
@@ -587,10 +664,18 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                         return (
                           <TablaDensaFila
                             key={fila.id}
+                            ref={(el) => {
+                              if (el === null) {
+                                refsFilaEscritorio.current.delete(fila.id);
+                              } else {
+                                refsFilaEscritorio.current.set(fila.id, el);
+                              }
+                            }}
+                            tabIndex={-1}
                             seleccionada={fila.id === idSeleccionada}
                             onClick={() => alClicFila(fila)}
                             onDoubleClick={() => abrirAvance(fila)}
-                            className="cursor-pointer"
+                            className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
                             data-testid="centro-fila"
                           >
                             <TablaDensaCelda className="text-xs text-muted-foreground">
@@ -943,15 +1028,17 @@ function CampoPanel({ k, children }: { k: string; children: React.ReactNode }): 
 }
 
 /**
- * PANEL DE DETALLE del centro (proto `opDetalle`): encabezado + mosaicos + botón de avance +
- * MATRIZ fijos arriba (sin scroll, petición de Daniel); abajo, con scroll: precios (§4.4.3),
- * datos del encabezado, tela y compra, foto del modelo y el expediente de Desarrollo (F8-E6).
+ * PANEL DE DETALLE del centro (proto `opDetalle`): encabezado + FOTO del modelo + mosaicos +
+ * botón de avance + MATRIZ fijos arriba (sin scroll; la foto arriba fue petición de Daniel,
+ * jul-2026); abajo, con scroll: precios (§4.4.3), datos del encabezado, tela y compra y el
+ * expediente de Desarrollo (F8-E6).
  */
 function DetalleCentroOrden({
   idOrden,
   fila,
   puedeVerDesarrollo,
   puedeAdministrarDesarrollo,
+  puedeAdministrarOrden,
   puedeVerHabilitacion,
   verImportes,
   alRegistrarAvance,
@@ -961,6 +1048,7 @@ function DetalleCentroOrden({
   fila: OrdenCentro | undefined;
   puedeVerDesarrollo: boolean;
   puedeAdministrarDesarrollo: boolean;
+  puedeAdministrarOrden: boolean;
   puedeVerHabilitacion: boolean;
   verImportes: boolean;
   alRegistrarAvance: (folioPedido: number | null) => void;
@@ -1004,8 +1092,8 @@ function DetalleCentroOrden({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="centro-detalle">
-      {/* ── FIJO arriba: encabezado + mosaicos + avance + matriz (Daniel) ── */}
-      <div className="shrink-0 space-y-3 border-b p-3">
+      {/* ── FIJO arriba: encabezado + FOTO + mosaicos + avance + matriz (Daniel) ── */}
+      <div className="shrink-0 space-y-3 border-b p-3" data-testid="centro-detalle-fijo">
         <div className="flex items-center gap-3">
           {/* Héroe del proto `.opd-hero`: cuadro 46px con degradado de marca y los 3 primeros
               dígitos del modelo en mono. */}
@@ -1026,6 +1114,17 @@ function DetalleCentroOrden({
             </p>
           </div>
         </div>
+
+        {/* FOTOS de la OP ARRIBA (petición de Daniel, jul-2026): tira de miniaturas que COMBINA las
+            fotos del modelo con las imágenes subidas a la orden; clic para ver grandes y navegar; con
+            `ordenes.administrar` se puede subir/quitar fotos de la orden. Si no hay fotos y no se
+            puede administrar, no pinta nada (sin hueco). */}
+        <FotosModeloOrden
+          idModelo={orden.idModelo}
+          codigoModelo={orden.codigoModelo}
+          idOrden={orden.id}
+          puedeAdministrar={puedeAdministrarOrden}
+        />
 
         {/* Mosaicos a módulos relacionados (los existentes NAVEGAN de verdad). */}
         <div className="grid grid-cols-4 gap-1.5" data-testid="centro-mosaicos">
@@ -1123,7 +1222,7 @@ function DetalleCentroOrden({
         </div>
       </div>
 
-      {/* ── Con scroll: trazabilidad, precios, encabezado, tela y compra, foto, desarrollo ── */}
+      {/* ── Con scroll: trazabilidad, precios, encabezado, tela y compra, desarrollo ── */}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
         {/* Cadena de trazabilidad (R3, §4.1): OC cliente → Desarrollo → Lista → Pedido → OP. */}
         <section>
@@ -1184,13 +1283,6 @@ function DetalleCentroOrden({
             </CampoPanel>
             <CampoPanel k="Estampador / bordador">{fila?.estampador ?? '—'}</CampoPanel>
           </div>
-        </section>
-
-        <section>
-          <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-            Foto del modelo
-          </h4>
-          <FotosModeloOrden idModelo={orden.idModelo} codigoModelo={orden.codigoModelo} />
         </section>
 
         {/* Expediente Desarrollo↔Producción 360 (F8-E6), re-vestido al estándar del panel. */}

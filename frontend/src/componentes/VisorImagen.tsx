@@ -1,4 +1,4 @@
-import { DownloadIcon, Loader2Icon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
  *
  * Genérico: no conoce modelos ni bordados; el padre controla `abierto`/`alCambiarAbierto`, la
  * `url`, el `nombreArchivo` (filename de la descarga) y el `textoAlt`.
+ *
+ * NAVEGACIÓN opcional (galería): si el padre pasa `alAnterior`/`alSiguiente`, el visor muestra
+ * flechas laterales y responde a ←/→ del teclado para moverse entre varias fotos (el padre gobierna
+ * la lista/índice y actualiza `url`/`textoAlt`/`nombreArchivo`). Sin esas props, el visor se ve
+ * idéntico a antes (una sola imagen) — 100% retrocompatible.
  */
 export interface PropsVisorImagen {
   abierto: boolean;
@@ -31,6 +36,16 @@ export interface PropsVisorImagen {
   alErrorDescarga?: (mensaje: string) => void;
   /** Base de los `data-testid` (p. ej. "foto" → `visor-foto`, `descargar-foto`). */
   testid?: string;
+  /** Galería: ir a la foto anterior (si se puede). Sin esta prop no se pinta la flecha. */
+  alAnterior?: () => void;
+  /** Galería: ir a la foto siguiente (si se puede). Sin esta prop no se pinta la flecha. */
+  alSiguiente?: () => void;
+  /** ¿Hay foto anterior? (deshabilita la flecha en el extremo). Default true. */
+  hayAnterior?: boolean;
+  /** ¿Hay foto siguiente? (deshabilita la flecha en el extremo). Default true. */
+  haySiguiente?: boolean;
+  /** Texto de posición en la galería (ej. "2 / 5"); se muestra junto a Descargar. */
+  posicion?: string;
 }
 
 /**
@@ -64,8 +79,14 @@ export function VisorImagen({
   nombreArchivo,
   alErrorDescarga,
   testid = 'imagen',
+  alAnterior,
+  alSiguiente,
+  hayAnterior = true,
+  haySiguiente = true,
+  posicion,
 }: PropsVisorImagen): React.JSX.Element {
   const [descargando, setDescargando] = useState(false);
+  const conGaleria = alAnterior !== undefined || alSiguiente !== undefined;
 
   async function alDescargar(): Promise<void> {
     if (descargando) {
@@ -81,25 +102,71 @@ export function VisorImagen({
     }
   }
 
+  function alTecla(evento: React.KeyboardEvent): void {
+    if (evento.key === 'ArrowLeft' && alAnterior !== undefined && hayAnterior) {
+      evento.preventDefault();
+      alAnterior();
+    } else if (evento.key === 'ArrowRight' && alSiguiente !== undefined && haySiguiente) {
+      evento.preventDefault();
+      alSiguiente();
+    }
+  }
+
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
       {/* Lightbox: ancho casi completo del viewport, fondo oscuro, imagen ajustada. */}
       <DialogContent
         className="max-h-[92vh] w-auto max-w-[95vw] overflow-hidden border-0 bg-black/90 p-2 sm:max-w-[90vw]"
         data-testid={`visor-${testid}`}
+        onKeyDown={conGaleria ? alTecla : undefined}
       >
         {/* Título/descripción accesibles (radix los exige); ocultos a la vista. */}
         <DialogTitle className="sr-only">{textoAlt}</DialogTitle>
         <DialogDescription className="sr-only">Vista ampliada de la imagen.</DialogDescription>
 
-        <img
-          src={url}
-          alt={textoAlt}
-          className="mx-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
-          data-testid={`imagen-${testid}`}
-        />
+        <div className="relative">
+          <img
+            src={url}
+            alt={textoAlt}
+            className="mx-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
+            data-testid={`imagen-${testid}`}
+          />
+          {alAnterior !== undefined ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full opacity-90"
+              disabled={!hayAnterior}
+              onClick={alAnterior}
+              aria-label="Foto anterior"
+              data-testid={`visor-${testid}-anterior`}
+            >
+              <ChevronLeftIcon aria-hidden />
+            </Button>
+          ) : null}
+          {alSiguiente !== undefined ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full opacity-90"
+              disabled={!haySiguiente}
+              onClick={alSiguiente}
+              aria-label="Foto siguiente"
+              data-testid={`visor-${testid}-siguiente`}
+            >
+              <ChevronRightIcon aria-hidden />
+            </Button>
+          ) : null}
+        </div>
 
-        <div className="flex justify-center pt-1">
+        <div className="flex items-center justify-center gap-3 pt-1">
+          {posicion !== undefined ? (
+            <span className="text-xs text-white/80" data-testid={`visor-${testid}-posicion`}>
+              {posicion}
+            </span>
+          ) : null}
           <Button
             type="button"
             variant="secondary"
