@@ -108,13 +108,19 @@ describe('<FotosModeloOrden>', () => {
     );
 
     await usuario.click(screen.getByRole('button', { name: 'Ver foto 1 de 501 ampliada' }));
-    expect(screen.getByTestId('imagen-foto-orden')).toHaveAttribute('src', 'https://ej.test/m1.jpg');
+    expect(screen.getByTestId('imagen-foto-orden')).toHaveAttribute(
+      'src',
+      'https://ej.test/m1.jpg',
+    );
     expect(screen.getByTestId('visor-foto-orden-posicion')).toHaveTextContent('1 / 2');
     // En la primera, no hay anterior.
     expect(screen.getByTestId('visor-foto-orden-anterior')).toBeDisabled();
 
     await usuario.click(screen.getByTestId('visor-foto-orden-siguiente'));
-    expect(screen.getByTestId('imagen-foto-orden')).toHaveAttribute('src', 'https://ej.test/o1.png');
+    expect(screen.getByTestId('imagen-foto-orden')).toHaveAttribute(
+      'src',
+      'https://ej.test/o1.png',
+    );
     expect(screen.getByTestId('visor-foto-orden-posicion')).toHaveTextContent('2 / 2');
   });
 

@@ -217,7 +217,8 @@ describe('<CentroOrdenesPagina>', () => {
     // El foco se movió al renglón seleccionado.
     expect(document.activeElement).toBe(filaActiva);
     // El detalle sigue siendo el mismo panel único (no hay estado paralelo de selección).
-    expect(within(screen.getByTestId('centro-detalle')).getByTestId('centro-detalle-fijo'))
-      .toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('centro-detalle')).getByTestId('centro-detalle-fijo'),
+    ).toBeInTheDocument();
   });
 });
