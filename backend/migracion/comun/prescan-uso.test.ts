@@ -70,21 +70,27 @@ function fuentes(): FuentesPrescanUso {
       { IdModelos: '2', Modelo: 'M-B' },
       { IdModelos: '3', Modelo: 'M-C' },
       { IdModelos: '4', Modelo: 'M-D' },
+      { IdModelos: '5', Modelo: 'M-E' },
     ],
     iptModelos: [
       { IdIPT_Modelos: '900', NumMod: 'M-B' },
       { IdIPT_Modelos: '901', NumMod: 'M-C' },
       { IdIPT_Modelos: '902', NumMod: 'M-D' },
+      { IdIPT_Modelos: '903', NumMod: 'M-E' },
     ],
     iptModAlm: [
       { IdIPT_Mod_Alm: '950', IdIPT_Modelos: '900', Existencia: '0' },
       { IdIPT_Mod_Alm: '951', IdIPT_Modelos: '901', Existencia: '0' },
       { IdIPT_Mod_Alm: '952', IdIPT_Modelos: '902', Existencia: '0' },
+      { IdIPT_Mod_Alm: '953', IdIPT_Modelos: '903', Existencia: '0' },
     ],
     iptMovs: [
       { IdIPT_Movs: 'm1', Fecha: '01/03/2020 00:00:00', EnSa: '1' }, // pre-corte entrada
       { IdIPT_Movs: 'm2', Fecha: '01/04/2020 00:00:00', EnSa: '2' }, // pre-corte salida
       { IdIPT_Movs: 'm3', Fecha: '15/03/2025 00:00:00', EnSa: '2' }, // DENTRO de la ventana
+      // Nota 4: EnSa VACÍO pero tipo 1 = inventario-inicial (entrada canónica) → el signo lo
+      // decide el TIPO (como el ETL), no el EnSa.
+      { IdIPT_Movs: 'm4', Fecha: '01/05/2020 00:00:00', IdIPT_TipoMov: '1', EnSa: '' },
     ],
     iptMovsDet: [
       { IdIPT_MovsDet: 'd1', IdIPT_Movs: 'm1', IdIPT_Mod_Alm: '950', CantMov: '10' }, // M-B +10
@@ -92,6 +98,7 @@ function fuentes(): FuentesPrescanUso {
       { IdIPT_MovsDet: 'd3', IdIPT_Movs: 'm1', IdIPT_Mod_Alm: '951', CantMov: '5' }, // M-C +5
       { IdIPT_MovsDet: 'd4', IdIPT_Movs: 'm2', IdIPT_Mod_Alm: '951', CantMov: '5' }, // M-C −5 → neto 0
       { IdIPT_MovsDet: 'd5', IdIPT_Movs: 'm3', IdIPT_Mod_Alm: '952', CantMov: '2' }, // M-D en ventana
+      { IdIPT_MovsDet: 'd6', IdIPT_Movs: 'm4', IdIPT_Mod_Alm: '953', CantMov: '3' }, // M-E +3 (por tipo)
     ],
     almInvCic: [],
     modelosTela: [
@@ -109,15 +116,27 @@ function fuentes(): FuentesPrescanUso {
     entradas: [
       { IdEntradas: 'e1', Fecha: '05/02/2025 00:00:00', IdTela: '81' }, // ≥ corte → usada
       { IdEntradas: 'e2', Fecha: '05/02/2019 00:00:00', IdTela: '83' }, // pre-corte → no aporta
+      { IdEntradas: 'e3', Fecha: '05/02/2020 00:00:00', IdTela: '84' }, // pre-corte, con renglones
     ],
-    salidas: [],
+    // BLOQUEANTE del reviewer: tela 84 con NETO pre-corte ≠ 0 CALCULADO desde los renglones,
+    // SIN snapshot en TelasColAlm (ExTela=0) — debe quedar usada por el neto, no por el snapshot.
+    entradasDet: [
+      { IdEntradasDet: 'ed1', IdEntradas: 'e3', IdTelasColAlm: 'c3', TelaEnt1: '7', TelaEnt2: '0' },
+      { IdEntradasDet: 'ed2', IdEntradas: 'e2', IdTelasColAlm: 'c2', TelaEnt1: '5', TelaEnt2: '0' }, // tela 83 +5
+    ],
+    salidas: [{ IdSalidas: 's1', Fecha: '06/02/2019 00:00:00', IdTela: '83' }],
+    salidasDet: [
+      { IdSalidasDet: 'sd1', IdSalidas: 's1', IdTelasColAlm: 'c2', TelaSal1: '5', TelaSal2: '0' }, // tela 83 −5 → neto 0
+    ],
     telasColAlm: [
       { IdTelasColAlm: 'c1', IdTelasColores: 'tc1', ExTela1: '3.5', ExTela2: '0' }, // existencia
       { IdTelasColAlm: 'c2', IdTelasColores: 'tc2', ExTela1: '0', ExTela2: '0' },
+      { IdTelasColAlm: 'c3', IdTelasColores: 'tc3', ExTela1: '0', ExTela2: '0' }, // SIN snapshot
     ],
     telasColores: [
       { IdTelasColores: 'tc1', IdTelas: '82', Color: 'ROJO' },
       { IdTelasColores: 'tc2', IdTelas: '83', Color: 'AZUL' },
+      { IdTelasColores: 'tc3', IdTelas: '84', Color: 'VERDE' },
     ],
     telasDis: [
       { IdTelasDis: '71', TelaDis: 'FELPA X', Proveedor: 'Prov Tela SA' },
@@ -148,7 +167,7 @@ function fuentes(): FuentesPrescanUso {
 describe('calcularPrescanUso — modelos', () => {
   it('usa documentos + kardex (neto pre-corte ≠ 0) + movimiento en ventana; excluye el resto', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    expect(p.modelosId).toEqual(new Set(['1', '2', '4'])); // 3 (M-C) queda fuera
+    expect(p.modelosId).toEqual(new Set(['1', '2', '4', '5'])); // 3 (M-C) queda fuera
     expect(p.modelosCodigo.has('M-A')).toBe(true);
     expect(p.modelosCodigo.has('M-B')).toBe(true);
     expect(p.modelosCodigo.has('M-D')).toBe(true);
@@ -157,7 +176,17 @@ describe('calcularPrescanUso — modelos', () => {
 
   it('separa los "solo existencia" (sin actividad en ventana) para la lista de Daniel', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    expect(p.modelosSoloExistencia).toEqual(new Set(['M-B'])); // ni M-A (docs) ni M-D (kardex ≥ corte)
+    // ni M-A (docs) ni M-D (kardex ≥ corte); M-E entra por el neto con signo por TIPO.
+    expect(p.modelosSoloExistencia).toEqual(new Set(['M-B', 'M-E']));
+    expect(p.existenciaPtEstimadaPorCodigo.get('M-B')).toBe(6);
+    expect(p.existenciaPtEstimadaPorCodigo.get('M-E')).toBe(3);
+  });
+
+  it('nota 4: con EnSa vacío el signo del neto PT lo decide el TIPO (misma regla que el ETL)', () => {
+    const p = calcularPrescanUso(resolverVentana(), fuentes());
+    // M-E solo tiene el movimiento m4 (tipo 1 = inventario-inicial, EnSa vacío): si el signo
+    // dependiera del EnSa, el neto sería 0 y M-E quedaría FUERA.
+    expect(p.modelosCodigo.has('M-E')).toBe(true);
   });
 });
 
@@ -169,9 +198,11 @@ describe('calcularPrescanUso — cascada BOM y telas', () => {
     expect(p.bordadosId).toEqual(new Set(['51'])); // BOM del modelo con existencia
   });
 
-  it('telas por movimiento ≥ corte y por existencia en TelasColAlm', () => {
+  it('telas por movimiento ≥ corte, por existencia snapshot Y por NETO pre-corte calculado', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    expect(p.telasIdTelas).toEqual(new Set(['81', '82'])); // 83: pre-corte y sin existencia
+    // 81 por movimiento ≥ corte; 82 por snapshot; 84 por NETO calculado (+7 sin snapshot —
+    // el caso del BLOQUEANTE); 83 queda fuera (neto 0: +5 −5, snapshot 0, pre-corte).
+    expect(p.telasIdTelas).toEqual(new Set(['81', '82', '84']));
   });
 });
 

@@ -26,6 +26,9 @@
  * SOLO por existencia se listan aparte ("candidatos a depurar", para Daniel). El resto va al
  * bucket `fueraVentana` (conteo agregado + muestra, §7). Inactiva → migran todos, como hoy.
  */
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { crearModelo, actualizarModelo } from '../../src/dominio/modelos/modelos.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
@@ -92,11 +95,65 @@ export async function cargarModelos(
   if (pre !== null && fueraVentana > 0) {
     reporte.nota(
       `Modelos fuera de ventana (sin uso: sin pedidos/órdenes/kardex/existencia/cíclico en la ` +
-        `ventana): ${String(fueraVentana)} NO migrados (ver sección en el reporte). ` +
-        `Migran por SOLO existencia: ${String(pre.modelosSoloExistencia.size)} (candidatos a depurar).`,
+        `ventana): ${String(fueraVentana)} NO migrados (ver sección en el reporte).`,
+    );
+  }
+  // Lista COMPLETA que pidió el dueño: modelos que migran por SOLO existencia (sin actividad
+  // en la ventana) — candidatos a depurar. El `Reporte` acota su volcado a 50 renglones, así
+  // que va a un archivo propio (gitignored como los reporte-etl-*) y al Reporte solo el conteo
+  // + la ruta.
+  if (pre !== null && pre.modelosSoloExistencia.size > 0) {
+    const ruta = escribirCandidatosDepurar(pre, filas);
+    reporte.nota(
+      `Modelos SIN actividad en la ventana pero CON existencia (migrados por saldo — candidatos ` +
+        `a depurar con Daniel): ${String(pre.modelosSoloExistencia.size)}. Lista COMPLETA en: ${ruta}`,
     );
   }
   return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
+}
+
+/**
+ * Escribe la lista COMPLETA de candidatos a depurar (código + descripción + existencia PT
+ * estimada) en `candidatos-depurar-modelos-<timestamp>.txt` junto a los reportes del ETL.
+ * Devuelve la ruta escrita.
+ */
+function escribirCandidatosDepurar(pre: PrescanUso, filas: Record<string, string>[]): string {
+  const renglones: string[] = [];
+  const conFila = new Set<string>();
+  for (const fila of filas) {
+    const codigo = (fila.Modelo ?? '').trim();
+    const codigoNorm = codigo.toUpperCase();
+    if (
+      codigoNorm === '' ||
+      !pre.modelosSoloExistencia.has(codigoNorm) ||
+      conFila.has(codigoNorm)
+    ) {
+      continue;
+    }
+    conFila.add(codigoNorm);
+    const existencia = pre.existenciaPtEstimadaPorCodigo.get(codigoNorm) ?? 0;
+    const descripcion = (fila.Descripcion ?? '').trim();
+    renglones.push(`${codigo}\t${descripcion}\texistencia≈${String(existencia)}`);
+  }
+  // Códigos del kardex sin fila en Modelos.csv (no migran como catálogo; se listan igual).
+  for (const codigoNorm of pre.modelosSoloExistencia) {
+    if (conFila.has(codigoNorm)) continue;
+    const existencia = pre.existenciaPtEstimadaPorCodigo.get(codigoNorm) ?? 0;
+    renglones.push(`${codigoNorm}\t(sin fila en Modelos.csv)\texistencia≈${String(existencia)}`);
+  }
+  const ruta = join(
+    process.cwd(),
+    `candidatos-depurar-modelos-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
+  );
+  const encabezado =
+    'MODELOS SIN ACTIVIDAD EN LA VENTANA PERO CON EXISTENCIA (candidatos a depurar — para Daniel)\n' +
+    'Migran SOLO porque su saldo inicial de inventario PT los necesita (sin pedidos/órdenes/\n' +
+    'movimientos/cíclico dentro de la ventana). Columnas: codigo <TAB> descripcion <TAB> existencia estimada.\n' +
+    `Total: ${String(renglones.length)}\n` +
+    '─'.repeat(80) +
+    '\n';
+  writeFileSync(ruta, encabezado + renglones.join('\n') + '\n', { encoding: 'utf-8' });
+  return ruta;
 }
 
 async function procesarModelo(
@@ -137,13 +194,8 @@ async function procesarModelo(
       );
       return 'fueraVentana';
     }
-    // Lista que pidió el dueño: migran por SOLO existencia (sin actividad en la ventana).
-    if (pre.modelosSoloExistencia.has(codigoNorm)) {
-      reporte.agregar(
-        'Modelos SIN actividad en la ventana pero CON existencia (migrados por saldo — candidatos a depurar con Daniel)',
-        `codigo="${codigoCrudo}" (IdModelos=${idViejo ?? '?'})`,
-      );
-    }
+    // Los que migran por SOLO existencia se listan COMPLETOS en un archivo propio (lo escribe
+    // `cargarModelos` al final — el Reporte acota a 50 renglones y el dueño pidió la lista entera).
   }
   const codigo =
     truncarYReportar(reporte, 'Modelo', idViejo, 'codigo', codigoCrudo, LIMITES_MODELO.codigo) ??

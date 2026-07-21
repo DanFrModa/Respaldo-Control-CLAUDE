@@ -554,6 +554,21 @@ export function tipoDestino(
 }
 
 /**
+ * SIGNO (+1 entrada / −1 salida / 0 irresoluble o traspaso) que el ETL aplicaría a un renglón
+ * IPT, con LA MISMA regla que la carga real: dirección canónica del TIPO destino (vía
+ * {@link tipoDestino}); el `EnSa` solo decide en tipos vacíos/discordantes. Lo usa el prescan
+ * de USO (`comun/prescan-uso.ts`) para que su neto pre-corte no diverja del ETL.
+ */
+export function signoMovimientoIpt(idTipoMov: number | null, enSa: number | null): number {
+  const destino = tipoDestino(idTipoMov, enSa);
+  if (destino === null) return 0;
+  const direccion = DIRECCION_POR_CODIGO[destino.codigo];
+  if (direccion === DireccionMovimiento.entrada) return 1;
+  if (direccion === DireccionMovimiento.salida) return -1;
+  return 0;
+}
+
+/**
  * Resuelve el tipo de movimiento de v2 (id + dirección reales del catálogo) para un renglón: aplica
  * {@link tipoDestino} (decisión pura) y luego busca el id por código en el catálogo ya cargado. `null`
  * si es irresoluble o si el código resultante no existe en el catálogo (raro: faltaría re-seed).

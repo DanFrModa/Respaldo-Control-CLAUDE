@@ -58,9 +58,10 @@ export async function cargarTelasColores(
     const idColor = colorTexto === '' ? undefined : mapaColor.get(colorTexto);
 
     if (idTela === undefined) {
-      // Con ventana activa una tela sin mapeo es (casi siempre) una tela excluida por USO:
-      // se cuenta en su propio bucket, sin inundar el reporte con miles de renglones.
-      if (pre !== null) {
+      // Con ventana activa se CRUZA contra el prescan: tela fuera del set de usadas →
+      // `fueraVentana` (cascada, sin inundar el reporte); tela USADA pero sin mapeo → es un
+      // dato roto GENUINO y se reporta igual que en la corrida completa.
+      if (pre !== null && !pre.telasIdTelas.has(idTelasViejo)) {
         fueraVentana += 1;
         continue;
       }

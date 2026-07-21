@@ -10,17 +10,20 @@
  *  • MODELO: referenciado por pedidos/órdenes DENTRO de la ventana (cascada de
  *    `ventana-f2.ts`) ∪ con movimiento de kardex PT con fecha ≥ corte ∪ con EXISTENCIA
  *    (neto de kardex pre-corte ≠ 0 por cadena IPT_Movs→IPT_MovsDet→IPT_Mod_Alm→IPT_Modelos
- *    →NumMod, con EnSa 1=entrada/2=salida, y además el snapshot `IPT_Mod_Alm.Existencia`≠0
- *    — su saldo inicial lo va a necesitar) ∪ referenciado por el cíclico (`Alm_InvCic`,
+ *    →NumMod, con el signo de LA MISMA regla del ETL — dirección canónica del TIPO vía
+ *    `signoMovimientoIpt`; EnSa solo decide en vacíos/discordantes — y además el snapshot
+ *    `IPT_Mod_Alm.Existencia`≠0 — su saldo inicial lo va a necesitar) ∪ el cíclico (`Alm_InvCic`,
  *    por CÓDIGO `ModeloIC`) dentro de la ventana. OJO: el kardex/cíclico referencian por
  *    CÓDIGO y los documentos por `IdModelos` → los sets van en AMBOS espacios, cruzados vía
  *    `Modelos.csv`. Los que migran SOLO por existencia (sin actividad en ventana) se separan
  *    en `modelosSoloExistencia` (lista para Daniel: candidatos a depurar).
  *  • TELA: en el BOM de un modelo usado (`ModelosTela`→IdTelasDis) ∪ referenciada por una
  *    orden dentro de la ventana (`Ordenes.IdTelasDis`) ∪ con movimiento ≥ corte
- *    (`Entradas`/`Salidas`, espacio IdTelas) ∪ con EXISTENCIA (snapshot `TelasColAlm`
- *    ExTela1/2 ≠ 0, vía `TelasColores`→IdTelas). Las OC/notas legacy NO aportan telas (sus
- *    renglones son TEXTO LIBRE, sin FK a catálogo).
+ *    (`Entradas`/`Salidas`, espacio IdTelas) ∪ con EXISTENCIA: **neto pre-corte CALCULADO**
+ *    desde `EntradasDet`/`SalidasDet` (cadena IdTelasColAlm→TelasColores→IdTelas, misma criba
+ *    del ETL de F4 — es lo que el ETL condensa en saldos iniciales, D3) y además el snapshot
+ *    `TelasColAlm.ExTela1/2` ≠ 0 (superset inofensivo). Las OC/notas legacy NO aportan telas
+ *    (sus renglones son TEXTO LIBRE, sin FK a catálogo).
  *  • AVÍO: en el BOM de un modelo usado (`ModelosHab`→IdHabilitacion). (OC/notas: texto
  *    libre, no referencian avíos por id.)
  *  • BORDADO: en el BOM de un modelo usado (`ModelosBor`→IdBordados).
@@ -44,9 +47,12 @@
  * nada cambia).
  */
 import { leerCsv, type FilaCsv } from './csv.js';
+import { signoMovimientoIpt } from '../loaders/ipt-kardex.js';
+
 import {
   normalizarParaDedup,
   parsearDinero,
+  parsearEntero,
   parsearFecha,
   parsearFechaSoloDia,
 } from './valores.js';
@@ -81,6 +87,12 @@ export interface PrescanUso {
   provIdCortadores: Set<string>;
   /** Nombres normalizados (`normalizarParaDedup`) del proveedor TEXTO de telas/avíos usados. */
   provNombres: Set<string>;
+  /**
+   * Existencia PT estimada por código de modelo (neto pre-corte CALCULADO; si el código solo
+   * apareció en el snapshot `IPT_Mod_Alm`, la suma del snapshot). Para la lista de
+   * "candidatos a depurar" que pidió el dueño.
+   */
+  existenciaPtEstimadaPorCodigo: Map<string, number>;
 }
 
 /** Fuentes crudas (inyectables en el test; en real las lee {@link prescanUso} con `leerCsv`). */
@@ -98,7 +110,9 @@ export interface FuentesPrescanUso {
   modelosHab: FilaCsv[];
   modelosBor: FilaCsv[];
   entradas: FilaCsv[];
+  entradasDet: FilaCsv[];
   salidas: FilaCsv[];
+  salidasDet: FilaCsv[];
   telasColAlm: FilaCsv[];
   telasColores: FilaCsv[];
   telasDis: FilaCsv[];
@@ -179,21 +193,33 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
   }
   const iptModeloPorModAlm = new Map<string, string>(); // IdIPT_Mod_Alm → IdIPT_Modelos
   const kardexExistencia = new Set<string>();
+  const snapshotPorCodigo = new Map<string, number>(); // Σ IPT_Mod_Alm.Existencia por código
   for (const f of fuentes.iptModAlm) {
     const id = limpio(f.IdIPT_Mod_Alm);
     const idIptModelo = limpio(f.IdIPT_Modelos);
     if (id !== '' && idIptModelo !== '') iptModeloPorModAlm.set(id, idIptModelo);
     const existencia = parsearDinero(f.Existencia) ?? 0;
+    const codigo = codigoPorIptModelo.get(idIptModelo);
+    if (codigo !== undefined && existencia !== 0) {
+      snapshotPorCodigo.set(codigo, (snapshotPorCodigo.get(codigo) ?? 0) + existencia);
+    }
     if (Math.abs(existencia) > TOLERANCIA_NETO) {
-      const codigo = codigoPorIptModelo.get(idIptModelo);
       if (codigo !== undefined) kardexExistencia.add(codigo);
     }
   }
-  const movCrudo = new Map<string, { fecha: Date | null; enSa: string }>(); // IdIPT_Movs
+  // IdIPT_Movs → cabecera cruda (fecha + tipo + EnSa).
+  const movCrudo = new Map<
+    string,
+    { fecha: Date | null; idTipoMov: number | null; enSa: number | null }
+  >();
   for (const f of fuentes.iptMovs) {
     const id = limpio(f.IdIPT_Movs);
     if (id === '') continue;
-    movCrudo.set(id, { fecha: parsearFecha(f.Fecha), enSa: limpio(f.EnSa) });
+    movCrudo.set(id, {
+      fecha: parsearFecha(f.Fecha),
+      idTipoMov: parsearEntero(f.IdIPT_TipoMov),
+      enSa: parsearEntero(f.EnSa),
+    });
   }
   const kardexEnVentana = new Set<string>();
   const netoPre = new Map<string, number>();
@@ -207,9 +233,10 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
       kardexEnVentana.add(codigo);
       continue;
     }
-    // Pre-corte: acumular el neto (EnSa 1=entrada, 2=salida — mismo criterio que etl-ipt).
+    // Pre-corte: acumular el neto con LA MISMA regla de signo del ETL (dirección canónica del
+    // TIPO vía `tipoDestino`; el EnSa solo decide en tipos vacíos/discordantes — nota 4).
     const cant = parsearDinero(f.CantMov) ?? 0;
-    const signo = mov.enSa === '1' ? 1 : mov.enSa === '2' ? -1 : 0;
+    const signo = signoMovimientoIpt(mov.idTipoMov, mov.enSa);
     if (signo !== 0 && cant !== 0) {
       netoPre.set(codigo, (netoPre.get(codigo) ?? 0) + signo * cant);
     }
@@ -250,6 +277,15 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     const id = idPorCodigo.get(codigo);
     if (id !== undefined) modelosId.add(id);
   }
+  // Existencia estimada por código (para la lista de candidatos a depurar): el neto CALCULADO
+  // manda; si el código solo apareció en el snapshot, la suma del snapshot.
+  const existenciaPtEstimadaPorCodigo = new Map<string, number>();
+  for (const [codigo, snapshot] of snapshotPorCodigo) {
+    existenciaPtEstimadaPorCodigo.set(codigo, snapshot);
+  }
+  for (const [codigo, neto] of netoPre) {
+    existenciaPtEstimadaPorCodigo.set(codigo, neto);
+  }
 
   // ── 5) BOM de los modelos usados → telas (IdTelasDis) / avíos / bordados ──────────────────
   const aviosId = new Set<string>();
@@ -270,7 +306,9 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (esClave(idBordado)) bordadosId.add(idBordado);
   }
 
-  // ── 6) Telas por movimiento ≥ corte (Entradas/Salidas) y existencia (TelasColAlm) ─────────
+  // ── 6) Telas por movimiento ≥ corte (Entradas/Salidas), NETO pre-corte CALCULADO desde los
+  // renglones (la MISMA base que el ETL de F4 condensa en saldos iniciales — D3: el snapshot
+  // `TelasColAlm` NO basta, difiere del neto real) y existencia snapshot (superset inofensivo).
   for (const f of [...fuentes.entradas, ...fuentes.salidas]) {
     if (!dentroVentana(parsearFechaSoloDia(f.Fecha), ventana)) continue;
     const idTela = limpio(f.IdTela);
@@ -282,11 +320,63 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     const idTelas = limpio(f.IdTelas);
     if (id !== '' && esClave(idTelas)) idTelasPorTelaColor.set(id, idTelas);
   }
+  const idTelasPorColAlm = new Map<string, string>(); // IdTelasColAlm → IdTelas
   for (const f of fuentes.telasColAlm) {
+    const idColAlm = limpio(f.IdTelasColAlm);
+    const idTelas = idTelasPorTelaColor.get(limpio(f.IdTelasColores));
+    if (idColAlm !== '' && idTelas !== undefined) idTelasPorColAlm.set(idColAlm, idTelas);
     const ex = (parsearDinero(f.ExTela1) ?? 0) + (parsearDinero(f.ExTela2) ?? 0);
     if (Math.abs(ex) <= TOLERANCIA_NETO) continue;
-    const idTelas = idTelasPorTelaColor.get(limpio(f.IdTelasColores));
     if (idTelas !== undefined) telasIdTelas.add(idTelas);
+  }
+  // Neto pre-corte por tela desde EntradasDet/SalidasDet (cadena IdTelasColAlm→TelasColores→
+  // IdTelas), con LA MISMA criba del ETL de telas: cantidad = cant1+cant2 > 0, cadena completa,
+  // documento sin fecha parseable omitido. Entrada suma, salida resta; los traspasos del viejo
+  // son pares entrada+salida de la MISMA tela → se cancelan a nivel tela (no distorsionan).
+  const netoTelaPre = new Map<string, number>();
+  const acumularNetoTela = (
+    dets: FilaCsv[],
+    fechaPorDoc: Map<string, Date | null>,
+    colDoc: string,
+    col1: string,
+    col2: string,
+    signo: number,
+  ): void => {
+    for (const f of dets) {
+      const fecha = fechaPorDoc.get(limpio(f[colDoc]));
+      if (fecha === undefined || fecha === null) continue; // doc inexistente o sin fecha (el ETL lo omite)
+      const cantidad = (parsearDinero(f[col1]) ?? 0) + (parsearDinero(f[col2]) ?? 0);
+      if (cantidad <= 0) continue; // renglón en ceros: no aporta movimiento (igual que el ETL)
+      const idTelas = idTelasPorColAlm.get(limpio(f.IdTelasColAlm));
+      if (idTelas === undefined) continue; // cadena rota: el ETL de telas ya la reporta
+      if (dentroVentana(fecha, ventana)) {
+        telasIdTelas.add(idTelas); // movimiento en ventana visto desde el renglón (superset)
+        continue;
+      }
+      netoTelaPre.set(idTelas, (netoTelaPre.get(idTelas) ?? 0) + signo * cantidad);
+    }
+  };
+  const fechaEntradaPorDoc = new Map<string, Date | null>();
+  for (const f of fuentes.entradas) {
+    const id = limpio(f.IdEntradas);
+    if (id !== '') fechaEntradaPorDoc.set(id, parsearFechaSoloDia(f.Fecha));
+  }
+  const fechaSalidaPorDoc = new Map<string, Date | null>();
+  for (const f of fuentes.salidas) {
+    const id = limpio(f.IdSalidas);
+    if (id !== '') fechaSalidaPorDoc.set(id, parsearFechaSoloDia(f.Fecha));
+  }
+  acumularNetoTela(
+    fuentes.entradasDet,
+    fechaEntradaPorDoc,
+    'IdEntradas',
+    'TelaEnt1',
+    'TelaEnt2',
+    1,
+  );
+  acumularNetoTela(fuentes.salidasDet, fechaSalidaPorDoc, 'IdSalidas', 'TelaSal1', 'TelaSal2', -1);
+  for (const [idTelas, neto] of netoTelaPre) {
+    if (Math.abs(neto) > TOLERANCIA_NETO) telasIdTelas.add(idTelas);
   }
 
   // ── 7) Proveedores: OC/notas por fecha; terceros por cascada de órdenes migradas; EsMa ────
@@ -356,6 +446,7 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     provIdEstampadores,
     provIdCortadores,
     provNombres,
+    existenciaPtEstimadaPorCodigo,
   };
 }
 
@@ -380,7 +471,9 @@ export function prescanUso(ventana: ConfigVentana): PrescanUso | null {
     modelosHab: leerCsv('ModelosHab.csv'),
     modelosBor: leerCsv('ModelosBor.csv'),
     entradas: leerCsv('Entradas.csv'),
+    entradasDet: leerCsv('EntradasDet.csv'),
     salidas: leerCsv('Salidas.csv'),
+    salidasDet: leerCsv('SalidasDet.csv'),
     telasColAlm: leerCsv('TelasColAlm.csv'),
     telasColores: leerCsv('TelasColores.csv'),
     telasDis: leerCsv('TelasDis.csv'),
