@@ -97,13 +97,14 @@ npx tsx --env-file=.env migracion/recargar.ts --desde=2025-01-01 --limpiar --con
 
 Banderas:
 
+- **`--confirmar` (OBLIGATORIO para ejecutar)**: sin él, **cualquier** invocación es **MODO PLAN** — imprime el plan numerado (con la ventana que aplicaría y, si trae `--limpiar`, los conteos actuales de la BD) y sale con exit 0 **sin tocar nada**. `--confirmar` **sin** `--limpiar` significa "ejecuta la carga sin vaciar antes" — es el modo de **reanudar** una recarga interrumpida.
 - **`--desde=YYYY-MM-DD`** (opcional): la ventana temporal. Se valida al arrancar (mal formada → ABORTA con mensaje, nunca se ignora) y se exporta como `ETL_DESDE` a todos los pasos. **Sin `--desde` → recarga COMPLETA** (sin ventana, migra todo el histórico).
-- **`--limpiar`**: vacía la BD antes de cargar (TRUNCATE de todo `public` menos `_prisma_migrations`, reusa la lógica de `limpiar-datos.ts`). **SOLO borra combinado con `--confirmar`**; con `--limpiar` sin `--confirmar` es un **ENSAYO**: imprime el plan completo (conteos actuales + lista de pasos) y sale sin tocar nada.
+- **`--limpiar`**: vacía la BD antes de cargar (TRUNCATE de todo `public` menos `_prisma_migrations`, reusa la lógica de `limpiar-datos.ts`) y agrega el paso de seed. Como todo, solo ejecuta con `--confirmar`.
 - **`--sin-cuadres`**: se salta los 6 cuadres del final.
 
 Qué hace, en orden: **(0)** limpieza (si `--limpiar --confirmar`) → **(1)** el **seed de fundación** (el MISMO `prisma/seed.ts` idempotente que dispara `SEED_ON_START`; correrlo aquí evita esperar un redeploy para poder cargar) → **(2)** los ETL: `etl-catalogos` → `etl-modelos` (SIN fotos masivas; esas se corren aparte cuando exista la carpeta) → `etl-pedidos-ordenes` → `etl-produccion` → `etl-ipt` → `etl-compras-notas` → `etl-telas` → `etl-ruta-critica` → `etl-calidad` → `etl-esma` → `etl-costos` → `etl-indicadores` → **(3)** `cuadre-f2`…`cuadre-f7`. Cada paso corre como subproceso secuencial con banner y duración; al final imprime la tabla resumen.
 
-**Si un paso falla**, la recarga se detiene ahí con el mensaje de cómo seguir: los ETL son **idempotentes**, así que corriges la causa y re-corres el mismo comando **SIN `--limpiar`** — retoma desde donde quedó sin duplicar nada.
+**Si un paso falla**, la recarga se detiene ahí con el mensaje de cómo seguir: los ETL son **idempotentes**, así que corriges la causa y re-corres con **`--confirmar` SIN `--limpiar`** — retoma desde donde quedó sin duplicar nada. **Caso especial:** si lo que falló fue el **seed** justo después de la limpieza, la BD quedó vacía y sin sembrar — ahí reanuda **CON `--limpiar --confirmar`** (volver a truncar una BD vacía es inocuo) o corre el seed a mano (`npx tsx --env-file=.env prisma/seed.ts`) y luego reanuda sin `--limpiar` (el propio comando imprime estas dos opciones).
 
 **Al terminar (recordatorios que el propio comando repite):** reinicia el backend en Railway (invalida sesiones viejas y deja drenarse los jobs `pgboss` encolados antes de la limpieza — ese esquema NO se trunca; los handlers son resilientes y los absorben); el `admin` quedó con el password del seed — **cámbialo**; las fotos previas en R2 quedaron huérfanas (limitación conocida — deuda aparcada en `HOJA-DE-RUTA.md` §4); y cada ETL dejó su `reporte-etl-*.txt` en `backend/` para revisar con Daniel.
 

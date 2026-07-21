@@ -14,9 +14,12 @@
  *  • `--desde=YYYY-MM-DD` (opcional): ventana temporal. Se valida con `parsearEtlDesde`
  *    (mal formada → ABORTA) y se exporta como `ETL_DESDE` para TODOS los subprocesos.
  *    Sin `--desde` → recarga COMPLETA (sin ventana).
- *  • `--limpiar`: vacía la BD antes de cargar. SOLO borra combinado con `--confirmar`;
- *    con `--limpiar` sin `--confirmar` es un ENSAYO: imprime el plan completo (conteos
- *    actuales + lista de pasos) y sale sin tocar nada.
+ *  • `--confirmar` (OBLIGATORIO para ejecutar): sin él, CUALQUIER invocación es MODO PLAN —
+ *    imprime el plan numerado (con la ventana que aplicaría y, si trae `--limpiar`, los
+ *    conteos actuales) y sale con exit 0 SIN tocar la BD. `--confirmar` solo (sin
+ *    `--limpiar`) significa "ejecuta la carga sin vaciar antes" — es el modo de REANUDAR.
+ *  • `--limpiar`: vacía la BD antes de cargar (TRUNCATE, reusa `limpiar-datos.ts`) y agrega
+ *    el paso de seed. Como todo, solo ejecuta con `--confirmar`.
  *  • `--sin-cuadres`: se salta los cuadres del final.
  *
  * Cada ETL corre como SUBPROCESO (no import): cada script ya es standalone con su propio
@@ -25,7 +28,10 @@
  * el env del padre (que ya corrió con `--env-file=.env`), así que no se repite el flag.
  *
  * Si un paso FALLA (exit ≠ 0) la recarga se DETIENE ahí: los ETL son idempotentes, así que
- * re-correr `recargar.ts` SIN `--limpiar` retoma desde donde quedó sin duplicar nada.
+ * re-correr `recargar.ts --confirmar` SIN `--limpiar` retoma desde donde quedó sin duplicar
+ * nada. CASO ESPECIAL: si lo que falló fue el SEED tras una limpieza, la BD quedó vacía y
+ * SIN sembrar — ahí la reanudación correcta es re-correr CON `--limpiar --confirmar` (volver
+ * a truncar una BD vacía es inocuo) o sembrar a mano y luego reanudar sin `--limpiar`.
  *
  * NOTA fotos: `etl-modelos` corre SIN los flags de fotos masivas (`--fotos-modelos` /
  * `--fotos-bordados`); esas se corren aparte cuando exista la carpeta física (pendiente F1).
@@ -158,12 +164,31 @@ function parsearArgumentos(argv: string[]): Argumentos {
   return args;
 }
 
-/** Imprime el plan de pasos (para el modo ensayo y el arranque). */
-function imprimirPlan(pasos: Paso[]): void {
+/** Imprime el plan de pasos (modo plan y arranque). Con `conLimpieza` antepone el paso 0. */
+function imprimirPlan(pasos: Paso[], conLimpieza: boolean): void {
   console.log('\nPlan de pasos (en este orden):');
+  if (conLimpieza) {
+    console.log(
+      '   0. Limpieza de la BD — TRUNCATE de public, conserva _prisma_migrations  (limpiar-datos.ts)',
+    );
+  }
   pasos.forEach((p, i) => {
     console.log(`  ${String(i + 1).padStart(2)}. ${p.etiqueta}  (${p.script})`);
   });
+}
+
+/**
+ * Arma el comando exacto de `recargar.ts` para los mensajes (modo plan / reanudación),
+ * preservando `--desde`/`--sin-cuadres` tal como vinieron y forzando `--confirmar`.
+ */
+function comandoRecargar(args: Argumentos, opciones: { conLimpiar: boolean }): string {
+  return (
+    '  npx tsx --env-file=.env migracion/recargar.ts' +
+    (args.desde !== null ? ` --desde=${args.desde}` : '') +
+    (opciones.conLimpiar ? ' --limpiar' : '') +
+    ' --confirmar' +
+    (args.sinCuadres ? ' --sin-cuadres' : '')
+  );
 }
 
 /** Punto de entrada. */
@@ -205,35 +230,41 @@ async function main(): Promise<void> {
       : ` ${describirVentana(ventana)}`,
   );
 
-  // Plan de pasos (sin la limpieza, que es especial por el --confirmar).
+  // Plan de pasos (la limpieza va aparte: no es subproceso, corre en este mismo proceso).
   const pasos: Paso[] = [
     ...(args.limpiar ? [PASO_SEED] : []), // el seed solo hace falta tras vaciar (es idempotente)
     ...PASOS_ETL,
     ...(args.sinCuadres ? [] : PASOS_CUADRE),
   ];
 
-  // ── Limpieza opcional (reusa limpiar-datos.ts; ensayo si falta --confirmar) ────────────────
+  // ── MODO PLAN: sin --confirmar NUNCA se ejecuta nada (ni siquiera la carga sin limpieza) ───
+  if (!args.confirmar) {
+    console.log('\nMODO PLAN (sin --confirmar): NO se ejecuta nada. Esto es lo que haría:');
+    if (args.limpiar) {
+      // Los conteos actuales de la limpieza necesitan BD; sin conexión el plan sale igual.
+      const cliente = crearClientePrisma(url);
+      try {
+        await ejecutarLimpieza(cliente, { confirmar: false });
+      } catch (error) {
+        console.error(
+          `(No se pudo conectar a la BD para contar filas: ${error instanceof Error ? error.message : String(error)})`,
+        );
+      } finally {
+        await cliente.$disconnect();
+      }
+    }
+    imprimirPlan(pasos, args.limpiar);
+    console.log('\nPara ejecutar de verdad: agrega --confirmar');
+    console.log(comandoRecargar(args, { conLimpiar: args.limpiar }));
+    return; // exit 0: solo plan
+  }
+
+  // ── Limpieza opcional (reusa limpiar-datos.ts) ─────────────────────────────────────────────
+  let limpiezaCorrida = false;
+  let segundosLimpieza = 0;
   if (args.limpiar) {
     const cliente = crearClientePrisma(url);
     try {
-      if (!args.confirmar) {
-        console.log('\nENSAYO (--limpiar sin --confirmar): NO se toca nada. Esto es lo que haría:');
-        try {
-          await ejecutarLimpieza(cliente, { confirmar: false });
-        } catch (error) {
-          // Para CONTAR hace falta la BD; sin conexión el ensayo igual muestra el plan de pasos.
-          console.error(
-            `(No se pudo conectar a la BD para contar filas: ${error instanceof Error ? error.message : String(error)})`,
-          );
-        }
-        imprimirPlan(pasos);
-        console.log(
-          '\nPara ejecutar de verdad: agrega --confirmar\n' +
-            '  npx tsx --env-file=.env migracion/recargar.ts ' +
-            `${args.desde !== null ? `--desde=${args.desde} ` : ''}--limpiar --confirmar`,
-        );
-        return;
-      }
       banner(
         0,
         pasos.length,
@@ -241,13 +272,15 @@ async function main(): Promise<void> {
       );
       const inicioLimpieza = Date.now();
       await ejecutarLimpieza(cliente, { confirmar: true });
-      console.log(`\n[limpieza OK en ${formatearDuracion((Date.now() - inicioLimpieza) / 1000)}]`);
+      segundosLimpieza = (Date.now() - inicioLimpieza) / 1000;
+      limpiezaCorrida = true;
+      console.log(`\n[limpieza OK en ${formatearDuracion(segundosLimpieza)}]`);
     } finally {
       await cliente.$disconnect();
     }
   }
 
-  imprimirPlan(pasos);
+  imprimirPlan(pasos, false);
 
   // ── Pasos secuenciales (seed → ETLs → cuadres) ─────────────────────────────────────────────
   const corridos: PasoCorrido[] = pasos.map((p) => ({
@@ -267,14 +300,31 @@ async function main(): Promise<void> {
     corrido.estado = exit === 0 ? 'OK' : 'FALLÓ';
     if (exit !== 0) {
       fallo = paso;
-      console.error(
+      const encabezado =
         `\n⛔ El paso ${String(i + 1)}/${String(pasos.length)} (${paso.script}) terminó con exit=${String(exit)}. ` +
-          'La recarga se DETIENE aquí.\n' +
-          'Cómo reanudar: los ETL son IDEMPOTENTES — corrige la causa y re-corre el mismo comando ' +
-          'SIN --limpiar (retoma desde donde quedó sin duplicar):\n' +
-          `  npx tsx --env-file=.env migracion/recargar.ts${args.desde !== null ? ` --desde=${args.desde}` : ''}` +
-          `${args.sinCuadres ? ' --sin-cuadres' : ''}`,
-      );
+        'La recarga se DETIENE aquí.\n';
+      if (paso.script === PASO_SEED.script && limpiezaCorrida) {
+        // Caso especial: la BD quedó VACÍA y SIN SEMBRAR — reanudar "sin --limpiar" dejaría a
+        // los ETL fallando contra una base sin permisos/roles/empresa.
+        console.error(
+          encabezado +
+            '⚠️ La BD quedó VACÍA (la limpieza sí corrió) pero SIN SEMBRAR (falló el seed): los ETL\n' +
+            'no pueden correr así. Cómo reanudar (elige una):\n' +
+            ' • Re-corre CON --limpiar --confirmar (volver a truncar una BD vacía es inocuo):\n' +
+            comandoRecargar(args, { conLimpiar: true }) +
+            '\n' +
+            ' • O corre el seed a mano y luego reanuda SIN --limpiar:\n' +
+            '  npx tsx --env-file=.env prisma/seed.ts\n' +
+            comandoRecargar(args, { conLimpiar: false }),
+        );
+      } else {
+        console.error(
+          encabezado +
+            'Cómo reanudar: los ETL son IDEMPOTENTES — corrige la causa y re-corre el mismo comando ' +
+            'SIN --limpiar (retoma desde donde quedó sin duplicar):\n' +
+            comandoRecargar(args, { conLimpiar: false }),
+        );
+      }
       break;
     }
   }
@@ -288,29 +338,69 @@ async function main(): Promise<void> {
       ? ' Ventana: NINGUNA (recarga completa).'
       : ` ${describirVentana(ventana)}`,
   );
-  if (args.limpiar) console.log(' Limpieza previa: SÍ (TRUNCATE ejecutado).');
+  if (limpiezaCorrida) console.log(' Limpieza previa: SÍ (TRUNCATE ejecutado).');
   console.log('');
   console.log(`${'Paso'.padEnd(48)}${'Estado'.padEnd(12)}Duración`);
   console.log('─'.repeat(70));
+  if (limpiezaCorrida) {
+    console.log(
+      `${'Limpieza de la BD (TRUNCATE)'.padEnd(48)}${'OK'.padEnd(12)}${formatearDuracion(segundosLimpieza)}`,
+    );
+  }
   for (const c of corridos) {
     console.log(
       `${c.etiqueta.padEnd(48)}${c.estado.padEnd(12)}${c.estado === 'no corrido' ? '—' : formatearDuracion(c.segundos)}`,
     );
   }
   console.log('─'.repeat(70));
-  const totalSeg = corridos.reduce((s, c) => s + c.segundos, 0);
+  const totalSeg = corridos.reduce((s, c) => s + c.segundos, 0) + segundosLimpieza;
   console.log(`TOTAL: ${formatearDuracion(totalSeg)}`);
 
-  console.log(
-    '\nRecordatorios:\n' +
-      ' • REINICIA el backend en Railway al terminar (invalida sesiones viejas y deja\n' +
-      '   drenarse los jobs pgboss encolados antes de la limpieza — ese esquema no se trunca).\n' +
-      ' • El usuario `admin` quedó con el password del seed — CÁMBIALO en cuanto entres.\n' +
-      ' • Las fotos masivas de modelos/bordados se corren APARTE cuando exista la carpeta\n' +
-      '   física (etl-modelos --fotos-modelos / --fotos-bordados). Las fotos previas en R2\n' +
-      '   quedaron huérfanas (limitación conocida, HOJA-DE-RUTA.md §4).\n' +
-      ' • Cada ETL dejó su reporte-etl-*.txt en backend/ (gitignored): revísalos con Daniel.',
+  // Recordatorios CONDICIONADOS a lo que de verdad pasó (tras un fallo temprano no aplica
+  // hablar del password del seed ni de reportes que no existen).
+  const seedOk = pasos.some(
+    (p, i) => p.script === PASO_SEED.script && corridos[i]?.estado === 'OK',
   );
+  const algunEtlCorrido = pasos.some(
+    (p, i) => p.script.startsWith('migracion/etl-') && corridos[i]?.estado !== 'no corrido',
+  );
+  const algunEtlOk = pasos.some(
+    (p, i) => p.script.startsWith('migracion/etl-') && corridos[i]?.estado === 'OK',
+  );
+  const recargaCompleta = fallo === null;
+  const recordatorios: string[] = [];
+  if (limpiezaCorrida || algunEtlCorrido) {
+    recordatorios.push(
+      ' • REINICIA el backend en Railway al terminar (invalida sesiones viejas' +
+        (limpiezaCorrida
+          ? ' y deja\n   drenarse los jobs pgboss encolados antes de la limpieza — ese esquema no se trunca).'
+          : ').'),
+    );
+  }
+  if (seedOk) {
+    recordatorios.push(
+      ' • El usuario `admin` quedó con el password del seed — CÁMBIALO en cuanto entres.',
+    );
+  }
+  if (limpiezaCorrida) {
+    recordatorios.push(
+      ' • Las fotos previas en R2 quedaron huérfanas (limitación conocida, HOJA-DE-RUTA.md §4).',
+    );
+  }
+  if (recargaCompleta) {
+    recordatorios.push(
+      ' • Las fotos masivas de modelos/bordados se corren APARTE cuando exista la carpeta\n' +
+        '   física (etl-modelos --fotos-modelos / --fotos-bordados).',
+    );
+  }
+  if (algunEtlOk) {
+    recordatorios.push(
+      ' • Cada ETL que corrió dejó su reporte-etl-*.txt en backend/ (gitignored): revísalos con Daniel.',
+    );
+  }
+  if (recordatorios.length > 0) {
+    console.log('\nRecordatorios:\n' + recordatorios.join('\n'));
+  }
 
   if (fallo !== null) {
     process.exit(1);
