@@ -29,6 +29,12 @@
  * exige un renglón por defecto: los pares DUPLICADOS del viejo (p. ej. la auditoría 488) se SUMAN
  * (decisión documentada). Cada `IdCC_AuditoriasDet` viejo se mapea al `AuditoriaDefecto` resultante.
  *
+ * VENTANA temporal (`ETL_DESDE`/`ETL_VENTANA_ANIOS`, default inactiva): una auditoría migra solo si
+ * (a) su ORDEN está mapeada (cascada: orden fuera de ventana u origen inválido → auditoría al bucket
+ * agregado) Y (b) su FECHA propia (`FechaAuditoria`, cae a `FechaElaboracion`) está `dentroVentana`
+ * (fuera → bucket agregado `fueraVentana`). El DETALLE sigue a su auditoría (el hijo nunca migra sin
+ * el padre). Con la ventana inactiva el comportamiento es EXACTAMENTE el de siempre.
+ *
  * Idempotencia: por el `MapeoMigracion` de `IdCC_Auditorias` (y, defensivamente, por el
  * `@@unique(idEmpresa, numAuditoria)`). CONCURRENCIA: cada auditoría + su detalle es una unidad
  * INDEPENDIENTE → `enLotes` (pool acotado) envuelta en `conReintentoTransitorio` (la unidad es
@@ -51,6 +57,7 @@ import {
   leerMapeo,
   type ClienteMapeo,
 } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
@@ -60,6 +67,7 @@ import {
   parsearFechaSoloDia,
   parsearTexto,
 } from '../comun/valores.js';
+import { dentroVentana, resolverVentana, type ConfigVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Resultado del loader de auditorías (encabezados + agregados del detalle para el reporte/tests). */
@@ -71,6 +79,8 @@ export interface ResultadoAuditorias {
   detallesMapeados: number;
   /** Renglones viejos de detalle OMITIDOS (defecto sin mapeo o auditoría omitida). */
   detallesOmitidos: number;
+  /** Renglones de detalle EXCLUIDOS en cascada por su auditoría fuera de ventana. */
+  detallesFueraVentana: number;
   /** Auditorías cuyo maquilero viejo no resolvió a Proveedor (idMaquilero quedó null). */
   maquileroSinMapeo: number;
 }
@@ -112,10 +122,12 @@ function idUsuarioViejo(crudo: string | undefined | null): string | null {
 
 /** Contribución de UNA auditoría a los conteos (se suma tras los lotes). */
 interface ContribAud {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
   detCreados: number;
   detMapeados: number;
   detOmitidos: number;
+  /** Detalles excluidos en cascada porque su auditoría quedó fuera de ventana. */
+  detFueraVentana: number;
   maquileroSinMapeo: number;
 }
 
@@ -124,12 +136,18 @@ interface ContextoAud {
   mapaMaquilero: Map<string, number>;
   mapaDefecto: Map<string, number>;
   detPorAud: Map<string, DetalleViejo[]>;
+  ventana: ConfigVentana;
+  /** Bucket agregado: auditorías con orden no migrada (fuera de ventana u origen inválido). */
+  bucketOrdenNoMigrada: MuestraAgregada;
+  /** Bucket agregado: auditorías con fecha propia fuera de la ventana temporal. */
+  bucketFueraVentana: MuestraAgregada;
 }
 
 export async function cargarAuditorias(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  ventana: ConfigVentana = resolverVentana(),
 ): Promise<ResultadoAuditorias> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const cli = cliente as PrismaClient;
@@ -153,7 +171,15 @@ export async function cargarAuditorias(
     detPorAud.set(idAud, lista);
   }
 
-  const ctx: ContextoAud = { mapaOrden, mapaMaquilero, mapaDefecto, detPorAud };
+  const ctx: ContextoAud = {
+    mapaOrden,
+    mapaMaquilero,
+    mapaDefecto,
+    detPorAud,
+    ventana,
+    bucketOrdenNoMigrada: new MuestraAgregada(),
+    bucketFueraVentana: new MuestraAgregada(),
+  };
 
   const filas = leerCsv('CC_Auditorias.csv');
   const contribs = await enLotes(
@@ -163,10 +189,11 @@ export async function cargarAuditorias(
   );
 
   const resultado: ResultadoAuditorias = {
-    auditorias: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
+    auditorias: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0, fueraVentana: 0 },
     detallesCreados: 0,
     detallesMapeados: 0,
     detallesOmitidos: 0,
+    detallesFueraVentana: 0,
     maquileroSinMapeo: 0,
   };
   for (const res of contribs) {
@@ -178,13 +205,25 @@ export async function cargarAuditorias(
     if (c.estado === 'creado') resultado.auditorias.creados += 1;
     else if (c.estado === 'existente') resultado.auditorias.existentes += 1;
     else if (c.estado === 'omitido') resultado.auditorias.omitidos += 1;
+    else if (c.estado === 'fueraVentana')
+      resultado.auditorias.fueraVentana = (resultado.auditorias.fueraVentana ?? 0) + 1;
     else
       resultado.auditorias.omitidosValidacion = (resultado.auditorias.omitidosValidacion ?? 0) + 1;
     resultado.detallesCreados += c.detCreados;
     resultado.detallesMapeados += c.detMapeados;
     resultado.detallesOmitidos += c.detOmitidos;
+    resultado.detallesFueraVentana += c.detFueraVentana;
     resultado.maquileroSinMapeo += c.maquileroSinMapeo;
   }
+
+  ctx.bucketOrdenNoMigrada.volcar(
+    reporte,
+    'Auditoría con orden no migrada (fuera de ventana u origen inválido) — OMITIDA (agregado)',
+  );
+  ctx.bucketFueraVentana.volcar(
+    reporte,
+    'Auditoría FUERA de la ventana temporal (EXCLUIDA con su detalle) (agregado)',
+  );
 
   return resultado;
 }
@@ -200,11 +239,12 @@ async function procesarAuditoria(
 ): Promise<ContribAud> {
   const idViejo = (f.IdCC_Auditorias ?? '').trim();
   const dets = ctx.detPorAud.get(idViejo) ?? [];
-  const base = (estado: ContribAud['estado'], detOmitidos = 0): ContribAud => ({
+  const base = (estado: ContribAud['estado'], detOmitidos = 0, detFueraVentana = 0): ContribAud => ({
     estado,
     detCreados: 0,
     detMapeados: 0,
     detOmitidos,
+    detFueraVentana,
     maquileroSinMapeo: 0,
   });
 
@@ -223,9 +263,9 @@ async function procesarAuditoria(
   const idOrdenViejo = (f.IdOrdenes ?? '').trim();
   const idOrden = ctx.mapaOrden.get(idOrdenViejo);
   if (idOrden === undefined) {
-    reporte.agregar(
-      'Auditoría con orden sin mapeo (OMITIDA — idOrden es obligatoria)',
-      `IdCC_Auditorias=${idViejo} IdOrdenes=${idOrdenViejo}`,
+    // Bucket agregado: con la ventana activa pueden ser CIENTOS (órdenes fuera de ventana).
+    ctx.bucketOrdenNoMigrada.agregar(
+      `IdCC_Auditorias=${idViejo} IdOrdenes=${idOrdenViejo} detalles=${String(dets.length)}`,
     );
     return base('omitido', dets.length);
   }
@@ -277,6 +317,15 @@ async function procesarAuditoria(
       `IdCC_Auditorias=${idViejo} FechaElaboracion="${f.FechaElaboracion ?? ''}" FechaAuditoria="${f.FechaAuditoria ?? ''}"`,
     );
     return base('omitido', dets.length);
+  }
+
+  // Ventana temporal por la fecha PROPIA de la auditoría (la de auditoría, ya con fallback). El
+  // detalle sigue a su auditoría (cascada). Con ventana inactiva `dentroVentana` siempre es true.
+  if (!dentroVentana(fechaAuditoria, ctx.ventana)) {
+    ctx.bucketFueraVentana.agregar(
+      `IdCC_Auditorias=${idViejo} fecha=${fechaAuditoria.toISOString().slice(0, 10)} detalles=${String(dets.length)}`,
+    );
+    return { ...base('fueraVentana', 0, dets.length), maquileroSinMapeo };
   }
 
   // Detalle: resuelve idDefecto, agrupa por defecto SUMANDO fallas (duplicados del viejo), y guarda
@@ -353,6 +402,7 @@ async function procesarAuditoria(
     detCreados: creada.defectos.length,
     detMapeados,
     detOmitidos,
+    detFueraVentana: 0,
     maquileroSinMapeo,
   };
 }

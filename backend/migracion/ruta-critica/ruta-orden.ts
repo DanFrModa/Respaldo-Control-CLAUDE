@@ -8,7 +8,9 @@
  *
  * Resolución de FKs:
  *  • `RC.IdOrdenes → Orden.id` por el mapeo `ENTIDAD_MAPEO.orden` que dejó el ETL de órdenes (F2-E5).
- *    Si la orden no está mapeada (no migrada), TODA la ruta de esa orden se OMITE y se LISTA.
+ *    Si la orden no está mapeada (fuera de la ventana temporal u origen inválido), TODA la ruta de
+ *    esa orden se OMITE y se reporta en un BUCKET AGREGADO (conteo total + muestra) — con la ventana
+ *    activa pueden ser MILES de órdenes y listarlas una a una inundaría el reporte.
  *  • `RC.IdCP_Procesos → ProcesoDef.id` por el puente de posición/codigo de `comun.ts` (E1).
  *  • `RC.IdUsuario → capturadoPorId`: los 137 usuarios del viejo NO están migrados a v2; se conserva el
  *    id legacy como texto `legacy:<id>` (sin FK, igual que `OrdenComentario.idUsuario` de F2). Si una
@@ -29,6 +31,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFecha } from '../comun/valores.js';
@@ -139,15 +142,15 @@ export async function cargarRutasOrden(
     porOrden.set(idOrdenViejo, lista);
   }
 
+  // Bucket agregado (conteo + muestra): con la ventana temporal activa pueden ser MILES de órdenes.
+  const ordenesNoMigradas = new MuestraAgregada();
+
   for (const [idOrdenViejo, filas] of porOrden) {
     const idOrden = mapaOrden.get(idOrdenViejo);
     if (idOrden === undefined) {
       resultado.ordenesSinMapeo += 1;
       resultado.omitidos += filas.length;
-      reporte.agregar(
-        'Ruta histórica con orden sin mapeo (OMITIDA — orden no migrada)',
-        `IdOrdenes=${idOrdenViejo} renglones=${String(filas.length)}`,
-      );
+      ordenesNoMigradas.agregar(`IdOrdenes=${idOrdenViejo} renglones=${String(filas.length)}`);
       continue;
     }
 
@@ -217,6 +220,11 @@ export async function cargarRutasOrden(
     resultado.renglones += creada.renglones;
     resultado.itemsChecklist += creada.itemsChecklist;
   }
+
+  ordenesNoMigradas.volcar(
+    reporte,
+    'Ruta histórica con orden no migrada (fuera de ventana u origen inválido) — OMITIDA (agregado)',
+  );
 
   return resultado;
 }

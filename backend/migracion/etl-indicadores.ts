@@ -30,6 +30,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import {
   cargarActividadesAlmacen,
   cargarActividadesIp,
@@ -49,10 +50,12 @@ import { calcularCuadreF7, formatearCuadreF7 } from './cuadre-f7.js';
 /** Imprime el resumen de un loader (mismo formato que los demás ETL). */
 function log(nombre: string, r: ResultadoLoader): void {
   const omVal = r.omitidosValidacion ?? 0;
+  const fueraVentana = r.fueraVentana ?? 0;
   console.log(
     `  ${nombre.padEnd(26)} creados=${String(r.creados).padStart(6)} ` +
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      (fueraVentana > 0 ? ` fueraVentana=${String(fueraVentana)}` : ''),
   );
 }
 
@@ -76,6 +79,23 @@ export async function ejecutarEtlIndicadores(cliente: PrismaClient): Promise<Rep
 
   console.log('ETL Indicadores F7-E6 — inicio (empresa favorita id=' + String(idEmpresa) + ')');
 
+  // Ventana temporal: SOLO el inventario CÍCLICO histórico (Proscai, D6) se recorta por su fecha
+  // propia (`FechaIC`). Los catálogos (personal/actividades) migran COMPLETOS (no son histórico);
+  // las FICHAS siguen a su orden (cascada natural: orden fuera de ventana → sin mapeo → omitida) y
+  // los MUESTRARIOS (21, pendientes/ciclo de vida) migran COMPLETOS: su `FechaRequerida` es de
+  // operación, no de histórico transaccional — se declara, no se recorta. La PRODUCTIVIDAD
+  // (IP/almacén) migra completa como hasta hoy (ver nota del cierre de F7).
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
+  if (ventana.corte !== null) {
+    reporte.nota(
+      'Indicadores (ventana activa): solo el cíclico histórico (Alm_InvCic) se recorta por FechaIC ' +
+        '(bucket agregado). Catálogos, productividad, fichas (cascada por orden) y muestrarios ' +
+        'migran completos — decisión declarada, no silenciosa.',
+    );
+  }
+
   // 1. Catálogos (antes que su productividad).
   log('Personal IP', await cargarPersonalIp(sesionGlobal, cliente, reporte));
   log('Actividades IP', await cargarActividadesIp(sesionGlobal, cliente, reporte));
@@ -95,8 +115,8 @@ export async function ejecutarEtlIndicadores(cliente: PrismaClient): Promise<Rep
   // 6. Muestrarios.
   log('Muestrarios', await cargarMuestrarios(sesionGlobal, cliente, reporte));
 
-  // 7. Cíclico histórico Proscai (D6).
-  log('Cíclico histórico', await cargarCiclicoHistorico(cliente, reporte, idEmpresa));
+  // 7. Cíclico histórico Proscai (D6) — único con recorte por fecha propia (ventana).
+  log('Cíclico histórico', await cargarCiclicoHistorico(cliente, reporte, idEmpresa, ventana));
 
   console.log('ETL Indicadores F7-E6 — fin de carga');
   return reporte;

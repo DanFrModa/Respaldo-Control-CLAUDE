@@ -19,6 +19,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { contarFilasCsv, leerCsv } from './comun/csv.js';
 import { ENTIDAD_MAPEO } from './comun/mapeo.js';
 import { parsearDinero } from './comun/valores.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 
 /** Un renglón del cuadre de conteos: entidad, v1, v2, nota. */
 export interface RenglonCuadreF7 {
@@ -192,10 +193,23 @@ export async function calcularCuadreF7(cliente: PrismaClient): Promise<CuadreF7>
 
 /** Da formato de texto al cuadre F7. */
 export function formatearCuadreF7(c: CuadreF7): string {
+  const ventana = resolverVentana();
   const p: string[] = [];
   p.push('═══════════════════════════════════════════════════════════════');
   p.push(' CUADRE F7 (COSTOS/EDR + INDICADORES) — v1 (CSV) vs v2 (Postgres)');
   p.push('═══════════════════════════════════════════════════════════════');
+  p.push(`  ${describirVentana(ventana)}`);
+  if (ventana.corte !== null) {
+    p.push(
+      '  Con la ventana ACTIVA: costos y fichas siguen a su orden (cascada) y el cíclico histórico se',
+    );
+    p.push(
+      '  recorta por FechaIC → v2 < v1 adicional ESPERADO (excluidos en los buckets del reporte).',
+    );
+    p.push(
+      '  Catálogos, productividad y muestrarios migran completos (decisión declarada del cierre F7).',
+    );
+  }
   p.push(`${'Entidad'.padEnd(42)}${'v1'.padStart(8)}${'v2'.padStart(8)}   Nota`);
   p.push('─'.repeat(90));
   for (const r of c.conteos) {

@@ -28,6 +28,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import { mapaColumnasTalla, normalizarClaveColor } from '../comun/tallas-orden.js';
 import { parsearEntero } from '../comun/valores.js';
 import type { Reporte } from '../comun/reporte.js';
@@ -132,6 +133,37 @@ export async function resolverContextoOrden(
   };
   cache.set(idOrdenViejo, ctx);
   return ctx;
+}
+
+/**
+ * BUCKET AGREGADO de filas cuya ORDEN no está en el mapeo de F2 ("orden no migrada — fuera de
+ * ventana u origen inválido"). Con la ventana temporal activa, F2 deja MILES de órdenes sin migrar
+ * y TODA su producción/cargos cae aquí: una incidencia POR FILA inundaría el reporte. En su lugar
+ * se cuenta el total y se guarda una MUESTRA (~10) de ejemplos; `volcar` escribe UNA sección con el
+ * total + la muestra (nada se descarta en silencio, §7 — pero agregado, vía `comun/muestra.ts`).
+ * NOTA: aquí NO hay filtro de fecha propio: si la orden migró, TODA su producción migra (la
+ * historia de la orden queda completa); si no migró, todo lo suyo cae a este bucket.
+ */
+export class BucketOrdenNoMigrada {
+  private readonly muestra = new MuestraAgregada();
+
+  /** Registra UNA fila omitida por orden no migrada (guarda el detalle solo si cabe en la muestra). */
+  registrar(detalle: string): void {
+    this.muestra.agregar(detalle);
+  }
+
+  /** Total de filas registradas. */
+  get conteo(): number {
+    return this.muestra.conteo;
+  }
+
+  /** Vuelca el agregado al reporte como UNA sección (no-op si no acumuló nada). */
+  volcar(reporte: Reporte, etiqueta: string): void {
+    this.muestra.volcar(
+      reporte,
+      `${etiqueta}: orden no migrada — fuera de ventana u origen inválido (filas OMITIDAS, agregado)`,
+    );
+  }
 }
 
 /** Una celda despivotada del histórico de producción: color + talla (ids v2) + cantidad. */

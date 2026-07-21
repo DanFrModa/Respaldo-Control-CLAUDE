@@ -27,6 +27,7 @@ import { conciliarEsMa } from '../src/dominio/esma/conciliacion.js';
 import { contarFilasCsv, leerCsv } from './comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO } from './comun/mapeo.js';
 import { parsearBandera, parsearDinero } from './comun/valores.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import {
   cargarCabecerasEsMa,
@@ -459,10 +460,23 @@ export async function calcularCuadreF6(cliente: PrismaClient): Promise<CuadreF6>
 
 /** Da formato de texto al cuadre F6. */
 export function formatearCuadreF6(c: CuadreF6): string {
+  const ventana = resolverVentana();
   const p: string[] = [];
   p.push('═══════════════════════════════════════════════════════════════');
   p.push(' CUADRE F6 (CALIDAD + EsMa) — v1 (CSV) vs v2 (Postgres)');
   p.push('═══════════════════════════════════════════════════════════════');
+  p.push(`  ${describirVentana(ventana)}`);
+  if (ventana.corte !== null) {
+    p.push(
+      '  Con la ventana ACTIVA: v2 lleva SOLO lo dentro de ventana + los asientos "Saldo inicial de',
+    );
+    p.push(
+      '  migración" (AbonoMaquilero por maquilero, fecha = corte); el v1 de este cuadre sigue siendo',
+    );
+    p.push(
+      '  el histórico COMPLETO de los CSV → v2 < v1 en conteos es lo ESPERADO (excluidos en el reporte).',
+    );
+  }
   p.push(`${'Entidad'.padEnd(38)}${'v1'.padStart(8)}${'v2'.padStart(8)}   Nota`);
   p.push('─'.repeat(80));
   for (const r of c.conteos) {
@@ -485,6 +499,18 @@ export function formatearCuadreF6(c: CuadreF6): string {
   p.push(
     `  Cargos 'propuesto' excluidos (v2 solo validados): ${String(s.cargosPropuestoExcluidos)}`,
   );
+  if (ventana.corte !== null) {
+    p.push(
+      '  Ventana ACTIVA: el saldo v1 comparable de arriba suma TODO el histórico de abonos/pagos/',
+    );
+    p.push(
+      '  descuentos, mientras v2 lleva lo dentro de ventana + el asiento de saldo inicial; el residuo',
+    );
+    p.push(
+      '  esperado del descuadre ≈ cargos excluidos por ORDEN NO MIGRADA (renglón de arriba). NO se',
+    );
+    p.push('  re-balancea (§7): el desglose por maquilero está en el reporte del ETL.');
+  }
   if (s.totalTableroDominio !== null) {
     p.push(
       `  Cruce tablero de dominio (saldosDeTodosMaquileros, activos c/rol y saldo≠0): ${String(s.filasTableroDominio)} maquileros, total ${s.totalTableroDominio.toFixed(2)}`,

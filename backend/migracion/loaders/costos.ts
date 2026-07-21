@@ -20,7 +20,9 @@
  *
  * Empresa (A9): el dominio acota por `sesion.idEmpresaActiva`, así que cada orden se costea con una
  * sesión de la EMPRESA de esa orden (derivada de la orden migrada de F2). Órdenes `noCostear` → el
- * dominio las rechaza: se LISTAN y OMITEN (no se fuerza). Órdenes sin mapeo → LISTADAS y OMITIDAS.
+ * dominio las rechaza: se LISTAN y OMITEN (no se fuerza). Órdenes sin mapeo (fuera de la ventana
+ * temporal u origen inválido) → OMITIDAS en un BUCKET AGREGADO (conteo + muestra; con la ventana
+ * activa pueden ser miles). El costo NO lleva fecha propia: su ventana es la CASCADA por orden.
  *
  * Idempotencia: se salta las órdenes que ya tienen `CostoOrden` (una 2ª corrida no re-costea).
  */
@@ -31,6 +33,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear, truncarYReportar } from '../comun/saneo.js';
@@ -70,6 +73,8 @@ interface ContextoCostos {
   mapaOrdenV2: Map<string, number>;
   ordenes: Map<number, OrdenCosteable>;
   yaCosteadas: Set<number>;
+  /** Bucket agregado (conteo + muestra): con la ventana temporal activa pueden ser MILES de órdenes. */
+  bucketOrdenNoMigrada: MuestraAgregada;
 }
 
 /** Migra UNA fila `CostoOrd` → `CostoOrden` (idempotente, tolerante). */
@@ -82,10 +87,8 @@ async function procesarCosto(
 
   const idOrden = ctx.mapaOrdenV2.get(idOrdenViejo);
   if (idOrden === undefined) {
-    ctx.reporte.agregar(
-      'CostoOrd con orden sin mapeo en v2 (OMITIDO)',
-      `IdCostoOrd=${idCostoViejo} IdOrdenes=${idOrdenViejo}`,
-    );
+    // Cascada por orden: orden no migrada (fuera de ventana u origen inválido) → bucket agregado.
+    ctx.bucketOrdenNoMigrada.agregar(`IdCostoOrd=${idCostoViejo} IdOrdenes=${idOrdenViejo}`);
     return 'omitido';
   }
 
@@ -177,7 +180,15 @@ export async function cargarCostos(
     (await cli.costoOrden.findMany({ select: { idOrden: true } })).map((c) => c.idOrden),
   );
 
-  const ctx: ContextoCostos = { cliente: cli, bd, reporte, mapaOrdenV2, ordenes, yaCosteadas };
+  const ctx: ContextoCostos = {
+    cliente: cli,
+    bd,
+    reporte,
+    mapaOrdenV2,
+    ordenes,
+    yaCosteadas,
+    bucketOrdenNoMigrada: new MuestraAgregada(),
+  };
 
   const resultado: ResultadoLoader = {
     creados: 0,
@@ -202,5 +213,11 @@ export async function cargarCostos(
     else if (e === 'omitido') resultado.omitidos += 1;
     else resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
   }
+
+  ctx.bucketOrdenNoMigrada.volcar(
+    reporte,
+    'CostoOrd con orden no migrada (fuera de ventana u origen inválido) — OMITIDO (agregado)',
+  );
+
   return resultado;
 }

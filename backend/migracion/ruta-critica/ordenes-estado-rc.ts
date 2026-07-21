@@ -12,7 +12,9 @@
  *
  * Resolución: `IdOrdenes → Orden.id` por el mapeo `ENTIDAD_MAPEO.orden` (F2-E5). Se procesan SOLO las
  * órdenes que traen ALGÚN campo RC en el CSV (la inmensa mayoría no tiene RC; tocarlas sería gasto sin
- * efecto). Carga concurrente acotada por lotes (nunca fila por fila contra la BD remota).
+ * efecto). Las órdenes SIN mapeo (fuera de la ventana temporal u origen inválido) se cuentan en un
+ * BUCKET AGREGADO (conteo + muestra) — con ventana activa pueden ser MILES. Carga concurrente acotada
+ * por lotes (nunca fila por fila contra la BD remota).
  */
 import { fijarEstadoRcOrdenMigrado } from '../../src/dominio/ruta-critica/migracion.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
@@ -22,6 +24,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
@@ -73,11 +76,19 @@ export async function cargarOrdenesEstadoRc(
 
   const candidatas = leerCsv('Ordenes.csv').filter(tieneAlgunCampoRc);
 
+  // Bucket agregado (conteo + muestra): con la ventana temporal activa pueden ser MILES de órdenes.
+  const ordenesNoMigradas = new MuestraAgregada();
+
   const resultados = await enLotes(
     candidatas,
     (f): Promise<Desenlace> =>
-      conReintentoTransitorio(() => procesarFila(sesion, bd, reporte, mapaOrden, f)),
+      conReintentoTransitorio(() => procesarFila(sesion, bd, reporte, mapaOrden, ordenesNoMigradas, f)),
     CONCURRENCIA_ETL,
+  );
+
+  ordenesNoMigradas.volcar(
+    reporte,
+    'Estado RC de orden no migrada (fuera de ventana u origen inválido) — OMITIDO (agregado)',
   );
 
   const r: ResultadoOrdenesEstadoRc = {
@@ -101,15 +112,13 @@ async function procesarFila(
   bd: ContextoBd,
   reporte: Reporte,
   mapaOrden: Map<string, number>,
+  ordenesNoMigradas: MuestraAgregada,
   f: Record<string, string>,
 ): Promise<Desenlace> {
   const idOrdenViejo = (f.IdOrdenes ?? '').trim();
   const idOrden = mapaOrden.get(idOrdenViejo);
   if (idOrden === undefined) {
-    reporte.agregar(
-      'Estado RC de orden sin mapeo (OMITIDA — orden no migrada)',
-      `IdOrdenes=${idOrdenViejo}`,
-    );
+    ordenesNoMigradas.agregar(`IdOrdenes=${idOrdenViejo}`);
     return 'sinMapeo';
   }
 

@@ -35,6 +35,7 @@ import { parsearFechaSoloDia, parsearTexto } from '../comun/valores.js';
 import type { Reporte } from '../comun/reporte.js';
 import type { ResultadoLoader } from './clientes.js';
 import {
+  BucketOrdenNoMigrada,
   cargarMapaColorF1Norm,
   cargarMapaOrdenesDet,
   cargarMapaOrdenV2,
@@ -89,6 +90,9 @@ export async function cargarCortes(
   // de forma idempotente — un par de cargas duplicadas de la misma orden no afectan correctitud).
   const cacheOrdenes: CacheOrdenes = new Map();
 
+  // Bucket AGREGADO de cortes con orden no migrada (con ventana activa serían miles: conteo + muestra).
+  const bucketOrden = new BucketOrdenNoMigrada();
+
   const resultado: ResultadoCortes = {
     cortes: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
     celdas: 0,
@@ -107,6 +111,7 @@ export async function cargarCortes(
           tallasCrudas,
           detPorCorte,
           cacheOrdenes,
+          bucketOrden,
         }),
       ),
     CONCURRENCIA_ETL,
@@ -125,6 +130,8 @@ export async function cargarCortes(
     resultado.celdas += c.celdas;
   }
 
+  bucketOrden.volcar(reporte, 'Corte');
+
   return resultado;
 }
 
@@ -137,6 +144,8 @@ interface ContextoCortes {
   tallasCrudas: Map<string, string>;
   detPorCorte: Map<string, Record<string, string>[]>;
   cacheOrdenes: CacheOrdenes;
+  /** Agregado de cortes con orden no migrada (conteo + muestra, no una incidencia por fila). */
+  bucketOrden: BucketOrdenNoMigrada;
 }
 
 /** Contribución de UN corte a los conteos. */
@@ -170,10 +179,9 @@ async function procesarCorte(
     idOrdenViejo,
   );
   if (orden === null) {
-    reporte.agregar(
-      'Corte con orden sin mapeo/inexistente (OMITIDO)',
-      `IdCorte=${idCorte} IdOrdenes=${idOrdenViejo}`,
-    );
+    // Orden no migrada (fuera de ventana u origen inválido): al bucket agregado, no una incidencia
+    // por fila (con ventana activa serían miles).
+    ctx.bucketOrden.registrar(`IdCorte=${idCorte} IdOrdenes=${idOrdenViejo}`);
     return { estado: 'omitido', celdas: 0 };
   }
 

@@ -19,23 +19,38 @@ import type { SesionUsuario } from '../../src/comun/permisos.js';
 
 import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
-import { cargarMovimientosPlanosEsMa } from './esma-cargos.js';
+import { resolverVentana, type ConfigVentana } from '../comun/ventana.js';
+import { cargarMovimientosPlanosEsMa, type SaldoInicialEsMa } from './esma-cargos.js';
 import type { ResultadoLoader } from './clientes.js';
 
-/** Carga los DESCUENTOS históricos (`EsMa_Desc.csv` → `DescuentoMaquilero`). */
+/**
+ * Carga los DESCUENTOS históricos (`EsMa_Desc.csv` → `DescuentoMaquilero`). Con la ventana temporal
+ * ACTIVA, los descuentos PRE-CORTE se excluyen y su monto (−, signo del saldo derivado D3) alimenta
+ * el saldo inicial (`saldoInicial`, lo pasa `etl-esma`); con la ventana inactiva nada cambia.
+ */
 export async function cargarDescuentosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  ventana: ConfigVentana = resolverVentana(),
+  saldoInicial?: SaldoInicialEsMa,
 ): Promise<ResultadoLoader> {
-  return cargarMovimientosPlanosEsMa(sesion, cliente, reporte, {
-    etiqueta: 'DescuentoMaquilero',
-    archivo: 'EsMa_Desc.csv',
-    columnaId: 'IdEsMa_Desc',
-    columnaMonto: 'DescuentoEsMa',
-    columnaObs: 'ObsDesc',
-    columnaRevision: null, // el viejo no traía bandera de revisión → revisado (ya conciliado)
-    entidadMapeo: ENTIDAD_MAPEO.descuentoMaquilero,
-    crear: crearDescuentoMigrado,
-  });
+  return cargarMovimientosPlanosEsMa(
+    sesion,
+    cliente,
+    reporte,
+    {
+      etiqueta: 'DescuentoMaquilero',
+      archivo: 'EsMa_Desc.csv',
+      columnaId: 'IdEsMa_Desc',
+      columnaMonto: 'DescuentoEsMa',
+      columnaObs: 'ObsDesc',
+      columnaRevision: null, // el viejo no traía bandera de revisión → revisado (ya conciliado)
+      entidadMapeo: ENTIDAD_MAPEO.descuentoMaquilero,
+      signoSaldo: -1, // el descuento RESTA al saldo derivado (D3)
+      crear: crearDescuentoMigrado,
+    },
+    ventana,
+    saldoInicial,
+  );
 }

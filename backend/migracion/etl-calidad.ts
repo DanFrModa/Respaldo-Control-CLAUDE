@@ -31,6 +31,7 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 import { contarFilasCsv } from './comun/csv.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarDefectos } from './loaders/calidad-defectos.js';
 import { cargarAuditorias } from './loaders/calidad-auditorias.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
@@ -38,10 +39,12 @@ import type { ResultadoLoader } from './loaders/clientes.js';
 /** Imprime el resumen de un loader (mismo formato que los otros ETL). */
 function log(nombre: string, r: ResultadoLoader): void {
   const omVal = r.omitidosValidacion ?? 0;
+  const fueraVentana = r.fueraVentana ?? 0;
   console.log(
     `  ${nombre.padEnd(22)} creados=${String(r.creados).padStart(6)} ` +
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      (fueraVentana > 0 ? ` fueraVentana=${String(fueraVentana)}` : ''),
   );
 }
 
@@ -71,18 +74,30 @@ export async function ejecutarEtlCalidad(cliente: PrismaClient): Promise<Reporte
   const reporte = new Reporte();
 
   console.log('ETL de calidad F6-E6 — inicio');
+  // Ventana temporal: el CATÁLOGO de defectos migra SIEMPRE completo (es catálogo, no histórico).
+  // Las auditorías siguen a su orden mapeada (cascada) Y a su fecha propia (`dentroVentana`).
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
+  if (ventana.corte !== null) {
+    reporte.nota(
+      'Calidad: el catálogo de defectos migra COMPLETO (la ventana no le aplica). Las auditorías ' +
+        'excluidas (orden no migrada o fecha fuera de ventana) van en buckets agregados, con su ' +
+        'detalle en cascada.',
+    );
+  }
 
   const defectos = await cargarDefectos(sesion, cliente, reporte);
   log('Defectos', defectos);
 
-  const auditorias = await cargarAuditorias(sesion, cliente, reporte);
+  const auditorias = await cargarAuditorias(sesion, cliente, reporte, ventana);
   log('Auditorías', auditorias.auditorias);
   console.log(
     `    (detalle: creados=${String(auditorias.detallesCreados)} mapeados=${String(
       auditorias.detallesMapeados,
-    )} omitidos=${String(auditorias.detallesOmitidos)} · maquilero sin mapeo=${String(
-      auditorias.maquileroSinMapeo,
-    )})`,
+    )} omitidos=${String(auditorias.detallesOmitidos)} · fuera de ventana=${String(
+      auditorias.detallesFueraVentana,
+    )} · maquilero sin mapeo=${String(auditorias.maquileroSinMapeo)})`,
   );
 
   console.log('ETL de calidad F6-E6 — recalibrando secuencias');
@@ -110,13 +125,16 @@ async function formatearConteos(cliente: PrismaClient): Promise<string> {
     '═══════════════════════════════════════════════════════════════',
     ' CUADRE F6-E6 (Pieza A — calidad) — v1 (CSV) vs v2 (Postgres)',
     '═══════════════════════════════════════════════════════════════',
+    `  ${describirVentana(resolverVentana())}`,
     `  Defectos (DefectoCatalogo):     v1=${String(defectosV1).padStart(6)}  v2=${String(defectosV2).padStart(6)}`,
     `  Auditorías (Auditoria):         v1=${String(auditoriasV1).padStart(6)}  v2=${String(auditoriasV2).padStart(6)}  (canceladas v2=${String(canceladasV2)})`,
     `  Detalle (AuditoriaDefecto):     v1=${String(detalleV1).padStart(6)}  v2=${String(detalleV2).padStart(6)}`,
     '',
     '  Nota: v2 ≤ v1 es ESPERADO — se OMITEN auditorías con orden sin mapeo y renglones de detalle',
     '  con defecto sin mapeo o de auditorías omitidas; además los pares (auditoría, defecto)',
-    '  DUPLICADOS del viejo se FUSIONAN sumando fallas. El desglose exacto va en el REPORTE.',
+    '  DUPLICADOS del viejo se FUSIONAN sumando fallas. Con la ventana temporal ACTIVA también se',
+    '  EXCLUYEN las auditorías fuera de ventana (por orden o por fecha propia), con su detalle en',
+    '  cascada. El desglose exacto va en el REPORTE.',
   ].join('\n');
 }
 

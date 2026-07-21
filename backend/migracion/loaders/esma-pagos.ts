@@ -22,23 +22,38 @@ import type { SesionUsuario } from '../../src/comun/permisos.js';
 
 import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
-import { cargarMovimientosPlanosEsMa } from './esma-cargos.js';
+import { resolverVentana, type ConfigVentana } from '../comun/ventana.js';
+import { cargarMovimientosPlanosEsMa, type SaldoInicialEsMa } from './esma-cargos.js';
 import type { ResultadoLoader } from './clientes.js';
 
-/** Carga los PAGOS históricos LIBRES (`EsMa_Pagos.csv` → `PagoMaquilero`, sin aplicaciones). */
+/**
+ * Carga los PAGOS históricos LIBRES (`EsMa_Pagos.csv` → `PagoMaquilero`, sin aplicaciones). Con la
+ * ventana temporal ACTIVA, los pagos PRE-CORTE se excluyen y su monto (−, signo del saldo derivado
+ * D3) alimenta el saldo inicial (`saldoInicial`, lo pasa `etl-esma`); inactiva → nada cambia.
+ */
 export async function cargarPagosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  ventana: ConfigVentana = resolverVentana(),
+  saldoInicial?: SaldoInicialEsMa,
 ): Promise<ResultadoLoader> {
-  return cargarMovimientosPlanosEsMa(sesion, cliente, reporte, {
-    etiqueta: 'PagoMaquilero',
-    archivo: 'EsMa_Pagos.csv',
-    columnaId: 'IdEsMa_Pagos',
-    columnaMonto: 'PagoEsMa',
-    columnaObs: 'ObsPagos',
-    columnaRevision: 'RevisionPendienteP', // 1 → capturado (por revisar) / 0 → revisado
-    entidadMapeo: ENTIDAD_MAPEO.pagoMaquilero,
-    crear: crearPagoMigrado,
-  });
+  return cargarMovimientosPlanosEsMa(
+    sesion,
+    cliente,
+    reporte,
+    {
+      etiqueta: 'PagoMaquilero',
+      archivo: 'EsMa_Pagos.csv',
+      columnaId: 'IdEsMa_Pagos',
+      columnaMonto: 'PagoEsMa',
+      columnaObs: 'ObsPagos',
+      columnaRevision: 'RevisionPendienteP', // 1 → capturado (por revisar) / 0 → revisado
+      entidadMapeo: ENTIDAD_MAPEO.pagoMaquilero,
+      signoSaldo: -1, // el pago RESTA al saldo derivado (D3)
+      crear: crearPagoMigrado,
+    },
+    ventana,
+    saldoInicial,
+  );
 }

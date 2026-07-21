@@ -30,6 +30,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { calcularCuadreF5, formatearCuadreF5 } from './cuadre-f5.js';
 import { verificarCatalogos, type ResultadoCatalogos } from './ruta-critica/catalogos.js';
 import {
@@ -60,6 +61,20 @@ export async function ejecutarEtlRutaCritica(
   const reporte = new Reporte();
 
   console.log('ETL de Ruta Crítica F5-E7 (Pieza B) — inicio');
+  // Ventana temporal: la CONFIGURACIÓN de la RC (catálogos, plantillas, roles, propiedades) migra
+  // SIEMPRE completa — es configuración del sistema, NO histórico, y la ventana NO le aplica. Solo el
+  // HISTÓRICO (rutas vivas + estado RC de órdenes) sigue a las órdenes migradas: lo de órdenes fuera
+  // de ventana se cuenta en buckets agregados (ver `ruta-orden.ts`/`ordenes-estado-rc.ts`).
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
+  if (ventana.corte !== null) {
+    reporte.nota(
+      'Ruta Crítica: la ventana NO aplica a la CONFIGURACIÓN (catálogos/plantillas/roles/propiedades ' +
+        'migran completos). El HISTÓRICO (rutas vivas + estado RC) sigue a las órdenes migradas: las ' +
+        'de órdenes fuera de ventana quedan en los buckets agregados del reporte.',
+    );
+  }
 
   const catalogos = await verificarCatalogos(sesion, cliente, reporte);
   console.log(

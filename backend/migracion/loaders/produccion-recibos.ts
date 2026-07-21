@@ -48,6 +48,7 @@ import { parsearFechaSoloDia, parsearTexto } from '../comun/valores.js';
 import type { Reporte } from '../comun/reporte.js';
 import type { ResultadoLoader } from './clientes.js';
 import {
+  BucketOrdenNoMigrada,
   cargarMapaColorF1Norm,
   cargarMapaOrdenesDet,
   cargarMapaOrdenV2,
@@ -177,6 +178,8 @@ async function cargarFlujoRecibo(
   }
 
   const cacheOrdenes: CacheOrdenes = new Map();
+  // Bucket AGREGADO de recibos con orden no migrada (con ventana activa serían miles: conteo + muestra).
+  const bucketOrden = new BucketOrdenNoMigrada();
   const resultado: ResultadoRecibos = { ...vacio, recibos: { ...vacio.recibos } };
 
   const filas = leerCsv(flujo.archivoCab);
@@ -194,6 +197,7 @@ async function cargarFlujoRecibo(
           tallasCrudas,
           detPorCab,
           cacheOrdenes,
+          bucketOrden,
         }),
       ),
     CONCURRENCIA_ETL,
@@ -215,6 +219,8 @@ async function cargarFlujoRecibo(
     if (c.sinCantidad) resultado.sinCantidad += 1;
   }
 
+  bucketOrden.volcar(reporte, flujo.etiqueta);
+
   return resultado;
 }
 
@@ -228,6 +234,8 @@ interface ContextoRecibos {
   tallasCrudas: Map<string, string>;
   detPorCab: Map<string, Record<string, string>[]>;
   cacheOrdenes: CacheOrdenes;
+  /** Agregado de recibos con orden no migrada (conteo + muestra, no una incidencia por fila). */
+  bucketOrden: BucketOrdenNoMigrada;
 }
 
 interface ContribRecibo {
@@ -275,10 +283,8 @@ async function procesarRecibo(
     idOrdenViejo,
   );
   if (orden === null) {
-    reporte.agregar(
-      `${flujo.etiqueta}: orden sin mapeo/inexistente (OMITIDO)`,
-      `${flujo.pkCab}=${idCab} IdOrdenes=${idOrdenViejo}`,
-    );
+    // Orden no migrada (fuera de ventana u origen inválido): al bucket agregado (conteo + muestra).
+    ctx.bucketOrden.registrar(`${flujo.pkCab}=${idCab} IdOrdenes=${idOrdenViejo}`);
     return sin('omitido');
   }
 

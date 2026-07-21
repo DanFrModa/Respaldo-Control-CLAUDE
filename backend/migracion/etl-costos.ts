@@ -18,6 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarCostos } from './loaders/costos.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 import { calcularCuadreF7, formatearCuadreF7 } from './cuadre-f7.js';
@@ -36,6 +37,11 @@ function log(nombre: string, r: ResultadoLoader): void {
 export async function ejecutarEtlCostos(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
   console.log('ETL Costos F7-E6 — inicio');
+  // Ventana temporal: el costo NO lleva fecha propia — su ventana es la CASCADA por orden (los
+  // costos de órdenes fuera de ventana quedan en el bucket agregado del reporte).
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
   const costos = await cargarCostos(cliente, reporte);
   log('Costos', costos);
   console.log('ETL Costos F7-E6 — fin de carga');

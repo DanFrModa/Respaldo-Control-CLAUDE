@@ -15,6 +15,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { contarFilasCsv, leerCsv } from './comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO } from './comun/mapeo.js';
 import { parsearTexto } from './comun/valores.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarRolesPorNombre, construirPuenteProcesos } from './ruta-critica/comun.js';
 
 /** Un renglón del cuadre de conteos: entidad, v1, v2, nota. */
@@ -241,10 +242,20 @@ export async function calcularCuadreF5(cliente: PrismaClient): Promise<CuadreF5>
 
 /** Da formato de texto al cuadre F5. */
 export function formatearCuadreF5(c: CuadreF5): string {
+  const ventana = resolverVentana();
   const p: string[] = [];
   p.push('═══════════════════════════════════════════════════════════════');
   p.push(' CUADRE F5 (RUTA CRÍTICA) — v1 (CSV) vs v2 (Postgres)');
   p.push('═══════════════════════════════════════════════════════════════');
+  p.push(`  ${describirVentana(ventana)}`);
+  if (ventana.corte !== null) {
+    p.push(
+      '  Con la ventana ACTIVA la CONFIGURACIÓN (catálogos/plantillas/roles) migra COMPLETA; solo el',
+    );
+    p.push(
+      '  HISTÓRICO (rutas RC + estado RC) de órdenes fuera de ventana queda excluido (buckets del reporte).',
+    );
+  }
   p.push(`${'Entidad'.padEnd(40)}${'v1'.padStart(8)}${'v2'.padStart(8)}   Nota`);
   p.push('─'.repeat(80));
   for (const r of c.conteos) {

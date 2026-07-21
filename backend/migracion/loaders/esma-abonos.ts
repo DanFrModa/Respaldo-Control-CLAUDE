@@ -21,23 +21,38 @@ import type { SesionUsuario } from '../../src/comun/permisos.js';
 
 import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
-import { cargarMovimientosPlanosEsMa } from './esma-cargos.js';
+import { resolverVentana, type ConfigVentana } from '../comun/ventana.js';
+import { cargarMovimientosPlanosEsMa, type SaldoInicialEsMa } from './esma-cargos.js';
 import type { ResultadoLoader } from './clientes.js';
 
-/** Carga los ABONOS históricos (`EsMa_Abonos.csv` → `AbonoMaquilero`). */
+/**
+ * Carga los ABONOS históricos (`EsMa_Abonos.csv` → `AbonoMaquilero`). Con la ventana temporal
+ * ACTIVA, los abonos PRE-CORTE se excluyen y su monto (+, signo del saldo derivado D3) alimenta el
+ * saldo inicial (`saldoInicial`, lo pasa `etl-esma`); con la ventana inactiva nada cambia.
+ */
 export async function cargarAbonosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  ventana: ConfigVentana = resolverVentana(),
+  saldoInicial?: SaldoInicialEsMa,
 ): Promise<ResultadoLoader> {
-  return cargarMovimientosPlanosEsMa(sesion, cliente, reporte, {
-    etiqueta: 'AbonoMaquilero',
-    archivo: 'EsMa_Abonos.csv',
-    columnaId: 'IdEsMa_Abonos',
-    columnaMonto: 'AbonoEsMa',
-    columnaObs: 'ObsAbonos',
-    columnaRevision: null, // el viejo no traía bandera de revisión → revisado (ya conciliado)
-    entidadMapeo: ENTIDAD_MAPEO.abonoMaquilero,
-    crear: crearAbonoMigrado,
-  });
+  return cargarMovimientosPlanosEsMa(
+    sesion,
+    cliente,
+    reporte,
+    {
+      etiqueta: 'AbonoMaquilero',
+      archivo: 'EsMa_Abonos.csv',
+      columnaId: 'IdEsMa_Abonos',
+      columnaMonto: 'AbonoEsMa',
+      columnaObs: 'ObsAbonos',
+      columnaRevision: null, // el viejo no traía bandera de revisión → revisado (ya conciliado)
+      entidadMapeo: ENTIDAD_MAPEO.abonoMaquilero,
+      signoSaldo: 1, // el abono SUMA al saldo derivado (D3)
+      crear: crearAbonoMigrado,
+    },
+    ventana,
+    saldoInicial,
+  );
 }

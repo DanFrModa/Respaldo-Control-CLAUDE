@@ -35,10 +35,12 @@ import {
   guardarMapeo,
   type ClienteMapeo,
 } from '../comun/mapeo.js';
+import { MuestraAgregada } from '../comun/muestra.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { sesionEtl } from '../comun/sesion-etl.js';
 import { parsearEntero, parsearFechaSoloDia } from '../comun/valores.js';
+import { dentroVentana, resolverVentana, type ConfigVentana } from '../comun/ventana.js';
 import { asegurarSentinelas } from './ipt-kardex.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -63,11 +65,17 @@ export async function asegurarAlmacenSentinela(
   return alm.id;
 }
 
-/** Carga Alm_InvCic → InventarioCiclico (histórico cerrado, D6). Empresa = `idEmpresa` (favorita). */
+/**
+ * Carga Alm_InvCic → InventarioCiclico (histórico cerrado, D6). Empresa = `idEmpresa` (favorita).
+ * VENTANA temporal: el cíclico es HISTÓRICO puro con fecha propia (`FechaIC`) — con la ventana
+ * activa, los conteos pre-corte se EXCLUYEN (bucket agregado). Sin efecto en saldos: son registros
+ * CERRADOS sin ajuste de kardex (D6), así que recortarlos no descuadra nada.
+ */
 export async function cargarCiclicoHistorico(
   cliente: ClienteMapeo,
   reporte: Reporte,
   idEmpresa: number,
+  ventana: ConfigVentana = resolverVentana(),
 ): Promise<ResultadoLoader> {
   const cli = cliente as PrismaClient;
   const bd: ContextoBd = { cliente: cli };
@@ -91,6 +99,9 @@ export async function cargarCiclicoHistorico(
   const yaMigrados = new Set(
     (await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.inventarioCiclicoHist)).keys(),
   );
+
+  // Bucket agregado de los cíclicos pre-corte excluidos por la ventana (conteo + muestra).
+  const bucketFueraVentana = new MuestraAgregada();
 
   for (const f of leerCsv('Alm_InvCic.csv')) {
     const idViejo = (f.IdAlm_InvCic ?? '').trim();
@@ -122,6 +133,14 @@ export async function cargarCiclicoHistorico(
       r.omitidos += 1;
       continue;
     }
+    // Ventana temporal por FechaIC (con ventana inactiva `dentroVentana` siempre es true).
+    if (!dentroVentana(fecha, ventana)) {
+      bucketFueraVentana.agregar(
+        `IdAlm_InvCic=${idViejo} FechaIC=${fecha.toISOString().slice(0, 10)} ModeloIC="${f.ModeloIC ?? ''}"`,
+      );
+      r.fueraVentana = (r.fueraVentana ?? 0) + 1;
+      continue;
+    }
     const cantReal = parsearEntero(f.CantReal);
 
     const entrada: InventarioCiclicoHistoricoMigrado = {
@@ -146,5 +165,11 @@ export async function cargarCiclicoHistorico(
     yaMigrados.add(idViejo);
     r.creados += 1;
   }
+
+  bucketFueraVentana.volcar(
+    reporte,
+    'Alm_InvCic FUERA de la ventana temporal (EXCLUIDO — histórico Proscai pre-corte) (agregado)',
+  );
+
   return r;
 }
