@@ -289,23 +289,6 @@ async function procesarAuditoria(
     return base('existente');
   }
 
-  // Maquilero (costura): 0/vacío → null; sin mapeo → null + reporte.
-  const idMaquileroViejo = (f.IdMaquilero ?? '').trim();
-  let idMaquilero: number | null = null;
-  let maquileroSinMapeo = 0;
-  if (idMaquileroViejo !== '' && idMaquileroViejo !== '0') {
-    const m = ctx.mapaMaquilero.get(idMaquileroViejo);
-    if (m === undefined) {
-      reporte.agregar(
-        'Auditoría con maquilero sin mapeo (idMaquilero NULL — es nullable)',
-        `IdCC_Auditorias=${idViejo} IdMaquilero=${idMaquileroViejo}`,
-      );
-      maquileroSinMapeo = 1;
-    } else {
-      idMaquilero = m;
-    }
-  }
-
   // Fechas (@db.Date): si falta una, cae a la otra. Ambas nulas → omitir (no fabricar fechas).
   const fechaElab = parsearFechaSoloDia(f.FechaElaboracion);
   const fechaAud = parsearFechaSoloDia(f.FechaAuditoria);
@@ -321,11 +304,30 @@ async function procesarAuditoria(
 
   // Ventana temporal por la fecha PROPIA de la auditoría (la de auditoría, ya con fallback). El
   // detalle sigue a su auditoría (cascada). Con ventana inactiva `dentroVentana` siempre es true.
+  // Va ANTES de resolver el maquilero: una auditoría excluida por ventana NO debe aportar stats ni
+  // incidencias de maquilero (sería ruido de registros que a propósito no migran).
   if (!dentroVentana(fechaAuditoria, ctx.ventana)) {
     ctx.bucketFueraVentana.agregar(
       `IdCC_Auditorias=${idViejo} fecha=${fechaAuditoria.toISOString().slice(0, 10)} detalles=${String(dets.length)}`,
     );
-    return { ...base('fueraVentana', 0, dets.length), maquileroSinMapeo };
+    return base('fueraVentana', 0, dets.length);
+  }
+
+  // Maquilero (costura): 0/vacío → null; sin mapeo → null + reporte.
+  const idMaquileroViejo = (f.IdMaquilero ?? '').trim();
+  let idMaquilero: number | null = null;
+  let maquileroSinMapeo = 0;
+  if (idMaquileroViejo !== '' && idMaquileroViejo !== '0') {
+    const m = ctx.mapaMaquilero.get(idMaquileroViejo);
+    if (m === undefined) {
+      reporte.agregar(
+        'Auditoría con maquilero sin mapeo (idMaquilero NULL — es nullable)',
+        `IdCC_Auditorias=${idViejo} IdMaquilero=${idMaquileroViejo}`,
+      );
+      maquileroSinMapeo = 1;
+    } else {
+      idMaquilero = m;
+    }
   }
 
   // Detalle: resuelve idDefecto, agrupa por defecto SUMANDO fallas (duplicados del viejo), y guarda

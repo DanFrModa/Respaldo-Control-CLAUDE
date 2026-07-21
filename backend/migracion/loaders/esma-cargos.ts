@@ -164,6 +164,17 @@ export class SaldoInicialEsMa {
   }
 }
 
+/**
+ * Contribución PURA de un CARGO excluido por la ventana al saldo inicial (D3): solo los VALIDADOS
+ * (`RevisionPendiente` = 0) suman — igual que en el saldo derivado de `saldos.ts` — con importe
+ * `CantRecEsMa × PrecioEsMa` "ceronulo" (nulos → 0). Un cargo pendiente/propuesto → `null` (no suma).
+ */
+export function contribucionCargoExcluido(f: Record<string, string>): number | null {
+  const validado = !parsearBandera(f.RevisionPendiente);
+  if (!validado) return null;
+  return (parsearDinero(f.CantRecEsMa) ?? 0) * (parsearDinero(f.PrecioEsMa) ?? 0);
+}
+
 export async function cargarCargosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
@@ -231,6 +242,7 @@ export async function cargarCargosEsMa(
     if (e === 'creado') resultado.creados += 1;
     else if (e === 'existente') resultado.existentes += 1;
     else if (e === 'omitido') resultado.omitidos += 1;
+    else if (e === 'fueraVentana') resultado.fueraVentana = (resultado.fueraVentana ?? 0) + 1;
     else resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
   }
 
@@ -293,21 +305,22 @@ async function procesarCargo(
     ctx.bucketOrden.registrar(`IdEsMa_Recibos=${idCargoViejo} IdOrdenes=${idOrdenViejo}`);
     // Ventana ACTIVA y la orden quedó fuera POR LA VENTANA (prescan F2): el importe VALIDADO del
     // cargo (cant×precio, "ceronulo" — solo los validados suman en el saldo derivado, D3) alimenta
-    // el saldo inicial del maquilero. Origen inválido → NO suma (igual que una corrida sin ventana).
+    // el saldo inicial del maquilero, y el cargo cuenta como `fueraVentana` (exclusión a propósito,
+    // NO incidencia — estándar F2). Origen inválido → `omitido` como siempre, sin saldo.
     if (ctx.saldoInicial?.activa === true && ctx.saldoInicial.ordenesFuera.has(idOrdenViejo)) {
-      const validado = !parsearBandera(f.RevisionPendiente);
+      const importe = contribucionCargoExcluido(f);
       const idMaquilero = resolverMaquileroCabecera(
         cab.idMaquileroViejo,
         ctx.mapaMaquilero,
         ctx.mapaEstampador,
       );
-      if (validado && idMaquilero !== null) {
-        const importe = (parsearDinero(f.CantRecEsMa) ?? 0) * (parsearDinero(f.PrecioEsMa) ?? 0);
+      if (importe !== null && idMaquilero !== null) {
         ctx.saldoInicial.sumar(idMaquilero, importe);
         ctx.saldoInicial.cargosAlSaldo += 1;
       } else {
         ctx.saldoInicial.cargosSinSaldo += 1;
       }
+      return 'fueraVentana';
     }
     return 'omitido';
   }
@@ -637,6 +650,48 @@ export interface ResultadoSaldoInicialEsMa {
   discrepantes: number;
 }
 
+/** Un asiento CANDIDATO de saldo inicial (parte PURA del cálculo, testeable sin BD). */
+export interface AsientoSaldoInicial {
+  idMaquilero: number;
+  /** Neto pre-corte redondeado a 2 decimales (≠ 0). */
+  neto: number;
+  /** # de renglones pre-corte que aportaron. */
+  renglones: number;
+  entradas: number;
+  salidas: number;
+}
+
+/**
+ * Calcula (PURO, sin BD) los asientos candidatos del saldo inicial: redondea el neto de cada
+ * maquilero a 2 decimales y separa los que cierran en CERO (no generan asiento). Con la ventana
+ * inactiva o sin nada acumulado devuelve vacío. Orden determinista (por clave del acumulador).
+ */
+export function calcularAsientosSaldoInicial(saldoInicial: SaldoInicialEsMa): {
+  asientos: AsientoSaldoInicial[];
+  netoCero: number;
+} {
+  const asientos: AsientoSaldoInicial[] = [];
+  let netoCero = 0;
+  if (saldoInicial.ventana.corte === null) {
+    return { asientos, netoCero };
+  }
+  for (const s of saldoInicial.acumulador.saldos()) {
+    const neto = redondear2(s.neto);
+    if (neto === 0) {
+      netoCero += 1;
+      continue;
+    }
+    asientos.push({
+      idMaquilero: s.datos.idMaquilero,
+      neto,
+      renglones: s.renglones,
+      entradas: redondear2(s.entradas),
+      salidas: redondear2(s.salidas),
+    });
+  }
+  return { asientos, netoCero };
+}
+
 /**
  * Crea UN `AbonoMaquilero` sintético "Saldo inicial de migración" por maquilero con neto pre-corte
  * ≠ 0, con fecha = corte de la ventana (ver el TSDoc del módulo). Vehículo LIMPIO y ya existente: el
@@ -660,8 +715,9 @@ export async function crearAsientosSaldoInicialEsMa(
     discrepantes: 0,
   };
   const corte = saldoInicial.ventana.corte;
-  const saldos = saldoInicial.acumulador.saldos();
-  if (corte === null || saldos.length === 0) {
+  const { asientos, netoCero } = calcularAsientosSaldoInicial(saldoInicial);
+  r.netoCero = netoCero;
+  if (corte === null || asientos.length === 0) {
     return r;
   }
 
@@ -670,14 +726,10 @@ export async function crearAsientosSaldoInicialEsMa(
   const idEmpresa = await resolverEmpresaEsMa(cli);
   const fechaCorte = corte.toISOString().slice(0, 10);
 
-  for (const s of saldos) {
-    const neto = redondear2(s.neto);
-    if (neto === 0) {
-      r.netoCero += 1;
-      continue;
-    }
+  for (const s of asientos) {
+    const neto = s.neto;
     r.maquileros += 1;
-    const idMaquilero = s.datos.idMaquilero;
+    const idMaquilero = s.idMaquilero;
     const claveVieja = `saldo-inicial:${String(idMaquilero)}`;
 
     const ya = await leerMapeo(cli, ENTIDAD_MAPEO.abonoMaquilero, claveVieja);
@@ -724,8 +776,8 @@ export async function crearAsientosSaldoInicialEsMa(
       neto,
       corte: fechaCorte,
       renglones: s.renglones,
-      entradas: redondear2(s.entradas),
-      salidas: redondear2(s.salidas),
+      entradas: s.entradas,
+      salidas: s.salidas,
     });
     r.creados += 1;
     // El desglose por maquilero queda EXPLÍCITO en el reporte (el delta v1-vs-v2 se explica solo).
