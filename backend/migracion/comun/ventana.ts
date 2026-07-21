@@ -14,8 +14,10 @@
  *    corridas reproducibles (fijar la referencia para que dos corridas excluyan lo mismo).
  *  • `ETL_DESDE` (fecha `YYYY-MM-DD`, sin default): fecha de corte DIRECTA — más clara que
  *    años+ref cuando se quiere "solo desde 2025": `ETL_DESDE=2025-01-01`. Si viene válida,
- *    GANA sobre `ETL_VENTANA_ANIOS`/`ETL_VENTANA_REF`; inválida o ausente → se ignora
- *    (aplica el comportamiento anterior tal cual).
+ *    GANA sobre `ETL_VENTANA_ANIOS`/`ETL_VENTANA_REF`. Vacía/ausente → sin ventana (como
+ *    siempre). ⚠️ NO-vacía pero MAL FORMADA (p. ej. `2025-1-1`) → el ETL ABORTA con error
+ *    (exit 1): en el runbook destructivo (truncar + recargar) un typo que se ignorara en
+ *    silencio migraría el histórico completo — eso nunca debe pasar en silencio.
  *
  * El reporte de cuadre SIEMPRE imprime la configuración de la ventana y el conteo excluido
  * (0 por defecto), así Gabriel ve explícito qué quedó fuera por edad — aunque sea cero.
@@ -44,14 +46,33 @@ function leerAnios(): number {
   return Number.isInteger(n) && n >= 0 ? n : 0;
 }
 
-/** Lee `ETL_DESDE` (`YYYY-MM-DD`, fecha de corte directa). Ausente o inválida → `null` (se ignora). */
-function leerDesde(): Date | null {
-  const crudo = (process.env.ETL_DESDE ?? '').trim();
-  if (crudo !== '' && /^\d{4}-\d{2}-\d{2}$/.test(crudo)) {
-    const ms = Date.parse(`${crudo}T00:00:00.000Z`);
-    if (Number.isFinite(ms)) return new Date(ms);
+/** Error tipado: `ETL_DESDE` vino NO-vacía pero mal formada (jamás se ignora en silencio). */
+export class ErrorEtlDesdeInvalida extends Error {
+  constructor(crudo: string) {
+    super(
+      `ETL_DESDE inválida: "${crudo}". Formato requerido: YYYY-MM-DD (p. ej. ETL_DESDE=2025-01-01). ` +
+        'Se ABORTA el ETL: continuar la ignoraría en silencio y migraría el histórico COMPLETO.',
+    );
+    this.name = 'ErrorEtlDesdeInvalida';
   }
-  return null;
+}
+
+/**
+ * Parsea el valor CRUDO de `ETL_DESDE` (exportada para test). Vacía → `null` (sin ventana);
+ * `YYYY-MM-DD` válida → la fecha a medianoche UTC; NO-vacía inválida → {@link ErrorEtlDesdeInvalida}.
+ */
+export function parsearEtlDesde(crudo: string): Date | null {
+  const t = crudo.trim();
+  if (t === '') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const ms = Date.parse(`${t}T00:00:00.000Z`);
+    // Round-trip contra el texto original: rechaza fechas que se "desbordaron" (V8 acepta
+    // 2025-02-30 y lo rueda a 2025-03-02 — eso NO es la fecha que se tecleó).
+    if (Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === t) {
+      return new Date(ms);
+    }
+  }
+  throw new ErrorEtlDesdeInvalida(t);
 }
 
 /** Lee `ETL_VENTANA_REF` (`YYYY-MM-DD`; default HOY). Inválida → HOY. */
@@ -71,8 +92,19 @@ function leerRefMs(): number {
 export function resolverVentana(): ConfigVentana {
   const anios = leerAnios();
   const refMs = leerRefMs();
-  // `ETL_DESDE` (fecha de corte DIRECTA) GANA sobre años+ref si viene válida.
-  const desde = leerDesde();
+  // `ETL_DESDE` (fecha de corte DIRECTA) GANA sobre años+ref si viene válida. NO-vacía pero
+  // mal formada → ABORTA (exit 1): en el runbook destructivo (truncar + recargar) un typo
+  // ignorado en silencio migraría el histórico completo.
+  let desde: Date | null;
+  try {
+    desde = parsearEtlDesde(process.env.ETL_DESDE ?? '');
+  } catch (error) {
+    if (error instanceof ErrorEtlDesdeInvalida) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
   if (desde !== null) {
     return { anios, refMs, corte: desde, desde };
   }

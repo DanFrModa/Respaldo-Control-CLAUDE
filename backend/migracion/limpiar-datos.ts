@@ -139,6 +139,10 @@ async function main(): Promise<void> {
         '     el bucket (limitación conocida: el motor de archivos no tiene DeleteObject;\n' +
         '     deuda técnica aparcada en HOJA-DE-RUTA.md §4). El ETL de fotos los re-liga\n' +
         '     al re-subir; los viejos solo ocupan espacio.\n' +
+        ' (d) El esquema `pgboss` NO se tocó (solo se vació `public`): pueden quedar jobs\n' +
+        '     de RC encolados apuntando a filas ya borradas. Los handlers son resilientes\n' +
+        '     y los absorben, pero conviene saberlo — el reinicio del backend del paso (a)\n' +
+        '     los deja drenarse en limpio.\n' +
         ' Después: corre los ETL en su orden documentado (ver README de migracion/),\n' +
         ' anteponiendo ETL_DESDE=YYYY-MM-DD si quieres la recarga limitada por fecha.',
     );

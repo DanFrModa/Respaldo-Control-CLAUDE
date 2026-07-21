@@ -2,9 +2,15 @@
  * Unit (sin BD) de la ventana temporal del ETL (F4-E6). Helpers puros: resolución desde el entorno,
  * inclusión/exclusión por fecha y descripción legible.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describirVentana, dentroVentana, resolverVentana } from './ventana.js';
+import {
+  describirVentana,
+  dentroVentana,
+  ErrorEtlDesdeInvalida,
+  parsearEtlDesde,
+  resolverVentana,
+} from './ventana.js';
 
 let aniosPrevio: string | undefined;
 let refPrevio: string | undefined;
@@ -76,21 +82,38 @@ describe('resolverVentana — ETL_DESDE (fecha de corte directa)', () => {
     expect(v.corte?.toISOString().slice(0, 10)).toBe('2025-01-01'); // no 2016-06-22
   });
 
-  it('ETL_DESDE inválida se IGNORA (comportamiento actual intacto)', () => {
-    for (const malo of ['no-es-fecha', '2025-13-45', '01-01-2025', '']) {
-      process.env.ETL_DESDE = malo;
+  it('ETL_DESDE vacía/ausente → sin ventana (como siempre)', () => {
+    for (const vacia of ['', '   ']) {
+      process.env.ETL_DESDE = vacia;
       const v = resolverVentana();
-      expect(v.corte).toBeNull(); // sin años → sin ventana, como hoy
+      expect(v.corte).toBeNull();
       expect(v.desde ?? null).toBeNull();
     }
   });
 
-  it('ETL_DESDE inválida con años+ref válidos → aplica la ventana de años (como hoy)', () => {
-    process.env.ETL_DESDE = 'no-es-fecha';
-    process.env.ETL_VENTANA_ANIOS = '10';
-    process.env.ETL_VENTANA_REF = '2026-06-22';
-    const v = resolverVentana();
-    expect(v.corte?.toISOString().slice(0, 10)).toBe('2016-06-22');
+  it('parsearEtlDesde: NO-vacía mal formada → ErrorEtlDesdeInvalida (nunca se ignora)', () => {
+    for (const malo of ['no-es-fecha', '2025-13-45', '2025-1-1', '01-01-2025', '2025-02-30']) {
+      expect(() => parsearEtlDesde(malo)).toThrow(ErrorEtlDesdeInvalida);
+    }
+    expect(parsearEtlDesde('')).toBeNull(); // vacía = sin ventana, no es error
+    expect(parsearEtlDesde('2025-01-01')?.toISOString().slice(0, 10)).toBe('2025-01-01');
+  });
+
+  it('resolverVentana con ETL_DESDE mal formada ABORTA (console.error + exit 1)', () => {
+    process.env.ETL_DESDE = '2025-1-1'; // typo real: le faltan los ceros
+    const centinela = new Error('exit-1');
+    const salir = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw centinela; // en test no salimos de verdad: verificamos que SE INTENTÓ abortar
+    });
+    const errores = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(() => resolverVentana()).toThrow(centinela);
+      expect(salir).toHaveBeenCalledWith(1);
+      expect(errores).toHaveBeenCalledWith(expect.stringContaining('ETL_DESDE inválida'));
+    } finally {
+      salir.mockRestore();
+      errores.mockRestore();
+    }
   });
 
   it('dentroVentana respeta el corte de ETL_DESDE (límite inclusivo)', () => {
