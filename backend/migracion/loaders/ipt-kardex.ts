@@ -36,6 +36,20 @@
  * crear, se consulta el set de origenId ya migrados (una sola query) y se saltan los existentes; una
  * 2ª corrida no duplica. Carga CONCURRENTE acotada (`enLotes` + `conReintentoTransitorio`), POR
  * RENGLÓN independiente (cada `IPT_MovsDet` es su propio `Movimiento`).
+ *
+ * VENTANA TEMPORAL (`comun/ventana.ts`, default INACTIVA = comportamiento idéntico al de siempre):
+ * con ventana ACTIVA, los renglones con fecha ≥ corte migran igual que hoy; los ANTERIORES no se
+ * migran individuales sino que se ACUMULAN en memoria por combinación de inventario
+ * (empresa×almacén×modelo — color/talla son el sentinela en TODO el histórico) con signo según la
+ * dirección del tipo, y al final se crea UN movimiento SINTÉTICO por combo con fecha = corte:
+ * neto > 0 → `inventario-inicial` (entrada); neto < 0 → `otras-salidas` por |neto| (incidencia
+ * listada); neto 0 → nada. Así la existencia final por combo con ventana activa === la de migrar
+ * todo (D3). Solo entra al neto lo que SE HABRÍA migrado (los renglones que hoy se omiten por datos
+ * inválidos siguen omitiéndose ANTES de acumular). Idempotencia de los sintéticos: mismo
+ * `origenTipo='migracion'` con `origenId = 'saldo-inicial:e<empresa>:a<almacén>:m<modelo>'` (no
+ * puede colisionar con los `IdIPT_MovsDet` reales, que son numéricos) — el MISMO set `yaMigrados`
+ * los salta en una 2ª corrida. OJO: cambiar la config de la ventana entre corridas contra la MISMA
+ * BD no está soportado (los saldos previos quedarían de otro corte); recargar desde BD limpia.
  */
 import {
   crearMovimientoIptMigrado,
@@ -51,8 +65,15 @@ import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import {
+  AcumuladorSaldos,
+  esPreCorte,
+  observacionSaldoInicial,
+  type SaldoCombo,
+} from '../comun/saldo-inicial.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFecha, parsearTexto } from '../comun/valores.js';
+import { describirVentana, resolverVentana, type ConfigVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Nombre/etiqueta del Color y la Talla SENTINELA (decisión (c)). Inactivos, reusados por todo IPT. */
@@ -117,6 +138,26 @@ const DIRECCION_POR_CODIGO: Record<string, DireccionMovimiento> = {
   'otras-entradas': DireccionMovimiento.entrada,
 };
 
+/** Combo de inventario PT del saldo inicial (color/talla son SIEMPRE el sentinela, decisión (c)). */
+export interface ComboIpt {
+  idEmpresa: number;
+  idAlmacen: number;
+  idModelo: number;
+}
+
+/** Clave estable del combo (también es la base del `origenId` del movimiento sintético). */
+export function claveComboIpt(c: ComboIpt): string {
+  return `e${String(c.idEmpresa)}:a${String(c.idAlmacen)}:m${String(c.idModelo)}`;
+}
+
+/**
+ * `origenId` del movimiento SINTÉTICO de saldo inicial de un combo (con `origenTipo='migracion'`).
+ * El prefijo `saldo-inicial:` garantiza no colisionar con los `IdIPT_MovsDet` reales (numéricos).
+ */
+export function origenIdSaldoInicialIpt(c: ComboIpt): string {
+  return `saldo-inicial:${claveComboIpt(c)}`;
+}
+
 /** Resultado del loader de kardex IPT (resumen estándar + contadores propios). */
 export interface ResultadoIptKardex {
   movimientos: ResultadoLoader;
@@ -128,6 +169,14 @@ export interface ResultadoIptKardex {
   direccionDiscordante: number;
   /** # de renglones con IdIPT_TipoMov 0/vacío (tipo derivado de EnSa). */
   tipoVacio: number;
+  /** Configuración de la ventana temporal aplicada (para el reporte). */
+  ventana: ConfigVentana;
+  /** # de renglones PRE-CORTE condensados en saldos iniciales (0 con ventana inactiva). */
+  renglonesCondensados: number;
+  /** Movimientos SINTÉTICOS de saldo inicial (uno por combo con neto ≠ 0). */
+  saldosIniciales: ResultadoLoader;
+  /** # de combos cuyo neto pre-corte fue NEGATIVO (salida `otras-salidas`, listados). */
+  saldosNegativos: number;
 }
 
 /** Tipo de movimiento del catálogo, resuelto por código (id + dirección). */
@@ -177,6 +226,13 @@ export async function cargarIptKardex(
   reporte: Reporte,
 ): Promise<ResultadoIptKardex> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
+  const ventana = resolverVentana();
+  if (ventana.corte !== null) {
+    reporte.nota(
+      `${describirVentana(ventana)} Los movimientos IPT anteriores al corte se CONDENSAN en ` +
+        `saldos iniciales por combo empresa×almacén×modelo (fecha = corte).`,
+    );
+  }
 
   // ── Sentinelas + catálogos de apoyo ────────────────────────────────────────────────────────
   const { idColor: idColorSentinela, idTalla: idTallaSentinela } =
@@ -258,6 +314,10 @@ export async function cargarIptKardex(
     piezas: 0,
     direccionDiscordante: 0,
     tipoVacio: 0,
+    ventana,
+    renglonesCondensados: 0,
+    saldosIniciales: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
+    saldosNegativos: 0,
   };
 
   const detalles = leerCsv('IPT_MovsDet.csv');
@@ -266,6 +326,8 @@ export async function cargarIptKardex(
     cliente,
     bd,
     reporte,
+    ventana,
+    acumulador: new AcumuladorSaldos<ComboIpt>(),
     idColorSentinela,
     idTallaSentinela,
     mapaEmpresa,
@@ -300,6 +362,10 @@ export async function cargarIptKardex(
       if (c.tipoVacio) resultado.tipoVacio += 1;
     } else if (c.estado === 'existente') {
       resultado.movimientos.existentes += 1;
+    } else if (c.estado === 'condensado') {
+      resultado.renglonesCondensados += 1;
+      if (c.direccionDiscordante) resultado.direccionDiscordante += 1;
+      if (c.tipoVacio) resultado.tipoVacio += 1;
     } else if (c.estado === 'omitido') {
       resultado.movimientos.omitidos += 1;
     } else {
@@ -308,7 +374,105 @@ export async function cargarIptKardex(
     }
   }
 
+  // ── SALDOS INICIALES (solo con ventana activa): un movimiento sintético por combo ────────────
+  await crearSaldosIniciales(contexto, resultado);
+
   return resultado;
+}
+
+/**
+ * Crea los movimientos SINTÉTICOS de saldo inicial (uno por combo con neto ≠ 0), con fecha = corte.
+ * Con ventana INACTIVA o sin renglones condensados, no hace nada (comportamiento de siempre).
+ * Idempotente: el `origenId` sintético vive en el MISMO set `yaMigrados` (origenTipo='migracion').
+ */
+async function crearSaldosIniciales(
+  ctx: ContextoIpt,
+  resultado: ResultadoIptKardex,
+): Promise<void> {
+  const corte = ctx.ventana.corte;
+  if (corte === null || ctx.acumulador.combos === 0) return;
+
+  const saldos = ctx.acumulador.saldos();
+  const combosEnCero = saldos.filter((s) => s.neto === 0).length;
+  const conNeto = saldos.filter((s) => s.neto !== 0);
+
+  const res = await enLotes(
+    conNeto,
+    (s) => conReintentoTransitorio(() => crearUnSaldoInicial(ctx, corte, s)),
+    CONCURRENCIA_ETL,
+  );
+  for (const r of res) {
+    if (!r.ok) {
+      resultado.saldosIniciales.omitidosValidacion =
+        (resultado.saldosIniciales.omitidosValidacion ?? 0) + 1;
+      continue;
+    }
+    if (r.valor.estado === 'creado') resultado.saldosIniciales.creados += 1;
+    else if (r.valor.estado === 'existente') resultado.saldosIniciales.existentes += 1;
+    else
+      resultado.saldosIniciales.omitidosValidacion =
+        (resultado.saldosIniciales.omitidosValidacion ?? 0) + 1;
+    if (r.valor.negativo) resultado.saldosNegativos += 1;
+  }
+
+  ctx.reporte.nota(
+    `IPT ventana: ${String(ctx.acumulador.renglones)} renglones pre-corte condensados en ` +
+      `${String(ctx.acumulador.combos)} combos (empresa×almacén×modelo) → saldos iniciales ` +
+      `creados=${String(resultado.saldosIniciales.creados)} ` +
+      `existentes=${String(resultado.saldosIniciales.existentes)} ` +
+      `netoNegativo=${String(resultado.saldosNegativos)} ` +
+      `netoCero(sin movimiento)=${String(combosEnCero)}.`,
+  );
+}
+
+/** Crea (idempotente) el movimiento sintético de UN combo. Neto > 0 entrada; < 0 salida por |neto|. */
+async function crearUnSaldoInicial(
+  ctx: ContextoIpt,
+  corte: Date,
+  s: SaldoCombo<ComboIpt>,
+): Promise<{ estado: 'creado' | 'existente' | 'omitidoValidacion'; negativo: boolean }> {
+  const negativo = s.neto < 0;
+  const origenId = origenIdSaldoInicialIpt(s.datos);
+  if (ctx.yaMigrados.has(origenId)) {
+    return { estado: 'existente', negativo };
+  }
+  const codigo = negativo ? COD_OTRAS_SALIDAS : 'inventario-inicial';
+  const tipo = ctx.tipoPorCodigo.get(codigo);
+  if (tipo === undefined) {
+    ctx.reporte.agregar(
+      `IPT saldo inicial: falta el tipo "${codigo}" en el catálogo (re-sembrar) — combo OMITIDO`,
+      `combo=${s.clave} neto=${String(s.neto)}`,
+    );
+    return { estado: 'omitidoValidacion', negativo };
+  }
+  if (negativo) {
+    ctx.reporte.agregar(
+      'IPT saldo inicial NEGATIVO (condensado como salida `otras-salidas` — descuadre del viejo)',
+      `combo=${s.clave} neto=${String(s.neto)} (entradas=${String(s.entradas)} salidas=${String(s.salidas)} renglones=${String(s.renglones)})`,
+    );
+  }
+  const entrada: MovimientoIptMigrado = {
+    idEmpresa: s.datos.idEmpresa,
+    idTipoMov: tipo.id,
+    idAlmacen: s.datos.idAlmacen,
+    idModelo: s.datos.idModelo,
+    idColorSentinela: ctx.idColorSentinela,
+    idTallaSentinela: ctx.idTallaSentinela,
+    cantidad: Math.abs(s.neto),
+    fecha: corte,
+    origenId,
+    observaciones: observacionSaldoInicial(
+      `${String(s.entradas)} entradas − ${String(s.salidas)} salidas en ${String(s.renglones)} renglones de IPT_MovsDet`,
+    ),
+  };
+  const idMovimiento = await intentarCrear(ctx.reporte, 'SaldoInicialIPT', s.clave, () =>
+    crearMovimientoIptMigrado(ctx.sesion, entrada, ctx.bd),
+  );
+  if (idMovimiento === null) {
+    return { estado: 'omitidoValidacion', negativo };
+  }
+  ctx.yaMigrados.add(origenId);
+  return { estado: 'creado', negativo };
 }
 
 /** Todo lo que necesita `procesarDetalle` (resuelto una sola vez). */
@@ -317,6 +481,10 @@ interface ContextoIpt {
   cliente: ClienteMapeo;
   bd: ContextoBd;
   reporte: Reporte;
+  /** Ventana temporal de la corrida (resuelta UNA vez; default inactiva). */
+  ventana: ConfigVentana;
+  /** Acumulador de renglones pre-corte por combo (solo se llena con ventana activa). */
+  acumulador: AcumuladorSaldos<ComboIpt>;
   idColorSentinela: number;
   idTallaSentinela: number;
   mapaEmpresa: Map<string, number>;
@@ -330,9 +498,9 @@ interface ContextoIpt {
   yaMigrados: Set<string>;
 }
 
-/** Contribución de UN renglón IPT_MovsDet a los conteos. */
+/** Contribución de UN renglón IPT_MovsDet a los conteos (`condensado` = pre-corte, va al saldo). */
 interface ContribDet {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'condensado';
   piezas: number;
   direccionDiscordante: boolean;
   tipoVacio: boolean;
@@ -515,6 +683,27 @@ async function procesarDetalle(ctx: ContextoIpt, f: Record<string, string>): Pro
       `IdIPT_MovsDet=${idDet} IdIPT_Movs=${idMovV1}`,
     );
     fecha = new Date(Date.UTC(1900, 0, 1));
+  }
+
+  // ── Ventana temporal: renglón PRE-CORTE → se ACUMULA al saldo inicial de su combo ────────────
+  // Solo llega aquí lo que SE HABRÍA migrado (todas las validaciones de arriba ya pasaron); lo que
+  // hoy se omite por datos inválidos NO entra al neto. La fecha sin parsear cayó al marcador 1900
+  // (histórico) → también se condensa. Rareza: un tipo con dirección `traspaso` (EnSa inválido +
+  // tipo 9) sigue el camino individual — el motor lo rechaza y queda listado, igual que hoy.
+  if (esPreCorte(fecha, ctx.ventana) && resTipo.tipo.direccion !== DireccionMovimiento.traspaso) {
+    const combo: ComboIpt = { idEmpresa, idAlmacen, idModelo };
+    ctx.acumulador.agregar(
+      claveComboIpt(combo),
+      combo,
+      resTipo.tipo.direccion === DireccionMovimiento.entrada ? 'entrada' : 'salida',
+      cantidad,
+    );
+    return {
+      estado: 'condensado',
+      piezas: cantidad,
+      direccionDiscordante: resTipo.discordante,
+      tipoVacio: resTipo.vacio,
+    };
   }
 
   const observaciones = construirObservaciones(mov);

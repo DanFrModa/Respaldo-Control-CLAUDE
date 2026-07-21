@@ -65,6 +65,16 @@ export async function ejecutarEtlTelas(cliente: PrismaClient): Promise<Reporte> 
   imprimir('Salidas a orden (c)', r.salidasOrden);
   imprimir('Salidas sin clasificar (d, ajuste-salida)', r.salidasSinClasificar);
   imprimir('Traspasos (a, pares)', r.traspasos);
+  if (r.ventana.corte !== null) {
+    console.log(`  ${describirVentana(r.ventana)}`);
+    console.log(
+      `    (docs condensados: entradas=${String(r.docsCondensados.entradas)} ` +
+        `salidas=${String(r.docsCondensados.salidas)} traspasos=${String(r.docsCondensados.traspasos)} · ` +
+        `renglones=${String(r.renglonesCondensados)})`,
+    );
+    imprimir('Saldos iniciales (sintéticos por combo)', r.saldosIniciales);
+    console.log(`    (combos con neto negativo=${String(r.saldosNegativos)})`);
+  }
 
   console.log('ETL de inventario de TELAS F4-E6 — fin de carga');
   return reporte;

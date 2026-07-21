@@ -29,6 +29,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { calcularCuadreF3, formatearCuadreF3 } from './cuadre-f3.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana } from './comun/ventana.js';
 import { cargarIptKardex } from './loaders/ipt-kardex.js';
 
 /** Corre el ETL de kardex IPT contra el cliente dado. Devuelve el reporte de incidencias. */
@@ -49,6 +50,15 @@ export async function ejecutarEtlIpt(cliente: PrismaClient): Promise<Reporte> {
     `    (detalles migrados=${String(r.detallesMigrados)} piezas=${String(r.piezas)} ` +
       `tipoVacío(EnSa)=${String(r.tipoVacio)} direcciónDiscordante=${String(r.direccionDiscordante)})`,
   );
+  if (r.ventana.corte !== null) {
+    console.log(`  ${describirVentana(r.ventana)}`);
+    console.log(
+      `    (renglones condensados=${String(r.renglonesCondensados)} saldos iniciales ` +
+        `creados=${String(r.saldosIniciales.creados)} existentes=${String(r.saldosIniciales.existentes)} ` +
+        `omitidosValidacion=${String(r.saldosIniciales.omitidosValidacion ?? 0)} ` +
+        `netoNegativo=${String(r.saldosNegativos)})`,
+    );
+  }
 
   console.log('ETL de inventario PT F3-E6 — fin de carga');
   return reporte;

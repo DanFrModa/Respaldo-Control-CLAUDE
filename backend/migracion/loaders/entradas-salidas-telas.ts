@@ -34,6 +34,23 @@
  * `Movimiento.origenId`. Carga POR LOTES (`enLotes` + `conReintentoTransitorio`): cada DOCUMENTO (o
  * par de traspaso) es una unidad atómica A2. Los lotes legacy y los catálogos se PRE-RESUELVEN antes
  * del bucle concurrente (el bucle solo LEE; nunca crea un lote al vuelo → sin carreras en el unique).
+ *
+ * VENTANA TEMPORAL (default INACTIVA = comportamiento idéntico al de siempre): antes, con ventana
+ * activa, los documentos pre-corte solo se OMITÍAN → las existencias (D3, suma de movimientos)
+ * quedaban MAL. Ahora los docs pre-corte se CONDENSAN: sus renglones se ACUMULAN en memoria por la
+ * combinación de inventario del kardex de telas (tela×lote×almacén — el lote legacy es 1:1 con el
+ * color viejo `IdTelasColores`, así que el combo preserva tela×color×almacén del viejo) con signo
+ * según el tipo de documento; un TRASPASO pre-corte resta en el almacén ORIGEN y suma en el DESTINO.
+ * Al final se crea UN movimiento sintético por combo con fecha = corte: neto > 0 →
+ * `inventario-inicial` (entrada, costo del `TelasColores.Precio` del color); neto < 0 →
+ * `ajuste-salida` por |neto| (incidencia listada); neto 0 → nada. Solo entra al neto lo que SE
+ * HABRÍA migrado (renglones sin tela/lote/almacén mapeable siguen omitiéndose y listándose).
+ * Idempotencia de los sintéticos: `origenTipo='migracion'` +
+ * `origenId='saldo-inicial-tela:t<tela>:l<lote>:a<almacén>'` (no colisiona con los origenId de
+ * documentos, que llevan prefijos `EntradasDet:`/`SalidasDet:`/`Traspaso:`) — el MISMO set
+ * `origenIdsTela` los salta en una 2ª corrida. La EMPRESA del sintético es la default (la existencia
+ * por almacén no depende de la empresa; solo numera el folio). OJO: cambiar la config de la ventana
+ * entre corridas contra la MISMA BD no está soportado; recargar desde BD limpia.
  */
 import {
   asegurarLoteLegacyTela,
@@ -61,8 +78,14 @@ import {
 } from '../comun/pares-traspaso-tela.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import {
+  AcumuladorSaldos,
+  esPreCorte,
+  observacionSaldoInicial,
+  type DireccionSaldo,
+} from '../comun/saldo-inicial.js';
 import { intentarCrear } from '../comun/saneo.js';
-import { dentroVentana, resolverVentana, type ConfigVentana } from '../comun/ventana.js';
+import { resolverVentana, type ConfigVentana } from '../comun/ventana.js';
 import { parsearDinero, parsearFechaSoloDia, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -75,6 +98,38 @@ const COD_TRANSFERENCIA_ENTRADA = 'transferencia-entrada';
 
 /** Prefijo de la clave determinista del lote legacy (uno por IdTelasColores). */
 const PREFIJO_LOTE_LEGACY = 'LEGACY-TELA';
+
+/** Tipo de la ENTRADA sintética de saldo inicial (el más natural del seed para "saldo de arranque"). */
+const COD_INVENTARIO_INICIAL = 'inventario-inicial';
+
+/** Combo de inventario del kardex de telas para el saldo inicial (tela×lote×almacén, D5). */
+export interface ComboTela {
+  idTela: number;
+  idLote: number;
+  idAlmacen: number;
+}
+
+/** Clave estable del combo (ordena el volcado; base del `origenId` sintético). */
+export function claveComboTela(c: ComboTela): string {
+  return `t${String(c.idTela)}:l${String(c.idLote)}:a${String(c.idAlmacen)}`;
+}
+
+/** `origenId` del movimiento SINTÉTICO de saldo inicial de un combo de telas. */
+export function origenIdSaldoInicialTela(c: ComboTela): string {
+  return `saldo-inicial-tela:${claveComboTela(c)}`;
+}
+
+/** Redondea un neto de tela a 4 decimales (la precisión del kardex, Decimal(14,4)). */
+function redondear4(n: number): number {
+  return Math.round(n * 10_000) / 10_000;
+}
+
+/** Documentos pre-corte CONDENSADOS (no migrados individuales), por clase. */
+export interface DocsCondensados {
+  entradas: number;
+  salidas: number;
+  traspasos: number;
+}
 
 /** Resultado del loader de kardex de telas (resumen + contadores propios de la clasificación). */
 export interface ResultadoTelasKardex {
@@ -94,6 +149,14 @@ export interface ResultadoTelasKardex {
   lotesLegacy: number;
   /** Configuración de la ventana temporal aplicada (para el reporte). */
   ventana: ConfigVentana;
+  /** Docs pre-corte condensados al saldo inicial (0 en todo con ventana inactiva). */
+  docsCondensados: DocsCondensados;
+  /** # de renglones pre-corte acumulados en los combos. */
+  renglonesCondensados: number;
+  /** Movimientos SINTÉTICOS de saldo inicial (uno por combo tela×lote×almacén con neto ≠ 0). */
+  saldosIniciales: ResultadoLoader;
+  /** # de combos cuyo neto pre-corte fue NEGATIVO (salida `ajuste-salida`, listados). */
+  saldosNegativos: number;
 }
 
 /** Una fila de detalle ya normalizada con su color/almacén resueltos. */
@@ -131,6 +194,13 @@ export async function cargarTelasKardex(
 ): Promise<ResultadoTelasKardex> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const ventana = resolverVentana();
+  if (ventana.corte !== null) {
+    reporte.nota(
+      'Telas ventana: los documentos anteriores al corte se CONDENSAN en saldos iniciales por ' +
+        'combo tela×lote×almacén (fecha = corte); los traspasos pre-corte restan en el origen y ' +
+        'suman en el destino.',
+    );
+  }
 
   // ── Mapeos de fases previas ──────────────────────────────────────────────────────────────────
   const mapaTela = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.telaPorIdTelas);
@@ -257,6 +327,13 @@ export async function cargarTelasKardex(
     loteIdPorColor,
   );
 
+  // Costo por lote legacy (= `TelasColores.Precio` del color 1:1 del lote), para que la ENTRADA
+  // sintética de saldo inicial conserve el costo de la tela (D1) igual que una entrada de compra.
+  const precioPorLote = new Map<number, number | null>();
+  for (const [idTelasColores, idLote] of loteIdPorColor) {
+    precioPorLote.set(idLote, coloresPorId.get(idTelasColores)?.precio ?? null);
+  }
+
   // ── Idempotencia: mapeos ya migrados ─────────────────────────────────────────────────────────
   const yaEntrada = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.movEntradaTela);
   const yaSalida = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.movSalidaTela);
@@ -278,6 +355,9 @@ export async function cargarTelasKardex(
     bd,
     reporte,
     ventana,
+    acumulador: new AcumuladorSaldos<ComboTela>(),
+    docsCondensados: { entradas: 0, salidas: 0, traspasos: 0 },
+    precioPorLote,
     idEmpresaDefecto,
     mapaTela,
     mapaAlmacen,
@@ -290,6 +370,7 @@ export async function cargarTelasKardex(
     idAjusteSalida,
     idTransfSalida,
     idTransfEntrada,
+    idTipoPorCodigo,
     yaEntrada,
     yaSalida,
     yaTraspaso,
@@ -336,6 +417,9 @@ export async function cargarTelasKardex(
     aplicarEstado(objetivo, r.valor.estado);
   }
 
+  // ── SALDOS INICIALES (solo con ventana activa): un movimiento sintético por combo ────────────
+  const { saldosIniciales, saldosNegativos } = await crearSaldosInicialesTela(ctx);
+
   return {
     entradasCompra,
     salidasOrden,
@@ -345,7 +429,111 @@ export async function cargarTelasKardex(
     entradasTransferenciaSinPar: entradasSinPar.length,
     lotesLegacy,
     ventana,
+    docsCondensados: ctx.docsCondensados,
+    renglonesCondensados: ctx.acumulador.renglones,
+    saldosIniciales,
+    saldosNegativos,
   };
+}
+
+/**
+ * Crea los movimientos SINTÉTICOS de saldo inicial de telas (uno por combo tela×lote×almacén con
+ * neto ≠ 0), con fecha = corte. Con ventana INACTIVA o sin nada condensado, no hace nada. Neto > 0 →
+ * `inventario-inicial` (entrada, costo del color); neto < 0 → `ajuste-salida` por |neto| (listado).
+ * Idempotente por el set `origenIdsTela` (el sintético lleva `origenTipo='migracion'` + su
+ * `origenId` determinista, y en una 2ª corrida ya aparece en la query de arranque).
+ */
+async function crearSaldosInicialesTela(
+  ctx: Ctx,
+): Promise<{ saldosIniciales: ResultadoLoader; saldosNegativos: number }> {
+  const saldosIniciales = RES_VACIO();
+  let saldosNegativos = 0;
+  const corte = ctx.ventana.corte;
+  if (corte === null || ctx.acumulador.combos === 0) {
+    return { saldosIniciales, saldosNegativos };
+  }
+
+  // El tipo de la entrada sintética se exige SOLO aquí (con ventana inactiva ni se consulta).
+  const idInventarioInicial = exigirTipo(ctx.idTipoPorCodigo, COD_INVENTARIO_INICIAL);
+
+  const saldos = ctx.acumulador.saldos();
+  let combosEnCero = 0;
+
+  const res = await enLotes(
+    saldos,
+    (s) =>
+      conReintentoTransitorio(
+        async (): Promise<
+          'creado' | 'creado-negativo' | 'existente' | 'omitidoValidacion' | 'cero'
+        > => {
+          const neto = redondear4(s.neto);
+          if (neto === 0) return 'cero'; // el combo cierra en cero: sin movimiento
+          const negativo = neto < 0;
+          const origenId = origenIdSaldoInicialTela(s.datos);
+          if (ctx.origenIdsTela.has(origenId)) return 'existente';
+          if (negativo) {
+            ctx.reporte.agregar(
+              'Telas saldo inicial NEGATIVO (condensado como `ajuste-salida` — descuadre del viejo)',
+              `combo=${s.clave} neto=${String(neto)} (entradas=${String(redondear4(s.entradas))} ` +
+                `salidas=${String(redondear4(s.salidas))} renglones=${String(s.renglones)})`,
+            );
+          }
+          const costoUnit = negativo ? null : (ctx.precioPorLote.get(s.datos.idLote) ?? null);
+          const creado = await intentarCrear(ctx.reporte, 'SaldoInicialTela', s.clave, () =>
+            crearMovimientoTelaMigrado(
+              ctx.sesion,
+              {
+                idEmpresa: ctx.idEmpresaDefecto,
+                idTipoMov: negativo ? ctx.idAjusteSalida : idInventarioInicial,
+                idAlmacen: s.datos.idAlmacen,
+                fecha: corte,
+                origenId,
+                origenTipo: ORIGEN.migracion,
+                lineas: [
+                  {
+                    idTela: s.datos.idTela,
+                    idLote: s.datos.idLote,
+                    cantidad: Math.abs(neto),
+                    costoUnit,
+                  },
+                ],
+                observaciones: observacionSaldoInicial(
+                  `${String(redondear4(s.entradas))} de entrada − ${String(redondear4(s.salidas))} ` +
+                    `de salida en ${String(s.renglones)} renglones de Entradas/Salidas/traspasos`,
+                ),
+              },
+              ctx.bd,
+            ),
+          );
+          if (creado === null) return 'omitidoValidacion';
+          ctx.origenIdsTela.add(origenId);
+          return negativo ? 'creado-negativo' : 'creado';
+        },
+      ),
+    CONCURRENCIA_ETL,
+  );
+
+  for (const r of res) {
+    if (!r.ok) {
+      saldosIniciales.omitidosValidacion = (saldosIniciales.omitidosValidacion ?? 0) + 1;
+      continue;
+    }
+    if (r.valor === 'cero') combosEnCero += 1;
+    else if (r.valor === 'creado-negativo') {
+      saldosIniciales.creados += 1;
+      saldosNegativos += 1;
+    } else aplicarEstado(saldosIniciales, r.valor);
+  }
+
+  ctx.reporte.nota(
+    `Telas ventana: ${String(ctx.acumulador.renglones)} renglones pre-corte condensados ` +
+      `(docs: entradas=${String(ctx.docsCondensados.entradas)} salidas=${String(ctx.docsCondensados.salidas)} ` +
+      `traspasos=${String(ctx.docsCondensados.traspasos)}) en ${String(ctx.acumulador.combos)} combos ` +
+      `(tela×lote×almacén) → saldos iniciales creados=${String(saldosIniciales.creados)} ` +
+      `existentes=${String(saldosIniciales.existentes)} netoNegativo=${String(saldosNegativos)} ` +
+      `netoCero(sin movimiento)=${String(combosEnCero)}.`,
+  );
+  return { saldosIniciales, saldosNegativos };
 }
 
 // ── Contexto del bucle ──────────────────────────────────────────────────────────────────────────
@@ -356,6 +544,12 @@ interface Ctx {
   bd: ContextoBd;
   reporte: Reporte;
   ventana: ConfigVentana;
+  /** Acumulador de renglones pre-corte por combo tela×lote×almacén (solo con ventana activa). */
+  acumulador: AcumuladorSaldos<ComboTela>;
+  /** Conteo de documentos pre-corte condensados, por clase. */
+  docsCondensados: DocsCondensados;
+  /** Costo (`TelasColores.Precio`) por lote legacy, para la entrada sintética de saldo. */
+  precioPorLote: Map<number, number | null>;
   idEmpresaDefecto: number;
   mapaTela: Map<string, number>;
   mapaAlmacen: Map<string, number>;
@@ -368,6 +562,8 @@ interface Ctx {
   idAjusteSalida: number;
   idTransfSalida: number;
   idTransfEntrada: number;
+  /** Catálogo completo código→id (para resolver tipos que solo usa la ventana activa). */
+  idTipoPorCodigo: Map<string, number>;
   yaEntrada: Map<string, number>;
   yaSalida: Map<string, number>;
   yaTraspaso: Map<string, number>;
@@ -426,10 +622,41 @@ function construirLineasPorAlmacen(
   return porAlmacen;
 }
 
+/**
+ * CONDENSA un documento PRE-CORTE al acumulador de saldos: resuelve sus renglones con la MISMA
+ * criba que la migración individual (`construirLineasPorAlmacen` — lo no mapeable se lista y NO
+ * entra al neto) y suma/resta cada línea en su combo tela×lote×almacén. Devuelve el # de renglones
+ * acumulados (0 = nada resoluble; el doc queda como omitido, igual que hoy).
+ */
+function condensarDocumento(
+  ctx: Ctx,
+  doc: DocResuelto,
+  direccion: DireccionSaldo,
+  etiqueta: string,
+): number {
+  const porAlmacen = construirLineasPorAlmacen(ctx, doc, false, etiqueta);
+  let renglones = 0;
+  for (const [idAlmacen, lineas] of porAlmacen) {
+    for (const l of lineas) {
+      const combo: ComboTela = { idTela: l.idTela, idLote: l.idLote, idAlmacen: Number(idAlmacen) };
+      ctx.acumulador.agregar(claveComboTela(combo), combo, direccion, l.cantidad);
+      renglones += 1;
+    }
+  }
+  return renglones;
+}
+
 /** Migra una ENTRADA DE COMPRA (b): movimientos de entrada directa (uno por almacén tocado). */
 async function migrarEntradaCompra(ctx: Ctx, doc: DocResuelto): Promise<Estado> {
   if (ctx.yaEntrada.has(doc.id)) return 'existente';
-  if (!dentroVentana(doc.fecha, ctx.ventana)) return 'omitido';
+  if (esPreCorte(doc.fecha, ctx.ventana)) {
+    // Pre-corte: NO migra individual — se condensa al saldo inicial (cuenta como omitido, igual
+    // que antes; el agregado sale en la nota de la ventana).
+    if (condensarDocumento(ctx, doc, 'entrada', 'Telas entrada (pre-corte)') > 0) {
+      ctx.docsCondensados.entradas += 1;
+    }
+    return 'omitido';
+  }
   const fecha = doc.fecha;
   if (fecha === null) {
     ctx.reporte.agregar('Telas entrada: sin fecha parseable (omitida)', `IdEntradas=${doc.id}`);
@@ -486,7 +713,15 @@ async function migrarSalida(ctx: Ctx, doc: DocResuelto): Promise<ResSalida> {
   const conOrden = doc.idOrdenV1 !== null;
   const clase: ResSalida['clase'] = conOrden ? 'orden' : 'sin-clasificar';
   if (ctx.yaSalida.has(doc.id)) return { estado: 'existente', clase };
-  if (!dentroVentana(doc.fecha, ctx.ventana)) return { estado: 'omitido', clase };
+  if (esPreCorte(doc.fecha, ctx.ventana)) {
+    // Pre-corte: se condensa al saldo (resta del combo). OJO: se condensa ANTES de clasificar
+    // (c/d) — para el neto da igual la clase, y así las miles de salidas viejas no inundan el
+    // reporte con la incidencia por-documento de la decisión (d).
+    if (condensarDocumento(ctx, doc, 'salida', 'Telas salida (pre-corte)') > 0) {
+      ctx.docsCondensados.salidas += 1;
+    }
+    return { estado: 'omitido', clase };
+  }
   const fecha = doc.fecha;
   if (fecha === null) {
     ctx.reporte.agregar('Telas salida: sin fecha parseable (omitida)', `IdSalidas=${doc.id}`);
@@ -590,7 +825,7 @@ async function migrarTraspaso(
     ctx.reporte.agregar('Telas traspaso: sin fecha parseable (omitido)', `IdSalidas=${salida.id}`);
     return 'omitido';
   }
-  if (!dentroVentana(fecha, ctx.ventana)) return 'omitido';
+  const preCorte = esPreCorte(fecha, ctx.ventana);
 
   const lineasSalida = construirLineasPorAlmacen(ctx, salida, false, 'Telas traspaso (salida)');
   const lineasEntrada = construirLineasPorAlmacen(ctx, entrada, false, 'Telas traspaso (entrada)');
@@ -608,6 +843,28 @@ async function migrarTraspaso(
       'Telas traspaso: origen y destino iguales (omitido)',
       `IdEntradas=${entrada.id} IdSalidas=${salida.id} almacén=${idAlmacenOrigen}`,
     );
+    return 'omitido';
+  }
+
+  if (preCorte) {
+    // Pre-corte: el traspaso se condensa como sus DOS patas (mismas líneas que la migración
+    // individual, tomadas de la pata de salida): RESTA en el almacén ORIGEN y SUMA en el DESTINO.
+    // Pasó ya las mismas validaciones que un traspaso migrable (par 1×1, almacenes distintos).
+    for (const l of lineas) {
+      const comboOrigen: ComboTela = {
+        idTela: l.idTela,
+        idLote: l.idLote,
+        idAlmacen: Number(idAlmacenOrigen),
+      };
+      const comboDestino: ComboTela = {
+        idTela: l.idTela,
+        idLote: l.idLote,
+        idAlmacen: Number(idAlmacenDestino),
+      };
+      ctx.acumulador.agregar(claveComboTela(comboOrigen), comboOrigen, 'salida', l.cantidad);
+      ctx.acumulador.agregar(claveComboTela(comboDestino), comboDestino, 'entrada', l.cantidad);
+    }
+    if (lineas.length > 0) ctx.docsCondensados.traspasos += 1;
     return 'omitido';
   }
 
