@@ -13,7 +13,12 @@
  *
  * Sin `--confirmar` es un ENSAYO (dry-run): lista las tablas con sus conteos y sale sin tocar
  * nada. Con `--confirmar` trunca y muestra conteos antes/después. Al final SIEMPRE recuerda los
- * pasos manuales: re-seed (`SEED_ON_START=true`), password del admin y huérfanos de R2.
+ * pasos manuales: re-seed (`SEED_ON_START=true` o el seed del orquestador), password del admin,
+ * huérfanos de R2 y jobs viejos de `pgboss`.
+ *
+ * La lógica (descubrir/contar/truncar) se EXPORTA para que `migracion/recargar.ts` (el
+ * orquestador de recarga de punta a punta) la reuse sin duplicarla; este script sigue
+ * funcionando solo.
  *
  * ⚠️ Pensado para la BD de `prueba` (Railway). Es DESTRUCTIVO e irreversible: apunta la
  * `DATABASE_URL` del `.env` con cuidado.
@@ -23,16 +28,24 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 /** Tabla que NUNCA se trunca (historial de migraciones de Prisma: estructura, no datos). */
-const TABLA_PROTEGIDA = '_prisma_migrations';
+export const TABLA_PROTEGIDA = '_prisma_migrations';
 
 /** Nombre de tabla + conteo de filas. */
-interface TablaConConteo {
+export interface TablaConConteo {
   tabla: string;
   filas: number;
 }
 
+/** Desenlace de {@link ejecutarLimpieza} (para que el orquestador sepa qué pasó). */
+export interface ResultadoLimpieza {
+  /** 'ensayo' = solo se imprimió el plan; 'limpiada' = TRUNCATE ejecutado. */
+  modo: 'ensayo' | 'limpiada';
+  /** Cuántas tablas abarcó (descubiertas en `public`, sin la protegida). */
+  tablas: number;
+}
+
 /** Descubre las tablas del esquema `public` (menos la protegida), en orden alfabético. */
-async function descubrirTablas(cliente: PrismaClient): Promise<string[]> {
+export async function descubrirTablas(cliente: PrismaClient): Promise<string[]> {
   const filas = await cliente.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
     WHERE schemaname = 'public' AND tablename <> ${TABLA_PROTEGIDA}
@@ -47,7 +60,10 @@ function citarIdent(nombre: string): string {
 }
 
 /** Cuenta las filas de cada tabla (una a una: son ~decenas de tablas, no hace falta más). */
-async function contarTablas(cliente: PrismaClient, tablas: string[]): Promise<TablaConConteo[]> {
+export async function contarTablas(
+  cliente: PrismaClient,
+  tablas: string[],
+): Promise<TablaConConteo[]> {
   const resultado: TablaConConteo[] = [];
   for (const tabla of tablas) {
     const filas = await cliente.$queryRawUnsafe<{ n: bigint }[]>(
@@ -75,6 +91,78 @@ function imprimirConteos(titulo: string, conteos: TablaConConteo[]): void {
   );
 }
 
+/**
+ * Núcleo REUSABLE de la limpieza (lo comparte `recargar.ts`): imprime los conteos actuales y,
+ * SOLO con `confirmar=true`, trunca todo `public` (menos {@link TABLA_PROTEGIDA}) verificando
+ * conteos después. Sin `confirmar` es un ensayo: no toca nada. NO imprime las advertencias
+ * finales (eso lo decide cada punto de entrada: este script o el orquestador).
+ */
+export async function ejecutarLimpieza(
+  cliente: PrismaClient,
+  opciones: { confirmar: boolean },
+): Promise<ResultadoLimpieza> {
+  const { confirmar } = opciones;
+  const tablas = await descubrirTablas(cliente);
+  if (tablas.length === 0) {
+    console.log('No hay tablas en el esquema public (¿migraciones sin aplicar?). Nada que hacer.');
+    return { modo: confirmar ? 'limpiada' : 'ensayo', tablas: 0 };
+  }
+
+  const antes = await contarTablas(cliente, tablas);
+  imprimirConteos(
+    confirmar
+      ? 'Conteos ANTES de limpiar:'
+      : `ENSAYO (sin --confirmar): esto es lo que se VACIARÍA (se conserva ${TABLA_PROTEGIDA}):`,
+    antes,
+  );
+
+  if (!confirmar) {
+    return { modo: 'ensayo', tablas: tablas.length };
+  }
+
+  // TRUNCATE de TODAS las tablas en una sola sentencia: RESTART IDENTITY reinicia las
+  // secuencias/identity y CASCADE resuelve las FKs entre ellas (no hay que ordenarlas).
+  console.log(`\nTRUNCATE de ${String(tablas.length)} tablas (RESTART IDENTITY CASCADE)…`);
+  await cliente.$executeRawUnsafe(
+    `TRUNCATE TABLE ${tablas.map(citarIdent).join(', ')} RESTART IDENTITY CASCADE`,
+  );
+
+  const despues = await contarTablas(cliente, tablas);
+  imprimirConteos('Conteos DESPUÉS de limpiar (todo debe estar en 0):', despues);
+  const sobran = despues.filter((c) => c.filas > 0);
+  if (sobran.length > 0) {
+    console.error(
+      `⚠️ Quedaron tablas con filas tras el TRUNCATE (revisar): ${sobran.map((c) => c.tabla).join(', ')}`,
+    );
+  }
+  return { modo: 'limpiada', tablas: tablas.length };
+}
+
+/**
+ * Advertencias post-limpieza (las imprime este script al terminar; `recargar.ts` da su propia
+ * versión en el resumen final porque él mismo corre el seed).
+ */
+export const ADVERTENCIAS_POST_LIMPIEZA =
+  '═══════════════════════════════════════════════════════════════\n' +
+  ' BD VACIADA. Pasos manuales OBLIGATORIOS antes de recargar:\n' +
+  '═══════════════════════════════════════════════════════════════\n' +
+  ' (a) Reinicia el backend en Railway con SEED_ON_START=true para re-sembrar\n' +
+  '     catálogos base, permisos, roles y el usuario admin (el TRUNCATE también\n' +
+  '     los borró; sin el seed el login y los menús NO funcionan).\n' +
+  ' (b) El usuario `admin` vuelve al password del seed — CÁMBIALO en cuanto entres.\n' +
+  ' (c) Los objetos ya subidos a R2 (fotos de modelos/bordados/adjuntos) quedan\n' +
+  '     HUÉRFANOS: sus registros en BD se borraron pero el archivo físico sigue en\n' +
+  '     el bucket (limitación conocida: el motor de archivos no tiene DeleteObject;\n' +
+  '     deuda técnica aparcada en HOJA-DE-RUTA.md §4). El ETL de fotos los re-liga\n' +
+  '     al re-subir; los viejos solo ocupan espacio.\n' +
+  ' (d) El esquema `pgboss` NO se tocó (solo se vació `public`): pueden quedar jobs\n' +
+  '     de RC encolados apuntando a filas ya borradas. Los handlers son resilientes\n' +
+  '     y los absorben, pero conviene saberlo — el reinicio del backend del paso (a)\n' +
+  '     los deja drenarse en limpio.\n' +
+  ' Después: corre los ETL en su orden documentado (ver README de migracion/),\n' +
+  ' anteponiendo ETL_DESDE=YYYY-MM-DD si quieres la recarga limitada por fecha\n' +
+  ' — o todo de una vez con:  npx tsx --env-file=.env migracion/recargar.ts …';
+
 /** Punto de entrada del script. */
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
@@ -86,66 +174,15 @@ async function main(): Promise<void> {
 
   const cliente = crearClientePrisma(url);
   try {
-    const tablas = await descubrirTablas(cliente);
-    if (tablas.length === 0) {
-      console.log(
-        'No hay tablas en el esquema public (¿migraciones sin aplicar?). Nada que hacer.',
-      );
-      return;
-    }
-
-    const antes = await contarTablas(cliente, tablas);
-    imprimirConteos(
-      confirmar
-        ? 'Conteos ANTES de limpiar:'
-        : `ENSAYO (sin --confirmar): esto es lo que se VACIARÍA (se conserva ${TABLA_PROTEGIDA}):`,
-      antes,
-    );
-
-    if (!confirmar) {
+    const resultado = await ejecutarLimpieza(cliente, { confirmar });
+    if (resultado.modo === 'ensayo') {
       console.log(
         '\nNo se borró NADA. Para vaciar de verdad:\n' +
           '  npx tsx --env-file=.env migracion/limpiar-datos.ts --confirmar',
       );
       return;
     }
-
-    // TRUNCATE de TODAS las tablas en una sola sentencia: RESTART IDENTITY reinicia las
-    // secuencias/identity y CASCADE resuelve las FKs entre ellas (no hay que ordenarlas).
-    console.log(`\nTRUNCATE de ${String(tablas.length)} tablas (RESTART IDENTITY CASCADE)…`);
-    await cliente.$executeRawUnsafe(
-      `TRUNCATE TABLE ${tablas.map(citarIdent).join(', ')} RESTART IDENTITY CASCADE`,
-    );
-
-    const despues = await contarTablas(cliente, tablas);
-    imprimirConteos('Conteos DESPUÉS de limpiar (todo debe estar en 0):', despues);
-    const sobran = despues.filter((c) => c.filas > 0);
-    if (sobran.length > 0) {
-      console.error(
-        `⚠️ Quedaron tablas con filas tras el TRUNCATE (revisar): ${sobran.map((c) => c.tabla).join(', ')}`,
-      );
-    }
-
-    console.log(
-      '\n═══════════════════════════════════════════════════════════════\n' +
-        ' BD VACIADA. Pasos manuales OBLIGATORIOS antes de recargar:\n' +
-        '═══════════════════════════════════════════════════════════════\n' +
-        ' (a) Reinicia el backend en Railway con SEED_ON_START=true para re-sembrar\n' +
-        '     catálogos base, permisos, roles y el usuario admin (el TRUNCATE también\n' +
-        '     los borró; sin el seed el login y los menús NO funcionan).\n' +
-        ' (b) El usuario `admin` vuelve al password del seed — CÁMBIALO en cuanto entres.\n' +
-        ' (c) Los objetos ya subidos a R2 (fotos de modelos/bordados/adjuntos) quedan\n' +
-        '     HUÉRFANOS: sus registros en BD se borraron pero el archivo físico sigue en\n' +
-        '     el bucket (limitación conocida: el motor de archivos no tiene DeleteObject;\n' +
-        '     deuda técnica aparcada en HOJA-DE-RUTA.md §4). El ETL de fotos los re-liga\n' +
-        '     al re-subir; los viejos solo ocupan espacio.\n' +
-        ' (d) El esquema `pgboss` NO se tocó (solo se vació `public`): pueden quedar jobs\n' +
-        '     de RC encolados apuntando a filas ya borradas. Los handlers son resilientes\n' +
-        '     y los absorben, pero conviene saberlo — el reinicio del backend del paso (a)\n' +
-        '     los deja drenarse en limpio.\n' +
-        ' Después: corre los ETL en su orden documentado (ver README de migracion/),\n' +
-        ' anteponiendo ETL_DESDE=YYYY-MM-DD si quieres la recarga limitada por fecha.',
-    );
+    console.log('\n' + ADVERTENCIAS_POST_LIMPIEZA);
   } finally {
     await cliente.$disconnect();
   }
