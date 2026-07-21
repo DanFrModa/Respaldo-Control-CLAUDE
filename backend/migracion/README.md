@@ -81,10 +81,52 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 
 La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa BD vía la `DATABASE_URL` del `.env`. Asegúrate de que las **migraciones de Prisma ya estén aplicadas** en esa base antes de cargar.
 
+## Recarga limitada por fecha (p. ej. solo 2025–2026)
+
+Para vaciar la BD de `prueba` y recargarla **solo con los datos desde una fecha de corte** (la variable nueva `ETL_DESDE=YYYY-MM-DD`; si no la pones, todo migra completo como siempre — el CI y las corridas normales no cambian):
+
+**1. Vaciar la BD** (desde `backend/`; sin `--confirmar` es un ensayo que solo imprime conteos):
+
+```bash
+npx tsx --env-file=.env migracion/limpiar-datos.ts              # ensayo (no borra nada)
+npx tsx --env-file=.env migracion/limpiar-datos.ts --confirmar  # TRUNCATE de todo (menos _prisma_migrations)
+```
+
+**2. Re-sembrar:** reinicia el backend en Railway con **`SEED_ON_START=true`** (el TRUNCATE también borró catálogos base, permisos, roles y el usuario `admin`; sin el seed no hay login ni menús). ⚠️ El `admin` vuelve al password del seed — **cámbialo** al entrar. Nota: las fotos ya subidas a **R2 quedan huérfanas** (el registro en BD se borró, el objeto físico sigue en el bucket; limitación conocida — deuda aparcada en `HOJA-DE-RUTA.md` §4).
+
+**3. Correr los ETL en su orden documentado** (el de arriba: F1 catálogos/modelos → F2 → F3 → F4 → F5 → F6 → F7), anteponiendo `ETL_DESDE`:
+
+```bash
+# Linux/macOS (bash):
+ETL_DESDE=2025-01-01 npx tsx --env-file=.env migracion/etl-catalogos.ts
+ETL_DESDE=2025-01-01 npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts
+# … y así con cada script, en su orden.
+```
+
+```powershell
+# Windows (PowerShell) — así trabaja Gabriel; la variable queda puesta para TODA la sesión:
+$env:ETL_DESDE = '2025-01-01'
+npx tsx --env-file=.env migracion/etl-catalogos.ts
+npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts
+# … resto de scripts en su orden. Para quitarla:  Remove-Item Env:ETL_DESDE
+```
+
+**4. Cuadres:** corre los `cuadre-f*.ts` de siempre. Con la ventana activa imprimen su configuración (`describirVentana`), así el delta v1-vs-v2 queda **explicado**: lo excluido por fecha es a propósito, no pérdida.
+
+**Qué filtra la ventana y qué migra completo:**
+
+- **Filtrado por fecha propia** (documento anterior al corte → NO migra; fecha vacía = migra): pedidos (`FechaPedido`), pedidos reales (`FechaPedPR`), órdenes (`Fecha`), y los movimientos/documentos de F3–F7 que ya la respetaban (OC/notas por F4). **Cascada:** un hijo cuyo padre quedó fuera se excluye también (orden de pedido excluido, comentarios de orden excluida, renglones) — cada bucket se **cuenta** en el resumen/reporte del ETL (nada se descarta en silencio).
+- **Clientes por USO:** solo migran los clientes referenciados por pedidos/órdenes **dentro** de la ventana; el resto se cuenta y se lista en el reporte de `etl-catalogos`.
+- **Migra COMPLETO (sin filtro):** todos los catálogos (colores, tallas, telas, avíos, proveedores, empresas, modelos+BOM) y la configuración de Ruta Crítica (procesos, plantillas, roles, calendario).
+- **Kardex (PT y telas):** el histórico de movimientos ANTERIOR al corte no se migra movimiento a movimiento — se **condensa en saldos iniciales** por almacén/color/talla a la fecha de corte (un movimiento de saldo inicial tipo migración), para que las existencias cuadren sin cargar años de kardex. *(Parte del diseño de la recarga; lo implementan los ETL de F3/F4.)*
+
+`ETL_DESDE` **gana** sobre la pareja `ETL_VENTANA_ANIOS`/`ETL_VENTANA_REF` de F4 si ambas están definidas; un valor inválido se ignora (equivale a no ponerla).
+
 ## Scripts disponibles
 
 | Script | Qué hace |
 |---|---|
+| `migracion/limpiar-datos.ts` | **VACÍA la BD** (TRUNCATE de todo `public` menos `_prisma_migrations`); sin `--confirmar` solo ensaya. Para la recarga limitada por fecha (ver sección arriba) |
 | `migracion/etl-catalogos.ts` | F1: catálogos, materiales, proveedores, mapeos |
 | `migracion/etl-modelos.ts` | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-bordados` para las fotos masivas) |
 | `migracion/etl-pedidos-ordenes.ts` | **F2: pedidos + pedidos reales + órdenes + matriz + comentarios** (imprime el cuadre al final) |

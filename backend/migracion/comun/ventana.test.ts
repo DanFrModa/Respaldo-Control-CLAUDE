@@ -8,12 +8,15 @@ import { describirVentana, dentroVentana, resolverVentana } from './ventana.js';
 
 let aniosPrevio: string | undefined;
 let refPrevio: string | undefined;
+let desdePrevio: string | undefined;
 
 beforeEach(() => {
   aniosPrevio = process.env.ETL_VENTANA_ANIOS;
   refPrevio = process.env.ETL_VENTANA_REF;
+  desdePrevio = process.env.ETL_DESDE;
   delete process.env.ETL_VENTANA_ANIOS;
   delete process.env.ETL_VENTANA_REF;
+  delete process.env.ETL_DESDE;
 });
 
 afterEach(() => {
@@ -21,6 +24,8 @@ afterEach(() => {
   else process.env.ETL_VENTANA_ANIOS = aniosPrevio;
   if (refPrevio === undefined) delete process.env.ETL_VENTANA_REF;
   else process.env.ETL_VENTANA_REF = refPrevio;
+  if (desdePrevio === undefined) delete process.env.ETL_DESDE;
+  else process.env.ETL_DESDE = desdePrevio;
 });
 
 describe('resolverVentana — configuración desde el entorno', () => {
@@ -52,6 +57,48 @@ describe('resolverVentana — configuración desde el entorno', () => {
     expect(v.corte).not.toBeNull();
     // El corte es ~5 años atrás de hoy: el año del corte < año actual.
     expect(v.corte!.getUTCFullYear()).toBeLessThan(new Date().getUTCFullYear());
+  });
+});
+
+describe('resolverVentana — ETL_DESDE (fecha de corte directa)', () => {
+  it('ETL_DESDE válida activa la ventana con esa fecha exacta de corte', () => {
+    process.env.ETL_DESDE = '2025-01-01';
+    const v = resolverVentana();
+    expect(v.corte?.toISOString().slice(0, 10)).toBe('2025-01-01');
+    expect(v.desde?.toISOString().slice(0, 10)).toBe('2025-01-01');
+  });
+
+  it('ETL_DESDE GANA sobre ETL_VENTANA_ANIOS/REF cuando ambas vienen', () => {
+    process.env.ETL_VENTANA_ANIOS = '10';
+    process.env.ETL_VENTANA_REF = '2026-06-22';
+    process.env.ETL_DESDE = '2025-01-01';
+    const v = resolverVentana();
+    expect(v.corte?.toISOString().slice(0, 10)).toBe('2025-01-01'); // no 2016-06-22
+  });
+
+  it('ETL_DESDE inválida se IGNORA (comportamiento actual intacto)', () => {
+    for (const malo of ['no-es-fecha', '2025-13-45', '01-01-2025', '']) {
+      process.env.ETL_DESDE = malo;
+      const v = resolverVentana();
+      expect(v.corte).toBeNull(); // sin años → sin ventana, como hoy
+      expect(v.desde ?? null).toBeNull();
+    }
+  });
+
+  it('ETL_DESDE inválida con años+ref válidos → aplica la ventana de años (como hoy)', () => {
+    process.env.ETL_DESDE = 'no-es-fecha';
+    process.env.ETL_VENTANA_ANIOS = '10';
+    process.env.ETL_VENTANA_REF = '2026-06-22';
+    const v = resolverVentana();
+    expect(v.corte?.toISOString().slice(0, 10)).toBe('2016-06-22');
+  });
+
+  it('dentroVentana respeta el corte de ETL_DESDE (límite inclusivo)', () => {
+    process.env.ETL_DESDE = '2025-01-01';
+    const v = resolverVentana();
+    expect(dentroVentana(new Date('2024-12-31T00:00:00Z'), v)).toBe(false);
+    expect(dentroVentana(new Date('2025-01-01T00:00:00Z'), v)).toBe(true);
+    expect(dentroVentana(null, v)).toBe(true); // fecha nula = dentro, como siempre
   });
 });
 
@@ -88,5 +135,11 @@ describe('describirVentana — texto para el reporte', () => {
     const txt = describirVentana(resolverVentana());
     expect(txt).toContain('10 años');
     expect(txt).toContain('2016-06-22');
+  });
+  it('con ETL_DESDE muestra la fecha de corte directa', () => {
+    process.env.ETL_DESDE = '2025-01-01';
+    const txt = describirVentana(resolverVentana());
+    expect(txt).toContain('ETL_DESDE=2025-01-01');
+    expect(txt).toContain('2025-01-01');
   });
 });

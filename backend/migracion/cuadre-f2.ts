@@ -18,6 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { contarFilasCsv, leerCsv, type FilaCsv } from './comun/csv.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 
 /** Un renglón del cuadre de filas/sumas: entidad, v1, v2, nota. */
 export interface RenglonCuadreF2 {
@@ -443,6 +444,13 @@ export function formatearCuadreF2(c: CuadreF2): string {
   p.push('═══════════════════════════════════════════════════════════════');
   p.push(' CUADRE F2-E5 (1) FILAS Y SUMAS — v1 (CSV) vs v2 (Postgres)');
   p.push('═══════════════════════════════════════════════════════════════');
+  // Con la ventana temporal ACTIVA (recarga limitada, p. ej. ETL_DESDE=2025-01-01) se imprime su
+  // configuración: el delta v1-vs-v2 queda EXPLICADO (lo excluido a propósito no es pérdida).
+  const ventana = resolverVentana();
+  if (ventana.corte !== null) {
+    p.push(`  ${describirVentana(ventana)}`);
+    p.push('  (v2 < v1 es lo ESPERADO: los documentos anteriores al corte NO se migraron.)');
+  }
   p.push(`${'Entidad'.padEnd(34)}${'v1'.padStart(8)}${'v2'.padStart(8)}   Nota`);
   p.push('─'.repeat(70));
   for (const r of c.filas) {

@@ -33,19 +33,24 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 import { calcularCuadreF2, formatearCuadreF2 } from './cuadre-f2.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { prescanVentanaF2 } from './comun/ventana-f2.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarComentariosOrden } from './loaders/comentarios-orden.js';
 import { cargarOrdenes } from './loaders/ordenes.js';
 import { cargarPedidos } from './loaders/pedidos.js';
 import { cargarPedidosReales } from './loaders/pedidos-reales.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 
-/** Imprime el resumen de un loader. */
-function log(nombre: string, r: ResultadoLoader): void {
+/** Imprime el resumen de un loader (con lo excluido por ventana, si aplica). */
+function log(nombre: string, r: ResultadoLoader, extra = ''): void {
   const omVal = r.omitidosValidacion ?? 0;
+  const fVent = r.fueraVentana ?? 0;
   console.log(
     `  ${nombre.padEnd(24)} creados=${String(r.creados).padStart(5)} ` +
       `existentes=${String(r.existentes).padStart(5)} omitidos=${String(r.omitidos).padStart(5)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      (fVent > 0 ? ` fueraVentana=${String(fVent)}` : '') +
+      (extra !== '' ? ` ${extra}` : ''),
   );
 }
 
@@ -82,18 +87,44 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   const sesion = sesionEtl();
   const reporte = new Reporte();
 
-  console.log('ETL de pedidos y órdenes F2-E5 — inicio');
+  // Ventana temporal (recarga limitada por fecha) + prescan de cascada, UNA vez por corrida y
+  // compartidos por todos los loaders. Inactiva (default) → prescan null y migra todo, como hoy.
+  const ventana = resolverVentana();
+  const prescan = prescanVentanaF2(ventana);
 
-  const pedidos = await cargarPedidos(sesion, cliente, reporte);
-  log('Pedidos', pedidos.pedidos);
+  console.log('ETL de pedidos y órdenes F2-E5 — inicio');
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
+
+  const pedidos = await cargarPedidos(sesion, cliente, reporte, ventana);
+  log(
+    'Pedidos',
+    pedidos.pedidos,
+    pedidos.fueraVentana > 0
+      ? `fueraVentana=${String(pedidos.fueraVentana)} (renglones=${String(pedidos.lineasFueraVentana)})`
+      : '',
+  );
   log('PedidoLinea', pedidos.lineas);
 
-  const reales = await cargarPedidosReales(sesion, cliente, reporte);
-  log('PedidosReales', reales.reales);
+  const reales = await cargarPedidosReales(sesion, cliente, reporte, ventana, prescan);
+  log(
+    'PedidosReales',
+    reales.reales,
+    reales.fueraVentana > 0 || reales.padreFueraVentana > 0
+      ? `fueraVentana=${String(reales.fueraVentana)} padreFueraVentana=${String(reales.padreFueraVentana)} ` +
+          `(renglones=${String(reales.lineasFueraVentana)})`
+      : '',
+  );
   log('PedidoRealLinea', reales.lineas);
 
-  const ordenes = await cargarOrdenes(sesion, cliente, reporte);
-  log('Ordenes', ordenes.ordenes);
+  const ordenes = await cargarOrdenes(sesion, cliente, reporte, ventana, prescan);
+  log(
+    'Ordenes',
+    ordenes.ordenes,
+    ordenes.fueraVentana > 0 || ordenes.padreFueraVentana > 0
+      ? `fueraVentana=${String(ordenes.fueraVentana)} padreFueraVentana=${String(ordenes.padreFueraVentana)}`
+      : '',
+  );
   console.log(
     `    (renglones color=${String(ordenes.renglonesColor)} celdas talla=${String(ordenes.celdasTalla)} ` +
       `referencias Monarch=${String(ordenes.referencias)} monarch-default descartados=${String(ordenes.monarchDefault)})`,
@@ -102,7 +133,7 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
     `    (colores creados al vuelo=${String(ordenes.coloresCreados)} tallas creadas al vuelo=${String(ordenes.tallasCreadas)})`,
   );
 
-  log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte));
+  log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte, prescan));
 
   console.log('ETL de pedidos y órdenes F2-E5 — sembrando secuencias');
   await sembrarSecuenciasF2(cliente);

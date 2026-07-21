@@ -6,6 +6,11 @@
  * Carga VÍA el dominio (A1): `crearCliente` + `agregarCampoCliente`. Idempotente: si el
  * cliente ya existe (por nombre, único global) se reutiliza; si el campo D7 ya existe, no se
  * duplica. Persiste el mapeo `IdClientes → idCliente` (reusado por F2).
+ *
+ * VENTANA temporal (recarga limitada, p. ej. `ETL_DESDE=2025-01-01`): con la ventana ACTIVA
+ * solo migran los clientes REFERENCIADOS por pedidos u órdenes cuya fecha cae dentro de la
+ * ventana (prescan de `comun/ventana-f2.ts`); el resto se cuenta y se lista en el reporte
+ * (nada se descarta en silencio, §7). Con la ventana inactiva migran TODOS, como siempre.
  */
 import {
   agregarCampoCliente,
@@ -22,6 +27,8 @@ import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.j
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearTexto } from '../comun/valores.js';
+import { prescanVentanaF2 } from '../comun/ventana-f2.js';
+import { describirVentana, resolverVentana } from '../comun/ventana.js';
 
 /** Etiqueta del campo D7 que se siembra por cliente (semilla del `Monarch` viejo). */
 export const CAMPO_D7_PEDIDO_CLIENTE = 'No. de pedido del cliente';
@@ -39,6 +46,11 @@ export interface ResultadoLoader {
    * validación de v2). Se separan de `omitidos` y van al reporte. Opcional: 0 si no hubo.
    */
   omitidosValidacion?: number;
+  /**
+   * Cuántos quedaron FUERA por la ventana temporal (`ETL_DESDE`/`ETL_VENTANA_ANIOS`):
+   * excluidos a propósito, NO son incidencia. Opcional: ausente/0 con la ventana inactiva.
+   */
+  fueraVentana?: number;
 }
 
 /** Busca por nombre (único global) en la BD para resolver idempotencia y mapeo. */
@@ -61,6 +73,18 @@ export async function cargarClientes(
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
+  let fueraVentana = 0;
+
+  // Ventana ACTIVA → prescan de uso: solo migran los clientes referenciados por pedidos u
+  // órdenes dentro de la ventana. Inactiva → prescan null y migran todos (como siempre).
+  const ventana = resolverVentana();
+  const prescan = prescanVentanaF2(ventana);
+  if (prescan !== null) {
+    reporte.nota(
+      `${describirVentana(ventana)} Clientes: migran SOLO los referenciados por ` +
+        `pedidos/órdenes dentro de la ventana (${String(prescan.clientesEnVentana.size)} claves v1 en uso).`,
+    );
+  }
 
   for (const fila of filas) {
     const idViejo = fila.IdClientes;
@@ -68,6 +92,15 @@ export async function cargarClientes(
     if (nombreCrudo === null) {
       omitidos += 1;
       reporte.agregar('Clientes con nombre vacío (omitidos)', `IdClientes=${idViejo ?? '?'}`);
+      continue;
+    }
+    // Exclusión por ventana (conteo agregado + lista acotada por el propio Reporte).
+    if (prescan !== null && !prescan.clientesEnVentana.has((idViejo ?? '').trim())) {
+      fueraVentana += 1;
+      reporte.agregar(
+        'Clientes FUERA de ventana (sin uso en pedidos/órdenes dentro de la ventana — NO migrados)',
+        `IdClientes=${idViejo ?? '?'} "${nombreCrudo}"`,
+      );
       continue;
     }
     const nombre =
@@ -123,5 +156,10 @@ export async function cargarClientes(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Clientes fuera de ventana: ${String(fueraVentana)} NO migrados (ver sección en el reporte).`,
+    );
+  }
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }

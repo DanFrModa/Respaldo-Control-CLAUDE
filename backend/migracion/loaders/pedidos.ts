@@ -13,6 +13,11 @@
  * Idempotencia: resuelve "ya existe" por el unique `(idEmpresa, folio)` ANTES de crear; en una
  * 2ª corrida no duplica y re-guarda los mapeos (por si el primer corrido se cortó). Las filas con
  * cliente/empresa/modelo sin mapeo, o con NumeroPed no numérico, se LISTAN al reporte (§7).
+ *
+ * VENTANA temporal (recarga limitada, p. ej. `ETL_DESDE=2025-01-01`): el pedido entra si su
+ * `FechaPedido` cae dentro de la ventana (fecha nula = dentro, como F4). Los excluidos y sus
+ * renglones se CUENTAN (`fueraVentana`/`lineasFueraVentana`, nada en silencio §7). Con la
+ * ventana inactiva (default) migra TODO, como siempre.
  */
 import {
   crearPedidoMigrado,
@@ -34,12 +39,22 @@ import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFechaSoloDia, parsearBandera } from '../comun/valores.js';
+import {
+  dentroVentana,
+  describirVentana,
+  resolverVentana,
+  type ConfigVentana,
+} from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Resultado del loader de pedidos: pedidos + renglones (para el log/cuadre). */
 export interface ResultadoPedidos {
   pedidos: ResultadoLoader;
   lineas: ResultadoLoader;
+  /** # de pedidos FUERA de la ventana temporal (excluidos a propósito; 0 con ventana inactiva). */
+  fueraVentana: number;
+  /** # de renglones de esos pedidos excluidos (cascada pedido → renglón). */
+  lineasFueraVentana: number;
 }
 
 /** Renglón crudo de `PedidosDet` ya parseado (sin el idModelo resuelto). */
@@ -55,17 +70,20 @@ interface DetCrudo {
 /** Contribución de UN pedido a los conteos (se suma tras los lotes). */
 interface ContribPedido {
   /** Desenlace del documento pedido. */
-  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
   /** Renglones creados / existentes / omitidos de ESTE pedido. */
   lineasCreadas: number;
   lineasExistentes: number;
   lineasOmitidas: number;
+  /** Renglones excluidos por cascada (el pedido quedó fuera de la ventana). */
+  lineasFueraVentana: number;
 }
 
 export async function cargarPedidos(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  ventana: ConfigVentana = resolverVentana(),
 ): Promise<ResultadoPedidos> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
 
@@ -106,6 +124,7 @@ export async function cargarPedidos(
           reporte,
           { mapaCliente, mapaEmpresa, mapaModelo },
           detPorPedido,
+          ventana,
           f,
         ),
       ),
@@ -119,6 +138,8 @@ export async function cargarPedidos(
     omitidosValidacion: 0,
   };
   const lineas: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
+  let fueraVentana = 0;
+  let lineasFueraVentana = 0;
   for (const res of contribs) {
     // Un fallo de `enLotes` (tras agotar reintentos) cuenta como pedido omitido por validación.
     if (!res.ok) {
@@ -129,13 +150,23 @@ export async function cargarPedidos(
     if (c.pedido === 'creado') pedidos.creados += 1;
     else if (c.pedido === 'existente') pedidos.existentes += 1;
     else if (c.pedido === 'omitido') pedidos.omitidos += 1;
+    else if (c.pedido === 'fueraVentana') fueraVentana += 1;
     else pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
     lineas.creados += c.lineasCreadas;
     lineas.existentes += c.lineasExistentes;
     lineas.omitidos += c.lineasOmitidas;
+    lineasFueraVentana += c.lineasFueraVentana;
   }
 
-  return { pedidos, lineas };
+  // Lo excluido por ventana se REPORTA agregado (miles de filas: conteo + configuración, no lista).
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `${describirVentana(ventana)} Pedidos fuera de ventana: ${String(fueraVentana)} ` +
+        `(con ${String(lineasFueraVentana)} renglones) — NO migrados.`,
+    );
+  }
+
+  return { pedidos, lineas, fueraVentana, lineasFueraVentana };
 }
 
 /** Mapeos de F1 que necesita cada pedido (clave vieja → id nuevo). */
@@ -153,6 +184,7 @@ async function procesarPedido(
   reporte: Reporte,
   mapeos: MapeosPedido,
   detPorPedido: Map<string, DetCrudo[]>,
+  ventana: ConfigVentana,
   f: Record<string, string>,
 ): Promise<ContribPedido> {
   const { mapaCliente, mapaEmpresa, mapaModelo } = mapeos;
@@ -160,10 +192,27 @@ async function procesarPedido(
   const folio = parsearEntero(f.NumeroPed);
   const idClienteV1 = (f.IdClientes ?? '').trim();
   const idEmpresaV1 = (f.IdEmpresas ?? '').trim();
+  const sinLineas = {
+    lineasCreadas: 0,
+    lineasExistentes: 0,
+    lineasOmitidas: 0,
+    lineasFueraVentana: 0,
+  };
+
+  // Ventana temporal ANTES de los mapeos: un pedido viejo con cliente fuera de ventana NO debe
+  // caer en el bucket "cliente sin mapeo" — es exclusión a propósito, con su propio conteo.
+  const fechaPedido = parsearFechaSoloDia(f.FechaPedido);
+  if (!dentroVentana(fechaPedido, ventana)) {
+    return {
+      pedido: 'fueraVentana',
+      ...sinLineas,
+      lineasFueraVentana: (detPorPedido.get(idViejo) ?? []).length,
+    };
+  }
 
   if (folio === null) {
     reporte.agregar('Pedido sin NumeroPed numérico (omitido)', `IdPedidos=${idViejo}`);
-    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+    return { pedido: 'omitido', ...sinLineas };
   }
   const idCliente = mapaCliente.get(idClienteV1);
   if (idCliente === undefined) {
@@ -171,7 +220,7 @@ async function procesarPedido(
       'Pedido con cliente sin mapeo (omitido)',
       `IdPedidos=${idViejo} IdClientes=${idClienteV1}`,
     );
-    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+    return { pedido: 'omitido', ...sinLineas };
   }
   const idEmpresa = mapaEmpresa.get(idEmpresaV1);
   if (idEmpresa === undefined) {
@@ -179,7 +228,7 @@ async function procesarPedido(
       'Pedido con empresa sin mapeo (omitido)',
       `IdPedidos=${idViejo} IdEmpresas=${idEmpresaV1}`,
     );
-    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+    return { pedido: 'omitido', ...sinLineas };
   }
 
   // Renglones: resolver idModelo; los sin mapeo se LISTAN y se descartan (el pedido sí entra).
@@ -225,7 +274,13 @@ async function procesarPedido(
         lineasExistentes += 1;
       }
     }
-    return { pedido: 'existente', lineasCreadas: 0, lineasExistentes, lineasOmitidas };
+    return {
+      pedido: 'existente',
+      lineasCreadas: 0,
+      lineasExistentes,
+      lineasOmitidas,
+      lineasFueraVentana: 0,
+    };
   }
 
   const resultado = await intentarCrear(reporte, 'Pedido', idViejo, () =>
@@ -235,7 +290,7 @@ async function procesarPedido(
         folio,
         idEmpresa,
         idCliente,
-        fechaPedido: parsearFechaSoloDia(f.FechaPedido),
+        fechaPedido,
         fechaDe: parsearFechaSoloDia(f.FechaDe),
         fechaHasta: parsearFechaSoloDia(f.FechaHasta),
         fechaTela: parsearFechaSoloDia(f.FechaTela),
@@ -250,7 +305,13 @@ async function procesarPedido(
     ),
   );
   if (resultado === null) {
-    return { pedido: 'omitidoValidacion', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas };
+    return {
+      pedido: 'omitidoValidacion',
+      lineasCreadas: 0,
+      lineasExistentes: 0,
+      lineasOmitidas,
+      lineasFueraVentana: 0,
+    };
   }
   await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, resultado.idPedido);
   let lineasCreadas = 0;
@@ -260,5 +321,11 @@ async function procesarPedido(
       lineasCreadas += 1;
     }
   }
-  return { pedido: 'creado', lineasCreadas, lineasExistentes: 0, lineasOmitidas };
+  return {
+    pedido: 'creado',
+    lineasCreadas,
+    lineasExistentes: 0,
+    lineasOmitidas,
+    lineasFueraVentana: 0,
+  };
 }

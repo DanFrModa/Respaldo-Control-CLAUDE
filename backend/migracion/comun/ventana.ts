@@ -12,6 +12,10 @@
  *    Un valor >0 activa el recorte: se excluye lo ANTERIOR a `ref − N años`.
  *  • `ETL_VENTANA_REF` (fecha `YYYY-MM-DD`, default = HOY): el ancla de la ventana. Útil para
  *    corridas reproducibles (fijar la referencia para que dos corridas excluyan lo mismo).
+ *  • `ETL_DESDE` (fecha `YYYY-MM-DD`, sin default): fecha de corte DIRECTA — más clara que
+ *    años+ref cuando se quiere "solo desde 2025": `ETL_DESDE=2025-01-01`. Si viene válida,
+ *    GANA sobre `ETL_VENTANA_ANIOS`/`ETL_VENTANA_REF`; inválida o ausente → se ignora
+ *    (aplica el comportamiento anterior tal cual).
  *
  * El reporte de cuadre SIEMPRE imprime la configuración de la ventana y el conteo excluido
  * (0 por defecto), así Gabriel ve explícito qué quedó fuera por edad — aunque sea cero.
@@ -23,8 +27,13 @@ export interface ConfigVentana {
   anios: number;
   /** Instante de referencia (ancla) en ms epoch. */
   refMs: number;
-  /** Fecha de corte (refMs − anios): lo anterior se excluye. `null` si `anios === 0`. */
+  /** Fecha de corte (refMs − anios, o `ETL_DESDE` directa): lo anterior se excluye. `null` = sin ventana. */
   corte: Date | null;
+  /**
+   * Fecha de corte DIRECTA leída de `ETL_DESDE` (si vino válida); en ese caso `corte === desde`
+   * y la pareja años+ref queda ignorada. Opcional para no romper construcciones existentes.
+   */
+  desde?: Date | null;
 }
 
 /** Lee `ETL_VENTANA_ANIOS` (entero ≥0; default 0 = sin ventana). Valores inválidos → 0. */
@@ -33,6 +42,16 @@ function leerAnios(): number {
   if (crudo === '') return 0;
   const n = Number(crudo);
   return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/** Lee `ETL_DESDE` (`YYYY-MM-DD`, fecha de corte directa). Ausente o inválida → `null` (se ignora). */
+function leerDesde(): Date | null {
+  const crudo = (process.env.ETL_DESDE ?? '').trim();
+  if (crudo !== '' && /^\d{4}-\d{2}-\d{2}$/.test(crudo)) {
+    const ms = Date.parse(`${crudo}T00:00:00.000Z`);
+    if (Number.isFinite(ms)) return new Date(ms);
+  }
+  return null;
 }
 
 /** Lee `ETL_VENTANA_REF` (`YYYY-MM-DD`; default HOY). Inválida → HOY. */
@@ -52,6 +71,11 @@ function leerRefMs(): number {
 export function resolverVentana(): ConfigVentana {
   const anios = leerAnios();
   const refMs = leerRefMs();
+  // `ETL_DESDE` (fecha de corte DIRECTA) GANA sobre años+ref si viene válida.
+  const desde = leerDesde();
+  if (desde !== null) {
+    return { anios, refMs, corte: desde, desde };
+  }
   if (anios === 0) {
     return { anios, refMs, corte: null };
   }
@@ -77,7 +101,10 @@ export function describirVentana(config: ConfigVentana): string {
   if (config.corte === null) {
     return 'Ventana temporal: DESACTIVADA (ETL_VENTANA_ANIOS=0) — se migra todo el histórico.';
   }
-  const ref = new Date(config.refMs).toISOString().slice(0, 10);
   const corte = config.corte.toISOString().slice(0, 10);
+  if (config.desde != null) {
+    return `Ventana temporal: ETL_DESDE=${corte} — se EXCLUYE lo anterior a ${corte}.`;
+  }
+  const ref = new Date(config.refMs).toISOString().slice(0, 10);
   return `Ventana temporal: ${String(config.anios)} años (ref=${ref}) — se EXCLUYE lo anterior a ${corte}.`;
 }
