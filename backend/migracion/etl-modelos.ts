@@ -38,19 +38,23 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { calcularCuadreFase, formatearCuadreFase } from './cuadre-fase.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { prescanUso } from './comun/prescan-uso.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarModelos } from './loaders/modelos.js';
 import { cargarBom } from './loaders/bom-modelos.js';
 import { cargarFotosModelos, cargarFotosBordados } from './loaders/fotos-modelos.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 
-/** Imprime el resumen de un loader. */
+/** Imprime el resumen de un loader (incluye lo excluido por la ventana, si aplica). */
 function log(nombre: string, r: ResultadoLoader): void {
   const omVal = r.omitidosValidacion ?? 0;
+  const fVent = r.fueraVentana ?? 0;
   console.log(
     `  ${nombre.padEnd(26)} creados=${String(r.creados).padStart(6)} ` +
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      (fVent > 0 ? ` fueraVentana=${String(fVent)}` : ''),
   );
 }
 
@@ -62,12 +66,23 @@ export async function ejecutarEtlModelos(cliente: PrismaClient): Promise<Reporte
   console.log('ETL de modelos F1-E7 — inicio');
   console.log('  (Depende de los mapeos de E6 — asegúrate de haber corrido etl:catalogos)');
 
+  // Ventana temporal + prescan de USO (pedido del dueño): con la ventana ACTIVA solo migran
+  // los modelos usados (pedidos/órdenes en ventana, kardex ≥ corte, existencia, cíclico) y su
+  // BOM/fotos en cascada. Se calcula UNA vez y se comparte. Inactiva → null (migra todo).
+  const ventana = resolverVentana();
+  const prescan = prescanUso(ventana);
+  if (prescan !== null) {
+    const nota = `${describirVentana(ventana)} Modelos filtrados por USO (+ BOM y fotos en cascada).`;
+    console.log(`  ${nota}`);
+    reporte.nota(nota);
+  }
+
   // 1. Modelos
-  const modelos = await cargarModelos(sesion, cliente, reporte);
+  const modelos = await cargarModelos(sesion, cliente, reporte, prescan);
   log('Modelos', modelos);
 
   // 2. BOM (telas, avíos, bordados)
-  const bom = await cargarBom(sesion, cliente, reporte);
+  const bom = await cargarBom(sesion, cliente, reporte, prescan);
   log('BOM — telas', bom.telas);
   log('BOM — avíos', bom.avios);
   log('BOM — bordados', bom.bordados);
@@ -76,11 +91,25 @@ export async function ejecutarEtlModelos(cliente: PrismaClient): Promise<Reporte
   }
 
   // 3. Fotos de modelos (opcional)
-  const fotosModelos = await cargarFotosModelos(sesion, cliente, reporte);
+  const fotosModelos = await cargarFotosModelos(
+    sesion,
+    cliente,
+    reporte,
+    undefined,
+    undefined,
+    prescan,
+  );
   log('Fotos modelos', fotosModelos);
 
   // 4. Fotos de bordados (opcional)
-  const fotosBordados = await cargarFotosBordados(sesion, cliente, reporte);
+  const fotosBordados = await cargarFotosBordados(
+    sesion,
+    cliente,
+    reporte,
+    undefined,
+    undefined,
+    prescan,
+  );
   log('Fotos bordados', fotosBordados);
 
   console.log('ETL de modelos F1-E7 — fin de carga');

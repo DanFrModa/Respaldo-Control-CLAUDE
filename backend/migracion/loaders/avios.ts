@@ -22,6 +22,7 @@ import { leerCsv } from '../comun/csv.js';
 import { decidirPrecioAvio } from '../comun/decisiones.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import {
@@ -30,11 +31,12 @@ import {
   parsearDinero,
   parsearTexto,
 } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 import { ErrorConflicto } from '../../src/comun/errores.js';
 
 /** Desenlace de procesar una fila (para agregar conteos tras los lotes). */
-type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 /** Índice nombreNormalizado → idProveedor (para el match difuso del texto `Proveedor`). */
 async function indiceProveedores(cliente: ClienteMapeo): Promise<Map<string, number>> {
@@ -58,15 +60,18 @@ export async function cargarAvios(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const idxProv = await indiceProveedores(cliente);
   const filas = leerCsv('Habilitacion.csv');
+  // Prescan de USO: con ventana activa solo migran los avíos del BOM de modelos usados.
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Filas INDEPENDIENTES → carga concurrente acotada.
   const resultados = await enLotes(
     filas,
-    (fila): Promise<Desenlace> => procesarAvio(sesion, bd, cliente, reporte, idxProv, fila),
+    (fila): Promise<Desenlace> => procesarAvio(sesion, bd, cliente, reporte, idxProv, pre, fila),
     CONCURRENCIA_ETL,
   );
 
@@ -74,14 +79,21 @@ export async function cargarAvios(
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
+  let fueraVentana = 0;
   for (const r of resultados) {
     const d = r.ok ? r.valor : 'omitidoValidacion';
     if (d === 'creado') creados += 1;
     else if (d === 'existente') existentes += 1;
     else if (d === 'omitido') omitidos += 1;
+    else if (d === 'fueraVentana') fueraVentana += 1;
     else omitidosValidacion += 1;
   }
-  return { creados, existentes, omitidos, omitidosValidacion };
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Avíos fuera de ventana (sin uso en BOM de modelos usados): ${String(fueraVentana)} NO migrados.`,
+    );
+  }
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 /** Procesa UNA fila de Habilitacion (idempotente por `clave`, tolerante a carreras). */
@@ -91,6 +103,7 @@ async function procesarAvio(
   cliente: ClienteMapeo,
   reporte: Reporte,
   idxProv: Map<string, number>,
+  pre: PrescanUso | null,
   fila: Record<string, string>,
 ): Promise<Desenlace> {
   const idViejo = fila.IdHabilitacion;
@@ -98,6 +111,14 @@ async function procesarAvio(
   if (claveCruda === null) {
     reporte.agregar('Avíos con clave vacía (omitidos)', `Id=${idViejo ?? '?'}`);
     return 'omitido';
+  }
+  // Ventana por USO: avío sin uso → fuera, con su propio bucket (muestra en el reporte).
+  if (pre !== null && (idViejo === undefined || !pre.aviosId.has(idViejo.trim()))) {
+    reporte.agregar(
+      'Avíos FUERA de ventana (sin uso — NO migrados)',
+      `clave="${claveCruda}" (IdHabilitacion=${idViejo ?? '?'})`,
+    );
+    return 'fueraVentana';
   }
   const clave =
     truncarYReportar(reporte, 'Avio', idViejo, 'clave', claveCruda, LIMITES.avio.clave) ??

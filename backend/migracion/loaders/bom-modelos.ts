@@ -32,9 +32,11 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, cargarMapaNumerico, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearBandera, parsearDinero } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 // ── Transformación de banderas (lógica pura — cubierta por unit tests) ──────────
@@ -94,8 +96,12 @@ export async function cargarBom(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoBom> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
+  // Prescan de USO: con ventana activa los renglones de BOM de modelos NO migrados van al
+  // bucket `fueraVentana` (cascada modelo → BOM), no al ruido de "modelo sin mapeo".
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Cargar mapas en paralelo (evita N+1 de leerMapeo por cada fila).
   const [mapaModelo, mapaTelasDis, mapaAvio, mapaBordado] = await Promise.all([
@@ -105,9 +111,18 @@ export async function cargarBom(
     cargarMapaNumerico(cliente, ENTIDAD_MAPEO.bordado),
   ]);
 
-  const telasBom = await cargarTelasBom(sesion, bd, reporte, mapaModelo, mapaTelasDis);
-  const aviosBom = await cargarAviosBom(sesion, bd, reporte, mapaModelo, mapaAvio);
-  const bordadosBom = await cargarBordadosBom(sesion, bd, reporte, mapaModelo, mapaBordado);
+  const telasBom = await cargarTelasBom(sesion, bd, reporte, mapaModelo, mapaTelasDis, pre);
+  const aviosBom = await cargarAviosBom(sesion, bd, reporte, mapaModelo, mapaAvio, pre);
+  const bordadosBom = await cargarBordadosBom(sesion, bd, reporte, mapaModelo, mapaBordado, pre);
+
+  const fueraVentana =
+    (telasBom.fueraVentana ?? 0) + (aviosBom.fueraVentana ?? 0) + (bordadosBom.fueraVentana ?? 0);
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `BOM fuera de ventana: ${String(fueraVentana)} renglones de modelos NO migrados ` +
+        `(cascada modelo → BOM) — NO migrados.`,
+    );
+  }
 
   return {
     telas: telasBom,
@@ -125,6 +140,7 @@ async function cargarTelasBom(
   reporte: Reporte,
   mapaModelo: Map<string, number>,
   mapaTelasDis: Map<string, number>,
+  pre: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const filas = leerCsv('ModelosTela.csv');
 
@@ -142,9 +158,15 @@ async function cargarTelasBom(
 
   let sinMapeoModelo = 0;
   let sinMapeoTela = 0;
+  let fueraVentana = 0;
 
   for (const fila of filas) {
     const idModeloViejo = fila.IdModelos?.trim() ?? '';
+    // Cascada de la ventana: renglón de un modelo excluido por USO → bucket propio.
+    if (pre !== null && !pre.modelosId.has(idModeloViejo)) {
+      fueraVentana += 1;
+      continue;
+    }
     const idModeloNuevo = mapaModelo.get(idModeloViejo);
     if (idModeloNuevo === undefined) {
       sinMapeoModelo += 1;
@@ -216,7 +238,7 @@ async function cargarTelasBom(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 // ── Avíos del BOM ────────────────────────────────────────────────────────────────
@@ -227,6 +249,7 @@ async function cargarAviosBom(
   reporte: Reporte,
   mapaModelo: Map<string, number>,
   mapaAvio: Map<string, number>,
+  pre: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const filas = leerCsv('ModelosHab.csv');
 
@@ -243,9 +266,15 @@ async function cargarAviosBom(
 
   let sinMapeoModelo = 0;
   let sinMapeoAvio = 0;
+  let fueraVentana = 0;
 
   for (const fila of filas) {
     const idModeloViejo = fila.IdModelos?.trim() ?? '';
+    // Cascada de la ventana: renglón de un modelo excluido por USO → bucket propio.
+    if (pre !== null && !pre.modelosId.has(idModeloViejo)) {
+      fueraVentana += 1;
+      continue;
+    }
     const idModeloNuevo = mapaModelo.get(idModeloViejo);
     if (idModeloNuevo === undefined) {
       sinMapeoModelo += 1;
@@ -313,7 +342,7 @@ async function cargarAviosBom(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 // ── Bordados del BOM ─────────────────────────────────────────────────────────────
@@ -324,6 +353,7 @@ async function cargarBordadosBom(
   reporte: Reporte,
   mapaModelo: Map<string, number>,
   mapaBordado: Map<string, number>,
+  pre: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const filas = leerCsv('ModelosBor.csv');
 
@@ -331,6 +361,7 @@ async function cargarBordadosBom(
 
   let sinMapeoModelo = 0;
   let sinMapeoBordado = 0;
+  let fueraVentana = 0;
 
   for (const fila of filas) {
     const idModeloViejo = fila.IdModelos?.trim() ?? '';
@@ -342,6 +373,12 @@ async function cargarBordadosBom(
         `IdModelosBor=${fila.IdModelosBor ?? '?'}, IdBordados=${fila.IdBordados ?? '?'}`,
       );
       sinMapeoModelo += 1;
+      continue;
+    }
+
+    // Cascada de la ventana: renglón de un modelo excluido por USO → bucket propio.
+    if (pre !== null && !pre.modelosId.has(idModeloViejo)) {
+      fueraVentana += 1;
       continue;
     }
 
@@ -407,5 +444,5 @@ async function cargarBordadosBom(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }

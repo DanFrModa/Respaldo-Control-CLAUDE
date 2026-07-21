@@ -35,7 +35,9 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { calcularCuadre, formatearCuadre } from './cuadre.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { prescanUso } from './comun/prescan-uso.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarAlmacenes } from './loaders/almacenes.js';
 import { cargarAvios } from './loaders/avios.js';
 import { cargarBordados } from './loaders/bordados.js';
@@ -51,13 +53,15 @@ import { cargarTelas } from './loaders/telas.js';
 import { cargarTelasColores } from './loaders/telas-colores.js';
 import { cargarTemporadas } from './loaders/temporadas.js';
 
-/** Imprime el resumen de un loader (creados/existentes/omitidos + omitidos por validación). */
+/** Imprime el resumen de un loader (creados/existentes/omitidos + validación + ventana). */
 function log(nombre: string, r: ResultadoLoader): void {
   const omVal = r.omitidosValidacion ?? 0;
+  const fVent = r.fueraVentana ?? 0;
   console.log(
     `  ${nombre.padEnd(22)} creados=${String(r.creados).padStart(5)} ` +
       `existentes=${String(r.existentes).padStart(5)} omitidos=${String(r.omitidos).padStart(5)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      (fVent > 0 ? ` fueraVentana=${String(fVent)}` : ''),
   );
 }
 
@@ -67,6 +71,20 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
 
   console.log('ETL de catálogos F1-E6 — inicio');
+
+  // Ventana temporal + prescan de USO (pedido del dueño): con ventana ACTIVA los catálogos
+  // GRANDES (proveedores/bordados/avíos/telas; los modelos en etl-modelos) migran SOLO lo
+  // usado. Se calcula UNA vez y se comparte. Inactiva → null y migra todo, como siempre.
+  const ventana = resolverVentana();
+  const prescan = prescanUso(ventana);
+  if (prescan !== null) {
+    const nota =
+      `${describirVentana(ventana)} Catálogos GRANDES filtrados por USO (proveedores/` +
+      `bordados/avíos/telas; clientes por su propio prescan). Colores y catálogos chicos ` +
+      `(empresas/almacenes/géneros/temporadas/etiquetas/tela-categorías/tallas) migran COMPLETOS.`;
+    console.log(`  ${nota}`);
+    reporte.nota(nota);
+  }
 
   const empresas = await cargarEmpresas(sesion, cliente, reporte);
   log('Empresas', empresas);
@@ -78,16 +96,16 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   log('Temporadas', await cargarTemporadas(sesion, cliente, reporte));
   log('Tela-categorías', await cargarTelaCategorias(sesion, cliente, reporte));
 
-  const prov = await cargarProveedores(sesion, cliente, reporte);
+  const prov = await cargarProveedores(sesion, cliente, reporte, prescan);
   log('Proveedores', prov);
   console.log(`    (fusiones de roles de terceros: ${String(prov.fusiones)})`);
 
   log('Almacenes', await cargarAlmacenes(sesion, cliente, reporte, idEmpresa));
-  log('Bordados', await cargarBordados(sesion, cliente, reporte));
-  log('Avíos', await cargarAvios(sesion, cliente, reporte));
+  log('Bordados', await cargarBordados(sesion, cliente, reporte, prescan));
+  log('Avíos', await cargarAvios(sesion, cliente, reporte, prescan));
   log('Colores', await cargarColores(sesion, cliente, reporte));
-  log('Telas', await cargarTelas(sesion, cliente, reporte));
-  log('Telas-colores', await cargarTelasColores(sesion, cliente, reporte));
+  log('Telas', await cargarTelas(sesion, cliente, reporte, prescan));
+  log('Telas-colores', await cargarTelasColores(sesion, cliente, reporte, prescan));
 
   const tallas = await cargarTallas(sesion, cliente, reporte);
   log('Tallas', tallas.tallas);

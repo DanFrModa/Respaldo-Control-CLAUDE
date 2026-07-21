@@ -25,6 +25,7 @@ import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { mapearTipoComponente } from '../comun/mapeos-enum.js';
 import { ENTIDAD_MAPEO, guardarMapeo, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { crearConNombreUnico, intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import {
@@ -33,10 +34,11 @@ import {
   parsearDinero,
   parsearTexto,
 } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Desenlace de procesar una tela (para agregar conteos tras los lotes). */
-type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 async function idTelaPorNombre(cliente: ClienteMapeo, nombre: string): Promise<number | null> {
   const fila = await cliente.tela.findFirst({
@@ -64,8 +66,12 @@ export async function cargarTelas(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
+  // Prescan de USO: con ventana activa solo migran las telas usadas (BOM/órdenes por
+  // IdTelasDis; movimientos/existencia por IdTelas — ambos espacios, ver prescan-uso.ts).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Índice de TelasDis por nombre normalizado (para el join y para detectar no-mapeados).
   const telasDis = leerCsv('TelasDis.csv');
@@ -83,7 +89,17 @@ export async function cargarTelas(
   const resBase = await enLotes(
     leerCsv('Telas.csv'),
     (fila): Promise<Desenlace> =>
-      procesarTelaBase(sesion, bd, cliente, reporte, disPorNombre, disUsados, contadores, fila),
+      procesarTelaBase(
+        sesion,
+        bd,
+        cliente,
+        reporte,
+        disPorNombre,
+        disUsados,
+        contadores,
+        pre,
+        fila,
+      ),
     CONCURRENCIA_ETL,
   );
 
@@ -92,7 +108,7 @@ export async function cargarTelas(
   const resDis = await enLotes(
     telasDis,
     (d): Promise<Desenlace> =>
-      procesarTelaDisSinTela(sesion, bd, cliente, reporte, disUsados, contadores, d),
+      procesarTelaDisSinTela(sesion, bd, cliente, reporte, disUsados, contadores, pre, d),
     CONCURRENCIA_ETL,
   );
 
@@ -101,11 +117,13 @@ export async function cargarTelas(
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
+  let fueraVentana = 0;
   for (const r of [...resBase, ...resDis]) {
     const d = r.ok ? r.valor : 'omitidoValidacion';
     if (d === 'creado') creados += 1;
     else if (d === 'existente') existentes += 1;
     else if (d === 'omitido') omitidos += 1;
+    else if (d === 'fueraVentana') fueraVentana += 1;
     else omitidosValidacion += 1;
   }
 
@@ -114,8 +132,26 @@ export async function cargarTelas(
     `Unificación de telas: ${String(contadores.telasSinTelaDis)} Telas sin TelaDis (normal), ` +
       `${String(contadores.disSinTela)} TelasDis sin Tela base (creadas aparte). Llave de join = nombre normalizado.`,
   );
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Telas fuera de ventana (sin BOM/órdenes/movimientos/existencia en la ventana): ` +
+        `${String(fueraVentana)} NO migradas.`,
+    );
+  }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
+}
+
+/** ¿La tela base (con su posible TelaDis unificada) está USADA según el prescan? */
+function telaBaseUsada(
+  pre: PrescanUso | null,
+  idViejo: string | undefined,
+  disMatch: Record<string, string> | undefined,
+): boolean {
+  if (pre === null) return true;
+  if (idViejo !== undefined && pre.telasIdTelas.has(idViejo.trim())) return true;
+  const idDis = (disMatch?.IdTelasDis ?? '').trim();
+  return idDis !== '' && pre.telasIdTelasDis.has(idDis);
 }
 
 /** Procesa UNA fila de `Telas.csv` (base), unificando con su `TelaDis` si hay match por nombre. */
@@ -127,6 +163,7 @@ async function procesarTelaBase(
   disPorNombre: Map<string, Record<string, string>>,
   disUsados: Set<string>,
   contadores: { telasSinTelaDis: number; disSinTela: number },
+  pre: PrescanUso | null,
   fila: Record<string, string>,
 ): Promise<Desenlace> {
   const idViejo = fila.IdTelas;
@@ -153,6 +190,17 @@ async function procesarTelaBase(
 
   const norm = normalizarParaDedup(nombreOriginal);
   const disMatch = disPorNombre.get(norm);
+
+  // Ventana por USO: tela sin uso (ni por IdTelas ni por su TelaDis unificada) → fuera. Su
+  // pareja TelasDis (si la hay) también quedará fuera en la pasada (2) — mismo criterio.
+  if (!telaBaseUsada(pre, idViejo, disMatch)) {
+    reporte.agregar(
+      'Telas FUERA de ventana (sin uso — NO migradas)',
+      `"${nombreOriginal}" (IdTelas=${idViejo ?? '?'})`,
+    );
+    return 'fueraVentana';
+  }
+
   if (disMatch !== undefined) {
     disUsados.add(norm);
     reporte.agregar(
@@ -238,6 +286,7 @@ async function procesarTelaDisSinTela(
   reporte: Reporte,
   disUsados: Set<string>,
   contadores: { telasSinTelaDis: number; disSinTela: number },
+  pre: PrescanUso | null,
   d: Record<string, string>,
 ): Promise<Desenlace> {
   const nombreCrudo = parsearTexto(d.TelaDis);
@@ -250,6 +299,15 @@ async function procesarTelaDisSinTela(
   const norm = normalizarParaDedup(nombreOriginal);
   if (disUsados.has(norm)) {
     return 'omitido'; // ya unificada con una Tela (no es incidencia)
+  }
+  // Ventana por USO: TelaDis sin uso (por IdTelasDis) → fuera, con su propio bucket.
+  const idDis = (d.IdTelasDis ?? '').trim();
+  if (pre !== null && (idDis === '' || !pre.telasIdTelasDis.has(idDis))) {
+    reporte.agregar(
+      'TelasDis FUERA de ventana (sin uso — NO migradas)',
+      `"${nombreOriginal}" (IdTelasDis=${d.IdTelasDis ?? '?'})`,
+    );
+    return 'fueraVentana';
   }
   // Idempotencia por IdTelasDis.
   if (d.IdTelasDis !== undefined) {

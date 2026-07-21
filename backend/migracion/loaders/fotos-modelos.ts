@@ -40,9 +40,11 @@ import { enTransaccion, type ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { resolverVentana } from '../comun/ventana.js';
 import { parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -122,6 +124,7 @@ export async function cargarFotosModelos(
   reporte: Reporte,
   r2Inyectado?: S3Client,
   r2BucketInyectado?: string,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoFotosModelos> {
   const dirFotos = process.env.ETL_FOTOS_MOD_DIR?.trim();
   if (!dirFotos) {
@@ -147,10 +150,21 @@ export async function cargarFotosModelos(
   const filas = leerCsv('Modelos.csv');
   const bd: ContextoBd = { cliente: clienteBd as PrismaClient };
 
+  // Cascada de la ventana por USO: las fotos siguen a su modelo (los excluidos ni se buscan).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  const filasACargar =
+    pre === null ? filas : filas.filter((f) => pre.modelosId.has((f.IdModelos ?? '').trim()));
+  const fueraVentana = filas.length - filasACargar.length;
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Fotos de modelos fuera de ventana: ${String(fueraVentana)} filas de modelos NO migrados — omitidas (cascada modelo → foto).`,
+    );
+  }
+
   type ResultadoPar = { frente: EstadoFoto; espalda: EstadoFoto };
 
   const resultados = await enLotes(
-    filas,
+    filasACargar,
     async (fila): Promise<ResultadoPar> => {
       const idViejo = fila.IdModelos?.trim() ?? '';
       const idModeloStr = await leerMapeo(clienteBd, ENTIDAD_MAPEO.modelo, idViejo);
@@ -213,7 +227,7 @@ export async function cargarFotosModelos(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion, totalSubidas };
+  return { creados, existentes, omitidos, omitidosValidacion, totalSubidas, fueraVentana };
 }
 
 type EstadoFoto = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
@@ -325,6 +339,7 @@ export async function cargarFotosBordados(
   reporte: Reporte,
   r2Inyectado?: S3Client,
   r2BucketInyectado?: string,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const dirFotos = process.env.ETL_FOTOS_BOR_DIR?.trim();
   if (!dirFotos) {
@@ -350,8 +365,19 @@ export async function cargarFotosBordados(
   const filas = leerCsv('Bordados.csv');
   const bd: ContextoBd = { cliente: clienteBd as PrismaClient };
 
+  // Cascada de la ventana por USO: las fotos siguen a su bordado (los excluidos ni se buscan).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  const filasACargar =
+    pre === null ? filas : filas.filter((f) => pre.bordadosId.has((f.IdBordados ?? '').trim()));
+  const fueraVentana = filas.length - filasACargar.length;
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Fotos de bordados fuera de ventana: ${String(fueraVentana)} filas de bordados NO migrados — omitidas (cascada bordado → foto).`,
+    );
+  }
+
   const resultados = await enLotes(
-    filas,
+    filasACargar,
     async (fila): Promise<EstadoFoto> => {
       const idViejo = fila.IdBordados?.trim() ?? '';
       const idBordadoStr = await leerMapeo(clienteBd, ENTIDAD_MAPEO.bordado, idViejo);
@@ -452,5 +478,5 @@ export async function cargarFotosBordados(
     else if (estado === 'omitido') omitidos += 1;
     else omitidosValidacion += 1;
   }
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }

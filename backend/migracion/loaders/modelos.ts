@@ -19,6 +19,12 @@
  *
  * `Maquila` → `maquilaBase` (mismo parseo de dinero que telas/avíos).
  * `Activo = '0'` → el modelo se descontinúa tras crear (borrado suave, igual que telas).
+ *
+ * VENTANA temporal (recarga limitada; pedido del dueño "hay muchísimos y ya no me sirven"):
+ * con la ventana ACTIVA solo migran los modelos USADOS (prescan de `comun/prescan-uso.ts`:
+ * pedidos/órdenes en ventana ∪ kardex PT ≥ corte ∪ existencia ∪ cíclico). Los que migran
+ * SOLO por existencia se listan aparte ("candidatos a depurar", para Daniel). El resto va al
+ * bucket `fueraVentana` (conteo agregado + muestra, §7). Inactiva → migran todos, como hoy.
  */
 import { crearModelo, actualizarModelo } from '../../src/dominio/modelos/modelos.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
@@ -28,9 +34,11 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, guardarMapeo, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear, truncarYReportar } from '../comun/saneo.js';
 import { parsearBandera, parsearDinero, parsearTexto } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Topes de longitud de los campos de Modelo (calcados del Zod de `src/contrato/esquemas/modelo`). */
@@ -40,15 +48,18 @@ const LIMITES_MODELO = {
 } as const;
 
 /** Desenlace de procesar una fila (para conteos). */
-type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 export async function cargarModelos(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const filas = leerCsv('Modelos.csv');
+  // Prescan de USO (lo pasa el orquestador; suelto se calcula aquí). Inactivo → null.
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Nota de incidencia: IdTemporadas siempre es 0 (Temporadas.csv vacío en E6).
   // Todos los modelos se cargan sin temporada; reportar al cuadre como incidencia informativa.
@@ -61,7 +72,7 @@ export async function cargarModelos(
 
   const resultados = await enLotes(
     filas,
-    (fila): Promise<Desenlace> => procesarModelo(sesion, bd, cliente, reporte, fila),
+    (fila): Promise<Desenlace> => procesarModelo(sesion, bd, cliente, reporte, pre, fila),
     CONCURRENCIA_ETL,
   );
 
@@ -69,14 +80,23 @@ export async function cargarModelos(
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
+  let fueraVentana = 0;
   for (const r of resultados) {
     const d = r.ok ? r.valor : 'omitidoValidacion';
     if (d === 'creado') creados += 1;
     else if (d === 'existente') existentes += 1;
     else if (d === 'omitido') omitidos += 1;
+    else if (d === 'fueraVentana') fueraVentana += 1;
     else omitidosValidacion += 1;
   }
-  return { creados, existentes, omitidos, omitidosValidacion };
+  if (pre !== null && fueraVentana > 0) {
+    reporte.nota(
+      `Modelos fuera de ventana (sin uso: sin pedidos/órdenes/kardex/existencia/cíclico en la ` +
+        `ventana): ${String(fueraVentana)} NO migrados (ver sección en el reporte). ` +
+        `Migran por SOLO existencia: ${String(pre.modelosSoloExistencia.size)} (candidatos a depurar).`,
+    );
+  }
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 async function procesarModelo(
@@ -84,6 +104,7 @@ async function procesarModelo(
   bd: ContextoBd,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  pre: PrescanUso | null,
   fila: Record<string, string>,
 ): Promise<Desenlace> {
   const idViejo = fila.IdModelos;
@@ -101,6 +122,28 @@ async function procesarModelo(
   if (codigoCrudo === null) {
     reporte.agregar('Modelos con código vacío (omitidos)', `IdModelos=${idViejo ?? '?'}`);
     return 'omitido';
+  }
+
+  // Ventana por USO: modelo sin uso (ni por id ni por código) → fuera, con su propio bucket.
+  if (pre !== null) {
+    const codigoNorm = codigoCrudo.trim().toUpperCase();
+    const usado =
+      (idViejo !== undefined && pre.modelosId.has(idViejo.trim())) ||
+      pre.modelosCodigo.has(codigoNorm);
+    if (!usado) {
+      reporte.agregar(
+        'Modelos FUERA de ventana (sin uso en la ventana — NO migrados)',
+        `codigo="${codigoCrudo}" (IdModelos=${idViejo ?? '?'})`,
+      );
+      return 'fueraVentana';
+    }
+    // Lista que pidió el dueño: migran por SOLO existencia (sin actividad en la ventana).
+    if (pre.modelosSoloExistencia.has(codigoNorm)) {
+      reporte.agregar(
+        'Modelos SIN actividad en la ventana pero CON existencia (migrados por saldo — candidatos a depurar con Daniel)',
+        `codigo="${codigoCrudo}" (IdModelos=${idViejo ?? '?'})`,
+      );
+    }
   }
   const codigo =
     truncarYReportar(reporte, 'Modelo', idViejo, 'codigo', codigoCrudo, LIMITES_MODELO.codigo) ??

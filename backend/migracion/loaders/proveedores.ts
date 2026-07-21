@@ -45,9 +45,11 @@ import {
   type DatosMapeo,
   type EntidadMapeo,
 } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { normalizarParaDedup, parsearBandera, parsearTexto } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Códigos de rol de `RolProveedor` que usa la fusión (sembrados en seed F0/E1B). */
@@ -121,16 +123,41 @@ export async function cargarProveedores(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoProveedores> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const rolPorCodigo = await cargarRoles(sesion, bd);
   const idx = await indiceExistentes(cliente);
+  // Prescan de USO: con ventana activa solo migran los terceros usados (OC/órdenes/EsMa/
+  // notas/auditorías por su espacio de id, o proveedor TEXTO de telas/avíos usados por nombre).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
   let fusiones = 0;
+  let fueraVentana = 0;
+
+  /** ¿El tercero está USADO (por id en su espacio, o por nombre de tela/avío usado)? */
+  function terceroUsado(
+    idsUsados: Set<string> | null,
+    idViejo: string | undefined,
+    nombre: string,
+  ): boolean {
+    if (pre === null) return true;
+    if (idsUsados !== null && idViejo !== undefined && idsUsados.has(idViejo.trim())) return true;
+    return pre.provNombres.has(normalizarParaDedup(nombre));
+  }
+
+  /** Cuenta y reporta un tercero excluido por la ventana (conteo agregado + muestra). */
+  function excluirTercero(origen: string, idViejo: string | undefined, nombre: string): void {
+    fueraVentana += 1;
+    reporte.agregar(
+      'Terceros FUERA de ventana (sin uso — NO migrados)',
+      `"${nombre}" (${origen}, id=${idViejo ?? '?'})`,
+    );
+  }
 
   function rolId(codigo: string): number {
     const id = rolPorCodigo.get(codigo);
@@ -283,6 +310,10 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!terceroUsado(pre?.provIdProveedor ?? null, fila.IdProveedor, nombre)) {
+      excluirTercero('Proveedores', fila.IdProveedor, nombre);
+      continue;
+    }
     // Rol según TipoProv: T→vende-telas, H→vende-avios, S/vacío→otros-servicios (F4/MRP
     // filtra proveedores por rol). El `tipo` enum se conserva como clasificador rápido.
     const codRolComercial = mapearRolProveedorComercial(fila.TipoProv);
@@ -309,6 +340,10 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!terceroUsado(pre?.provIdCortadores ?? null, fila.IdCortadores, nombre)) {
+      excluirTercero('Cortadores', fila.IdCortadores, nombre);
+      continue;
+    }
     const idNuevo = await crearOFusionar(
       nombre,
       [rolId(COD_ROL.corte)],
@@ -324,6 +359,10 @@ export async function cargarProveedores(
     const nombre = parsearTexto(`${fila.Nombre ?? ''} ${fila.Apellidos ?? ''}`);
     if (nombre === null) {
       omitidos += 1;
+      continue;
+    }
+    if (!terceroUsado(pre?.provIdMaquileros ?? null, fila.IdMaquileros, nombre)) {
+      excluirTercero('Maquileros', fila.IdMaquileros, nombre);
       continue;
     }
     const costura = parsearBandera(fila.Costura);
@@ -362,6 +401,10 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!terceroUsado(pre?.provIdEstampadores ?? null, fila.IdEstampadores, nombre)) {
+      excluirTercero('Estampadores', fila.IdEstampadores, nombre);
+      continue;
+    }
     const idNuevo = await crearOFusionar(
       nombre,
       [rolId(COD_ROL.estampado)],
@@ -379,5 +422,11 @@ export async function cargarProveedores(
     });
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion, fusiones };
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Terceros fuera de ventana (sin OC/órdenes/EsMa/notas/auditorías en la ventana ni ` +
+        `telas/avíos usados): ${String(fueraVentana)} NO migrados.`,
+    );
+  }
+  return { creados, existentes, omitidos, omitidosValidacion, fusiones, fueraVentana };
 }

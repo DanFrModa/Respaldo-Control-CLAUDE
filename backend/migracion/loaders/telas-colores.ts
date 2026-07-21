@@ -21,9 +21,11 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearDinero } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Resultado del grid: telas tocadas (creados), renglones omitidos, etc. */
@@ -31,8 +33,12 @@ export async function cargarTelasColores(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
+  // Prescan de USO: con ventana activa, los renglones de telas NO migradas van al bucket
+  // `fueraVentana` (cascada tela → grid de colores), no al de "sin mapeo".
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Mapeos: IdTelas → idTela ; textoColor(original) → idColor.
   const mapaTela = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.telaPorIdTelas);
@@ -43,6 +49,7 @@ export async function cargarTelasColores(
   // Agrupar por idTela nuevo: idColor → precio (último gana).
   const porTela = new Map<number, Map<number, number | undefined>>();
   let omitidos = 0;
+  let fueraVentana = 0;
 
   for (const fila of filas) {
     const idTelasViejo = (fila.IdTelas ?? '').trim();
@@ -51,6 +58,12 @@ export async function cargarTelasColores(
     const idColor = colorTexto === '' ? undefined : mapaColor.get(colorTexto);
 
     if (idTela === undefined) {
+      // Con ventana activa una tela sin mapeo es (casi siempre) una tela excluida por USO:
+      // se cuenta en su propio bucket, sin inundar el reporte con miles de renglones.
+      if (pre !== null) {
+        fueraVentana += 1;
+        continue;
+      }
       omitidos += 1;
       reporte.agregar(
         'TelasColores: IdTelas sin mapeo de tela (omitidos)',
@@ -111,5 +124,11 @@ export async function cargarTelasColores(
     }
   }
 
-  return { creados: telasTocadas, existentes: 0, omitidos, omitidosValidacion };
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `TelasColores fuera de ventana: ${String(fueraVentana)} renglones de telas NO migradas ` +
+        `(cascada tela → grid) — NO migrados.`,
+    );
+  }
+  return { creados: telasTocadas, existentes: 0, omitidos, omitidosValidacion, fueraVentana };
 }

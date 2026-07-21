@@ -19,13 +19,15 @@ import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { mapearTipoBordado } from '../comun/mapeos-enum.js';
 import { ENTIDAD_MAPEO, guardarMapeo, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { crearConNombreUnico, intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearDinero, parsearEntero, parsearTexto } from '../comun/valores.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Desenlace de procesar una fila (para agregar conteos tras los lotes). */
-type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 async function idPorNombre(cliente: ClienteMapeo, nombre: string): Promise<number | null> {
   const fila = await cliente.bordado.findFirst({
@@ -54,14 +56,17 @@ export async function cargarBordados(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const filas = leerCsv('Bordados.csv');
+  // Prescan de USO: con ventana activa solo migran los bordados del BOM de modelos usados.
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
 
   // Filas INDEPENDIENTES → carga concurrente acotada (acelera carga Y re-chequeo idempotente).
   const resultados = await enLotes(
     filas,
-    (fila): Promise<Desenlace> => procesarBordado(sesion, bd, cliente, reporte, fila),
+    (fila): Promise<Desenlace> => procesarBordado(sesion, bd, cliente, reporte, pre, fila),
     CONCURRENCIA_ETL,
   );
 
@@ -70,14 +75,21 @@ export async function cargarBordados(
   let existentes = 0;
   let omitidos = 0;
   let omitidosValidacion = 0;
+  let fueraVentana = 0;
   for (const r of resultados) {
     const d = r.ok ? r.valor : 'omitidoValidacion';
     if (d === 'creado') creados += 1;
     else if (d === 'existente') existentes += 1;
     else if (d === 'omitido') omitidos += 1;
+    else if (d === 'fueraVentana') fueraVentana += 1;
     else omitidosValidacion += 1;
   }
-  return { creados, existentes, omitidos, omitidosValidacion };
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Bordados fuera de ventana (sin uso en BOM de modelos usados): ${String(fueraVentana)} NO migrados.`,
+    );
+  }
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 /** Procesa UNA fila de Bordados (idempotente, tolerante, con desambiguación de nombre). */
@@ -86,6 +98,7 @@ async function procesarBordado(
   bd: ContextoBd,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  pre: PrescanUso | null,
   fila: Record<string, string>,
 ): Promise<Desenlace> {
   const idViejo = fila.IdBordados;
@@ -93,6 +106,14 @@ async function procesarBordado(
   if (nombreCrudo === null) {
     reporte.agregar('Bordados con nombre vacío (omitidos)', `Id=${idViejo ?? '?'}`);
     return 'omitido';
+  }
+  // Ventana por USO: bordado sin uso → fuera, con su propio bucket (muestra en el reporte).
+  if (pre !== null && (idViejo === undefined || !pre.bordadosId.has(idViejo.trim()))) {
+    reporte.agregar(
+      'Bordados FUERA de ventana (sin uso — NO migrados)',
+      `"${nombreCrudo}" (IdBordados=${idViejo ?? '?'})`,
+    );
+    return 'fueraVentana';
   }
   // Trunca el nombre al máximo del esquema (deja sitio para el sufijo de desambiguación).
   const nombreOriginal =
