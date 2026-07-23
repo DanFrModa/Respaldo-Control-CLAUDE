@@ -23,6 +23,10 @@
  * `listarFotos`) y degradando con ELEGANCIA: si una foto no se puede obtener, el PDF se renderiza
  * igual sin esa imagen (jamás se trunca el impreso por una foto faltante). El servicio de archivos
  * y la descarga de bytes son INYECTABLES para los tests (sin R2 real).
+ *
+ * Artes (petición Daniel, jul-2026): además de las fotos del MODELO, el impreso incluye las
+ * IMÁGENES SUBIDAS A LA ORDEN (adjuntos F8-E6 con `tipoMime` image/*), en la sección
+ * "Artes / fotos de la orden", con el MISMO patrón de descarga best-effort.
  */
 import { createElement as h, type ReactElement } from 'react';
 
@@ -57,6 +61,10 @@ import { leerBom } from '../../modelos/bom-modelo.js';
 // la orden. Exigir `modelos.ver` haría que un rol con `ordenes.ver` pero sin `modelos.ver` reciba
 // 403 y truene el PDF entero, contradiciendo el degradado best-effort de fotos.
 import { leerFotosModelo } from '../../modelos/fotos-modelo.js';
+// Los ARTES (imágenes subidas a la orden, F8-E6) sí se leen por `listarAdjuntos`: ese servicio
+// exige exactamente `ordenes.ver` (el mismo permiso que ya autoriza esta impresión), así que no
+// introduce ningún 403 nuevo; la descarga de sus bytes es igual de best-effort que las fotos.
+import { listarAdjuntos, type AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
 import { obtenerOrden } from '../ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin red ni BD) ──────────────────────────────────
@@ -123,6 +131,12 @@ export interface DatosImpresoOrden {
   bordados: BordadoImpreso[];
   habilitacion: AvioImpreso[];
   fotos: FotoImpreso[];
+  /**
+   * ARTES de la orden (petición Daniel, jul-2026): las IMÁGENES subidas como adjuntos de la orden
+   * (F8-E6, `tipoMime` image/*), ya descargadas best-effort igual que `fotos`. Sección propia
+   * "Artes / fotos de la orden" en el impreso; vacío = la sección no se pinta.
+   */
+  artes: FotoImpreso[];
 }
 
 // ── Resolución de datos (lo único que toca BD/red) ──────────────────────────────────────────────
@@ -163,6 +177,7 @@ export interface DepsImpreso {
   obtenerOrden?: typeof obtenerOrden;
   leerBom?: typeof leerBom;
   leerFotosModelo?: typeof leerFotosModelo;
+  listarAdjuntos?: typeof listarAdjuntos;
 }
 
 /**
@@ -224,6 +239,7 @@ export async function armarDatosImpresoOrden(
   const obtener = deps.obtenerOrden ?? obtenerOrden;
   const leer = deps.leerBom ?? leerBom;
   const leerFotos = deps.leerFotosModelo ?? leerFotosModelo;
+  const listarAdjuntosOrden = deps.listarAdjuntos ?? listarAdjuntos;
 
   // `obtenerOrden` ya verifica permiso + empresa activa (A9) y deriva la matriz/total. Va PRIMERO:
   // si la orden no es de la empresa activa, fallamos con 404 antes de tocar R2 (servicioArchivos()).
@@ -233,10 +249,33 @@ export async function armarDatosImpresoOrden(
   const cliente = clienteLectura(bd);
   const bom = await leer(cliente, orden.idModelo);
   const fotos = await leerFotos(orden.idModelo, bd, archivos);
+  // ARTES: los adjuntos de la orden (F8-E6) que sean IMAGEN (`tipoMime` image/*). `listarAdjuntos`
+  // exige el mismo `ordenes.ver` que ya autoriza esta impresión (no introduce 403 nuevos), pero
+  // presigna TODOS los adjuntos antes de que podamos filtrar por MIME (filtrar antes exigiría
+  // cambiarle la firma al servicio) → la llamada entera es BEST-EFFORT: si falla (R2 caído, etc.),
+  // el impreso sale igual SIN artes; jamás se trunca el PDF por los adjuntos.
+  let adjuntosImagen: AdjuntoOrdenConUrl[] = [];
+  try {
+    const adjuntos = await listarAdjuntosOrden(sesion, id, bd, archivos);
+    adjuntosImagen = adjuntos.filter((a) => a.tipoMime.startsWith('image/'));
+  } catch (error) {
+    // Mismo patrón tenue que el resto del módulo de adjuntos: se loguea y se sigue sin artes.
+    console.warn(
+      `No se pudieron leer los adjuntos (artes) de la orden ${id} para su impreso.`,
+      error,
+    );
+  }
 
-  // Fotos: se bajan en paralelo y se descartan las que no se pudieron obtener (best-effort).
-  const dataUrls = await Promise.all(fotos.map((f) => descargarImagen(f.urlDescarga)));
+  // Fotos y artes: se bajan en paralelo y se descartan las que no se pudieron obtener
+  // (best-effort: una imagen caída JAMÁS trunca el impreso).
+  const [dataUrls, dataUrlsArtes] = await Promise.all([
+    Promise.all(fotos.map((f) => descargarImagen(f.urlDescarga))),
+    Promise.all(adjuntosImagen.map((a) => descargarImagen(a.urlDescarga))),
+  ]);
   const fotosImpreso: FotoImpreso[] = dataUrls
+    .filter((u): u is string => u !== null)
+    .map((dataUrl) => ({ dataUrl }));
+  const artesImpreso: FotoImpreso[] = dataUrlsArtes
     .filter((u): u is string => u !== null)
     .map((dataUrl) => ({ dataUrl }));
 
@@ -274,6 +313,7 @@ export async function armarDatosImpresoOrden(
         consumoPorPrenda: a.consumoPorPrenda,
       })),
     fotos: fotosImpreso,
+    artes: artesImpreso,
   };
 }
 
@@ -289,6 +329,8 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETA.borde,
   },
+  // Artes de la orden: misma tarjeta de foto, pero en fila que ENVUELVE (pueden ser varias).
+  artes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   colColor: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   colTalla: { width: 34, textAlign: 'center' },
   colTotal: { width: 42, textAlign: 'center', fontFamily: FUENTE.negrita },
@@ -399,6 +441,29 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
   );
 }
 
+/**
+ * Sección "Artes / fotos de la orden" (petición Daniel, jul-2026): las IMÁGENES subidas a la orden
+ * (adjuntos F8-E6 con `tipoMime` image/*), ya descargadas best-effort. Sin artes NO se pinta nada
+ * (ni el título): el impreso histórico queda idéntico.
+ */
+function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
+  if (datos.artes.length === 0) {
+    return null;
+  }
+  return h(
+    View,
+    { style: estilosDoc.seccion },
+    TituloSeccion('Artes / fotos de la orden'),
+    h(
+      View,
+      { style: estilos.artes },
+      ...datos.artes.map((arte, i) =>
+        h(Image, { key: `arte-${i}`, style: estilos.foto, src: arte.dataUrl }),
+      ),
+    ),
+  );
+}
+
 /** Sección de lista simple (Telas / Bordados / Habilitación), con su texto o un "—" si va vacía. */
 function seccionLista(titulo: string, lineas: string[]): ReactElement {
   const cuerpo =
@@ -414,7 +479,8 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     EncabezadoDocumento({
       empresa: datos.empresa,
       titulo: 'Orden de producción — CONTROL v2',
-      derecha: { etiqueta: 'Folio', valor: String(datos.folio), grande: true },
+      // "Orden", no "Folio" (petición Daniel, jul-2026): el impreso dice "Orden 5341".
+      derecha: { etiqueta: 'Orden', valor: String(datos.folio), grande: true },
     }),
     bandaCancelada(datos),
     bloqueFotos(datos),
@@ -468,6 +534,7 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
         (a) => `${a.clave} — ${a.descripcion} (consumo ${a.consumoPorPrenda} / prenda)`,
       ),
     ),
+    bloqueArtes(datos),
     PieDocumento({
       contexto: `CONTROL v2 · ${datos.empresa} · Orden ${datos.folio} · ${datos.totalPiezas} piezas`,
     }),
