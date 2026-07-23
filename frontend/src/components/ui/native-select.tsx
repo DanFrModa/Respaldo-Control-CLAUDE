@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, X } from 'lucide-react';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -33,17 +33,34 @@ function esClaseDeAncho(clase: string): boolean {
  * `claseContenedor`, el comportamiento es identico al anterior (`w-full`), y
  * los wrappers locales tipo `<div className="w-52"><SelectNativo …/></div>`
  * siguen funcionando (el contenedor `w-full` llena ese padre).
+ *
+ * LIMPIAR (aditivo, jul-2026 — petición de Daniel en los filtros de Órdenes):
+ * con la prop opcional `alLimpiar`, cuando el select tiene un valor distinto
+ * del default (`value` no vacío) el chevron se sustituye por un botón ✕ que
+ * invoca `alLimpiar` (el padre regresa el filtro a "Todos"). Mismo look que la
+ * ✕ del `ComboboxBuscable` para que toda la barra de filtros sea consistente.
+ * Sin `alLimpiar` el componente se comporta EXACTAMENTE igual que antes.
  */
 function SelectNativo({
   className,
   claseContenedor,
+  alLimpiar,
   children,
   ...props
 }: React.ComponentProps<'select'> & {
   /** Clases extra para el CONTENEDOR del select (no el `<select>` interno). */
   claseContenedor?: string;
+  /** Con valor no vacío pinta una ✕ (en lugar del chevron) que limpia el filtro. */
+  alLimpiar?: () => void;
 }): React.JSX.Element {
   const clasesDeAncho = (className ?? '').split(/\s+/).filter(esClaseDeAncho);
+  // La ✕ solo aparece con un valor "real" (no el default '' de los filtros) y select habilitado.
+  const limpiable =
+    alLimpiar !== undefined &&
+    props.value !== undefined &&
+    props.value !== '' &&
+    props.disabled !== true;
+  const testid = (props as { 'data-testid'?: string })['data-testid'];
   return (
     <div className={cn('relative w-full', clasesDeAncho, claseContenedor)}>
       <select
@@ -56,10 +73,22 @@ function SelectNativo({
       >
         {children}
       </select>
-      <ChevronDownIcon
-        className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
+      {limpiable ? (
+        <button
+          type="button"
+          onClick={alLimpiar}
+          aria-label="Quitar filtro"
+          {...(testid !== undefined ? { 'data-testid': `${testid}-limpiar` } : {})}
+          className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <X className="size-3.5" aria-hidden />
+        </button>
+      ) : (
+        <ChevronDownIcon
+          className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+      )}
     </div>
   );
 }

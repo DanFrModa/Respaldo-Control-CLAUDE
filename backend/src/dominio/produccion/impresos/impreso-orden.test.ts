@@ -3,8 +3,9 @@
  *  • `armarTabla` — la proyección de la matriz a tabla color × talla con totales (deben CUADRAR).
  *  • `generarPdfOrden` / `generarPdfOrdenes` — que devuelven un Buffer PDF real (cabecera `%PDF`),
  *    incluso con matriz grande, orden cancelada o sin fotos (degradación elegante).
- *  • `armarDatosImpresoOrden` — reúsa `obtenerOrden`/`leerBom`/`leerFotosModelo` (inyectados), filtra
- *    `paraProduccion`, excluye precios y descarta fotos no descargables (best-effort).
+ *  • `armarDatosImpresoOrden` — reúsa `obtenerOrden`/`leerBom`/`leerFotosModelo`/`listarAdjuntos`
+ *    (inyectados), filtra `paraProduccion`, excluye precios, descarta fotos no descargables
+ *    (best-effort) y trae como ARTES solo los adjuntos de la orden con `tipoMime` image/*.
  *  • `descargarImagenComoDataUrl` — best-effort (un fallo de red → `null`, no truena).
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,7 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { OrdenSalida } from '../../../contrato/index.js';
 import type { BomModelo } from '../../modelos/bom-modelo.js';
 import type { FotoModeloConUrl } from '../../modelos/fotos-modelo.js';
+import type { AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
 
 import {
   armarDatosImpresoOrden,
@@ -83,9 +85,14 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     bordados: [{ nombre: 'Logo pecho', tipo: 'BORDADO' }],
     habilitacion: [{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }],
     fotos: [],
+    artes: [],
     ...over,
   };
 }
+
+/** PNG de 1×1 real (base64) para las pruebas de render con imagen incrustada. */
+const PNG_1X1 =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 /** ¿El Buffer empieza con la firma de un PDF? */
 function esPdf(buffer: Buffer): boolean {
@@ -196,6 +203,16 @@ describe('generarPdfOrden', () => {
     const buffer = await generarPdfOrden(datosBase({ telas: [], bordados: [], habilitacion: [] }));
     expect(esPdf(buffer)).toBe(true);
   });
+
+  it('renderiza la sección de ARTES cuando la orden trae imágenes subidas', async () => {
+    const buffer = await generarPdfOrden(
+      datosBase({ artes: [{ dataUrl: PNG_1X1 }, { dataUrl: PNG_1X1 }] }),
+    );
+    expect(esPdf(buffer)).toBe(true);
+    // Con artes el PDF crece respecto al mismo impreso sin artes (la sección sí se pintó).
+    const sinArtes = await generarPdfOrden(datosBase({ artes: [] }));
+    expect(buffer.length).toBeGreaterThan(sinArtes.length);
+  });
 });
 
 describe('generarPdfOrdenes', () => {
@@ -248,18 +265,34 @@ describe('armarDatosImpresoOrden', () => {
     } as unknown as OrdenSalida;
   }
 
-  /** `deps` con las lecturas de dominio inyectadas (fakes), parametrizable por BOM/fotos. */
+  /** Adjunto de la orden mínimo (solo los campos que usa el impreso), con overrides. */
+  function adjunto(over: Partial<AdjuntoOrdenConUrl> = {}): AdjuntoOrdenConUrl {
+    return {
+      idArchivo: 'a1',
+      nombreOriginal: 'arte.png',
+      tipoMime: 'image/png',
+      tamanoBytes: 10,
+      urlDescarga: 'https://r2/arte',
+      subidoPorId: null,
+      creadoEn: new Date('2026-07-01'),
+      ...over,
+    };
+  }
+
+  /** `deps` con las lecturas de dominio inyectadas (fakes), parametrizable por BOM/fotos/adjuntos. */
   function depsCon(
     orden: OrdenSalida,
     bom: BomModelo,
     fotos: FotoModeloConUrl[],
     descargarImagen?: DepsImpreso['descargarImagen'],
+    adjuntos: AdjuntoOrdenConUrl[] = [],
   ): DepsImpreso {
     return {
       archivos: archivosFake,
       obtenerOrden: () => Promise.resolve(orden),
       leerBom: () => Promise.resolve(bom),
       leerFotosModelo: () => Promise.resolve(fotos),
+      listarAdjuntos: () => Promise.resolve(adjuntos),
       ...(descargarImagen ? { descargarImagen } : {}),
     };
   }
@@ -364,6 +397,77 @@ describe('armarDatosImpresoOrden', () => {
     expect(esPdf(buffer)).toBe(true);
   });
 
+  it('trae como ARTES solo los adjuntos de la orden con tipoMime image/*', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const adjuntos = [
+      adjunto({ idArchivo: 'a1', tipoMime: 'image/png', urlDescarga: 'https://r2/arte-1' }),
+      // Un Excel y un PDF adjuntos NO son artes: se excluyen por tipoMime.
+      adjunto({
+        idArchivo: 'a2',
+        tipoMime: 'application/pdf',
+        urlDescarga: 'https://r2/ficha.pdf',
+      }),
+      adjunto({ idArchivo: 'a3', tipoMime: 'image/jpeg', urlDescarga: 'https://r2/arte-2' }),
+    ];
+    const descargarImagen = vi.fn((url: string) => Promise.resolve(`data:img;${url}`));
+
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida(), bom, [], descargarImagen, adjuntos),
+    );
+
+    // Solo las 2 imágenes entran (y en su orden); el PDF adjunto ni se intenta descargar.
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/arte-1' },
+      { dataUrl: 'data:img;https://r2/arte-2' },
+    ]);
+    expect(descargarImagen).not.toHaveBeenCalledWith('https://r2/ficha.pdf');
+  });
+
+  it('descarta artes que no se pudieron descargar (best-effort, el PDF sale igual)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const adjuntos = [
+      adjunto({ idArchivo: 'a1', urlDescarga: 'https://r2/ok' }),
+      adjunto({ idArchivo: 'a2', urlDescarga: 'https://r2/falla' }),
+    ];
+    const descargarImagen = vi.fn((url: string) =>
+      Promise.resolve(url.endsWith('ok') ? PNG_1X1 : null),
+    );
+
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida(), bom, [], descargarImagen, adjuntos),
+    );
+
+    expect(datos.artes).toEqual([{ dataUrl: PNG_1X1 }]);
+    const buffer = await generarPdfOrden(datos);
+    expect(esPdf(buffer)).toBe(true);
+  });
+
+  it('si listarAdjuntos FALLA por completo, el impreso sale igual SIN artes (best-effort)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    // Silencia el warn tenue del degradado para no ensuciar la salida del runner.
+    const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps: DepsImpreso = {
+        ...depsCon(ordenSalida(), bom, []),
+        listarAdjuntos: () => Promise.reject(new Error('R2 caído')),
+      };
+      const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, deps);
+
+      expect(datos.artes).toEqual([]);
+      expect(advertir).toHaveBeenCalled();
+      const buffer = await generarPdfOrden(datos);
+      expect(esPdf(buffer)).toBe(true);
+    } finally {
+      advertir.mockRestore();
+    }
+  });
+
   it('NO depende de modelos.ver: con solo ordenes.ver no lanza ErrorPermiso', async () => {
     // Sesión con ordenes.ver pero SIN modelos.ver. El impreso lee fotos a bajo nivel
     // (`leerFotosModelo`, sin verificar permiso), así que NO debe rebotar por falta de modelos.ver.
@@ -397,6 +501,7 @@ describe('armarDatosImpresoOrden', () => {
       obtenerOrden: () => Promise.reject(new ErrorNoEncontrado('Orden', 999)),
       leerBom: () => Promise.resolve({ telas: [], avios: [], bordados: [] }),
       leerFotosModelo: () => Promise.resolve([]),
+      listarAdjuntos: () => Promise.resolve([]),
     };
     await expect(
       armarDatosImpresoOrden(sesionConVer(), 999, undefined, deps),

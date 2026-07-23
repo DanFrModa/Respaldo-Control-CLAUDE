@@ -58,9 +58,9 @@ import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
  * ÓRDENES DE PRODUCCIÓN — CENTRO DE COMANDO (rediseño R2, §4.2 ⭐): LA pantalla principal de la
  * operación (proto `vOrdenes`). Filtros arriba (buscador + Cliente/Maquilero/Estampador/Empresa/
  * OC-tela) + tabs de MES DE ENTREGA; tabla densa con las 13 columnas del proto (todas AGREGADAS en
- * el servidor, brecha B2); panel de detalle PERSISTENTE a la derecha con encabezado + mosaicos +
- * MATRIZ color×talla fijos arriba (petición de Daniel: la matriz siempre visible) y el resto con
- * scroll (precios con rastro §4.4.3, tela y compra, foto, desarrollo 360).
+ * el servidor, brecha B2); panel de detalle PERSISTENTE a la derecha con lo ESENCIAL fijo arriba
+ * (encabezado + fotos + mosaicos + botón de avance) y el resto con scroll AMPLIO, empezando por la
+ * matriz color×talla (ajuste jul-2026: antes la matriz iba fija y aplastaba la trazabilidad).
  *
  * Doble clic en una fila (o el botón "Registrar avance") abre el AVANCE DE PRODUCCIÓN (§4.3). La
  * captura/edición completa de la orden (F2-E3) se abre con el mosaico "Modificar" en el diálogo
@@ -168,10 +168,15 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   const [idSeleccionada, setIdSeleccionada] = useState<number | null>(null);
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
+  // Deep-link pendiente de "aterrizar" en la lista (petición Daniel, jul-2026): además de fijar la
+  // selección, la orden debe VERSE seleccionada en la lista izquierda como si se hubiera clickeado.
+  const [idDeepLinkPendiente, setIdDeepLinkPendiente] = useState<number | null>(null);
+
   const idDeepLink = leerIdOrdenState(location.state);
   useEffect(() => {
     if (idDeepLink !== null) {
       setIdSeleccionada(idDeepLink);
+      setIdDeepLinkPendiente(idDeepLink);
       // En pantallas chicas el panel vive en el cajón: sin abrirlo, el deep-link "no se ve".
       if (window.innerWidth < 1024) {
         setCajonAbierto(true);
@@ -180,13 +185,61 @@ export function CentroOrdenesPagina(): React.JSX.Element {
     }
   }, [idDeepLink, location.pathname, navigate]);
 
+  // Si la fila del deep-link NO está en la página visible, se pone el BUSCADOR al folio de la orden
+  // y se resetean los demás filtros/página para que el listado la traiga y se pinte seleccionada
+  // (con su resaltado normal). El folio sale del detalle que el panel ya carga (`useOrden`, misma
+  // clave de cache: cero peticiones extra). Se aplica UNA sola vez por deep-link y el "pendiente"
+  // se apaga en cuanto se resuelve: al aplicar el folio, al confirmar que la fila ya es visible,
+  // si la orden FALLA (404/sin permiso/otra empresa — sin esto la query quedaría habilitada
+  // refetcheando para siempre), o si el usuario TECLEA en el buscador mientras el folio viene en
+  // vuelo (su escritura manda: el deep-link pendiente se cancela, ver el onChange del buscador).
+  // Limitación conocida y ACEPTADA: con un deep-link a una orden CANCELADA el buscador queda con
+  // el folio pero la lista sale vacía (pide `incluirCanceladas: 'false'`); el panel derecho sí
+  // muestra la orden, que es lo que importa del deep-link.
+  const ordenDeepLink = useOrden(idDeepLinkPendiente ?? undefined);
+  useEffect(() => {
+    if (idDeepLinkPendiente === null) {
+      return;
+    }
+    if (ordenDeepLink.isError) {
+      // La orden no se pudo cargar: se apaga el pendiente SIN tocar el buscador ni los filtros.
+      setIdDeepLinkPendiente(null);
+      return;
+    }
+    if (filas.some((f) => f.id === idDeepLinkPendiente)) {
+      // La fila ya está visible: nada que traer.
+      setIdDeepLinkPendiente(null);
+      return;
+    }
+    const folio = ordenDeepLink.data?.folio;
+    if (folio === undefined || consulta.isPending) {
+      // Aún no se conoce el folio (o la lista sigue cargando): se decide cuando lleguen.
+      return;
+    }
+    setTextoBusqueda(String(folio));
+    setIdCliente(null);
+    setIdMaquilero(null);
+    setIdEstampador(null);
+    setTextoCliente('');
+    setTextoMaquilero('');
+    setTextoEstampador('');
+    setIdEmpresa('');
+    setOcTela('');
+    setMes(0);
+    setPagina(1);
+    setIdDeepLinkPendiente(null);
+  }, [idDeepLinkPendiente, filas, ordenDeepLink.data, ordenDeepLink.isError, consulta.isPending]);
+
   // Default: la primera fila de la página (panel persistente nunca vacío). La selección de un
   // deep-link se conserva aunque no esté en la página visible: el panel carga la orden directo.
+  // Con un deep-link EN CURSO (`idDeepLink` aún en el location.state) NO se aplica el default:
+  // en el primer render ambos efectos corren en el mismo flush y este pisaría la selección del
+  // deep-link con la primera fila (carrera cazada por la prueba del deep-link).
   useEffect(() => {
-    if (idSeleccionada === null && filas.length > 0) {
+    if (idSeleccionada === null && idDeepLink === null && filas.length > 0) {
       setIdSeleccionada(filas[0]?.id ?? null);
     }
-  }, [filas, idSeleccionada]);
+  }, [filas, idSeleccionada, idDeepLink]);
 
   const filaSeleccionada = filas.find((f) => f.id === idSeleccionada);
 
@@ -362,18 +415,22 @@ export function CentroOrdenesPagina(): React.JSX.Element {
     );
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
+    // Verticalmente COMPACTO arriba (ajuste jul-2026, petición de Daniel: recuperar filas visibles
+    // de la tabla): menos padding vertical y menos gap SOLO en esta página (el header global de la
+    // app no se toca). El padding horizontal se conserva (p-4/md:px-5).
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-4 py-2.5 md:px-5 lg:overflow-visible">
       {/* ── Encabezado de página ─────────────────────────────────────────── */}
       {/* En angosto (<sm) el título toma toda la línea y la barra de botones ENVUELVE
-          debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha. */}
-      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="min-w-0 flex-1">
+          debajo (flex-col); a partir de sm vuelve a la fila título-izquierda / barra-derecha.
+          Título y subtítulo comparten UNA línea base (más filas de tabla, sin quitar el título). */}
+      <header className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Órdenes de producción
           </h1>
           {/* Subtítulo con el conteo del proto: filas EN PANTALLA y abiertas (el total del filtro
               vive en el contador de la barra de herramientas, como en el proto). */}
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="min-w-0 truncate text-xs text-muted-foreground">
             Centro de operación · {filas.length.toLocaleString('es-MX')} en pantalla ·{' '}
             {abiertas.toLocaleString('es-MX')} abiertas · filtra por OP, modelo, pedido del cliente,
             maquilero…
@@ -419,7 +476,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           FLEXIONA (flex-1) para llenar el hueco y encogerse cuando falta espacio, con topes
           razonables; los selects/comboboxes llevan anchos modestos. En pantallas angostas la barra
           envuelve como el resto del sistema. */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-1.5">
         <div className="relative min-w-[180px] max-w-[320px] flex-1">
           <Search
             className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -431,6 +488,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             onChange={(e) => {
               setTextoBusqueda(e.target.value);
               reiniciarPagina();
+              // Si el usuario teclea mientras el folio de un deep-link viene en vuelo, SU escritura
+              // manda: se cancela el pendiente para no pisarle el texto al llegar la respuesta.
+              setIdDeepLinkPendiente(null);
             }}
             placeholder="Buscar OP, modelo o pedido del cliente…"
             className="h-8 pl-8 text-sm"
@@ -494,6 +554,11 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             setIdEmpresa(e.target.value);
             reiniciarPagina();
           }}
+          // ✕ para quitar el filtro (petición Daniel: TODOS los filtros con su tachita).
+          alLimpiar={() => {
+            setIdEmpresa('');
+            reiniciarPagina();
+          }}
           data-testid="centro-filtro-empresa"
         >
           <option value="">Empresa</option>
@@ -511,6 +576,10 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             setOcTela(e.target.value);
             reiniciarPagina();
           }}
+          alLimpiar={() => {
+            setOcTela('');
+            reiniciarPagina();
+          }}
           data-testid="centro-filtro-oc"
         >
           <option value="">OC tela</option>
@@ -525,6 +594,10 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           value={mes === 0 ? '' : String(mes)}
           onChange={(e) => {
             setMes(e.target.value === '' ? 0 : Number(e.target.value));
+            reiniciarPagina();
+          }}
+          alLimpiar={() => {
+            setMes(0);
             reiniciarPagina();
           }}
           data-testid="centro-filtro-mes"
@@ -1028,10 +1101,11 @@ function CampoPanel({ k, children }: { k: string; children: React.ReactNode }): 
 }
 
 /**
- * PANEL DE DETALLE del centro (proto `opDetalle`): encabezado + FOTO del modelo + mosaicos +
- * botón de avance + MATRIZ fijos arriba (sin scroll; la foto arriba fue petición de Daniel,
- * jul-2026); abajo, con scroll: precios (§4.4.3), datos del encabezado, tela y compra y el
- * expediente de Desarrollo (F8-E6).
+ * PANEL DE DETALLE del centro (proto `opDetalle`): SOLO lo esencial fijo arriba (encabezado +
+ * FOTOS + mosaicos + botón de avance; la foto arriba fue petición de Daniel, jul-2026); abajo,
+ * con scroll AMPLIO: la MATRIZ color×talla primero (movida aquí en jul-2026 para que la
+ * trazabilidad y el resto no queden aplastados), trazabilidad, precios (§4.4.3), datos del
+ * encabezado, tela y compra y el expediente de Desarrollo (F8-E6).
  */
 function DetalleCentroOrden({
   idOrden,
@@ -1092,7 +1166,7 @@ function DetalleCentroOrden({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="centro-detalle">
-      {/* ── FIJO arriba: encabezado + FOTO + mosaicos + avance + matriz (Daniel) ── */}
+      {/* ── FIJO arriba: SOLO lo esencial — encabezado + FOTOS + mosaicos + avance (Daniel) ── */}
       <div className="shrink-0 space-y-3 border-b p-3" data-testid="centro-detalle-fijo">
         <div className="flex items-center gap-3">
           {/* Héroe del proto `.opd-hero`: cuadro 46px con degradado de marca y los 3 primeros
@@ -1212,18 +1286,21 @@ function DetalleCentroOrden({
           <Scissors aria-hidden />
           Registrar avance de producción
         </Button>
+      </div>
 
-        {/* La MATRIZ va primero y SIEMPRE visible (petición explícita de Daniel). */}
+      {/* ── Con scroll: matriz, trazabilidad, precios, encabezado, tela y compra, desarrollo ── */}
+      {/* La MATRIZ abre la zona con scroll (ajuste jul-2026, petición de Daniel): antes vivía en la
+          zona fija y le comía casi toda la altura al scroll — la trazabilidad y lo demás quedaban
+          "aplastados en un huequito". Al abrir una orden la matriz se sigue viendo de primera, pero
+          el área scrolleable ahora dispone de mucha más altura. */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
         <div>
           <h4 className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Cantidades por color y talla · total {orden.totalPiezas.toLocaleString('es-MX')}
           </h4>
           <MatrizResumen orden={orden} />
         </div>
-      </div>
 
-      {/* ── Con scroll: trazabilidad, precios, encabezado, tela y compra, desarrollo ── */}
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
         {/* Cadena de trazabilidad (R3, §4.1): OC cliente → Desarrollo → Lista → Pedido → OP. */}
         <section>
           <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
