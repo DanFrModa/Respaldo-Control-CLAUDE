@@ -161,4 +161,38 @@ describe('<FotosModeloOrden>', () => {
     expect(screen.queryByTestId('subir-foto-orden')).not.toBeInTheDocument();
     expect(screen.queryByTestId('quitar-foto-orden')).not.toBeInTheDocument();
   });
+
+  // FOTO PRINCIPAL del modelo (Daniel, 25-jul-2026): es la PRIMERA de la galería del modelo, abre
+  // la tira y lleva su distintivo; las imágenes de la ORDEN nunca son "la principal del modelo".
+  it('marca la PRIMERA foto del modelo como principal y la pone al frente de la tira', () => {
+    useFotosModelo.mockReturnValue({
+      data: [fotoModelo(1, 'https://ej.test/m1.jpg'), fotoModelo(2, 'https://ej.test/m2.jpg')],
+    });
+    useAdjuntosOrden.mockReturnValue({
+      data: [adjunto('img1', 'image/png', 'https://ej.test/o1.png')],
+    });
+    renderConProveedores(
+      <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar={false} />,
+    );
+
+    // Un solo distintivo, y está en la PRIMERA miniatura de la tira.
+    const distintivos = screen.getAllByTestId('foto-modelo-orden-principal');
+    expect(distintivos).toHaveLength(1);
+    const miniaturas = screen.getAllByTestId('foto-modelo-orden');
+    expect(miniaturas[0]?.parentElement).toContainElement(distintivos[0] ?? null);
+    // El texto accesible dice cuál es (no solo un icono de color).
+    expect(screen.getByAltText('Foto principal de 501')).toBeInTheDocument();
+    expect(screen.getAllByAltText('Foto de 501')).toHaveLength(2);
+  });
+
+  it('sin fotos del modelo, ninguna imagen de la ORDEN se marca como principal', () => {
+    useAdjuntosOrden.mockReturnValue({
+      data: [adjunto('img1', 'image/png', 'https://ej.test/o1.png')],
+    });
+    renderConProveedores(
+      <FotosModeloOrden idModelo={1} codigoModelo="501" idOrden={9} puedeAdministrar={false} />,
+    );
+    expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(1);
+    expect(screen.queryByTestId('foto-modelo-orden-principal')).not.toBeInTheDocument();
+  });
 });

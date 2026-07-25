@@ -357,8 +357,10 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  { codigo: 'estampado', nombre: 'Estampado' },
-  { codigo: 'bordado', nombre: 'Bordado' },
+  // Vocabulario unificado (Daniel, jul-2026): estampado y bordado son ARTE; el proveedor que los
+  // presta es un "Prov. de Arte". Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
+  { codigo: 'estampado', nombre: 'Prov. de Arte (estampado)' },
+  { codigo: 'bordado', nombre: 'Prov. de Arte (bordado)' },
   { codigo: 'lavado', nombre: 'Lavado' },
   { codigo: 'aplicacion', nombre: 'Aplicación' },
   // Venta de materiales (proveedores comerciales).
@@ -690,8 +692,8 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[] = [
   { clave: 'InfGeneral', etiqueta: 'Información general', orden: 1 },
   { clave: 'InfTela', etiqueta: 'Información de tela', orden: 2 },
-  { clave: 'InfHab', etiqueta: 'Información de habilitación', orden: 3 },
-  { clave: 'Medidas', etiqueta: 'Medidas de habilitación', orden: 4 },
+  { clave: 'InfHab', etiqueta: 'Información de avíos', orden: 3 },
+  { clave: 'Medidas', etiqueta: 'Medidas de avíos', orden: 4 },
   { clave: 'Dibujo', etiqueta: 'Dibujo', orden: 5 },
   { clave: 'InfEtiqueta', etiqueta: 'Información de etiqueta', orden: 6 },
   { clave: 'EspCostura', etiqueta: 'Especificaciones de costura', orden: 7 },

@@ -1009,16 +1009,24 @@ async function crearOrdenDesdePdf(
     { tx },
   );
 
-  // El nº de orden de C&A vive en la OP (cada PDF el suyo) + la composición del PDF. `crearOrden` copió
-  // `Pedido.ocCliente` (la referencia general); aquí se SOBREESCRIBE con el nº de orden propio del PDF.
-  // También se PERSISTE el desglose SKU/packs del cliente (base del futuro módulo de empaque), en ESTA
-  // misma tx: si el alta se revierte, el desglose tampoco queda (A2).
+  // El nº de orden de C&A vive en la OP (cada PDF el suyo). `crearOrden` copió `Pedido.ocCliente`
+  // (la referencia general); aquí se SOBREESCRIBE con el nº de orden propio del PDF. También se
+  // PERSISTE el desglose SKU/packs del cliente (base del futuro módulo de empaque), en ESTA misma
+  // tx: si el alta se revierte, el desglose tampoco queda (A2).
+  //
+  // COMPOSICIÓN (Daniel 24-jul-2026): «no sale de la OC del cliente, sale del desarrollo del
+  // modelo». `crearOrden` ya heredó `Modelo.composicion`, y esa MANDA: el PDF NO la pisa. La del
+  // papel solo se usa como RESPALDO cuando el modelo no tiene composición capturada (para no
+  // perder el dato); en ese caso queda marcada como override (`compForzada = true`), porque no
+  // deriva del modelo. En cuanto se capture la del modelo, basta vaciar el campo en la orden para
+  // que vuelva a heredarla.
   const packs = packsClienteJson(r);
+  const composicionDeRespaldo = salida.orden.composicion === null && r.composicion !== '';
   await tx.orden.update({
     where: { id: salida.orden.id },
     data: {
       ocCliente: r.numeroOrden,
-      ...(r.composicion !== '' ? { composicion: r.composicion } : {}),
+      ...(composicionDeRespaldo ? { composicion: r.composicion, compForzada: true } : {}),
       ...(packs !== null ? { packsCliente: packs } : {}),
       ...datosModificacion(sesion),
     },

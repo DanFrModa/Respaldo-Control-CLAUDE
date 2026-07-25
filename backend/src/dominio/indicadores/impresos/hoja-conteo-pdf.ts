@@ -79,7 +79,13 @@ export async function impresoHojaConteo(
 ): Promise<{ buffer: Buffer }> {
   const datos = await leerConteoParaHoja(sesion, idInventarioCiclico, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
-  return { buffer: await renderizarPdfEnWorker('hoja-conteo', { pagador, datos }) };
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'hoja-conteo',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
 }
 
 /** Payload YA resuelto de la hoja de conteo (para el render en worker). */

@@ -31,6 +31,10 @@ vi.mock('@/api/empresas', () => ({
   // Configuracion (dialogo secundario): no se ejercita aqui.
   useConfiguracionEmpresa: () => ({ data: undefined, isPending: true, isError: false }),
   useActualizarConfiguracion: () => ({ mutate: vi.fn(), isPending: false }),
+  // Logo (seccion del cajon): su comportamiento propio se prueba en `LogoEmpresa.test.tsx`.
+  useLogoEmpresa: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useSubirLogoEmpresa: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarLogoEmpresa: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 /** Empresa de ejemplo (OJO: flag `activa`). */
@@ -42,6 +46,7 @@ function empresa(id: number, nombre: string, sobre: Partial<Empresa> = {}): Empr
     rfc: null,
     identificador: null,
     favorita: false,
+    idArchivoLogo: null,
     paraIpt: false,
     paraEdr: false,
     activa: true,

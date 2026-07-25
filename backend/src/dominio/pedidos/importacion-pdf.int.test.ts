@@ -5,6 +5,8 @@
  *    C&A `{color} {letra}`, resuelto-o-creado), el nº de orden de C&A en `Orden.ocCliente`, el
  *    departamento (División) + las referencias (D7) configuradas, el PDF ADJUNTO a la OP, y la LIGA
  *    aprendida (modelo del cliente → nuestro modelo),
+ *  • COMPOSICIÓN (Daniel 24-jul-2026): la del MODELO manda; la del PDF sólo entra de RESPALDO
+ *    (marcada como override) cuando el modelo no la tiene capturada,
  *  • MULTI-PDF → UN pedido con 2 OPs (resurtido), catálogos REUSADOS (color/talla no se duplican),
  *  • APRENDIZAJE: con la liga ya guardada, `analizar` la PROPONE y `confirmar` corre sin liga manual,
  *  • SIN liga (ni aprendida ni manual) → no se importa nada (error claro),
@@ -71,15 +73,21 @@ function archivosFalsos(): ServicioArchivos {
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
     },
+    descargarContenido(key) {
+      // El fake no guarda bytes: solo cumple el contrato del servicio (nadie lo usa aquí).
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
     eliminarObjeto() {
       return Promise.resolve();
     },
   };
 }
 
-/** Crea un modelo del catálogo y devuelve su id. */
-async function crearModelo(codigo: string): Promise<number> {
-  const modelo = await cliente.modelo.create({ data: { codigo } });
+/** Crea un modelo del catálogo (opcionalmente con composición del desarrollo) y devuelve su id. */
+async function crearModelo(codigo: string, composicion?: string): Promise<number> {
+  const modelo = await cliente.modelo.create({
+    data: { codigo, ...(composicion === undefined ? {} : { composicion }) },
+  });
   return modelo.id;
 }
 
@@ -131,7 +139,10 @@ describe('confirmar importación por PDF (1 PDF)', () => {
       },
     });
     expect(orden.ocCliente).toBe('620884');
+    // Composición (Daniel 24-jul-2026): el modelo de esta prueba NO la tiene capturada, así que la
+    // del PDF entra como RESPALDO y queda marcada como override (no deriva del modelo).
     expect(orden.composicion).toContain('ALGOD');
+    expect(orden.compForzada).toBe(true);
     // UN renglón por pack (convención C&A `{color} {letra}`): la OC 620884 trae 3 packs (A/B/C). El
     // sobre-pedido NO cambia la ESTRUCTURA de renglones (sólo las cantidades) → 3 líneas aun a pct 0.
     expect(orden.lineas).toHaveLength(3);
@@ -212,6 +223,28 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     // Evento outbox de la RC (orden-creada) encolado.
     const eventos = await cliente.eventoOutbox.count();
     expect(eventos).toBeGreaterThanOrEqual(1);
+  });
+
+  it('la composición del MODELO manda: el PDF del cliente NO la pisa (Daniel 24-jul-2026)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-COMP', '95% ALGODON 5% ELASTANO (DESARROLLO)');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: res.ordenes[0]!.idOrden },
+    });
+    // Heredada del modelo, SIN override: la del papel se descarta.
+    expect(orden.composicion).toBe('95% ALGODON 5% ELASTANO (DESARROLLO)');
+    expect(orden.compForzada).toBe(false);
   });
 });
 

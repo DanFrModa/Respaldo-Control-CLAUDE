@@ -57,11 +57,19 @@ export {
   esquemaEmpresaSalida,
   esquemaConfiguracionEmpresaActualizar,
   esquemaConfiguracionEmpresaSalida,
+  esquemaEmpresaLogoCrear,
+  esquemaEmpresaLogoConfirmar,
+  esquemaEmpresaLogoSubida,
+  esquemaEmpresaLogoSalida,
   type DatosEmpresaCrear,
   type DatosEmpresaEditar,
   type EmpresaSalida,
   type DatosConfiguracionEmpresaActualizar,
   type ConfiguracionEmpresaSalida,
+  type DatosEmpresaLogoCrear,
+  type DatosEmpresaLogoConfirmar,
+  type EmpresaLogoSubida,
+  type EmpresaLogoSalida,
 } from './esquemas/empresa.js';
 
 export {

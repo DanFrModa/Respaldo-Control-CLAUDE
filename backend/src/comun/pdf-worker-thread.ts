@@ -22,6 +22,8 @@
  */
 import { parentPort } from 'node:worker_threads';
 
+import { fijarLogoImpresos } from './impresos-estilos.js';
+
 /** Una función de CONSTRUCCIÓN pura: datos YA resueltos (serializables) → Buffer del documento. */
 type GeneradorDocumento = (datos: never) => Promise<Buffer>;
 
@@ -173,6 +175,13 @@ export interface PeticionRenderPdf {
   id: string;
   clave: string;
   datos: unknown;
+  /**
+   * LOGO de la empresa como data-URL, ya resuelto en el hilo principal (`comun/logo-empresa.ts`).
+   * Se fija en `impresos-estilos.ts` ANTES de construir el documento, que es el único punto por el
+   * que pasan los 23 impresos: así el membrete sale brandeado sin tocar ni un impreso. Si no viene
+   * (p. ej. un Excel, que no lleva membrete), se deja el que ya tenga el módulo (el empaquetado).
+   */
+  logo?: string;
 }
 
 /** Respuesta del worker: el Buffer del documento, o un error legible. */
@@ -194,6 +203,11 @@ async function atender(
     const thunk = generadorDe(msg.clave);
     if (thunk === undefined) {
       throw new Error(`Impreso no registrado: ${msg.clave}`);
+    }
+    // Branding: fija el logo de la empresa ANTES de construir. El worker atiende un trabajo a la
+    // vez, así que este estado de módulo no se pisa entre documentos.
+    if (msg.logo !== undefined) {
+      fijarLogoImpresos(msg.logo);
     }
     const generar = (await thunk()) as (datos: unknown) => Promise<Buffer>;
     const buffer = await generar(msg.datos);

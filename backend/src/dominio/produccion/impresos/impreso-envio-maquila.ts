@@ -286,14 +286,14 @@ function paginaFichaEstampado(datos: DatosImpresoEnvio, clave: string): ReactEle
   const hijos: (ReactElement | null)[] = [
     EncabezadoDocumento({
       empresa: datos.empresa,
-      titulo: 'Ficha de estampado — CONTROL v2',
+      titulo: 'Ficha de arte — CONTROL v2',
       derecha: { etiqueta: 'Folio de envío', valor: String(datos.folio), grande: true },
     }),
     bandaCancelada(datos),
     h(
       View,
       { style: estilosDoc.filaCampos, key: 'campos' },
-      campo('Estampador', datos.maquilero),
+      campo('Prov. de Arte', datos.maquilero),
       campo('Proceso', datos.proceso),
       campo('Orden', String(datos.folioOrden)),
       campo('Fecha de envío', datos.fecha),
@@ -304,13 +304,13 @@ function paginaFichaEstampado(datos: DatosImpresoEnvio, clave: string): ReactEle
     h(
       View,
       { style: estilosDoc.seccion, key: 'instr' },
-      TituloSeccion('Instrucciones del estampado'),
+      TituloSeccion('Instrucciones del arte'),
       datos.observaciones
         ? h(View, { style: estilos.cajaInstrucciones }, h(Text, {}, datos.observaciones))
         : h(View, { style: estilos.cajaInstrucciones }, h(Text, { style: estilosDoc.vacio }, '')),
     ),
     PieDocumento({
-      contexto: `CONTROL v2 · ${datos.empresa} · Ficha de estampado · Envío ${datos.folio} · ${datos.totalPiezas} piezas`,
+      contexto: `CONTROL v2 · ${datos.empresa} · Ficha de arte · Envío ${datos.folio} · ${datos.totalPiezas} piezas`,
     }),
   ];
   return h(
@@ -334,9 +334,9 @@ function documentoFichaEstampado(datos: DatosImpresoEnvio): ReactElement<Documen
   return h(
     Document,
     {
-      title: `Ficha de estampado ${datos.folio}`,
+      title: `Ficha de arte ${datos.folio}`,
       author: datos.empresa,
-      subject: 'Ficha de estampado',
+      subject: 'Ficha de arte',
     },
     paginaFichaEstampado(datos, 'ficha'),
   );
@@ -370,7 +370,12 @@ export async function impresoEnvioMaquila(
   deps: DepsImpresoEnvio = {},
 ): Promise<ImpresoEnvio> {
   const datos = await armarDatosImpresoEnvio(sesion, idEtapa, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('envio-maquila', datos), folio: datos.folio };
+  return {
+    buffer: await renderizarPdfEnWorker('envio-maquila', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    folio: datos.folio,
+  };
 }
 
 /** Resuelve los datos del envío (A9) y devuelve la ficha de estampado (PDF) + el folio. */
@@ -381,5 +386,10 @@ export async function impresoFichaEstampado(
   deps: DepsImpresoEnvio = {},
 ): Promise<ImpresoEnvio> {
   const datos = await armarDatosImpresoEnvio(sesion, idEtapa, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('ficha-estampado', datos), folio: datos.folio };
+  return {
+    buffer: await renderizarPdfEnWorker('ficha-estampado', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    folio: datos.folio,
+  };
 }

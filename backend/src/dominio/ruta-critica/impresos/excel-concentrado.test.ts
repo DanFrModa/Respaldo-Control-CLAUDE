@@ -82,7 +82,7 @@ describe('excelConcentrado', () => {
     expect(buffer.length).toBeGreaterThan(0);
     // Un .xlsx es un ZIP: empieza por "PK".
     expect(buffer.subarray(0, 2).toString('latin1')).toBe('PK');
-  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
+  });
 
   it('pagina internamente y trae TODAS las filas (no solo la primera página)', async () => {
     // 250 filas con tope interno de 100 → 3 páginas.
@@ -100,7 +100,7 @@ describe('excelConcentrado', () => {
     expect(hoja).toBeDefined();
     // 1 encabezado + 250 filas de datos.
     expect(hoja?.rowCount).toBe(251);
-  }, 20_000);
+  });
 
   it('vuelca folio, cliente y el resumen de procesos a las celdas', async () => {
     const consultar = vi.fn(fakeConsultar([fila(42, { cliente: 'Boutique Aurora' })]));
@@ -121,7 +121,7 @@ describe('excelConcentrado', () => {
     const procesos = renglon?.getCell(10).value;
     expect(typeof procesos).toBe('string');
     expect(procesos as string).toContain('Corte: 2026-06-17→—');
-  }, 20_000);
+  });
 
   // El constructor puro (sin worker) fija el color de marca: el encabezado usa el verde `FF0E7C47`,
   // no el teal viejo. Se verifica directo sobre el builder para ser determinista.

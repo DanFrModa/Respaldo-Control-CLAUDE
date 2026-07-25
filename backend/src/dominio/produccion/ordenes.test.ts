@@ -15,10 +15,11 @@ import {
 /**
  * Unit del dominio de Órdenes (F2-E2) — SIN Postgres. Cubre lo que no necesita la base: el guard
  * de permisos (deny-by-default, A4), la validación de captura (Zod: orden SIN pedido rechazada,
- * cancelar SIN motivo rechazado) y la PROYECCIÓN del total DERIVADO por suma de tallas (D4). La
- * integridad transaccional real (folio por empresa, color duplicado, copiado por etiqueta,
- * referencia de otro cliente, búsqueda por referencia, estado derivado, bitácora) se prueba contra
- * Postgres en `ordenes.int.test.ts` (CI).
+ * cancelar SIN motivo rechazado), la PROYECCIÓN del total DERIVADO por suma de tallas (D4) y la
+ * HERENCIA de la composición desde la ficha del modelo con su override por orden (Daniel
+ * 24-jul-2026). La integridad transaccional real (folio por empresa, color duplicado, copiado por
+ * etiqueta, referencia de otro cliente, búsqueda por referencia, estado derivado, bitácora) se
+ * prueba contra Postgres en `ordenes.int.test.ts` (CI).
  */
 
 const sesionAdmin = () =>
@@ -89,7 +90,8 @@ function bdParaCrear(): ContextoBd {
       findUnique: vi.fn(() =>
         Promise.resolve({
           idModelo: 9,
-          modelo: { activo: true, codigo: '501' },
+          // La composición del MODELO es la fuente de la de la orden (Daniel 24-jul-2026).
+          modelo: { activo: true, codigo: '501', composicion: '100% ALGODÓN (MODELO)' },
           pedido: {
             idEmpresa: 1,
             idCliente: 3,
@@ -223,5 +225,159 @@ describe('dominio Órdenes (R2) — redacción de precios en la salida (§4.4.3)
     const salida = await obtenerOrden(sesion, 1, bdConPrecios());
     expect(salida.maquilaOrd).toBe(27.5);
     expect(salida.aplicacionOrd).toBe(6);
+  });
+});
+
+describe('dominio Órdenes — COMPOSICIÓN heredada del modelo (Daniel 24-jul-2026)', () => {
+  /** Lee el `data` con el que se creó la orden en el stub. */
+  function datosDelCreate(bd: ContextoBd): { composicion: string | null; compForzada: boolean } {
+    const tx = bd.tx as unknown as {
+      orden: { create: ReturnType<typeof vi.fn<(args: unknown) => Promise<unknown>>> };
+    };
+    const args = tx.orden.create.mock.calls[0]?.[0] as {
+      data: { composicion: string | null; compForzada: boolean };
+    };
+    return args.data;
+  }
+
+  it('el alta SIN composición capturada hereda la del modelo (sin override)', async () => {
+    const bd = bdParaCrear();
+    await crearOrden(sesionAdmin(), { idPedidoLinea: 50 }, bd);
+    expect(datosDelCreate(bd)).toMatchObject({
+      composicion: '100% ALGODÓN (MODELO)',
+      compForzada: false,
+    });
+  });
+
+  it('el alta CON composición capturada la respeta y la marca como override', async () => {
+    const bd = bdParaCrear();
+    await crearOrden(sesionAdmin(), { idPedidoLinea: 50, composicion: '50/50 (A MANO)' }, bd);
+    expect(datosDelCreate(bd)).toMatchObject({
+      composicion: '50/50 (A MANO)',
+      compForzada: true,
+    });
+  });
+
+  /**
+   * Stub para `actualizarOrden`: la orden guardada (findFirst) y el modelo con SU composición.
+   * Devuelve el contexto + un lector del `data` con que se actualizó.
+   */
+  function bdParaActualizar(
+    guardada: { composicion: string | null; compForzada: boolean },
+    composicionModelo: string | null = '100% ALGODÓN (MODELO)',
+  ): {
+    bd: ContextoBd;
+    cambios: () => Record<string, unknown>;
+  } {
+    const bd = bdParaCrear();
+    const tx = bd.tx as unknown as {
+      orden: {
+        findFirst: ReturnType<typeof vi.fn<() => Promise<Record<string, unknown>>>>;
+        update: ReturnType<typeof vi.fn<(args: unknown) => Promise<unknown>>>;
+      };
+      modelo?: unknown;
+    };
+    const original = tx.orden.findFirst.getMockImplementation();
+    tx.orden.findFirst.mockImplementation(async () => ({ ...(await original?.()), ...guardada }));
+    tx.modelo = {
+      findUniqueOrThrow: vi.fn(() => Promise.resolve({ composicion: composicionModelo })),
+    };
+    return {
+      bd,
+      cambios: () => (tx.orden.update.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data,
+    };
+  }
+
+  it('editar la composición a mano la vuelve override (ya no se pisa con la del modelo)', async () => {
+    const { bd, cambios } = bdParaActualizar({
+      composicion: '100% ALGODÓN (MODELO)',
+      compForzada: false,
+    });
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: 'MEZCLA ESPECIAL' }, bd);
+    expect(cambios()).toMatchObject({ composicion: 'MEZCLA ESPECIAL', compForzada: true });
+  });
+
+  it('re-guardar el encabezado SIN tocar el campo NO convierte la heredada en override', async () => {
+    const { bd, cambios } = bdParaActualizar({
+      composicion: 'VIEJA DEL MODELO',
+      compForzada: false,
+    });
+    // La UI reenvía el mismo texto que estaba: no es una captura, es el mismo valor.
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: 'VIEJA DEL MODELO' }, bd);
+    // Sigue sin override → se RE-DERIVA de la ficha del modelo (que ya cambió).
+    expect(cambios()).toMatchObject({ composicion: '100% ALGODÓN (MODELO)', compForzada: false });
+  });
+
+  it('vaciar la composición la devuelve a la del modelo', async () => {
+    const { bd, cambios } = bdParaActualizar({ composicion: 'MEZCLA ESPECIAL', compForzada: true });
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: null }, bd);
+    expect(cambios()).toMatchObject({ composicion: '100% ALGODÓN (MODELO)', compForzada: false });
+  });
+
+  it('con override, guardar el encabezado sin tocar la composición la CONSERVA', async () => {
+    const { bd, cambios } = bdParaActualizar({ composicion: 'MEZCLA ESPECIAL', compForzada: true });
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: 'MEZCLA ESPECIAL' }, bd);
+    expect(cambios()).toMatchObject({ composicion: 'MEZCLA ESPECIAL', compForzada: true });
+  });
+
+  it('teclear EXACTAMENTE la del modelo NO desconecta la orden (sigue heredada)', async () => {
+    const { bd, cambios } = bdParaActualizar({ composicion: null, compForzada: false });
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: '100% ALGODÓN (MODELO)' }, bd);
+    expect(cambios()).toMatchObject({
+      composicion: '100% ALGODÓN (MODELO)',
+      compForzada: false,
+    });
+  });
+
+  // 🔒 Guard anti-pérdida: el caso REAL de las OPs históricas y las importadas por PDF, cuyo
+  // modelo todavía no tiene composición capturada.
+  it('guardar el encabezado de una OP histórica NO borra su composición si el modelo no tiene', async () => {
+    const { bd, cambios } = bdParaActualizar(
+      { composicion: '80% ALGODÓN 20% POLIÉSTER', compForzada: false },
+      null, // el modelo NO tiene composición (la migración aditiva no hizo backfill)
+    );
+    // La UI reenvía el encabezado completo aunque el usuario solo cambió la fecha de entrega.
+    await actualizarOrden(
+      sesionAdmin(),
+      { id: 1, fechaEntrega: '2026-08-01', composicion: '80% ALGODÓN 20% POLIÉSTER' },
+      bd,
+    );
+    expect(cambios()).toMatchObject({
+      composicion: '80% ALGODÓN 20% POLIÉSTER',
+      compForzada: false,
+    });
+  });
+
+  it('pero si el usuario VACÍA el campo a propósito y el modelo no tiene, sí queda vacía', async () => {
+    const { bd, cambios } = bdParaActualizar(
+      { composicion: '80% ALGODÓN 20% POLIÉSTER', compForzada: false },
+      null,
+    );
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: null }, bd);
+    expect(cambios()).toMatchObject({ composicion: null, compForzada: false });
+  });
+
+  it('con `compForzada: false` EXPLÍCITO manda la re-derivación, no el guard', async () => {
+    const { bd, cambios } = bdParaActualizar(
+      { composicion: '80% ALGODÓN 20% POLIÉSTER', compForzada: false },
+      null, // el modelo no tiene composición
+    );
+    // El cuerpo pide explícitamente "sin override" Y un texto nuevo: gana lo pedido (re-derivar del
+    // modelo). El guard NO se mete: solo cubre el guardado que no tocó el campo.
+    await actualizarOrden(
+      sesionAdmin(),
+      { id: 1, composicion: 'TEXTO NUEVO', compForzada: false },
+      bd,
+    );
+    expect(cambios()).toMatchObject({ composicion: null, compForzada: false });
+  });
+
+  it('el guard tampoco pisa un OVERRIDE cuando el modelo no tiene composición', async () => {
+    const { bd, cambios } = bdParaActualizar(
+      { composicion: 'MEZCLA ESPECIAL', compForzada: true },
+      null,
+    );
+    await actualizarOrden(sesionAdmin(), { id: 1, composicion: 'MEZCLA ESPECIAL' }, bd);
+    expect(cambios()).toMatchObject({ composicion: 'MEZCLA ESPECIAL', compForzada: true });
   });
 });

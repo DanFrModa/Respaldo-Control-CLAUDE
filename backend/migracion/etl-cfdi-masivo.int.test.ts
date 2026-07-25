@@ -50,6 +50,9 @@ function archivosFalsos(): ServicioArchivos {
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
     },
+    descargarContenido(key) {
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
     eliminarObjeto() {
       return Promise.resolve();
     },

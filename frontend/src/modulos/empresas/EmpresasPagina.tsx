@@ -40,6 +40,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoConfiguracion } from './DialogoConfiguracion';
 import { DialogoEmpresa } from './DialogoEmpresa';
+import { LogoEmpresa } from './LogoEmpresa';
 
 /** Badge de "Favorita" (estrella ámbar): la empresa predeterminada al iniciar sesión. */
 function BadgeFavorita(): React.JSX.Element {
@@ -345,6 +346,10 @@ export function EmpresasPagina(): React.JSX.Element {
                   {seleccion.identificador ?? <ValorVacio />}
                 </CampoDetalle>
               </RejillaCampos>
+            </SeccionDetalle>
+
+            <SeccionDetalle titulo="Logo de la empresa">
+              <LogoEmpresa empresa={seleccion} deshabilitado={!puedeAdministrar} />
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Banderas">

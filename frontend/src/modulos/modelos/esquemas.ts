@@ -49,6 +49,14 @@ export const esquemaModeloFormulario = z.object({
     .string()
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+  /**
+   * COMPOSICIÓN textil (Daniel 24-jul-2026): se captura AQUÍ, en el desarrollo del modelo, y toda
+   * orden de este modelo la hereda sola. Vacío = sin capturar.
+   */
+  composicion: z
+    .string()
+    .trim()
+    .max(2000, { error: 'La composición no puede tener más de 2000 caracteres' }),
   maquilaBase: z
     .string()
     .refine((v) => v.trim() === '' || Number.isFinite(Number(v)), {

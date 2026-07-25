@@ -357,5 +357,8 @@ export async function impresoPlanRc(
   deps: DepsImpresoPlanRc = {},
 ): Promise<ImpresoPlanRc> {
   const datos = await armarDatosImpresoPlanRc(sesion, idOrden, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('plan-rc', datos), folioOrden: datos.folioOrden };
+  return {
+    buffer: await renderizarPdfEnWorker('plan-rc', datos, { idEmpresa: sesion.idEmpresaActiva }),
+    folioOrden: datos.folioOrden,
+  };
 }

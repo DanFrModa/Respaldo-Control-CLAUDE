@@ -22,7 +22,9 @@
  */
 import { createElement as h, type ReactElement } from 'react';
 
-import { Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Image, Text, View, StyleSheet } from '@react-pdf/renderer';
+
+import { LOGO_EMPAQUETADO_DATA_URL } from './logo-empaquetado.js';
 
 // ── Paleta (identidad VERDE del rediseño — tokens de `frontend/src/index.css`, tema claro) ─────────
 
@@ -99,6 +101,53 @@ export const TIPO = {
   pie: 7,
 } as const;
 
+// ── Logo del membrete ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Caja del logo en el encabezado (pt). Discreta y CONSTANTE en los 23 impresos: `objectFit:
+ * contain` mete cualquier proporción dentro de la caja sin deformarla, así que subir un logo más
+ * cuadrado o más alargado NO descuadra el membrete.
+ *
+ * El ALTO (26 pt) está elegido para NO superar el del bloque de texto que va a su lado, y por eso
+ * el encabezado mide EXACTAMENTE lo mismo que antes de que hubiera logo: ningún impreso al límite
+ * se derrama a una página extra. Ese bloque son dos líneas —membrete de 14 pt y subtítulo de 8 pt,
+ * separados por `marginTop: 3`—, y lo que ocupan NO es la suma de los tamaños de fuente sino la de
+ * sus CAJAS de línea (react-pdf aplica su interlineado por defecto): ≈ 29 pt en total. 26 < 29, con
+ * margen. 52×26 pt ≈ 1.8 cm de ancho en papel: suficiente para leer la marca sin robarle sitio al
+ * documento. Si algún día cambian esas tipografías, revísese este número contra
+ * `impreso-orden.test.ts` ("una orden densa … cabe en UNA sola página"), que es el que lo vigila.
+ */
+const ANCHO_LOGO = 52;
+const ALTO_LOGO = 26;
+
+/**
+ * Logo VIGENTE para los impresos: data-URL de la imagen que pinta {@link EncabezadoDocumento}.
+ *
+ * Arranca con el PNG empaquetado del repo (así un PDF sale brandeado incluso si nadie inyectó
+ * nada), y el hilo worker de PDF lo sustituye por el de la EMPRESA antes de cada render — ver
+ * `pdf-worker-thread.ts` → {@link fijarLogoImpresos}. Es un valor de módulo (no un parámetro)
+ * a propósito: `EncabezadoDocumento` es SÍNCRONO y lo llaman los 23 impresos con su propia firma;
+ * inyectarlo así los brandea a todos sin tocar ni uno.
+ *
+ * Es seguro que sea estado de módulo: cada render corre en un worker que atiende UN trabajo a la
+ * vez, y el worker fija el logo justo antes de construir el documento.
+ */
+let logoImpresos: string | null = LOGO_EMPAQUETADO_DATA_URL;
+
+/**
+ * Fija el logo que usarán los siguientes impresos. `null` = sin imagen (el encabezado sale solo con
+ * el membrete de texto, exactamente como antes de esta función). Lo llama el hilo worker de PDF con
+ * el logo ya resuelto de la empresa; nadie más debería llamarlo fuera de pruebas.
+ */
+export function fijarLogoImpresos(dataUrl: string | null): void {
+  logoImpresos = dataUrl;
+}
+
+/** Devuelve al logo EMPAQUETADO (estado inicial). Para pruebas y para deshacer una inyección. */
+export function restablecerLogoImpresos(): void {
+  logoImpresos = LOGO_EMPAQUETADO_DATA_URL;
+}
+
 // ── Estilos compartidos ─────────────────────────────────────────────────────────────────────────
 
 /**
@@ -138,6 +187,13 @@ export const estilosDoc = StyleSheet.create({
   },
   subtitulo: { fontSize: TIPO.subtitulo, color: PALETA.muted, marginTop: 3 },
   bloqueDerecha: { alignItems: 'flex-end' },
+
+  // Membrete con LOGO: la imagen a la izquierda y, pegado, el bloque de texto (empresa + subtítulo).
+  // `alignItems: center` centra el texto contra el alto del logo; `flexShrink: 1` deja que el texto
+  // ceda ancho (nunca el logo) cuando el bloque derecho es largo.
+  membrete: { flexDirection: 'row', alignItems: 'center' },
+  logo: { width: ANCHO_LOGO, height: ALTO_LOGO, objectFit: 'contain', marginRight: 10 },
+  membreteTexto: { flexShrink: 1 },
 
   // Etiqueta MAYÚSCULAS atenuada + valor fuerte (bloque derecho y campos).
   etiquetaMenor: {
@@ -267,9 +323,17 @@ export interface EncabezadoOpciones {
 }
 
 /**
- * Encabezado uniforme de TODOS los impresos: membrete de la empresa (verde de marca), subtítulo del
- * documento y, a la derecha, un bloque etiqueta/valor opcional (folio grande, fecha, maquilero…). Cierra
- * con la línea de marca inferior. Trae su propia `key` para poder ir directo en el arreglo de hijos.
+ * Encabezado uniforme de TODOS los impresos: LOGO de la empresa + membrete (razón social en el
+ * verde de marca), subtítulo del documento y, a la derecha, un bloque etiqueta/valor opcional
+ * (folio grande, fecha, maquilero…). Cierra con la línea de marca inferior. Trae su propia `key`
+ * para poder ir directo en el arreglo de hijos.
+ *
+ * **Este es EL punto único de branding de los impresos** (post-F9, petición de Daniel): los 23
+ * documentos del sistema pasan por aquí, así que el logo se resuelve una vez ({@link logoImpresos},
+ * que el worker de PDF fija con el de la empresa) y aparece en todos sin tocar ni un impreso.
+ *
+ * El membrete de TEXTO se conserva junto al logo: cada documento manda ahí lo suyo (razón social,
+ * pagador, acreedor…) y es lo que sostiene el encabezado si el logo no está disponible.
  */
 export function EncabezadoDocumento(opts: EncabezadoOpciones): ReactElement {
   const derecha =
@@ -285,14 +349,24 @@ export function EncabezadoDocumento(opts: EncabezadoOpciones): ReactElement {
             opts.derecha.valor,
           ),
         );
+  // Sin logo (nadie lo inyectó y se pidió `null`) el membrete sale igual que siempre: solo texto.
+  const logo =
+    logoImpresos === null
+      ? null
+      : h(Image, { style: estilosDoc.logo, src: logoImpresos, key: 'logo' });
   return h(
     View,
     { style: estilosDoc.encabezado, key: 'encabezado' },
     h(
       View,
-      {},
-      h(Text, { style: estilosDoc.marca }, opts.empresa),
-      h(Text, { style: estilosDoc.subtitulo }, opts.titulo),
+      { style: estilosDoc.membrete },
+      logo,
+      h(
+        View,
+        { style: estilosDoc.membreteTexto },
+        h(Text, { style: estilosDoc.marca }, opts.empresa),
+        h(Text, { style: estilosDoc.subtitulo }, opts.titulo),
+      ),
     ),
     derecha,
   );

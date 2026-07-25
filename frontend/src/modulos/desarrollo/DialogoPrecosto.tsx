@@ -383,7 +383,7 @@ function EditorPrecosto({
         >
           <span>
             {confirmando === 'recalcular'
-              ? 'Recalcular reemplaza los renglones de tela/avíos/bordado con los valores vigentes del BOM (respeta los manuales y los renglones AJUSTADOS en la negociación). ¿Continuar?'
+              ? 'Recalcular reemplaza los renglones de tela/avíos/arte con los valores vigentes del BOM (respeta los manuales y los renglones AJUSTADOS en la negociación). ¿Continuar?'
               : 'Al congelar, esta versión queda INMUTABLE y sirve de base para la lista y la negociación. ¿Continuar?'}
           </span>
           <div className="flex gap-2">

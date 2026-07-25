@@ -19,7 +19,7 @@ export function sesionDePrueba(permisos: ClavePermiso[]): Sesion {
     id: 'usuario-prueba',
     username: 'admin',
     nombre: 'Administrador',
-    empresaActiva: { id: 1, nombre: 'FR Moda' },
+    empresaActiva: { id: 1, nombre: 'FR Moda', idArchivoLogo: null },
     permisos,
   };
 }

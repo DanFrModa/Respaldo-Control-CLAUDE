@@ -67,8 +67,8 @@
  *  | EnRiesgo           | enRiesgo (Bool?)    | F5                                                 |
  *  | SI_RC              | siRC (Bool?)        | F5                                                 |
  *  | FechaDet           | fechaCompletada     | deriva estado='completa'                           |
- *  | Composicion        | composicion         | String?                                            |
- *  | CompForzada        | compForzada (Bool)  |                                                    |
+ *  | Composicion        | composicion         | String? — se HEREDA de `Modelo.composicion`        |
+ *  | CompForzada        | compForzada (Bool)  | true = override manual de ESTA orden               |
  *  | Pagada             | pagada (Bool?)      | F6                                                 |
  *  | ObsMaquila         | obsMaquila          | String?                                            |
  *  | AplicacionOrd      | aplicacionOrd (Dec?)| dato F3/F6                                         |
@@ -217,6 +217,12 @@ interface OrigenPedidoLinea {
   idEmpresa: number;
   /** OC original del cliente en el pedido: se copia como SNAPSHOT a la orden (R3, B3). */
   ocCliente: string | null;
+  /**
+   * COMPOSICIÓN capturada en la ficha del MODELO (Daniel 24-jul-2026): la orden la HEREDA sola.
+   * No es un snapshot congelado como `ocCliente`: mientras la orden no tenga override
+   * (`compForzada = false`) se vuelve a derivar cada vez que se guarda su encabezado.
+   */
+  composicionModelo: string | null;
 }
 
 /**
@@ -238,7 +244,7 @@ async function resolverOrigenPedido(
     where: { id: idPedidoLinea },
     select: {
       idModelo: true,
-      modelo: { select: { activo: true, codigo: true } },
+      modelo: { select: { activo: true, codigo: true, composicion: true } },
       pedido: {
         select: {
           idEmpresa: true,
@@ -278,6 +284,7 @@ async function resolverOrigenPedido(
     idCliente: linea.pedido.idCliente,
     idEmpresa: linea.pedido.idEmpresa,
     ocCliente: linea.pedido.ocCliente,
+    composicionModelo: linea.modelo.composicion,
   };
 }
 
@@ -552,6 +559,77 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
   return valor;
 }
 
+/**
+ * COMPOSICIÓN de la orden — decisión de DANIEL (24-jul-2026): «la composición no sale de la OC del
+ * cliente, sale del desarrollo del modelo; de ahí la jala». La fuente es `Modelo.composicion`; lo
+ * que se capture en la orden es un OVERRIDE de ESA orden, marcado con `compForzada = true`.
+ *
+ * Reglas (las mismas en el alta y en la edición del encabezado):
+ *  • Sin captura (`null`/'') → se HEREDA la del modelo y `compForzada = false`.
+ *  • Con captura IGUAL a la del MODELO → se trata como HEREDADA (`compForzada = false`): teclear
+ *    justo lo que ya dice el modelo no es "desconectarse" de él.
+ *  • Con captura DISTINTA de la guardada → override: se respeta el texto y `compForzada = true`.
+ *  • Con captura IGUAL a la guardada → no se toca la bandera (re-guardar el encabezado sin tocar
+ *    el campo NUNCA convierte una composición heredada en override).
+ *  • `compForzada` explícito en el cuerpo MANDA (lo usan el importador de OC y el ETL): `false`
+ *    fuerza la re-derivación del modelo, `true` conserva el texto capturado.
+ *
+ * 🔒 HEREDAR NUNCA DESTRUYE UN DATO (guard anti-pérdida). Si al heredar el modelo NO tiene
+ * composición y la orden SÍ tenía una, se CONSERVA la de la orden. Sin este guard, abrir una OP
+ * histórica (o importada por PDF) y guardar cualquier campo del encabezado la habría vaciado en
+ * silencio, porque `modelos.composicion` nació vacía. El guard cubre EXACTAMENTE ese caso: el
+ * guardado que NO tocó el campo (`capturada === actual`, incluido el campo omitido). Si el usuario
+ * escribió otra cosa —o lo vació, o el cuerpo pidió `compForzada: false`— manda lo que pidió, no el
+ * guard. La migración de datos `20260724130000_ordenes_composicion_historica` marca además esas
+ * órdenes como override.
+ *
+ * Re-derivación: solo ocurre donde la orden YA se está tocando (alta y guardado del encabezado) y
+ * solo si la orden NO tiene override. Cambiar la composición del MODELO no recalcula de golpe las
+ * órdenes históricas (sería un recálculo masivo silencioso); cada una la refresca al siguiente
+ * guardado de su encabezado. El modelo de una orden NO se puede cambiar (no está en el PATCH: se
+ * autorrellena del renglón de pedido al nacer), así que no hay caso de "cambió el modelo".
+ */
+function resolverComposicion(args: {
+  /** Lo que viene en el cuerpo (`undefined` = no se tocó el campo). */
+  capturada: string | null | undefined;
+  /** Bandera explícita del cuerpo (`undefined` = que la deduzca esta función). */
+  forzadaExplicita: boolean | undefined;
+  /** Composición guardada hoy en la orden (`null` en el alta). */
+  actual: string | null;
+  /** Bandera guardada hoy en la orden (`false` en el alta). */
+  forzadaActual: boolean;
+  /** Composición capturada en la ficha del modelo. */
+  delModelo: string | null;
+}): { composicion: string | null; compForzada: boolean } {
+  const capturada = args.capturada === undefined ? args.actual : (aTexto(args.capturada) ?? null);
+
+  let forzada: boolean;
+  if (args.forzadaExplicita !== undefined) {
+    forzada = args.forzadaExplicita;
+  } else if (capturada === null) {
+    // Vaciar el campo = "vuelve a la del modelo".
+    forzada = false;
+  } else if (capturada === args.delModelo) {
+    // Es exactamente la del modelo: sigue siendo heredada, no un override.
+    forzada = false;
+  } else if (capturada === args.actual) {
+    // Mismo texto que ya estaba: se conserva el estado actual de la bandera.
+    forzada = args.forzadaActual;
+  } else {
+    forzada = true;
+  }
+
+  if (forzada) {
+    return { composicion: capturada, compForzada: true };
+  }
+  // Guard anti-pérdida: heredar "nada" sobre un dato existente NO borra (ver 🔒 arriba). Solo
+  // aplica al guardado que NO tocó el campo; si se pidió otro texto (o vaciarlo), manda lo pedido.
+  if (args.delModelo === null && args.actual !== null && capturada === args.actual) {
+    return { composicion: args.actual, compForzada: args.forzadaActual };
+  }
+  return { composicion: args.delModelo, compForzada: false };
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
@@ -567,6 +645,10 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
  * evento se publica AQUÍ —el punto ÚNICO de nacimiento por captura— para que tanto la salida a
  * producción del constructor como el alta directa de /captura la disparen sin duplicar lógica;
  * el modo migración usa `crearOrdenMigrada` (migracion.ts), que NO pasa por aquí y NO encola.
+ *
+ * COMPOSICIÓN (Daniel 24-jul-2026): si el alta no la captura, la orden HEREDA
+ * `Modelo.composicion` con `compForzada = false`; si la captura, queda como override
+ * (`compForzada = true`). Ver `resolverComposicion`.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
@@ -591,6 +673,15 @@ export async function crearOrden(
 
     const folio = await siguienteFolio(tx, origen.idEmpresa, CLAVE_SECUENCIA_ORDEN);
 
+    // Composición: se HEREDA del modelo salvo que el alta capture una a mano (Daniel 24-jul-2026).
+    const composicion = resolverComposicion({
+      capturada: datos.composicion,
+      forzadaExplicita: datos.compForzada,
+      actual: null,
+      forzadaActual: false,
+      delModelo: origen.composicionModelo,
+    });
+
     const orden = await tx.orden.create({
       data: {
         folio,
@@ -604,8 +695,8 @@ export async function crearOrden(
         fecha: aDateColumna(datos.fecha) ?? null,
         fechaEntrega: aDateColumna(datos.fechaEntrega) ?? null,
         observaciones: aTexto(datos.observaciones) ?? null,
-        composicion: aTexto(datos.composicion) ?? null,
-        compForzada: datos.compForzada ?? false,
+        composicion: composicion.composicion,
+        compForzada: composicion.compForzada,
         obsMaquila: aTexto(datos.obsMaquila) ?? null,
         noCostear: datos.noCostear ?? false,
         ocCliente: origen.ocCliente,
@@ -661,6 +752,11 @@ export async function crearOrden(
  * compForzada, observaciones, obsMaquila, noCostear) en UNA transacción (A2). NO toca el estado
  * derivado, el folio, el pedido de origen, el modelo/cliente (autorrellenados) ni la matriz. No
  * se puede editar una orden cancelada.
+ *
+ * COMPOSICIÓN (Daniel 24-jul-2026): editarla a mano deja la orden con override
+ * (`compForzada = true`) y ya no se pisa; VACIARLA la devuelve a la del modelo. Si la orden no
+ * tiene override, este guardado la RE-DERIVA de `Modelo.composicion` (así una corrección en la
+ * ficha del modelo baja a la orden sin recálculos masivos). Ver `resolverComposicion`.
  */
 export async function actualizarOrden(
   sesion: SesionUsuario,
@@ -698,8 +794,23 @@ export async function actualizarOrden(
       cambios.fechaEntrega = aDateColumna(datos.fechaEntrega) ?? null;
     if (datos.observaciones !== undefined)
       cambios.observaciones = aTexto(datos.observaciones) ?? null;
-    if (datos.composicion !== undefined) cambios.composicion = aTexto(datos.composicion) ?? null;
-    if (datos.compForzada !== undefined) cambios.compForzada = datos.compForzada;
+    // Composición (Daniel 24-jul-2026): la fuente es el MODELO; lo capturado aquí es el override
+    // de ESTA orden. Vaciar el campo la devuelve a la del modelo. Ver `resolverComposicion`.
+    if (datos.composicion !== undefined || datos.compForzada !== undefined) {
+      const modelo = await tx.modelo.findUniqueOrThrow({
+        where: { id: actual.idModelo },
+        select: { composicion: true },
+      });
+      const resuelta = resolverComposicion({
+        capturada: datos.composicion,
+        forzadaExplicita: datos.compForzada,
+        actual: actual.composicion,
+        forzadaActual: actual.compForzada,
+        delModelo: modelo.composicion,
+      });
+      cambios.composicion = resuelta.composicion;
+      cambios.compForzada = resuelta.compForzada;
+    }
     if (datos.obsMaquila !== undefined) cambios.obsMaquila = aTexto(datos.obsMaquila) ?? null;
     if (datos.noCostear !== undefined) cambios.noCostear = datos.noCostear;
 

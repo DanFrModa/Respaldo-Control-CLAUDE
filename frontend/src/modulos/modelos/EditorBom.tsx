@@ -1,10 +1,11 @@
-import { Loader2Icon, Trash2Icon } from 'lucide-react';
+import { Loader2Icon, StarIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
 import { useBordados } from '@/api/bordados';
 import {
+  useMarcarArtePrincipal,
   useReemplazarAviosBom,
   useReemplazarBordadosBom,
   useReemplazarTelasBom,
@@ -54,11 +55,16 @@ interface RenglonComponente {
   paraCosto: boolean;
 }
 
-/** Renglón de bordado en captura: precio como texto (sin banderas). */
+/**
+ * Renglón de bordado (ARTE) en captura: precio como texto (sin banderas). Su POSICIÓN es
+ * significativa: el arte PRINCIPAL del modelo es el PRIMERO (jul-2026, Daniel).
+ */
 interface RenglonBordado {
   id: number;
   etiqueta: string;
   precio: string;
+  /** ¿Ya está guardado en el BOM? Solo esos se pueden marcar como principales. */
+  guardado: boolean;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -85,9 +91,34 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
   };
 }
 
-/** Convierte un renglón de bordado del API a su forma de captura. */
+/** Convierte un renglón de bordado del API a su forma de captura (llega YA ordenado). */
 function aRenglonBordado(b: ModeloBordado): RenglonBordado {
-  return { id: b.idBordado, etiqueta: b.nombre, precio: b.precio === null ? '' : String(b.precio) };
+  return {
+    id: b.idBordado,
+    etiqueta: b.nombre,
+    precio: b.precio === null ? '' : String(b.precio),
+    guardado: true,
+  };
+}
+
+/**
+ * FIRMA de una sección para detectar CAPTURA SIN GUARDAR: compara lo que hay en pantalla con lo
+ * que vino de la ficha (mismos campos, mismo orden). Se usa para no dejar que "Marcar como
+ * principal" —que recarga la ficha y vuelve a sembrar las TRES pestañas— borre lo que el usuario
+ * está capturando.
+ */
+function firmaComponentes(renglones: RenglonComponente[]): string {
+  return renglones
+    .map(
+      (r) =>
+        `${String(r.id)}|${r.consumo}|${r.paraPreCosto ? 1 : 0}${r.paraProduccion ? 1 : 0}${r.paraCosto ? 1 : 0}`,
+    )
+    .join(';');
+}
+
+/** Firma de la sección de arte (id + precio capturado, en orden). */
+function firmaBordados(renglones: RenglonBordado[]): string {
+  return renglones.map((r) => `${String(r.id)}|${r.precio}`).join(';');
 }
 
 /**
@@ -131,6 +162,7 @@ export function EditorBom({
   const guardarTelas = useReemplazarTelasBom();
   const guardarAvios = useReemplazarAviosBom();
   const guardarBordados = useReemplazarBordadosBom();
+  const marcarArtePrincipal = useMarcarArtePrincipal();
 
   // ── Helpers de agregar/quitar/editar renglones ───────────────────────────────
   const idsTela = new Set(telas.map((r) => r.id));
@@ -181,13 +213,15 @@ export function EditorBom({
     if (!bordado || idsBordado.has(id)) {
       return;
     }
-    // Pre-llena el precio con el del catálogo (editable).
+    // Pre-llena el precio con el del catálogo (editable). Se agrega AL FINAL: el arte nuevo nunca
+    // desbanca al principal (el backend le asigna el orden siguiente al guardar).
     setBordados((prev) => [
       ...prev,
       {
         id,
         etiqueta: bordado.nombre,
         precio: bordado.precio === null ? '' : String(bordado.precio),
+        guardado: false,
       },
     ]);
   }
@@ -238,7 +272,7 @@ export function EditorBom({
     const sinPrecio = bordados.filter((r) => r.precio.trim() === '');
     if (sinPrecio.length > 0) {
       setBordadosInvalidos(new Set(sinPrecio.map((r) => r.id)));
-      toast.error('Captura el precio de cada bordado de la receta.');
+      toast.error('Captura el precio de cada arte de la receta.');
       return;
     }
     setBordadosInvalidos(new Set());
@@ -248,7 +282,35 @@ export function EditorBom({
         bordados: bordados.map((r) => ({ idBordado: r.id, precio: Number(r.precio) })),
       },
       {
-        onSuccess: () => toast.success('Bordados de la receta guardados.'),
+        onSuccess: () => toast.success('Arte de la receta guardado.'),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  /**
+   * ¿Hay CAPTURA SIN GUARDAR en alguna de las tres pestañas? Marcar el arte principal recarga la
+   * ficha y el efecto de arriba vuelve a sembrar las TRES secciones desde el servidor: si el
+   * usuario tenía un precio o un consumo a medio teclear, lo perdería sin darse cuenta (el toast
+   * diría "éxito"). Con esto, la acción se DESHABILITA mientras haya cambios pendientes y se le
+   * dice al usuario qué hacer, en vez de destruirle la captura.
+   */
+  const hayCambiosSinGuardar =
+    firmaComponentes(telas) !== firmaComponentes(ficha.telas.map(aRenglonTela)) ||
+    firmaComponentes(avios) !== firmaComponentes(ficha.avios.map(aRenglonAvio)) ||
+    firmaBordados(bordados) !== firmaBordados(ficha.bordados.map(aRenglonBordado));
+
+  /**
+   * Marca UN arte como el PRINCIPAL del modelo (jul-2026, Daniel): el backend lo mueve al primer
+   * lugar y reindexa el resto; al invalidarse la ficha, la captura se vuelve a sembrar ya en el
+   * orden nuevo. Solo aplica a los artes YA guardados (los recién agregados aún no existen en BD)
+   * y solo cuando NO hay captura pendiente (ver `hayCambiosSinGuardar`).
+   */
+  function marcarPrincipal(idBordado: number): void {
+    marcarArtePrincipal.mutate(
+      { id: ficha.id, idBordado },
+      {
+        onSuccess: () => toast.success('Arte principal actualizado.'),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -265,7 +327,7 @@ export function EditorBom({
             [
               ['telas', 'Telas'],
               ['avios', 'Avíos'],
-              ['bordados', 'Bordados'],
+              ['bordados', 'Arte'],
             ] as const
           ).map(([clave, etiqueta]) => (
             <Button
@@ -371,6 +433,9 @@ export function EditorBom({
           idsUsados={idsBordado}
           alAgregar={agregarBordado}
           alGuardar={guardarSeccionBordados}
+          alMarcarPrincipal={marcarPrincipal}
+          marcandoPrincipal={marcarArtePrincipal.isPending}
+          hayCambiosSinGuardar={hayCambiosSinGuardar}
         />
       )}
 
@@ -551,7 +616,12 @@ function SeccionComponentes({
   );
 }
 
-/** Sección de bordados (precio por renglón REQUERIDO, pre-llenado; sin banderas). */
+/**
+ * Sección de bordados/ARTE (precio por renglón REQUERIDO, pre-llenado; sin banderas). El ORDEN de
+ * la lista importa: el PRIMER renglón es el arte PRINCIPAL del modelo (jul-2026, Daniel) — lleva
+ * estrella + rótulo "Principal" y los demás una acción para tomar su lugar. Esa acción recarga la
+ * receta desde el servidor, así que se DESHABILITA (con aviso) mientras haya captura sin guardar.
+ */
 function SeccionBordados({
   renglones,
   alCambiar,
@@ -565,6 +635,9 @@ function SeccionBordados({
   idsUsados,
   alAgregar,
   alGuardar,
+  alMarcarPrincipal,
+  marcandoPrincipal,
+  hayCambiosSinGuardar,
 }: {
   renglones: RenglonBordado[];
   alCambiar: React.Dispatch<React.SetStateAction<RenglonBordado[]>>;
@@ -580,6 +653,11 @@ function SeccionBordados({
   idsUsados: ReadonlySet<number>;
   alAgregar: (id: number) => void;
   alGuardar: () => void;
+  /** Marca ese arte como el principal del modelo (endpoint propio, no pasa por "Guardar receta"). */
+  alMarcarPrincipal: (id: number) => void;
+  marcandoPrincipal: boolean;
+  /** Hay captura pendiente en alguna pestaña: marcar principal recargaría la ficha y la borraría. */
+  hayCambiosSinGuardar: boolean;
 }): React.JSX.Element {
   const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
 
@@ -595,7 +673,7 @@ function SeccionBordados({
     <div className="space-y-3" data-testid="seccion-bom-bordados">
       {puedeAdministrar ? (
         <SelectorAgregar
-          etiqueta="Agregar bordado…"
+          etiqueta="Agregar arte…"
           disponibles={disponibles}
           cargando={cargandoCatalogo}
           deshabilitado={deshabilitadoGlobal}
@@ -606,22 +684,55 @@ function SeccionBordados({
 
       {renglones.length === 0 ? (
         <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-          La receta no tiene bordados.
+          La receta no tiene arte.
         </p>
       ) : (
         <ul className="space-y-2">
-          {renglones.map((r) => (
+          {renglones.map((r, indice) => (
             <li
               key={r.id}
               className="flex items-center gap-2 rounded-lg border p-3"
               data-testid={`renglon-bom-bordado-${r.id}`}
+              // El PRIMER arte es el principal del modelo (el backend devuelve el BOM ordenado).
+              data-principal={indice === 0 ? 'si' : 'no'}
             >
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.etiqueta}</span>
+              {indice === 0 ? (
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[11px] font-semibold text-primary-foreground"
+                  data-testid={`arte-principal-${r.id}`}
+                >
+                  <StarIcon className="size-3 fill-current" aria-hidden />
+                  Principal
+                </span>
+              ) : puedeAdministrar && r.guardado ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 text-[11px]"
+                  onClick={() => alMarcarPrincipal(r.id)}
+                  // Con captura sin guardar NO se puede: recargaría la ficha y borraría lo tecleado.
+                  disabled={deshabilitadoGlobal || marcandoPrincipal || hayCambiosSinGuardar}
+                  aria-label={`Marcar ${r.etiqueta} como arte principal`}
+                  aria-describedby={
+                    hayCambiosSinGuardar ? 'aviso-principal-sin-guardar' : undefined
+                  }
+                  data-testid={`marcar-principal-bordado-${r.id}`}
+                >
+                  {marcandoPrincipal ? (
+                    <Loader2Icon className="animate-spin" aria-hidden />
+                  ) : (
+                    <StarIcon aria-hidden />
+                  )}
+                  Marcar como principal
+                </Button>
+              ) : null}
               <div>
                 <label
                   htmlFor={`precio-bordado-${r.id}`}
                   className="sr-only"
-                >{`Precio del bordado ${r.etiqueta}`}</label>
+                >{`Precio del arte ${r.etiqueta}`}</label>
                 <Input
                   id={`precio-bordado-${r.id}`}
                   type="number"
@@ -665,8 +776,21 @@ function SeccionBordados({
       )}
 
       <p className="text-xs text-muted-foreground">
-        Precio del bordado/estampado en este modelo (se pre-llena con el del catálogo).
+        Precio del arte en este modelo (se pre-llena con el del catálogo). El PRIMER arte es el
+        principal: es el que encabeza el impreso de la orden y nunca se recorta.
       </p>
+
+      {/* Por qué la estrella está apagada: hay captura pendiente (en ESTA u otra pestaña) y marcar
+          el principal recarga la receta desde el servidor. Se avisa en vez de perder lo tecleado. */}
+      {puedeAdministrar && hayCambiosSinGuardar && renglones.length > 1 ? (
+        <p
+          id="aviso-principal-sin-guardar"
+          className="text-xs text-amber-700 dark:text-amber-500"
+          data-testid="aviso-principal-sin-guardar"
+        >
+          Guarda la receta primero para poder cambiar el arte principal (hay cambios sin guardar).
+        </p>
+      ) : null}
 
       {puedeAdministrar ? (
         <Button

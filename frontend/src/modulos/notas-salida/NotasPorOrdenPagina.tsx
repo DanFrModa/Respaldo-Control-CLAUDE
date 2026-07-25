@@ -180,7 +180,7 @@ export function NotasPorOrdenPagina(): React.JSX.Element {
                 data-testid="npo-ver-habilitacion"
               >
                 <Layers aria-hidden />
-                Ver habilitación
+                Ver avíos
               </Button>
               <button
                 type="button"

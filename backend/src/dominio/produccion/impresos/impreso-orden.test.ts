@@ -3,9 +3,11 @@
  *  • `armarTabla` — la proyección de la matriz a tabla color × talla con totales (deben CUADRAR).
  *  • `generarPdfOrden` / `generarPdfOrdenes` — que devuelven un Buffer PDF real (cabecera `%PDF`),
  *    incluso con matriz grande, orden cancelada o sin fotos (degradación elegante).
- *  • `armarDatosImpresoOrden` — reúsa `obtenerOrden`/`leerBom`/`leerFotosModelo`/`listarAdjuntos`
- *    (inyectados), filtra `paraProduccion`, excluye precios, descarta fotos no descargables
- *    (best-effort) y trae como ARTES solo los adjuntos de la orden con `tipoMime` image/*.
+ *  • `armarDatosImpresoOrden` — reúsa `obtenerOrden`/`leerBom`/`leerFotosModelo`/`listarAdjuntos`/
+ *    `leerTelasCompradas` (inyectados), filtra `paraProduccion`, excluye precios, descarta fotos no
+ *    descargables (best-effort) y trae como ARTES las fotos de los bordados del BOM + los adjuntos
+ *    de la orden con `tipoMime` image/*.
+ *  • `textoTelaComprada` — el texto de la TELA a partir de las OC ligadas (dedup + folios).
  *  • `descargarImagenComoDataUrl` — best-effort (un fallo de red → `null`, no truena).
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -24,8 +26,14 @@ import {
   descargarImagenComoDataUrl,
   generarPdfOrden,
   generarPdfOrdenes,
+  recortarArtes,
+  recortarFotos,
+  textoTelaComprada,
+  MAX_ARTES,
+  MAX_FOTOS,
   type DatosImpresoOrden,
   type DepsImpreso,
+  type TelaCompradaOrden,
 } from './impreso-orden.js';
 
 /** Servicio de archivos inocuo (los tests inyectan `listarFotos`, que es quien lo usaría). */
@@ -78,6 +86,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     codigoModelo: 'MOD-501',
     descripcionModelo: 'Playera básica',
     composicion: '95% algodón 5% elastano',
+    tela: 'Chifón (OC 334)',
     observaciones: 'Cuidar el tono.',
     obsMaquila: 'Doble costura.',
     ...tabla,
@@ -97,6 +106,39 @@ const PNG_1X1 =
 /** ¿El Buffer empieza con la firma de un PDF? */
 function esPdf(buffer: Buffer): boolean {
   return buffer.length > 0 && buffer.subarray(0, 5).toString('latin1') === '%PDF-';
+}
+
+/**
+ * Cuenta las PÁGINAS de un PDF: cada hoja es un objeto `/Type /Page` (el `[^s]` evita cazar el
+ * `/Type /Pages` del nodo raíz, que es uno solo). Sirve para vigilar que el impreso siga cabiendo
+ * en una hoja cuando se le agrega contenido.
+ */
+function paginasPdf(buffer: Buffer): number {
+  return (buffer.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+}
+
+/**
+ * Orden PESADA para vigilar el presupuesto de altura: matriz de 4 colores × 5 tallas, las dos
+ * observaciones, 3 fotos del modelo y `artes` imágenes de arte.
+ */
+function ordenDensa(artes: number): DatosImpresoOrden {
+  const tabla = armarTabla(
+    Array.from({ length: 4 }, (_, c) => ({
+      color: `Color ${String(c)}`,
+      tallas: ['XS', 'S', 'M', 'L', 'XL'].map((etiquetaTalla, t) => ({
+        etiquetaTalla,
+        cantidad: 10 + t,
+      })),
+    })),
+  );
+  return datosBase({
+    ...tabla,
+    fotos: [{ dataUrl: PNG_1X1 }, { dataUrl: PNG_1X1 }, { dataUrl: PNG_1X1 }],
+    artes: Array.from({ length: artes }, (_, i) => ({
+      dataUrl: PNG_1X1,
+      titulo: `Arte ${String(i)}`,
+    })),
+  });
 }
 
 describe('armarTabla', () => {
@@ -213,6 +255,119 @@ describe('generarPdfOrden', () => {
     const sinArtes = await generarPdfOrden(datosBase({ artes: [] }));
     expect(buffer.length).toBeGreaterThan(sinArtes.length);
   });
+
+  it('rotula el arte del BOM con su nombre debajo de la imagen', async () => {
+    const conRotulo = await generarPdfOrden(
+      datosBase({ artes: [{ dataUrl: PNG_1X1, titulo: 'Logo pecho bordado' }] }),
+    );
+    const sinRotulo = await generarPdfOrden(datosBase({ artes: [{ dataUrl: PNG_1X1 }] }));
+    expect(esPdf(conRotulo)).toBe(true);
+    // El mismo impreso con el texto del rótulo pesa más (el `Text` extra sí se pintó).
+    expect(conRotulo.length).toBeGreaterThan(sinRotulo.length);
+  });
+
+  it('renderiza sin tela (ni comprada ni manual): el campo cae al "—"', async () => {
+    expect(esPdf(await generarPdfOrden(datosBase({ tela: null })))).toBe(true);
+  });
+
+  // PRESUPUESTO DE ALTURA (el impreso es de UNA hoja). Esta orden es de las pesadas: matriz de 4
+  // colores × 5 tallas, las dos observaciones, 3 fotos del modelo y 4 imágenes de arte. Cuida que
+  // el título grande + la rejilla de artes no se coman la página: con las tarjetas de arte de
+  // 110 × 120 y sin tope, este mismo impreso se iba a una SEGUNDA hoja.
+  it('una orden densa con fotos y 4 artes cabe en UNA sola página', async () => {
+    const buffer = await generarPdfOrden(ordenDensa(4));
+    expect(esPdf(buffer)).toBe(true);
+    expect(paginasPdf(buffer)).toBe(1);
+  });
+
+  it('el tope de la rejilla no deja que 9 artes agreguen filas (misma paginación que 4)', async () => {
+    const conTope = paginasPdf(await generarPdfOrden(ordenDensa(4)));
+    const conMuchos = paginasPdf(await generarPdfOrden(ordenDensa(9)));
+    // Las 5 imágenes extra no se pintan (solo la leyenda de truncado): no agregan hoja.
+    expect(conMuchos).toBe(conTope);
+  });
+
+  // GARANTÍA de la imagen PRINCIPAL (Daniel, 25-jul-2026): que esté al final del arreglo no la
+  // deja fuera del tope, y anteponerla NO cuesta altura (misma paginación que sin marcarla).
+  it('el arte PRINCIPAL se imprime aunque venga al final de 9 artes, sin costar una hoja', async () => {
+    const densa = ordenDensa(9);
+    const artes = densa.artes.map((arte, i) =>
+      i === densa.artes.length - 1 ? { ...arte, principal: true } : arte,
+    );
+
+    // El recorte lo sube a la primera posición (y sigue mostrando solo MAX_ARTES).
+    const { mostradas } = recortarArtes(artes);
+    expect(mostradas[0]?.titulo).toBe('Arte 8');
+    expect(mostradas).toHaveLength(MAX_ARTES);
+
+    const buffer = await generarPdfOrden({ ...densa, artes });
+    expect(paginasPdf(buffer)).toBe(paginasPdf(await generarPdfOrden(ordenDensa(9))));
+    expect(paginasPdf(buffer)).toBe(1);
+  });
+
+  it('la foto PRINCIPAL del modelo se imprime aunque venga al final, sin costar una hoja', async () => {
+    const densa = ordenDensa(4);
+    // 5 fotos (más que el tope de 3) con la principal hasta el final.
+    const fotos = Array.from({ length: 5 }, (_, i) => ({
+      dataUrl: PNG_1X1,
+      ...(i === 4 ? { principal: true } : {}),
+    }));
+
+    expect(recortarFotos(fotos)).toEqual([fotos[4], fotos[0], fotos[1]]);
+
+    const buffer = await generarPdfOrden({ ...densa, fotos });
+    expect(paginasPdf(buffer)).toBe(1);
+  });
+});
+
+describe('recortarArtes', () => {
+  const arte = (i: number) => ({ dataUrl: PNG_1X1, titulo: `Arte ${String(i)}` });
+
+  it('deja pasar todas cuando no llegan al tope', () => {
+    const artes = [arte(1), arte(2)];
+    expect(recortarArtes(artes)).toEqual({ mostradas: artes, ocultas: 0 });
+  });
+
+  it('corta en MAX_ARTES conservando las PRIMERAS (el arte del BOM va primero) y cuenta el resto', () => {
+    const artes = Array.from({ length: 9 }, (_, i) => arte(i));
+    const { mostradas, ocultas } = recortarArtes(artes);
+    expect(mostradas).toHaveLength(MAX_ARTES);
+    expect(mostradas).toEqual(artes.slice(0, MAX_ARTES));
+    expect(ocultas).toBe(9 - MAX_ARTES);
+  });
+
+  it('NUNCA recorta el arte PRINCIPAL: lo antepone aunque venga al final de 9', () => {
+    const artes = Array.from({ length: 9 }, (_, i) => ({ ...arte(i), principal: i === 8 }));
+    const { mostradas, ocultas } = recortarArtes(artes);
+
+    expect(mostradas[0]).toBe(artes[8]);
+    expect(mostradas).toHaveLength(MAX_ARTES);
+    // Los que sí caben detrás conservan su orden relativo, y el conteo del título no miente.
+    expect(mostradas.slice(1).map((a) => a.titulo)).toEqual(['Arte 0', 'Arte 1', 'Arte 2']);
+    expect(ocultas).toBe(9 - MAX_ARTES);
+  });
+
+  it('sin ninguna marcada como principal se comporta igual que siempre', () => {
+    const artes = Array.from({ length: 6 }, (_, i) => arte(i));
+    expect(recortarArtes(artes).mostradas).toEqual(artes.slice(0, MAX_ARTES));
+  });
+});
+
+describe('recortarFotos', () => {
+  const foto = (i: number) => ({ dataUrl: PNG_1X1, titulo: `Foto ${String(i)}` });
+
+  it('deja hasta MAX_FOTOS y conserva el orden cuando no hay principal marcada', () => {
+    const fotos = Array.from({ length: 5 }, (_, i) => foto(i));
+    expect(recortarFotos(fotos)).toEqual(fotos.slice(0, MAX_FOTOS));
+  });
+
+  it('sube la foto PRINCIPAL al frente y nunca la deja fuera del tope', () => {
+    const fotos = [foto(0), foto(1), foto(2), { ...foto(3), principal: true }];
+    const mostradas = recortarFotos(fotos);
+    expect(mostradas).toHaveLength(MAX_FOTOS);
+    expect(mostradas[0]?.titulo).toBe('Foto 3');
+    expect(mostradas.slice(1).map((f) => f.titulo)).toEqual(['Foto 0', 'Foto 1']);
+  });
 });
 
 describe('generarPdfOrdenes', () => {
@@ -249,6 +404,8 @@ describe('armarDatosImpresoOrden', () => {
       codigoModelo: 'MOD-7',
       descripcionModelo: 'Desc',
       composicion: 'algodón',
+      // Tela capturada A MANO en la orden (`Orden.idTela`): es el FALLBACK del impreso.
+      tela: 'Tela manual',
       observaciones: null,
       obsMaquila: null,
       lineas: [
@@ -279,13 +436,17 @@ describe('armarDatosImpresoOrden', () => {
     };
   }
 
-  /** `deps` con las lecturas de dominio inyectadas (fakes), parametrizable por BOM/fotos/adjuntos. */
+  /**
+   * `deps` con las lecturas de dominio inyectadas (fakes), parametrizable por BOM/fotos/adjuntos y
+   * por las telas COMPRADAS (OC ligadas a la orden; vacío = el impreso cae a la tela manual).
+   */
   function depsCon(
     orden: OrdenSalida,
     bom: BomModelo,
     fotos: FotoModeloConUrl[],
     descargarImagen?: DepsImpreso['descargarImagen'],
     adjuntos: AdjuntoOrdenConUrl[] = [],
+    telasCompradas: TelaCompradaOrden[] = [],
   ): DepsImpreso {
     return {
       archivos: archivosFake,
@@ -293,6 +454,7 @@ describe('armarDatosImpresoOrden', () => {
       leerBom: () => Promise.resolve(bom),
       leerFotosModelo: () => Promise.resolve(fotos),
       listarAdjuntos: () => Promise.resolve(adjuntos),
+      leerTelasCompradas: () => Promise.resolve(telasCompradas),
       ...(descargarImagen ? { descargarImagen } : {}),
     };
   }
@@ -337,7 +499,7 @@ describe('armarDatosImpresoOrden', () => {
           paraCosto: false,
         },
       ],
-      bordados: [{ idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 12.5 }],
+      bordados: [{ idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 12.5, keyFoto: null }],
     };
 
     const datos = await armarDatosImpresoOrden(
@@ -391,7 +553,8 @@ describe('armarDatosImpresoOrden', () => {
       depsCon(ordenSalida(), bom, fotos, descargarImagen),
     );
 
-    expect(datos.fotos).toEqual([{ dataUrl: 'data:image/jpeg;base64,AAAA' }]);
+    // La primera foto del modelo es la PRINCIPAL (Daniel, jul-2026) y viene marcada como tal.
+    expect(datos.fotos).toEqual([{ dataUrl: 'data:image/jpeg;base64,AAAA', principal: true }]);
     // El PDF se genera igual con la foto buena (y sin truncar por la faltante).
     const buffer = await generarPdfOrden(datos);
     expect(esPdf(buffer)).toBe(true);
@@ -468,6 +631,298 @@ describe('armarDatosImpresoOrden', () => {
     }
   });
 
+  it('rellena la TELA con las OC de tela ligadas a la orden (no con el campo manual)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(
+        ordenSalida(),
+        bom,
+        [],
+        undefined,
+        [],
+        [
+          { idTela: 1, nombre: 'Chifón', folioOc: 334 },
+          // Segundo renglón de la MISMA tela y OC: se deduplica (no sale dos veces).
+          { idTela: 1, nombre: 'Chifón', folioOc: 334 },
+          { idTela: 2, nombre: 'Forro', folioOc: 335 },
+        ],
+      ),
+    );
+    expect(datos.tela).toBe('Chifón (OC 334)  ·  Forro (OC 335)');
+    // La tela capturada a mano NO se usa cuando sí hay compra.
+    expect(datos.tela).not.toContain('Tela manual');
+  });
+
+  it('cae a la TELA capturada a mano cuando la orden no tiene OC de tela', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida(), bom, [], undefined, [], []),
+    );
+    expect(datos.tela).toBe('Tela manual');
+  });
+
+  it('si la lectura de OC de tela TRUENA, degrada a la tela manual (best-effort)', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps: DepsImpreso = {
+        ...depsCon(ordenSalida(), bom, []),
+        leerTelasCompradas: () => Promise.reject(new Error('BD caída')),
+      };
+      const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, deps);
+
+      expect(datos.tela).toBe('Tela manual');
+      expect(advertir).toHaveBeenCalled();
+      expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+    } finally {
+      advertir.mockRestore();
+    }
+  });
+
+  it('sin OC y sin tela manual, el campo queda en null (el impreso pinta "—")', async () => {
+    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const datos = await armarDatosImpresoOrden(
+      sesionConVer(),
+      1,
+      undefined,
+      depsCon(ordenSalida({ tela: null }), bom, []),
+    );
+    expect(datos.tela).toBeNull();
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  // Caso documentado en `docs/modulos/impreso-orden.md`: si el arte PRINCIPAL no tiene foto, el
+  // segundo NO hereda el papel (ser principal es una decisión sobre un arte concreto). Sin esta
+  // prueba, "heredar la marca" pasaría desapercibido como cambio de comportamiento.
+  it('si el arte PRINCIPAL del BOM no tiene foto, ninguna imagen queda marcada como principal', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      bordados: [
+        // El principal (1º del BOM) NO tiene foto…
+        {
+          idBordado: 1,
+          nombre: 'Principal sin foto',
+          tipo: 'BORDADO',
+          precio: null,
+          keyFoto: null,
+        },
+        // …y el que sí la tiene NO se vuelve principal por eso.
+        { idBordado: 2, nombre: 'Segundo', tipo: 'ESTAMPADO', precio: null, keyFoto: 'bor/2.png' },
+      ],
+    };
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], (url) => Promise.resolve(`data:img;${url}`)),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.artes).toEqual([{ dataUrl: 'data:img;https://r2/bor/2.png', titulo: 'Segundo' }]);
+    expect(datos.artes.some((a) => a.principal === true)).toBe(false);
+    // El arte principal sin foto sigue en la lista de TEXTO (no desaparece del impreso).
+    expect(datos.bordados.map((b) => b.nombre)).toEqual(['Principal sin foto', 'Segundo']);
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  it('incrusta como ARTES las fotos de los bordados del BOM, con su nombre, antes de los adjuntos', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      bordados: [
+        { idBordado: 1, nombre: 'Logo pecho', tipo: 'BORDADO', precio: null, keyFoto: 'bor/1.png' },
+        // Sin foto: sigue saliendo en la lista de texto, pero no aporta imagen.
+        { idBordado: 2, nombre: 'Estampa espalda', tipo: 'ESTAMPADO', precio: null, keyFoto: null },
+      ],
+    };
+    // El servicio de archivos presigna la key del arte; la descarga devuelve un data-URL por URL.
+    const urlDescarga = vi.fn((key: string) => Promise.resolve(`https://r2/${key}`));
+    const archivos = { solicitarSubida: vi.fn(), urlDescarga } as unknown as ServicioArchivos;
+    const descargarImagen = vi.fn((url: string) => Promise.resolve(`data:img;${url}`));
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], descargarImagen, [
+        adjunto({ idArchivo: 'a1', urlDescarga: 'https://r2/adjunto-1' }),
+      ]),
+      archivos,
+    });
+
+    // Arte del BOM primero (con rótulo y marcado como PRINCIPAL: es el primero del BOM), adjunto
+    // de la orden después (sin rótulo).
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/bor/1.png', titulo: 'Logo pecho', principal: true },
+      { dataUrl: 'data:img;https://r2/adjunto-1' },
+    ]);
+    // Solo se presignó la key del bordado CON foto.
+    expect(urlDescarga).toHaveBeenCalledTimes(1);
+    expect(urlDescarga).toHaveBeenCalledWith('bor/1.png');
+    // La lista de texto del arte conserva los dos renglones (con su subtipo).
+    expect(datos.bordados).toEqual([
+      { nombre: 'Logo pecho', tipo: 'BORDADO' },
+      { nombre: 'Estampa espalda', tipo: 'ESTAMPADO' },
+    ]);
+  });
+
+  /** Servicio de archivos que presigna cualquier key (`key` → `https://r2/<key>`). */
+  function archivosQuePresignan(): ServicioArchivos {
+    return {
+      solicitarSubida: vi.fn(),
+      urlDescarga: (key: string) => Promise.resolve(`https://r2/${key}`),
+    } as unknown as ServicioArchivos;
+  }
+
+  /** BOM de dos bordados con foto, en el orden dado (para probar el rótulo por índice). */
+  function bomDosArtes(primero: [string, string], segundo: [string, string]): BomModelo {
+    return {
+      telas: [],
+      avios: [],
+      bordados: [
+        { idBordado: 1, nombre: primero[0], tipo: 'BORDADO', precio: null, keyFoto: primero[1] },
+        { idBordado: 2, nombre: segundo[0], tipo: 'ESTAMPADO', precio: null, keyFoto: segundo[1] },
+      ],
+    };
+  }
+
+  // El rótulo de cada arte se toma POR ÍNDICE de la lista presignada, así que hay que probar los
+  // dos extremos: si solo se cubriera el caso "falla el ÚLTIMO", una implementación con
+  // corrimiento de índice (filtrar los nulos y luego mapear el título por posición) pasaría igual.
+  it.each([
+    {
+      caso: 'falla la PRIMERA (atrapa el corrimiento de índice)',
+      bom: bomDosArtes(['Caída', 'falla.png'], ['Buena', 'ok.png']),
+      // El arte PRINCIPAL (el 1º del BOM) es justo el que no bajó: no hay principal que marcar.
+      esperado: [{ dataUrl: PNG_1X1, titulo: 'Buena' }],
+    },
+    {
+      caso: 'falla la ÚLTIMA',
+      bom: bomDosArtes(['Buena', 'ok.png'], ['Caída', 'falla.png']),
+      esperado: [{ dataUrl: PNG_1X1, titulo: 'Buena', principal: true }],
+    },
+  ])('una foto de arte del BOM que no baja NO trunca el PDF ($caso)', async ({ bom, esperado }) => {
+    const descargarImagen = vi.fn((url: string) =>
+      Promise.resolve(url.endsWith('ok.png') ? PNG_1X1 : null),
+    );
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], descargarImagen),
+      archivos: archivosQuePresignan(),
+    });
+
+    // La caída se descarta y la buena conserva SU rótulo (nunca el del arte caído).
+    expect(datos.artes).toEqual(esperado);
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  it('si PRESIGNAR el arte del BOM truena, el impreso sale igual sin esas imágenes', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      bordados: [
+        { idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: null, keyFoto: 'bor/1.png' },
+      ],
+    };
+    const archivos = {
+      solicitarSubida: vi.fn(),
+      urlDescarga: () => Promise.reject(new Error('R2 caído')),
+    } as unknown as ServicioArchivos;
+    const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+        ...depsCon(ordenSalida(), bom, []),
+        archivos,
+      });
+
+      expect(datos.artes).toEqual([]);
+      expect(advertir).toHaveBeenCalled();
+      // La lista de texto del arte sigue ahí (el bordado no desaparece del impreso).
+      expect(datos.bordados).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
+      expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+    } finally {
+      advertir.mockRestore();
+    }
+  });
+
+  it('si falla el presign de UN arte, los demás sí salen (best-effort por imagen)', async () => {
+    const bom = bomDosArtes(['Caída', 'falla.png'], ['Buena', 'ok.png']);
+    // R2 revienta SOLO con una key; la otra se presigna bien.
+    const archivos = {
+      solicitarSubida: vi.fn(),
+      urlDescarga: (key: string) =>
+        key === 'falla.png'
+          ? Promise.reject(new Error('R2 rechazó la key'))
+          : Promise.resolve(`https://r2/${key}`),
+    } as unknown as ServicioArchivos;
+    const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+        ...depsCon(ordenSalida(), bom, [], () => Promise.resolve(PNG_1X1)),
+        archivos,
+      });
+
+      // El arte que sí se presignó sale (con SU rótulo); el otro se pierde solo él.
+      expect(datos.artes).toEqual([{ dataUrl: PNG_1X1, titulo: 'Buena' }]);
+      expect(advertir).toHaveBeenCalled();
+      expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+    } finally {
+      advertir.mockRestore();
+    }
+  });
+
+  it('sin OC, sin fotos de arte y sin adjuntos, el impreso queda como siempre', async () => {
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      bordados: [{ idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 9, keyFoto: null }],
+    };
+    const urlDescarga = vi.fn(() => Promise.resolve('https://r2/x'));
+    const archivos = { solicitarSubida: vi.fn(), urlDescarga } as unknown as ServicioArchivos;
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, []),
+      archivos,
+    });
+
+    expect(datos.artes).toEqual([]);
+    expect(datos.fotos).toEqual([]);
+    expect(datos.tela).toBe('Tela manual');
+    // No se presignó nada (ningún bordado tiene foto).
+    expect(urlDescarga).not.toHaveBeenCalled();
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
+  });
+
+  it('marca como PRINCIPAL la 1ª foto del modelo y el 1er arte del BOM (y solo esos)', async () => {
+    // Las lecturas ya llegan ordenadas (`leerFotosModelo` / `leerBordadosBom`): la principal es la
+    // primera de cada lista, y el impreso la marca para blindarla contra los topes.
+    const bom = bomDosArtes(['Principal', 'uno.png'], ['Secundario', 'dos.png']);
+    const fotos = [
+      { urlDescarga: 'https://r2/foto-1' },
+      { urlDescarga: 'https://r2/foto-2' },
+    ] as unknown as FotoModeloConUrl[];
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, fotos, (url) => Promise.resolve(`data:img;${url}`), [
+        adjunto({ idArchivo: 'a1', urlDescarga: 'https://r2/adjunto-1' }),
+      ]),
+      archivos: archivosQuePresignan(),
+    });
+
+    expect(datos.fotos).toEqual([
+      { dataUrl: 'data:img;https://r2/foto-1', principal: true },
+      { dataUrl: 'data:img;https://r2/foto-2' },
+    ]);
+    expect(datos.artes).toEqual([
+      { dataUrl: 'data:img;https://r2/uno.png', titulo: 'Principal', principal: true },
+      { dataUrl: 'data:img;https://r2/dos.png', titulo: 'Secundario' },
+      // El adjunto de la orden nunca es "el arte principal" (ese es del modelo).
+      { dataUrl: 'data:img;https://r2/adjunto-1' },
+    ]);
+  });
+
   it('NO depende de modelos.ver: con solo ordenes.ver no lanza ErrorPermiso', async () => {
     // Sesión con ordenes.ver pero SIN modelos.ver. El impreso lee fotos a bajo nivel
     // (`leerFotosModelo`, sin verificar permiso), así que NO debe rebotar por falta de modelos.ver.
@@ -490,9 +945,9 @@ describe('armarDatosImpresoOrden', () => {
       depsCon(ordenSalida(), bom, fotos, () => Promise.resolve('data:image/jpeg;base64,AAAA')),
     );
 
-    // Se resolvió sin ErrorPermiso y con la foto incluida.
+    // Se resolvió sin ErrorPermiso y con la foto incluida (la única es, por definición, la principal).
     expect(datos.folio).toBe(999);
-    expect(datos.fotos).toEqual([{ dataUrl: 'data:image/jpeg;base64,AAAA' }]);
+    expect(datos.fotos).toEqual([{ dataUrl: 'data:image/jpeg;base64,AAAA', principal: true }]);
   });
 
   it('propaga el ErrorNoEncontrado de obtenerOrden (orden de otra empresa → 404)', async () => {
@@ -506,6 +961,38 @@ describe('armarDatosImpresoOrden', () => {
     await expect(
       armarDatosImpresoOrden(sesionConVer(), 999, undefined, deps),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+describe('textoTelaComprada', () => {
+  it('sin compras devuelve null (el impreso cae a la tela manual)', () => {
+    expect(textoTelaComprada([])).toBeNull();
+  });
+
+  it('junta los folios de OC de una misma tela en un solo renglón', () => {
+    const telas: TelaCompradaOrden[] = [
+      { idTela: 7, nombre: 'Chifón', folioOc: 334 },
+      { idTela: 7, nombre: 'Chifón', folioOc: 340 },
+      { idTela: 7, nombre: 'Chifón', folioOc: 334 },
+    ];
+    expect(textoTelaComprada(telas)).toBe('Chifón (OC 334, 340)');
+  });
+
+  it('lista varias telas en el orden en que llegan, separadas por " · "', () => {
+    const telas: TelaCompradaOrden[] = [
+      { idTela: 1, nombre: 'Jersey', folioOc: 10 },
+      { idTela: 2, nombre: 'Rib', folioOc: 11 },
+    ];
+    expect(textoTelaComprada(telas)).toBe('Jersey (OC 10)  ·  Rib (OC 11)');
+  });
+
+  it('NO funde dos telas distintas del catálogo que se llamen igual (dedup por idTela)', () => {
+    const telas: TelaCompradaOrden[] = [
+      { idTela: 1, nombre: 'Jersey', folioOc: 10 },
+      { idTela: 2, nombre: 'Jersey', folioOc: 11 },
+    ];
+    // Son telas DISTINTAS (ids distintos) aunque compartan nombre: dos renglones, no uno.
+    expect(textoTelaComprada(telas)).toBe('Jersey (OC 10)  ·  Jersey (OC 11)');
   });
 });
 

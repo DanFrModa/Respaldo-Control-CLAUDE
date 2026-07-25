@@ -96,7 +96,7 @@ describe('<GaleriaBordados>', () => {
     renderConProveedores(<GaleriaBordados />, {
       sesion: estadoSesionDePrueba(['bordados.ver']),
     });
-    expect(screen.getByText('No hay bordados que coincidan con la búsqueda.')).toBeInTheDocument();
+    expect(screen.getByText('No hay arte que coincida con la búsqueda.')).toBeInTheDocument();
   });
 
   it('al tocar una celda navega a la ficha del bordado', async () => {

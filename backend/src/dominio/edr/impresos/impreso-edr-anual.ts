@@ -167,5 +167,7 @@ export async function impresoEdrAnual(
   deps: DepsImpresoEdrAnual = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoEdrAnual(sesion, anio, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('edr-anual', datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('edr-anual', datos, { idEmpresa: sesion.idEmpresaActiva }),
+  };
 }

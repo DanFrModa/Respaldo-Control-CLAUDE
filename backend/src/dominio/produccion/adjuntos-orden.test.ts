@@ -164,6 +164,7 @@ describe('dominio Adjuntos de orden (F8-E6) — borrado físico R2 best-effort',
         throw new Error('no debe llamarse');
       },
       urlDescarga: () => Promise.reject(new Error('no debe llamarse')),
+      descargarContenido: () => Promise.reject(new Error('no debe llamarse')),
       eliminarObjeto,
     };
 
@@ -184,6 +185,7 @@ describe('dominio Adjuntos de orden (F8-E6) — borrado físico R2 best-effort',
         throw new Error('no debe llamarse');
       },
       urlDescarga: () => Promise.reject(new Error('no debe llamarse')),
+      descargarContenido: () => Promise.reject(new Error('no debe llamarse')),
       eliminarObjeto: () => Promise.reject(new Error('R2 caído')),
     };
 

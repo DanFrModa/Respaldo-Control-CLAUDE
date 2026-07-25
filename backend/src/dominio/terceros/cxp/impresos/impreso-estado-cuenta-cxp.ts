@@ -266,5 +266,10 @@ export async function impresoEstadoCuentaCxp(
   deps: DepsImpresoCxp = {},
 ): Promise<ImpresoCxp> {
   const datos = await armarDatosImpresoCxp(sesion, idProveedor, query, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('cxp-estado-cuenta', datos), idProveedor };
+  return {
+    buffer: await renderizarPdfEnWorker('cxp-estado-cuenta', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    idProveedor,
+  };
 }

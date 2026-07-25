@@ -179,8 +179,10 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Completa');
     const matriz = detalle.getByTestId('matriz-orden');
     await matriz.getByTestId('matriz-orden-celda').first().fill('25');
-    await detalle.getByTestId('guardar-matriz').click();
-    await expect(page.getByText('Matriz guardada.')).toBeVisible();
+    // Guardado ÚNICO (Daniel 24-jul-2026): un solo botón en el pie del diálogo, para TODO.
+    await expect(page.getByTestId('guardar-orden')).toBeEnabled();
+    await page.getByTestId('guardar-orden').click();
+    await expect(page.getByText('Cambios guardados.')).toBeVisible();
 
     // ── Copiar la matriz de la OP 1 sobre la OP 2 ───────────────────────────────
     await abrirOrdenEnCaptura(page, folio2, codigoModelo);
@@ -193,13 +195,16 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await page.getByTestId('confirmar-copiar-matriz').click();
     await expect(page.getByText('Matriz copiada.')).toBeVisible();
 
-    // ── Referencia D7 ───────────────────────────────────────────────────────────
+    // ── Referencia D7 (misma vía: el botón único del pie) ───────────────────────
     const campoRef = detalle.getByLabel(campoReferencia);
     await expect(campoRef).toBeVisible();
     await campoRef.fill(valorReferencia);
-    await detalle.getByTestId('guardar-referencias').click();
-    await expect(page.getByText('Referencias guardadas.')).toBeVisible();
+    await expect(page.getByTestId('guardar-orden')).toBeEnabled();
+    await page.getByTestId('guardar-orden').click();
+    await expect(page.getByText('Cambios guardados.')).toBeVisible();
     await expect(campoRef).toHaveValue(valorReferencia);
+    // Guardado todo, el botón vuelve a quedar deshabilitado (sin cambios pendientes).
+    await expect(page.getByTestId('guardar-orden')).toBeDisabled();
 
     // ── Cancelar con motivo ─────────────────────────────────────────────────────
     await page.getByTestId('cancelar-orden').click();

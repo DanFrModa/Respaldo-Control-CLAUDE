@@ -280,5 +280,9 @@ export async function impresoReporteFiscal(
   deps: DepsImpresoReporteFiscal = {},
 ): Promise<ImpresoReporteFiscal> {
   const datos = await armarDatosImpresoReporteFiscal(sesion, query, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('reporte-fiscal', datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('reporte-fiscal', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+  };
 }

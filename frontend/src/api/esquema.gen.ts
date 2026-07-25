@@ -76,6 +76,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre de la empresa activa. */
                 nombre: string;
+                /** @description Id del Archivo del LOGO de la empresa, o null si todavía no se ha subido uno (la app pinta entonces el logo empaquetado). Viaja aquí para que el riel lo tenga sin una petición extra, y sirve de versión para refrescar la caché del navegador. */
+                idArchivoLogo: string | null;
               };
               /** @description Claves de permiso efectivas del usuario (unión de sus roles). */
               permisos: (
@@ -12344,6 +12346,8 @@ export interface paths {
                 codigo: string;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
+                /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+                composicion: string | null;
                 /** @description Costo de maquila base, o null. */
                 maquilaBase: number | null;
                 /** @description Id de la temporada, o null. */
@@ -12522,6 +12526,7 @@ export interface paths {
              */
             secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
             descripcion?: string;
+            composicion?: string;
           };
         };
       };
@@ -12539,6 +12544,8 @@ export interface paths {
               codigo: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
               /** @description Costo de maquila base, o null. */
               maquilaBase: number | null;
               /** @description Id de la temporada, o null. */
@@ -12720,6 +12727,8 @@ export interface paths {
               codigo: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
               /** @description Costo de maquila base, o null. */
               maquilaBase: number | null;
               /** @description Id de la temporada, o null. */
@@ -12936,6 +12945,8 @@ export interface paths {
               codigo: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
               /** @description Costo de maquila base, o null. */
               maquilaBase: number | null;
               /** @description Id de la temporada, o null. */
@@ -13109,6 +13120,7 @@ export interface paths {
              */
             secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
             descripcion?: string | null;
+            composicion?: string | null;
             activo?: boolean;
           };
         };
@@ -13127,6 +13139,8 @@ export interface paths {
               codigo: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
               /** @description Costo de maquila base, o null. */
               maquilaBase: number | null;
               /** @description Id de la temporada, o null. */
@@ -14077,6 +14091,142 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/modelos/{id}/bom/bordados/{idBordado}/principal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Marcar un arte del BOM como el principal del modelo */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del BOM. */
+          idBordado: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bordados del BOM de un modelo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Bordados del BOM. */
+              datos: {
+                /** @description Id del bordado. */
+                idBordado: number;
+                /** @description Nombre del bordado (para la UI). */
+                nombre: string;
+                /**
+                 * @description Tipo del bordado (para la UI).
+                 * @enum {string}
+                 */
+                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del bordado en este modelo, o null. */
+                precio: number | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/modelos/{id}/copiar-bom': {
     parameters: {
       query?: never;
@@ -14759,6 +14909,150 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/modelos/{id}/fotos/{idFoto}/principal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Marcar una foto como la principal del modelo */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id de la foto. */
+          idFoto: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Fotos de un modelo (N por modelo). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Fotos del modelo (ordenadas). */
+              datos: {
+                /** @description Id del registro ModeloFoto. */
+                idFoto: number;
+                /** @description Id del registro Archivo de la foto. */
+                idArchivo: string;
+                /**
+                 * @description Tipo de foto (frente/espalda/otra).
+                 * @enum {string}
+                 */
+                tipo: 'FRENTE' | 'ESPALDA' | 'OTRO';
+                /** @description Orden de despliegue en el carrusel. */
+                orden: number;
+                /** @description Nombre original del archivo. */
+                nombreOriginal: string;
+                /** @description Tipo MIME de la imagen. */
+                tipoMime: string;
+                /** @description Tamaño en bytes. */
+                tamanoBytes: number;
+                /** @description URL GET prefirmada para ver la foto. */
+                urlDescarga: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/pedidos': {
@@ -81519,6 +81813,8 @@ export interface paths {
               paraEdr: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activa: boolean;
+              /** @description Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. Sirve además de versión para refrescar la caché del navegador al cambiarlo. */
+              idArchivoLogo: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -81669,6 +81965,8 @@ export interface paths {
               paraEdr: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activa: boolean;
+              /** @description Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. Sirve además de versión para refrescar la caché del navegador al cambiarlo. */
+              idArchivoLogo: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -81819,6 +82117,8 @@ export interface paths {
               paraEdr: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activa: boolean;
+              /** @description Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. Sirve además de versión para refrescar la caché del navegador al cambiarlo. */
+              idArchivoLogo: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -81958,6 +82258,8 @@ export interface paths {
               paraEdr: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activa: boolean;
+              /** @description Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. Sirve además de versión para refrescar la caché del navegador al cambiarlo. */
+              idArchivoLogo: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -82110,6 +82412,8 @@ export interface paths {
               paraEdr: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activa: boolean;
+              /** @description Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. Sirve además de versión para refrescar la caché del navegador al cambiarlo. */
+              idArchivoLogo: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -82510,6 +82814,541 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/empresas/{id}/logo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener el logo de una empresa (metadatos + URL prefirmada) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la empresa. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Logo de la empresa (con su URL de descarga) o vacío si no tiene. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo del logo, o null. */
+              idArchivo: string | null;
+              /** @description Nombre original del archivo, o null. */
+              nombreOriginal: string | null;
+              /** @description Tipo MIME del logo, o null. */
+              tipoMime: string | null;
+              /** @description Tamaño en bytes, o null. */
+              tamanoBytes: number | null;
+              /** @description URL GET prefirmada para ver el logo, o null si la empresa no tiene. */
+              urlDescarga: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Preparar la subida del logo de una empresa */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la empresa. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para preparar la subida del logo de la empresa. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre del archivo tal como lo llama el usuario. */
+            nombreOriginal: string;
+            /**
+             * @description Tipo MIME del logo: image/png o image/jpeg.
+             * @enum {string}
+             */
+            tipoMime: 'image/png' | 'image/jpeg';
+            /** @description Tamaño exacto en bytes. */
+            tamanoBytes: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de preparar la subida del logo (URL prefirmada). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo creado para el logo. */
+              idArchivo: string;
+              /** @description Nombre original del archivo. */
+              nombreOriginal: string;
+              /** @description URL PUT prefirmada: el navegador sube directo a R2. */
+              urlSubida: string;
+              /** @description Vigencia de la URL de subida (segundos). */
+              expiraEnSegundos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Quitar el logo de una empresa */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la empresa. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/empresas/{id}/logo/confirmar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirmar la subida del logo de una empresa */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la empresa. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Confirma que el logo ya se subió a R2 y lo deja como logo vigente. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Id del Archivo devuelto al preparar la subida. */
+            idArchivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/empresas/logo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Imagen del logo de la empresa (binario PNG/JPG, público)
+     * @description Marca del sistema. Con sesión devuelve el logo de la empresa activa; sin sesión, el de la empresa predeterminada (lo necesita el login). Si no hay logo propio devuelve el empaquetado en el repo. Pásale `?v=<idArchivoLogo>` para poder cachearla de forma indefinida.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Versión del logo (id de su Archivo) para invalidar la caché del navegador. */
+          v?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bytes del logo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'image/png': string;
+            'image/jpeg': string;
+          };
+        };
+        /** @description El logo no cambió (coincide el ETag): no se reenvía la imagen. */
+        304: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': unknown;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/roles': {

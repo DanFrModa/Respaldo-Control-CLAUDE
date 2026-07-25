@@ -74,6 +74,10 @@ function archivosFalsos(): ServicioArchivos {
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
     },
+    descargarContenido(key) {
+      // El fake no guarda bytes: solo cumple el contrato del servicio (nadie lo usa aquí).
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
     eliminarObjeto() {
       return Promise.resolve();
     },

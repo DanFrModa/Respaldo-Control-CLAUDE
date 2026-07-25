@@ -124,7 +124,7 @@ describe('<BordadosPagina>', () => {
     renderConProveedores(<BordadosPagina />, {
       sesion: estadoSesionDePrueba(['bordados.ver']),
     });
-    expect(screen.getByText('No hay bordados que coincidan con la búsqueda.')).toBeInTheDocument();
+    expect(screen.getByText('No hay arte que coincida con la búsqueda.')).toBeInTheDocument();
   });
 
   it('muestra el mensaje de error y un boton de reintento cuando la consulta falla', () => {
@@ -162,7 +162,7 @@ describe('<BordadosPagina>', () => {
 
     await usuario.click(screen.getByTestId('desactivar-bordado'));
     const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Desactivar bordado')).toBeInTheDocument();
+    expect(within(dialogo).getByText('Desactivar arte')).toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());

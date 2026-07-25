@@ -255,6 +255,8 @@ export async function impresoExplosion(
   deps: DepsImpresoExplosion = {},
 ): Promise<ImpresoExplosion> {
   const datos = await armarDatosImpresoExplosion(sesion, idOrden, bd, deps);
-  const buffer = await renderizarPdfEnWorker('explosion', datos);
+  const buffer = await renderizarPdfEnWorker('explosion', datos, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   return { buffer, folioOrden: datos.folioOrden };
 }

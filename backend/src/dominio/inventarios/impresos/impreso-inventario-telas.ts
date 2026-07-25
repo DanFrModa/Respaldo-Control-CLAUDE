@@ -236,5 +236,5 @@ export async function impresoInventarioTelas(
   deps: DepsImpresoInventarioTelas = {},
 ): Promise<Buffer> {
   const datos = await armarDatosImpresoInventarioTelas(sesion, parametros, bd, deps);
-  return renderizarPdfEnWorker('inventario-telas', datos);
+  return renderizarPdfEnWorker('inventario-telas', datos, { idEmpresa: sesion.idEmpresaActiva });
 }

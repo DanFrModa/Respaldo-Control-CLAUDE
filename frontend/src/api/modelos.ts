@@ -340,6 +340,39 @@ export function useCopiarBom(): UseMutationResult<void, ErrorDeApi, ArgsCopiarBo
   });
 }
 
+/**
+ * Marca un ARTE del BOM como el PRINCIPAL del modelo (jul-2026, Daniel): el backend lo mueve al
+ * primer lugar y reindexa el resto. El "principal" es simplemente el PRIMERO de la lista.
+ */
+async function marcarArtePrincipal(id: number, idBordado: number): Promise<ModeloBordado[]> {
+  const { data, error } = await api.POST('/api/modelos/{id}/bom/bordados/{idBordado}/principal', {
+    params: { path: { id, idBordado } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Argumentos de marcar el arte principal. */
+export interface ArgsArtePrincipal {
+  id: number;
+  idBordado: number;
+}
+
+/** Marca el arte principal del modelo e invalida la ficha (el BOM cambió de orden). */
+export function useMarcarArtePrincipal(): UseMutationResult<
+  ModeloBordado[],
+  ErrorDeApi,
+  ArgsArtePrincipal
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, idBordado }: ArgsArtePrincipal) => marcarArtePrincipal(id, idBordado),
+    onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
+  });
+}
+
 // ── Fotos (presigned: POST metadatos → PUT directo a R2) ──────────────────────
 
 async function listarFotos(id: number): Promise<ModeloFoto[]> {
@@ -482,6 +515,47 @@ export function useActualizarFotoModelo(): UseMutationResult<void, ErrorDeApi, A
       actualizarFoto(idModelo, idFoto, cuerpo),
     onSuccess: (_r, v) => {
       void queryClient.invalidateQueries({ queryKey: claveFotos(v.idModelo) });
+    },
+  });
+}
+
+/**
+ * Marca una foto como la PRINCIPAL del modelo (jul-2026, Daniel: *"es la más importante"*): el
+ * backend la mueve al primer lugar y reindexa el resto. La principal es SIEMPRE la primera de la
+ * lista — no hay bandera que pueda contradecir al orden.
+ */
+async function marcarFotoPrincipal(idModelo: number, idFoto: number): Promise<ModeloFoto[]> {
+  const { data, error } = await api.POST('/api/modelos/{id}/fotos/{idFoto}/principal', {
+    params: { path: { id: idModelo, idFoto } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Argumentos de marcar la foto principal. */
+export interface ArgsFotoPrincipal {
+  idModelo: number;
+  idFoto: number;
+}
+
+/**
+ * Marca la foto principal del modelo e invalida las fotos + el listado y la ficha (la miniatura
+ * del catálogo es justo la principal, `urlFotoPrincipal`).
+ */
+export function useMarcarFotoPrincipal(): UseMutationResult<
+  ModeloFoto[],
+  ErrorDeApi,
+  ArgsFotoPrincipal
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idModelo, idFoto }: ArgsFotoPrincipal) => marcarFotoPrincipal(idModelo, idFoto),
+    onSuccess: (_r, v) => {
+      void queryClient.invalidateQueries({ queryKey: claveFotos(v.idModelo) });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(v.idModelo) });
     },
   });
 }

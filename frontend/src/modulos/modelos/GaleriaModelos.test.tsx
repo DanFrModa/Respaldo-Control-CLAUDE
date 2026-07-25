@@ -54,6 +54,7 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
     id,
     codigo,
     descripcion: null,
+    composicion: null,
     maquilaBase: null,
     idTemporada: null,
     temporada: null,

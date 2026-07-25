@@ -778,6 +778,12 @@ function DetalleModelo({
               {modelo.descripcion}
             </CampoDetalle>
           ) : null}
+          {/* Composición del DESARROLLO (Daniel 24-jul-2026): la fuente que heredan las órdenes. */}
+          {modelo.composicion !== null && modelo.composicion.trim() !== '' ? (
+            <CampoDetalle icono={Scissors} etiqueta="Composición" anchoCompleto>
+              {modelo.composicion}
+            </CampoDetalle>
+          ) : null}
         </RejillaCampos>
       </SeccionDetalle>
 

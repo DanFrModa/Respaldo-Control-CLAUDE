@@ -252,8 +252,8 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           // Conservan el gate del hub Catálogos que los albergaba ("autenticado").
           {
             clave: 'bordados',
-            titulo: 'Bordados',
-            descripcion: 'Catálogo de bordados y estampados con su galería de fotos',
+            titulo: 'Arte',
+            descripcion: 'Catálogo de arte (bordado y estampado) con su galería de fotos',
             ruta: '/catalogos/bordados',
             icono: 'libreria',
             permisos: 'autenticado',
@@ -261,8 +261,8 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           {
             clave: 'galeria-bordados',
-            titulo: 'Galería de bordados',
-            descripcion: 'Vista visual de los bordados y estampados con su foto',
+            titulo: 'Galería de arte',
+            descripcion: 'Vista visual del arte (bordado y estampado) con su foto',
             ruta: '/catalogos/galeria-bordados',
             icono: 'imagenes',
             permisos: 'autenticado',
@@ -317,7 +317,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'envios',
             titulo: 'Envío a maquila',
-            descripcion: 'Envía a costura, estampado, bordado o lavado desde una sola pantalla',
+            descripcion: 'Envía a costura, arte o lavado desde una sola pantalla',
             ruta: '/produccion/envios',
             icono: 'paquete',
             permisos: ['produccion.envio'],
@@ -327,7 +327,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'recibos',
             titulo: 'Recibo de maquila',
             descripcion:
-              'Recibe prenda terminada de costura/estampado y mete a inventario lo de costura',
+              'Recibe prenda terminada de costura/arte y mete a inventario lo de costura',
             ruta: '/produccion/recibos',
             icono: 'paquete',
             permisos: ['produccion.recibo'],
@@ -660,7 +660,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'catalogo-avios',
             titulo: 'Catálogo de avíos',
-            descripcion: 'Catálogo de avíos y habilitación con sus medidas por talla',
+            descripcion: 'Catálogo de avíos con sus medidas por talla',
             ruta: '/catalogos/avios',
             icono: 'tijeras',
             permisos: 'autenticado',

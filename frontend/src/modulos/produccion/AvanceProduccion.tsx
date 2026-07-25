@@ -876,7 +876,7 @@ function ResumenAvance({
       </div>
       <div>
         <h4 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Resumen · estampado / bordado (aplicación)
+          Resumen · arte (aplicación)
         </h4>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <TarjetaResumen etiqueta="Entregada" valor={n(enviadoAplicacion)} />

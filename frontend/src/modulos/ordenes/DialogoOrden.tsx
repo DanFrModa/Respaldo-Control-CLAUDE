@@ -4,20 +4,24 @@ import {
   Factory,
   Grid3x3,
   ListChecks,
+  Loader2Icon,
   MessageSquare,
   Paperclip,
   Route,
+  SaveIcon,
   Tags,
   UserRound,
   Workflow,
   X,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import { useOrden } from '@/api/ordenes';
 import type { EstadoOrden, Orden } from '@/api/tipos';
+import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +33,7 @@ import { DialogoCancelarOrden } from './DialogoCancelarOrden';
 import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
 import { EditorEncabezadoOrden } from './EditorEncabezadoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
+import { ProveedorGuardadoOrden, useRegistroGuardadoOrden } from './guardado-orden';
 import { PanelComentarios } from './PanelComentarios';
 import { PanelHitosOrden } from './PanelHitosOrden';
 import { PanelMatriz } from './PanelMatriz';
@@ -94,6 +99,14 @@ export interface PropsDialogoOrden {
  * Se cierra con Esc, el botón ✕ o el clic en el fondo (mismo patrón que el Avance de producción).
  * Las acciones de escritura se ocultan sin `ordenes.administrar` (cancelar exige `ordenes.cancelar`);
  * la decisión real la toma el backend (A1).
+ *
+ * GUARDADO ÚNICO (petición de Daniel, 24-jul-2026): las secciones con captura (encabezado, matriz,
+ * referencias) YA NO tienen un botón cada una — se registran en `useRegistroGuardadoOrden` y las
+ * guarda el único botón "Guardar" del pie, habilitado sólo si hay cambios. Y si se intenta cerrar
+ * con cambios sin guardar, se pregunta antes de salir (Guardar y salir / Salir sin guardar /
+ * Cancelar). Las acciones que NO son captura pendiente (comentarios, adjuntos, hitos, la liga con
+ * Desarrollo, copiar matriz, cancelar la orden) conservan su acción propia: cada una es una
+ * operación con su endpoint y su efecto inmediato, no un cambio en espera de guardarse.
  */
 export function DialogoOrden({
   abierto,
@@ -121,24 +134,52 @@ export function DialogoOrden({
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
 
-  // Esc cierra el diálogo — pero NO mientras un diálogo hijo (cancelar/copiar) está abierto: su
-  // propio Esc lo cierra (Radix) y si este listener también corriera, tiraría el panel entero.
+  // Guardado único de las secciones con captura + guardia de cierre con cambios sin guardar.
+  const { valorContexto, hayCambios, guardando, guardarTodo } = useRegistroGuardadoOrden(idOrden);
+  const [confirmarSalida, setConfirmarSalida] = useState(false);
+
+  /** Guarda todo lo pendiente; devuelve si quedó todo guardado. */
+  const guardar = useCallback(async (): Promise<boolean> => {
+    const resultado = await guardarTodo();
+    if (resultado.ok) {
+      toast.success('Cambios guardados.');
+    } else if (resultado.error !== undefined) {
+      toast.error(resultado.error);
+    }
+    return resultado.ok;
+  }, [guardarTodo]);
+
+  /** Cierra el diálogo, pero pregunta antes si hay cambios sin guardar. */
+  const intentarCerrar = useCallback((): void => {
+    if (hayCambios) {
+      setConfirmarSalida(true);
+      return;
+    }
+    alCerrar();
+  }, [hayCambios, alCerrar]);
+
+  // Esc cierra el diálogo (con el mismo guardia) — pero NO mientras un diálogo hijo (cancelar/
+  // copiar/confirmar salida) está abierto: su propio Esc lo cierra (Radix) y si este listener
+  // también corriera, tiraría el panel entero.
   useEffect(() => {
-    if (!abierto || aCancelar !== null || aCopiarMatriz !== null) {
+    if (!abierto || aCancelar !== null || aCopiarMatriz !== null || confirmarSalida) {
       return;
     }
     function alTeclear(evento: KeyboardEvent): void {
       if (evento.key === 'Escape') {
-        alCerrar();
+        intentarCerrar();
       }
     }
     window.addEventListener('keydown', alTeclear);
     return () => window.removeEventListener('keydown', alTeclear);
-  }, [abierto, alCerrar, aCancelar, aCopiarMatriz]);
+  }, [abierto, intentarCerrar, aCancelar, aCopiarMatriz, confirmarSalida]);
 
   if (!abierto || idOrden === null) {
     return null;
   }
+
+  // El pie con el botón único sólo aparece donde hay algo que guardar (con permiso y no cancelada).
+  const puedeGuardar = orden !== undefined && puedeAdministrar && orden.estado !== 'cancelada';
 
   return (
     <div
@@ -148,7 +189,7 @@ export function DialogoOrden({
       aria-label={`Orden ${String(orden?.folio ?? idOrden)}`}
       data-testid="dialogo-orden"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) alCerrar();
+        if (e.target === e.currentTarget) intentarCerrar();
       }}
     >
       <div className="flex w-full max-w-4xl flex-col overflow-hidden bg-background shadow-xl sm:rounded-xl">
@@ -186,7 +227,7 @@ export function DialogoOrden({
           <Button
             variant="ghost"
             size="icon"
-            onClick={alCerrar}
+            onClick={intentarCerrar}
             aria-label="Cerrar (Esc)"
             data-testid="dialogo-orden-cerrar"
           >
@@ -208,21 +249,58 @@ export function DialogoOrden({
           ) : orden === undefined ? (
             <p className="text-sm text-muted-foreground">Sin detalle.</p>
           ) : (
-            <DetalleOrden
-              orden={orden}
-              puedeAdministrar={puedeAdministrar}
-              puedeRutaVer={puedeRutaVer}
-              puedeProgramar={puedeProgramar}
-              puedeCapturarRc={puedeCapturarRc}
-              puedeVerDesarrollo={puedeVerDesarrollo}
-              puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
-              verImportes={verImportes}
-              alCopiarMatriz={() => setACopiarMatriz(orden)}
-              alVerRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}`)}
-              alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}/programar`)}
-            />
+            <ProveedorGuardadoOrden value={valorContexto}>
+              <DetalleOrden
+                orden={orden}
+                puedeAdministrar={puedeAdministrar}
+                puedeRutaVer={puedeRutaVer}
+                puedeProgramar={puedeProgramar}
+                puedeCapturarRc={puedeCapturarRc}
+                puedeVerDesarrollo={puedeVerDesarrollo}
+                puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
+                verImportes={verImportes}
+                alCopiarMatriz={() => setACopiarMatriz(orden)}
+                alVerRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}`)}
+                alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}/programar`)}
+              />
+            </ProveedorGuardadoOrden>
           )}
         </div>
+
+        {/* ── Pie: UN SOLO botón de guardar para TODO el diálogo (Daniel 24-jul-2026) ── */}
+        {puedeGuardar ? (
+          <footer
+            className="flex shrink-0 items-center justify-end gap-3 border-t px-4 py-3"
+            data-testid="pie-orden"
+          >
+            <p className="mr-auto text-xs text-muted-foreground" data-testid="aviso-cambios-orden">
+              {hayCambios ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={intentarCerrar}
+              disabled={guardando}
+            >
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void guardar()}
+              disabled={!hayCambios || guardando}
+              data-testid="guardar-orden"
+            >
+              {guardando ? (
+                <Loader2Icon className="animate-spin" aria-hidden />
+              ) : (
+                <SaveIcon aria-hidden />
+              )}
+              Guardar
+            </Button>
+          </footer>
+        ) : null}
       </div>
 
       {/* Los diálogos con búsqueda interna se montan SOLO al abrirse. */}
@@ -245,6 +323,38 @@ export function DialogoOrden({
           }
         }}
         orden={aCancelar ?? undefined}
+      />
+
+      {/* Guardia de cierre con cambios sin guardar (Daniel 24-jul-2026). */}
+      <DialogoConfirmacion
+        abierto={confirmarSalida}
+        alCambiarAbierto={(abiertoNuevo) => {
+          if (!abiertoNuevo) {
+            setConfirmarSalida(false);
+          }
+        }}
+        titulo="Cambios sin guardar"
+        descripcion="Tienes cambios sin guardar en esta orden. ¿Quieres guardarlos antes de salir?"
+        textoCancelar="Cancelar"
+        accionSecundaria={{
+          texto: 'Salir sin guardar',
+          testid: 'salir-sin-guardar-orden',
+          alAccionar: () => {
+            setConfirmarSalida(false);
+            alCerrar();
+          },
+        }}
+        textoConfirmar="Guardar y salir"
+        procesando={guardando}
+        alConfirmar={() => {
+          void guardar().then((ok) => {
+            if (ok) {
+              setConfirmarSalida(false);
+              alCerrar();
+            }
+            // Si falló, el diálogo de confirmación se queda: el usuario decide qué hacer.
+          });
+        }}
       />
     </div>
   );

@@ -191,7 +191,11 @@ export async function impresoMargenes(
   deps: DepsImpresoMargenes = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoMargenes(sesion, query, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('costos-margenes', datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('costos-margenes', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+  };
 }
 
 /** Reexporta el tipo del filtro para la ruta (comodidad). */

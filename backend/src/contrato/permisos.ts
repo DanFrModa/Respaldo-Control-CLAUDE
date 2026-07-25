@@ -83,7 +83,7 @@ export const MODULOS_PERMISO = {
   // `telas` ya existe arriba (Inventario de telas): la administración del CATÁLOGO de
   // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` y `bordados` son nuevos.
   avios: 'Avíos',
-  bordados: 'Bordados y estampados',
+  bordados: 'Arte (bordado y estampado)',
   // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
   modelos: 'Modelos',
   // ── Producción / WIP (Módulo 4, F3) ────────────────────────────────────────
@@ -174,7 +174,7 @@ export const CATALOGO_PERMISOS = [
   {
     clave: 'ordenes.habilitacion',
     modulo: 'ordenes',
-    descripcion: 'Capturar o modificar la habilitación de la orden',
+    descripcion: 'Capturar o modificar los avíos de la orden',
     origen: {
       idAcceso: 31,
       formulario: 'OrdenVer',
@@ -876,13 +876,13 @@ export const CATALOGO_PERMISOS = [
   {
     clave: 'bordados.ver',
     modulo: 'bordados',
-    descripcion: 'Consultar el catálogo de bordados y estampados',
+    descripcion: 'Consultar el catálogo de arte (bordado y estampado)',
   },
   {
     clave: 'bordados.administrar',
     modulo: 'bordados',
     descripcion:
-      'Administrar el catálogo de bordados y estampados, incluida su foto (alta, edición, desactivación)',
+      'Administrar el catálogo de arte (bordado y estampado), incluida su foto (alta, edición, desactivación)',
   },
 
   // ── Modelos (Módulo 2, F1-E4, global — ADR-0007; doc 01-Modelos) ────────────
@@ -899,7 +899,7 @@ export const CATALOGO_PERMISOS = [
     clave: 'modelos.administrar',
     modulo: 'modelos',
     descripcion:
-      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
+      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación)',
   },
 
   // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────

@@ -859,9 +859,7 @@ export async function restaurarLineaBom(
       throw new ErrorNoEncontrado('PrecostoLinea', idLinea);
     }
     if (!(ORIGENES_BOM as readonly string[]).includes(linea.origen)) {
-      throw new ErrorConflicto(
-        'Sólo se restauran renglones que vienen del BOM (tela/avío/bordado).',
-      );
+      throw new ErrorConflicto('Sólo se restauran renglones que vienen del BOM (tela/avío/arte).');
     }
 
     const desarrollo = await tx.desarrollo.findUnique({

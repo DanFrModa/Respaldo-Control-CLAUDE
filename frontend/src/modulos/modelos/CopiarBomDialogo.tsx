@@ -76,7 +76,7 @@ export function CopiarBomDialogo({
         <DialogHeader>
           <DialogTitle>Copiar receta de otro modelo</DialogTitle>
           <DialogDescription>
-            Copia la receta (telas, avíos y bordados) de otro modelo a éste.
+            Copia la receta (telas, avíos y arte) de otro modelo a éste.
           </DialogDescription>
         </DialogHeader>
 

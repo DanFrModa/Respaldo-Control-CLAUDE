@@ -110,8 +110,8 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
   if (existente !== null) {
     throw new ErrorConflicto(
       existente.activo
-        ? `Ya existe un bordado llamado "${nombre}".`
-        : `Ya existe un bordado llamado "${nombre}" (está desactivado; puedes reactivarlo).`,
+        ? `Ya existe un arte llamado "${nombre}".`
+        : `Ya existe un arte llamado "${nombre}" (está desactivado; puedes reactivarlo).`,
     );
   }
 }
@@ -120,7 +120,7 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
 async function exigirBordado(tx: Tx, id: number): Promise<Bordado> {
   const bordado = await tx.bordado.findUnique({ where: { id } });
   if (bordado === null) {
-    throw new ErrorNoEncontrado('Bordado', id);
+    throw new ErrorNoEncontrado('Arte', id);
   }
   return bordado;
 }
@@ -168,7 +168,7 @@ export async function crearBordado(
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto(`Ya existe un bordado llamado "${datos.nombre}".`, {
+      throw new ErrorConflicto(`Ya existe un arte llamado "${datos.nombre}".`, {
         causa: error,
       });
     }
@@ -302,7 +302,7 @@ export async function actualizarBordado(
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto('Ya existe un bordado con ese nombre.', { causa: error });
+      throw new ErrorConflicto('Ya existe un arte con ese nombre.', { causa: error });
     }
     throw error;
   }
@@ -321,7 +321,7 @@ export async function desactivarBordado(
   return enTransaccion(async (tx) => {
     const actual = await exigirBordado(tx, id);
     if (!actual.activo) {
-      throw new ErrorConflicto(`El bordado "${actual.nombre}" ya está desactivado.`);
+      throw new ErrorConflicto(`El arte "${actual.nombre}" ya está desactivado.`);
     }
     return actualizarBordado(sesion, { id, activo: false }, { tx });
   }, bd);
@@ -337,7 +337,7 @@ export async function reactivarBordado(
   return enTransaccion(async (tx) => {
     const actual = await exigirBordado(tx, id);
     if (actual.activo) {
-      throw new ErrorConflicto(`El bordado "${actual.nombre}" ya está activo.`);
+      throw new ErrorConflicto(`El arte "${actual.nombre}" ya está activo.`);
     }
     return actualizarBordado(sesion, { id, activo: true }, { tx });
   }, bd);
@@ -352,7 +352,7 @@ export async function obtenerBordado(
   verificarPermiso(sesion, 'bordados.ver');
   const bordado = await clienteLectura(bd).bordado.findUnique({ where: { id } });
   if (bordado === null) {
-    throw new ErrorNoEncontrado('Bordado', id);
+    throw new ErrorNoEncontrado('Arte', id);
   }
   return bordado;
 }
@@ -541,7 +541,7 @@ export async function urlFoto(
     },
   });
   if (bordado === null) {
-    throw new ErrorNoEncontrado('Bordado', idBordado);
+    throw new ErrorNoEncontrado('Arte', idBordado);
   }
 
   const foto = bordado.archivoFoto;
@@ -581,7 +581,7 @@ export async function quitarFoto(
   return enTransaccion(async (tx) => {
     const actual = await exigirBordado(tx, idBordado);
     if (actual.idArchivoFoto === null) {
-      throw new ErrorConflicto(`El bordado "${actual.nombre}" no tiene foto.`);
+      throw new ErrorConflicto(`El arte "${actual.nombre}" no tiene foto.`);
     }
 
     // Borrar el Archivo dispara SetNull en idArchivoFoto (FK), dejándolo en null;

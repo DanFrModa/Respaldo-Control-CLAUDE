@@ -13,6 +13,7 @@
  * script de generación (`scripts/generar-openapi.ts`).
  */
 import { jsonSchemaTransform } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import type { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
 
 /** Nombre de la cookie de sesión de better-auth (security scheme del contrato). */
@@ -27,6 +28,70 @@ export const RUTA_DOCS = '/api/docs';
  * cliente de E4) sepan que necesitan estar autenticadas.
  */
 export const SEGURIDAD_SESION = [{ cookieSesion: [] }];
+
+/**
+ * Esquema de una respuesta BINARIA (imagen, PDF…) para el contrato.
+ *
+ * En Fastify, `reply.send(buffer)` NO pasa por el serializador (los Buffer viajan tal cual), así que
+ * declarar la respuesta 200 aquí **no cambia nada en tiempo de ejecución**: solo hace que el
+ * endpoint quede DOCUMENTADO en el OpenAPI (antes las rutas binarias solo declaraban sus errores y
+ * el 200 quedaba invisible para quien lee el contrato).
+ *
+ * `@fastify/swagger` envuelve toda respuesta en `application/json`; los tipos de medio REALES se
+ * declaran en `mediaTypes` y {@link corregirMediaTypesBinarios} los corrige al volcar el contrato.
+ */
+export function esquemaRespuestaBinaria(descripcion: string, mediaTypes: string[]) {
+  // `z.custom<Buffer>` (y no `z.string()`) para que `reply.send(buffer)` tipe sin castear: el
+  // `.meta()` fija a mano el JSON Schema equivalente (`string` con `format: binary`).
+  return z
+    .custom<Buffer>((valor) => Buffer.isBuffer(valor))
+    .meta({ type: 'string', format: 'binary', mediaTypes, description: descripcion });
+}
+
+/** Forma mínima del documento OpenAPI que recorre {@link corregirMediaTypesBinarios}. */
+interface DocumentoOpenApi {
+  paths?: Record<
+    string,
+    Record<
+      string,
+      {
+        responses?: Record<
+          string,
+          { content?: Record<string, { schema?: { mediaTypes?: unknown } }> }
+        >;
+      }
+    >
+  >;
+}
+
+/**
+ * Corrige, EN EL DOCUMENTO YA GENERADO, el tipo de medio de las respuestas binarias: donde
+ * {@link esquemaRespuestaBinaria} dejó `mediaTypes`, cambia el `application/json` que pone
+ * `@fastify/swagger` por los tipos reales (`image/png`, `image/jpeg`…) y quita la marca auxiliar.
+ *
+ * Se aplica al volcar `openapi.json` (lo que consume el cliente del frontend y lo que lee un
+ * humano). La Swagger UI que sirve la app en vivo llama a `app.swagger()` por su cuenta y ahí sigue
+ * mostrando `application/json`: es cosmético y no vale acoplar el pipeline de la app por eso.
+ */
+export function corregirMediaTypesBinarios(documento: unknown): void {
+  const paths = (documento as DocumentoOpenApi).paths ?? {};
+  for (const operaciones of Object.values(paths)) {
+    for (const operacion of Object.values(operaciones)) {
+      for (const respuesta of Object.values(operacion.responses ?? {})) {
+        const json = respuesta.content?.['application/json'];
+        const tipos = json?.schema?.mediaTypes;
+        if (json === undefined || respuesta.content === undefined || !Array.isArray(tipos)) {
+          continue;
+        }
+        delete json.schema?.mediaTypes;
+        delete respuesta.content['application/json'];
+        for (const tipo of tipos as string[]) {
+          respuesta.content[tipo] = json;
+        }
+      }
+    }
+  }
+}
 
 /** Opciones de `@fastify/swagger` (metadatos + transform Zod→JSON Schema). */
 export const opcionesSwagger: FastifyDynamicSwaggerOptions = {

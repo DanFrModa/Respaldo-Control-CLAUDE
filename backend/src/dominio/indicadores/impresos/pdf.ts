@@ -138,7 +138,13 @@ export async function impresoKpisRc(
   const obtener = deps.kpisRutaCritica ?? kpisRutaCritica;
   const datos: KpisRc = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
-  return { buffer: await renderizarPdfEnWorker('kpis-rc', { pagador, datos }) };
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-rc',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
 }
 
 /** Payload YA resuelto del tablero de RC (para el render en worker). */
@@ -233,7 +239,13 @@ export async function impresoKpisCalidad(
   const obtener = deps.kpisCalidadMaquilero ?? kpisCalidadMaquilero;
   const datos: KpisCalidad = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
-  return { buffer: await renderizarPdfEnWorker('kpis-calidad', { pagador, datos }) };
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-calidad',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
 }
 
 /** Payload YA resuelto del tablero de calidad por maquilero (para el render en worker). */
@@ -333,7 +345,13 @@ export async function impresoKpisWip(
   }
   const datos: KpisWip = { ...primera, datos: filas.slice(0, MAX_FILAS_PDF) };
   const pagador = await razonSocialEmpresa(sesion, bd);
-  return { buffer: await renderizarPdfEnWorker('kpis-wip', { pagador, datos }) };
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-wip',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
 }
 
 /** Payload YA resuelto del tablero WIP analítico (para el render en worker). */

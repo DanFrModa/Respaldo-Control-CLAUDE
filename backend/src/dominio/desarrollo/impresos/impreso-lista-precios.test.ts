@@ -85,7 +85,7 @@ describe('impresoListaPrecios (PDF)', () => {
     expect(folio).toBe(7);
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20_000); // orquestador → render en worker (arranque en frío del pool bajo carga de tests).
+  });
 });
 
 describe('excelListaPrecios (Excel)', () => {
@@ -105,5 +105,5 @@ describe('excelListaPrecios (Excel)', () => {
     expect(hoja.getCell('A3').value).toBe('MOD-B');
     expect(Number(hoja.getCell('D3').value)).toBe(100);
     expect(hoja.getCell('E3').value).toBe('Calculado');
-  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
+  });
 });

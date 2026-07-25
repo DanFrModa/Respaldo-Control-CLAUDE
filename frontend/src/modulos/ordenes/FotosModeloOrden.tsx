@@ -1,4 +1,4 @@
-import { Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { Loader2Icon, PlusIcon, StarIcon, Trash2Icon } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -24,6 +24,8 @@ interface FotoTira {
   /** `idArchivo` del adjunto (solo las de la ORDEN se pueden quitar desde aquí). */
   idArchivo?: string;
   nombreArchivo: string;
+  /** ¿Es la foto PRINCIPAL del modelo (la primera de su galería)? Lleva distintivo y va al frente. */
+  principal?: boolean;
 }
 
 /**
@@ -33,6 +35,9 @@ interface FotoTira {
  * visor NAVEGABLE (anterior/siguiente entre todas). Con `ordenes.administrar` aparece un tile "+"
  * para SUBIR una foto a la orden (presigned a R2, sin backend nuevo) y un botón para QUITAR las que
  * se subieron a la orden (nunca las del modelo). Compacto: solo miniaturas + visor.
+ *
+ * La FOTO PRINCIPAL del modelo (la primera de su galería, jul-2026 a petición de Daniel) abre la
+ * tira y lleva una estrella. Marcarla/cambiarla se hace en la ficha del modelo, no aquí.
  *
  * `idOrden`/`puedeAdministrar` son opcionales: sin `idOrden` (p. ej. desde el diálogo de captura) se
  * comporta como antes, solo con las fotos del modelo. Si no hay ninguna foto y no se puede
@@ -60,13 +65,15 @@ export function FotosModeloOrden({
 
   const puedeSubir = puedeAdministrar && idOrden !== undefined;
 
-  // Tira COMBINADA: primero las fotos del modelo, luego las imágenes subidas a la orden.
+  // Tira COMBINADA: primero las fotos del modelo (la PRINCIPAL al frente: el API las devuelve
+  // ordenadas y la principal es la primera), luego las imágenes subidas a la orden.
   const fotos = useMemo<FotoTira[]>(() => {
-    const delModelo: FotoTira[] = (fotosModelo.data ?? []).map((f) => ({
+    const delModelo: FotoTira[] = (fotosModelo.data ?? []).map((f, indice) => ({
       clave: `modelo-${f.idFoto}`,
       url: f.urlDescarga,
       origen: 'modelo',
       nombreArchivo: `${codigoModelo}.jpg`,
+      ...(indice === 0 ? { principal: true } : {}),
     }));
     const deLaOrden: FotoTira[] = (adjuntos.data ?? [])
       .filter((a) => a.tipoMime.startsWith('image/'))
@@ -140,10 +147,26 @@ export function FotosModeloOrden({
             >
               <img
                 src={foto.url}
-                alt={`Foto de ${codigoModelo}`}
+                alt={
+                  foto.principal === true
+                    ? `Foto principal de ${codigoModelo}`
+                    : `Foto de ${codigoModelo}`
+                }
                 className="size-full object-cover"
               />
             </button>
+            {/* Distintivo de la foto PRINCIPAL del modelo (la primera de su galería). En la tira
+                solo cabe la estrella; el rótulo va en el `sr-only` (el `<span>` es
+                `pointer-events-none`, así que un `title` sería letra muerta: no se pondría). */}
+            {foto.principal === true ? (
+              <span
+                className="pointer-events-none absolute bottom-0 left-0 flex items-center gap-0.5 rounded-tr-md rounded-bl-lg bg-primary/90 px-1 text-[9px] font-semibold text-primary-foreground"
+                data-testid="foto-modelo-orden-principal"
+              >
+                <StarIcon className="size-2.5 fill-current" aria-hidden />
+                <span className="sr-only">Foto principal del modelo</span>
+              </span>
+            ) : null}
             {/* Solo las fotos SUBIDAS a la orden se pueden quitar desde aquí (las del modelo no). */}
             {puedeAdministrar && foto.origen === 'orden' ? (
               <button
