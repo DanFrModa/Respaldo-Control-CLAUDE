@@ -705,3 +705,186 @@ sigue en su lugar y basta reintentar.
 - **Dos marcados a la vez no se pisan:** el reordenamiento toma un `pg_advisory_xact_lock` por
   modelo (el mismo idioma que ya usa el motor de terceros), así el segundo espera y recalcula sobre
   el orden ya actualizado en vez de dejar dos "primeros".
+
+---
+
+## 2026-07-26 — La orden se pone **COMPLETA sola** (y dice qué le falta) + 3 remates
+
+Daniel: *"El estado de la orden (completa, incompleta) no sé en base a qué existe. En CONTROL viejo
+existía, pero está en desuso. Acá podríamos definirla como completa cuando ya tenga los avíos, los
+artes. De manera automática se pone como completa."*
+
+### La regla, en lenguaje de negocio
+
+Una orden está **COMPLETA** cuando cumple **las tres cosas que aplican**:
+
+| Requisito | Qué se revisa | Cuándo bloquea |
+| --- | --- | --- |
+| **Tallas** | La orden tiene su matriz color × talla capturada (al menos un renglón). | Siempre. |
+| **Avíos** | El **modelo** de la orden tiene su receta de avíos de producción (al menos un avío marcado "se considera al producir"). | Siempre. |
+| **Arte** | El modelo tiene su arte (bordado/estampado) capturado en la receta. | **Solo si el modelo lleva arte** — lo dice la casilla nueva "Lleva arte" de la ficha del modelo, que viene **marcada por default**. |
+
+Todo es **AUTOMÁTICO**: nadie marca nada. En el momento en que la orden cumple, pasa a `completa`
+sola. La **fecha en que quedó completa por primera vez** se guarda una sola vez y **nunca se borra**
+(es el dato histórico, el viejo `FechaDet`). Una orden **CANCELADA** siempre gana: la regla no la
+toca.
+
+**¿Y si deja de cumplir?** Aquí se puso el freno a propósito, porque "decir la verdad" no puede
+costarle a la operación una orden en curso. Una orden solo **regresa** de `completa` a `capturada`
+cuando se dan las dos cosas: (1) se editó **la matriz de ESA orden** y (2) la orden **todavía no
+tiene producción** (ningún corte ni envío vivo). En cualquier otro caso el estado se **conserva** y
+lo que cambia es el aviso de la pantalla:
+
+- **Editar la receta de un modelo NUNCA degrada sus órdenes.** Quitarle los avíos a un modelo es
+  una operación de catálogo de todos los días; si degradara, de un clic se "des-completarían" cientos
+  de órdenes viejas —incluidas las entregadas hace años— y las que están a medio producir. Al revés
+  sí: **capturar** la receta completa sola a las órdenes de ese modelo a las que solo les faltaba eso.
+- **Una orden ya cortada o enviada a maquila no se degrada** aunque le vacíen la matriz. Sigue
+  `completa` y la pantalla avisa "Falta: tallas".
+
+### La casilla "Lleva arte" (lo que decidió Daniel)
+
+Daniel, textual: *"por default sí lleva. A menos que la marques como que no lleva. Y de esa manera
+si no meten la información del arte, o no desmarcan la casilla, está como incompleto. Es decir,
+siempre hay que atender ese tema."*
+
+Así quedó, en la **ficha del modelo** (alta y edición), sección *Desarrollo*:
+
+- **Casilla "Lleva arte (bordado o estampado)", MARCADA por default.** Debajo dice: *"Si la prenda
+  no lleva bordado ni estampado, desmárcala; si no, la orden quedará incompleta hasta capturar el
+  arte."*
+- **Marcada + arte capturado en la receta** → requisito cumplido.
+- **Marcada + receta sin arte** → las órdenes de ese modelo dicen **"Falta: arte"** y no se
+  completan. Es el "siempre hay que atender ese tema".
+- **Desmarcada** (prenda lisa) → el arte no aplica y no estorba.
+- En el detalle del modelo se ve siempre: *Lleva arte* · *Lleva arte — falta capturarlo* · *No lleva
+  arte*.
+
+**Ojo con el efecto en lo que ya existe (es intencional):** la casilla nace marcada **también en los
+miles de modelos que vinieron de Access**, así que **muchas órdenes vivas van a aparecer como
+incompletas** hasta que se capture su arte o se desmarque la casilla. Eso es exactamente lo que
+Daniel pidió. Por eso importa lo del siguiente apartado: **incompleta no impide trabajar la orden**.
+Dos formas de atenderlo: capturar el arte en la receta del modelo, o desmarcar la casilla en los
+modelos de prenda lisa (en ambos casos las órdenes se completan solas, sin tocarlas una por una).
+
+### Dónde se ve
+
+- **Órdenes de producción** (`/produccion/ordenes`): junto al chip de avance de cada renglón —y en
+  el encabezado del panel de detalle— aparece un **"Falta: avíos"** / **"Falta: tallas"** cuando algo
+  impide que la orden esté completa. Es la respuesta a *"no sé en base a qué existe el estado"*: la
+  pantalla lo dice. Si la orden ya cumple, no se pinta nada (no estorba). El layout aprobado no
+  cambió: no hay columna nueva, el texto va debajo del chip que ya estaba.
+- La consulta **"Órdenes incompletas"** sigue funcionando igual, pero ahora una incompleta **puede
+  tener matriz** (le puede faltar la receta de avíos), así que ya muestra sus piezas en vez de 0.
+
+### Qué pasa con el HISTÓRICO (el día del deploy)
+
+Aquí está el cambio que más se va a notar, y es **a propósito**: si el histórico se quedara como
+estaba, el backlog que Daniel pidió atender —*"si no meten la información del arte… está como
+incompleto; siempre hay que atender ese tema"*— sería **invisible**, porque la pantalla "Órdenes
+incompletas" se guía por el estado guardado de cada orden. El semáforo **es** el entregable, así que
+el histórico se pone al día **una sola vez** al desplegar:
+
+- Corre sola una **puesta al día** (migración de datos, sin que nadie ejecute nada) que baja a
+  **incompleta** las órdenes que hoy dicen "completa" pero **no cumplen** la regla: sin matriz, o su
+  modelo sin receta de avíos, o el modelo lleva arte y no lo tiene capturado.
+- **No toca** las órdenes que ya están **en producción** (con corte o envío a maquila vivos): esas
+  conservan su "completa" pase lo que pase. Tampoco toca las **canceladas**.
+- **No borra** la fecha en que la orden quedó completa por primera vez (el dato histórico se
+  conserva; por eso puede haber órdenes "incompletas" que sí traen esa fecha).
+- Cada orden que cambia **deja su renglón en la bitácora**, así que se puede ver qué se movió y por
+  qué.
+
+**Qué va a ver Daniel:** muchas OP viejas aparecerán como **incompleta**, casi todas con
+**"Falta: arte"** (porque la casilla "Lleva arte" nace marcada en todos los modelos migrados) y
+algunas con "Falta: avíos". Se resuelven **por modelo, no orden por orden**: capturar el arte en la
+receta, o desmarcar la casilla si la prenda es lisa — en ambos casos las órdenes de ese modelo se
+completan solas. Y mientras tanto **se puede seguir trabajando con ellas con toda normalidad**: el
+estado no impide cortar, enviar, recibir ni entregar (ver el apartado siguiente).
+
+De aquí en adelante no hay más recálculos masivos: cada orden se re-evalúa cuando nace, cuando se
+toca su matriz o cuando se cambia el catálogo de su modelo (y en ese último caso, solo para
+completarla).
+
+### Ojo: el estado NO es una llave para operar (crítico con lo anterior)
+
+Aparejado con lo anterior se quitó un filtro que sí habría parado la producción: el buscador de
+órdenes que usan **siete** pantallas (captura de corte, envío a maquila, recibo de maquila, entrega
+a cliente, salida de tela, nota de salida de tela y alta de auditoría) pedía **solo órdenes
+completas**. Con el estado automático, una orden de un modelo sin receta de avíos —muy común en lo
+que vino de Access— habría **desaparecido de esos siete buscadores** sin más explicación que un "no
+hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora esos buscadores muestran
+**todas las órdenes menos las canceladas**, que es lo único que el sistema rechaza de verdad. El
+`completa` es un **semáforo de captura**, no un permiso para trabajar.
+
+### Los 3 remates que salieron del día
+
+1. **El impreso de la orden ya dice "Avíos"** donde decía *"Habilitación"* (el renombrado de
+   vocabulario del 24-jul no había podido tocar ese archivo). La sección de arte ya decía "Arte";
+   el subtipo por renglón (Bordado / Estampado) se conserva.
+2. **Los impresos ya no se quedan cacheados en el navegador.** Pasó de verdad: tras un despliegue,
+   Daniel siguió viendo el PDF **viejo** media hora (solo en incógnito salía el nuevo). Ahora
+   **todos** los PDF y todos los Excel del sistema salen con `Cache-Control: no-store` — está puesto
+   en un punto **común** (no ruta por ruta), así que también aplica a los impresos que se agreguen
+   después. El **logo** sigue cacheándose como antes (es un asset, no un documento).
+3. **Al subir el logo se revisa el PNG.** Dos variantes de PNG que el generador de PDF pinta mal —los
+   de **16 bits** y los de **color indexado con transparencia**— ahora se **rechazan al subirlos**,
+   con un mensaje que dice qué hacer (*"guárdalo como PNG de 8 bits o JPG"*), en vez de dejar que el
+   problema aparezca semanas después en un documento ya enviado. Si R2 no responde en ese momento,
+   **no** se bloquea la subida (perder la marca sería peor que un color corrido).
+
+### Nota de despliegue (para Gabriel)
+
+1. **Hay DOS migraciones**, las dos automáticas (se aplican solas al desplegar, sin pasos manuales):
+   - `20260726120000_modelo_lleva_arte` — agrega la columna `modelos.lleva_arte` con default `true`.
+   - `20260726130000_recalculo_estado_ordenes` — **puesta al día del histórico** (solo datos, no
+     cambia la estructura): baja a "incompleta" las órdenes que ya no cumplen la regla, **saltándose
+     las que están en producción** y **sin borrar** la fecha de completado. Deja bitácora por orden.
+2. **NO hay permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **NO hay que correr ningún script a mano**, pero **sí hay que avisarle a Daniel** que va a ver
+   muchas OP históricas como **incompleta** con "Falta: arte": es el backlog que él pidió que se
+   atienda, no un error. Las que ya están cortadas o en maquila no cambian. Se resuelven por modelo
+   (capturar el arte o desmarcar "Lleva arte"), no orden por orden.
+4. Al desplegar, conviene refrescar una vez con **Ctrl+Shift+R**: el arreglo de la caché de PDF
+   aplica a los impresos **nuevos**; el PDF viejo que ya esté guardado en un navegador se suelta con
+   esa recarga (después ya no vuelve a pasar).
+5. **Cuando se borre la base y se vuelva a cargar** (es lo que Daniel dijo que va a pasar: *"todo lo
+   que hay se va a borrar y meter nueva información"*), la puesta al día del punto 1 **no se repite
+   sola** — corre una sola vez. Al terminar esa carga hay que ejecutar, una vez:
+   `npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts` (desde `backend/`). Aplica la
+   misma regla y además hace las dos direcciones (marca las incompletas **y** completa las que ya
+   cumplían); es re-ejecutable y deja un resumen de cuántas órdenes movió — con `--dry-run` primero
+   se puede ver el impacto sin escribir nada. Está en el runbook (`backend/migracion/README.md`) y
+   en la nota de F10 de `HOJA-DE-RUTA.md`.
+
+### Archivos tocados
+
+- **Backend (nuevos):** `prisma/migrations/20260726120000_modelo_lleva_arte/migration.sql` ·
+  `prisma/migrations/20260726130000_recalculo_estado_ordenes/migration.sql` (puesta al día) ·
+  `migracion/realinear-estado-ordenes.ts` (**el mismo realineado, re-ejecutable**, para después de
+  cada carga de datos) ·
+  `src/dominio/produccion/requisitos-orden.ts` (la regla, ÚNICA fuente) ·
+  `src/comun/png.ts` (lectura del IHDR) · `src/api/cache-documentos.ts` (hook `no-store`).
+- **Backend (modificados):** `src/dominio/produccion/ordenes.ts` (los 3 puntos usan la regla) ·
+  `src/dominio/modelos/bom-modelo.ts` (capturar avíos/arte COMPLETA las órdenes del modelo, en la
+  misma transacción; nunca las degrada) · `src/dominio/produccion/centro-comando.ts` (`faltantes`) ·
+  `src/comun/auditoria.ts` (`registrarBitacoraLote`, para dejar bitácora por orden) ·
+  `src/dominio/produccion/consultas.ts` (las incompletas ya suman piezas) ·
+  `src/dominio/admin/empresas.ts` (inspección del PNG al confirmar el logo) · `src/app.ts` ·
+  `prisma/schema.prisma` + `src/dominio/modelos/modelos.ts` + `src/api/modelos/modelos.rutas.ts`
+  (la bandera `llevaArte`, y desmarcarla recalcula las órdenes del modelo) ·
+  `src/contrato/esquemas/{orden,orden-centro}.ts` + `src/contrato/index.ts` · `openapi.json`.
+- **Impreso:** `src/dominio/produccion/impresos/impreso-orden.ts` ("Avíos").
+- **Frontend:** `src/modulos/ordenes/CentroOrdenesPagina.tsx` y `DialogoOrden.tsx` (el
+  "Falta: …") · `src/modulos/ordenes/requisitos.ts` (**nuevo**, la frase compartida) ·
+  `src/modulos/modelos/DialogoModelo.tsx` + `esquemas.ts` + `ModelosPagina.tsx` (la casilla
+  "Lleva arte" y su aviso en la ficha) ·
+  `src/modulos/produccion/SelectorOrden.tsx` (fuera el filtro por `completa`) ·
+  `openapi.json` + `src/api/esquema.gen.ts` regenerados.
+- **Pruebas:** `requisitos-orden.test.ts` (la regla completa, incluido *no aplica*, las
+  transiciones y **cuándo se permite degradar**) · `ordenes.int.test.ts` (el BOM solo completa; una
+  orden con corte vivo no se degrada; cancelada gana; la fecha no se borra — CI) ·
+  `SelectorOrden.test.tsx` (**nuevo**: la regresión de las 7 pantallas no vuelve) ·
+  `png.test.ts` + `empresas-logo.test.ts` (los PNG malos) · `cache-documentos.test.ts` +
+  `auditorias.int.test.ts` + `logo.rutas.test.ts` (no-store sí, logo no) ·
+  `CentroOrdenesPagina.test.tsx` / `DialogoOrden.test.tsx` (el "Falta: …").

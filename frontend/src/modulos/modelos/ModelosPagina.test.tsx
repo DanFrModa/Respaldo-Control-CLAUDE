@@ -122,6 +122,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idMaquileroCotizado: null,
     maquileroCotizado: null,
     secuenciaEstampado: 'antes',
+    llevaArte: true,
     telaPrincipal: null,
     stockPt: null,
     costoActual: null,
@@ -212,6 +213,33 @@ describe('<ModelosPagina>', () => {
     expect(within(detalle).getByText('$35.00')).toBeInTheDocument();
     // Sin fotos → placeholder NoFoto.
     expect(within(detalle).getByTestId('modelo-sin-fotos')).toBeInTheDocument();
+  });
+
+  // ── ¿Lleva arte? (Daniel 26-jul-2026) ──
+  it('la ficha avisa cuando el modelo LLEVA arte y aún no está capturado', () => {
+    const m = modelo(1, '501', true, { llevaArte: true });
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m))); // BOM sin arte
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(within(detalle).getByText('Lleva arte — falta capturarlo')).toBeInTheDocument();
+  });
+
+  it('la ficha dice "No lleva arte" cuando la casilla está desmarcada (prenda lisa)', () => {
+    const m = modelo(1, '501', true, { llevaArte: false });
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(within(detalle).getByText('No lleva arte')).toBeInTheDocument();
   });
 
   it('muestra las 3 pestañas del BOM y cambia de sección al hacer clic', async () => {

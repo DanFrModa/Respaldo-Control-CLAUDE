@@ -21,10 +21,19 @@
  * capturan). La empresa de la orden = la empresa del PEDIDO (no la de la sesión), para no
  * desligar la orden de su pedido; se exige que esa empresa sea la de la sesión activa (A9).
  *
- * ESTADO DERIVADO (no editable por el usuario): `capturada` al abrir; `completa` cuando se guarda
- * la PRIMERA matriz con líneas (paridad con `OrdenesDet.Form_BeforeInsert`, que sellaba
- * `Ordenes.FechaDet = Now()` al insertar el primer renglón del detalle) — ahí se sella
- * `fechaCompletada` y NO se re-sella después; `cancelada` por `cancelarOrden`.
+ * ESTADO AUTOMÁTICO (no editable por el usuario; Daniel 26-jul-2026): la orden pasa sola a
+ * `completa` cuando cumple sus REQUISITOS —**tallas + avíos, y arte si aplica**—. La regla vive
+ * ENTERA en `requisitos-orden.ts` (función pura `requisitosOrden` + `recalcularEstadoOrden`), y
+ * este módulo la invoca en los tres puntos donde la orden cambia: alta, guardar matriz y copiar
+ * matriz. `fechaCompletada` se sella la PRIMERA vez que se completa y NUNCA se borra (paridad con
+ * `Ordenes.FechaDet = Now()` de v1). `cancelada` (por `cancelarOrden`) SIEMPRE gana.
+ *   DES-COMPLETAR es la excepción, no la regla: una orden solo vuelve de `completa` a `capturada`
+ * al editar LA MATRIZ DE ESA ORDEN y siempre que NO tenga actividad de producción viva (corte o
+ * envío sin cancelar). Los cambios del BOM del MODELO (`modelos/bom-modelo.ts`) SOLO pueden
+ * COMPLETAR órdenes de ese modelo, nunca degradarlas: editar un catálogo no puede sacar de los
+ * tableros a lo que ya se está produciendo ni degradar el histórico.
+ *   El estado es un SEMÁFORO DE CAPTURA, no una llave para operar: ninguna pantalla exige
+ * `completa` para cortar/enviar/recibir/entregar (lo único que bloquea es `cancelada`).
  *
  * UPC: ELIMINADO. Los códigos de barra de orden ya no se usan y la columna `Orden.upc` fue
  * borrada del modelo (decisión Gabriel 16-jun-2026): no hay dato, endpoint ni generación.
@@ -120,6 +129,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN = 'orden';
@@ -154,7 +164,13 @@ export type ParametrosListarOrdenes = z.input<typeof esquemaListarOrdenesDominio
  * etiqueta/tela (para nombres en UI), su matriz (colores con sus tallas), referencias y comentarios.
  */
 type OrdenConDetalle = Orden & {
-  modelo: { codigo: string; descripcion: string | null };
+  modelo: {
+    codigo: string;
+    descripcion: string | null;
+    /** Bandera + conteos del BOM: insumos de la regla de "orden completa" (requisitos-orden.ts). */
+    llevaArte: boolean;
+    _count: { avios: number; bordados: number };
+  };
   cliente: { nombre: string };
   maquilero: { nombre: string } | null;
   etiquetaMarca: { nombre: string } | null;
@@ -174,7 +190,17 @@ type OrdenConDetalle = Orden & {
 
 /** `include` estándar para traer la orden con todo su detalle (ordenado de forma estable). */
 const incluirDetalle = {
-  modelo: { select: { codigo: true, descripcion: true } },
+  modelo: {
+    select: {
+      codigo: true,
+      descripcion: true,
+      // Insumos de la regla de "orden completa": la bandera "lleva arte" del modelo + los conteos
+      // de avíos de PRODUCCIÓN y artes del BOM. Van como `_count` (dos conteos en la misma
+      // consulta) para no traer las recetas enteras.
+      llevaArte: true,
+      _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+    },
+  },
   cliente: { select: { nombre: true } },
   maquilero: { select: { nombre: true } },
   etiquetaMarca: { select: { nombre: true } },
@@ -509,6 +535,13 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     obsMaquila: orden.obsMaquila,
     noCostear: orden.noCostear,
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
+    // Transparencia del estado (Daniel 26-jul-2026): la orden dice POR QUÉ está como está.
+    requisitos: requisitosOrden({
+      renglonesMatriz: orden.lineas.length,
+      aviosProduccion: orden.modelo._count.avios,
+      artesModelo: orden.modelo._count.bordados,
+      llevaArte: orden.modelo.llevaArte,
+    }),
     motivoCancelada: orden.motivoCancelada,
     ocCliente: orden.ocCliente,
     tallasV1: orden.tallasV1,
@@ -637,7 +670,8 @@ function resolverComposicion(args: {
  * (A2). AUTORRELLENO de modelo/cliente/empresa del renglón→pedido; el folio sale de la secuencia
  * atómica `"orden"` de la empresa del pedido (A3/A9). EXIGE el renglón de pedido y rechaza pedidos
  * cancelados/no-producir o modelos descontinuados. Permite N órdenes por renglón (resurtidos). Si
- * `lineas` viene, crea la matriz en la misma tx (deriva estado='completa'). Auditoría + bitácora.
+ * `lineas` viene, crea la matriz en la misma tx y el estado se deriva de la regla. Auditoría +
+ * bitácora.
  *
  * Rediseño R3: copia el SNAPSHOT `Pedido.ocCliente` → `Orden.ocCliente` (B3: la OC del cliente
  * queda amarrada a CADA OP que nace del pedido) y publica el evento outbox `orden-creada` (B5:
@@ -704,14 +738,15 @@ export async function crearOrden(
       },
     });
 
-    // Matriz inicial opcional: la sincroniza y, si trae líneas, deriva el estado completa.
+    // Matriz inicial opcional: la sincroniza y deja que la regla derive el estado (tallas +
+    // avíos, y arte si aplica — `requisitos-orden.ts`). Una orden que nace ya con matriz y con
+    // la receta de avíos de su modelo nace COMPLETA sola; si le falta algo, nace `capturada`.
     if (datos.lineas !== undefined && datos.lineas.length > 0) {
       await sincronizarMatriz(tx, sesion, orden.id, datos.lineas);
-      await tx.orden.update({
-        where: { id: orden.id },
-        data: { estado: 'completa', fechaCompletada: new Date(), ...datosModificacion(sesion) },
-      });
     }
+    // `tocarAuditoria: false`: la orden ACABA de nacer con su `datosCreacion`; si el recálculo no
+    // cambia nada, no tiene por qué emitir un UPDATE extra ni re-sellar `modificadoEn`.
+    await recalcularEstadoOrden(tx, sesion, orden, { tocarAuditoria: false });
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -830,9 +865,10 @@ export async function actualizarOrden(
 /**
  * Guarda la MATRIZ completa de una orden (colores × tallas) en UNA transacción (A2). Sincroniza
  * el set (agrega/edita/quita) conservando auditoría, valida color no repetido + tallas del
- * catálogo + cantidades ≥0. DERIVA `estado='completa'` + sella `fechaCompletada` en el PRIMER
- * guardado con líneas (paridad con `FechaDet` de v1); en guardados posteriores NO re-sella la
- * fecha. No se puede tocar la matriz de una orden cancelada. Bitácora A7 (entidad crítica).
+ * catálogo + cantidades ≥0. RECALCULA el estado con la regla única (`requisitos-orden.ts`): se
+ * completa sola si ya cumple todo, y si le vacían la matriz vuelve a `capturada`; `fechaCompletada`
+ * se sella la primera vez y no se re-sella ni se borra. No se puede tocar la matriz de una orden
+ * cancelada. Bitácora A7 (entidad crítica).
  */
 export async function guardarMatrizOrden(
   sesion: SesionUsuario,
@@ -851,14 +887,12 @@ export async function guardarMatrizOrden(
 
     const renglones = await sincronizarMatriz(tx, sesion, id, datos.lineas);
 
-    // Estado derivado: la PRIMERA vez que la orden tiene matriz con líneas se sella completa +
-    // fechaCompletada (paridad con OrdenesDet.Form_BeforeInsert sellando FechaDet). No se re-sella.
-    const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
-    if (renglones > 0 && actual.fechaCompletada === null) {
-      cambios.estado = 'completa';
-      cambios.fechaCompletada = new Date();
-    }
-    await tx.orden.update({ where: { id }, data: cambios });
+    // Estado derivado: lo decide la regla ÚNICA (`requisitos-orden.ts`). Si al guardar la matriz
+    // ya se cumple todo, la orden pasa sola a `completa` y se sella `fechaCompletada` la PRIMERA
+    // vez (paridad con `FechaDet` de v1, que nunca se borra). Este es el ÚNICO camino que puede
+    // DES-completar (vaciar la matriz), y aun así solo si la orden no tiene actividad de producción
+    // viva — una orden ya cortada/enviada no se degrada. El `modificadoPor` lo pone el recálculo.
+    await recalcularEstadoOrden(tx, sesion, actual);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -876,7 +910,7 @@ export async function guardarMatrizOrden(
  * las tallas por su ETIQUETA (las curvas/órdenes pueden tener tallas distintas: se reutiliza la
  * misma talla del catálogo por su etiqueta — como las dos órdenes usan el catálogo de tallas
  * global, basta con copiar `idTalla`). Ambas órdenes deben ser de la empresa activa. Sustituye la
- * matriz actual. Deriva estado='completa' como cualquier guardado de matriz con líneas.
+ * matriz actual. Recalcula el estado como cualquier guardado de matriz.
  */
 export async function copiarDetalleOrden(
   sesion: SesionUsuario,
@@ -913,12 +947,8 @@ export async function copiarDetalleOrden(
     }));
     const renglones = await sincronizarMatriz(tx, sesion, id, set);
 
-    const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
-    if (renglones > 0 && destino.fechaCompletada === null) {
-      cambios.estado = 'completa';
-      cambios.fechaCompletada = new Date();
-    }
-    await tx.orden.update({ where: { id }, data: cambios });
+    // Mismo estado derivado que cualquier guardado de matriz: lo decide la regla única.
+    await recalcularEstadoOrden(tx, sesion, destino);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',

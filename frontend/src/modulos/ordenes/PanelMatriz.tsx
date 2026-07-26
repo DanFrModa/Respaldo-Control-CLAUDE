@@ -121,7 +121,7 @@ function construirCuerpo(
  * Panel de la MATRIZ color × talla de una orden (F2-E3). Alimenta el componente reutilizable con:
  * los colores del catálogo (filas), las tallas de la CURVA del modelo (columnas iniciales) unidas a
  * las que ya tiene la orden, y el catálogo de tallas para agregar columnas extra. Guarda el set
- * completo con `PUT /matriz`: al primer guardado con líneas el backend DERIVA estado='completa'.
+ * completo con `PUT /matriz`: el backend recalcula el estado (`tallas + avíos`) en cada guardado.
  *
  * NO tiene botón propio de guardar (Daniel 24-jul-2026): se registra en el guardado ÚNICO del
  * diálogo (`useSeccionGuardable`). Sí conserva "Copiar matriz de otra orden", que NO es una

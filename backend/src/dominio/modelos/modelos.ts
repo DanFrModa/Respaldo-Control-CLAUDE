@@ -44,6 +44,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 import { cantidadDeBase, cantidadesDeOrdenes } from '../costos/cantidades.js';
 import { redondear2 } from '../costos/decimales.js';
+import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
@@ -222,6 +223,9 @@ function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUnc
   if (datos.corteBase !== undefined) data.corteBase = datos.corteBase;
   if (datos.idMaquileroCotizado !== undefined) data.idMaquileroCotizado = datos.idMaquileroCotizado;
   if (datos.secuenciaEstampado !== undefined) data.secuenciaEstampado = datos.secuenciaEstampado;
+  // ¿Lleva arte? (Daniel 26-jul-2026): omitir = `true` por default de la BD, que es lo que él
+  // pidió — la prenda lleva arte MIENTRAS no la desmarquen.
+  if (datos.llevaArte !== undefined) data.llevaArte = datos.llevaArte;
   return data;
 }
 
@@ -366,6 +370,12 @@ function aplicarOpcionalesEditar(
   ) {
     cambios.secuenciaEstampado = datos.secuenciaEstampado;
     detalle.secuenciaEstampado = { de: actual.secuenciaEstampado, a: datos.secuenciaEstampado };
+  }
+  // ¿Lleva arte? (booleano con default `true`, no nullable): omitir = no tocar. Cambiarlo mueve el
+  // estado de las órdenes del modelo (requisito ARTE), por eso queda en el detalle de bitácora.
+  if (datos.llevaArte !== undefined && datos.llevaArte !== actual.llevaArte) {
+    cambios.llevaArte = datos.llevaArte;
+    detalle.llevaArte = { de: actual.llevaArte, a: datos.llevaArte };
   }
 
   return detalle;
@@ -536,6 +546,14 @@ export async function actualizarModelo(
           accion: 'DESACTIVAR',
           datos: { codigo: actual.codigo },
         });
+      }
+
+      // "Lleva arte" es un REQUISITO del estado automático de la orden (Daniel 26-jul-2026):
+      // desmarcarlo puede COMPLETAR sola a una orden a la que solo le faltaba el arte. Se recalcula
+      // en la MISMA transacción (A2) y, como todo recálculo por catálogo, SOLO puede completar —
+      // marcar "sí lleva" nunca degrada lo ya completo (ver `recalcularEstadoOrdenesDeModelo`).
+      if (detalleOpcionales.llevaArte !== undefined) {
+        await recalcularEstadoOrdenesDeModelo(tx, sesion, datos.id, 'lleva-arte');
       }
 
       return tx.modelo.findUniqueOrThrow({

@@ -41,7 +41,8 @@ function bdParaCrear(): ContextoBd {
     idPedidoLinea: 50,
     idModelo: 9,
     cliente: { nombre: 'Liverpool' },
-    modelo: { codigo: '501', descripcion: 'Playera' },
+    // `_count`: insumos de la regla de "orden completa" (requisitos-orden.ts) que trae el include.
+    modelo: { codigo: '501', descripcion: 'Playera', _count: { avios: 2, bordados: 1 } },
     maquilero: null,
     etiquetaMarca: null,
     tela: null,
@@ -108,6 +109,11 @@ function bdParaCrear(): ContextoBd {
       update: vi.fn(() => Promise.resolve({})),
       findFirst: vi.fn(() => Promise.resolve(ordenDetallada)),
     },
+    // Insumos de la regla de "orden completa": el alta la recalcula en la misma tx.
+    ordenLinea: { count: vi.fn(() => Promise.resolve(1)) },
+    modeloAvio: { count: vi.fn(() => Promise.resolve(2)) },
+    modeloBordado: { count: vi.fn(() => Promise.resolve(1)) },
+    modelo: { findUnique: vi.fn(() => Promise.resolve({ llevaArte: true })) },
     bitacora: { create: vi.fn(() => Promise.resolve({})) },
     // El alta escribe el evento outbox `orden-creada` en la MISMA tx (R3, B5).
     eventoOutbox: { create: vi.fn(() => Promise.resolve({ id: 1 })) },

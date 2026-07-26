@@ -63,8 +63,17 @@ async function sembrarPedidoConDesarrollo(opciones: {
   ocCliente?: string | null;
   conDesarrollo?: boolean;
 }): Promise<{ idModelo: number; idDesarrollo: number | null; idPedido: number; idLinea: number }> {
+  // El modelo nace CUMPLIENDO los requisitos del estado automático de la orden
+  // (`requisitos-orden.ts`): receta de avíos de producción y `llevaArte: false` (prenda lisa), para
+  // que la OP que salga a producción con su matriz nazca `completa` como espera esta prueba.
   const modelo = await cliente.modelo.create({
-    data: { codigo: opciones.codigoModelo, descripcion: 'Playera' },
+    data: { codigo: opciones.codigoModelo, descripcion: 'Playera', llevaArte: false },
+  });
+  const avio = await cliente.avio.create({
+    data: { clave: `AV-${opciones.codigoModelo}`, descripcion: 'Hilo' },
+  });
+  await cliente.modeloAvio.create({
+    data: { idModelo: modelo.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
   });
   let idDesarrollo: number | null = null;
   if (opciones.conDesarrollo !== false) {

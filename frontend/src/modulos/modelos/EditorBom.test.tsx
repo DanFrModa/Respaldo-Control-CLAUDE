@@ -74,6 +74,7 @@ function fichaConBordado(precio: number | null): ModeloFicha {
     idMaquileroCotizado: null,
     maquileroCotizado: null,
     secuenciaEstampado: 'antes',
+    llevaArte: true,
     cantidadFotos: 0,
     urlFotoPrincipal: null,
     telaPrincipal: null,

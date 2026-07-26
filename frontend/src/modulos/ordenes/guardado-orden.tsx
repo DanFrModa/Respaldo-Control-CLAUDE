@@ -25,7 +25,7 @@ import {
  * comerse lo que el usuario escribió.
  *
  * El orden de guardado lo fija `SECCIONES_GUARDABLES` (encabezado → matriz → referencias): la
- * matriz deriva el estado 'completa' de la orden, así que va después del encabezado.
+ * matriz puede completar la orden (regla `tallas + avíos`), así que va después del encabezado.
  */
 
 /** Secciones guardables del diálogo, EN EL ORDEN en que se guardan. */

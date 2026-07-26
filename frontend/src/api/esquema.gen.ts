@@ -12379,6 +12379,8 @@ export interface paths {
                  * @enum {string}
                  */
                 secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+                /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+                llevaArte: boolean;
                 /** @description Cantidad de fotos del modelo. */
                 cantidadFotos: number;
                 /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -12525,6 +12527,8 @@ export interface paths {
              * @enum {string}
              */
             secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
+            /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+            llevaArte?: boolean;
             descripcion?: string;
             composicion?: string;
           };
@@ -12577,6 +12581,8 @@ export interface paths {
                * @enum {string}
                */
               secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -12760,6 +12766,8 @@ export interface paths {
                * @enum {string}
                */
               secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -12978,6 +12986,8 @@ export interface paths {
                * @enum {string}
                */
               secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -13119,6 +13129,8 @@ export interface paths {
              * @enum {string}
              */
             secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
+            /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+            llevaArte?: boolean;
             descripcion?: string | null;
             composicion?: string | null;
             activo?: boolean;
@@ -13172,6 +13184,8 @@ export interface paths {
                * @enum {string}
                */
               secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -17915,8 +17929,21 @@ export interface paths {
                 obsMaquila: string | null;
                 /** @description No costear esta orden. */
                 noCostear: boolean;
-                /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+                /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
                 fechaCompletada: string | null;
+                /** @description Por qué la orden está (o no) completa. */
+                requisitos: {
+                  /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                  tallas: boolean;
+                  /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                  avios: boolean;
+                  /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                  arte: 'no-aplica' | boolean;
+                  /** @description Se cumplen todos los requisitos que aplican. */
+                  completa: boolean;
+                  /** @description Requisitos que hoy faltan (vacío si está completa). */
+                  faltantes: ('tallas' | 'avios' | 'arte')[];
+                };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
                 /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -19458,8 +19485,21 @@ export interface paths {
                 obsMaquila: string | null;
                 /** @description No costear esta orden. */
                 noCostear: boolean;
-                /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+                /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
                 fechaCompletada: string | null;
+                /** @description Por qué la orden está (o no) completa. */
+                requisitos: {
+                  /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                  tallas: boolean;
+                  /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                  avios: boolean;
+                  /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                  arte: 'no-aplica' | boolean;
+                  /** @description Se cumplen todos los requisitos que aplican. */
+                  completa: boolean;
+                  /** @description Requisitos que hoy faltan (vacío si está completa). */
+                  faltantes: ('tallas' | 'avios' | 'arte')[];
+                };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
                 /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -19748,8 +19788,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -19998,8 +20051,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -20265,8 +20331,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -20536,8 +20615,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -20796,8 +20888,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -21055,8 +21160,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -21318,8 +21436,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -22242,8 +22373,21 @@ export interface paths {
               obsMaquila: string | null;
               /** @description No costear esta orden. */
               noCostear: boolean;
-              /** @description Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null. */
+              /** @description Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null. */
               fechaCompletada: string | null;
+              /** @description Por qué la orden está (o no) completa. */
+              requisitos: {
+                /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
+                tallas: boolean;
+                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
+                avios: boolean;
+                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                arte: 'no-aplica' | boolean;
+                /** @description Se cumplen todos los requisitos que aplican. */
+                completa: boolean;
+                /** @description Requisitos que hoy faltan (vacío si está completa). */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
+              };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
               /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
@@ -23303,6 +23447,8 @@ export interface paths {
                 idCliente: number;
                 /** @description Nombre del cliente. */
                 cliente: string;
+                /** @description Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como "Falta: …". */
+                faltantes: ('tallas' | 'avios' | 'arte')[];
               }[];
               /** @description Total de órdenes que cumplen el filtro. */
               total: number;

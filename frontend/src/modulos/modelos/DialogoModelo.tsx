@@ -69,6 +69,8 @@ const VALORES_INICIALES: DatosModeloFormulario = {
   corteBase: '',
   numOperaciones: '',
   secuenciaEstampado: 'antes',
+  // Daniel (26-jul-2026): "por default sí lleva" arte — la casilla nace MARCADA.
+  llevaArte: true,
   idTemporada: '',
   idCurvaTalla: '',
   idGenero: '',
@@ -106,6 +108,7 @@ function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
     cuerpo.numOperaciones = numOps;
   }
   cuerpo.secuenciaEstampado = datos.secuenciaEstampado;
+  cuerpo.llevaArte = datos.llevaArte;
   const idMaquilero = idSelectorACuerpo(datos.idMaquileroCotizado);
   if (idMaquilero !== null) {
     cuerpo.idMaquileroCotizado = idMaquilero;
@@ -143,6 +146,7 @@ function aCuerpoEditar(datos: DatosModeloFormulario): ModeloEditar {
     corteBase: numeroOpcionalACuerpo(datos.corteBase) ?? null,
     numOperaciones: numeroOpcionalACuerpo(datos.numOperaciones) ?? null,
     secuenciaEstampado: datos.secuenciaEstampado,
+    llevaArte: datos.llevaArte,
     idTemporada: idSelectorACuerpo(datos.idTemporada),
     idCurvaTalla: idSelectorACuerpo(datos.idCurvaTalla),
     idGenero: idSelectorACuerpo(datos.idGenero),
@@ -217,6 +221,7 @@ export function DialogoModelo({
               corteBase: modelo.corteBase === null ? '' : String(modelo.corteBase),
               numOperaciones: modelo.numOperaciones === null ? '' : String(modelo.numOperaciones),
               secuenciaEstampado: modelo.secuenciaEstampado,
+              llevaArte: modelo.llevaArte,
               idTemporada: idTexto(modelo.idTemporada),
               idCurvaTalla: idTexto(modelo.idCurvaTalla),
               idGenero: idTexto(modelo.idGenero),
@@ -448,6 +453,28 @@ export function DialogoModelo({
                         <option value="despues">Después de coser</option>
                         <option value="flexible">Flexible (se decide por orden)</option>
                       </SelectNativo>
+                    </Field>
+
+                    {/* ¿Lleva arte? (Daniel 26-jul-2026): marcada por default. Es el requisito
+                        ARTE del estado automático de la orden. */}
+                    <Field>
+                      <Field orientation="horizontal">
+                        <input
+                          id="modelo-lleva-arte"
+                          type="checkbox"
+                          className="size-4 rounded border-input accent-primary"
+                          disabled={guardando}
+                          {...registrar('llevaArte')}
+                          data-testid="modelo-lleva-arte"
+                        />
+                        <FieldLabel htmlFor="modelo-lleva-arte" className="font-normal">
+                          Lleva arte (bordado o estampado)
+                        </FieldLabel>
+                      </Field>
+                      <FieldDescription>
+                        Si la prenda no lleva bordado ni estampado, desmárcala; si no, la orden
+                        quedará incompleta hasta capturar el arte.
+                      </FieldDescription>
                     </Field>
                   </FieldGroup>
                 </AccordionContent>

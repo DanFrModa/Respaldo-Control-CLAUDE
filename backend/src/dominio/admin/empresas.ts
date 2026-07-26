@@ -27,6 +27,7 @@ import {
   type LogoResuelto,
 } from '../../comun/logo-empresa.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { problemaPngParaPdf } from '../../comun/png.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -579,6 +580,75 @@ export async function solicitarSubidaLogo(
 }
 
 /**
+ * Rechaza los PNG que el generador de PDFs pinta MAL (16 bits por canal, o paleta con
+ * transparencia). Es la ÚNICA oportunidad de mirar los bytes: la subida va DIRECTA del navegador a
+ * R2 con una URL prefirmada, así que el servidor no los ve hasta que le confirman la key.
+ *
+ * ⚠️ Se ejecuta **FUERA de la transacción** (ver {@link confirmarLogo}): baja hasta 5 MB de R2, y
+ * una transacción interactiva de Prisma tiene timeout (un round-trip lento la reventaría con
+ * `P2028` → 500 opaco) además de retener una conexión del pool durante toda la espera.
+ *
+ * Se aplica solo a los PNG (los JPG no tienen el problema). Si R2 no responde NO se bloquea la
+ * confirmación: el logo se acepta —perder la marca por un bache de red sería peor que un logo con
+ * el color corrido— y queda el aviso en el log. El veredicto lo da la función pura
+ * `problemaPngParaPdf` (`comun/png.ts`), probada aparte.
+ */
+async function exigirPngImprimible(
+  archivo: { key: string; tipoMime: string | null },
+  archivos: ServicioArchivos | undefined,
+): Promise<void> {
+  if (archivo.tipoMime?.toLowerCase() !== 'image/png') return;
+
+  let bytes: Buffer;
+  try {
+    // El servicio se resuelve AQUÍ (no como default del parámetro): construirlo exige la config de
+    // R2 y no tiene por qué pedirse cuando el logo es un JPG.
+    bytes = await (archivos ?? servicioArchivos()).descargarContenido(
+      archivo.key,
+      TAMANO_MAXIMO_LOGO_BYTES,
+    );
+  } catch (error) {
+    console.warn(
+      `No se pudo leer el logo recién subido (${archivo.key}) para validar su PNG; se acepta sin revisar.`,
+      error,
+    );
+    return;
+  }
+
+  const problema = problemaPngParaPdf(bytes);
+  if (problema !== null) {
+    throw new ErrorValidacion(problema);
+  }
+}
+
+/**
+ * Lectura previa (SIN transacción) para inspeccionar el PNG antes de confirmarlo. Se salta en los
+ * casos que la transacción va a resolver igual (ya vigente = idempotente; archivo inexistente;
+ * archivo de otra entidad): no tiene caso bajar bytes para eso.
+ */
+async function inspeccionarLogoAntesDeConfirmar(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  idArchivo: string,
+  archivos: ServicioArchivos | undefined,
+): Promise<void> {
+  const empresa = await cliente.empresa.findUnique({
+    where: { id: idEmpresa },
+    select: { idArchivoLogo: true },
+  });
+  if (empresa === null || empresa.idArchivoLogo === idArchivo) return;
+
+  const archivo = await cliente.archivo.findUnique({
+    where: { id: idArchivo },
+    select: { key: true, tipoMime: true },
+  });
+  if (archivo === null) return;
+  if (!archivo.key.startsWith(`${CARPETA_LOGOS}/${String(idEmpresa)}/`)) return;
+
+  await exigirPngImprimible(archivo, archivos);
+}
+
+/**
  * PASO 2 de la subida del LOGO: con el objeto YA en R2, liga el `Archivo` a la empresa y borra el
  * logo anterior, todo en UNA transacción (A2). Solo aquí cambia la marca del sistema, así que una
  * subida que no llegó a terminar NUNCA deja a la empresa sin logo. Exige `empresas.administrar`.
@@ -589,14 +659,22 @@ export async function solicitarSubidaLogo(
  *
  * Al terminar invalida la caché en memoria del logo: el siguiente impreso y la siguiente carga de
  * la app ya salen con el logo nuevo.
+ *
+ * La INSPECCIÓN del PNG va ANTES de abrir la transacción (baja el objeto de R2; ver
+ * {@link exigirPngImprimible}). Lo que valida afuera se vuelve a validar adentro —existencia del
+ * archivo y pertenencia por prefijo de key—, así que la comprobación previa nunca es la autoridad:
+ * solo evita bajar bytes de un archivo que la transacción va a rechazar igual.
  */
 export async function confirmarLogo(
   sesion: SesionUsuario,
   idEmpresa: number,
   idArchivo: string,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'empresas.administrar');
+
+  await inspeccionarLogoAntesDeConfirmar(clienteLectura(bd), idEmpresa, idArchivo, archivos);
 
   await enTransaccion(async (tx) => {
     const actual = await exigirEmpresa(tx, idEmpresa);
@@ -606,7 +684,7 @@ export async function confirmarLogo(
 
     const archivo = await tx.archivo.findUnique({
       where: { id: idArchivo },
-      select: { id: true, key: true, nombreOriginal: true },
+      select: { id: true, key: true, nombreOriginal: true, tipoMime: true },
     });
     if (archivo === null) {
       throw new ErrorNoEncontrado('Archivo del logo', idArchivo);

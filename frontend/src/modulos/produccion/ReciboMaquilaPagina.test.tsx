@@ -102,6 +102,13 @@ const orden: Orden = {
   obsMaquila: null,
   noCostear: false,
   fechaCompletada: '2026-06-18T00:00:00.000Z',
+  requisitos: {
+    tallas: true,
+    avios: true,
+    arte: 'no-aplica' as const,
+    completa: true,
+    faltantes: [],
+  },
   motivoCancelada: null,
   ocCliente: null,
   tallasV1: null,

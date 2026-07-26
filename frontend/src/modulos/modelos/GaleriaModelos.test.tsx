@@ -71,6 +71,7 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
     idMaquileroCotizado: null,
     maquileroCotizado: null,
     secuenciaEstampado: 'antes',
+    llevaArte: true,
     telaPrincipal: null,
     stockPt: null,
     costoActual: null,

@@ -15,6 +15,8 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { reemplazarAviosBom, reemplazarBordadosBom } from '../modelos/bom-modelo.js';
+import { actualizarModelo } from '../modelos/modelos.js';
 import {
   actualizarOrden,
   agregarComentarioOrden,
@@ -94,7 +96,16 @@ beforeEach(async () => {
   empresa = await crearEmpresaPrueba(cliente);
   clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
   otroCliente = await cliente.cliente.create({ data: { nombre: 'Coppel' } });
-  modelo = await cliente.modelo.create({ data: { codigo: 'A-100', descripcion: 'Playera' } });
+  // Modelo BASE de las pruebas: cumple los requisitos del estado automático (Daniel 26-jul-2026,
+  // `requisitos-orden.ts`) — receta de avíos + `llevaArte: false` (prenda lisa). Ojo con el
+  // default de la bandera: es `true`, así que un modelo recién creado EXIGE arte.
+  modelo = await cliente.modelo.create({
+    data: { codigo: 'A-100', descripcion: 'Playera', llevaArte: false },
+  });
+  const avio = await cliente.avio.create({ data: { clave: 'HIL-1', descripcion: 'Hilo' } });
+  await cliente.modeloAvio.create({
+    data: { idModelo: modelo.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+  });
   modeloInactivo = await cliente.modelo.create({ data: { codigo: 'Z-999', activo: false } });
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
@@ -326,6 +337,166 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     );
     expect(reguardado.estado).toBe('completa');
     expect(reguardado.fechaCompletada).toBe(selladaEn);
+  });
+
+  it('SIN receta de avíos NO se completa, aunque tenga matriz, y dice qué le falta', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const sinAvios = await cliente.modelo.create({ data: { codigo: 'SIN-AV', llevaArte: false } });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, sinAvios.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('capturada');
+    expect(orden.fechaCompletada).toBeNull();
+    expect(orden.requisitos).toMatchObject({ tallas: true, avios: false, arte: 'no-aplica' });
+    expect(orden.requisitos.faltantes).toEqual(['avios']);
+  });
+
+  it('vaciar la matriz de una orden completa la REGRESA a capturada, conservando la fecha', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: lineaPedido.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('completa');
+
+    const vaciada = await guardarMatrizOrden(s, orden.id, { lineas: [] }, bd());
+    expect(vaciada.estado).toBe('capturada');
+    // El sello histórico NO se borra (es el "cuándo quedó lista por primera vez").
+    expect(vaciada.fechaCompletada).toBe(orden.fechaCompletada);
+    expect(vaciada.requisitos.faltantes).toEqual(['tallas']);
+  });
+
+  it('capturar la receta de avíos del modelo COMPLETA sus órdenes; quitarla NO las degrada', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const sinAvios = await cliente.modelo.create({ data: { codigo: 'BOM-1', llevaArte: false } });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, sinAvios.id);
+    const matriz = [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }];
+    const orden = await crearOrden(s, { idPedidoLinea: renglon.id, lineas: matriz }, bd());
+    const cancelada = await crearOrden(s, { idPedidoLinea: renglon.id, lineas: matriz }, bd());
+    await cancelarOrden(s, cancelada.id, { motivo: 'prueba' }, bd());
+    expect(orden.estado).toBe('capturada');
+
+    const avio = await cliente.avio.create({ data: { clave: 'BTN-9', descripcion: 'Botón' } });
+    const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
+    await reemplazarAviosBom(sAdmin, sinAvios.id, [{ idAvio: avio.id, consumoPorPrenda: 2 }], bd());
+
+    // La orden se completó SOLA al aparecer la receta, con su bitácora propia (A7).
+    const recalculada = await obtenerOrden(s, orden.id, bd());
+    expect(recalculada.estado).toBe('completa');
+    expect(recalculada.fechaCompletada).not.toBeNull();
+    const bitacoras = await cliente.bitacora.count({
+      where: { entidad: 'Orden', idEntidad: String(orden.id), accion: 'MODIFICAR' },
+    });
+    expect(bitacoras).toBeGreaterThan(0);
+    // La cancelada sigue cancelada (cancelada siempre gana).
+    expect((await obtenerOrden(s, cancelada.id, bd())).estado).toBe('cancelada');
+
+    // Y al QUITARLE la receta, la orden NO se degrada: un cambio de catálogo jamás des-completa
+    // (26-jul-2026). Solo la edición de la matriz de la propia orden puede hacerlo.
+    await reemplazarAviosBom(sAdmin, sinAvios.id, [], bd());
+    const sinReceta = await obtenerOrden(s, orden.id, bd());
+    expect(sinReceta.estado).toBe('completa');
+    expect(sinReceta.requisitos.faltantes).toEqual(['avios']); // la UI SÍ dice la verdad
+  });
+
+  it('modelo que LLEVA arte (default) sin arte capturado: la orden queda INCOMPLETA por arte', async () => {
+    const s = sesion([...PERM_TODOS]);
+    // Default de Daniel: un modelo nuevo LLEVA arte mientras no lo desmarquen.
+    const conArte = await cliente.modelo.create({ data: { codigo: 'ARTE-1' } });
+    const avio = await cliente.avio.create({ data: { clave: 'ELA-1', descripcion: 'Elástico' } });
+    await cliente.modeloAvio.create({
+      data: { idModelo: conArte.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+    });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, conArte.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('capturada');
+    expect(orden.requisitos).toMatchObject({ tallas: true, avios: true, arte: false });
+    expect(orden.requisitos.faltantes).toEqual(['arte']);
+
+    // Capturar el ARTE en el BOM completa la orden sola (recálculo por BOM = solo asciende).
+    const bordado = await cliente.bordado.create({
+      data: { nombre: 'Logo pecho', tipo: 'BORDADO' },
+    });
+    const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
+    await reemplazarBordadosBom(sAdmin, conArte.id, [{ idBordado: bordado.id, precio: 10 }], bd());
+
+    const conArteCapturado = await obtenerOrden(s, orden.id, bd());
+    expect(conArteCapturado.estado).toBe('completa');
+    expect(conArteCapturado.requisitos.arte).toBe(true);
+  });
+
+  it('DESMARCAR "lleva arte" en el modelo completa sus órdenes (prenda lisa)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const conArte = await cliente.modelo.create({ data: { codigo: 'ARTE-2' } });
+    const avio = await cliente.avio.create({ data: { clave: 'ELA-2', descripcion: 'Elástico' } });
+    await cliente.modeloAvio.create({
+      data: { idModelo: conArte.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+    });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, conArte.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('capturada');
+
+    await actualizarModelo(
+      sesion(['modelos.administrar', ...PERM_TODOS]),
+      { id: conArte.id, llevaArte: false },
+      bd(),
+    );
+
+    const lista = await obtenerOrden(s, orden.id, bd());
+    expect(lista.estado).toBe('completa');
+    expect(lista.requisitos.arte).toBe('no-aplica');
+  });
+
+  it('una orden CON actividad de producción no se des-completa aunque le vacíen la matriz', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: lineaPedido.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('completa');
+
+    // Un corte VIVO = la orden ya está en producción (no importa por qué camino se registró).
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 1n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'corte',
+        fecha: new Date('2026-07-26T00:00:00.000Z'),
+      },
+    });
+
+    const vaciada = await guardarMatrizOrden(s, orden.id, { lineas: [] }, bd());
+    expect(vaciada.estado).toBe('completa'); // NO se degrada: está a medio producir
+    expect(vaciada.requisitos.faltantes).toEqual(['tallas']); // pero la pantalla lo dice
   });
 
   it('crear con matriz en el alta ya nace completa', async () => {

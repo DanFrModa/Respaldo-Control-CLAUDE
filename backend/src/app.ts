@@ -10,6 +10,7 @@ import { rutasClientes } from './api/clientes/clientes.rutas.js';
 import { rutasColores } from './api/colores/colores.rutas.js';
 import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
 import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
+import { registrarNoCacheDocumentos } from './api/cache-documentos.js';
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasMedidasAvioTalla } from './api/modelos/medidas-avio-talla.rutas.js';
@@ -152,6 +153,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   registrarManejadorErrores(app);
+  // 1.b) Anti-caché de documentos generados (impresos PDF / exports Excel). Punto COMÚN para
+  //      todas las rutas: sin esto el navegador servía un PDF viejo tras un despliegue.
+  registrarNoCacheDocumentos(app);
 
   // 2) Autenticacion: decoradores en la raiz + catch-all /api/auth/*.
   registrarAuth(app, opciones.auth ?? {});

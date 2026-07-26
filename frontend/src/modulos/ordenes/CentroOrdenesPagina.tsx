@@ -52,6 +52,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
+import { textoFaltantes } from './requisitos';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
 /**
@@ -674,7 +675,15 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                             </p>
                             <p className="num text-sm">{fila.codigoModelo}</p>
                           </div>
-                          <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
+                          <div className="shrink-0 text-right">
+                            <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
+                            {fila.estado === 'capturada' &&
+                              textoFaltantes(fila.faltantes) !== null && (
+                                <span className="mt-0.5 block text-[10px] leading-tight text-warn">
+                                  {textoFaltantes(fila.faltantes)}
+                                </span>
+                              )}
+                          </div>
                         </div>
                         <p className="mt-1 truncate text-sm font-medium">{fila.cliente}</p>
                         <p className="truncate text-xs text-muted-foreground">
@@ -803,6 +812,15 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                             </TablaDensaCelda>
                             <TablaDensaCelda>
                               <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
+                              {/* Transparencia del estado automático: qué le falta para estar
+                                  completa (no ocupa columna nueva; va bajo el chip). Solo si el
+                                  estado guardado es `capturada` — ver `EstadoOrdenBadge`. */}
+                              {fila.estado === 'capturada' &&
+                                textoFaltantes(fila.faltantes) !== null && (
+                                  <span className="mt-0.5 block text-[10px] leading-tight text-warn">
+                                    {textoFaltantes(fila.faltantes)}
+                                  </span>
+                                )}
                             </TablaDensaCelda>
                           </TablaDensaFila>
                         );
@@ -1181,6 +1199,13 @@ function DetalleCentroOrden({
             <p className="flex items-center gap-2">
               <span className="text-base font-bold">OP {orden.folio}</span>
               <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
+              {/* De dónde sale el estado (Daniel 26-jul-2026): si le falta algo, se dice aquí
+                  mismo. Solo con estado `capturada`: una completa/cancelada no "debe" requisitos y
+                  "Completa · Falta: arte" se leería como una contradicción. */}
+              {orden.estado === 'capturada' &&
+                textoFaltantes(orden.requisitos.faltantes) !== null && (
+                  <ChipEstado tono="warn">{textoFaltantes(orden.requisitos.faltantes)}</ChipEstado>
+                )}
             </p>
             <p className="truncate text-xs text-muted-foreground">
               Modelo {orden.codigoModelo} · {orden.cliente}

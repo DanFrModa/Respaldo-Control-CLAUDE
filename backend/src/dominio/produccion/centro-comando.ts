@@ -45,6 +45,7 @@ import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { totalesPorOrden } from './consultas.js';
+import { requisitosOrden } from './requisitos-orden.js';
 
 /**
  * Parámetros EN DOMINIO (tipos nativos; la ruta coacciona la querystring — mismo patrón que
@@ -202,7 +203,20 @@ export async function centroComandoOrdenes(
         idEmpresa: true,
         empresa: { select: { nombre: true } },
         idModelo: true,
-        modelo: { select: { codigo: true, descripcion: true } },
+        modelo: {
+          select: {
+            codigo: true,
+            descripcion: true,
+            // Insumos de la regla de "orden completa" (`requisitos-orden.ts`): la bandera "lleva
+            // arte" + la receta de avíos de producción y el arte del BOM. Dos conteos en la misma
+            // consulta, sin traer las recetas.
+            llevaArte: true,
+            _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+          },
+        },
+        // Renglones de la matriz: el requisito "tallas" es por RENGLONES, no por piezas (una
+        // matriz capturada en ceros ya cuenta como capturada).
+        _count: { select: { lineas: true } },
         idMaquilero: true,
         maquilero: { select: { nombre: true } },
         fechaEntrega: true,
@@ -334,6 +348,17 @@ export async function centroComandoOrdenes(
       mesEntrega: fila.fechaEntrega === null ? null : fila.fechaEntrega.getUTCMonth() + 1,
       idCliente: fila.idCliente,
       cliente: fila.cliente.nombre,
+      // Transparencia del estado (Daniel 26-jul-2026): qué le falta para estar completa. Una
+      // orden CANCELADA no "debe" nada (su estado no lo manda la regla), así que no lista nada.
+      faltantes:
+        fila.estado === 'cancelada'
+          ? []
+          : requisitosOrden({
+              renglonesMatriz: fila._count.lineas,
+              aviosProduccion: fila.modelo._count.avios,
+              artesModelo: fila.modelo._count.bordados,
+              llevaArte: fila.modelo.llevaArte,
+            }).faltantes,
     };
   });
 

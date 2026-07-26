@@ -16,16 +16,22 @@ import { centroComandoOrdenes } from './centro-comando.js';
 
 const sesionVer = () => sesionDePrueba({ permisos: ['ordenes.ver'] });
 
-/** Stub de lectura: 1 orden con cortes (2 vivos), envíos a 2 maquileros + 1 estampador y 2 OC. */
-function bdStub() {
-  const orden = {
+/**
+ * Fila cruda de la orden del stub (lo que devuelve `findMany` con el select del centro). Vive
+ * fuera de `bdStub` para que un test pueda re-emitirla con un cambio puntual.
+ */
+function ordenBase() {
+  return {
     id: 10,
     folio: 5424n,
     estado: 'completa',
     idEmpresa: 1,
     empresa: { nombre: 'FR Moda' },
     idModelo: 3,
-    modelo: { codigo: '62182', descripcion: 'Sudadera' },
+    // `_count`s: insumos de la regla de "orden completa" (`requisitos-orden.ts`). Este modelo NO
+    // tiene receta de avíos → la fila reporta `faltantes: ['avios']`.
+    modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 0, bordados: 2 } },
+    _count: { lineas: 3 },
     idMaquilero: 77,
     maquilero: { nombre: 'Asignado SA' },
     fechaEntrega: new Date('2026-07-04T00:00:00Z'),
@@ -34,6 +40,11 @@ function bdStub() {
     pedidoLinea: { pedido: { id: 9, folio: 1485n } },
     referencias: [{ valor: '613609' }],
   };
+}
+
+/** Stub de lectura: 1 orden con cortes (2 vivos), envíos a 2 maquileros + 1 estampador y 2 OC. */
+function bdStub() {
+  const orden = ordenBase();
   const tx = {
     orden: {
       count: vi.fn(() => Promise.resolve(1)),
@@ -147,6 +158,33 @@ describe('centro de comando — proyección de las 13 columnas (agregado por lot
     expect(fila.mesEntrega).toBe(7); // julio (de fechaEntrega)
     expect(fila.fechaEntrega).toBe('2026-07-04');
     expect(fila.cliente).toBe('C&A');
+    // Transparencia del estado: el modelo del stub tiene matriz y arte pero NO receta de avíos.
+    expect(fila.faltantes).toEqual(['avios']);
+  });
+
+  it('faltantes: vacío cuando el modelo ya tiene su receta de avíos', async () => {
+    const { bd, tx } = bdStub();
+    tx.orden.findMany.mockImplementation(() =>
+      Promise.resolve([
+        {
+          ...ordenBase(),
+          modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 4, bordados: 0 } },
+        },
+      ]),
+    );
+    const s = sesionDePrueba({ permisos: ['ordenes.ver'], idEmpresaActiva: 1 });
+    const pagina = await centroComandoOrdenes(s, {}, bd);
+    expect(pagina.datos[0]?.faltantes).toEqual([]);
+  });
+
+  it('faltantes: una orden CANCELADA no lista requisitos (su estado no lo manda la regla)', async () => {
+    const { bd, tx } = bdStub();
+    tx.orden.findMany.mockImplementation(() =>
+      Promise.resolve([{ ...ordenBase(), estado: 'cancelada', _count: { lineas: 0 } }]),
+    );
+    const s = sesionDePrueba({ permisos: ['ordenes.ver'], idEmpresaActiva: 1 });
+    const pagina = await centroComandoOrdenes(s, { incluirCanceladas: true }, bd);
+    expect(pagina.datos[0]?.faltantes).toEqual([]);
   });
 
   it('sin envíos ni OC: cae al maquilero ASIGNADO, numMaquileros 0 y ocTela null ("falta")', async () => {

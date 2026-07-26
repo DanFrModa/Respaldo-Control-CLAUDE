@@ -8,7 +8,8 @@
  *  • SIN precios ni costos: NO se imprime el precio de bordados, ni `maquilaOrd`/`aplicacionOrd`,
  *    ni `maquilaBase`. Es una orden para PRODUCIR, no un costeo.
  *  • SIN código de barra / UPC (esa funcionalidad está en retiro).
- *  • Sección HABILITACIÓN = los avíos del modelo marcados `paraProduccion` (rotulada "Habilitación").
+ *  • Sección AVÍOS = los avíos del modelo marcados `paraProduccion` (rotulada "Avíos" — el
+ *    renombrado de vocabulario de Daniel; la estructura interna sigue llamándose `habilitacion`).
  *  • Impresión por lote = UN solo PDF consolidado, una orden por página (salto entre órdenes).
  *
  * Innegociables aplicados:
@@ -113,14 +114,14 @@ export interface TelaImpreso {
   consumoPorPrenda: number;
 }
 
-/** Un renglón de la sección HABILITACIÓN (avíos del BOM `paraProduccion`; sin precio). */
+/** Un renglón de la sección AVÍOS (avíos del BOM `paraProduccion`; sin precio). */
 export interface AvioImpreso {
   clave: string;
   descripcion: string;
   consumoPorPrenda: number;
 }
 
-/** Un renglón de la sección BORDADOS (solo nombre/tipo; SIN precio, decisión del dueño). */
+/** Un renglón de la sección ARTE (solo nombre/subtipo; SIN precio, decisión del dueño). */
 export interface BordadoImpreso {
   nombre: string;
   tipo: 'BORDADO' | 'ESTAMPADO';
@@ -469,7 +470,7 @@ export async function armarDatosImpresoOrden(
     observaciones: orden.observaciones,
     obsMaquila: orden.obsMaquila,
     ...tabla,
-    // Telas y Habilitación (avíos): SOLO los marcados `paraProduccion`. Bordados: todos.
+    // Telas y Avíos: SOLO los marcados `paraProduccion`. Arte: todo el del BOM.
     telas: bom.telas
       .filter((t) => t.paraProduccion)
       .map((t) => ({ nombre: t.nombre, consumoPorPrenda: t.consumoPorPrenda })),
@@ -747,7 +748,7 @@ function bloqueArtes(datos: DatosImpresoOrden): ReactElement | null {
   );
 }
 
-/** Sección de lista simple (Telas / Arte / Habilitación), con su texto o un "—" si va vacía. */
+/** Sección de lista simple (Telas / Arte / Avíos), con su texto o un "—" si va vacía. */
 function seccionLista(titulo: string, lineas: string[]): ReactElement {
   const cuerpo =
     lineas.length === 0
@@ -817,8 +818,10 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
         (b) => `${b.nombre} (${b.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
       ),
     ),
+    // "Avíos", no "Habilitación" (mismo renombrado de vocabulario de Daniel que ya rige en toda la
+    // app; este archivo no se pudo tocar en su momento y quedó con el rótulo viejo).
     seccionLista(
-      'Habilitación',
+      'Avíos',
       datos.habilitacion.map(
         (a) => `${a.clave} — ${a.descripcion} (consumo ${a.consumoPorPrenda} / prenda)`,
       ),

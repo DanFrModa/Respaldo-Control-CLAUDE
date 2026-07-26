@@ -78,7 +78,11 @@ vi.mock('@/api/adjuntos-orden', () => ({
 function orden(
   id: number,
   folio: number,
-  opciones: { estado?: Orden['estado']; idCliente?: number } = {},
+  opciones: {
+    estado?: Orden['estado'];
+    idCliente?: number;
+    requisitos?: Orden['requisitos'];
+  } = {},
 ): Orden {
   return {
     id,
@@ -105,6 +109,13 @@ function orden(
     obsMaquila: null,
     noCostear: false,
     fechaCompletada: null,
+    requisitos: opciones.requisitos ?? {
+      tallas: true,
+      avios: true,
+      arte: 'no-aplica' as const,
+      completa: true,
+      faltantes: [],
+    },
     motivoCancelada: opciones.estado === 'cancelada' ? 'Cliente canceló' : null,
     ocCliente: null,
     tallasV1: null,
@@ -185,6 +196,44 @@ describe('<DialogoOrden>', () => {
     expect(
       within(detalle).queryByRole('button', { name: /marcar completa/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('dice QUÉ LE FALTA a la orden para completarse (estado automático, 26-jul-2026)', () => {
+    renderDialogo(
+      orden(1, 101, {
+        estado: 'capturada',
+        requisitos: {
+          tallas: true,
+          avios: false,
+          arte: 'no-aplica' as const,
+          completa: false,
+          faltantes: ['avios'],
+        },
+      }),
+      [...PERM_TODOS],
+    );
+
+    const detalle = screen.getByTestId('detalle-orden');
+    expect(within(detalle).getAllByTestId('estado-orden')[0]).toHaveTextContent('Capturada');
+    expect(within(detalle).getAllByTestId('faltantes-orden')[0]).toHaveTextContent('Falta: avíos');
+  });
+
+  it('una orden CANCELADA no lista requisitos pendientes', () => {
+    renderDialogo(
+      orden(3, 103, {
+        estado: 'cancelada',
+        requisitos: {
+          tallas: false,
+          avios: false,
+          arte: 'no-aplica' as const,
+          completa: false,
+          faltantes: ['tallas', 'avios'],
+        },
+      }),
+      [...PERM_TODOS],
+    );
+
+    expect(screen.queryByTestId('faltantes-orden')).not.toBeInTheDocument();
   });
 
   it('una orden cancelada muestra su motivo y no ofrece cancelar', () => {

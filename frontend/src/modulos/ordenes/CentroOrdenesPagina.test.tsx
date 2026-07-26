@@ -85,6 +85,8 @@ function fila(id: number, folio: number): OrdenCentro {
     mesEntrega: null,
     cliente: `Cliente ${folio}`,
     estado: 'capturada',
+    // Regla del estado automático: a esta orden le falta la receta de avíos del modelo.
+    faltantes: ['avios'],
   } as unknown as OrdenCentro;
 }
 
@@ -96,6 +98,13 @@ function ordenDetalle(id = 1, folio = 101): Orden {
     idModelo: 55,
     cliente: `Cliente ${folio}`,
     estado: 'capturada',
+    requisitos: {
+      tallas: false,
+      avios: true,
+      arte: 'no-aplica',
+      completa: false,
+      faltantes: ['tallas'],
+    },
     referencias: [],
     lineas: [],
     totalPiezas: 0,
@@ -142,6 +151,37 @@ describe('<CentroOrdenesPagina>', () => {
     expect(tira.closest('[data-testid="centro-detalle-fijo"]')).not.toBeNull();
     // Ya no hay una sección "Foto del modelo" enterrada abajo.
     expect(screen.queryByText('Foto del modelo')).not.toBeInTheDocument();
+  });
+
+  // ── Transparencia del estado automático (Daniel 26-jul-2026) ──
+  it('dice QUÉ LE FALTA a la orden para estar completa (lista y detalle)', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    // En la lista, junto al chip de avance: la fila no tiene la receta de avíos.
+    expect(screen.getAllByText('Falta: avíos').length).toBeGreaterThan(0);
+    // En el detalle (que en el fixture es una orden SIN matriz): falta la captura de tallas.
+    expect(screen.getByText('Falta: tallas')).toBeInTheDocument();
+  });
+
+  it('no dice nada de faltantes cuando la orden ya cumple todo', () => {
+    useOrdenesCentro.mockReturnValue(conFilas([{ ...fila(1, 101), faltantes: [] }]));
+    useOrden.mockImplementation(() =>
+      detalleResuelto({
+        ...ordenDetalle(1, 101),
+        estado: 'completa',
+        requisitos: {
+          tallas: true,
+          avios: true,
+          arte: true,
+          completa: true,
+          faltantes: [],
+        },
+      } as unknown as Orden),
+    );
+    renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+    expect(screen.queryByText(/^Falta: /)).not.toBeInTheDocument();
   });
 
   it('no pinta bloque de foto cuando el modelo no tiene fotos', () => {

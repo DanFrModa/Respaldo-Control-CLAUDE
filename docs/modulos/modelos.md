@@ -49,6 +49,26 @@ Sale de la información del desarrollo del modelo. De ahí la jala.»_
   **importador de OC por PDF** ya no pisa la del modelo (solo la usa de respaldo si el modelo no tiene
   ninguna, marcándola como override). Detalle completo en `docs/cambios-frontend-daniel.md` (2026-07-24).
 
+### ¿La prenda LLEVA arte? — `Modelo.llevaArte` (Daniel, 26-jul-2026)
+
+`Modelo.llevaArte` (BOOL NOT NULL **default `true`**, migración `20260726120000_modelo_lleva_arte`)
+dice si la prenda lleva bordado/estampado. Decisión textual de Daniel: _«por default sí lleva. A
+menos que la marques como que no lleva. Y de esa manera si no meten la información del arte, o no
+desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender ese tema.»_
+(`DECISIONES.md §Post-F9.4`).
+
+- Es el **requisito ARTE del estado automático de la orden**
+  (`backend/src/dominio/produccion/requisitos-orden.ts`): con `true`, las órdenes del modelo NO se
+  completan hasta que el BOM tenga su arte; con `false`, el arte no aplica.
+- **Default `true` también para los ~miles de modelos migrados**, a propósito: el tema se atiende
+  siempre. Efecto querido: muchas órdenes vivas quedan incompletas hasta capturar el arte o
+  desmarcar la casilla. El estado es **informativo** — no impide operar la orden.
+- **Desmarcarla recalcula** las órdenes de ese modelo en la misma transacción (`actualizarModelo` →
+  `recalcularEstadoOrdenesDeModelo`), y como todo recálculo por catálogo **solo puede completar**.
+- UI: casilla "Lleva arte (bordado o estampado)" en el alta/edición del modelo (sección Desarrollo)
+  y el estado del arte en la ficha del detalle (*Lleva arte* / *Lleva arte — falta capturarlo* /
+  *No lleva arte*).
+
 ### BOM — banderas `b*` → `para*`
 
 Los CSV del BOM viejo usan banderas `bPreCosto`/`bProduccion`/`bCosto` (valores `0`/`1`). En v2 son `paraPreCosto`/`paraProduccion`/`paraCosto` (booleanos). La transformación es directa y está cubierta por unit tests en `etl-modelos-unit.test.ts`.

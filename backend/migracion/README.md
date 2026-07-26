@@ -41,7 +41,43 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv   # F9: saldos iniciales CxC/CxP (aperturas)
 npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-historicos # F9: importación masiva de CFDI (XML)
 npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
+
+# ⚠️ AL FINAL DE TODA CARGA/RECARGA (obligatorio, ver abajo):
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone al día el estado completa/incompleta
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opcional) simula: reporta sin escribir
 ```
+
+## ⚠️ PASO OBLIGATORIO AL TERMINAR CUALQUIER CARGA: realinear el estado de las órdenes
+
+Después de correr los ETL (F10 completo o una re-corrida), hay que ejecutar **una vez**:
+
+```bash
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts
+```
+
+**Por qué.** El ETL es **fiel a la fuente**: `crearOrdenMigrada` escribe el `estado` y la
+`fechaCompletada` EXPLÍCITOS que traía Access (`FechaDet`/`OrdCancelada`) y **no recalcula** — así
+debe ser, migrar es copiar el histórico, no reinterpretarlo. Pero desde el 26-jul-2026 el estado de
+la orden es **automático** (`completa` = tallas + avíos, y arte si aplica; `DECISIONES.md
+§Post-F9.4`) y la pantalla **"Órdenes incompletas"** filtra por el estado GUARDADO. Sin este paso, el
+semáforo queda desalineado recién cargada la base y **el backlog que Daniel pidió atender queda
+invisible** (*"si no meten la información del arte, o no desmarcan la casilla, está como
+incompleto… siempre hay que atender ese tema"*).
+
+- **Idempotente y re-ejecutable**: la segunda corrida no escribe nada. Va por lotes (páginas de 500,
+  cada una en su transacción corta) y termina con un resumen (revisadas / a incompleta / a completa
+  / respetadas por producción viva).
+- **Reusa la regla del dominio** (`realinearEstadoOrdenes` → `requisitosOrden`): no hay una segunda
+  copia de la regla en el script. Respeta el mismo cinturón que la app: **nunca degrada una orden
+  con `EtapaMovimiento` viva**, no toca las canceladas y **no borra `fechaCompletada`**.
+- Deja **bitácora por orden** con `idUsuario` NULL (proceso de sistema).
+- Flags: `--empresa=<id>` (por defecto todas), `--lote=<n>` (default 500), `--dry-run` (simula: hace
+  el cálculo real y revierte, para ver el impacto antes de aplicarlo).
+
+*(En la base de HOY la migración `20260726130000_recalculo_estado_ordenes` ya aplicó esta MISMA
+REGLA, pero con menos alcance: corre **sola y UNA vez** y **solo DEGRADA** las `completa` que
+dejaron de cumplir. El script hace **las dos direcciones** —degrada y también completa las
+`capturada` que ya cumplían— y es re-ejecutable: es el que se corre después de cada carga.)*
 
 > **F7 (importante):** `etl-costos` y `etl-indicadores` son INDEPENDIENTES (entidades destino
 > disjuntas). **Costos (D2):** la **REGALÍA** (`RegaliasCost`) NO se migra como componente del costo

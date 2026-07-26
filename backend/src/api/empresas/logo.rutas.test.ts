@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { registrarNoCacheDocumentos } from '../cache-documentos.js';
 
 /**
  * Ruta `GET /api/empresas/logo` — la IMAGEN de la marca que pinta toda la app (branding post-F9).
@@ -62,6 +63,9 @@ async function appCon(sesion: SesionUsuario | null): Promise<FastifyInstance> {
   // Los guards no se ejercitan aquí (la ruta del logo no los usa); basta con que existan.
   app.decorate('conPermiso', () => () => Promise.resolve(undefined));
   app.decorate('conAlgunPermiso', () => () => Promise.resolve(undefined));
+  // El MISMO hook anti-caché de documentos que monta `construirApp`: el logo es un ASSET y NO debe
+  // perder su caché larga por él (las aserciones de `cache-control` de abajo lo vigilan).
+  registrarNoCacheDocumentos(app);
   await app.register(rutasEmpresas, { prefix: '/api' });
   await app.ready();
   return app;
