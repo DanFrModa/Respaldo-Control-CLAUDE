@@ -31,6 +31,14 @@
  *    prorrateo que pidió Daniel (regla 3). Si el material NUNCA se ha comprado, cae al precio de
  *    CATÁLOGO y se AVISA; si tampoco hay catálogo, cuenta 0 y se AVISA.
  *
+ * ═══ "ÚLTIMO PRECIO" = EL MÁS RECIENTE, VENGA DE LA ORDEN QUE VENGA ═══
+ * Incluida **esta misma orden**: si la orden acaba de comprar felpa a $30 y le falta cubrir un
+ * remanente, ese remanente se valúa a **$30**, no a una compra vieja de $18 de otra orden. Es lo que
+ * significa "último precio de compra" y es lo más fiel al costo de reponer hoy ese material; valuar
+ * con un precio viejo teniendo uno fresco sería peor. El desempate es explícito y determinista:
+ * **fecha de la OC DESC (las OC sin fecha, al final) → folio DESC → renglón DESC**. La liga a la
+ * orden NO influye en el orden: solo cuenta la fecha.
+ *
  * ═══ LA SOBRE-COMPRA SE COSTEA COMPLETA (aclaración de DANIEL, 26-jul-2026) ═══
  * Textual: *"si se cortaron 1,000 prendas pero la orden de etiquetas se hizo por 1,100, se debe
  * costear —para efectos reales— el costo de la orden COMPLETA entre lo cortado. En este caso debería

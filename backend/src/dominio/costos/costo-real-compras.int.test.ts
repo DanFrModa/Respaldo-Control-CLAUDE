@@ -63,7 +63,15 @@ interface LineaOc {
   idOrden?: number | null;
 }
 
-/** Crea una OC con sus renglones (folio autoincremental de la prueba). */
+/**
+ * Crea una OC con sus renglones (folio autoincremental de la prueba).
+ *
+ * ⚠️ La FECHA de la OC no es decorativa: es la que decide cuál es el "último precio de compra" de un
+ * material. Por eso, cuando el caso no la fija, cada OC nace **UN DÍA MÁS NUEVA que la anterior** —
+ * así el orden de creación es también el cronológico y ninguna prueba queda a merced del desempate
+ * (con una fecha fija compartida, el ganador lo decidía el folio y eso es azar de la fixture).
+ * Los casos donde el último precio IMPORTA fijan sus fechas explícitas, separadas y comentadas.
+ */
 async function crearOc(opciones: {
   estatus: 'borrador' | 'pendiente_autorizacion' | 'autorizada' | 'recibida_total' | 'cancelada';
   lineas: LineaOc[];
@@ -71,13 +79,14 @@ async function crearOc(opciones: {
   idEmpresa?: number;
 }): Promise<number> {
   folioOc += 1;
+  const fecha = opciones.fecha ?? new Date(Date.UTC(2026, 5, folioOc)).toISOString().slice(0, 10);
   const oc = await cliente.ordenCompra.create({
     data: {
       numCompra: BigInt(folioOc),
       idEmpresa: opciones.idEmpresa ?? empresa.id,
       idProveedor,
       estatus: opciones.estatus,
-      fecha: new Date(`${opciones.fecha ?? '2026-06-05'}T00:00:00.000Z`),
+      fecha: new Date(`${fecha}T00:00:00.000Z`),
       lineas: {
         create: opciones.lineas.map((l) => ({
           idTela: l.idTela ?? null,
@@ -282,6 +291,7 @@ describe('costoRealOrden — reglas 2 y 3: último precio de compra y prorrateo'
   it('una compra compartida se PRORRATEA: cada orden se lleva su consumo al mismo precio', async () => {
     await crearOc({
       estatus: 'autorizada',
+      fecha: '2026-06-15', // única compra de botón: fija su último precio
       lineas: [{ idAvio, cantidad: 10000, precio: 2, idOrden: null }],
     });
     // Esta orden consume 400 botones del snapshot ⇒ se lleva 400 × $2 = $800 de esa compra.
@@ -291,25 +301,70 @@ describe('costoRealOrden — reglas 2 y 3: último precio de compra y prorrateo'
     expect(boton?.importeValuado).toBe(800);
   });
 
-  it('mezcla: parte comprada para la orden y parte valuada a último precio', async () => {
+  it('mezcla: lo comprado a su precio y el resto al ÚLTIMO precio, que puede ser el de esta orden', async () => {
+    // Compra VIEJA de felpa, sin ligar a ninguna orden (mayo, $18).
     await crearOc({
       estatus: 'autorizada',
       fecha: '2026-05-01',
-      lineas: [{ idTela, cantidad: 1000, precio: 18, idOrden: null }], // fija el último precio
+      lineas: [{ idTela, cantidad: 1000, precio: 18, idOrden: null }],
     });
+    // Compra RECIENTE ligada a esta orden (junio, $30): es la compra más nueva de felpa que existe.
     await crearOc({
       estatus: 'autorizada',
       fecha: '2026-06-10',
-      lineas: [{ idTela, cantidad: 120, precio: 30 }], // ligada a la orden
+      lineas: [{ idTela, cantidad: 120, precio: 30 }],
     });
 
     const real = await costoRealOrden(sesion(), idOrden, bd());
     const felpa = real.materiales.find((m) => m.idTela === idTela);
     expect(felpa?.comprado).toBe(120);
-    expect(felpa?.importeDirecto).toBe(3600); // 120 × 30
+    expect(felpa?.importeDirecto).toBe(3600); // 120 × 30, lo realmente comprado para la orden
     expect(felpa?.cantidadValuada).toBe(80);
-    expect(felpa?.importeValuado).toBe(1440); // 80 × 18 (último precio de compra)
-    expect(felpa?.importe).toBe(5040);
+    // El remanente se valúa a $30, NO a los $18 de mayo: "último precio de compra" es el de la
+    // compra MÁS RECIENTE del material, venga de la orden que venga — incluida esta misma orden.
+    // Si hoy la felpa se está comprando a $30, valuar el resto a un precio viejo sería peor.
+    expect(felpa?.importeValuado).toBe(2400); // 80 × 30
+    expect(felpa?.importe).toBe(6000);
+    expect(felpa?.ultimaCompra?.numCompra).toBe(2); // la OC de junio, la ligada a esta orden
+  });
+
+  it('el ÚLTIMO precio se decide por FECHA, no por si la compra es de esta orden', async () => {
+    // Ahora al revés: la compra ligada a la orden es la VIEJA y la de otra orden es la reciente.
+    await crearOc({
+      estatus: 'autorizada',
+      fecha: '2026-04-01',
+      lineas: [{ idTela, cantidad: 120, precio: 30 }], // ligada a esta orden, pero vieja
+    });
+    await crearOc({
+      estatus: 'autorizada',
+      fecha: '2026-06-20',
+      lineas: [{ idTela, cantidad: 1000, precio: 18, idOrden: null }], // de otra orden, reciente
+    });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    expect(felpa?.importeDirecto).toBe(3600); // lo comprado para la orden no cambia
+    expect(felpa?.cantidadValuada).toBe(80);
+    expect(felpa?.importeValuado).toBe(1440); // 80 × 18 — gana la compra de JUNIO, la de otra orden
+    expect(felpa?.ultimaCompra?.numCompra).toBe(2);
+  });
+
+  it('si la ÚNICA compra del material es vieja y de otra orden, esa fija el último precio', async () => {
+    // Caso hermano del anterior: la orden no compró felpa; todo su consumo se valúa con la compra
+    // vieja de otra orden (la regla del "último precio" sigue probada en su forma pura).
+    await crearOc({
+      estatus: 'autorizada',
+      fecha: '2026-01-15',
+      lineas: [{ idTela, cantidad: 5000, precio: 12, idOrden: null }],
+    });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    expect(felpa?.importeDirecto).toBe(0);
+    expect(felpa?.cantidadValuada).toBe(200); // todo el requerido
+    expect(felpa?.origenPrecio).toBe('ultimo-precio-compra');
+    expect(felpa?.importeValuado).toBe(2400); // 200 × 12, NO los $20 de catálogo
+    expect(felpa?.ultimaCompra?.numCompra).toBe(1);
   });
 });
 

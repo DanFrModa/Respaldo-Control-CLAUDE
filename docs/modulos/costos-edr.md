@@ -88,6 +88,11 @@ costo real del material  =  IMPORTE DIRECTO  +  IMPORTE VALUADO
 - **El prorrateo (regla 3) sale solo:** una compra grande sin `idOrden` se vuelve "último precio"; cada
   orden se valúa por **su** consumo ⇒ el reparto es proporcional al consumo. No hay una tabla de
   prorrateo que mantener.
+- **"Último precio" = el de la compra MÁS RECIENTE, venga de la orden que venga — incluida la propia
+  orden.** Si esta orden acaba de comprar felpa a $30 y le falta cubrir un remanente, ese remanente se
+  valúa a **$30**, no a una compra vieja de $18 de otra orden: es el costo de reponer hoy el material,
+  y usar un precio viejo teniendo uno fresco sería peor. Orden determinista: **fecha de la OC DESC
+  (las OC sin fecha, al final) → folio DESC → renglón DESC**; la liga a la orden no influye.
 - **La SOBRE-COMPRA se costea COMPLETA** (aclaración de Daniel, 26-jul-2026): *"si se cortaron 1,000
   prendas pero la orden de etiquetas se hizo por 1,100, se debe costear el costo de la orden COMPLETA
   entre lo cortado ⇒ 1.1 etiquetas por prenda"*. El directo **jamás** se recorta a
