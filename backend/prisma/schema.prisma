@@ -4931,6 +4931,15 @@ model CostoOrden {
   /// Avíos: habilitación de costura + empaque — teórico y GUARDADO (ex `HabCost`).
   aviosCalc    Decimal? @map("avios_calc") @db.Decimal(14, 2)
   aviosCost    Decimal? @map("avios_cost") @db.Decimal(14, 2)
+
+  /// REAL DE COMPRAS congelado al guardar (petición de DANIEL, 26-jul-2026): lo que el motor
+  /// `dominio/costos/costo-real-compras.ts` calculó en ESE momento = compra directa (líneas de OC
+  /// autorizada+ ligadas a la orden) + el consumo sin compra propia valuado a ÚLTIMO PRECIO DE
+  /// COMPRA. Es el tercer origen del costo, junto al teórico (`*Calc`) y el guardado (`*Cost`):
+  /// NO se suma a nada, solo deja constancia de CON QUÉ se costeó. NULL en las órdenes costeadas
+  /// antes de esta columna (histórico intacto).
+  telaReal     Decimal? @map("tela_real") @db.Decimal(14, 2)
+  aviosReal    Decimal? @map("avios_real") @db.Decimal(14, 2)
   /// Otros costos + su descripción (ex `CostoOrd.Otros`/`DescOtros`), para flexibilidad.
   otros        Decimal? @db.Decimal(14, 2)
   descOtros    String?  @map("desc_otros")

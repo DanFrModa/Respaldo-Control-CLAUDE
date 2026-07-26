@@ -1,24 +1,27 @@
-import { AlertTriangle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useCostoOrden, useGuardarCostoOrden } from '@/api/costos';
+import { useCostoOrden, useCostoRealOrden, useGuardarCostoOrden } from '@/api/costos';
 import { useBuscarOrdenes } from '@/api/ordenes-consulta';
-import type { BaseProrrateo, CostoOrdenGuardar } from '@/api/tipos';
+import type { BaseProrrateo, CostoOrdenGuardar, CostoRealMaterial } from '@/api/tipos';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { AvisoAlta } from '@/components/ui/aviso-alta';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -30,12 +33,34 @@ function num(s: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/** Formatea una cantidad de material (hasta 4 decimales, sin ceros de relleno). */
+function cantidad(valor: number, unidad?: string | null): string {
+  const n = valor.toLocaleString('es-MX', { maximumFractionDigits: 4 });
+  return unidad === null || unidad === undefined || unidad === '' ? n : `${n} ${unidad}`;
+}
+
+/** Etiqueta en español del origen del precio con el que se valuó un material. */
+function etiquetaOrigen(origen: CostoRealMaterial['origenPrecio']): string {
+  return origen === 'compra-directa'
+    ? 'Comprado para esta orden'
+    : origen === 'ultimo-precio-compra'
+      ? 'Último precio de compra'
+      : origen === 'catalogo'
+        ? 'Precio de catálogo'
+        : 'Sin precio';
+}
+
 /**
- * COSTEO DE ORDEN (F7-E1; doc 06-Costos-y-EDR §3): busca una orden y captura su costo real. Muestra el
- * teórico (receta × precios vigentes) y el GUARDADO LADO A LADO; el total se arma con el guardado y el
- * costo unitario se prorratea sobre la base elegida (cortado por defecto). Respeta `noCostear` (no
- * deja guardar). Ver con `costos.ver`; guardar con `costos.capturar`. Importes en "—" sin
- * `consultas.ver-importes`.
+ * COSTEO DE ORDEN (F7-E1; doc 06-Costos-y-EDR §3): busca una orden y captura su costo. Muestra los
+ * TRES números lado a lado —
+ *  • **Real de compras**: lo que de verdad se compró en órdenes de compra para esta orden, más el
+ *    material sin compra propia (genéricos, compras compartidas) valuado a último precio de compra.
+ *    Es el default al guardar cuando la orden tiene compras (petición de Daniel, 26-jul-2026).
+ *  • **Teórico**: la receta del modelo × los precios de catálogo (lo de siempre).
+ *  • **Capturado**: lo que el usuario confirma o ajusta; con eso se arma el costo total y el unitario.
+ * El desglose del real (qué se compró, a quién y a qué precio) se abre en un cajón, bajo demanda.
+ * Respeta `noCostear` (no deja guardar). Ver con `costos.ver`; guardar con `costos.capturar`.
+ * Importes en "—" sin `consultas.ver-importes`.
  */
 export function CosteoOrdenPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -50,6 +75,9 @@ export function CosteoOrdenPagina(): React.JSX.Element {
   const costo = useCostoOrden(idOrden);
   const guardar = useGuardarCostoOrden();
 
+  const [desgloseAbierto, setDesgloseAbierto] = useState(false);
+  const desglose = useCostoRealOrden(idOrden, desgloseAbierto);
+
   const [telaCost, setTelaCost] = useState('');
   const [procesosCost, setProcesosCost] = useState('');
   const [aviosCost, setAviosCost] = useState('');
@@ -58,14 +86,17 @@ export function CosteoOrdenPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [base, setBase] = useState<BaseProrrateo>('cortado');
 
-  // Sincroniza el formulario con el costo cargado (guardado si existe; si no, el teórico).
+  // Sincroniza el formulario con el costo cargado. Si aún no se ha costeado, el valor propuesto para
+  // tela/avíos es el REAL de compras cuando la orden tiene compras (Daniel), y el teórico si no.
   const data = costo.data;
   useEffect(() => {
     if (!data) return;
     const g = data.guardado;
-    setTelaCost(String(g?.telaCost ?? data.teorico.tela ?? ''));
+    const propuestaTela = data.real.hayCompras ? data.real.tela : data.teorico.tela;
+    const propuestaAvios = data.real.hayCompras ? data.real.avios : data.teorico.avios;
+    setTelaCost(String(g?.telaCost ?? propuestaTela ?? ''));
     setProcesosCost(String(g?.procesosCost ?? data.teorico.procesos ?? ''));
-    setAviosCost(String(g?.aviosCost ?? data.teorico.avios ?? ''));
+    setAviosCost(String(g?.aviosCost ?? propuestaAvios ?? ''));
     setOtros(String(g?.otros ?? ''));
     setDescOtros(g?.descOtros ?? '');
     setObservaciones(g?.observaciones ?? '');
@@ -75,6 +106,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
   function elegir(id: number): void {
     setParams({ idOrden: String(id) });
     setBusqueda('');
+    setDesgloseAbierto(false);
   }
 
   function alGuardar(): void {
@@ -97,6 +129,15 @@ export function CosteoOrdenPagina(): React.JSX.Element {
     );
   }
 
+  /** Copia a los campos capturables los materiales de un origen (real de compras o teórico). */
+  function copiarMateriales(origen: 'real' | 'teorico'): void {
+    if (!data) return;
+    const tela = origen === 'real' ? data.real.tela : data.teorico.tela;
+    const avios = origen === 'real' ? data.real.avios : data.teorico.avios;
+    setTelaCost(String(tela ?? ''));
+    setAviosCost(String(avios ?? ''));
+  }
+
   const cantBase =
     data === undefined
       ? 0
@@ -116,7 +157,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
             Costeo de orden
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Teórico (receta × precios) vs guardado; el total se arma con el guardado
+            Real de compras vs teórico; el total se arma con lo capturado
           </p>
         </div>
       </header>
@@ -188,104 +229,173 @@ export function CosteoOrdenPagina(): React.JSX.Element {
               </p>
             )}
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Componente</TableHead>
-                  <TableHead className="text-right">Teórico</TableHead>
-                  <TableHead className="text-right">Guardado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Tela</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {moneda(data.teorico.tela)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={telaCost}
-                      onChange={(e) => setTelaCost(e.target.value)}
-                      disabled={!puedeCapturar || data.noCostear}
-                      className="ml-auto w-32 text-right"
-                      data-testid="costeo-tela"
-                    />
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Procesos (maquila/arte)</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {moneda(data.teorico.procesos)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={procesosCost}
-                      onChange={(e) => setProcesosCost(e.target.value)}
-                      disabled={!puedeCapturar || data.noCostear}
-                      className="ml-auto w-32 text-right"
-                      data-testid="costeo-procesos"
-                    />
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Avíos (costura + empaque)</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {moneda(data.teorico.avios)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={aviosCost}
-                      onChange={(e) => setAviosCost(e.target.value)}
-                      disabled={!puedeCapturar || data.noCostear}
-                      className="ml-auto w-32 text-right"
-                      data-testid="costeo-avios"
-                    />
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <span>Otros</span>
+            <div className="overflow-x-auto">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Componente</TablaDensaHead>
+                    <TablaDensaHead numerica>Real de compras</TablaDensaHead>
+                    <TablaDensaHead numerica>Teórico</TablaDensaHead>
+                    <TablaDensaHead numerica>Capturado</TablaDensaHead>
+                  </TablaDensaFila>
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
+                  <TablaDensaFila>
+                    <TablaDensaCelda>Tela</TablaDensaCelda>
+                    <TablaDensaCelda numerica data-testid="costeo-real-tela">
+                      {moneda(data.real.tela)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      {moneda(data.teorico.tela)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
                       <Input
-                        value={descOtros}
-                        onChange={(e) => setDescOtros(e.target.value)}
-                        placeholder="Descripción"
+                        type="number"
+                        step="0.01"
+                        value={telaCost}
+                        onChange={(e) => setTelaCost(e.target.value)}
                         disabled={!puedeCapturar || data.noCostear}
-                        className="w-56"
-                        data-testid="costeo-desc-otros"
+                        className="ml-auto w-32 text-right"
+                        data-testid="costeo-tela"
                       />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">—</TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={otros}
-                      onChange={(e) => setOtros(e.target.value)}
-                      disabled={!puedeCapturar || data.noCostear}
-                      className="ml-auto w-32 text-right"
-                      data-testid="costeo-otros"
-                    />
-                  </TableCell>
-                </TableRow>
-                <TableRow className="font-semibold">
-                  <TableCell>Costo total</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {moneda(data.teorico.total)}
-                  </TableCell>
-                  <TableCell className="text-right" data-testid="costeo-total">
-                    {moneda(totalPreview)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                  <TablaDensaFila>
+                    <TablaDensaCelda>Procesos (maquila/arte)</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      {moneda(data.teorico.procesos)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={procesosCost}
+                        onChange={(e) => setProcesosCost(e.target.value)}
+                        disabled={!puedeCapturar || data.noCostear}
+                        className="ml-auto w-32 text-right"
+                        data-testid="costeo-procesos"
+                      />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                  <TablaDensaFila>
+                    <TablaDensaCelda>Avíos (costura + empaque)</TablaDensaCelda>
+                    <TablaDensaCelda numerica data-testid="costeo-real-avios">
+                      {moneda(data.real.avios)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      {moneda(data.teorico.avios)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={aviosCost}
+                        onChange={(e) => setAviosCost(e.target.value)}
+                        disabled={!puedeCapturar || data.noCostear}
+                        className="ml-auto w-32 text-right"
+                        data-testid="costeo-avios"
+                      />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                  <TablaDensaFila>
+                    <TablaDensaCelda>
+                      <div className="space-y-1">
+                        <span>Otros</span>
+                        <Input
+                          value={descOtros}
+                          onChange={(e) => setDescOtros(e.target.value)}
+                          placeholder="Descripción"
+                          disabled={!puedeCapturar || data.noCostear}
+                          className="w-56"
+                          data-testid="costeo-desc-otros"
+                        />
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={otros}
+                        onChange={(e) => setOtros(e.target.value)}
+                        disabled={!puedeCapturar || data.noCostear}
+                        className="ml-auto w-32 text-right"
+                        data-testid="costeo-otros"
+                      />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                  <TablaDensaFila className="font-semibold">
+                    <TablaDensaCelda>Costo total</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(data.real.total)}</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      {moneda(data.teorico.total)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica data-testid="costeo-total">
+                      {moneda(totalPreview)}
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                </TablaDensaCuerpo>
+              </TablaDensa>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDesgloseAbierto(true)}
+                data-testid="costeo-ver-desglose"
+              >
+                <ShoppingCart className="size-4" aria-hidden />
+                Ver de dónde sale el real
+              </Button>
+              {puedeCapturar && !data.noCostear && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copiarMateriales('real')}
+                    data-testid="costeo-usar-real"
+                  >
+                    Usar el real de compras
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copiarMateriales('teorico')}
+                    data-testid="costeo-usar-teorico"
+                  >
+                    Usar el teórico
+                  </Button>
+                </>
+              )}
+              {data.real.hayCompras ? (
+                <Badge variant="secondary">Esta orden tiene compras registradas</Badge>
+              ) : (
+                <Badge variant="outline">Sin compras ligadas a esta orden</Badge>
+              )}
+            </div>
+
+            {data.real.avisos.length > 0 && (
+              <AvisoAlta data-testid="costeo-avisos-real">
+                <p className="mb-1 font-medium text-foreground">Revisa el real de compras:</p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {data.real.avisos.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </AvisoAlta>
+            )}
 
             <div className="flex flex-wrap items-end gap-4">
               <Field className="w-56">
@@ -334,6 +444,150 @@ export function CosteoOrdenPagina(): React.JSX.Element {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Cajón: de dónde sale el REAL — material por material, con sus compras y su valuación. */}
+      <CajonDetalle
+        abierto={desgloseAbierto}
+        alCambiarAbierto={setDesgloseAbierto}
+        ancho="maximo"
+        titulo="De dónde sale el real de compras"
+        subtitulo={
+          data === undefined
+            ? undefined
+            : `Orden #${String(data.folio)} · ${data.codigoModelo} · ${data.cliente}`
+        }
+      >
+        {desglose.isPending ? (
+          <p className="text-sm text-muted-foreground">Cargando el desglose…</p>
+        ) : desglose.isError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {desglose.error.message}
+          </p>
+        ) : desglose.data === undefined ? null : (
+          <div className="space-y-4" data-testid="costeo-desglose">
+            <AvisoAlta>
+              <p>
+                Cada material se cuenta primero por lo que se{' '}
+                <strong>compró para esta orden</strong> (órdenes de compra autorizadas). Lo que la
+                orden consume y no tiene compra propia — los avíos de stock y las compras que surten
+                a varias órdenes — se valúa al <strong>último precio de compra</strong>, de modo que
+                cada orden se lleva su parte.
+              </p>
+            </AvisoAlta>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground uppercase">Comprado para la orden</p>
+                <p className="num text-lg font-semibold">{moneda(desglose.data.importeDirecto)}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground uppercase">Valuado por consumo</p>
+                <p className="num text-lg font-semibold">{moneda(desglose.data.importeValuado)}</p>
+              </div>
+              <div className="rounded-lg border p-3 bg-primary-soft">
+                <p className="text-xs text-muted-foreground uppercase">Total de materiales</p>
+                <p className="num text-lg font-semibold">{moneda(desglose.data.total)}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Material</TablaDensaHead>
+                    <TablaDensaHead numerica>Requerido</TablaDensaHead>
+                    <TablaDensaHead numerica>Comprado</TablaDensaHead>
+                    <TablaDensaHead numerica>Importe comprado</TablaDensaHead>
+                    <TablaDensaHead numerica>Por valuar</TablaDensaHead>
+                    <TablaDensaHead numerica>Precio</TablaDensaHead>
+                    <TablaDensaHead numerica>Importe valuado</TablaDensaHead>
+                    <TablaDensaHead numerica>Total</TablaDensaHead>
+                  </TablaDensaFila>
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
+                  {desglose.data.materiales.map((m, i) => (
+                    <Fragment key={`m-${String(i)}-${m.material}`}>
+                      <TablaDensaFila>
+                        <TablaDensaCelda>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium">{m.material}</span>
+                            {m.esGenerico && (
+                              <Badge variant="outline" className="text-[10px]">
+                                genérico
+                              </Badge>
+                            )}
+                            {m.tipo === 'libre' && (
+                              <Badge variant="outline" className="text-[10px]">
+                                compra libre — no entra al total
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {etiquetaOrigen(m.origenPrecio)}
+                            {m.ultimaCompra === null
+                              ? ''
+                              : ` · OC ${String(m.ultimaCompra.numCompra)} · ${m.ultimaCompra.proveedor}`}
+                          </span>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {cantidad(m.requerido, m.unidad)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{cantidad(m.comprado, m.unidad)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.importeDirecto)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {cantidad(m.cantidadValuada, m.unidad)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.precioValuado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.importeValuado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
+                          {moneda(m.importe)}
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                      {m.compras.map((c) => (
+                        <TablaDensaFila key={`m-${String(i)}-c-${String(c.idOrdenCompra)}`}>
+                          <TablaDensaCelda
+                            colSpan={8}
+                            className="py-1 pl-8 text-xs text-muted-foreground"
+                          >
+                            OC {c.numCompra} · {c.proveedor}
+                            {c.fecha === null ? '' : ` · ${c.fecha}`} ·{' '}
+                            {cantidad(c.cantidad, c.unidad)} × {moneda(c.precio)} ={' '}
+                            {moneda(c.importe)}
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
+                      ))}
+                    </Fragment>
+                  ))}
+                  {desglose.data.materiales.length === 0 && (
+                    <TablaDensaFila>
+                      <TablaDensaCelda colSpan={8} className="text-muted-foreground">
+                        Esta orden no tiene materiales ni compras registradas.
+                      </TablaDensaCelda>
+                    </TablaDensaFila>
+                  )}
+                </TablaDensaCuerpo>
+              </TablaDensa>
+            </div>
+
+            {desglose.data.importeLibre !== null && desglose.data.importeLibre > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Compras libres ligadas a la orden: {moneda(desglose.data.importeLibre)} (no entran
+                al costo de materiales).
+              </p>
+            )}
+
+            {desglose.data.avisos.length > 0 && (
+              <AvisoAlta>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {desglose.data.avisos.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </AvisoAlta>
+            )}
+          </div>
+        )}
+      </CajonDetalle>
     </div>
   );
 }

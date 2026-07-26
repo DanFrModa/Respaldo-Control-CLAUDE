@@ -646,3 +646,27 @@ Daniel preguntó de dónde salía el estado `completa`/`incompleta` de la orden:
 - **Histórico migrado:** no se reescribe. El ETL carga `estado`/`fechaCompletada` explícitos y la regla entra cuando la orden se vuelve a tocar (o cuando se toca el catálogo de su modelo, y solo para completar).
 - **Aplica en:** rama `claude/logo-pdf-estado`; regla en `backend/src/dominio/produccion/requisitos-orden.ts`; migración `20260726120000_modelo_lleva_arte`.
 - **Fecha:** 2026-07-26.
+
+#### (Post-F9.5) — El costo de MATERIALES de la orden sale de lo REALMENTE COMPRADO (DANIEL, 26-jul-2026)
+
+Daniel señaló que el costo de materiales de la orden de producción se estaba calculando con la **receta del modelo × los precios de catálogo** (`Tela.precioSugerido` / `Avio.precioReferencia`) y que **eso no refleja la realidad**: al comprar cambian con frecuencia el **proveedor** y el **precio** de un material para esa orden concreta, y en v2 todo eso ya queda registrado en las **órdenes de compra ligadas a la orden de producción** (`OrdenCompraLinea.idOrden`, R7/F4). Sus tres definiciones, textuales:
+
+1. **«Manda lo COMPRADO: la OC autorizada»** (no lo recibido, no lo surtido).
+2. **«Los avíos genéricos se valúan al último precio de compra»** (los de stock, `Avio.esGenerico`, que no se compran por orden).
+3. **«Cuando una compra surte a más de una orden, el costo se PRORRATEA.»**
+
+Cómo quedó resuelto (motor `backend/src/dominio/costos/costo-real-compras.ts`):
+
+- **Costo real de un material = atribución DIRECTA + valuación POR CONSUMO.**
+  - **Directo** (regla 1) = Σ (cantidad × precio) de las líneas de OC **ligadas a la orden** cuya OC esté en `autorizada` / `recibida_parcial` / `recibida_total`. **Fuera**: `borrador`, `pendiente_autorizacion` y `cancelada`. Sin impuestos ni descuentos (la OC no los modela): el importe es literal.
+  - **Por consumo** (reglas 2 y 3) = lo que la orden requiere y **no** tiene compra propia — `max(0, requerido − comprado)` — valuado al **último precio de compra** de ese material (la línea de OC autorizada+ más reciente **de la empresa activa**, sin importar a qué orden estuviera ligada). Ahí caen los genéricos y las compras grandes hechas sin ligar a una orden: **cada orden se lleva su parte en proporción a su consumo**, que es el prorrateo que pidió Daniel.
+- **El "requerido"** sale del **snapshot del MRP** (`RequerimientoOrden.cantidadRequerida`, el consumo BRUTO antes del neteo contra stock — por eso el genérico sí se costea aunque salga del almacén); si la orden no tiene explosión, de la **receta `paraCosto` × piezas** (cortadas, o pedidas si aún no hay corte), la misma base que el teórico.
+- **Se calcula por separado para TELA y para AVÍOS** (son componentes distintos de `CostoOrden`). **Los PROCESOS no** (maquila/arte/bordados no se compran con OC de material).
+- **Sin compras y sin historial de compra** de un material: cae al **precio de catálogo** y **avisa**; si tampoco hay catálogo, cuenta **0** y **avisa**. Nada se calla (mismo criterio de `avisos` que el MRP).
+- **Compras LIBRES** (renglón de OC con `descripcionLibre`, sin material de catálogo) ligadas a la orden: se **reportan aparte** y **NO** se suman a tela ni a avíos (no hay forma de clasificarlas). Se avisa para capturarlas en "Otros" si corresponden.
+- **Unidades (R1):** el importe directo no necesita conversión (cantidad × precio no cambia al convertir). La cantidad comprada y el último precio sí se normalizan a unidad de consumo con **exactamente la misma cascada que usa la recepción** (tela → factor 1; avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion` → 1), para que el real cuadre con lo que entra al kardex.
+- **El DEFAULT al guardar cambia** (el corazón de la petición): si la orden **tiene compras ligadas**, `telaCost`/`aviosCost` caen al **REAL**; si no las tiene, siguen cayendo al **teórico** (comportamiento anterior intacto). `procesosCost` sigue al teórico. El usuario **siempre puede teclear su propio valor**, y **lo ya costeado no se toca**.
+- **Trazabilidad:** el real se **congela** al guardar en `CostoOrden.telaReal`/`aviosReal` (columnas nuevas, nullable — el histórico queda en NULL) y la pantalla ofrece un **desglose por material**: qué se compró, a qué proveedor, a qué precio, y qué se valuó a último precio.
+- **NO se tocó el EDR** (sigue recalculando desde `CostoOrden` al leer, D1) ni la regla del estado "completa" de la orden ni el MRP.
+- **Aplica en:** rama `claude/costo-real-oc`; motor `backend/src/dominio/costos/costo-real-compras.ts`; endpoint `GET /api/costos/ordenes/{idOrden}/real`; migración `20260726140000_costo_orden_real_compras` (aditiva, sin permisos nuevos ni re-seed).
+- **Fecha:** 2026-07-26.

@@ -164,10 +164,12 @@ const esquemaCostoTeorico = z.object({
 const esquemaCostoGuardado = z.object({
   telaCalc: z.number().nullable().describe('Tela teórica congelada al guardar.'),
   telaCost: z.number().nullable().describe('Tela GUARDADA (ajustable).'),
+  telaReal: z.number().nullable().describe('Tela REAL de compras congelada al guardar.'),
   procesosCalc: z.number().nullable().describe('Procesos teóricos congelados al guardar.'),
   procesosCost: z.number().nullable().describe('Procesos GUARDADOS (ajustables).'),
   aviosCalc: z.number().nullable().describe('Avíos teóricos congelados al guardar.'),
   aviosCost: z.number().nullable().describe('Avíos GUARDADOS (ajustables).'),
+  aviosReal: z.number().nullable().describe('Avíos REALES de compras congelados al guardar.'),
   otros: z.number().nullable().describe('Otros costos.'),
   descOtros: z.string().nullable().describe('Descripción de otros costos.'),
   costoTotal: z.number().nullable().describe('Costo total = Σ de los guardados.'),
@@ -176,6 +178,127 @@ const esquemaCostoGuardado = z.object({
   creadoEn: z.string().describe('Fecha de captura (ISO).'),
   modificadoEn: z.string().describe('Última modificación (ISO).'),
 });
+
+// ── Costo REAL de materiales desde las OC (petición de Daniel, 26-jul-2026) ──────────────────────
+
+/** De dónde salió el precio con el que se valuó un material en el costo REAL. */
+export const esquemaOrigenPrecioReal = z
+  .enum(['compra-directa', 'ultimo-precio-compra', 'catalogo', 'sin-precio'])
+  .describe(
+    'Origen del precio con el que se valuó la parte del consumo SIN compra propia: ' +
+      '`compra-directa` = la compra ligada a la orden cubre todo (no hubo que valuar nada); ' +
+      '`ultimo-precio-compra` = último precio de compra del material; `catalogo` = nunca se ha ' +
+      'comprado, se usó el precio de catálogo; `sin-precio` = no hay precio por ningún lado.',
+  );
+
+/** Origen del precio con el que se valuó un material en el costo real. */
+export type OrigenPrecioReal = z.infer<typeof esquemaOrigenPrecioReal>;
+
+/** De dónde salió la cantidad REQUERIDA del material (snapshot del MRP o la receta). */
+export const esquemaOrigenRequerido = z
+  .enum(['snapshot-mrp', 'receta', 'sin-requerido'])
+  .describe('Origen de las cantidades requeridas: snapshot del MRP, receta paraCosto, o ninguno.');
+
+/** Origen de las cantidades requeridas del costo real. */
+export type OrigenRequerido = z.infer<typeof esquemaOrigenRequerido>;
+
+/** Un renglón de compra REAL ligado a la orden (trazabilidad: qué OC, a quién y a qué precio). */
+const esquemaCompraReal = z.object({
+  idOrdenCompra: z.number().int().describe('Id de la orden de compra.'),
+  numCompra: z.number().int().describe('Folio de la orden de compra.'),
+  estatus: z
+    .string()
+    .describe('Estatus de la OC (autorizada / recibida_parcial / recibida_total).'),
+  fecha: z.string().nullable().describe('Fecha de la OC (YYYY-MM-DD) o null.'),
+  idProveedor: z.number().int().describe('Proveedor al que se le compró.'),
+  proveedor: z.string().describe('Nombre del proveedor.'),
+  cantidad: z.number().describe('Cantidad comprada en la línea (unidad de compra).'),
+  unidad: z.string().nullable().describe('Unidad/presentación de compra de la línea.'),
+  precio: z.number().nullable().describe('Precio unitario de la línea (o null sin importes).'),
+  importe: z.number().nullable().describe('cantidad × precio (o null sin importes).'),
+});
+
+/** Un material del costo REAL: lo comprado directo + lo valuado a último precio de compra. */
+const esquemaMaterialReal = z.object({
+  tipo: z.enum(['tela', 'avio', 'libre']).describe('Tipo de material del renglón.'),
+  idTela: z.number().int().nullable().describe('Id de la tela (o null).'),
+  idAvio: z.number().int().nullable().describe('Id del avío (o null).'),
+  material: z.string().describe('Nombre/clave del material.'),
+  unidad: z.string().nullable().describe('Unidad de consumo del material.'),
+  esGenerico: z.boolean().describe('¿Es un avío genérico (de stock, R4)?'),
+  requerido: z.number().describe('Cantidad que la orden requiere (unidad de consumo).'),
+  comprado: z
+    .number()
+    .describe('Cantidad comprada y ligada a la orden, ya en unidad de consumo (R1).'),
+  compras: z.array(esquemaCompraReal).describe('Líneas de OC ligadas a la orden (trazabilidad).'),
+  importeDirecto: z.number().nullable().describe('Σ de lo comprado directo (o null sin importes).'),
+  cantidadValuada: z
+    .number()
+    .describe('Consumo SIN compra propia = max(0, requerido − comprado). Se valúa aparte.'),
+  precioValuado: z
+    .number()
+    .nullable()
+    .describe(
+      'Precio unitario usado para valuar (último de compra o catálogo); null sin importes.',
+    ),
+  importeValuado: z
+    .number()
+    .nullable()
+    .describe('cantidadValuada × precioValuado (o null sin importes).'),
+  origenPrecio: esquemaOrigenPrecioReal.describe('De dónde salió el precio del material.'),
+  ultimaCompra: z
+    .object({
+      idOrdenCompra: z.number().int().describe('Id de la OC del último precio.'),
+      numCompra: z.number().int().describe('Folio de la OC del último precio.'),
+      fecha: z.string().nullable().describe('Fecha de esa OC (YYYY-MM-DD) o null.'),
+      idProveedor: z.number().int().describe('Proveedor de esa OC.'),
+      proveedor: z.string().describe('Nombre del proveedor de esa OC.'),
+    })
+    .nullable()
+    .describe('OC de la que salió el ÚLTIMO precio de compra (null si no aplica).'),
+  importe: z.number().nullable().describe('Costo real del material = directo + valuado.'),
+});
+
+/** Resumen del costo REAL de materiales (el que se muestra junto al teórico y al guardado). */
+export const esquemaCostoRealResumen = z.object({
+  tela: z.number().nullable().describe('Costo real de TELA (o null sin importes).'),
+  avios: z.number().nullable().describe('Costo real de AVÍOS (o null sin importes).'),
+  total: z.number().nullable().describe('tela + avíos (los procesos NO entran al real).'),
+  importeDirecto: z
+    .number()
+    .nullable()
+    .describe('Parte que viene de compras ligadas a la orden (tela + avíos).'),
+  importeValuado: z
+    .number()
+    .nullable()
+    .describe('Parte valuada a último precio de compra / catálogo (tela + avíos).'),
+  importeLibre: z
+    .number()
+    .nullable()
+    .describe('Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total.'),
+  hayCompras: z
+    .boolean()
+    .describe('¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada?'),
+  origenRequerido: esquemaOrigenRequerido.describe('De dónde salieron las cantidades requeridas.'),
+  avisos: z.array(z.string()).describe('Avisos del cálculo (nunca truena en silencio).'),
+});
+
+/** Resumen del costo real de materiales de una orden. */
+export type CostoRealResumen = z.infer<typeof esquemaCostoRealResumen>;
+
+/** DESGLOSE completo del costo real de materiales de una orden (endpoint aparte, bajo demanda). */
+export const esquemaCostoRealOrdenSalida = esquemaCostoRealResumen
+  .extend({
+    idOrden: z.number().int().describe('Id de la orden.'),
+    folio: z.number().int().describe('Folio de la orden.'),
+    materiales: z
+      .array(esquemaMaterialReal)
+      .describe('Un renglón por material (telas, avíos y compras libres).'),
+  })
+  .describe('Costo real de materiales de una orden, desglosado por material (desde las OC).');
+
+/** Forma del desglose del costo real de materiales. */
+export type CostoRealOrdenSalida = z.infer<typeof esquemaCostoRealOrdenSalida>;
 
 /** El costo unitario y la base usada para calcularlo. */
 const esquemaCostoUnitario = z.object({
@@ -205,12 +328,13 @@ export const esquemaCostoOrdenSalida = z
       .describe('Si true, la orden está marcada "no costear" (no se guarda costo).'),
     cantidades: esquemaCantidadesOrden.describe('Cantidades derivadas de la orden.'),
     teorico: esquemaCostoTeorico.describe('Componentes teóricos (receta × precios).'),
+    real: esquemaCostoRealResumen.describe('Costo REAL de materiales desde las órdenes de compra.'),
     guardado: esquemaCostoGuardado
       .nullable()
       .describe('Costo guardado (o null si no se ha costeado).'),
     unitario: esquemaCostoUnitario.describe('Costo unitario y su base.'),
   })
-  .describe('Costo real de una orden: teórico + guardado + cantidades + unitario.');
+  .describe('Costo de una orden: teórico + real de compras + guardado + cantidades + unitario.');
 
 /** Forma del costo de una orden. */
 export type CostoOrdenSalida = z.infer<typeof esquemaCostoOrdenSalida>;
