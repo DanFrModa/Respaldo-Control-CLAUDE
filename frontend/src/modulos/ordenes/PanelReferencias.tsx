@@ -29,6 +29,18 @@ function setReferencias(
     .filter((r) => r.valor.length > 0);
 }
 
+/** Valores tal como los tiene el SERVIDOR, un renglón por campo activo (vacío si no hay). */
+function valoresDelServidor(
+  activos: readonly { id: number }[],
+  valoresOrden: ReadonlyMap<number, string>,
+): Record<number, string> {
+  const inicial: Record<number, string> = {};
+  for (const campo of activos) {
+    inicial[campo.id] = valoresOrden.get(campo.id) ?? '';
+  }
+  return inicial;
+}
+
 /** FIRMA del set de referencias, para saber si hay cambios sin guardar. */
 function firmaReferencias(
   activos: readonly { id: number }[],
@@ -81,18 +93,32 @@ export function PanelReferencias({
   // encabezado tiraría las referencias que el usuario acaba de capturar y aún no se mandan.
   const reinicioBloqueado = useReinicioBloqueado();
 
-  // Reinicializa al cambiar de orden o cuando llegan los campos del cliente.
-  const claveReset = `${orden.id}:${orden.modificadoEn}:${activos.map((c) => c.id).join(',')}`;
+  // Reinicializa al cambiar de orden, al llegar los campos del cliente o cuando el SERVIDOR ya
+  // trae otras referencias.
+  //
+  // ⚠️ La clave mira `modificadoEn` Y LOS VALORES del servidor. Son DOS PUNTAS COMPLEMENTARIAS del
+  // mismo arreglo (jul-2026: sin ellas la sección quedaba "sucia" para siempre tras guardar —
+  // botón único del pie habilitado y "Tienes cambios sin guardar" eternos):
+  //   • `modificadoEn`: `guardarReferenciasOrden` SÍ sella la auditoría de la orden (A7, igual que
+  //     la matriz), así que un guardado siempre mueve la clave — incluso cuando NO cambia ninguna
+  //     referencia (re-guardar exactamente lo mismo), caso que la firma de valores no vería.
+  //   • firma de valores: cubre lo contrario — que el servidor traiga OTRAS referencias sin que
+  //     `modificadoEn` se haya movido para nosotros (refetch que trae el guardado de otro usuario,
+  //     el importador de pedidos, un ETL…). Ahí la firma es lo único que delata el cambio.
+  // Ninguna de las dos, sola, cubre los dos casos: no quitar una "porque la otra basta".
+  const delServidor = useMemo(
+    () => valoresDelServidor(activos, valoresOrden),
+    [activos, valoresOrden],
+  );
+  const claveReset = `${orden.id}:${orden.modificadoEn}:${activos
+    .map((c) => c.id)
+    .join(',')}:${firmaReferencias(activos, delServidor)}`;
   useEffect(() => {
     if (reinicioBloqueado) {
       return;
     }
-    const inicial: Record<number, string> = {};
-    for (const campo of activos) {
-      inicial[campo.id] = valoresOrden.get(campo.id) ?? '';
-    }
-    setValores(inicial);
-    setFirmaCargada(firmaReferencias(activos, inicial));
+    setValores(delServidor);
+    setFirmaCargada(firmaReferencias(activos, delServidor));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveReset, reinicioBloqueado]);
 

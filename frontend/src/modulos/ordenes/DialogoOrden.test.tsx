@@ -1,5 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useSyncExternalStore } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Orden } from '@/api/tipos';
@@ -414,5 +415,116 @@ describe('<DialogoOrden> — composición heredada del modelo (Daniel 24-jul-202
     expect(campo).toHaveValue('');
     // Vaciar es un cambio pendiente: el guardado único se habilita.
     await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+  });
+});
+
+// ── Reinicio tras el REFETCH ─────────────────────────────────────────────────────────────────
+// El resto del archivo mockea `useOrden` con un valor ESTÁTICO, así que el ciclo real —guardar →
+// invalidar → la orden VUELVE del servidor— nunca se ejerce en unitarias y su único guardián era
+// el e2e (que no corre en local). Aquí `useOrden` se alimenta de un STORE EXTERNO: publicar una
+// orden nueva aterriza el refetch de verdad sobre el diálogo YA montado, que es donde vivía el
+// defecto de jul-2026 (la sección de referencias se quedaba "sucia" para siempre porque su clave
+// de reinicio solo miraba `modificadoEn`).
+
+/** Suscriptores del store (los `useSyncExternalStore` montados). */
+const suscriptoresOrden = new Set<() => void>();
+/** Lo que "responde el servidor" ahora mismo. */
+let ordenServidor: Orden;
+
+/** `useOrden` respaldado por el store externo (nombre `use*`: es el hook del componente). */
+function useOrdenDelStore(): EstadoOrden {
+  const datos = useSyncExternalStore(
+    (avisar: () => void) => {
+      suscriptoresOrden.add(avisar);
+      return () => {
+        suscriptoresOrden.delete(avisar);
+      };
+    },
+    () => ordenServidor,
+  );
+  return consultaConOrden(datos);
+}
+
+describe('<DialogoOrden> — el refetch re-sincroniza las referencias', () => {
+  /** Publica lo que responde el servidor y despierta al diálogo montado (el refetch). */
+  function publicar(nueva: Orden): void {
+    ordenServidor = nueva;
+    act(() => {
+      for (const avisar of suscriptoresOrden) {
+        avisar();
+      }
+    });
+  }
+
+  /** La orden del servidor con ESA referencia capturada (y, si se pide, otro sello A7). */
+  function conReferencia(valor: string, modificadoEn?: string): Orden {
+    return {
+      ...ordenServidor,
+      referencias: [{ id: 1, idClienteCampo: CAMPO_REF.id, etiqueta: CAMPO_REF.etiqueta, valor }],
+      ...(modificadoEn === undefined ? {} : { modificadoEn }),
+    };
+  }
+
+  beforeEach(() => {
+    suscriptoresOrden.clear();
+    ordenServidor = orden(1, 101);
+    guardarReferencias.mockReset();
+    guardarReferencias.mockImplementation(() => Promise.resolve());
+    useCamposCliente.mockReturnValue({
+      data: [CAMPO_REF],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useOrden.mockReset();
+    useOrden.mockImplementation(useOrdenDelStore);
+    renderConProveedores(<DialogoOrden abierto idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...PERM_TODOS]),
+    });
+  });
+
+  it('(A) tras guardar, el refetch con la referencia nueva deja la sección LIMPIA aunque el sello no se mueva', async () => {
+    const usuario = userEvent.setup();
+    await usuario.type(screen.getByLabelText('Orden de compra'), 'OC-1');
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+
+    await usuario.click(screen.getByTestId('guardar-orden'));
+    await waitFor(() => expect(guardarReferencias).toHaveBeenCalledTimes(1));
+    // El servidor YA tiene la referencia; en este escenario `modificadoEn` no cambió para nosotros
+    // (p. ej. la respuesta que aterriza es la de otro guardado). La firma de valores lo delata.
+    publicar(conReferencia('OC-1'));
+
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeDisabled());
+    expect(screen.getByTestId('aviso-cambios-orden')).toHaveTextContent('Sin cambios pendientes');
+  });
+
+  // (D) es el caso DISCRIMINANTE de la firma de valores en la clave de reinicio: sin ella (clave
+  // solo por `modificadoEn`) esta prueba falla, aunque (A) y (C) sigan pasando. No la quites.
+  it('(D) sin tocar nada, un refetch con OTRAS referencias re-sincroniza la pantalla', async () => {
+    expect(screen.getByLabelText('Orden de compra')).toHaveValue('');
+
+    publicar(conReferencia('OC-9'));
+
+    await waitFor(() => expect(screen.getByLabelText('Orden de compra')).toHaveValue('OC-9'));
+    expect(screen.getByTestId('guardar-orden')).toBeDisabled();
+  });
+
+  it('(C) si el guardado FALLA, un refetch posterior NO pisa lo capturado', async () => {
+    const usuario = userEvent.setup();
+    guardarReferencias.mockRejectedValueOnce(new Error('La red falló'));
+    await usuario.type(screen.getByLabelText('Orden de compra'), 'OC-7');
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+
+    await usuario.click(screen.getByTestId('guardar-orden'));
+    await waitFor(() => expect(guardarReferencias).toHaveBeenCalledTimes(1));
+    // Aterriza un refetch (el servidor sigue SIN la referencia y con otro sello): el bloqueo de
+    // reinicio debe conservar lo tecleado para poder reintentar sin recapturar.
+    publicar({ ...ordenServidor, modificadoEn: '2026-06-20T00:00:00.000Z' });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('aviso-cambios-orden')).toHaveTextContent('cambios sin guardar'),
+    );
+    expect(screen.getByLabelText('Orden de compra')).toHaveValue('OC-7');
+    expect(screen.getByTestId('guardar-orden')).toBeEnabled();
   });
 });

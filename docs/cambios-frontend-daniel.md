@@ -280,13 +280,22 @@ ficha-estampado`) y **rutas del frontend** (`/catalogos/bordados`, `/catalogos/g
 
 ### ⚠️ Nota de despliegue (importante)
 
+**No hay nada que hacer a mano: se actualiza solo con desplegar.**
+
 El seed es **idempotente por código** y usa `update: {}` — es decir, **NO pisa el `nombre` de un
 registro que ya existe** (a propósito: el nombre pudo editarse en producción). Por eso, en `prueba` y
-en producción los roles de proveedor y los reactivos de ficha **seguirán mostrando su nombre viejo**
-aunque se re-despliegue con `SEED_ON_START=true`. Para que tomen el nombre nuevo hay que **editarlos
-a mano una vez** desde la UI de Administración (o correr un `UPDATE` puntual). Las bases **nuevas**
-sí nacen con el vocabulario unificado. Todo el resto del renombrado (que vive en código) se aplica
-solo con desplegar.
+en producción los roles de proveedor y los reactivos de ficha se habrían quedado con su nombre viejo
+aunque se re-desplegara con `SEED_ON_START=true`. Para que no hubiera pasos manuales (petición de
+Daniel), se agregó la **migración de datos `20260725140000_roles_proveedor_prov_de_arte`**, que el
+deploy aplica solo (`prisma migrate deploy`): renombra los dos **roles de proveedor**
+(`estampado` → "Prov. de Arte (estampado)", `bordado` → "Prov. de Arte (bordado)") y los dos
+**reactivos de ficha** (`InfHab` → "Información de avíos", `Medidas` → "Medidas de avíos").
+
+Es **condicional a propósito**: cada `UPDATE` solo toca el renglón si todavía conserva el **nombre
+por defecto exacto** del seed viejo; si alguien ya lo personalizó a otra cosa, se respeta su texto.
+Es idempotente (re-correrla no cambia nada) y no toca las claves estables (`codigo`/`clave`). Las
+bases **nuevas** siguen naciendo con el vocabulario unificado desde el seed. Todo el resto del
+renombrado (que vive en código) se aplica solo con desplegar.
 
 ### Archivos tocados
 
@@ -299,9 +308,11 @@ solo con desplegar.
   `modulos/costos/{PreCostoPagina,CosteoOrdenPagina}.tsx` · `modulos/desarrollo/DialogoPrecosto.tsx` ·
   `modulos/ruta-critica/{PanelRutaOrden,ProcesosResponsablesPagina,piezas}.tsx` ·
   `modulos/esma/SelectorMaquilero.tsx` · `api/esquemas.ts`.
-- **Backend (6):** `contrato/permisos.ts` · `dominio/catalogos/bordados.ts` ·
+- **Backend (7):** `contrato/permisos.ts` · `dominio/catalogos/bordados.ts` ·
   `dominio/modelos/bom-modelo.ts` · `dominio/desarrollo/precostos.ts` ·
-  `dominio/produccion/impresos/impreso-envio-maquila.ts` · `prisma/seed.ts`.
+  `dominio/produccion/impresos/impreso-envio-maquila.ts` · `prisma/seed.ts` ·
+  `prisma/migrations/20260725140000_roles_proveedor_prov_de_arte/migration.sql` (**nuevo**,
+  migración de datos: renombra los renglones ya sembrados que conserven el nombre viejo).
 - **Pruebas (5):** `frontend/e2e/{bordados,modelos}.spec.ts` ·
   `frontend/src/modulos/bordados/{BordadosPagina,GaleriaBordados}.test.tsx` ·
   `frontend/src/modulos/modelos/EditorBom.test.tsx`.
@@ -393,6 +404,22 @@ inmediata con su propio endpoint y su propio efecto (subir un archivo, registrar
 matriz con su diálogo de confirmación). Meterlas en el botón único las volvería más confusas, no menos.
 "Cancelar orden" sigue igual (exige `ordenes.cancelar` y su motivo).
 
+**Defecto de auditoría (A7) que destapó el e2e — corregido:** `guardarReferenciasOrden` escribía los
+renglones `OrdenReferencia` y su bitácora, pero **no sellaba `modificadoEn`/`modificadoPorId` de la
+orden**, a diferencia de la matriz y el encabezado. Consecuencias: el bloque **"Historial"** del
+detalle mentía tras guardar referencias, y la UI —que se re-sincroniza por `modificadoEn`— nunca se
+enteraba del guardado, así que la sección quedaba "sucia para siempre" (el botón único seguía
+habilitado y el aviso "Tienes cambios sin guardar" no se iba). Ahora la orden se sella en la **misma
+transacción**, calcando lo que hace la matriz. Las referencias son **datos de la orden** (en el Access
+viejo eran columnas del propio registro), así que marcarla como modificada es lo correcto.
+
+> **Qué NO se cambió y por qué:** comentarios, adjuntos, hitos y la liga con Desarrollo **tampoco**
+> tocan `Orden.modificadoEn` — y así se queda **a propósito**. No son datos de la orden sino registros
+> propios con su propia auditoría y su propia entidad en bitácora (el comentario incluso se registra
+> como `OTRO`, "es un evento de hilo, no un cambio de datos de la orden"). Además, hacerlos mover
+> `modificadoEn` **agravaría** la deuda de abajo: hoy re-inicializarían las secciones y tirarían las
+> capturas pendientes.
+
 > ⚠️ **Deuda conocida, anotada y NO resuelta en este lote** (`HOJA-DE-RUTA.md` §4): esas acciones
 > inmediatas **sí** modifican la orden, y al hacerlo re-inicializan las 3 secciones — **tirando las
 > capturas pendientes** de encabezado/matriz/referencias. El riesgo ya existía (cada sección se
@@ -436,8 +463,9 @@ corrido todavía. Ambos caminos tienen prueba.
   (**nuevo**) · `prisma/migrations/20260724130000_ordenes_composicion_historica/migration.sql`
   (**nuevo**, migración de datos) · `src/contrato/esquemas/modelo.ts` ·
   `src/dominio/modelos/modelos.ts` · `src/api/modelos/modelos.rutas.ts` ·
-  `src/dominio/produccion/ordenes.ts` (`resolverComposicion` + guard anti-pérdida) ·
-  `src/dominio/pedidos/importacion-pdf.ts` · `backend/openapi.json` (regenerado).
+  `src/dominio/produccion/ordenes.ts` (`resolverComposicion` + guard anti-pérdida +
+  `guardarReferenciasOrden` sella la auditoría de la orden) · `src/dominio/pedidos/importacion-pdf.ts` ·
+  `backend/openapi.json` (regenerado).
 - **Frontend (10):** `modulos/ordenes/guardado-orden.tsx` (**nuevo**) · `modulos/ordenes/DialogoOrden.tsx` ·
   `modulos/ordenes/EditorEncabezadoOrden.tsx` · `modulos/ordenes/PanelMatriz.tsx` ·
   `modulos/ordenes/PanelReferencias.tsx` · `modulos/ordenes/esquemas.ts` ·
@@ -452,9 +480,20 @@ corrido todavía. Ambos caminos tienen prueba.
 - **Pruebas (8):** `backend/src/contrato/esquemas/modelo.test.ts` ·
   `backend/src/dominio/produccion/ordenes.test.ts` ·
   `backend/src/dominio/pedidos/importacion-pdf.int.test.ts` ·
-  `frontend/src/modulos/ordenes/DialogoOrden.test.tsx` ·
+  `frontend/src/modulos/ordenes/DialogoOrden.test.tsx` (incluye 3 pruebas nuevas que aterrizan el
+  **refetch** de verdad —store externo + `useSyncExternalStore`— sobre el diálogo ya montado: sin
+  ellas, el ciclo guardar→invalidar→reinicio solo lo cubría el e2e) ·
   `frontend/src/modulos/modelos/{DialogoModelo,ModelosPagina,GaleriaModelos,EditorBom}.test.tsx` ·
   `frontend/e2e/ordenes.spec.ts`.
+- **CI, para poder DEPURAR esto (2):** `.github/workflows/ci.yml` · `frontend/playwright.config.ts`.
+  Cuando el e2e de este lote se puso rojo, el fallo resultó **indepurable**: el paso de diagnóstico
+  volcaba `docker compose logs` **sin tope** (miles de líneas de peticiones del backend) y empujaba
+  la salida de Playwright fuera de la ventana de log que la API de GitHub deja leer; y el artefacto
+  `playwright-report.zip` tampoco se puede descargar (vive en un blob de Azure que el proxy bloquea).
+  Ahora: el volcado va con `--tail=200`; Playwright agrega en CI los reporters `github`
+  (anotaciones con archivo:línea) y `json`; y un paso nuevo —**el último del job**— imprime el
+  **resumen compacto de las pruebas fallidas** (archivo:línea + el error) en el log y en el
+  *summary* del run. Así un e2e rojo se lee de un vistazo, sin artefactos ni ventanas de log.
 - `docs/cambios-frontend-daniel.md` — esta bitácora.
 
 ---

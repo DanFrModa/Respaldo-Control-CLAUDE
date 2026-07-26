@@ -396,6 +396,44 @@ describe('Órdenes (F2-E2) — referencias por cliente (D7)', () => {
     expect(conRef.referencias[0]?.etiqueta).toBe('No. de pedido del cliente');
   });
 
+  /**
+   * Regresión (24-jul-2026): guardar referencias NO sellaba `modificadoEn`/`modificadoPorId` de la
+   * orden aunque la orden sí cambiaba → el "Historial" del detalle mentía y la UI, que se
+   * re-sincroniza por `modificadoEn`, se quedaba creyendo que había cambios sin guardar para
+   * siempre (lo destapó el e2e `ordenes.spec.ts`). Las referencias son datos de la ORDEN (A7).
+   */
+  it('guardar referencias SELLA la auditoría de la orden y deja bitácora MODIFICAR', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    const antes = await cliente.orden.findUniqueOrThrow({ where: { id: orden.id } });
+
+    // OTRO usuario guarda las referencias: así el sello es comprobable sin depender del reloj
+    // (`modificadoEn` es `@updatedAt`; crear y guardar pueden caer en el mismo milisegundo).
+    const otro = sesionDePrueba({
+      id: 'usuario-referencias',
+      idEmpresaActiva: empresa.id,
+      permisos: [...PERM_TODOS],
+    });
+    await guardarReferenciasOrden(
+      otro,
+      orden.id,
+      { referencias: [{ idClienteCampo: campoCliente.id, valor: 'PO-777' }] },
+      bd(),
+    );
+
+    const despues = await cliente.orden.findUniqueOrThrow({ where: { id: orden.id } });
+    expect(despues.modificadoPorId).toBe('usuario-referencias');
+    expect(despues.modificadoEn.getTime()).toBeGreaterThanOrEqual(antes.modificadoEn.getTime());
+
+    const eventos = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: String(orden.id) },
+      orderBy: { id: 'asc' },
+    });
+    // CREAR + MODIFICAR (referencias)
+    expect(eventos.map((e) => e.accion)).toEqual(['CREAR', 'MODIFICAR']);
+    expect((eventos[1]?.datos as { referencias?: number } | null)?.referencias).toBe(1);
+  });
+
   it('RECHAZA una referencia con un ClienteCampo de OTRO cliente', async () => {
     const s = sesion([...PERM_TODOS]);
     const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());

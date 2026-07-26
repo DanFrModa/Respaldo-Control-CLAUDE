@@ -240,10 +240,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
-      # Diagnostico si algo fallo: vuelca logs de los tres servicios.
+      # Diagnostico si algo fallo: vuelca logs de los tres servicios, ACOTADOS. Sin `--tail` el
+      # volcado son miles de lineas de peticiones del backend que empujan la salida de Playwright
+      # fuera de la ventana de log que la API de GitHub deja leer (un fallo de e2e quedaba
+      # indepurable). Con el tope, el diagnostico sigue estando y el log sigue siendo legible.
       - name: Logs del stack (si fallo)
         if: failure()
-        run: docker compose logs
+        run: docker compose logs --no-color --tail=200
 
       - name: Reporte de Playwright (si fallo)
         if: failure()
@@ -256,3 +259,54 @@ jobs:
       - name: Bajar el stack
         if: always()
         run: docker compose down -v
+
+      # Resumen COMPACTO de las pruebas fallidas, EL ULTIMO del job (y en el summary del run): asi
+      # la lista de fallos con su error queda siempre en las ultimas lineas del log, pase lo que
+      # pase con el volcado de arriba o con el artefacto.
+      - name: Resumen de fallos de Playwright (si fallo)
+        if: failure()
+        working-directory: frontend
+        run: |
+          cat > /tmp/resumen-e2e.cjs <<'JS'
+          const fs = require('node:fs');
+          const RUTA = 'test-results/resultados.json';
+          const sinAnsi = (t) => String(t).replace(/\u001b\[[0-9;]*m/g, '');
+          if (!fs.existsSync(RUTA)) {
+            console.log('## E2E: no hay ' + RUTA + ' (¿el paso de pruebas ni arrancó?)');
+            process.exit(0);
+          }
+          const informe = JSON.parse(fs.readFileSync(RUTA, 'utf8'));
+          const fallos = [];
+          const recorrer = (suites) => {
+            for (const suite of suites ?? []) {
+              for (const spec of suite.specs ?? []) if (spec.ok !== true) fallos.push(spec);
+              recorrer(suite.suites);
+            }
+          };
+          recorrer(informe.suites);
+          const s = informe.stats ?? {};
+          console.log('## E2E — ' + fallos.length + ' prueba(s) fallida(s)');
+          console.log('');
+          console.log('esperadas: ' + (s.expected ?? '?') + ' · inesperadas: ' + (s.unexpected ?? '?') +
+            ' · con reintento: ' + (s.flaky ?? '?') + ' · omitidas: ' + (s.skipped ?? '?'));
+          for (const spec of fallos) {
+            console.log('');
+            console.log('### ✘ ' + spec.file + ':' + spec.line + ' › ' + spec.title);
+            const resultados = (spec.tests ?? []).flatMap((t) => t.results ?? []);
+            // `errors: []` NO es nullish: con `??` un resultado con la lista vacía y `error`
+            // poblado imprimía el encabezado del spec SIN mensaje. Se mira la LONGITUD.
+            const errores = resultados.flatMap((r) =>
+              r.errors?.length ? r.errors : r.error ? [r.error] : [],
+            );
+            const visto = new Set();
+            for (const error of errores) {
+              const texto = sinAnsi(error.message ?? error.value ?? '').split('\n').slice(0, 25).join('\n');
+              if (texto === '' || visto.has(texto)) continue;
+              visto.add(texto);
+              console.log('```');
+              console.log(texto);
+              console.log('```');
+            }
+          }
+          JS
+          node /tmp/resumen-e2e.cjs | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

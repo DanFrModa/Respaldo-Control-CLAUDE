@@ -969,6 +969,12 @@ export async function cancelarOrden(
  * Guarda el SET COMPLETO de referencias de una orden (D7 — generaliza el `Monarch` del viejo).
  * Cada valor debe corresponder a un `ClienteCampo` ACTIVO del CLIENTE de la orden (rechaza un
  * campo de otro cliente o desactivado). Diff mínimo conservando auditoría; en UNA transacción.
+ *
+ * Las referencias son DATOS DE LA ORDEN (en el viejo eran columnas del propio registro), así que
+ * guardarlas SÍ marca la orden como modificada (`modificadoEn`/`modificadoPorId`) en la MISMA tx,
+ * igual que la matriz o el encabezado (A7). Faltaba: el "Historial" del detalle mentía tras
+ * guardar referencias, y la UI —que se re-sincroniza por `modificadoEn`— no se enteraba del
+ * guardado (defecto encontrado por el e2e de `ordenes.spec.ts`, 24-jul-2026).
  */
 export async function guardarReferenciasOrden(
   sesion: SesionUsuario,
@@ -986,6 +992,9 @@ export async function guardarReferenciasOrden(
     }
     await validarReferencias(tx, actual.idCliente, datos.referencias);
     await sincronizarReferencias(tx, sesion, id, datos.referencias);
+
+    // La orden CAMBIÓ: se sella su auditoría en la misma tx (calca lo que hace la matriz, A7).
+    await tx.orden.update({ where: { id }, data: { ...datosModificacion(sesion) } });
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
