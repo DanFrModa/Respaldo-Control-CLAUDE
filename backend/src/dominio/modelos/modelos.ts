@@ -209,6 +209,9 @@ async function exigirTipoProductoValido(tx: Tx, idTipoProducto: number): Promise
 function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
   const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
+  // Composición del DESARROLLO (Daniel 24-jul-2026): '' se guarda como null (nunca cadena vacía).
+  if (datos.composicion !== undefined)
+    data.composicion = datos.composicion === '' ? null : datos.composicion;
   if (datos.maquilaBase !== undefined) data.maquilaBase = datos.maquilaBase;
   if (datos.idTemporada !== undefined) data.idTemporada = datos.idTemporada;
   if (datos.idCurvaTalla !== undefined) data.idCurvaTalla = datos.idCurvaTalla;
@@ -289,6 +292,17 @@ function aplicarOpcionalesEditar(
     if (nuevo !== actual.descripcion) {
       cambios.descripcion = nuevo;
       detalle.descripcion = { de: actual.descripcion, a: nuevo };
+    }
+  }
+
+  // composicion (texto, Daniel 24-jul-2026): omitir = no tocar; vacío/`null` = borrar (a null).
+  // Cambiarla aquí NO re-deriva las órdenes ya creadas (ver `crearOrden`): las que no tienen
+  // override (`compForzada = false`) se re-derivan la próxima vez que se toca la orden.
+  if (datos.composicion !== undefined) {
+    const nuevo = datos.composicion === null || datos.composicion === '' ? null : datos.composicion;
+    if (nuevo !== actual.composicion) {
+      cambios.composicion = nuevo;
+      detalle.composicion = { de: actual.composicion, a: nuevo };
     }
   }
 

@@ -239,7 +239,9 @@ export async function impresoListaPrecios(
 ): Promise<ImpresoListaPrecios> {
   const datos = await armarDatosImpresoListaPrecios(sesion, idLista, bd, deps);
   return {
-    buffer: await renderizarPdfEnWorker('desarrollo-lista-precios', datos),
+    buffer: await renderizarPdfEnWorker('desarrollo-lista-precios', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
     folio: datos.folio,
   };
 }

@@ -130,7 +130,7 @@ export function DialogoBordado({
         { id: bordado.id, cuerpo: aCuerpoEditar(datos) },
         {
           onSuccess: (resultado) => {
-            toast.success(`Bordado "${resultado.nombre}" actualizado.`);
+            toast.success(`Arte "${resultado.nombre}" actualizado.`);
             alCambiarAbierto(false);
           },
           onError: (error) => toast.error(error.message),
@@ -140,7 +140,7 @@ export function DialogoBordado({
     }
     crear.mutate(aCuerpoCrear(datos), {
       onSuccess: (resultado) => {
-        toast.success(`Bordado "${resultado.nombre}" creado.`);
+        toast.success(`Arte "${resultado.nombre}" creado.`);
         alCambiarAbierto(false);
       },
       onError: (error) => toast.error(error.message),
@@ -155,11 +155,11 @@ export function DialogoBordado({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={(e) => void enviar(e)} noValidate>
           <DialogHeader>
-            <DialogTitle>{esEdicion ? 'Editar bordado' : 'Nuevo bordado'}</DialogTitle>
+            <DialogTitle>{esEdicion ? 'Editar arte' : 'Nuevo arte'}</DialogTitle>
             <DialogDescription>
               {esEdicion
-                ? 'Cambia los datos de este bordado/estampado.'
-                : 'Captura los datos del nuevo bordado/estampado del catálogo.'}
+                ? 'Cambia los datos de este arte.'
+                : 'Captura los datos del nuevo arte del catálogo.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -210,7 +210,7 @@ export function DialogoBordado({
                   disabled={guardando}
                   {...registrar('puntadas')}
                 />
-                <FieldDescription>Informativo (alimenta el costeo del bordado).</FieldDescription>
+                <FieldDescription>Informativo (alimenta el costeo del arte).</FieldDescription>
                 <FieldError errors={[errors.puntadas]} />
               </Field>
 
@@ -249,7 +249,7 @@ export function DialogoBordado({
                   <FotoBordado bordado={bordado} deshabilitado={guardando} />
                 ) : (
                   <p className="text-sm text-muted-foreground" data-testid="foto-aviso-alta">
-                    Guarda el bordado primero para poder subir su foto.
+                    Guarda el arte primero para poder subir su foto.
                   </p>
                 )}
               </Field>
@@ -272,7 +272,7 @@ export function DialogoBordado({
               className="w-full sm:w-auto"
             >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-              {esEdicion ? 'Guardar cambios' : 'Crear bordado'}
+              {esEdicion ? 'Guardar cambios' : 'Crear arte'}
             </Button>
           </DialogFooter>
         </form>

@@ -100,5 +100,5 @@ describe('impreso inventario de telas (F4-E1, R9)', () => {
       consultarExistenciasTela: () => Promise.resolve(listaFake),
     });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20_000); // orquestador → render en worker (arranque en frío del pool bajo carga de tests).
+  });
 });

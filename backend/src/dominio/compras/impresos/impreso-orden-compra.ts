@@ -381,6 +381,8 @@ export async function impresoOrdenCompra(
   deps: DepsImpresoOC = {},
 ): Promise<ImpresoOC> {
   const datos = await armarDatosImpresoOC(sesion, id, bd, deps);
-  const buffer = await renderizarPdfEnWorker('orden-compra', datos);
+  const buffer = await renderizarPdfEnWorker('orden-compra', datos, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   return { buffer, numCompra: datos.numCompra };
 }

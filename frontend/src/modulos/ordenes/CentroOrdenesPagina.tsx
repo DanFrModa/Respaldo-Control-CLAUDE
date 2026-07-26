@@ -539,8 +539,8 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             }}
             alCambiarTexto={setTextoEstampador}
             cargando={estampadores.isFetching || bordadores.isFetching}
-            placeholder="Estampador"
-            etiqueta="Filtrar por estampador"
+            placeholder="Prov. de Arte"
+            etiqueta="Filtrar por prov. de arte"
             testid="centro-filtro-estampador"
           />
         </div>
@@ -704,7 +704,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span>Maquilero: {fila.maquilero ?? '—'}</span>
-                          <span>Estampador: {fila.estampador ?? '—'}</span>
+                          <span>Prov. de Arte: {fila.estampador ?? '—'}</span>
                           <span>Entrega: {mesDeFila(fila)}</span>
                         </div>
                       </button>
@@ -723,7 +723,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                         <TablaDensaHead numerica>Ordenada</TablaDensaHead>
                         <TablaDensaHead numerica>Cortada</TablaDensaHead>
                         <TablaDensaHead>Maquilero</TablaDensaHead>
-                        <TablaDensaHead>Estampador</TablaDensaHead>
+                        <TablaDensaHead>Prov. de Arte</TablaDensaHead>
                         <TablaDensaHead numerica>P. int.</TablaDensaHead>
                         <TablaDensaHead>OC tela</TablaDensaHead>
                         <TablaDensaHead>Entrega</TablaDensaHead>
@@ -1134,7 +1134,7 @@ function DetalleCentroOrden({
   // Panel "Ruta de la orden" (R4): el mosaico lo abre aquí mismo (sin navegar), reusando el
   // MISMO componente de Mis pendientes; el detalle completo sigue en /ruta-critica/ordenes/:id.
   const [rutaAbierta, setRutaAbierta] = useState(false);
-  // Panel "Habilitación de avíos" (R6, §4.6): el mosaico lo abre aquí mismo (sin navegar).
+  // Panel "Avíos" (R6, §4.6): el mosaico lo abre aquí mismo (sin navegar).
   const [habAbierta, setHabAbierta] = useState(false);
 
   if (consulta.isPending) {
@@ -1210,11 +1210,11 @@ function DetalleCentroOrden({
           />
           <Mosaico
             icono={Layers}
-            etiqueta="Habilitación"
+            etiqueta="Avíos"
             // Deshabilitado bloquea el click; solo se agrega el tooltip cuando falta el permiso.
             onClick={() => setHabAbierta(true)}
             deshabilitado={!puedeVerHabilitacion}
-            {...(puedeVerHabilitacion ? {} : { tooltip: 'Requiere permiso de Habilitación' })}
+            {...(puedeVerHabilitacion ? {} : { tooltip: 'Requiere permiso de Avíos' })}
             testid="mosaico-habilitacion"
           />
           <Mosaico
@@ -1358,7 +1358,7 @@ function DetalleCentroOrden({
               {fila?.maquilero ?? orden.maquilero ?? '—'}
               {fila !== undefined && fila.numMaquileros > 1 ? ` (×${fila.numMaquileros})` : ''}
             </CampoPanel>
-            <CampoPanel k="Estampador / bordador">{fila?.estampador ?? '—'}</CampoPanel>
+            <CampoPanel k="Prov. de Arte">{fila?.estampador ?? '—'}</CampoPanel>
           </div>
         </section>
 

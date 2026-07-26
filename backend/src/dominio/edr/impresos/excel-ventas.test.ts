@@ -81,7 +81,7 @@ describe('excelVentas', () => {
     expect(buffer.length).toBeGreaterThan(0);
     // Un .xlsx es un ZIP: empieza por "PK".
     expect(buffer.subarray(0, 2).toString('latin1')).toBe('PK');
-  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
+  });
 
   it('pagina internamente y trae TODAS las líneas (no solo la primera página)', async () => {
     // 250 líneas con tope interno de 100 → 3 páginas.
@@ -104,7 +104,7 @@ describe('excelVentas', () => {
     expect(hoja).toBeDefined();
     // 1 encabezado + 250 líneas + 1 fila total.
     expect(hoja?.rowCount).toBe(252);
-  }, 20_000);
+  });
 
   it('vuelca folio de OP, cliente, importe y mes; la línea manual sin folio sale "—"', async () => {
     const consultar = vi.fn(
@@ -136,5 +136,5 @@ describe('excelVentas', () => {
     const segunda = hoja?.getRow(3);
     expect(segunda?.getCell(1).value).toBe('—');
     expect(segunda?.getCell(8).value).toBe('Junio 2026');
-  }, 20_000);
+  });
 });

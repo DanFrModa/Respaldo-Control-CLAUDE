@@ -652,6 +652,9 @@ export type EmpresaConfiguracion =
 /** Cuerpo de edicion de la configuracion (`PATCH /api/empresas/{id}/configuracion`). */
 export type EmpresaConfiguracionEditar =
   paths['/api/empresas/{id}/configuracion']['patch']['requestBody']['content']['application/json'];
+/** LOGO de la empresa con su URL prefirmada (`GET /api/empresas/{id}/logo`), o todo null. */
+export type EmpresaLogo =
+  paths['/api/empresas/{id}/logo']['get']['responses']['200']['content']['application/json'];
 
 // ── Tipos de proceso de maquila (Módulo 4, F3-E1; CRUD patrón Almacenes) ─────
 

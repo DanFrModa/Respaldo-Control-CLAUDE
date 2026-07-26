@@ -196,6 +196,16 @@ const esquemaIdMaquilero = z
   .int({ error: 'El id del maquilero debe ser entero' })
   .positive({ error: 'El id del maquilero debe ser positivo' });
 
+/**
+ * COMPOSICIÓN textil del modelo (decisión de Daniel, 24-jul-2026): se captura en la ficha del
+ * modelo (el desarrollo) y toda orden de ese modelo la HEREDA sola. Mismo tope que la composición
+ * de la orden (2000 caracteres) para que la herencia nunca se trunque.
+ */
+const esquemaComposicionModelo = z
+  .string()
+  .trim()
+  .max(2000, { error: 'La composición no puede tener más de 2000 caracteres' });
+
 /** Campos opcionales del modelo (mismas reglas de longitud en alta y edición). */
 const camposOpcionalesModelo = {
   descripcion: z
@@ -203,6 +213,7 @@ const camposOpcionalesModelo = {
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
     .optional(),
+  composicion: esquemaComposicionModelo.optional(),
 } as const;
 
 /**
@@ -317,6 +328,8 @@ export const esquemaModeloEditar = z
     /** Cambia la secuencia de estampado; omitir = no tocar (R5/B10). No es nullable (tiene default). */
     secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
+    /** `null`/'' borra la composición del modelo; omitir = no tocar. */
+    composicion: camposOpcionalesModelo.composicion.nullable(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
   })
   .extend({
@@ -385,6 +398,10 @@ export const esquemaModeloSalida = z
     id: z.number().int().describe('Id del modelo.'),
     codigo: z.string().describe('Código/clave de negocio del modelo (único global).'),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
+    composicion: z
+      .string()
+      .nullable()
+      .describe('Composición textil del modelo (la heredan sus órdenes), o null.'),
     maquilaBase: z.number().nullable().describe('Costo de maquila base, o null.'),
     idTemporada: z.number().int().nullable().describe('Id de la temporada, o null.'),
     temporada: z.string().nullable().describe('Nombre de la temporada, o null.'),

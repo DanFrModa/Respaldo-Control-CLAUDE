@@ -21,7 +21,22 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // En CI, además del `list` de siempre y del reporte HTML (que se sube como artefacto):
+  //  • `github`: emite anotaciones `::error` con el archivo/línea del fallo, visibles en la UI del
+  //    run Y en el log crudo del job.
+  //  • `json`: deja `test-results/resultados.json` (carpeta ya ignorada por git), del que el paso
+  //    "Resumen de fallos" del workflow saca la lista compacta al FINAL del log — el volcado de
+  //    `docker compose logs` es largo y, sin ese resumen al final, la salida de las pruebas queda
+  //    fuera de la ventana de log que la API de GitHub deja leer (y el artefacto no siempre se
+  //    puede descargar).
+  reporter: process.env.CI
+    ? [
+        ['list'],
+        ['github'],
+        ['json', { outputFile: 'test-results/resultados.json' }],
+        ['html', { open: 'never' }],
+      ]
+    : 'list',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {

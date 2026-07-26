@@ -89,6 +89,13 @@ export const esquemaEmpresaSalida = z
     paraIpt: z.boolean().describe('Participa en el inventario de producto terminado.'),
     paraEdr: z.boolean().describe('Participa en el estado de resultados.'),
     activa: z.boolean().describe('Falso si está desactivada (borrado suave).'),
+    idArchivoLogo: z
+      .string()
+      .nullable()
+      .describe(
+        'Id del Archivo que es el LOGO de la empresa, o null si usa el empaquetado. ' +
+          'Sirve además de versión para refrescar la caché del navegador al cambiarlo.',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
@@ -203,3 +210,86 @@ export const esquemaConfiguracionEmpresaSalida = z
 
 /** Forma de la configuración de empresa tal como la devuelve la API. */
 export type ConfiguracionEmpresaSalida = z.infer<typeof esquemaConfiguracionEmpresaSalida>;
+
+// ── LOGO de la empresa (post-F9, petición de Daniel del 25-jul-2026) ──────────
+
+/**
+ * Solicitud de subida del LOGO de la empresa (flujo presigned, igual que la foto de bordado). Solo
+ * **PNG o JPG** y hasta **5 MB**: son los formatos que `@react-pdf/renderer` sabe incrustar en los
+ * impresos, y el peso viaja dentro de cada PDF. El dominio re-valida (es la autoridad).
+ */
+export const esquemaEmpresaLogoCrear = z
+  .object({
+    nombreOriginal: z
+      .string({ error: 'El nombre del archivo es obligatorio' })
+      .trim()
+      .min(1, { error: 'El nombre del archivo es obligatorio' })
+      .max(255)
+      .describe('Nombre del archivo tal como lo llama el usuario.'),
+    tipoMime: z
+      .enum(['image/png', 'image/jpeg'], {
+        error: 'El logo debe ser una imagen PNG o JPG (son las que se pueden imprimir en los PDF)',
+      })
+      .describe('Tipo MIME del logo: image/png o image/jpeg.'),
+    tamanoBytes: z
+      .number({ error: 'El tamaño es obligatorio' })
+      .int({ error: 'El tamaño debe ser un entero de bytes' })
+      .positive({ error: 'El archivo está vacío' })
+      .max(5 * 1024 * 1024, { error: 'El logo no puede pesar más de 5 MB' })
+      .describe('Tamaño exacto en bytes.'),
+  })
+  .describe('Datos para preparar la subida del logo de la empresa.');
+
+/** Datos validados de la solicitud de subida del logo. */
+export type DatosEmpresaLogoCrear = z.infer<typeof esquemaEmpresaLogoCrear>;
+
+/**
+ * Confirmación de la subida del logo (PASO 2). Se manda DESPUÉS de que el PUT a R2 salió bien: solo
+ * entonces la empresa cambia de logo y se borra el anterior. Así una subida a medias (PUT fallido,
+ * pestaña cerrada) deja intacta la marca del sistema.
+ */
+export const esquemaEmpresaLogoConfirmar = z
+  .object({
+    idArchivo: z
+      .string({ error: 'El id del archivo es obligatorio' })
+      .trim()
+      .min(1, { error: 'El id del archivo es obligatorio' })
+      .describe('Id del Archivo devuelto al preparar la subida.'),
+  })
+  .describe('Confirma que el logo ya se subió a R2 y lo deja como logo vigente.');
+
+/** Datos validados de la confirmación del logo. */
+export type DatosEmpresaLogoConfirmar = z.infer<typeof esquemaEmpresaLogoConfirmar>;
+
+/** Salida tras solicitar la subida del logo: registro + URL PUT prefirmada para R2. */
+export const esquemaEmpresaLogoSubida = z
+  .object({
+    idArchivo: z.string().describe('Id del registro Archivo creado para el logo.'),
+    nombreOriginal: z.string().describe('Nombre original del archivo.'),
+    urlSubida: z.string().describe('URL PUT prefirmada: el navegador sube directo a R2.'),
+    expiraEnSegundos: z.number().int().describe('Vigencia de la URL de subida (segundos).'),
+  })
+  .describe('Resultado de preparar la subida del logo (URL prefirmada).');
+
+/** Forma de la respuesta al preparar la subida del logo. */
+export type EmpresaLogoSubida = z.infer<typeof esquemaEmpresaLogoSubida>;
+
+/**
+ * Logo de una empresa con su URL GET prefirmada (para la vista previa de Administración). Todo en
+ * `null` cuando la empresa aún no tiene logo propio: ahí el sistema usa el PNG empaquetado.
+ */
+export const esquemaEmpresaLogoSalida = z
+  .object({
+    idArchivo: z.string().nullable().describe('Id del registro Archivo del logo, o null.'),
+    nombreOriginal: z.string().nullable().describe('Nombre original del archivo, o null.'),
+    tipoMime: z.string().nullable().describe('Tipo MIME del logo, o null.'),
+    tamanoBytes: z.number().int().nullable().describe('Tamaño en bytes, o null.'),
+    urlDescarga: z
+      .string()
+      .nullable()
+      .describe('URL GET prefirmada para ver el logo, o null si la empresa no tiene.'),
+  })
+  .describe('Logo de la empresa (con su URL de descarga) o vacío si no tiene.');
+
+/** Forma del logo de una empresa tal como la devuelve la API. */
+export type EmpresaLogoSalida = z.infer<typeof esquemaEmpresaLogoSalida>;

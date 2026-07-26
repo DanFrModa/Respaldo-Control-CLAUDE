@@ -294,7 +294,7 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
             Recibo de maquila
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
-            Recibe prenda terminada de costura o estampado. Lo de costura entra a inventario PT.
+            Recibe prenda terminada de costura o arte. Lo de costura entra a inventario PT.
           </p>
         </div>
       </header>
@@ -363,7 +363,7 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="maquilero">
-                      {esEstampado ? 'Estampador' : 'Maquilero'}
+                      {esEstampado ? 'Prov. de Arte' : 'Maquilero'}
                     </FieldLabel>
                     <SelectNativo
                       id="maquilero"

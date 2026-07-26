@@ -296,6 +296,8 @@ export async function impresoNotaSalida(
   deps: DepsImpresoNotaSalida = {},
 ): Promise<ImpresoNotaSalida> {
   const datos = await armarDatosImpresoNotaSalida(sesion, id, bd, deps);
-  const buffer = await renderizarPdfEnWorker('nota-salida', datos);
+  const buffer = await renderizarPdfEnWorker('nota-salida', datos, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   return { buffer, numNota: datos.numNota };
 }

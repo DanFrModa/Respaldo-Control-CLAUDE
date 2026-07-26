@@ -11,6 +11,7 @@
  */
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
+import { idLogoEmpresa } from '../../comun/logo-empresa.js';
 import { esquemaErrorApi, esquemaSesionActual } from '../../contrato/index.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 
@@ -33,11 +34,18 @@ export const rutasSesion: FastifyPluginCallbackZod = (app, _opciones, done) => {
           .code(401)
           .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
       }
+      // El id del logo viaja con la sesión (post-F9, branding): con eso el riel sabe si pedir la
+      // imagen al servidor o pintar la empaquetada, sin una petición extra, y el id hace de
+      // versión para que el navegador refresque el logo en cuanto se cambia en Administración.
       return reply.code(200).send({
         id: sesion.id,
         username: sesion.username,
         nombre: sesion.nombre,
-        empresaActiva: { id: sesion.idEmpresaActiva, nombre: sesion.nombreEmpresaActiva },
+        empresaActiva: {
+          id: sesion.idEmpresaActiva,
+          nombre: sesion.nombreEmpresaActiva,
+          idArchivoLogo: await idLogoEmpresa(sesion.idEmpresaActiva),
+        },
         permisos: [...sesion.permisos],
       });
     },

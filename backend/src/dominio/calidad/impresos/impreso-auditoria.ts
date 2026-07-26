@@ -358,5 +358,8 @@ export async function impresoAuditoria(
   deps: DepsImpresoAuditoria = {},
 ): Promise<ImpresoAuditoria> {
   const datos = await armarDatosImpresoAuditoria(sesion, idAuditoria, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('auditoria', datos), folio: datos.numAuditoria };
+  return {
+    buffer: await renderizarPdfEnWorker('auditoria', datos, { idEmpresa: sesion.idEmpresaActiva }),
+    folio: datos.numAuditoria,
+  };
 }

@@ -14,6 +14,10 @@ import {
  * Dialogo de confirmacion reutilizable para acciones delicadas (desactivar,
  * etc.). Componente generico del patron CRUD: el llamador decide el texto, el
  * estilo del boton de accion y que ocurre al confirmar.
+ *
+ * `accionSecundaria` (opcional) agrega una TERCERA salida entre cancelar y
+ * confirmar, para las decisiones de tres caminos — p. ej. el guardia de cierre
+ * del dialogo de una orden: Cancelar / Salir sin guardar / Guardar y salir.
  */
 export function DialogoConfirmacion({
   abierto,
@@ -24,6 +28,7 @@ export function DialogoConfirmacion({
   textoCancelar = 'Cancelar',
   variante = 'default',
   procesando = false,
+  accionSecundaria,
   alConfirmar,
 }: {
   abierto: boolean;
@@ -34,6 +39,8 @@ export function DialogoConfirmacion({
   textoCancelar?: string;
   variante?: 'default' | 'destructive';
   procesando?: boolean;
+  /** Tercera salida opcional (ni cancelar ni confirmar). */
+  accionSecundaria?: { texto: string; alAccionar: () => void; testid?: string };
   alConfirmar: () => void;
 }): React.JSX.Element {
   return (
@@ -52,6 +59,17 @@ export function DialogoConfirmacion({
           >
             {textoCancelar}
           </Button>
+          {accionSecundaria !== undefined ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={accionSecundaria.alAccionar}
+              disabled={procesando}
+              data-testid={accionSecundaria.testid ?? 'accion-secundaria'}
+            >
+              {accionSecundaria.texto}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant={variante}

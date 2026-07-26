@@ -187,11 +187,11 @@ export function PreCostoPagina(): React.JSX.Element {
                 </section>
 
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold">Bordados / estampados</h3>
+                  <h3 className="mb-2 text-sm font-semibold">Arte</h3>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Bordado</TableHead>
+                        <TableHead>Arte</TableHead>
                         <TableHead className="text-right">Precio</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -199,7 +199,7 @@ export function PreCostoPagina(): React.JSX.Element {
                       {pre.data.bordados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={2} className="text-muted-foreground">
-                            Sin bordados.
+                            Sin arte.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -213,7 +213,7 @@ export function PreCostoPagina(): React.JSX.Element {
                     </TableBody>
                   </Table>
                   <p className="mt-1 text-right text-sm font-medium">
-                    Total bordado: {moneda(pre.data.totalBordado)} · Maquila:{' '}
+                    Total arte: {moneda(pre.data.totalBordado)} · Maquila:{' '}
                     {moneda(pre.data.maquila)}
                   </p>
                 </section>

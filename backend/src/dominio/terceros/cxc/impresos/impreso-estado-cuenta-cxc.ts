@@ -255,5 +255,10 @@ export async function impresoEstadoCuentaCxc(
   deps: DepsImpresoCxc = {},
 ): Promise<ImpresoCxc> {
   const datos = await armarDatosImpresoCxc(sesion, idCliente, query, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('cxc-estado-cuenta', datos), idCliente };
+  return {
+    buffer: await renderizarPdfEnWorker('cxc-estado-cuenta', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    idCliente,
+  };
 }

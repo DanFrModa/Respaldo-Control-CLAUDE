@@ -215,7 +215,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Procesos (maquila/estampado/bordado)</TableCell>
+                  <TableCell>Procesos (maquila/arte)</TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {moneda(data.teorico.procesos)}
                   </TableCell>

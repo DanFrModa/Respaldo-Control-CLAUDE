@@ -12,6 +12,11 @@ import type { DatosExcelConcentrado } from '../dominio/ruta-critica/impresos/exc
  *  • una construcción GRANDE no bloquea el event loop (un `setInterval` sigue latiendo mientras corre);
  *  • una clave desconocida se rechaza limpio;
  *  • una construcción que excede el timeout se corta con un mensaje accionable (rama de timeout).
+ *
+ * **Timeouts.** Estas pruebas renderizan de verdad miles de renglones (CPU-bound) y son de las más
+ * pesadas del suite. NO llevan tope propio a propósito: heredan el del proyecto `unit`
+ * (`vitest.config.ts`), que es único para todas las pruebas de render. Antes tenían `20_000`
+ * —POR DEBAJO del default— y por eso eran las primeras en caer cuando el runner iba cargado.
  */
 function datosTelas(nFilas: number): DatosImpresoInventarioTelas {
   const filas = Array.from({ length: nFilas }, (_, i) => ({
@@ -62,7 +67,7 @@ describe('pool de render de PDF en worker', () => {
     const buffer = await renderizarPdfEnWorker('inventario-telas', datosTelas(3));
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20_000);
+  });
 
   it('un render grande NO bloquea el event loop (el setInterval sigue latiendo)', async () => {
     let latidos = 0;
@@ -77,11 +82,11 @@ describe('pool de render de PDF en worker', () => {
     }
     // Si el render bloqueara el hilo principal, el reloj no habría latido ni una vez.
     expect(latidos).toBeGreaterThan(0);
-  }, 20_000);
+  });
 
   it('rechaza una clave de impreso desconocida', async () => {
     await expect(renderizarPdfEnWorker('no-existe' as never, {})).rejects.toThrow(/no registrado/i);
-  }, 20_000);
+  });
 
   it('corta un render que excede el timeout con un mensaje accionable', async () => {
     const previo = process.env.PDF_WORKER_TIMEOUT_MS;
@@ -97,14 +102,14 @@ describe('pool de render de PDF en worker', () => {
         process.env.PDF_WORKER_TIMEOUT_MS = previo;
       }
     }
-  }, 20_000);
+  });
 
   it('construye un .xlsx válido (firma ZIP) fuera del hilo principal', async () => {
     const buffer = await renderizarExcelEnWorker('excel-concentrado', datosConcentrado(3));
     expect(buffer.length).toBeGreaterThan(0);
     // Un .xlsx es un ZIP: empieza por "PK".
     expect(buffer.subarray(0, 2).toString('latin1')).toBe('PK');
-  }, 20_000);
+  });
 
   it('un Excel grande NO bloquea el event loop (el setInterval sigue latiendo)', async () => {
     let latidos = 0;
@@ -119,13 +124,13 @@ describe('pool de render de PDF en worker', () => {
     }
     // Si la construcción bloqueara el hilo principal, el reloj no habría latido ni una vez.
     expect(latidos).toBeGreaterThan(0);
-  }, 30_000);
+  });
 
   it('rechaza una clave de Excel desconocida', async () => {
     await expect(renderizarExcelEnWorker('no-existe' as never, {})).rejects.toThrow(
       /no registrado/i,
     );
-  }, 20_000);
+  });
 
   it('corta un Excel que excede su propio timeout con un mensaje accionable', async () => {
     const previo = process.env.EXCEL_WORKER_TIMEOUT_MS;
@@ -141,5 +146,5 @@ describe('pool de render de PDF en worker', () => {
         process.env.EXCEL_WORKER_TIMEOUT_MS = previo;
       }
     }
-  }, 20_000);
+  });
 });

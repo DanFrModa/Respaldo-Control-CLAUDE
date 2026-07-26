@@ -184,8 +184,7 @@ export function EnvioMaquilaPagina(): React.JSX.Element {
             Envío a maquila
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
-            Costura, estampado, bordado o lavado desde una sola pantalla. No deja exceder lo
-            cortado.
+            Costura, arte o lavado desde una sola pantalla. No deja exceder lo cortado.
           </p>
         </div>
       </header>
@@ -239,7 +238,7 @@ export function EnvioMaquilaPagina(): React.JSX.Element {
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="maquilero">
-                      {esEstampado ? 'Estampador' : 'Maquilero'}
+                      {esEstampado ? 'Prov. de Arte' : 'Maquilero'}
                     </FieldLabel>
                     <SelectNativo
                       id="maquilero"
@@ -371,7 +370,7 @@ export function EnvioMaquilaPagina(): React.JSX.Element {
                       }
                       data-testid="envio-ficha"
                     >
-                      <FileText className="mr-1.5 size-4" aria-hidden /> Ficha de estampado
+                      <FileText className="mr-1.5 size-4" aria-hidden /> Ficha de arte
                     </Button>
                   </div>
                 ) : null}

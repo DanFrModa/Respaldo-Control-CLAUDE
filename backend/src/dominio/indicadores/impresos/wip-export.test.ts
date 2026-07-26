@@ -98,7 +98,7 @@ describe('export WIP — PDF con aviso de truncado (D3)', () => {
     const buffer = await generarPdfKpisWip({ pagador: 'FR Moda SA de CV', datos });
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20_000);
+  });
 
   it('renderiza sin aviso cuando caben todas las órdenes', async () => {
     const datos: KpisWip = {
@@ -112,7 +112,7 @@ describe('export WIP — PDF con aviso de truncado (D3)', () => {
     };
     const buffer = await generarPdfKpisWip({ pagador: 'FR Moda SA de CV', datos });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20_000);
+  });
 });
 
 // Referencia al tope estándar para dejar constancia de que el impreso lo respeta (no re-implementa).

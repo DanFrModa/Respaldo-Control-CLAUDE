@@ -64,6 +64,7 @@ const QUERY_SELECTOR = {
 const VALORES_INICIALES: DatosModeloFormulario = {
   codigo: '',
   descripcion: '',
+  composicion: '',
   maquilaBase: '',
   corteBase: '',
   numOperaciones: '',
@@ -88,6 +89,9 @@ function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
   const cuerpo: ModeloCrear = { codigo: datos.codigo };
   if (datos.descripcion.length > 0) {
     cuerpo.descripcion = datos.descripcion;
+  }
+  if (datos.composicion.length > 0) {
+    cuerpo.composicion = datos.composicion;
   }
   const maquila = numeroOpcionalACuerpo(datos.maquilaBase);
   if (maquila !== undefined) {
@@ -134,6 +138,7 @@ function aCuerpoEditar(datos: DatosModeloFormulario): ModeloEditar {
   return {
     codigo: datos.codigo,
     descripcion: datos.descripcion.length > 0 ? datos.descripcion : null,
+    composicion: datos.composicion.length > 0 ? datos.composicion : null,
     maquilaBase: numeroOpcionalACuerpo(datos.maquilaBase) ?? null,
     corteBase: numeroOpcionalACuerpo(datos.corteBase) ?? null,
     numOperaciones: numeroOpcionalACuerpo(datos.numOperaciones) ?? null,
@@ -207,6 +212,7 @@ export function DialogoModelo({
           ? {
               codigo: modelo.codigo,
               descripcion: modelo.descripcion ?? '',
+              composicion: modelo.composicion ?? '',
               maquilaBase: modelo.maquilaBase === null ? '' : String(modelo.maquilaBase),
               corteBase: modelo.corteBase === null ? '' : String(modelo.corteBase),
               numOperaciones: modelo.numOperaciones === null ? '' : String(modelo.numOperaciones),
@@ -314,6 +320,25 @@ export function DialogoModelo({
                       />
                       <FieldError errors={[errors.descripcion]} />
                     </Field>
+
+                    {/* COMPOSICIÓN (Daniel 24-jul-2026): sale del DESARROLLO del modelo, no de la
+                        OC del cliente. Toda orden de este modelo la hereda sola. */}
+                    <Field data-invalid={Boolean(errors.composicion)}>
+                      <FieldLabel htmlFor="modelo-composicion">Composición</FieldLabel>
+                      <Input
+                        id="modelo-composicion"
+                        placeholder="Ej. 60% algodón 40% poliéster"
+                        aria-invalid={Boolean(errors.composicion)}
+                        disabled={guardando}
+                        data-testid="modelo-composicion"
+                        {...registrar('composicion')}
+                      />
+                      <FieldDescription>
+                        Composición textil del desarrollo. Las órdenes de este modelo la heredan
+                        solas (se puede corregir a mano en una orden puntual).
+                      </FieldDescription>
+                      <FieldError errors={[errors.composicion]} />
+                    </Field>
                   </FieldGroup>
                 </AccordionContent>
               </AccordionItem>
@@ -412,7 +437,7 @@ export function DialogoModelo({
 
                     <Field>
                       <FieldLabel htmlFor="modelo-secuencia-estampado">
-                        Secuencia de estampado
+                        Secuencia del arte
                       </FieldLabel>
                       <SelectNativo
                         id="modelo-secuencia-estampado"

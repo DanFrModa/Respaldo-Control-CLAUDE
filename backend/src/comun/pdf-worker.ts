@@ -29,6 +29,7 @@ import { Worker } from 'node:worker_threads';
 import { randomUUID } from 'node:crypto';
 
 import { ErrorValidacion } from './errores.js';
+import { dataUrlLogoEmpresa } from './logo-empresa.js';
 import type {
   ClavePdf,
   ClaveExcel,
@@ -61,6 +62,8 @@ interface Trabajo {
   clave: ClavePdf | ClaveExcel;
   tipo: TipoDocumento;
   datos: unknown;
+  /** Logo de la empresa (data-URL) para el membrete del PDF; `undefined` = deja el empaquetado. */
+  logo: string | undefined;
   resolver: (buffer: Buffer) => void;
   rechazar: (error: Error) => void;
 }
@@ -118,6 +121,23 @@ function asegurarPool(): Ranura[] {
   return pool;
 }
 
+/**
+ * Arranca el pool AHORA, sin encolar nada. Es un `void`: los `Worker` se crean y siguen booteando
+ * en segundo plano (bajo tsx eso incluye registrar el loader e importar módulos TypeScript, lo más
+ * caro del primer render de cada proceso).
+ *
+ * Existe para SOLAPAR ese arranque con lo que el hilo principal tenga que resolver antes de poder
+ * encolar — hoy, el logo del membrete (`comun/logo-empresa.ts`, que en frío inicializa Prisma).
+ * Hacerlos en serie sumaba ambos costos al primer impreso; lanzados a la vez, el logo se resuelve
+ * mientras el worker arranca y prácticamente desaparece del reloj.
+ */
+function precalentarPool(): void {
+  // Un `precalentar` cuenta como uso: reabre el pool si venía de un cierre (mismo criterio que
+  // `encolar`), porque justo detrás va a llegar el trabajo.
+  cerrando = false;
+  asegurarPool();
+}
+
 /** Reparte los trabajos en cola a los workers ociosos. */
 function repartir(): void {
   // Durante el cierre no se despacha ni se recrea el pool: los `exit` de `terminate()` llegan aquí
@@ -143,6 +163,7 @@ function repartir(): void {
       id: trabajo.id,
       clave: trabajo.clave,
       datos: trabajo.datos,
+      ...(trabajo.logo === undefined ? {} : { logo: trabajo.logo }),
     };
     ranura.worker.postMessage(peticion);
   }
@@ -215,9 +236,10 @@ function encolar(
   tipo: TipoDocumento,
   clave: ClavePdf | ClaveExcel,
   datos: unknown,
+  logo?: string,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolver, rechazar) => {
-    cola.push({ id: randomUUID(), clave, tipo, datos, resolver, rechazar });
+    cola.push({ id: randomUUID(), clave, tipo, datos, logo, resolver, rechazar });
     // Un trabajo nuevo reabre el pool si venía de un cierre (reset de `cerrando` ANTES de repartir,
     // que crea el pool nuevo perezosamente).
     cerrando = false;
@@ -230,9 +252,29 @@ function encolar(
  * resultado YA resuelto de `armarDatos*` (serializable por structured clone: primitivos, arreglos,
  * objetos planos, `Date`; NO instancias como `Prisma.Decimal` — conviértelas a número/cadena al armar).
  * Lanza `ErrorValidacion` (400) si el render excede el timeout; propaga cualquier otro fallo del render.
+ *
+ * **Branding (post-F9, petición de Daniel):** aquí, y SOLO aquí, se resuelve el LOGO de la empresa y
+ * se manda al worker, que lo fija antes de construir el documento (`fijarLogoImpresos`). Como los 23
+ * impresos comparten `EncabezadoDocumento`, con esto quedan brandeados TODOS sin tocar ninguno.
+ * La resolución es best-effort y con tope de tiempo (`comun/logo-empresa.ts`): si la BD o R2 fallan,
+ * se manda el logo empaquetado y el PDF sale igual.
+ *
+ * @param opciones.idEmpresa **empresa activa de la sesión** (`sesion.idEmpresaActiva`). PÁSALA
+ *   SIEMPRE: el membrete de TEXTO ya sale de `sesion.nombreEmpresaActiva`, así que omitirla haría
+ *   que en multi-empresa (A9) un impreso lleve el nombre de una empresa y el logo de otra. Si se
+ *   omite, el logo se resuelve con la empresa PREDETERMINADA (favorita / primera activa) — que es
+ *   lo correcto solo cuando hay una sola empresa, y por eso es un respaldo, no el camino normal.
  */
-export function renderizarPdfEnWorker(clave: ClavePdf, datos: unknown): Promise<Buffer> {
-  return encolar('pdf', clave, datos);
+export async function renderizarPdfEnWorker(
+  clave: ClavePdf,
+  datos: unknown,
+  opciones?: { idEmpresa?: number },
+): Promise<Buffer> {
+  // El worker arranca EN PARALELO con la resolución del logo (que en frío levanta Prisma): en
+  // serie, el primer impreso de cada proceso pagaba los dos costos uno detrás del otro.
+  precalentarPool();
+  const logo = await dataUrlLogoEmpresa(opciones?.idEmpresa);
+  return encolar('pdf', clave, datos, logo);
 }
 
 /**

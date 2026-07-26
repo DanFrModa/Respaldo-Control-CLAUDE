@@ -96,7 +96,7 @@ export function BordadosPagina(): React.JSX.Element {
     const objetivo = aDesactivar;
     desactivar.mutate(objetivo.id, {
       onSuccess: () => {
-        toast.success(`Bordado "${objetivo.nombre}" desactivado.`);
+        toast.success(`Arte "${objetivo.nombre}" desactivado.`);
         setADesactivar(null);
       },
       onError: (error) => toast.error(error.message),
@@ -106,7 +106,7 @@ export function BordadosPagina(): React.JSX.Element {
   // Reactivar es NO destructivo: directo, sin dialogo de confirmacion.
   function reactivarBordado(bordado: Bordado): void {
     reactivar.mutate(bordado.id, {
-      onSuccess: () => toast.success(`Bordado "${bordado.nombre}" activado.`),
+      onSuccess: () => toast.success(`Arte "${bordado.nombre}" activado.`),
       onError: (error) => toast.error(error.message),
     });
   }
@@ -144,8 +144,8 @@ export function BordadosPagina(): React.JSX.Element {
     <>
       <ListaDetalle<Bordado>
         testid="bordado"
-        titulo="Bordados y estampados"
-        descripcion="Catálogo de bordados y estampados con su foto."
+        titulo="Arte"
+        descripcion="Catálogo de arte (bordado y estampado) con su foto."
         icono={Sparkles}
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
@@ -168,7 +168,7 @@ export function BordadosPagina(): React.JSX.Element {
           <SelectNativo
             value={tipoFiltro}
             onChange={(e) => alCambiarTipo(e.target.value)}
-            aria-label="Filtrar bordados por tipo"
+            aria-label="Filtrar arte por tipo"
             data-testid="filtro-tipo-bordado"
           >
             <option value={TIPO_TODOS}>Todos los tipos</option>
@@ -181,11 +181,11 @@ export function BordadosPagina(): React.JSX.Element {
         }
         incluirInactivos={incluirInactivos}
         alAlternarInactivos={alAlternarInactivos}
-        textoVacio="No hay bordados que coincidan con la búsqueda."
+        textoVacio="No hay arte que coincida con la búsqueda."
         paginacion={paginacion}
         puedeAdministrar={puedeAdministrar}
         alNuevo={abrirAlta}
-        textoNuevo="Nuevo bordado"
+        textoNuevo="Nuevo arte"
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarBordado}
@@ -215,10 +215,10 @@ export function BordadosPagina(): React.JSX.Element {
             setADesactivar(null);
           }
         }}
-        titulo="Desactivar bordado"
+        titulo="Desactivar arte"
         descripcion={
           <>
-            ¿Seguro que quieres desactivar el bordado{' '}
+            ¿Seguro que quieres desactivar el arte{' '}
             <span className="font-medium text-foreground">{aDesactivar?.nombre}</span>? Podrás
             volver a activarlo después; su historial se conserva.
           </>
@@ -245,7 +245,7 @@ function DetalleBordado({ b }: { b: Bordado }): React.JSX.Element {
         <MiniaturaFoto idBordado={b.id} nombre={b.nombre} tamano="grande" />
       </SeccionDetalle>
 
-      <SeccionDetalle titulo="Datos del bordado" icono={Sparkles}>
+      <SeccionDetalle titulo="Datos del arte" icono={Sparkles}>
         <RejillaCampos>
           <CampoDetalle icono={Tag} etiqueta="Tipo">
             <TipoBadge tono={TONO_POR_TIPO[b.tipo]}>{ETIQUETAS_TIPO_BORDADO[b.tipo]}</TipoBadge>

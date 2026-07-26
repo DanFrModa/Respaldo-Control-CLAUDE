@@ -36,6 +36,15 @@ import type { SesionUsuario } from './permisos.js';
 import type { Tx } from './transaccion.js';
 import { validarEntrada } from './validacion.js';
 
+/**
+ * El objeto de R2 pesa MÁS de lo que el llamador está dispuesto a cargar en memoria
+ * (`descargarContenido(key, maxBytes)`). Es una subclase propia —y no un `ErrorValidacion` a
+ * secas— para que el llamador pueda distinguir "el archivo no sirve" (estado ESTABLE: no vale la
+ * pena reintentarlo en cada petición) de "R2 falló" (transitorio: hay que reintentar). Lo usa el
+ * logo de la empresa para caer al empaquetado y CACHEAR esa decisión.
+ */
+export class ErrorArchivoDemasiadoGrande extends ErrorValidacion {}
+
 /** Tamaño máximo aceptado por subida: 50 MB (fotos, fichas, PDFs — sobra). */
 export const TAMANO_MAXIMO_BYTES = 50 * 1024 * 1024;
 
@@ -266,6 +275,25 @@ export interface ServicioArchivos {
   ): Promise<string>;
 
   /**
+   * Descarga el OBJETO de R2 a memoria (`GetObjectCommand`) y devuelve sus bytes. Es la operación
+   * inversa de `subirContenido`: para cuando el SERVIDOR necesita el contenido, no una URL para el
+   * navegador — hoy, el LOGO de la empresa, que hay que incrustar en los impresos PDF (react-pdf
+   * necesita los bytes/data-URL, no puede seguir una URL prefirmada) y servirlo por el API.
+   *
+   * Solo para objetos PEQUEÑOS y de uso repetido: carga todo el objeto en RAM, no hace streaming.
+   * Lanza si la key no existe o R2 falla; el llamador decide si eso es fatal (para el logo NO lo
+   * es: cae al empaquetado).
+   *
+   * @param maxBytes tope DURO de tamaño. **Úsalo siempre** que el objeto venga de una subida
+   *   presigned: la URL PUT NO firma `Content-Length` (ver la nota de `solicitarSubida`), así que
+   *   el tamaño que validó el POST es una PROMESA del navegador, no un hecho — el objeto real en
+   *   R2 puede ser mucho más grande. Se comprueba el `ContentLength` que devuelve R2 **antes** de
+   *   bufferear y, por si el objeto viniera sin esa cabecera, también los bytes ya leídos. Si se
+   *   excede, lanza `ErrorValidacion` sin dejar el objeto entero en memoria.
+   */
+  descargarContenido(key: string, maxBytes?: number): Promise<Buffer>;
+
+  /**
    * Borra el OBJETO físico de R2 por su key (`DeleteObjectCommand`). Se usa al eliminar un adjunto
    * para no dejar el objeto huérfano en el bucket (salda la deuda técnica de §8: antes solo se
    * borraba el registro `Archivo` y el objeto quedaba en R2).
@@ -375,6 +403,35 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
         }),
         { expiresIn: opciones?.expiraEnSegundos ?? EXPIRACION_DESCARGA_SEGUNDOS },
       );
+    },
+
+    async descargarContenido(key, maxBytes) {
+      if (key.trim() === '') {
+        throw new ErrorValidacion('La key del archivo es obligatoria.');
+      }
+      const respuesta = await deps.cliente.send(
+        new GetObjectCommand({ Bucket: deps.bucket, Key: key }),
+      );
+      if (respuesta.Body === undefined) {
+        throw new ErrorValidacion(`El objeto "${key}" no tiene contenido en R2.`);
+      }
+      // Corte por el tamaño que REPORTA R2, antes de bufferear nada: el `tamanoBytes` que validó
+      // el POST no obliga a nada (la URL PUT no firma Content-Length), así que este es el único
+      // punto donde se conoce el tamaño real sin traerse el objeto.
+      if (maxBytes !== undefined && (respuesta.ContentLength ?? 0) > maxBytes) {
+        throw new ErrorArchivoDemasiadoGrande(
+          `El objeto "${key}" pesa más de lo permitido (${String(maxBytes)} bytes).`,
+        );
+      }
+      // `transformToByteArray` lo da el SDK v3 para cualquier stream (Node o web).
+      const bytes = Buffer.from(await respuesta.Body.transformToByteArray());
+      // Cinturón y tirantes: si R2 no mandó `ContentLength`, el corte de arriba no aplicó.
+      if (maxBytes !== undefined && bytes.byteLength > maxBytes) {
+        throw new ErrorArchivoDemasiadoGrande(
+          `El objeto "${key}" pesa más de lo permitido (${String(maxBytes)} bytes).`,
+        );
+      }
+      return bytes;
     },
 
     async eliminarObjeto(key) {

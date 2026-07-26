@@ -192,5 +192,9 @@ export async function impresoEdrMensual(
   deps: DepsImpresoEdrMensual = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoEdrMensual(sesion, idEdr, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('edr-mensual', datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('edr-mensual', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+  };
 }

@@ -48,7 +48,9 @@ tableros/consultas de F2-E4.
   `Talla`). El total NUNCA se persiste: se deriva por suma (espíritu D3).
 - **D7 referencias por cliente:** el `Monarch` del viejo se generaliza a `OrdenReferencia` (valor de
   un `ClienteCampo` del cliente de la orden). Índice dedicado sobre `valor` para la búsqueda global.
-- **R9 impreso:** el impreso de la orden (PDF) se construyó en F2-E4.
+- **R9 impreso:** el impreso de la orden (PDF) se construyó en F2-E4. Cómo quedó por dentro (qué
+  muestra, de dónde sale cada dato —incluida la regla de la TELA desde la OC—, el presupuesto de
+  altura de la hoja y los seams de DI): **`docs/modulos/impreso-orden.md`**.
 - **UPC en retiro (Gabriel, 16-jun-2026):** los códigos de barra de orden ya NO se usan. La columna
   `Orden.upc` queda en el schema pero **el ETL NO la migra** (no se conserva historial); su
   desmantelamiento completo (quitar columna, generador F1-E5, UI) es una tarea aparte.

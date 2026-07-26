@@ -407,5 +407,10 @@ export async function impresoEstadoCuenta(
   deps: DepsImpresoEstadoCuenta = {},
 ): Promise<ImpresoEstadoCuenta> {
   const datos = await armarDatosImpresoEstadoCuenta(sesion, idMaquilero, query, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('esma-estado-cuenta', datos), idMaquilero };
+  return {
+    buffer: await renderizarPdfEnWorker('esma-estado-cuenta', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    idMaquilero,
+  };
 }

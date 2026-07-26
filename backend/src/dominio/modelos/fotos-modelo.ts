@@ -11,6 +11,10 @@
  *    prefirmada para que el navegador suba DIRECTO a R2 (todo en UNA transacción, A2).
  *  • `listarFotos` devuelve cada foto con su URL GET prefirmada (ordenadas por `orden`, luego id).
  *  • `actualizarFoto` cambia tipo/orden de una foto (sin tocar la imagen).
+ *  • `marcarFotoPrincipal` deja UNA foto como la PRINCIPAL del modelo (jul-2026, Daniel): la mueve
+ *    al primer lugar y reindexa el resto. La principal NO es una bandera: es la PRIMERA (ver
+ *    `orden-principal.ts`), la misma que ya encabeza la galería, el listado (`urlFotoPrincipal`)
+ *    y el impreso de la orden.
  *  • `quitarFoto` borra el `Archivo` (Cascade arrastra el `ModeloFoto`) en UNA transacción (A2).
  * El servicio de archivos se INYECTA (default `servicioArchivos()` lazy) para poder pasar un
  * fake en tests sin R2 real (igual que bordados/proveedores). Permiso `modelos.ver` para leer,
@@ -36,9 +40,32 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { exigirModelo } from './modelos.js';
+import { reordenarComoPrincipal } from './orden-principal.js';
 
 /** Carpeta R2 de las fotos de modelos (la key real se ordena por id, no por nombre, A5). */
 const CARPETA_FOTOS = 'modelos';
+
+/**
+ * Namespace del `pg_advisory_xact_lock` que serializa el REORDENAMIENTO de las fotos de UN modelo
+ * (`marcarFotoPrincipal`). Distinto del de arte del BOM (`bom-modelo.ts`) para no serializar de más.
+ *
+ * ⚠️ Los namespaces de la forma de DOS `int4` comparten un solo espacio de locks: dos módulos con
+ * el mismo namespace se serializan entre sí en cuanto coincida la segunda clave (p. ej. un
+ * `idModelo` con un `idEmpresa`). **Antes de estrenar uno, revisa el inventario** — varios son
+ * `const` NO exportados, así que un grep de exports no los ve. Familia 20_5xx ocupada hoy:
+ *
+ * | Valor | Dueño | Segunda clave |
+ * |---|---|---|
+ * | 20_531 | `desarrollo/precostos.ts` (`NAMESPACE_LOCK_PRECOSTO`) | idPrecosto |
+ * | 20_541 | `desarrollo/cliente-factores.ts` (`NAMESPACE_LOCK_FACTORES`) | idCliente |
+ * | 20_542 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_LISTA`, exportado) | idLista |
+ * | 20_543 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_CREAR_LISTA`, **no exportado**) | idEmpresa |
+ * | 20_544 | `modelos/bom-modelo.ts` (`NAMESPACE_LOCK_ARTE`) | idModelo |
+ * | 20_545 | **este** | idModelo |
+ *
+ * El siguiente libre es el 20_546.
+ */
+const NAMESPACE_LOCK_FOTOS = 20_545;
 
 /** Solicitud de subida tal como LLEGA (tipo opcional; el dominio aplica el default OTRO). */
 export type EntradaSubirFoto = z.input<typeof esquemaModeloFotoCrear>;
@@ -243,6 +270,69 @@ export async function actualizarFoto(
 
     return foto;
   }, bd);
+}
+
+/**
+ * Marca UNA foto como la PRINCIPAL del modelo (jul-2026, petición de Daniel: *"debe de haber una
+ * foto principal del modelo, es la más importante"*). Como la principal es **la primera** (no hay
+ * bandera; el `orden` es la única fuente de verdad), marcarla = moverla al primer lugar y
+ * reindexar las demás 0..N-1 conservando su orden relativo, todo en UNA transacción (A2).
+ *
+ * Requiere `modelos.administrar` — el MISMO permiso que ya rige editar el modelo y sus fotos (no
+ * hay permiso nuevo, así que el deploy no necesita re-seed). Si la foto no pertenece al modelo →
+ * `ErrorNoEncontrado`. Es IDEMPOTENTE: si ya era la principal (y el orden ya estaba compacto), no
+ * escribe nada ni registra bitácora vacía. Devuelve las fotos del modelo ya reordenadas.
+ *
+ * CONCURRENCIA: el reindexado es leer-calcular-escribir, y bajo READ COMMITTED dos marcados
+ * simultáneos del MISMO modelo se pisarían (cada uno calcula con la foto del otro en su posición
+ * vieja → `orden` duplicado y, con el desempate, la principal equivocada). Por eso lo PRIMERO de la
+ * transacción es un `pg_advisory_xact_lock(NAMESPACE, idModelo)`: el segundo marcado espera, re-lee
+ * el estado ya reordenado y calcula bien (mismo idioma que `terceros/cuenta-terceros.ts`). El lock
+ * se libera al commit y solo serializa marcados del MISMO modelo.
+ */
+export async function marcarFotoPrincipal(
+  sesion: SesionUsuario,
+  idModelo: number,
+  idFoto: number,
+  bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
+): Promise<FotoModeloConUrl[]> {
+  verificarPermiso(sesion, 'modelos.administrar');
+
+  await enTransaccion(async (tx) => {
+    // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_FOTOS}::int, ${idModelo}::int)`;
+    await exigirFotoDelModelo(tx, idModelo, idFoto);
+
+    // MISMO orden que las lecturas (`orden` asc, luego id): de ahí sale el orden relativo que se
+    // conserva al reindexar, para que la galería no dé saltos raros.
+    const actuales = await tx.modeloFoto.findMany({
+      where: { idModelo },
+      orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+      select: { id: true, orden: true },
+    });
+
+    const { cambios } = reordenarComoPrincipal(
+      actuales.map((f) => ({ clave: f.id, orden: f.orden })),
+      idFoto,
+    );
+    if (cambios.length === 0) {
+      return; // ya era la principal: idempotente, sin escrituras ni bitácora vacía
+    }
+
+    for (const cambio of cambios) {
+      await tx.modeloFoto.update({ where: { id: cambio.clave }, data: { orden: cambio.orden } });
+    }
+    await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Modelo',
+      idEntidad: idModelo,
+      accion: 'MODIFICAR',
+      datos: { foto: 'principal', idFoto },
+    });
+  }, bd);
+
+  return leerFotosModelo(idModelo, bd, archivos);
 }
 
 /**

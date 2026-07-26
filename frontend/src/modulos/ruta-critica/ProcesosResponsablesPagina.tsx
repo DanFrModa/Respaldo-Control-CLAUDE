@@ -273,7 +273,7 @@ function FilaProceso({
             <Badge
               variant="outline"
               className="ml-2 text-[10px]"
-              title="Solo si la prenda lleva estampado o bordado"
+              title="Solo si la prenda lleva arte (estampado o bordado)"
             >
               condicional
             </Badge>
@@ -402,7 +402,7 @@ function DetalleTiempo({ proceso }: { proceso: ProcesoRc }): React.JSX.Element {
         </>
       ) : proceso.tipoDuracion === 'porAplicacion' ? (
         <p className="text-xs text-muted-foreground">
-          Según la <b>aplicación/estampado</b> elegida al programar (catálogo en{' '}
+          Según el <b>arte (aplicación/estampado)</b> elegido al programar (catálogo en{' '}
           <Link className="underline" to="/ruta-critica/reglas-duracion">
             Reglas de duración
           </Link>

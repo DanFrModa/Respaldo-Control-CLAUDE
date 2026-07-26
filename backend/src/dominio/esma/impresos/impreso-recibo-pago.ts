@@ -254,5 +254,10 @@ export async function impresoReciboPago(
   deps: DepsImpresoReciboPago = {},
 ): Promise<ImpresoReciboPago> {
   const datos = await armarDatosImpresoReciboPago(sesion, idPago, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('esma-recibo-pago', datos), folio: datos.folioPago };
+  return {
+    buffer: await renderizarPdfEnWorker('esma-recibo-pago', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    folio: datos.folioPago,
+  };
 }

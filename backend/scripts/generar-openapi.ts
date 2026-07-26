@@ -12,6 +12,7 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { construirApp } from '../src/app.js';
+import { corregirMediaTypesBinarios } from '../src/openapi.js';
 
 /** Ruta del contrato versionado, junto a package.json. */
 const DESTINO = fileURLToPath(new URL('../openapi.json', import.meta.url));
@@ -21,6 +22,9 @@ async function generar(): Promise<void> {
   try {
     await app.ready();
     const documento = app.swagger();
+    // Las respuestas BINARIAS (imágenes) salen envueltas en `application/json` por
+    // `@fastify/swagger`; aquí se les pone su tipo real antes de volcar el contrato.
+    corregirMediaTypesBinarios(documento);
     await writeFile(DESTINO, `${JSON.stringify(documento, null, 2)}\n`, 'utf8');
     console.log(`OpenAPI generado en ${DESTINO}`);
   } finally {

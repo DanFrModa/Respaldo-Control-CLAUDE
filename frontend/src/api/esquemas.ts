@@ -672,7 +672,7 @@ export type CondicionAplicabilidadClave = (typeof CONDICIONES_APLICABILIDAD)[num
 /** Etiquetas para UI de cada condición. */
 export const ETIQUETAS_CONDICION_APLICABILIDAD: Record<CondicionAplicabilidadClave, string> = {
   ninguna: 'Siempre aplica',
-  soloSiLlevaAplicacion: 'Solo si la orden lleva aplicación/estampado',
+  soloSiLlevaAplicacion: 'Solo si la orden lleva arte (aplicación/estampado)',
 };
 
 /** Tipos de evento de proceso (espejo del backend). */
@@ -705,8 +705,8 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   corte: 'Corte',
   envioCostura: 'Envío a costura',
   reciboCostura: 'Recibo de costura',
-  envioEstampado: 'Envío a estampado',
-  reciboEstampado: 'Recibo de estampado',
+  envioEstampado: 'Envío a arte',
+  reciboEstampado: 'Recibo de arte',
   auditoria: 'Auditoría de calidad',
   autorizacionArte: 'Autorización de arte',
   entregaCliente: 'Entrega a cliente',

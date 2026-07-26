@@ -98,7 +98,7 @@ export function SelectorMaquilero({
         >
           <option value="">Todos</option>
           <option value="costura">Costura</option>
-          <option value="estampado">Estampado</option>
+          <option value="estampado">Prov. de Arte</option>
         </SelectNativo>
       </Field>
       <Field>

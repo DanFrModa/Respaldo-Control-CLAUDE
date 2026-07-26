@@ -87,3 +87,24 @@ describe('DialogoModelo · props del importador', () => {
     );
   });
 });
+
+describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', () => {
+  beforeEach(() => crearMutate.mockReset());
+
+  it('captura la composición en la ficha del modelo y la manda en el alta', async () => {
+    renderConProveedores(<DialogoModelo abierto alCambiarAbierto={vi.fn()} modelo={undefined} />);
+
+    const campo = screen.getByLabelText('Composición');
+    expect(screen.getByText(/Las órdenes de este modelo la heredan solas/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-COMP' } });
+    fireEvent.change(campo, { target: { value: '60% algodón 40% poliéster' } });
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect(crearMutate.mock.calls[0]?.[0]).toMatchObject({
+      codigo: 'M-COMP',
+      composicion: '60% algodón 40% poliéster',
+    });
+  });
+});

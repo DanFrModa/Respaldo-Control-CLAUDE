@@ -291,5 +291,10 @@ export async function impresoEntregaCliente(
   deps: DepsImpresoEntrega = {},
 ): Promise<ImpresoEntrega> {
   const datos = await armarDatosImpresoEntrega(sesion, idEntrega, bd, deps);
-  return { buffer: await renderizarPdfEnWorker('entrega-cliente', datos), folio: datos.folio };
+  return {
+    buffer: await renderizarPdfEnWorker('entrega-cliente', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    folio: datos.folio,
+  };
 }

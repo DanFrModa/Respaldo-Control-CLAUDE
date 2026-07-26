@@ -241,6 +241,8 @@ export async function impresoEstatusMateriales(
   deps: DepsImpresoEstatus = {},
 ): Promise<ImpresoEstatusMateriales> {
   const datos = await armarDatosImpresoEstatus(sesion, idOrden, bd, deps);
-  const buffer = await renderizarPdfEnWorker('estatus-materiales', datos);
+  const buffer = await renderizarPdfEnWorker('estatus-materiales', datos, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   return { buffer, folioOrden: datos.folioOrden };
 }

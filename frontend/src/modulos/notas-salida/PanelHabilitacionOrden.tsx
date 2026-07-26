@@ -38,13 +38,13 @@ function aNum(texto: string): number {
 }
 
 /**
- * PANEL "Habilitación de avíos — Orden N" (rediseño R6, §4.6 ⭐): cajón deslizante con el tablero de
+ * PANEL "Avíos — Orden N" (rediseño R6, §4.6 ⭐): cajón deslizante con el tablero de
  * SURTIDO de la orden — por avío de la receta, Requerido vs. Enviado vs. Falta con barra + estado
  * (Completo/Parcial/Pendiente/**Sobre-surtido**), % global, y los avíos **Extra** (fuera de receta).
  * **Surtido selectivo + re-envío:** cada renglón trae un check + input "A surtir" (default = la
  * falta; escribir auto-marca; re-envío permitido aunque la falta sea 0 → sobre-surtido). **"Pasar a
  * nota de salida (N)"** abre el constructor PRE-CARGADO con lo seleccionado + el maquilero de la
- * orden. Se abre desde el tile "Habilitación" del centro de Órdenes (R2) y desde el banner de notas.
+ * orden. Se abre desde el tile "Avíos" del centro de Órdenes (R2) y desde el banner de notas.
  * CERO lógica de negocio (A1): requerido/enviado/estado/% los agrega el backend (B13).
  */
 export function PanelHabilitacionOrden({
@@ -138,7 +138,7 @@ export function PanelHabilitacionOrden({
   const titulo = (
     <span className="inline-flex items-center gap-2">
       <Boxes className="size-4 text-primary" aria-hidden />
-      {`Habilitación de avíos — Orden ${String(hab?.folioOrden ?? encabezado?.folio ?? '')}`}
+      {`Avíos — Orden ${String(hab?.folioOrden ?? encabezado?.folio ?? '')}`}
     </span>
   );
   const subtitulo = [
@@ -168,7 +168,7 @@ export function PanelHabilitacionOrden({
       >
         {consulta.isPending ? (
           <p className="p-2 text-sm text-muted-foreground" data-testid="hab-cargando">
-            Cargando habilitación…
+            Cargando avíos…
           </p>
         ) : consulta.isError ? (
           <p className="p-2 text-sm text-destructive" data-testid="hab-error">

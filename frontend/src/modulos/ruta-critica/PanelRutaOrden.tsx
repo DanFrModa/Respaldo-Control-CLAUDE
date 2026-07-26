@@ -111,7 +111,7 @@ export function PanelRutaOrden({
       {
         onSuccess: () =>
           toast.success(
-            `Ruta reprogramada · estampado ${secuencia === 'antes' ? 'ANTES' : 'DESPUÉS'} de coser.`,
+            `Ruta reprogramada · arte ${secuencia === 'antes' ? 'ANTES' : 'DESPUÉS'} de coser.`,
           ),
         onError: (e) => toast.error(e.message),
       },
@@ -214,7 +214,7 @@ export function PanelRutaOrden({
               data-testid="panel-ruta-estampado"
             >
               <p>
-                <b>Estampado / bordado en esta orden:</b>{' '}
+                <b>Arte en esta orden:</b>{' '}
                 {ruta.secuenciaEstampadoModelo === 'flexible' ? (
                   <>
                     <b>FLEXIBLE</b> — decídelo aquí en producción según la carga
@@ -225,7 +225,7 @@ export function PanelRutaOrden({
                   </>
                 ) : ruta.secuenciaEstampadoModelo === 'antes' ? (
                   <>
-                    <b>ANTES de coser</b> — la confección espera al estampado.
+                    <b>ANTES de coser</b> — la confección espera al arte.
                   </>
                 ) : (
                   <>

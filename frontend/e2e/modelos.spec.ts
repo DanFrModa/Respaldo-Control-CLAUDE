@@ -41,12 +41,12 @@ async function crearAvio(page: Page, clave: string): Promise<void> {
 
 async function crearBordado(page: Page, nombre: string): Promise<void> {
   await page.goto('/catalogos/bordados');
-  await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
   await page.getByTestId('nuevo-bordado').click();
   const dialogo = page.getByRole('dialog');
   await dialogo.getByLabel('Nombre').fill(nombre);
   await page.getByTestId('guardar-bordado').click();
-  await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
+  await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
 }
 
 test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
@@ -147,7 +147,7 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
       .getByTestId(/^renglon-bom-bordado-\d+$/);
     await renglonBordado.getByRole('spinbutton').fill('45');
     await detalle.getByTestId('guardar-bom-bordados').click();
-    await expect(page.getByText('Bordados de la receta guardados.')).toBeVisible();
+    await expect(page.getByText('Arte de la receta guardado.')).toBeVisible();
 
     // ── Crear un 2º modelo y COPIAR la receta del primero ───────────────────────
     // El cajón del 1er modelo sigue abierto; ciérralo antes de tocar el botón del fondo
