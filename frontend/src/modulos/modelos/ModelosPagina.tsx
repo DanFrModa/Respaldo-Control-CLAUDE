@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   Layers,
   Package,
+  Palette,
   Pencil,
   Plus,
   RotateCcw,
@@ -778,6 +779,15 @@ function DetalleModelo({
               {modelo.descripcion}
             </CampoDetalle>
           ) : null}
+          {/* ¿Lleva arte? (Daniel 26-jul-2026): es el requisito ARTE del estado de sus órdenes, así
+              que se ve SIEMPRE (marcado o no), no solo cuando "hay dato". */}
+          <CampoDetalle icono={Palette} etiqueta="Arte">
+            {modelo.llevaArte
+              ? ficha.data !== undefined && ficha.data.bordados.length === 0
+                ? 'Lleva arte — falta capturarlo'
+                : 'Lleva arte'
+              : 'No lleva arte'}
+          </CampoDetalle>
           {/* Composición del DESARROLLO (Daniel 24-jul-2026): la fuente que heredan las órdenes. */}
           {modelo.composicion !== null && modelo.composicion.trim() !== '' ? (
             <CampoDetalle icono={Scissors} etiqueta="Composición" anchoCompleto>

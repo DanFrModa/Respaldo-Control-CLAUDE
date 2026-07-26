@@ -79,3 +79,28 @@ export async function registrarBitacora(
     },
   });
 }
+
+/**
+ * Inserta VARIOS renglones de bitácora de una sola vez, en la misma transacción (A7).
+ *
+ * Mismo contrato que {@link registrarBitacora}, pero con un `createMany`: lo usan las operaciones
+ * que cambian N registros críticos de golpe (p. ej. completar las órdenes de un modelo al que se le
+ * capturó su receta), donde un `create` por renglón sería un N+1 dentro de la transacción. No hacer
+ * bitácora "porque son muchos" NO es opción: la entidad crítica la exige una por una.
+ */
+export async function registrarBitacoraLote(
+  tx: Tx,
+  sesion: SesionUsuario | null,
+  entradas: EntradaBitacora[],
+): Promise<void> {
+  if (entradas.length === 0) return;
+  await tx.bitacora.createMany({
+    data: entradas.map((entrada) => ({
+      entidad: entrada.entidad,
+      idEntidad: String(entrada.idEntidad),
+      accion: entrada.accion,
+      ...(entrada.datos === undefined ? {} : { datos: entrada.datos }),
+      idUsuario: sesion?.id ?? null,
+    })),
+  });
+}

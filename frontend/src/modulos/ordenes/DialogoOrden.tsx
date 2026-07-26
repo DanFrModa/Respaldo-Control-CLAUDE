@@ -38,6 +38,7 @@ import { PanelComentarios } from './PanelComentarios';
 import { PanelHitosOrden } from './PanelHitosOrden';
 import { PanelMatriz } from './PanelMatriz';
 import { PanelReferencias } from './PanelReferencias';
+import { textoFaltantes } from './requisitos';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
 /** Formatea una fecha date-only `YYYY-MM-DD` como "13 jun 2026" sin desfase de zona. */
@@ -70,13 +71,37 @@ function badgeEstado(estado: EstadoOrden): {
   return { texto: 'Capturada', variante: 'secondary' };
 }
 
-/** Badge del estado de una orden (estado derivado por el backend, sin acción de "marcar"). */
-function EstadoOrdenBadge({ estado }: { estado: EstadoOrden }): React.JSX.Element {
+/**
+ * Badge del estado de una orden (estado AUTOMÁTICO, calculado por el backend: sin acción de
+ * "marcar"). Cuando la orden todavía no está completa se dice **qué le falta** al lado —Daniel no
+ * podía saber de dónde salía el estado (26-jul-2026).
+ *
+ * El "Falta: …" SOLO se pinta cuando el estado guardado es `capturada`: una orden `completa` o
+ * `cancelada` no debe requisitos, y "Completa · Falta: arte" sería una contradicción en la misma
+ * pantalla. Ese desfase es posible por diseño —una orden en producción NO se degrada aunque deje
+ * de cumplir (ver `requisitos-orden.ts`)—, así que se resuelve mostrando el ESTADO, que es el dato
+ * con el que se opera.
+ */
+function EstadoOrdenBadge({
+  estado,
+  faltantes = [],
+}: {
+  estado: EstadoOrden;
+  faltantes?: readonly ('tallas' | 'avios' | 'arte')[];
+}): React.JSX.Element {
   const { texto, variante } = badgeEstado(estado);
+  const falta = estado === 'capturada' ? textoFaltantes(faltantes) : null;
   return (
-    <Badge variant={variante} data-testid="estado-orden">
-      {texto}
-    </Badge>
+    <>
+      <Badge variant={variante} data-testid="estado-orden">
+        {texto}
+      </Badge>
+      {falta !== null && (
+        <span className="text-xs font-normal text-warn" data-testid="faltantes-orden">
+          {falta}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -199,7 +224,9 @@ export function DialogoOrden({
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 truncate text-base font-semibold">
               Orden {orden?.folio ?? '…'}
-              {orden ? <EstadoOrdenBadge estado={orden.estado} /> : null}
+              {orden ? (
+                <EstadoOrdenBadge estado={orden.estado} faltantes={orden.requisitos.faltantes} />
+              ) : null}
             </h2>
             <p className="truncate text-xs text-muted-foreground">
               {orden ? (
@@ -400,7 +427,7 @@ function DetalleOrden({
             {orden.cliente}
           </CampoDetalle>
           <CampoDetalle icono={Building2} etiqueta="Estado">
-            <EstadoOrdenBadge estado={orden.estado} />
+            <EstadoOrdenBadge estado={orden.estado} faltantes={orden.requisitos.faltantes} />
           </CampoDetalle>
           <CampoDetalle icono={Calendar} etiqueta="Entrega">
             {fechaCorta(orden.fechaEntrega)}

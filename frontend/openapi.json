@@ -27421,6 +27421,10 @@
                             ],
                             "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
                           },
+                          "llevaArte": {
+                            "type": "boolean",
+                            "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                          },
                           "cantidadFotos": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -27531,6 +27535,7 @@
                           "idMaquileroCotizado",
                           "maquileroCotizado",
                           "secuenciaEstampado",
+                          "llevaArte",
                           "cantidadFotos",
                           "urlFotoPrincipal",
                           "telaPrincipal",
@@ -27796,6 +27801,10 @@
                     ],
                     "description": "Secuencia del estampado respecto a la costura: antes | después | flexible."
                   },
+                  "llevaArte": {
+                    "type": "boolean",
+                    "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                  },
                   "descripcion": {
                     "type": "string",
                     "maxLength": 500
@@ -28021,6 +28030,10 @@
                       ],
                       "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
                     },
+                    "llevaArte": {
+                      "type": "boolean",
+                      "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -28131,6 +28144,7 @@
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
+                    "llevaArte",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "telaPrincipal",
@@ -28524,6 +28538,10 @@
                       ],
                       "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
                     },
+                    "llevaArte": {
+                      "type": "boolean",
+                      "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -28775,6 +28793,7 @@
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
+                    "llevaArte",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "telaPrincipal",
@@ -29062,6 +29081,10 @@
                     ],
                     "description": "Secuencia del estampado respecto a la costura: antes | después | flexible."
                   },
+                  "llevaArte": {
+                    "type": "boolean",
+                    "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                  },
                   "descripcion": {
                     "anyOf": [
                       {
@@ -29314,6 +29337,10 @@
                       ],
                       "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
                     },
+                    "llevaArte": {
+                      "type": "boolean",
+                      "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -29424,6 +29451,7 @@
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
+                    "llevaArte",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "telaPrincipal",
@@ -29815,6 +29843,10 @@
                       ],
                       "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
                     },
+                    "llevaArte": {
+                      "type": "boolean",
+                      "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -29925,6 +29957,7 @@
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
+                    "llevaArte",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "telaPrincipal",
@@ -40961,7 +40994,59 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                          "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                        },
+                        "requisitos": {
+                          "type": "object",
+                          "properties": {
+                            "tallas": {
+                              "type": "boolean",
+                              "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                            },
+                            "avios": {
+                              "type": "boolean",
+                              "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                            },
+                            "arte": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "no-aplica"
+                                  ]
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ],
+                              "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                            },
+                            "completa": {
+                              "type": "boolean",
+                              "description": "Se cumplen todos los requisitos que aplican."
+                            },
+                            "faltantes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "tallas",
+                                  "avios",
+                                  "arte"
+                                ]
+                              },
+                              "description": "Requisitos que hoy faltan (vacío si está completa)."
+                            }
+                          },
+                          "required": [
+                            "tallas",
+                            "avios",
+                            "arte",
+                            "completa",
+                            "faltantes"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Por qué la orden está (o no) completa."
                         },
                         "motivoCancelada": {
                           "anyOf": [
@@ -41293,6 +41378,7 @@
                         "obsMaquila",
                         "noCostear",
                         "fechaCompletada",
+                        "requisitos",
                         "motivoCancelada",
                         "ocCliente",
                         "tallasV1",
@@ -44754,7 +44840,59 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                            "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                          },
+                          "requisitos": {
+                            "type": "object",
+                            "properties": {
+                              "tallas": {
+                                "type": "boolean",
+                                "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                              },
+                              "avios": {
+                                "type": "boolean",
+                                "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                              },
+                              "arte": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "no-aplica"
+                                    ]
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ],
+                                "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                              },
+                              "completa": {
+                                "type": "boolean",
+                                "description": "Se cumplen todos los requisitos que aplican."
+                              },
+                              "faltantes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "tallas",
+                                    "avios",
+                                    "arte"
+                                  ]
+                                },
+                                "description": "Requisitos que hoy faltan (vacío si está completa)."
+                              }
+                            },
+                            "required": [
+                              "tallas",
+                              "avios",
+                              "arte",
+                              "completa",
+                              "faltantes"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Por qué la orden está (o no) completa."
                           },
                           "motivoCancelada": {
                             "anyOf": [
@@ -45086,6 +45224,7 @@
                           "obsMaquila",
                           "noCostear",
                           "fechaCompletada",
+                          "requisitos",
                           "motivoCancelada",
                           "ocCliente",
                           "tallasV1",
@@ -45725,7 +45864,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -46057,6 +46248,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -46482,7 +46674,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -46814,6 +47058,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -47358,7 +47603,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -47690,6 +47987,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -48192,7 +48490,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -48524,6 +48874,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -48970,7 +49321,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -49302,6 +49705,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -49748,7 +50152,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -50080,6 +50536,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -50544,7 +51001,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -50876,6 +51385,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -52888,7 +53398,59 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                      "description": "Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null."
+                    },
+                    "requisitos": {
+                      "type": "object",
+                      "properties": {
+                        "tallas": {
+                          "type": "boolean",
+                          "description": "La orden tiene su matriz de tallas capturada (≥1 renglón)."
+                        },
+                        "avios": {
+                          "type": "boolean",
+                          "description": "El modelo tiene su receta de avíos de producción (≥1 avío)."
+                        },
+                        "arte": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "no-aplica"
+                              ]
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ],
+                          "description": "El modelo tiene su arte; \"no-aplica\" si el modelo no lleva arte."
+                        },
+                        "completa": {
+                          "type": "boolean",
+                          "description": "Se cumplen todos los requisitos que aplican."
+                        },
+                        "faltantes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "tallas",
+                              "avios",
+                              "arte"
+                            ]
+                          },
+                          "description": "Requisitos que hoy faltan (vacío si está completa)."
+                        }
+                      },
+                      "required": [
+                        "tallas",
+                        "avios",
+                        "arte",
+                        "completa",
+                        "faltantes"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Por qué la orden está (o no) completa."
                     },
                     "motivoCancelada": {
                       "anyOf": [
@@ -53220,6 +53782,7 @@
                     "obsMaquila",
                     "noCostear",
                     "fechaCompletada",
+                    "requisitos",
                     "motivoCancelada",
                     "ocCliente",
                     "tallasV1",
@@ -55441,6 +56004,18 @@
                           "cliente": {
                             "type": "string",
                             "description": "Nombre del cliente."
+                          },
+                          "faltantes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "tallas",
+                                "avios",
+                                "arte"
+                              ]
+                            },
+                            "description": "Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como \"Falta: …\"."
                           }
                         },
                         "required": [
@@ -55467,7 +56042,8 @@
                           "fechaEntrega",
                           "mesEntrega",
                           "idCliente",
-                          "cliente"
+                          "cliente",
+                          "faltantes"
                         ],
                         "additionalProperties": false,
                         "description": "Fila del centro de comando de órdenes (13 columnas del proto, agregadas en servidor)."

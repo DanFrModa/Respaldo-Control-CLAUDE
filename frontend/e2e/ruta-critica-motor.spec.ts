@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 
 import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
@@ -20,6 +20,14 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
   test('programar una orden → ambos procesos pendientes en Mis pendientes → marcar hecho uno y luego el otro', async ({
     page,
   }) => {
+    // Flujo de extremo a extremo ENORME (catálogo RC por API + 2 procesos + plantilla + cliente +
+    // modelo + pedido + OP con matriz por UI + programar RC + Mis pendientes con 2 capturas). Con los
+    // 30 s globales de `playwright.config.ts` vivía al filo: en el CI del PR #147 (run 345) el
+    // REINTENTO murió por "Test timeout of 30000ms exceeded" DENTRO del `toPass` del paso 6, así que
+    // el reporte culpó al reintento y no al síntoma. Timeout holgado SOLO para esta prueba (el global
+    // NO se toca: las demás deben seguir siendo rápidas).
+    test.setTimeout(120_000);
+
     const sufijo = Date.now().toString().slice(-6);
     const cliente = `Cliente RC ${sufijo}`;
     const codigoModelo = `RC-${sufijo}`;
@@ -146,7 +154,20 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('prog-articulo').selectOption(String(idArticulo));
     await page.getByTestId('prog-tela').selectOption({ label: nombreTela });
     await page.getByTestId('prog-aplicacion').selectOption({ label: nombreAplicacion });
-    await page.getByTestId('prog-entrega').fill(fechaRelativa(30));
+    // ENTREGA CERCANA A PROPÓSITO (antes eran +30 días, y ahí estaba la bomba de tiempo del CI):
+    // el CPM ancla a los procesos TERMINALES —y estos dos lo son, no se encadenan entre sí— EXACTAMENTE
+    // en la fecha de entrega de la RC (backward pass de `backend/src/dominio/ruta-critica/cpm.ts`), así
+    // que con +30 la `fechaPlaneadaVigente` de AMBOS caía en urgencia `despues`… y "Mis pendientes"
+    // agrupado por URGENCIA (la vista por defecto) NO pinta renglón para `despues`: solo lo cuenta en
+    // "+N programadas más adelante" (`MisPendientesPagina.tsx` arma secciones vencida/hoy/semana/sinFecha).
+    // Resultado: la prueba SOLO pasaba mientras el CPM —que corre ASÍNCRONO en pg-boss tras programar—
+    // no había fechado la ruta (`fechaPlaneadaVigente` null → `sinFecha`, que sí se pinta); en cuanto el
+    // job aterrizaba, las filas DESAPARECÍAN de la pantalla. Eso reventó el CI del PR #147 (run 345): un
+    // intento halló `Proc RC 1` y ya no halló `Proc RC 2` tras marcar el primero, y el reintento no halló
+    // ninguna de las dos. Con la entrega a 3 días la urgencia es `semana` DESPUÉS del CPM y `sinFecha`
+    // ANTES: la fila se pinta en LOS DOS estados y la prueba deja de depender de cuándo corre el job.
+    // ⚠️ No volver a alejar esta fecha más de 4 días (`DIAS_SEMANA_PENDIENTES` en `bandeja.ts`).
+    await page.getByTestId('prog-entrega').fill(fechaRelativa(3));
     await page.getByTestId('prog-enviar').click();
     await expect(page.getByText('Ruta Crítica programada.')).toBeVisible();
     // La ruta resultante muestra sus renglones (procesos con fecha).
@@ -166,45 +187,57 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
       .click();
     await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
     await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
-    // AISLA las filas de ESTA corrida: el admin ve TODO y la página trae 100 tareas por consulta —
-    // con la BD del CI llena de órdenes de otros specs, la fila podía quedar FUERA de la página
-    // (el flaky de la 1ª corrida). El filtro por cliente es SERVER-SIDE (parámetro de la bandeja).
-    //
-    // Además, la RUTA VIVA (renglones + fechas del CPM) se materializa ASÍNCRONO en el backend del
-    // compose (outbox → pg-boss); con este PR la cola trae MÁS mensajes (OCs y notas ahora emiten;
-    // cada auditoría re-evalúa 2 tipos), así que la fila puede tardar y la página NO re-consulta sola.
-    // Se reintenta RECARGANDO y re-aplicando el filtro hasta que la fila del proc1 exista. `toPass`
-    // reintenta el callback COMPLETO aunque una aserción interna lance (mismo patrón que pedidos.spec).
-    await expect(async () => {
+
+    /** La fila de un proceso en la lista de pendientes (por su nombre único de la corrida). */
+    const filaDe = (nombreProceso: string): Locator =>
+      page.getByTestId('pendientes-fila').filter({ hasText: nombreProceso });
+
+    /**
+     * Recarga Mis pendientes y RE-APLICA el filtro por cliente (el reload lo limpia). AISLA las filas
+     * de ESTA corrida: el admin ve TODO y la página trae 100 tareas por consulta — con la BD del CI
+     * llena de órdenes de otros specs, la fila podía quedar FUERA de la página. El filtro por cliente
+     * es SERVER-SIDE (parámetro de la bandeja), así que la acota de verdad.
+     */
+    const recargarFiltrado = async (): Promise<void> => {
       await page.reload();
       await page.getByTestId('pendientes-buscar-cliente').fill(cliente);
-      await expect(
-        page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre }),
-      ).toBeVisible({ timeout: 3_000 });
+    };
+
+    // La RUTA VIVA se materializa en dos tiempos: los renglones y su activación son SÍNCRONOS al
+    // programar (`generarRutaOrden` → `activarProcesosListos`), pero el FECHADO del CPM corre
+    // ASÍNCRONO (pg-boss) y cambia la urgencia de la fila cuando aterriza — y la página NO se
+    // re-consulta sola. Se reintenta RECARGANDO y re-filtrando hasta ver la fila del proc1. `toPass`
+    // reintenta el callback COMPLETO aunque una aserción interna lance (mismo patrón que pedidos.spec).
+    await expect(async () => {
+      await recargarFiltrado();
+      await expect(filaDe(proc1Nombre)).toBeVisible({ timeout: 3_000 });
     }).toPass({ timeout: 30_000, intervals: [2_000] });
 
-    const fila1 = page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre });
     // Los procesos del test no tienen evento de sistema → tag "✋ manual" + botón "Marcar hecho".
-    await expect(fila1.getByTestId('pendientes-tag-evento')).toHaveText('✋ manual');
+    await expect(filaDe(proc1Nombre).getByTestId('pendientes-tag-evento')).toHaveText('✋ manual');
 
     // ── 7) "Marcar hecho" saca al primero; el otro (raíz independiente) sigue ahí ──────────────
-    await fila1.getByTestId('pendientes-marcar-hecho').click();
+    await filaDe(proc1Nombre).getByTestId('pendientes-marcar-hecho').click();
     // Toast ESPECÍFICO por nombre: el toast del paso 8 (proc2) puede solaparse con este mientras se
     // desvanece; un `/marcado como hecho\./` genérico casaría 2 elementos (strict mode). El texto real
     // es `"<nombre>" de la orden <folio> marcado como hecho.` (MisPendientesPagina).
     await expect(page.getByText(new RegExp(`"${proc1Nombre}".*marcado como hecho`))).toBeVisible();
-    await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre })).toHaveCount(
-      0,
-    );
-    const fila2 = page.getByTestId('pendientes-fila').filter({ hasText: proc2Nombre });
-    await expect(fila2).toBeVisible();
+    // MISMO patrón resiliente que el paso 6, y por la misma razón: tras la mutación la lista se
+    // re-consulta sola (invalidación de TanStack Query) y, mientras el refetch va en vuelo o si el CPM
+    // aterriza justo ahí, la fila del proc2 puede no estar pintada todavía. Las DOS aserciones van
+    // JUNTAS dentro del reintento a propósito: `toHaveCount(0)` de fila1 pasaría EN FALSO con la lista
+    // vacía (fue lo que enmascaró el fallo del CI del PR #147 — el intento 1 "pasó" esa línea y reventó
+    // en la de fila2), así que exigir en el mismo intento que fila2 SÍ esté y fila1 ya NO cierra el hueco.
+    await expect(async () => {
+      await recargarFiltrado();
+      await expect(filaDe(proc2Nombre)).toBeVisible({ timeout: 3_000 });
+      await expect(filaDe(proc1Nombre)).toHaveCount(0);
+    }).toPass({ timeout: 30_000, intervals: [2_000] });
 
     // ── 8) Marcar el último: la orden queda al día (sale de Mis pendientes) ─────
-    await fila2.getByTestId('pendientes-marcar-hecho').click();
+    await filaDe(proc2Nombre).getByTestId('pendientes-marcar-hecho').click();
     await expect(page.getByText(new RegExp(`"${proc2Nombre}".*marcado como hecho`))).toBeVisible();
-    await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc2Nombre })).toHaveCount(
-      0,
-    );
+    await expect(filaDe(proc2Nombre)).toHaveCount(0);
 
     // ── 9) Clic en un renglón abre el panel "Ruta de la orden" (R4). El panel se prueba con la
     //    ruta de ESTA orden desde el centro de órdenes: aquí basta verificar el deep-link viejo.

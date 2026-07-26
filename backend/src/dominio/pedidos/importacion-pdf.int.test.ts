@@ -83,7 +83,14 @@ function archivosFalsos(): ServicioArchivos {
   };
 }
 
-/** Crea un modelo del catálogo (opcionalmente con composición del desarrollo) y devuelve su id. */
+/**
+ * Crea un modelo del catálogo (opcionalmente con composición del desarrollo) y devuelve su id.
+ *
+ * Nace PELADO a propósito (sin receta de avíos y con `llevaArte` en su default `true`): es el caso
+ * REAL del importador de OC, donde el modelo se crea al capturar el pedido y la receta llega
+ * después. Por eso las OP importadas nacen `capturada` con "Falta: avíos y arte" — estado
+ * automático (`dominio/produccion/requisitos-orden.ts`), no un fallo, y no impide operarlas.
+ */
 async function crearModelo(codigo: string, composicion?: string): Promise<number> {
   const modelo = await cliente.modelo.create({
     data: { codigo, ...(composicion === undefined ? {} : { composicion }) },

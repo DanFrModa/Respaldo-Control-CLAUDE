@@ -125,7 +125,7 @@ async function crearOrdenConMatriz(
 }
 
 test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () => {
-  test('Generar OP (nace completa) → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
+  test('Generar OP (con su "Falta: avíos") → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
     page,
   }) => {
     test.setTimeout(150_000);
@@ -173,10 +173,14 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     const folio1 = await generarOp(page, { cliente, color, talla }, '20');
     const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
-    // ── La OP nace COMPLETA (matriz al crear, R3) y la matriz se puede RE-guardar ─
+    // ── La OP nace con matriz (R3) pero NO completa: el modelo de la prueba no tiene receta de
+    //    avíos NI arte capturado (y "lleva arte" viene MARCADO por default, decisión de Daniel).
+    //    Desde el 26-jul-2026 el estado es AUTOMÁTICO (tallas + avíos, y arte si aplica) y la
+    //    pantalla tiene que DECIR qué falta. Ojo: incompleta NO impide operar la orden.
     await abrirOrdenEnCaptura(page, folio1, codigoModelo);
     const detalle = page.getByTestId('detalle-orden');
-    await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Completa');
+    await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Capturada');
+    await expect(detalle.getByTestId('faltantes-orden').first()).toHaveText('Falta: avíos y arte');
     const matriz = detalle.getByTestId('matriz-orden');
     await matriz.getByTestId('matriz-orden-celda').first().fill('25');
     // Guardado ÚNICO (Daniel 24-jul-2026): un solo botón en el pie del diálogo, para TODO.

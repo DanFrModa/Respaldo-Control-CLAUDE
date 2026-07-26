@@ -137,6 +137,21 @@ export const esquemaSecuenciaEstampado = z
 /** Clave de la secuencia de estampado. */
 export type SecuenciaEstampadoClave = z.infer<typeof esquemaSecuenciaEstampado>;
 
+// ── ¿La prenda LLEVA arte? (decisión de Daniel, 26-jul-2026) ────────────────────
+
+/**
+ * ¿El modelo LLEVA arte (bordado/estampado)? Decisión de Daniel: *"por default sí lleva; a menos
+ * que la marques como que no lleva… si no meten la información del arte, o no desmarcan la
+ * casilla, está como incompleto"*. Es el requisito ARTE del estado automático de la orden: con
+ * `true` la orden no se completa hasta que el modelo tenga su arte capturado; con `false` el arte
+ * no aplica. Default `true` en BD (también para lo migrado).
+ */
+export const esquemaLlevaArte = z
+  .boolean({ error: '"Lleva arte" debe ser verdadero o falso' })
+  .describe(
+    '¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta.',
+  );
+
 // ── Dificultad DERIVADA del # de operaciones (rediseño R5, B7) ──────────────────
 
 /** Querystring del resolvedor de dificultad: el # de operaciones a evaluar. */
@@ -265,6 +280,8 @@ export const esquemaModeloCrear = z.object({
   idMaquileroCotizado: esquemaIdMaquilero.optional(),
   /** Secuencia de estampado (R5/B10): antes | después | flexible. Opcional (default 'antes' en BD). */
   secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+  /** ¿La prenda lleva arte? Opcional; omitir = `true` (default de Daniel, ver el esquema de salida). */
+  llevaArte: esquemaLlevaArte.optional(),
   ...camposOpcionalesModelo,
 });
 
@@ -327,6 +344,8 @@ export const esquemaModeloEditar = z
     idMaquileroCotizado: esquemaIdMaquilero.nullable().optional(),
     /** Cambia la secuencia de estampado; omitir = no tocar (R5/B10). No es nullable (tiene default). */
     secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+    /** Marca/desmarca "lleva arte"; omitir = no tocar. No es nullable (tiene default `true`). */
+    llevaArte: esquemaLlevaArte.optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
     /** `null`/'' borra la composición del modelo; omitir = no tocar. */
     composicion: camposOpcionalesModelo.composicion.nullable(),
@@ -433,6 +452,7 @@ export const esquemaModeloSalida = z
     secuenciaEstampado: esquemaSecuenciaEstampado.describe(
       'Secuencia de estampado del modelo (R5/B10; default "antes").',
     ),
+    llevaArte: esquemaLlevaArte,
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o

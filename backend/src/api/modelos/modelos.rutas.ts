@@ -101,6 +101,7 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     idMaquileroCotizado: modelo.idMaquileroCotizado,
     maquileroCotizado: modelo.maquileroCotizado?.nombre ?? null,
     secuenciaEstampado: modelo.secuenciaEstampado,
+    llevaArte: modelo.llevaArte,
     cantidadFotos: modelo._count.fotos,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,

@@ -107,4 +107,33 @@ describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', ()
       composicion: '60% algodón 40% poliéster',
     });
   });
+
+  // ── ¿Lleva arte? (Daniel 26-jul-2026: "por default sí lleva") ──
+  it('la casilla "Lleva arte" nace MARCADA y el alta manda llevaArte: true', async () => {
+    renderConProveedores(<DialogoModelo abierto alCambiarAbierto={vi.fn()} modelo={undefined} />);
+
+    const casilla = screen.getByTestId('modelo-lleva-arte');
+    expect(casilla).toBeChecked();
+    expect(
+      screen.getByText(/desmárcala; si no, la orden quedará incompleta hasta capturar el arte/),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-ARTE' } });
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect(crearMutate.mock.calls[0]?.[0]).toMatchObject({ codigo: 'M-ARTE', llevaArte: true });
+  });
+
+  it('desmarcarla manda llevaArte: false (prenda lisa)', async () => {
+    renderConProveedores(<DialogoModelo abierto alCambiarAbierto={vi.fn()} modelo={undefined} />);
+
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-LISA' } });
+    fireEvent.click(screen.getByTestId('modelo-lleva-arte'));
+    expect(screen.getByTestId('modelo-lleva-arte')).not.toBeChecked();
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect(crearMutate.mock.calls[0]?.[0]).toMatchObject({ codigo: 'M-LISA', llevaArte: false });
+  });
 });

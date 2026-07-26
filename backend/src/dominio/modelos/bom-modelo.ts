@@ -45,6 +45,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
 import { exigirModelo, incluirRelacionesModelo, type ModeloConRelaciones } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
@@ -566,6 +567,11 @@ export async function reemplazarAviosBom(
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModelo(tx, sesion, idModelo);
+      // El BOM de avíos es uno de los REQUISITOS de "orden completa" (Daniel 26-jul-2026): las
+      // órdenes de ESTE modelo a las que solo les faltaba la receta se COMPLETAN en la MISMA
+      // transacción (A2). Solo COMPLETA: un cambio de catálogo NUNCA degrada órdenes (ver
+      // `recalcularEstadoOrdenesDeModelo`).
+      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -594,6 +600,10 @@ export async function reemplazarBordadosBom(
     const cambio = await sincronizarBordados(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModelo(tx, sesion, idModelo);
+      // El arte también entra en la regla de "orden completa" (aunque hoy nunca bloquee: ver el
+      // juicio documentado en `requisitos-orden.ts`). Se recalcula igual, por consistencia; como
+      // arriba, solo puede COMPLETAR.
+      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -837,6 +847,10 @@ export async function copiarBom(
     }
 
     await tocarModelo(tx, sesion, idDestino);
+    // Copiar un BOM puede DARLE su receta de avíos al modelo destino: las órdenes suyas a las que
+    // solo les faltaba eso se COMPLETAN aquí mismo (A2). Al REEMPLAZAR también puede quitársela,
+    // pero eso NO degrada nada: el recálculo por catálogo solo asciende.
+    await recalcularEstadoOrdenesDeModelo(tx, sesion, idDestino);
     await registrarBitacora(tx, sesion, {
       entidad: 'Modelo',
       idEntidad: idDestino,

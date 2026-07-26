@@ -73,7 +73,15 @@ const FILAS_DEMO: (string | number)[][] = [
   ['CA-KM-999', 'Blanco', 'M', 200, 140],
 ];
 
-/** Crea un modelo + su desarrollo (proyecto/departamento del cliente) y devuelve sus ids. */
+/**
+ * Crea un modelo + su desarrollo (proyecto/departamento del cliente) y devuelve sus ids.
+ *
+ * El modelo nace PELADO a propósito (sin receta de avíos y con `llevaArte` en su default `true`),
+ * que es el caso REAL del importador: Daniel crea los modelos al capturar el pedido y la receta se
+ * llena después. Consecuencia esperada: las OP que salgan de aquí nacen `capturada` con "Falta:
+ * avíos y arte" — es el estado automático (`dominio/produccion/requisitos-orden.ts`), NO un fallo
+ * del importador, y no impide operarlas. El estado se prueba en `produccion/ordenes.int.test.ts`.
+ */
 async function sembrarDesarrollo(
   codigoModelo: string,
   numeroCliente: string | null,

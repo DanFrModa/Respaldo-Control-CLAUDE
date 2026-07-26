@@ -262,6 +262,11 @@ describe('API de Auditorías — consulta/impreso/modificar/cancelar (F6-E3)', (
     expect(pdf.statusCode).toBe(200);
     expect(pdf.headers['content-type']).toContain('application/pdf');
     expect(pdf.rawPayload.subarray(0, 4).toString('latin1')).toBe('%PDF');
+    // Los impresos NO se cachean (incidente del 26-jul-2026: tras un despliegue el navegador
+    // seguía sirviendo el PDF viejo). Esta aserción va contra la APP REAL a propósito: la unit de
+    // `api/cache-documentos.test.ts` prueba el hook, pero solo esto detecta que alguien lo
+    // desconecte de `construirApp`.
+    expect(pdf.headers['cache-control']).toBe('no-store');
   });
 
   it('modificar y cancelar por HTTP (con calidad.modificar-auditorias)', async () => {

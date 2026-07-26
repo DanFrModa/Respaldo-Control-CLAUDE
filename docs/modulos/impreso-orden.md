@@ -29,7 +29,7 @@ un costeo) y **sin código de barra/UPC** (retirado en F2-E5).
 | Matriz color × talla + totales | `armarTabla` sobre `orden.lineas` (D4); totales por fila, columna y general |
 | Telas | BOM del modelo, solo las `paraProduccion` (con consumo por prenda) |
 | **Arte** (antes "Bordados") | BOM del modelo: nombre + subtipo por renglón (`Bordado`/`Estampado`) |
-| Habilitación | Avíos del BOM `paraProduccion` (clave, descripción, consumo) |
+| **Avíos** (antes "Habilitación") | Avíos del BOM `paraProduccion` (clave, descripción, consumo) |
 | **Artes (imágenes)** | Fotos de los bordados/estampados del BOM (con su nombre debajo) **+** los adjuntos de la orden (F8-E6) con `tipoMime` `image/*`. Máximo 4 (ver presupuesto de altura) |
 | Pie | Contexto + "Página N de M" + fecha de generación |
 
@@ -137,6 +137,16 @@ en la sección de texto "Arte". Con 5 o más bordados con foto, **los adjuntos d
 nunca** en el impreso. Detectado en la revisión de jul-2026; **sin decisión de Daniel todavía**.
 Alternativas cuando se decida: reservar cupo para al menos un adjunto, priorizar los adjuntos sobre
 el arte del BOM, o listar por nombre los adjuntos recortados.
+
+## Caché del navegador (26-jul-2026)
+
+Los impresos se abren con `window.open('/api/…/impreso')`. Sin cabecera de caché el navegador
+guardaba el PDF por heurística y, tras un despliegue, seguía sirviendo **el viejo** (pasó de verdad:
+media hora de confusión; solo en incógnito salía el nuevo). Ahora un hook `onSend` de la raíz de la
+app (`src/api/cache-documentos.ts`) marca `Cache-Control: no-store` en **toda** respuesta cuyo
+`Content-Type` sea de documento generado (PDF o XLSX) — punto **común**, así que también cubre los
+impresos que se agreguen después. Respeta el `Cache-Control` que una ruta ya haya fijado, por lo que
+`GET /api/empresas/logo` conserva su caché larga con ETag (es un asset, no un documento).
 
 ## Permisos (A4)
 

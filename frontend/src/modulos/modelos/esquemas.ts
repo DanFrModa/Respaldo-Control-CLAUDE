@@ -85,6 +85,8 @@ export const esquemaModeloFormulario = z.object({
     .describe('# de operaciones de costura (vacío = sin capturar).'),
   /** Secuencia de estampado respecto a la costura (R5/B10). */
   secuenciaEstampado: z.enum(['antes', 'despues', 'flexible']),
+  /** ¿La prenda lleva arte? Default `true` (decisión de Daniel 26-jul-2026). */
+  llevaArte: z.boolean(),
   // Selectores: id como texto ('' = sin asignar).
   idTemporada: z.string(),
   idCurvaTalla: z.string(),

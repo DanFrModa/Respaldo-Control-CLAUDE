@@ -633,3 +633,16 @@ Revisando el importador en operación, Daniel precisó cómo deben nacer los ren
 - **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor` en `componerColor`/`componerColorUI`, backend y frontend en espejo). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-renglon-por-pack`).
 - **Fecha:** 2026-07-12.
+
+#### (Post-F9.4) — Estado de la orden AUTOMÁTICO y la bandera "lleva arte" (DANIEL, 26-jul-2026)
+
+Daniel preguntó de dónde salía el estado `completa`/`incompleta` de la orden: *"El estado de la orden (completa, incompleta) no sé en base a qué existe. En CONTROL viejo existía, pero está en desuso. Acá podríamos definirla como completa cuando ya tenga los avíos, los artes. De manera automática se pone como completa."* Se le propuso la regla con el matiz de las prendas sin arte y **eligió "tallas + avíos, y arte si aplica"**.
+
+- **La orden se marca COMPLETA sola** cuando: (1) tiene su **matriz de tallas** capturada, (2) el **modelo tiene su receta de avíos** de producción, y (3) el **arte**, si el modelo lo lleva. Nadie marca nada a mano.
+- **El arte, textual de Daniel:** *"por default sí lleva. A menos que la marques como que no lleva. Y de esa manera si no meten la información del arte, o no desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender ese tema."* → bandera **`Modelo.llevaArte`, default `true`**, también para los ~miles de modelos migrados de Access. Casilla "Lleva arte" en la ficha del modelo. **Consecuencia querida:** muchas órdenes vivas quedan incompletas hasta capturar el arte o desmarcar la casilla.
+- **El estado es INFORMATIVO, nunca una llave para operar** (decisión del lead al implementar, para que el punto anterior no pare la planta): ninguna pantalla de captura —corte, envío a maquila, recibo, entrega a cliente, salida de tela, nota de salida de tela, alta de auditoría— filtra ni bloquea por `completa`. Lo único que impide operar una orden es que esté **cancelada**.
+- **DES-COMPLETAR está acotado:** una orden vuelve de `completa` a `capturada` **solo** al editar **su propia matriz** y **solo si aún no tiene producción** (ningún corte/envío vivo). Cambiar el catálogo (receta de avíos, arte, la casilla) **solo puede COMPLETAR**, nunca degradar — para no des-completar de un clic el histórico ni sacar de los tableros una orden a medio producir.
+- **La fecha en que quedó completa por primera vez** se sella una vez y **nunca se borra** (es el `FechaDet` del viejo); el estado no se deriva de ella.
+- **Histórico migrado:** no se reescribe. El ETL carga `estado`/`fechaCompletada` explícitos y la regla entra cuando la orden se vuelve a tocar (o cuando se toca el catálogo de su modelo, y solo para completar).
+- **Aplica en:** rama `claude/logo-pdf-estado`; regla en `backend/src/dominio/produccion/requisitos-orden.ts`; migración `20260726120000_modelo_lleva_arte`.
+- **Fecha:** 2026-07-26.

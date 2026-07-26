@@ -1637,6 +1637,15 @@ model Modelo {
   idTipoProducto Int?          @map("id_tipo_producto")
   tipoProducto   TipoProducto? @relation(fields: [idTipoProducto], references: [id], onDelete: Restrict)
 
+  /// ¿La prenda LLEVA arte (bordado/estampado)? Decisión de Daniel (26-jul-2026): *"por default sí
+  /// lleva; a menos que la marques como que no lleva. Y de esa manera si no meten la información
+  /// del arte, o no desmarcan la casilla, está como incompleto. Siempre hay que atender ese tema"*.
+  /// Es el requisito ARTE del estado automático de la orden
+  /// (`dominio/produccion/requisitos-orden.ts`): con `true` la orden NO se completa hasta que el BOM
+  /// tenga su arte; con `false` el arte no aplica y no estorba. Default `true` A PROPÓSITO, también
+  /// para los modelos migrados: el tema se atiende siempre.
+  llevaArte Boolean @default(true) @map("lleva_arte")
+
   /// Borrado suave = descontinuar (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
@@ -2208,11 +2217,13 @@ model Orden {
   /// estatus y la derivación deja de pisarlo; null = derivación automática. Se registra en bitácora.
   pagadaForzada Boolean? @map("pagada_forzada")
 
-  /// Estado DERIVADO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`).
+  /// Estado AUTOMÁTICO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`). Lo
+  /// decide `dominio/produccion/requisitos-orden.ts` (tallas + avíos, y arte si aplica).
   estado          EstadoOrden @default(capturada)
-  /// Fecha en que la orden quedó COMPLETA — se sella al primer guardado de matriz con líneas
-  /// (paridad con `Ordenes.FechaDet` del viejo, sellado en el primer renglón del detalle). De ahí
-  /// deriva `estado='completa'`. NO se re-sella en guardados posteriores.
+  /// Fecha en que la orden quedó COMPLETA por PRIMERA vez (paridad con `Ordenes.FechaDet` del
+  /// viejo). Es un SELLO HISTÓRICO independiente del estado actual: se pone una sola vez, NO se
+  /// re-sella y NO se borra, así que una orden puede estar `capturada` y traer fecha (estuvo
+  /// completa y luego le quitaron la matriz). El estado NO se deriva de esta columna.
   fechaCompletada DateTime?   @map("fecha_completada")
   /// Motivo de la cancelación suave (viejo: `MotivoCancelada`; `OrdCancelada` → estado=cancelada).
   motivoCancelada String?     @map("motivo_cancelada") @db.Text

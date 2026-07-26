@@ -52,7 +52,11 @@ const LOGO_OK = { nombreOriginal: 'FR Moda.png', tipoMime: 'image/png', tamanoBy
 function bdParaLogo(
   idEmpresa: number,
   idArchivoLogo: string | null,
-  opciones: { archivoNuevo?: { id: string; key: string } | null; borrados?: number } = {},
+  opciones: {
+    archivoNuevo?: { id: string; key: string } | null;
+    borrados?: number;
+    tipoMime?: string;
+  } = {},
 ) {
   const empresaUpdate = vi.fn((args: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: idEmpresa, ...args.data }),
@@ -74,7 +78,16 @@ function bdParaLogo(
         Promise.resolve({ id: 'arch_nuevo', ...args.data }),
       ),
       findUnique: vi.fn(() =>
-        Promise.resolve(nuevo === null ? null : { ...nuevo, nombreOriginal: 'logo.png' }),
+        Promise.resolve(
+          nuevo === null
+            ? null
+            : {
+                ...nuevo,
+                nombreOriginal: 'logo.png',
+                // `tipoMime` decide si se inspecciona el PNG al confirmar (ver `exigirPngImprimible`).
+                tipoMime: opciones.tipoMime ?? 'image/jpeg',
+              },
+        ),
       ),
       deleteMany: archivoDeleteMany,
     },
@@ -217,6 +230,80 @@ describe('logo de la empresa — paso 2: confirmar', () => {
     await expect(confirmarLogo(sesionAdmin(), 3, 'arch_ajeno', bd)).rejects.toBeInstanceOf(
       ErrorValidacion,
     );
+  });
+
+  // ── Inspección del PNG (incidente del logo que se imprimía mal, 26-jul-2026) ──
+  // La subida va DIRECTA del navegador a R2, así que confirmar es el único momento en que el
+  // servidor puede mirar los bytes. Aquí se stubea la descarga; la regla en sí vive (y se prueba
+  // exhaustivamente) en `comun/png.ts`.
+
+  /** Servicio de archivos que devuelve los bytes dados como contenido de cualquier key. */
+  function archivosQueDevuelven(bytes: Buffer | Error): ServicioArchivos {
+    return {
+      descargarContenido: vi.fn(() =>
+        bytes instanceof Error ? Promise.reject(bytes) : Promise.resolve(bytes),
+      ),
+    } as unknown as ServicioArchivos;
+  }
+
+  /** PNG sintético mínimo con la profundidad/tipo de color pedidos. */
+  function pngFalso(profundidad: number, tipoColor: number): Buffer {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(10, 0);
+    ihdr.writeUInt32BE(10, 4);
+    ihdr.writeUInt8(profundidad, 8);
+    ihdr.writeUInt8(tipoColor, 9);
+    const largo = Buffer.alloc(4);
+    largo.writeUInt32BE(13);
+    return Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      largo,
+      Buffer.from('IHDR', 'latin1'),
+      ihdr,
+      Buffer.alloc(4),
+    ]);
+  }
+
+  it('RECHAZA un PNG de 16 bits (el generador de PDF lo pinta mal) sin tocar la empresa', async () => {
+    const { bd, empresaUpdate } = bdParaLogo(3, null, { tipoMime: 'image/png' });
+
+    await expect(
+      confirmarLogo(sesionAdmin(), 3, 'arch_nuevo', bd, archivosQueDevuelven(pngFalso(16, 6))),
+    ).rejects.toThrow(/16 bits/);
+    expect(empresaUpdate).not.toHaveBeenCalled();
+  });
+
+  it('acepta un PNG de 8 bits', async () => {
+    const { bd, empresaUpdate } = bdParaLogo(3, null, { tipoMime: 'image/png' });
+
+    await confirmarLogo(sesionAdmin(), 3, 'arch_nuevo', bd, archivosQueDevuelven(pngFalso(8, 6)));
+
+    expect(empresaUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('un JPG no se descarga siquiera (la inspección es solo para PNG)', async () => {
+    const { bd, empresaUpdate } = bdParaLogo(3, null, { tipoMime: 'image/jpeg' });
+    const descargar = vi.fn(() => Promise.resolve(pngFalso(16, 6)));
+    const archivos = { descargarContenido: descargar } as unknown as ServicioArchivos;
+
+    await confirmarLogo(sesionAdmin(), 3, 'arch_nuevo', bd, archivos);
+
+    expect(descargar).not.toHaveBeenCalled();
+    expect(empresaUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('si R2 no responde, NO bloquea la confirmación (perder la marca sería peor)', async () => {
+    const { bd, empresaUpdate } = bdParaLogo(3, null, { tipoMime: 'image/png' });
+
+    await confirmarLogo(
+      sesionAdmin(),
+      3,
+      'arch_nuevo',
+      bd,
+      archivosQueDevuelven(new Error('R2 caído')),
+    );
+
+    expect(empresaUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('si el archivo no existe → ErrorNoEncontrado', async () => {
