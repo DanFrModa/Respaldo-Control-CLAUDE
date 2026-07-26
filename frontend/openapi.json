@@ -141614,7 +141614,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Costo real de una orden: teórico + guardado + cantidades + unitario.",
+            "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario.",
             "content": {
               "application/json": {
                 "schema": {
@@ -141797,6 +141797,117 @@
                       "additionalProperties": false,
                       "description": "Componentes teóricos (receta × precios)."
                     },
+                    "real": {
+                      "type": "object",
+                      "properties": {
+                        "tela": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo real de TELA (o null sin importes)."
+                        },
+                        "avios": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo real de AVÍOS (o null sin importes)."
+                        },
+                        "total": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "tela + avíos (los procesos NO entran al real)."
+                        },
+                        "importeDirecto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Parte que viene de compras ligadas a la orden (tela + avíos)."
+                        },
+                        "importeValuado": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Parte valuada a último precio de compra / catálogo (tela + avíos)."
+                        },
+                        "importeLibre": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total."
+                        },
+                        "hayCompras": {
+                          "type": "boolean",
+                          "description": "¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada?"
+                        },
+                        "origenRequerido": {
+                          "type": "string",
+                          "enum": [
+                            "snapshot-mrp",
+                            "receta",
+                            "sin-requerido"
+                          ],
+                          "description": "De dónde salieron las cantidades requeridas."
+                        },
+                        "piezasBase": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                        },
+                        "avisos": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
+                        }
+                      },
+                      "required": [
+                        "tela",
+                        "avios",
+                        "total",
+                        "importeDirecto",
+                        "importeValuado",
+                        "importeLibre",
+                        "hayCompras",
+                        "origenRequerido",
+                        "piezasBase",
+                        "avisos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Costo REAL de materiales desde las órdenes de compra."
+                    },
                     "guardado": {
                       "anyOf": [
                         {
@@ -141823,6 +141934,17 @@
                                 }
                               ],
                               "description": "Tela GUARDADA (ajustable)."
+                            },
+                            "telaReal": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Tela REAL de compras congelada al guardar."
                             },
                             "procesosCalc": {
                               "anyOf": [
@@ -141867,6 +141989,17 @@
                                 }
                               ],
                               "description": "Avíos GUARDADOS (ajustables)."
+                            },
+                            "aviosReal": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Avíos REALES de compras congelados al guardar."
                             },
                             "otros": {
                               "anyOf": [
@@ -141933,10 +142066,12 @@
                           "required": [
                             "telaCalc",
                             "telaCost",
+                            "telaReal",
                             "procesosCalc",
                             "procesosCost",
                             "aviosCalc",
                             "aviosCost",
+                            "aviosReal",
                             "otros",
                             "descOtros",
                             "costoTotal",
@@ -142003,11 +142138,12 @@
                     "noCostear",
                     "cantidades",
                     "teorico",
+                    "real",
                     "guardado",
                     "unitario"
                   ],
                   "additionalProperties": false,
-                  "description": "Costo real de una orden: teórico + guardado + cantidades + unitario."
+                  "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario."
                 }
               }
             }
@@ -142172,7 +142308,7 @@
                 "type": "object",
                 "properties": {
                   "telaCost": {
-                    "description": "Tela guardada (≥0) o null.",
+                    "description": "Tela guardada (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -142184,7 +142320,7 @@
                     ]
                   },
                   "procesosCost": {
-                    "description": "Procesos guardados (≥0) o null.",
+                    "description": "Procesos guardados (≥0). OMITIR = conservar lo ya guardado (o el teórico en el primer costeo: los procesos no se compran con OC). `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -142196,7 +142332,7 @@
                     ]
                   },
                   "aviosCost": {
-                    "description": "Avíos guardados (≥0) o null.",
+                    "description": "Avíos guardados (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -142208,7 +142344,7 @@
                     ]
                   },
                   "otros": {
-                    "description": "Otros costos (≥0) o null.",
+                    "description": "Otros costos (≥0). OMITIR = conservar lo ya guardado. `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -142220,7 +142356,7 @@
                     ]
                   },
                   "descOtros": {
-                    "description": "Descripción de otros.",
+                    "description": "Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -142233,7 +142369,7 @@
                   },
                   "baseProrrateo": {
                     "default": "cortado",
-                    "description": "Base de prorrateo.",
+                    "description": "Base de prorrateo. ÚNICA EXCEPCIÓN a \"omitir = conservar\": tiene default, así que OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.",
                     "type": "string",
                     "enum": [
                       "cortado",
@@ -142242,7 +142378,7 @@
                     ]
                   },
                   "observaciones": {
-                    "description": "Observaciones.",
+                    "description": "Observaciones. OMITIR = conservar lo ya guardado. `null` = borrar.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -142254,11 +142390,11 @@
                     ]
                   }
                 },
-                "description": "Componentes guardados del costo de una orden (el total lo arma el servidor)."
+                "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default)."
               }
             }
           },
-          "description": "Componentes guardados del costo de una orden (el total lo arma el servidor)."
+          "description": "Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default)."
         },
         "parameters": [
           {
@@ -142280,7 +142416,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Costo real de una orden: teórico + guardado + cantidades + unitario.",
+            "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario.",
             "content": {
               "application/json": {
                 "schema": {
@@ -142463,6 +142599,117 @@
                       "additionalProperties": false,
                       "description": "Componentes teóricos (receta × precios)."
                     },
+                    "real": {
+                      "type": "object",
+                      "properties": {
+                        "tela": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo real de TELA (o null sin importes)."
+                        },
+                        "avios": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo real de AVÍOS (o null sin importes)."
+                        },
+                        "total": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "tela + avíos (los procesos NO entran al real)."
+                        },
+                        "importeDirecto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Parte que viene de compras ligadas a la orden (tela + avíos)."
+                        },
+                        "importeValuado": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Parte valuada a último precio de compra / catálogo (tela + avíos)."
+                        },
+                        "importeLibre": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total."
+                        },
+                        "hayCompras": {
+                          "type": "boolean",
+                          "description": "¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada?"
+                        },
+                        "origenRequerido": {
+                          "type": "string",
+                          "enum": [
+                            "snapshot-mrp",
+                            "receta",
+                            "sin-requerido"
+                          ],
+                          "description": "De dónde salieron las cantidades requeridas."
+                        },
+                        "piezasBase": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                        },
+                        "avisos": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
+                        }
+                      },
+                      "required": [
+                        "tela",
+                        "avios",
+                        "total",
+                        "importeDirecto",
+                        "importeValuado",
+                        "importeLibre",
+                        "hayCompras",
+                        "origenRequerido",
+                        "piezasBase",
+                        "avisos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Costo REAL de materiales desde las órdenes de compra."
+                    },
                     "guardado": {
                       "anyOf": [
                         {
@@ -142489,6 +142736,17 @@
                                 }
                               ],
                               "description": "Tela GUARDADA (ajustable)."
+                            },
+                            "telaReal": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Tela REAL de compras congelada al guardar."
                             },
                             "procesosCalc": {
                               "anyOf": [
@@ -142533,6 +142791,17 @@
                                 }
                               ],
                               "description": "Avíos GUARDADOS (ajustables)."
+                            },
+                            "aviosReal": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Avíos REALES de compras congelados al guardar."
                             },
                             "otros": {
                               "anyOf": [
@@ -142599,10 +142868,12 @@
                           "required": [
                             "telaCalc",
                             "telaCost",
+                            "telaReal",
                             "procesosCalc",
                             "procesosCost",
                             "aviosCalc",
                             "aviosCost",
+                            "aviosReal",
                             "otros",
                             "descOtros",
                             "costoTotal",
@@ -142669,11 +142940,621 @@
                     "noCostear",
                     "cantidades",
                     "teorico",
+                    "real",
                     "guardado",
                     "unitario"
                   ],
                   "additionalProperties": false,
-                  "description": "Costo real de una orden: teórico + guardado + cantidades + unitario."
+                  "description": "Costo de una orden: teórico + real de compras + guardado + cantidades + unitario."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/costos/ordenes/{idOrden}/real": {
+      "get": {
+        "summary": "Costo REAL de materiales de una orden, desglosado por material (desde las OC)",
+        "tags": [
+          "costos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idOrden",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Costo real de materiales de una orden, desglosado por material (desde las OC).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tela": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo real de TELA (o null sin importes)."
+                    },
+                    "avios": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo real de AVÍOS (o null sin importes)."
+                    },
+                    "total": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "tela + avíos (los procesos NO entran al real)."
+                    },
+                    "importeDirecto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Parte que viene de compras ligadas a la orden (tela + avíos)."
+                    },
+                    "importeValuado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Parte valuada a último precio de compra / catálogo (tela + avíos)."
+                    },
+                    "importeLibre": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total."
+                    },
+                    "hayCompras": {
+                      "type": "boolean",
+                      "description": "¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada?"
+                    },
+                    "origenRequerido": {
+                      "type": "string",
+                      "enum": [
+                        "snapshot-mrp",
+                        "receta",
+                        "sin-requerido"
+                      ],
+                      "description": "De dónde salieron las cantidades requeridas."
+                    },
+                    "piezasBase": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la orden."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "materiales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "libre"
+                            ],
+                            "description": "Tipo de material del renglón."
+                          },
+                          "idTela": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la tela (o null)."
+                          },
+                          "idAvio": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del avío (o null)."
+                          },
+                          "material": {
+                            "type": "string",
+                            "description": "Nombre/clave del material."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo del material."
+                          },
+                          "esGenerico": {
+                            "type": "boolean",
+                            "description": "¿Es un avío genérico (de stock, R4)?"
+                          },
+                          "requerido": {
+                            "type": "number",
+                            "description": "Cantidad que la orden requiere (unidad de consumo)."
+                          },
+                          "comprado": {
+                            "type": "number",
+                            "description": "Cantidad comprada y ligada a la orden, ya en unidad de consumo (R1)."
+                          },
+                          "compras": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idOrdenCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id de la orden de compra."
+                                },
+                                "numCompra": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Folio de la orden de compra."
+                                },
+                                "estatus": {
+                                  "type": "string",
+                                  "description": "Estatus de la OC (autorizada / recibida_parcial / recibida_total)."
+                                },
+                                "fecha": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Fecha de la OC (YYYY-MM-DD) o null."
+                                },
+                                "idProveedor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Proveedor al que se le compró."
+                                },
+                                "proveedor": {
+                                  "type": "string",
+                                  "description": "Nombre del proveedor."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cantidad comprada en la línea (unidad de compra)."
+                                },
+                                "unidad": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Unidad/presentación de compra de la línea."
+                                },
+                                "precio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio unitario de la línea (o null sin importes)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "cantidad × precio (o null sin importes)."
+                                }
+                              },
+                              "required": [
+                                "idOrdenCompra",
+                                "numCompra",
+                                "estatus",
+                                "fecha",
+                                "idProveedor",
+                                "proveedor",
+                                "cantidad",
+                                "unidad",
+                                "precio",
+                                "importe"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Líneas de OC ligadas a la orden (trazabilidad)."
+                          },
+                          "importeDirecto": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Σ de lo comprado directo (o null sin importes)."
+                          },
+                          "cantidadValuada": {
+                            "type": "number",
+                            "description": "Consumo SIN compra propia = max(0, requerido − comprado). Se valúa aparte."
+                          },
+                          "precioValuado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio unitario usado para valuar (último de compra o catálogo); null sin importes."
+                          },
+                          "importeValuado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "cantidadValuada × precioValuado (o null sin importes)."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "compra-directa",
+                              "ultimo-precio-compra",
+                              "catalogo",
+                              "sin-precio"
+                            ],
+                            "description": "De dónde salió el precio del material."
+                          },
+                          "ultimaCompra": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "idOrdenCompra": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Id de la OC del último precio."
+                                  },
+                                  "numCompra": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Folio de la OC del último precio."
+                                  },
+                                  "estatus": {
+                                    "type": "string",
+                                    "description": "Estatus de esa OC (autorizada / recibida_*)."
+                                  },
+                                  "fecha": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Fecha de esa OC (YYYY-MM-DD) o null."
+                                  },
+                                  "idProveedor": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Proveedor de esa OC."
+                                  },
+                                  "proveedor": {
+                                    "type": "string",
+                                    "description": "Nombre del proveedor de esa OC."
+                                  }
+                                },
+                                "required": [
+                                  "idOrdenCompra",
+                                  "numCompra",
+                                  "estatus",
+                                  "fecha",
+                                  "idProveedor",
+                                  "proveedor"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "OC de la que salió el ÚLTIMO precio de compra (null si no aplica)."
+                          },
+                          "importe": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo real del material = directo + valuado."
+                          }
+                        },
+                        "required": [
+                          "tipo",
+                          "idTela",
+                          "idAvio",
+                          "material",
+                          "unidad",
+                          "esGenerico",
+                          "requerido",
+                          "comprado",
+                          "compras",
+                          "importeDirecto",
+                          "cantidadValuada",
+                          "precioValuado",
+                          "importeValuado",
+                          "origenPrecio",
+                          "ultimaCompra",
+                          "importe"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Un renglón por material (telas, avíos y compras libres)."
+                    }
+                  },
+                  "required": [
+                    "tela",
+                    "avios",
+                    "total",
+                    "importeDirecto",
+                    "importeValuado",
+                    "importeLibre",
+                    "hayCompras",
+                    "origenRequerido",
+                    "piezasBase",
+                    "avisos",
+                    "idOrden",
+                    "folio",
+                    "materiales"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Costo real de materiales de una orden, desglosado por material (desde las OC)."
                 }
               }
             }

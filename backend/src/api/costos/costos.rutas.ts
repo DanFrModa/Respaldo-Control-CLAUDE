@@ -9,7 +9,8 @@
  *  • `GET  /costos/lista-precios`            (`precostos.consultar`) → lista de precios sugeridos.
  *  • `GET  /costos/lista-precios/impreso`    (`precostos.consultar`) → lista de precios en PDF (R9).
  *  • `GET  /costos/ordenes`                  (`costos.ver`)          → lista de órdenes costeadas.
- *  • `GET  /costos/ordenes/:idOrden`         (`costos.ver`)          → costo de una orden (teórico+guardado).
+ *  • `GET  /costos/ordenes/:idOrden`         (`costos.ver`)          → costo de una orden (teórico+real+guardado).
+ *  • `GET  /costos/ordenes/:idOrden/real`    (`costos.ver`)          → desglose del REAL de compras por material.
  *  • `PUT  /costos/ordenes/:idOrden`         (`costos.capturar`)     → guarda/ajusta el costo de una orden.
  *  • `GET  /costos/margenes-por-pedido`      (`costos.ver`)          → costos y márgenes por pedido.
  *  • `GET  /costos/margenes-por-pedido/impreso` (`costos.ver`)       → márgenes en PDF (R9).
@@ -21,6 +22,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import {
   esquemaCostoOrdenGuardarCuerpo,
   esquemaCostoOrdenSalida,
+  esquemaCostoRealOrdenSalida,
   esquemaErrorApi,
   esquemaListaCostosPagina,
   esquemaListaCostosQuery,
@@ -38,6 +40,7 @@ import {
   listarCostos,
   obtenerCostoOrden,
 } from '../../dominio/costos/costo-orden.js';
+import { costoRealOrden } from '../../dominio/costos/costo-real-compras.js';
 import { margenesPorPedido } from '../../dominio/costos/margenes.js';
 import { impresoListaPrecios } from '../../dominio/costos/impresos/impreso-lista-precios.js';
 import { impresoMargenes } from '../../dominio/costos/impresos/impreso-margenes.js';
@@ -164,6 +167,25 @@ export const rutasCostos: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return obtenerCostoOrden(sesion, request.params.idOrden);
+    },
+  });
+
+  // Desglose del REAL de compras (petición de Daniel, 26-jul-2026): qué se compró, a quién, a qué
+  // precio, y qué se valuó a último precio de compra. Bajo demanda (el cajón "¿de dónde sale?").
+  app.route({
+    method: 'GET',
+    url: '/costos/ordenes/:idOrden/real',
+    preHandler: app.conPermiso('costos.ver'),
+    schema: {
+      tags: ['costos'],
+      summary: 'Costo REAL de materiales de una orden, desglosado por material (desde las OC)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      response: { 200: esquemaCostoRealOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return costoRealOrden(sesion, request.params.idOrden);
     },
   });
 

@@ -1402,9 +1402,14 @@ export type ListaPreciosFila = ListaPrecios['filas'][number];
 export type ListaPreciosQuery = NonNullable<
   paths['/api/costos/lista-precios']['get']['parameters']['query']
 >;
-/** Costo de una orden: teórico + guardado + unitario (`GET /api/costos/ordenes/{idOrden}`). */
+/** Costo de una orden: teórico + real de compras + guardado (`GET /api/costos/ordenes/{idOrden}`). */
 export type CostoOrden =
   paths['/api/costos/ordenes/{idOrden}']['get']['responses']['200']['content']['application/json'];
+/** Desglose del costo REAL de materiales desde las OC (`GET /api/costos/ordenes/{idOrden}/real`). */
+export type CostoRealOrden =
+  paths['/api/costos/ordenes/{idOrden}/real']['get']['responses']['200']['content']['application/json'];
+/** Un material del desglose del costo real (lo comprado + lo valuado a último precio). */
+export type CostoRealMaterial = CostoRealOrden['materiales'][number];
 /** Cuerpo para guardar/ajustar el costo de una orden (`PUT /api/costos/ordenes/{idOrden}`). */
 export type CostoOrdenGuardar =
   paths['/api/costos/ordenes/{idOrden}']['put']['requestBody']['content']['application/json'];

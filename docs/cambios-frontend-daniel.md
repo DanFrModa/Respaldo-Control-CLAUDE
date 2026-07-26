@@ -888,3 +888,152 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
   `png.test.ts` + `empresas-logo.test.ts` (los PNG malos) · `cache-documentos.test.ts` +
   `auditorias.int.test.ts` + `logo.rutas.test.ts` (no-store sí, logo no) ·
   `CentroOrdenesPagina.test.tsx` / `DialogoOrden.test.tsx` (el "Falta: …").
+
+---
+
+## 2026-07-26 — El costo de MATERIALES ahora sale de lo que **realmente se compró**
+
+Daniel: el costo de la orden se estaba sacando de la **receta del modelo × los precios del catálogo**,
+y eso **no es lo que costó**. Cuando se compra, con frecuencia **cambian el proveedor y el precio** de
+un avío o de la tela para esa orden en concreto — y todo eso ya está capturado en las **órdenes de
+compra ligadas a la orden de producción**. Sus tres reglas, textuales:
+
+1. **«Manda lo comprado: la OC autorizada»** (no lo recibido, no lo surtido).
+2. **«Los avíos genéricos se valúan al último precio de compra»** (los de stock, que no se compran
+   por orden).
+3. **«Cuando una compra surte a más de una orden, el costo se prorratea.»**
+
+### Cómo se calcula ahora, en lenguaje de negocio
+
+Por cada material de la orden, el sistema suma dos cosas:
+
+| | De dónde sale | Regla |
+| --- | --- | --- |
+| **Comprado para esta orden** | Las órdenes de compra **ligadas a la orden** que ya están **autorizadas** (o recibidas). Cantidad × precio de cada renglón, tal cual se compró. Las que están en **borrador**, **pendientes de autorizar** o **canceladas** NO cuentan. | 1 |
+| **Valuado por consumo** | Lo que la orden consume y **no** tiene compra propia — los **avíos de stock** y las compras grandes que surten a varias órdenes — se valúa al **último precio al que se compró** ese material. | 2 y 3 |
+
+**El prorrateo sale solo:** si compraste 10,000 botones en una sola OC sin ligarla a ninguna orden,
+ese precio se vuelve "el último precio de compra"; cada orden se valúa por **lo que ella consume**, así
+que el gasto se reparte en proporción al consumo, sin que nadie tenga que repartirlo a mano.
+
+**Si se compró de MÁS, se costea de más.** Daniel: *"si se cortaron 1,000 prendas pero la orden de
+etiquetas se hizo por 1,100, se debe costear —para efectos reales— el costo de la orden COMPLETA
+entre lo cortado. En este caso debería costar 1.1 etiquetas por prenda"*. Así quedó: **lo comprado
+entra completo**, nunca recortado a lo que "debía" consumir la orden, y como el costo unitario se
+divide entre las **piezas cortadas**, el 1.1 por prenda sale solo. Comprar de más es normal: **no**
+sale ningún aviso por eso.
+
+**¿Cuánto consume la orden?** Lo que dice su **explosión de materiales (MRP)**, pero **ajustado a las
+piezas que de verdad se cortaron** — la explosión se calcula sobre lo *pedido*, y el costo se
+reparte sobre lo *cortado*, así que si pediste 1,000 y cortaste 900, el consumo se ajusta a esa
+proporción (antes se costeaba sobre 1,000 y el costo salía ~11 % inflado sin que nada lo dijera). Si
+la orden no tiene explosión, se usa la receta del modelo por las piezas cortadas. Y si la orden
+**todavía no se corta**, el consumo es cero: solo cuenta lo que ya se compró (la pantalla lo dice).
+
+**La receta de COSTO manda.** Se compara la explosión contra la receta de costo del modelo y se avisa
+en los dos sentidos: si un material está en la **receta de costo** pero **no** en la explosión, se
+costea con la receta (antes salía en **$0 sin decir nada**); si está en la explosión pero **no** está
+marcado *"se considera al costear"*, no se valúa su consumo — aunque si se le compró para la orden,
+esa compra sí cuenta. En ambos casos aparece un aviso en la pantalla.
+
+La pantalla dice, junto a las etiquetas de arriba, **sobre qué se calculó**: *"Consumo de la explosión
+de materiales, ajustado sobre 900 pzas cortadas"*, por ejemplo.
+
+Esto aplica a **tela** y a **avíos**. La **maquila y el arte** no se compran con órdenes de compra:
+esos siguen saliendo de la receta y de lo que traiga la orden, como siempre.
+
+### Qué se ve en la pantalla *Costos › Costeo de orden*
+
+Ahora la tabla trae **tres columnas** en vez de dos:
+
+- **Real de compras** — lo de arriba: lo que de verdad se compró, más lo valuado a último precio.
+- **Teórico** — la receta × precios de catálogo (lo de antes, se conserva para comparar).
+- **Capturado** — lo que tú confirmas o ajustas. **Con esto se sigue armando el costo total y el
+  costo unitario**; nada de eso cambió.
+
+Debajo hay una etiqueta que dice si la orden **tiene compras registradas** o **no las tiene**, y dos
+botones de conveniencia: **"Usar el real de compras"** y **"Usar el teórico"**, que copian el número
+elegido a los campos capturables (tela y avíos) por si quieres partir de uno u otro.
+
+**Lo que el sistema te propone al abrir una orden SIN COSTEAR cambió:** si la orden **tiene compras**,
+te propone el **real**; si **no tiene ninguna**, te propone el **teórico**, igual que antes. **Siempre
+puedes escribir tu propio número encima** — eso no se tocó.
+
+**Y lo ya costeado NO se mueve.** Si una orden ya tenía su costo capturado y se vuelve a guardar sin
+tocar un componente, ese componente **se conserva tal cual** (antes, en ese caso, se sobreescribía con
+el valor propuesto). Para dejar un componente en blanco hay que borrarlo a propósito. Las órdenes ya
+costeadas se quedan exactamente como estaban: nada se recalcula solo.
+
+### El botón "Ver de dónde sale el real"
+
+Abre un panel lateral con el **desglose material por material**, para que el número no sea una caja
+negra. Arriba, tres cifras: *comprado para la orden*, *valuado por consumo* y *total de materiales*.
+Abajo, un renglón por material con lo requerido, lo comprado, el importe, lo que quedó por valuar, el
+precio usado y el total — y, debajo de cada material, **la lista de sus compras**: número de orden de
+compra, **proveedor**, fecha, cantidad, precio y el importe de ese renglón. Cuando un material se
+valuó a último precio, se ve **de qué OC y de qué proveedor** salió ese precio.
+
+### Cuando algo no cuadra, lo dice (no lo esconde)
+
+Bajo la tabla aparecen avisos en lenguaje llano cuando:
+
+- un material **nunca se ha comprado** con orden de compra → se valuó al precio de catálogo;
+- un material **no tiene precio por ningún lado** → se contó en $0 y hay que revisarlo;
+- hay renglones de **compra libre** (fletes, servicios, cosas sin material de catálogo) ligados a la
+  orden → se muestran aparte y **NO se meten** al costo de tela ni de avíos, porque el sistema no
+  puede adivinar qué son; si corresponden a la orden, van en **"Otros"**;
+- se compró para la orden un material que **no aparece en su explosión** → esa compra **sí** entra al
+  costo, pero se avisa;
+- una compra ligada a la orden viene con **precio en cero** → el costo de ese material se queda corto
+  y hay que capturar el precio en la orden de compra;
+- un material que la orden **sí requiere** acaba costando **cero** → hay un dato faltante;
+- el real de un componente queda **por debajo de la mitad** del teórico → casi nunca es "compramos
+  barato": suele ser que faltan compras, que no están autorizadas, o que van sin precio. Antes de
+  guardar, revísalo;
+- la explosión y la receta de costo **no coinciden** (los dos casos explicados arriba).
+
+**Ningún aviso menciona cantidades de dinero.** Quien no tiene permiso para ver importes ve los avisos
+igual, pero sin que se le escape ninguna cifra.
+
+### Detalles finos que ya quedaron resueltos
+
+- **Presentaciones de compra:** si un avío se compra por caja/rollo, la cantidad y el precio se
+  convierten a la unidad de uso con **el mismo factor que usa la recepción de material**, para que el
+  costo cuadre con lo que entra al almacén. El importe total nunca cambia al convertir. Se detectó un
+  **defecto viejo del módulo de compras** que afecta a las órdenes de compra **generadas
+  automáticamente desde la explosión** cuando el material se compra por caja/rollo: en esos casos el
+  sistema **avisa** que ese renglón puede venir sesgado. El arreglo de fondo es un trabajo aparte (ya
+  está anotado como pendiente) porque tocaría órdenes de compra ya emitidas.
+- **Los centavos cuadran:** el desglose suma exactamente lo que dice el encabezado (se redondea una
+  sola vez, de abajo hacia arriba).
+- **Empresa:** solo se ven las compras de la empresa con la que estás trabajando.
+- **Permisos:** ninguno nuevo. Se ve con el permiso de costos de siempre, y quien no tiene permiso de
+  ver importes sigue viendo "—" en el dinero (las **cantidades** sí las ve).
+- **El Estado de Resultados no cambió**: sigue tomando el costo capturado de cada orden.
+
+### Archivos tocados / creados
+
+- `backend/src/dominio/costos/costo-real-compras.ts` — **nuevo**: el motor del costo real.
+- `backend/src/dominio/costos/costo-orden.ts` — el real se suma a la respuesta y manda el valor
+  propuesto en el primer costeo; congela `telaReal`/`aviosReal`; omitir un componente ya guardado
+  ahora lo conserva.
+- `backend/migracion/loaders/costos.ts` — la carga del histórico NO calcula el real (no tiene sentido
+  sellar un número de hoy en una orden vieja, y así el ETL no se hace más lento).
+- `backend/src/contrato/esquemas/costos.ts` + `index.ts` — las formas nuevas del contrato.
+- `backend/src/api/costos/costos.rutas.ts` — `GET /costos/ordenes/:idOrden/real` (desglose).
+- `backend/prisma/schema.prisma` + `prisma/migrations/20260726140000_costo_orden_real_compras/` —
+  columnas `tela_real` / `avios_real` (aditivas, nullable).
+- `frontend/src/modulos/costos/CosteoOrdenPagina.tsx` — tres columnas, botones, avisos y el cajón
+  del desglose.
+- `frontend/src/api/costos.ts` + `src/api/tipos.ts` — el hook y los tipos del desglose.
+- `Documentacion_MJD/DECISIONES.md` (§Post-F9.5) · `docs/modulos/costos-edr.md` · `HOJA-DE-RUTA.md` ·
+  esta bitácora.
+- **Pruebas:** `costo-real-compras.test.ts` (**nuevo**, 28 casos del cálculo puro: directo, valuado,
+  mezcla, **el caso de las 1,100 etiquetas de Daniel**, prorrateo, sin precio, precio en cero, costo
+  cero, el comparativo contra el teórico, compras libres, unidades, cuadre de centavos, y que
+  **ningún aviso lleve dinero**) · `costo-real-compras.int.test.ts` (**nuevo**, camino completo contra
+  Postgres en CI: estatus de la OC, empresa, factor de conversión, ajuste a las piezas cortadas,
+  reconciliación con la receta de costo, la sobre-compra, el valor propuesto al guardar, que lo ya
+  capturado se conserve y que la carga del histórico no calcule el real) ·
+  `CosteoOrdenPagina.test.tsx` (**nuevo**, las tres columnas, la propuesta, la base del cálculo y el
+  desglose bajo demanda).

@@ -60624,7 +60624,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Costo real de una orden: teórico + guardado + cantidades + unitario. */
+        /** @description Costo de una orden: teórico + real de compras + guardado + cantidades + unitario. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -60675,12 +60675,40 @@ export interface paths {
                 /** @description Costo teórico total = tela + avíos + procesos. */
                 total: number | null;
               };
+              /** @description Costo REAL de materiales desde las órdenes de compra. */
+              real: {
+                /** @description Costo real de TELA (o null sin importes). */
+                tela: number | null;
+                /** @description Costo real de AVÍOS (o null sin importes). */
+                avios: number | null;
+                /** @description tela + avíos (los procesos NO entran al real). */
+                total: number | null;
+                /** @description Parte que viene de compras ligadas a la orden (tela + avíos). */
+                importeDirecto: number | null;
+                /** @description Parte valuada a último precio de compra / catálogo (tela + avíos). */
+                importeValuado: number | null;
+                /** @description Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total. */
+                importeLibre: number | null;
+                /** @description ¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada? */
+                hayCompras: boolean;
+                /**
+                 * @description De dónde salieron las cantidades requeridas.
+                 * @enum {string}
+                 */
+                origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
+                /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+                piezasBase: number;
+                /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
+                avisos: string[];
+              };
               /** @description Costo guardado (o null si no se ha costeado). */
               guardado: {
                 /** @description Tela teórica congelada al guardar. */
                 telaCalc: number | null;
                 /** @description Tela GUARDADA (ajustable). */
                 telaCost: number | null;
+                /** @description Tela REAL de compras congelada al guardar. */
+                telaReal: number | null;
                 /** @description Procesos teóricos congelados al guardar. */
                 procesosCalc: number | null;
                 /** @description Procesos GUARDADOS (ajustables). */
@@ -60689,6 +60717,8 @@ export interface paths {
                 aviosCalc: number | null;
                 /** @description Avíos GUARDADOS (ajustables). */
                 aviosCost: number | null;
+                /** @description Avíos REALES de compras congelados al guardar. */
+                aviosReal: number | null;
                 /** @description Otros costos. */
                 otros: number | null;
                 /** @description Descripción de otros costos. */
@@ -60815,33 +60845,33 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). */
+      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default). */
       requestBody: {
         content: {
           'application/json': {
-            /** @description Tela guardada (≥0) o null. */
+            /** @description Tela guardada (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar. */
             telaCost?: number | null;
-            /** @description Procesos guardados (≥0) o null. */
+            /** @description Procesos guardados (≥0). OMITIR = conservar lo ya guardado (o el teórico en el primer costeo: los procesos no se compran con OC). `null` = borrar. */
             procesosCost?: number | null;
-            /** @description Avíos guardados (≥0) o null. */
+            /** @description Avíos guardados (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar. */
             aviosCost?: number | null;
-            /** @description Otros costos (≥0) o null. */
+            /** @description Otros costos (≥0). OMITIR = conservar lo ya guardado. `null` = borrar. */
             otros?: number | null;
-            /** @description Descripción de otros. */
+            /** @description Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar. */
             descOtros?: string | null;
             /**
-             * @description Base de prorrateo.
+             * @description Base de prorrateo. ÚNICA EXCEPCIÓN a "omitir = conservar": tiene default, así que OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.
              * @default cortado
              * @enum {string}
              */
             baseProrrateo?: 'cortado' | 'recibido' | 'vendido';
-            /** @description Observaciones. */
+            /** @description Observaciones. OMITIR = conservar lo ya guardado. `null` = borrar. */
             observaciones?: string | null;
           };
         };
       };
       responses: {
-        /** @description Costo real de una orden: teórico + guardado + cantidades + unitario. */
+        /** @description Costo de una orden: teórico + real de compras + guardado + cantidades + unitario. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -60892,12 +60922,40 @@ export interface paths {
                 /** @description Costo teórico total = tela + avíos + procesos. */
                 total: number | null;
               };
+              /** @description Costo REAL de materiales desde las órdenes de compra. */
+              real: {
+                /** @description Costo real de TELA (o null sin importes). */
+                tela: number | null;
+                /** @description Costo real de AVÍOS (o null sin importes). */
+                avios: number | null;
+                /** @description tela + avíos (los procesos NO entran al real). */
+                total: number | null;
+                /** @description Parte que viene de compras ligadas a la orden (tela + avíos). */
+                importeDirecto: number | null;
+                /** @description Parte valuada a último precio de compra / catálogo (tela + avíos). */
+                importeValuado: number | null;
+                /** @description Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total. */
+                importeLibre: number | null;
+                /** @description ¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada? */
+                hayCompras: boolean;
+                /**
+                 * @description De dónde salieron las cantidades requeridas.
+                 * @enum {string}
+                 */
+                origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
+                /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+                piezasBase: number;
+                /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
+                avisos: string[];
+              };
               /** @description Costo guardado (o null si no se ha costeado). */
               guardado: {
                 /** @description Tela teórica congelada al guardar. */
                 telaCalc: number | null;
                 /** @description Tela GUARDADA (ajustable). */
                 telaCost: number | null;
+                /** @description Tela REAL de compras congelada al guardar. */
+                telaReal: number | null;
                 /** @description Procesos teóricos congelados al guardar. */
                 procesosCalc: number | null;
                 /** @description Procesos GUARDADOS (ajustables). */
@@ -60906,6 +60964,8 @@ export interface paths {
                 aviosCalc: number | null;
                 /** @description Avíos GUARDADOS (ajustables). */
                 aviosCost: number | null;
+                /** @description Avíos REALES de compras congelados al guardar. */
+                aviosReal: number | null;
                 /** @description Otros costos. */
                 otros: number | null;
                 /** @description Descripción de otros costos. */
@@ -61021,6 +61081,228 @@ export interface paths {
         };
       };
     };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/costos/ordenes/{idOrden}/real': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Costo REAL de materiales de una orden, desglosado por material (desde las OC) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          idOrden: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Costo real de materiales de una orden, desglosado por material (desde las OC). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Costo real de TELA (o null sin importes). */
+              tela: number | null;
+              /** @description Costo real de AVÍOS (o null sin importes). */
+              avios: number | null;
+              /** @description tela + avíos (los procesos NO entran al real). */
+              total: number | null;
+              /** @description Parte que viene de compras ligadas a la orden (tela + avíos). */
+              importeDirecto: number | null;
+              /** @description Parte valuada a último precio de compra / catálogo (tela + avíos). */
+              importeValuado: number | null;
+              /** @description Compras LIBRES (sin material de catálogo) ligadas a la orden: NO entran al total. */
+              importeLibre: number | null;
+              /** @description ¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada? */
+              hayCompras: boolean;
+              /**
+               * @description De dónde salieron las cantidades requeridas.
+               * @enum {string}
+               */
+              origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
+              /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+              piezasBase: number;
+              /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
+              avisos: string[];
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folio: number;
+              /** @description Un renglón por material (telas, avíos y compras libres). */
+              materiales: {
+                /**
+                 * @description Tipo de material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'libre';
+                /** @description Id de la tela (o null). */
+                idTela: number | null;
+                /** @description Id del avío (o null). */
+                idAvio: number | null;
+                /** @description Nombre/clave del material. */
+                material: string;
+                /** @description Unidad de consumo del material. */
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (de stock, R4)? */
+                esGenerico: boolean;
+                /** @description Cantidad que la orden requiere (unidad de consumo). */
+                requerido: number;
+                /** @description Cantidad comprada y ligada a la orden, ya en unidad de consumo (R1). */
+                comprado: number;
+                /** @description Líneas de OC ligadas a la orden (trazabilidad). */
+                compras: {
+                  /** @description Id de la orden de compra. */
+                  idOrdenCompra: number;
+                  /** @description Folio de la orden de compra. */
+                  numCompra: number;
+                  /** @description Estatus de la OC (autorizada / recibida_parcial / recibida_total). */
+                  estatus: string;
+                  /** @description Fecha de la OC (YYYY-MM-DD) o null. */
+                  fecha: string | null;
+                  /** @description Proveedor al que se le compró. */
+                  idProveedor: number;
+                  /** @description Nombre del proveedor. */
+                  proveedor: string;
+                  /** @description Cantidad comprada en la línea (unidad de compra). */
+                  cantidad: number;
+                  /** @description Unidad/presentación de compra de la línea. */
+                  unidad: string | null;
+                  /** @description Precio unitario de la línea (o null sin importes). */
+                  precio: number | null;
+                  /** @description cantidad × precio (o null sin importes). */
+                  importe: number | null;
+                }[];
+                /** @description Σ de lo comprado directo (o null sin importes). */
+                importeDirecto: number | null;
+                /** @description Consumo SIN compra propia = max(0, requerido − comprado). Se valúa aparte. */
+                cantidadValuada: number;
+                /** @description Precio unitario usado para valuar (último de compra o catálogo); null sin importes. */
+                precioValuado: number | null;
+                /** @description cantidadValuada × precioValuado (o null sin importes). */
+                importeValuado: number | null;
+                /**
+                 * @description De dónde salió el precio del material.
+                 * @enum {string}
+                 */
+                origenPrecio: 'compra-directa' | 'ultimo-precio-compra' | 'catalogo' | 'sin-precio';
+                /** @description OC de la que salió el ÚLTIMO precio de compra (null si no aplica). */
+                ultimaCompra: {
+                  /** @description Id de la OC del último precio. */
+                  idOrdenCompra: number;
+                  /** @description Folio de la OC del último precio. */
+                  numCompra: number;
+                  /** @description Estatus de esa OC (autorizada / recibida_*). */
+                  estatus: string;
+                  /** @description Fecha de esa OC (YYYY-MM-DD) o null. */
+                  fecha: string | null;
+                  /** @description Proveedor de esa OC. */
+                  idProveedor: number;
+                  /** @description Nombre del proveedor de esa OC. */
+                  proveedor: string;
+                } | null;
+                /** @description Costo real del material = directo + valuado. */
+                importe: number | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
