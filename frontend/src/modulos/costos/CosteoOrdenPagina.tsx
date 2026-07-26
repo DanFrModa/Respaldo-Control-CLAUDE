@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import { useCostoOrden, useCostoRealOrden, useGuardarCostoOrden } from '@/api/costos';
 import { useBuscarOrdenes } from '@/api/ordenes-consulta';
-import type { BaseProrrateo, CostoOrdenGuardar, CostoRealMaterial } from '@/api/tipos';
+import type { BaseProrrateo, CostoOrden, CostoOrdenGuardar, CostoRealMaterial } from '@/api/tipos';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import {
   TablaDensa,
@@ -37,6 +37,25 @@ function num(s: string): number {
 function cantidad(valor: number, unidad?: string | null): string {
   const n = valor.toLocaleString('es-MX', { maximumFractionDigits: 4 });
   return unidad === null || unidad === undefined || unidad === '' ? n : `${n} ${unidad}`;
+}
+
+/**
+ * Frase en lenguaje de negocio de DÓNDE salió la base del cálculo del real (lo que el backend manda
+ * en `origenRequerido` + `piezasBase`). Daniel tiene que poder leer, sin jerga, sobre qué se calculó.
+ */
+function fraseBaseDelCalculo(
+  origen: CostoOrden['real']['origenRequerido'],
+  piezas: number,
+): string {
+  const sobre = `sobre ${piezas.toLocaleString('es-MX')} pzas cortadas`;
+  if (piezas <= 0) {
+    return 'La orden aún no tiene corte: solo cuenta lo comprado';
+  }
+  return origen === 'snapshot-mrp'
+    ? `Consumo de la explosión de materiales, ajustado ${sobre}`
+    : origen === 'receta'
+      ? `Consumo de la receta del modelo, ${sobre}`
+      : `El modelo no tiene receta de costo: solo cuenta lo comprado`;
 }
 
 /** Etiqueta en español del origen del precio con el que se valuó un material. */
@@ -384,6 +403,9 @@ export function CosteoOrdenPagina(): React.JSX.Element {
               ) : (
                 <Badge variant="outline">Sin compras ligadas a esta orden</Badge>
               )}
+              <span className="text-xs text-muted-foreground" data-testid="costeo-origen-requerido">
+                {fraseBaseDelCalculo(data.real.origenRequerido, data.real.piezasBase)}
+              </span>
             </div>
 
             {data.real.avisos.length > 0 && (
@@ -489,6 +511,10 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                 <p className="num text-lg font-semibold">{moneda(desglose.data.total)}</p>
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              {fraseBaseDelCalculo(desglose.data.origenRequerido, desglose.data.piezasBase)}.
+            </p>
 
             <div className="overflow-x-auto">
               <TablaDensa>

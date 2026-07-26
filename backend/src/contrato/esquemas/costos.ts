@@ -197,7 +197,12 @@ export type OrigenPrecioReal = z.infer<typeof esquemaOrigenPrecioReal>;
 /** De dónde salió la cantidad REQUERIDA del material (snapshot del MRP o la receta). */
 export const esquemaOrigenRequerido = z
   .enum(['snapshot-mrp', 'receta', 'sin-requerido'])
-  .describe('Origen de las cantidades requeridas: snapshot del MRP, receta paraCosto, o ninguno.');
+  .describe(
+    'Origen del consumo requerido, SIEMPRE sobre las piezas CORTADAS (la base del teórico): ' +
+      '`snapshot-mrp` = explosión de materiales escalada de piezas pedidas a cortadas y ' +
+      'reconciliada con la receta de costo; `receta` = receta paraCosto × cortadas (sin explosión); ' +
+      '`sin-requerido` = el modelo no tiene receta de costo.',
+  );
 
 /** Origen de las cantidades requeridas del costo real. */
 export type OrigenRequerido = z.infer<typeof esquemaOrigenRequerido>;
@@ -250,6 +255,7 @@ const esquemaMaterialReal = z.object({
     .object({
       idOrdenCompra: z.number().int().describe('Id de la OC del último precio.'),
       numCompra: z.number().int().describe('Folio de la OC del último precio.'),
+      estatus: z.string().describe('Estatus de esa OC (autorizada / recibida_*).'),
       fecha: z.string().nullable().describe('Fecha de esa OC (YYYY-MM-DD) o null.'),
       idProveedor: z.number().int().describe('Proveedor de esa OC.'),
       proveedor: z.string().describe('Nombre del proveedor de esa OC.'),
@@ -280,7 +286,15 @@ export const esquemaCostoRealResumen = z.object({
     .boolean()
     .describe('¿Hay al menos una línea de OC de tela/avío ligada a la orden y autorizada?'),
   origenRequerido: esquemaOrigenRequerido.describe('De dónde salieron las cantidades requeridas.'),
-  avisos: z.array(z.string()).describe('Avisos del cálculo (nunca truena en silencio).'),
+  piezasBase: z
+    .number()
+    .int()
+    .describe(
+      'Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico).',
+    ),
+  avisos: z
+    .array(z.string())
+    .describe('Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe.'),
 });
 
 /** Resumen del costo real de materiales de una orden. */

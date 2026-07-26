@@ -31,11 +31,36 @@
  *    prorrateo que pidió Daniel (regla 3). Si el material NUNCA se ha comprado, cae al precio de
  *    CATÁLOGO y se AVISA; si tampoco hay catálogo, cuenta 0 y se AVISA.
  *
- * DE DÓNDE SALE EL "REQUERIDO": del **snapshot del MRP** (`RequerimientoOrden.cantidadRequerida`, el
- * consumo BRUTO antes del neteo contra stock — por eso los genéricos sí se costean aunque salgan del
- * almacén). Si la orden no tiene explosión, se calcula con la receta `paraCosto` × piezas, la MISMA
- * base que el teórico (`cortado`, o `pedido` si aún no hay corte) para que ambos números sean
- * comparables.
+ * ═══ LA SOBRE-COMPRA SE COSTEA COMPLETA (aclaración de DANIEL, 26-jul-2026) ═══
+ * Textual: *"si se cortaron 1,000 prendas pero la orden de etiquetas se hizo por 1,100, se debe
+ * costear —para efectos reales— el costo de la orden COMPLETA entre lo cortado. En este caso debería
+ * costar 1.1 etiquetas por prenda"*. Por eso el IMPORTE DIRECTO entra **íntegro y sin tope**: jamás
+ * se recorta a `min(comprado, requerido)` ni se prorratea hacia abajo. El `max(0, requerido −
+ * comprado)` existe SOLO para el remanente que la orden consume y NO compró; cuando lo comprado
+ * excede al requerido ese remanente es 0 y ya está — comprar de más es NORMAL, **no** genera aviso de
+ * alarma. El "1.1 por prenda" cae solo al dividir `costoTotal ÷ cortado` (la base de prorrateo D2)
+ * en `costo-orden.ts`. Corolario: escalar el REQUERIDO (abajo) nunca toca el importe directo.
+ *
+ * ═══ DE DÓNDE SALE EL "REQUERIDO" (corregido tras la revisión del 26-jul-2026) ═══
+ * El real y el TEÓRICO tienen que ser COMPARABLES: si no, el default que se guarda mete un sesgo
+ * invisible. El teórico usa la receta **`paraCosto`** sobre las piezas **CORTADAS**; el snapshot del
+ * MRP (`RequerimientoOrden`) usa la receta **`paraProduccion`** sobre las piezas **PEDIDAS**. Son dos
+ * universos distintos. Por eso aquí el requerido se construye SIEMPRE sobre la base del costeo:
+ *
+ *  • **Base de piezas = `cantidades.cortado`** (la misma del teórico). Si la orden aún no se corta,
+ *    el requerido es 0 y el real refleja SOLO lo comprado (con aviso). NUNCA se cae a `pedido`: eso
+ *    era justo el sesgo (1,000 pedidas / 900 cortadas ⇒ ~11 % de sobrecosto silencioso).
+ *  • **El snapshot del MRP se ESCALA** de su base (piezas pedidas = Σ de la matriz) a las cortadas:
+ *    `requerido = cantidadRequerida × (cortado ÷ pedido)`. Se usa el snapshot porque su consumo es
+ *    más fino que el BOM plano (matriz real, consumo por talla R18). Si la orden no tiene matriz
+ *    (pedido = 0) no se puede escalar: se usa tal cual y se AVISA.
+ *  • **Se RECONCILIA contra el BOM `paraCosto`**, que es el que manda para costear:
+ *      – material `paraCosto` **ausente** del snapshot ⇒ se AGREGA con `consumoPorPrenda × cortado`
+ *        y se AVISA (BOM que creció después de explosionar, o avío `paraCosto` sin `paraProduccion`).
+ *        Antes esto salía en **$0 sin un solo aviso**.
+ *      – material del snapshot que **NO es `paraCosto`** ⇒ NO se valúa (no es componente de costo) y
+ *        se AVISA. Si se le compró para la orden, esa compra SÍ cuenta (dinero realmente gastado).
+ *  • Sin snapshot: BOM `paraCosto` × cortado (`origenRequerido = 'receta'`).
  *
  * UNIDADES (R1, `comun/conversion.ts`): el IMPORTE directo nunca necesita conversión (la invariante
  * de valuación dice que `cantidad × precio` no cambia al convertir). Sí la necesitan la CANTIDAD
@@ -45,13 +70,25 @@
  * de uso); **avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion`
  * → 1**.
  *
+ * ⚠️ DEUDA CONOCIDA DE F4 (ver `HOJA-DE-RUTA.md` §4): `mrp.generarOCDesdeExplosion` escribe la línea
+ * de OC en unidad de CONSUMO, mientras `recepciones.ts` y el TSDoc del schema la definen en unidad de
+ * PRESENTACIÓN. Con `factor ≠ 1` ese renglón queda sesgado en el kardex Y aquí. NO se corrige en este
+ * módulo (cambiar la semántica afectaría a las OC ya creadas): se **AVISA** por cada material cuyo
+ * factor sea ≠ 1 para que nadie guarde un número sesgado sin verlo.
+ *
  * QUÉ NO HACE (por diseño):
  *  • NO toca los PROCESOS (maquila / arte / bordados): esos no se compran con OC de material.
  *  • Las líneas de OC **LIBRES** (`descripcionLibre`, sin material de catálogo) ligadas a la orden se
  *    REPORTAN aparte (`importeLibre`) y NO se suman a tela ni a avíos: no hay forma de clasificarlas
  *    automáticamente. Se avisa para que el usuario las capture en "Otros" si aplica.
+ *  • Solo mira la liga POR RENGLÓN (`OrdenCompraLinea.idOrden`). La liga N:N de encabezado
+ *    (`OrdenCompraOrden`) NO cuenta como compra directa (decisión declarada en §Post-F9.5).
  *  • NO escribe nada: es lectura pura. Quien congela el resultado es `guardarCostoOrden`
  *    (`CostoOrden.telaReal`/`aviosReal`).
+ *
+ * AVISOS SIN DINERO (A9/permisos): los textos de `avisos` **NUNCA** contienen un importe. Van al
+ * mismo canal para todos, y un usuario con `costos.ver` pero SIN `consultas.ver-importes` no puede
+ * deducir cifras de ellos (lo verifican `costo-real-compras.test.ts` y el test de integración).
  *
  * Innegociables: A1 (lógica aquí), A4 (`costos.ver`), A9 (todo acotado a la empresa activa: la orden,
  * las OC ligadas y las OC del último precio), D1 (precio ACTUAL: el último de compra o el de
@@ -89,6 +126,14 @@ export const ESTATUS_COMPRADO: readonly EstatusOrdenCompra[] = [
 /** Tolerancia de comparación de cantidades decimales (4 decimales en BD). */
 const TOLERANCIA = 1e-6;
 
+/**
+ * Umbral de SOSPECHA del real contra el teórico: si un componente real queda por DEBAJO de esta
+ * fracción de su teórico, se avisa. Medio (0.5) porque un real legítimo suele moverse ±30 % contra
+ * el catálogo (mejor precio negociado, merma distinta); caer a MENOS DE LA MITAD casi siempre
+ * significa compras incompletas, sin autorizar o con precio en cero — no un buen precio.
+ */
+const UMBRAL_REAL_SOSPECHOSO = 0.5;
+
 /** Redondeo de cantidades a 4 decimales (la precisión de `RequerimientoOrden.cantidadRequerida`). */
 function redondear4(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -107,7 +152,7 @@ export interface ReferenciaCompra {
   proveedor: string;
 }
 
-/** Un material que la orden REQUIERE (del snapshot del MRP o de la receta), con sus precios. */
+/** Un material que la orden REQUIERE (BOM `paraCosto`, reconciliado con el MRP), con sus precios. */
 export interface RequeridoMaterial {
   /** Clave de cruce: `tela-<id>` / `avio-<id>`. */
   clave: string;
@@ -117,7 +162,7 @@ export interface RequeridoMaterial {
   material: string;
   unidad: string | null;
   esGenerico: boolean;
-  /** Consumo BRUTO de la orden, en unidad de consumo del BOM. */
+  /** Consumo BRUTO de la orden sobre las piezas CORTADAS, en unidad de consumo del BOM. */
   requerido: number;
   /** Último precio de compra POR UNIDAD DE CONSUMO (ya normalizado, R1), o null si nunca se compró. */
   ultimoPrecio: number | null;
@@ -142,6 +187,19 @@ export interface LineaCompraLigada {
   unidad: string | null;
   precio: number;
   compra: ReferenciaCompra;
+}
+
+/** Opciones del núcleo puro (todas opcionales: los tests pueden llamarlo con dos argumentos). */
+export interface OpcionesCombinar {
+  /** Avisos ya detectados por el lector de BD (escalado del MRP, factores de conversión…). */
+  avisosPrevios?: readonly string[];
+  /**
+   * Claves que el lector ya conoce y decidió NO costear (materiales del snapshot fuera de
+   * `paraCosto`): evitan el aviso genérico de "no aparece en el requerido", que sería redundante.
+   */
+  clavesNoCosteables?: ReadonlySet<string>;
+  /** Teórico del mismo componente, para el aviso comparativo de subvaluación. Null = no comparar. */
+  teorico?: { tela: number; avios: number } | null;
 }
 
 // ── Tipos de SALIDA del núcleo puro (números crudos; el gate de importes se aplica al proyectar) ──
@@ -184,6 +242,33 @@ export interface CostoRealCalculado {
   avisos: string[];
 }
 
+/** El real de una orden ya calculado, con el contexto que la salida necesita mostrar. */
+export interface RealDeOrden {
+  calculado: CostoRealCalculado;
+  origenRequerido: OrigenRequerido;
+  /** Piezas sobre las que se calculó el consumo requerido (= piezas cortadas, la base del teórico). */
+  piezasBase: number;
+}
+
+/** Real VACÍO: lo usa el camino que decide NO calcularlo (migración) para no mentir con números. */
+export function realVacio(): RealDeOrden {
+  return {
+    calculado: {
+      tela: 0,
+      avios: 0,
+      total: 0,
+      importeDirecto: 0,
+      importeValuado: 0,
+      importeLibre: 0,
+      hayCompras: false,
+      materiales: [],
+      avisos: [],
+    },
+    origenRequerido: 'sin-requerido',
+    piezasBase: 0,
+  };
+}
+
 // ── NÚCLEO PURO (sin BD — es lo que ejercitan los tests unitarios) ────────────────────────────────
 
 /**
@@ -192,17 +277,46 @@ export interface CostoRealCalculado {
  * ligadas ya filtradas por estatus y por empresa) y no toca la base de datos.
  *
  * Reglas aplicadas, en este orden, por material:
- *  1. `importeDirecto` = Σ (cantidad × precio) de sus líneas de OC ligadas → regla 1 de Daniel.
- *  2. `cantidadValuada` = max(0, requerido − comprado) → lo que la orden consume pero no compró.
+ *  1. `importeDirecto` = Σ (cantidad × precio) de sus líneas de OC ligadas, **COMPLETO y sin tope**
+ *     aunque exceda el requerido (aclaración de Daniel: la sobre-compra es costo real) → regla 1.
+ *  2. `cantidadValuada` = max(0, requerido − comprado) → SOLO el remanente que no se compró.
  *  3. `precioValuado` = último precio de compra → catálogo (con aviso) → 0 (con aviso) → reglas 2 y 3.
  *  4. `importe` = directo + valuado; se acumula en TELA o en AVÍOS según el tipo.
  * Las compras LIBRES se acumulan aparte (`importeLibre`) y NO entran a los totales.
+ *
+ * REDONDEO (una sola vez, para que el desglose CUADRE con el encabezado): cada compra se redondea a
+ * 2 decimales, el importe directo es la Σ de esas compras ya redondeadas, el valuado se redondea, y
+ * los totales `tela`/`avios`/`total` se acumulan a partir de los importes de material YA redondeados.
+ *
+ * ROBUSTEZ: `RequerimientoOrden` no tiene índice único por (orden, material), así que las filas
+ * repetidas de un mismo material se FUSIONAN aquí (suma de requeridos) antes de calcular.
+ *
+ * AVISOS: nunca llevan un importe en el texto (ver el encabezado del módulo).
  */
 export function combinarCostoReal(
   requeridos: readonly RequeridoMaterial[],
   lineas: readonly LineaCompraLigada[],
+  opciones: OpcionesCombinar = {},
 ): CostoRealCalculado {
-  const avisos: string[] = [];
+  const avisos: string[] = [...(opciones.avisosPrevios ?? [])];
+  const noCosteables = opciones.clavesNoCosteables ?? new Set<string>();
+
+  // Fusiona requeridos repetidos del mismo material (sin @@unique en `RequerimientoOrden`).
+  const requeridosUnicos: RequeridoMaterial[] = [];
+  const indicePorClave = new Map<string, number>();
+  for (const r of requeridos) {
+    const i = indicePorClave.get(r.clave);
+    if (i === undefined) {
+      indicePorClave.set(r.clave, requeridosUnicos.length);
+      requeridosUnicos.push({ ...r });
+      continue;
+    }
+    const previo = requeridosUnicos[i];
+    if (previo !== undefined) {
+      previo.requerido += r.requerido;
+      previo.esGenerico = previo.esGenerico || r.esGenerico;
+    }
+  }
 
   // Agrupa las líneas ligadas por material.
   const porClave = new Map<string, LineaCompraLigada[]>();
@@ -221,35 +335,53 @@ export function combinarCostoReal(
   let importeLibre = 0;
   let hayCompras = false;
 
-  /** Proyecta las líneas de un material a la forma de trazabilidad + su importe directo. */
+  /** Proyecta las líneas de un material: compras redondeadas + su importe directo (Σ de ellas). */
   const armarCompras = (
     lista: readonly LineaCompraLigada[],
-  ): { compras: MaterialRealCalculado['compras']; directo: number; comprado: number } => {
+  ): {
+    compras: MaterialRealCalculado['compras'];
+    directo: number;
+    comprado: number;
+    hayPrecioCero: boolean;
+  } => {
     let directo = 0;
     let comprado = 0;
+    let hayPrecioCero = false;
     const compras = lista.map((l) => {
-      const importe = l.cantidad * l.precio;
+      // El importe de CADA renglón se redondea aquí y el directo es su suma: así la lista del
+      // desglose suma EXACTAMENTE el importe directo que se muestra arriba (punto de centavos).
+      const importe = redondear2(l.cantidad * l.precio);
       directo += importe;
       comprado += l.cantidadConsumo;
+      if (l.precio <= TOLERANCIA) {
+        hayPrecioCero = true;
+      }
       return {
         ...l.compra,
         cantidad: redondear4(l.cantidad),
         unidad: l.unidad,
         precio: redondear2(l.precio),
-        importe: redondear2(importe),
+        importe,
       };
     });
-    return { compras, directo, comprado };
+    return { compras, directo: redondear2(directo), comprado, hayPrecioCero };
   };
 
   // 1) Un renglón por material REQUERIDO (el caso normal).
-  for (const r of requeridos) {
+  for (const r of requeridosUnicos) {
     clavesUsadas.add(r.clave);
     const lista = porClave.get(r.clave) ?? [];
     if (lista.length > 0) {
       hayCompras = true;
     }
-    const { compras, directo, comprado } = armarCompras(lista);
+    const { compras, directo, comprado, hayPrecioCero } = armarCompras(lista);
+
+    if (hayPrecioCero) {
+      avisos.push(
+        `«${r.material}» tiene una compra ligada a esta orden con PRECIO EN CERO: su costo real ` +
+          `puede estar subvaluado. Captura el precio en la orden de compra.`,
+      );
+    }
 
     const cantidadValuada = Math.max(0, r.requerido - comprado);
     let precioValuado: number | null = null;
@@ -269,12 +401,22 @@ export function combinarCostoReal(
     } else {
       origenPrecio = 'sin-precio';
       avisos.push(
-        `«${r.material}» no tiene precio (ni compras ni catálogo): se valuó en $0. Revísalo.`,
+        `«${r.material}» no tiene precio (ni compras ni catálogo): se valuó en cero. Revísalo.`,
       );
     }
 
-    const valuado = cantidadValuada * (precioValuado ?? 0);
-    const importe = directo + valuado;
+    const valuado = redondear2(cantidadValuada * (precioValuado ?? 0));
+    const importe = redondear2(directo + valuado);
+
+    // Un material que la orden REQUIERE y que acaba costando CERO es casi siempre un dato faltante
+    // (precio en cero, catálogo en cero, compra sin autorizar). El caso `sin-precio` ya avisó arriba.
+    if (r.requerido > TOLERANCIA && importe <= TOLERANCIA && origenPrecio !== 'sin-precio') {
+      avisos.push(
+        `«${r.material}» se requiere para esta orden pero su costo real quedó en CERO. Revisa ` +
+          `precios y compras antes de guardar.`,
+      );
+    }
+
     importeDirecto += directo;
     importeValuado += valuado;
     if (r.tipo === 'tela') {
@@ -293,24 +435,25 @@ export function combinarCostoReal(
       requerido: redondear4(r.requerido),
       comprado: redondear4(comprado),
       compras,
-      importeDirecto: redondear2(directo),
+      importeDirecto: directo,
       cantidadValuada: redondear4(cantidadValuada),
       precioValuado: precioValuado === null ? null : redondear2(precioValuado),
-      importeValuado: redondear2(valuado),
+      importeValuado: valuado,
       origenPrecio,
       ultimaCompra: origenPrecio === 'ultimo-precio-compra' ? r.ultimaCompra : null,
-      importe: redondear2(importe),
+      importe,
     });
   }
 
-  // 2) Materiales COMPRADOS para la orden que NO aparecen en el requerido (fuera del BOM, o compras
-  //    libres). Su compra SÍ es real: entra al costo (las de catálogo) o se reporta aparte (libres).
+  // 2) Materiales COMPRADOS para la orden que NO están en el requerido de COSTO (fuera del BOM
+  //    `paraCosto`, o compras libres). Su compra SÍ es dinero gastado en esta orden: entra al costo
+  //    (las de catálogo) o se reporta aparte (las libres). Lo que NO se hace es valuar consumo suyo.
   let renglonesLibres = 0;
   for (const [clave, lista] of porClave) {
     if (clavesUsadas.has(clave)) continue;
     const primera = lista[0];
     if (primera === undefined) continue;
-    const { compras, directo, comprado } = armarCompras(lista);
+    const { compras, directo, comprado, hayPrecioCero } = armarCompras(lista);
 
     if (primera.tipo === 'libre') {
       renglonesLibres += lista.length;
@@ -323,10 +466,20 @@ export function combinarCostoReal(
       } else {
         avios += directo;
       }
-      avisos.push(
-        `«${primera.material}» tiene compra ligada a la orden pero NO aparece en el requerido ` +
-          `(ni en el MRP ni en la receta): su compra SÍ entra al costo real.`,
-      );
+      if (hayPrecioCero) {
+        avisos.push(
+          `«${primera.material}» tiene una compra ligada a esta orden con PRECIO EN CERO: su ` +
+            `costo real puede estar subvaluado. Captura el precio en la orden de compra.`,
+        );
+      }
+      // El lector ya avisó (y explicó por qué) de los materiales que decidió no costear.
+      if (!noCosteables.has(clave)) {
+        avisos.push(
+          `«${primera.material}» tiene compra ligada a la orden pero NO aparece en el requerido ` +
+            `(ni en la explosión de materiales ni en la receta de costo): su compra SÍ entra al ` +
+            `costo real.`,
+        );
+      }
     }
 
     materiales.push({
@@ -339,28 +492,49 @@ export function combinarCostoReal(
       requerido: 0,
       comprado: redondear4(comprado),
       compras,
-      importeDirecto: redondear2(directo),
+      importeDirecto: directo,
       cantidadValuada: 0,
       precioValuado: null,
       importeValuado: 0,
       origenPrecio: 'compra-directa',
       ultimaCompra: null,
-      importe: primera.tipo === 'libre' ? 0 : redondear2(directo),
+      importe: primera.tipo === 'libre' ? 0 : directo,
     });
   }
 
   if (renglonesLibres > 0) {
     avisos.push(
-      `${renglonesLibres} renglón(es) de compra LIBRE ligados a la orden por ` +
-        `${redondear2(importeLibre).toFixed(2)}: no se pueden clasificar como tela ni avío, así que ` +
-        `NO entran al costo real. Captúralos en "Otros" si corresponden a esta orden.`,
+      `Hay renglones de compra LIBRE ligados a esta orden (fletes, servicios, material no ` +
+        `catalogado): no se pueden clasificar como tela ni avío, así que NO entran al costo real. ` +
+        `Captúralos en "Otros" si corresponden a esta orden.`,
     );
   }
 
+  const telaFinal = redondear2(tela);
+  const aviosFinal = redondear2(avios);
+
+  // Aviso comparativo: un real muy por debajo del teórico casi nunca es "compramos barato".
+  const teorico = opciones.teorico ?? null;
+  if (teorico !== null) {
+    if (teorico.tela > TOLERANCIA && telaFinal < teorico.tela * UMBRAL_REAL_SOSPECHOSO) {
+      avisos.push(
+        `El costo real de TELA quedó por debajo de la MITAD del teórico: revisa que las compras ` +
+          `estén completas, autorizadas y con precio antes de guardar.`,
+      );
+    }
+    if (teorico.avios > TOLERANCIA && aviosFinal < teorico.avios * UMBRAL_REAL_SOSPECHOSO) {
+      avisos.push(
+        `El costo real de AVÍOS quedó por debajo de la MITAD del teórico: revisa que las compras ` +
+          `estén completas, autorizadas y con precio antes de guardar.`,
+      );
+    }
+  }
+
   return {
-    tela: redondear2(tela),
-    avios: redondear2(avios),
-    total: redondear2(tela + avios),
+    tela: telaFinal,
+    avios: aviosFinal,
+    // El total se deriva de los componentes YA redondeados: el encabezado siempre cuadra.
+    total: redondear2(telaFinal + aviosFinal),
     importeDirecto: redondear2(importeDirecto),
     importeValuado: redondear2(importeValuado),
     importeLibre: redondear2(importeLibre),
@@ -484,6 +658,15 @@ async function leerFactores(
   return { factoresAvio, factoresAvioProveedor };
 }
 
+/** Aviso de la deuda conocida de F4 cuando un material usa factor de conversión ≠ 1. */
+function avisoFactor(material: string): string {
+  return (
+    `«${material}» se compra en una presentación distinta a su unidad de uso (factor de ` +
+    `conversión): por un defecto conocido del MRP (ver HOJA-DE-RUTA §4), su cantidad comprada y su ` +
+    `último precio pueden venir sesgados. Verifica este renglón antes de guardar.`
+  );
+}
+
 /**
  * ÚLTIMO PRECIO DE COMPRA de cada material (regla 2 de Daniel), POR UNIDAD DE CONSUMO. Es la línea
  * de OC `autorizada`/`recibida_*` MÁS RECIENTE de la EMPRESA ACTIVA (A9) para ese material — sin
@@ -491,16 +674,27 @@ async function leerFactores(
  * órdenes que la consumen (regla 3). "Más reciente" = fecha de la OC descendente (las OC sin fecha
  * van al final), y a igualdad, el folio/renglón mayor (determinista).
  *
- * Se resuelve con una consulta POR MATERIAL (`findFirst`, índice por `id_tela`/`id_avio`): son unas
- * pocas decenas de materiales por orden y así el orden es exacto, en vez de traer todo el histórico
- * de compras del material para quedarnos con una fila.
+ * Se resuelve con una consulta POR MATERIAL (`findFirst`, índice por `id_tela`/`id_avio`) y solo de
+ * los materiales que REALMENTE hay que valuar: son unas pocas decenas por orden, van en paralelo, y
+ * así el orden es EXACTO (incluidas las OC sin fecha), en vez de traer todo el histórico de compras
+ * del material para quedarnos con una fila. El camino de migración ni siquiera las ejecuta
+ * (`guardarCostoOrden` con `calcularReal: false`).
  */
 async function leerUltimosPrecios(
   cliente: ClienteLectura,
   idEmpresa: number,
-  materiales: readonly { clave: string; idTela: number | null; idAvio: number | null }[],
-): Promise<Map<string, { precio: number; compra: ReferenciaCompra }>> {
-  const resultado = new Map<string, { precio: number; compra: ReferenciaCompra }>();
+  materiales: readonly {
+    clave: string;
+    material: string;
+    idTela: number | null;
+    idAvio: number | null;
+  }[],
+): Promise<{
+  precios: Map<string, { precio: number; compra: ReferenciaCompra }>;
+  avisos: string[];
+}> {
+  const precios = new Map<string, { precio: number; compra: ReferenciaCompra }>();
+  const avisos: string[] = [];
   const filas = await Promise.all(
     materiales.map(async (m) => {
       const linea = await cliente.ordenCompraLinea.findFirst({
@@ -515,7 +709,7 @@ async function leerUltimosPrecios(
         ],
         select: seleccionLineaOc,
       });
-      return { clave: m.clave, linea };
+      return { clave: m.clave, material: m.material, linea };
     }),
   );
 
@@ -524,16 +718,19 @@ async function leerUltimosPrecios(
   for (const f of filas) {
     if (f.linea === null) continue;
     const factor = factorDeLinea(f.linea, factoresAvio, factoresAvioProveedor);
-    resultado.set(f.clave, {
+    if (factor !== 1) {
+      avisos.push(avisoFactor(f.material));
+    }
+    precios.set(f.clave, {
       // Precio por unidad de CONSUMO (R1: precio por presentación ÷ factor) — igual que la recepción.
       precio: num(f.linea.precio) / factor,
       compra: referencia(f.linea),
     });
   }
-  return resultado;
+  return { precios, avisos };
 }
 
-/** `select` de la orden para el costo real: empresa + receta `paraCosto` (fallback sin snapshot). */
+/** `select` de la orden para el costo real: empresa + receta `paraCosto` (la que manda al costear). */
 const seleccionOrdenReal = {
   id: true,
   folio: true,
@@ -570,60 +767,22 @@ const seleccionOrdenReal = {
 
 type OrdenReal = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenReal }>;
 
-/** Base de materiales requeridos (sin precios todavía) + de dónde salió. */
-interface BaseRequerido {
-  origen: OrigenRequerido;
-  filas: Omit<RequeridoMaterial, 'ultimoPrecio' | 'ultimaCompra'>[];
+/** Un material del BOM `paraCosto` normalizado (la fuente de verdad del COSTEO). */
+interface MaterialBom {
+  clave: string;
+  tipo: 'tela' | 'avio';
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  unidad: string | null;
+  esGenerico: boolean;
+  consumoPorPrenda: number;
+  precioCatalogo: number | null;
 }
 
-/**
- * Arma el REQUERIDO de la orden: el snapshot del MRP si existe (consumo BRUTO, antes del neteo
- * contra stock — los genéricos también se costean), y si no, la receta `paraCosto` × piezas (la
- * MISMA base que el teórico: cortado, o pedido si aún no hay corte).
- */
-async function armarRequerido(
-  cliente: ClienteLectura,
-  orden: OrdenReal,
-  bd: ContextoBd | undefined,
-): Promise<BaseRequerido> {
-  const snapshot = await cliente.requerimientoOrden.findMany({
-    where: { idOrden: orden.id },
-    select: {
-      idTela: true,
-      idAvio: true,
-      cantidadRequerida: true,
-      unidad: true,
-      esGenerico: true,
-      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
-      avio: {
-        select: { clave: true, descripcion: true, unidad: true, precioReferencia: true },
-      },
-    },
-    orderBy: { id: 'asc' },
-  });
-
-  if (snapshot.length > 0) {
-    return {
-      origen: 'snapshot-mrp',
-      filas: snapshot.map((r) => ({
-        clave: r.idTela === null ? `avio-${String(r.idAvio)}` : `tela-${String(r.idTela)}`,
-        tipo: r.idTela === null ? ('avio' as const) : ('tela' as const),
-        idTela: r.idTela,
-        idAvio: r.idAvio,
-        material:
-          r.tela?.nombre ?? (r.avio === null ? '—' : `${r.avio.clave} — ${r.avio.descripcion}`),
-        unidad: r.unidad ?? r.tela?.unidadMedida ?? r.avio?.unidad ?? null,
-        esGenerico: r.esGenerico,
-        requerido: num(r.cantidadRequerida),
-        precioCatalogo: numOrNull(r.tela?.precioSugerido ?? r.avio?.precioReferencia ?? null),
-      })),
-    };
-  }
-
-  // Sin explosión de MRP: receta `paraCosto` × piezas (cortado, o pedido si aún no se corta).
-  const cant = await cantidadesDeOrden(orden.id, bd);
-  const piezas = cant.cortado > 0 ? cant.cortado : cant.pedido;
-  const filas: BaseRequerido['filas'] = [
+/** Normaliza el BOM `paraCosto` del modelo (telas + avíos) a una lista uniforme. */
+function bomParaCosto(orden: OrdenReal): MaterialBom[] {
+  return [
     ...orden.modelo.telas.map((t) => ({
       clave: `tela-${String(t.idTela)}`,
       tipo: 'tela' as const,
@@ -632,7 +791,7 @@ async function armarRequerido(
       material: t.tela.nombre,
       unidad: t.tela.unidadMedida,
       esGenerico: false,
-      requerido: num(t.consumoPorPrenda) * piezas,
+      consumoPorPrenda: num(t.consumoPorPrenda),
       precioCatalogo: numOrNull(t.tela.precioSugerido),
     })),
     ...orden.modelo.avios.map((a) => ({
@@ -643,11 +802,170 @@ async function armarRequerido(
       material: `${a.avio.clave} — ${a.avio.descripcion}`,
       unidad: a.avio.unidad,
       esGenerico: a.avio.esGenerico,
-      requerido: num(a.consumoPorPrenda) * piezas,
+      consumoPorPrenda: num(a.consumoPorPrenda),
       precioCatalogo: numOrNull(a.avio.precioReferencia),
     })),
   ];
-  return { origen: filas.length === 0 ? 'sin-requerido' : 'receta', filas };
+}
+
+/** Base de materiales requeridos (sin último precio todavía) + contexto del cálculo. */
+interface BaseRequerido {
+  origen: OrigenRequerido;
+  piezasBase: number;
+  filas: Omit<RequeridoMaterial, 'ultimoPrecio' | 'ultimaCompra'>[];
+  /** Materiales del snapshot que NO son `paraCosto`: no se valúan (pero su compra sí cuenta). */
+  clavesNoCosteables: Set<string>;
+  avisos: string[];
+  /** Teórico del mismo alcance (BOM `paraCosto` × piezas cortadas), para el aviso comparativo. */
+  teorico: { tela: number; avios: number };
+}
+
+/**
+ * Arma el REQUERIDO del COSTEO (ver el bloque "DE DÓNDE SALE EL REQUERIDO" del encabezado):
+ * BOM `paraCosto` × piezas CORTADAS como esqueleto, afinado con el snapshot del MRP ESCALADO de su
+ * base (piezas pedidas) a las cortadas, y reconciliado en los dos sentidos con avisos explícitos.
+ */
+async function armarRequerido(
+  cliente: ClienteLectura,
+  orden: OrdenReal,
+  bd: ContextoBd | undefined,
+): Promise<BaseRequerido> {
+  const avisos: string[] = [];
+  const clavesNoCosteables = new Set<string>();
+  const bom = bomParaCosto(orden);
+  const bomPorClave = new Map(bom.map((b) => [b.clave, b]));
+
+  const cant = await cantidadesDeOrden(orden.id, bd);
+  // La MISMA base que el teórico de `costo-orden.ts`: piezas CORTADAS (nunca las pedidas).
+  const piezasBase = cant.cortado;
+
+  const teorico = {
+    tela:
+      bom
+        .filter((b) => b.tipo === 'tela')
+        .reduce((s, b) => s + b.consumoPorPrenda * (b.precioCatalogo ?? 0), 0) * piezasBase,
+    avios:
+      bom
+        .filter((b) => b.tipo === 'avio')
+        .reduce((s, b) => s + b.consumoPorPrenda * (b.precioCatalogo ?? 0), 0) * piezasBase,
+  };
+
+  if (piezasBase <= 0) {
+    avisos.push(
+      `La orden todavía no tiene corte: el consumo requerido es cero, así que el costo real solo ` +
+        `refleja lo que ya se compró para ella.`,
+    );
+  }
+
+  const snapshot = await cliente.requerimientoOrden.findMany({
+    where: { idOrden: orden.id },
+    select: {
+      idTela: true,
+      idAvio: true,
+      cantidadRequerida: true,
+      unidad: true,
+      esGenerico: true,
+      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+      avio: { select: { clave: true, descripcion: true, unidad: true, precioReferencia: true } },
+    },
+    orderBy: { id: 'asc' },
+  });
+
+  // ── Sin explosión de MRP: BOM `paraCosto` × cortado ────────────────────────────────────────────
+  if (snapshot.length === 0) {
+    return {
+      origen: bom.length === 0 ? 'sin-requerido' : 'receta',
+      piezasBase,
+      filas: bom.map((b) => ({
+        clave: b.clave,
+        tipo: b.tipo,
+        idTela: b.idTela,
+        idAvio: b.idAvio,
+        material: b.material,
+        unidad: b.unidad,
+        esGenerico: b.esGenerico,
+        requerido: b.consumoPorPrenda * piezasBase,
+        precioCatalogo: b.precioCatalogo,
+      })),
+      clavesNoCosteables,
+      avisos,
+      teorico,
+    };
+  }
+
+  // ── Con explosión: se ESCALA de piezas PEDIDAS (su base, `mrp.ts`) a piezas CORTADAS ────────────
+  const piezasSnapshot = cant.pedido;
+  let escala = 1;
+  if (piezasSnapshot > 0) {
+    escala = piezasBase / piezasSnapshot;
+    if (Math.abs(escala - 1) > TOLERANCIA) {
+      avisos.push(
+        `La explosión de materiales se calculó sobre las piezas PEDIDAS y el costo se prorratea ` +
+          `sobre las CORTADAS: el consumo requerido se ajustó a esa proporción.`,
+      );
+    }
+  } else if (piezasBase > 0) {
+    avisos.push(
+      `No se pudo ajustar la explosión de materiales a las piezas cortadas (la orden no tiene ` +
+        `matriz de tallas): se usó el consumo de la explosión tal cual.`,
+    );
+  }
+
+  // Suma el snapshot por material (no hay índice único que lo garantice) y descarta lo no costeable.
+  const requeridoSnapshot = new Map<string, { cantidad: number; unidad: string | null }>();
+  for (const r of snapshot) {
+    const clave = r.idTela === null ? `avio-${String(r.idAvio)}` : `tela-${String(r.idTela)}`;
+    if (!bomPorClave.has(clave)) {
+      if (!clavesNoCosteables.has(clave)) {
+        clavesNoCosteables.add(clave);
+        const nombre =
+          r.tela?.nombre ?? (r.avio === null ? clave : `${r.avio.clave} — ${r.avio.descripcion}`);
+        avisos.push(
+          `«${nombre}» viene de la explosión de materiales pero NO está marcado "se considera al ` +
+            `costear" en la receta del modelo: su consumo NO se valuó. Si se le compró para esta ` +
+            `orden, esa compra sí cuenta.`,
+        );
+      }
+      continue;
+    }
+    const previo = requeridoSnapshot.get(clave);
+    requeridoSnapshot.set(clave, {
+      cantidad: (previo?.cantidad ?? 0) + num(r.cantidadRequerida),
+      unidad: previo?.unidad ?? r.unidad,
+    });
+  }
+
+  const filas = bom.map((b) => {
+    const delSnapshot = requeridoSnapshot.get(b.clave);
+    if (delSnapshot === undefined) {
+      avisos.push(
+        `«${b.material}» está en la receta de COSTO del modelo pero NO en la explosión de ` +
+          `materiales de la orden: se costeó con la receta. Vuelve a explosionar la orden si ` +
+          `quieres que el MRP mande.`,
+      );
+    }
+    return {
+      clave: b.clave,
+      tipo: b.tipo,
+      idTela: b.idTela,
+      idAvio: b.idAvio,
+      material: b.material,
+      unidad: delSnapshot?.unidad ?? b.unidad,
+      esGenerico: b.esGenerico,
+      requerido:
+        delSnapshot === undefined ? b.consumoPorPrenda * piezasBase : delSnapshot.cantidad * escala,
+      precioCatalogo: b.precioCatalogo,
+    };
+  });
+
+  return {
+    origen: filas.length === 0 ? 'sin-requerido' : 'snapshot-mrp',
+    piezasBase,
+    filas,
+    clavesNoCosteables,
+    avisos,
+    teorico,
+  };
 }
 
 /**
@@ -658,9 +976,10 @@ async function armarRequerido(
 export async function calcularCostoRealDeOrden(
   orden: OrdenReal,
   bd?: ContextoBd,
-): Promise<{ calculado: CostoRealCalculado; origenRequerido: OrigenRequerido }> {
+): Promise<RealDeOrden> {
   const cliente = clienteLectura(bd);
   const idEmpresa = orden.idEmpresa;
+  const avisosPrevios: string[] = [];
 
   // 1) Compras LIGADAS a la orden, de OC autorizada+ y de la empresa activa (A9, regla 1).
   const lineasOc = await cliente.ordenCompraLinea.findMany({
@@ -672,15 +991,20 @@ export async function calcularCostoRealDeOrden(
     select: seleccionLineaOc,
   });
   const { factoresAvio, factoresAvioProveedor } = await leerFactores(cliente, lineasOc);
+  const conFactorRaro = new Set<string>();
   const ligadas: LineaCompraLigada[] = lineasOc.map((l) => {
     const factor = factorDeLinea(l, factoresAvio, factoresAvioProveedor);
     const cantidad = num(l.cantidad);
+    const material = nombreMaterial(l);
+    if (factor !== 1) {
+      conFactorRaro.add(material);
+    }
     return {
       clave: claveLinea(l),
       tipo: l.idTela !== null ? 'tela' : l.idAvio !== null ? 'avio' : 'libre',
       idTela: l.idTela,
       idAvio: l.idAvio,
-      material: nombreMaterial(l),
+      material,
       cantidad,
       // Cantidad en unidad de CONSUMO (R1) — para poder restarla del requerido del BOM.
       cantidadConsumo: cantidad * factor,
@@ -689,9 +1013,13 @@ export async function calcularCostoRealDeOrden(
       compra: referencia(l),
     };
   });
+  for (const material of conFactorRaro) {
+    avisosPrevios.push(avisoFactor(material));
+  }
 
-  // 2) Requerido de la orden (snapshot del MRP o receta).
+  // 2) Requerido del COSTEO (BOM `paraCosto` × cortado, afinado y reconciliado con el MRP).
   const base = await armarRequerido(cliente, orden, bd);
+  avisosPrevios.push(...base.avisos);
 
   // 3) Último precio de compra SOLO de los materiales que tienen consumo sin compra propia (los
   //    que la compra ligada ya cubre por completo no necesitan valuarse → cero consultas de más).
@@ -702,9 +1030,19 @@ export async function calcularCostoRealDeOrden(
   const porValuar = base.filas.filter(
     (f) => f.requerido - (compradoPorClave.get(f.clave) ?? 0) > TOLERANCIA,
   );
-  const ultimos = await leerUltimosPrecios(cliente, idEmpresa, porValuar);
+  const { precios, avisos: avisosUltimos } = await leerUltimosPrecios(
+    cliente,
+    idEmpresa,
+    porValuar,
+  );
+  for (const aviso of avisosUltimos) {
+    if (!avisosPrevios.includes(aviso)) {
+      avisosPrevios.push(aviso);
+    }
+  }
+
   const requeridos: RequeridoMaterial[] = base.filas.map((f) => {
-    const u = ultimos.get(f.clave);
+    const u = precios.get(f.clave);
     return {
       ...f,
       ultimoPrecio: u === undefined ? null : u.precio,
@@ -712,7 +1050,15 @@ export async function calcularCostoRealDeOrden(
     };
   });
 
-  return { calculado: combinarCostoReal(requeridos, ligadas), origenRequerido: base.origen };
+  return {
+    calculado: combinarCostoReal(requeridos, ligadas, {
+      avisosPrevios,
+      clavesNoCosteables: base.clavesNoCosteables,
+      teorico: base.teorico,
+    }),
+    origenRequerido: base.origen,
+    piezasBase: base.piezasBase,
+  };
 }
 
 /** Lee la orden de la empresa activa con lo que el costo real necesita, o lanza `ErrorNoEncontrado`. */
@@ -731,23 +1077,24 @@ async function ordenParaReal(
   return orden;
 }
 
-/** Proyecta el resumen del real ocultando importes sin `consultas.ver-importes`. */
-export function resumenReal(
-  calculado: CostoRealCalculado,
-  origenRequerido: OrigenRequerido,
-  verImportes: boolean,
-): CostoRealResumen {
+/**
+ * Proyecta el resumen del real ocultando importes sin `consultas.ver-importes`. Los `avisos` viajan
+ * SIEMPRE completos porque, por contrato de este módulo, nunca llevan una cifra de dinero.
+ */
+export function resumenReal(real: RealDeOrden, verImportes: boolean): CostoRealResumen {
+  const c = real.calculado;
   const money = (v: number): number | null => (verImportes ? v : null);
   return {
-    tela: money(calculado.tela),
-    avios: money(calculado.avios),
-    total: money(calculado.total),
-    importeDirecto: money(calculado.importeDirecto),
-    importeValuado: money(calculado.importeValuado),
-    importeLibre: money(calculado.importeLibre),
-    hayCompras: calculado.hayCompras,
-    origenRequerido,
-    avisos: calculado.avisos,
+    tela: money(c.tela),
+    avios: money(c.avios),
+    total: money(c.total),
+    importeDirecto: money(c.importeDirecto),
+    importeValuado: money(c.importeValuado),
+    importeLibre: money(c.importeLibre),
+    hayCompras: c.hayCompras,
+    origenRequerido: real.origenRequerido,
+    piezasBase: real.piezasBase,
+    avisos: c.avisos,
   };
 }
 
@@ -765,15 +1112,15 @@ export async function costoRealOrden(
   verificarPermiso(sesion, 'costos.ver');
   const cliente = clienteLectura(bd);
   const orden = await ordenParaReal(sesion, idOrden, cliente);
-  const { calculado, origenRequerido } = await calcularCostoRealDeOrden(orden, bd);
+  const real = await calcularCostoRealDeOrden(orden, bd);
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const money = (v: number | null): number | null => (verImportes ? v : null);
 
   return {
-    ...resumenReal(calculado, origenRequerido, verImportes),
+    ...resumenReal(real, verImportes),
     idOrden: orden.id,
     folio: Number(orden.folio),
-    materiales: calculado.materiales.map((m) => ({
+    materiales: real.calculado.materiales.map((m) => ({
       tipo: m.tipo,
       idTela: m.idTela,
       idAvio: m.idAvio,

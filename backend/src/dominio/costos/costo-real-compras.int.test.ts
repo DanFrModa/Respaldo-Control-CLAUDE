@@ -12,10 +12,16 @@
  *  (d) A9: ni las OC de otra empresa ni las órdenes de otra empresa se ven;
  *  (e) el factor de conversión del avío (R1) convierte la cantidad comprada a unidad de consumo y
  *      normaliza el último precio, igual que la recepción;
- *  (f) `guardarCostoOrden` usa el REAL como DEFAULT cuando hay compras, y el teórico cuando no las
- *      hay; el usuario siempre puede teclear su propio valor; y el real queda CONGELADO en
- *      `telaReal`/`aviosReal`;
- *  (g) sin `consultas.ver-importes` los importes salen en null pero las cantidades se ven.
+ *  (f) `guardarCostoOrden` usa el REAL como DEFAULT en el PRIMER costeo cuando hay compras, y el
+ *      teórico cuando no las hay; omitir un componente ya guardado lo CONSERVA; el usuario siempre
+ *      puede teclear su propio valor; y el real queda CONGELADO en `telaReal`/`aviosReal` (salvo con
+ *      `calcularReal: false`, el camino del ETL de migración);
+ *  (g) sin `consultas.ver-importes` los importes salen en null, las cantidades se ven, y NINGÚN aviso
+ *      deja escapar una cifra de dinero;
+ *  (h) el requerido se calcula SIEMPRE sobre las piezas CORTADAS (la base del teórico): el snapshot
+ *      del MRP se ESCALA desde su base (piezas pedidas) y se RECONCILIA con el BOM `paraCosto` en los
+ *      dos sentidos, con aviso explícito en cada caso;
+ *  (i) la SOBRE-COMPRA se costea COMPLETA (aclaración de Daniel: 1,100 etiquetas / 1,000 cortadas).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -37,6 +43,7 @@ let idTela: number;
 let idAvio: number;
 let idAvioGenerico: number;
 let idProveedor: number;
+let idModelo: number;
 let folioOc = 0;
 
 const PERM_TODOS: ClavePermiso[] = ['costos.ver', 'costos.capturar', 'consultas.ver-importes'];
@@ -141,6 +148,8 @@ beforeEach(async () => {
       },
     },
   });
+
+  idModelo = modelo.id;
 
   const clienteNeg = await cliente.cliente.create({ data: { nombre: 'Tienda X' } });
   const crearOrden = async (folio: bigint, idEmpresa: number): Promise<number> => {
@@ -363,6 +372,128 @@ describe('costoRealOrden — A9 (empresa activa) y permisos', () => {
     expect(felpa?.compras[0]?.precio).toBeNull();
     expect(felpa?.comprado).toBe(200); // la cantidad no es dinero: se ve
   });
+
+  it('NINGÚN aviso deja escapar una cifra de dinero sin `consultas.ver-importes`', async () => {
+    // Se disparan a la vez varios avisos, incluido el de compras LIBRES (que antes metía el monto
+    // dentro del texto y lo filtraba a un usuario sin permiso de ver importes).
+    await crearOc({
+      estatus: 'autorizada',
+      lineas: [
+        { descripcionLibre: 'Flete especial', cantidad: 1, precio: 1500 },
+        { idTela, cantidad: 10, precio: 0 },
+      ],
+    });
+    const conPermiso = await costoRealOrden(sesion(), idOrden, bd());
+    const sinPermiso = await costoRealOrden(sesion(['costos.ver']), idOrden, bd());
+
+    // El canal de avisos es el MISMO para los dos (por eso no puede llevar dinero dentro).
+    expect(sinPermiso.avisos).toEqual(conPermiso.avisos);
+    expect(sinPermiso.avisos.length).toBeGreaterThan(0);
+    for (const aviso of sinPermiso.avisos) {
+      expect(/\$|\d+[.,]\d{2}\b/.test(aviso), `aviso con importe: ${aviso}`).toBe(false);
+    }
+    expect(sinPermiso.avisos.join(' ')).not.toContain('1500');
+    expect(sinPermiso.importeLibre).toBeNull();
+    // Y sí avisa de la línea con precio en cero (subvaluación silenciosa).
+    expect(sinPermiso.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(true);
+  });
+});
+
+describe('costoRealOrden — el requerido va SIEMPRE en la base del COSTEO (piezas cortadas)', () => {
+  /** Deja el corte de la orden en `piezas` (la matriz pedida se queda en 100). */
+  async function cortar(piezas: number): Promise<void> {
+    await cliente.etapaMovimientoDet.updateMany({
+      where: { etapaMov: { idOrden } },
+      data: { cantidad: piezas },
+    });
+  }
+
+  it('ESCALA el snapshot del MRP de las piezas pedidas a las cortadas (y avisa)', async () => {
+    await cortar(90); // 100 pedidas, 90 cortadas ⇒ escala 0.9
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.origenRequerido).toBe('snapshot-mrp');
+    expect(real.piezasBase).toBe(90);
+    // El snapshot decía 200 m (sobre 100 pedidas) ⇒ 180 m sobre las 90 cortadas.
+    expect(real.materiales.find((m) => m.idTela === idTela)?.requerido).toBe(180);
+    expect(real.avisos.some((a) => a.includes('CORTADAS'))).toBe(true);
+
+    // Y así el real es COMPARABLE con el teórico: ambos sobre 90 piezas (2 m × $20 × 90).
+    const costo = await obtenerCostoOrden(sesion(), idOrden, bd());
+    expect(costo.teorico.tela).toBe(3600);
+    expect(costo.real.tela).toBe(3600);
+  });
+
+  it('sin corte, el requerido es CERO y el real solo refleja lo comprado (con aviso)', async () => {
+    await cortar(0);
+    await crearOc({ estatus: 'autorizada', lineas: [{ idTela, cantidad: 50, precio: 30 }] });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.piezasBase).toBe(0);
+    expect(real.tela).toBe(1500); // 50 × 30, lo realmente comprado
+    expect(real.importeValuado).toBe(0);
+    expect(real.avisos.some((a) => a.includes('todavía no tiene corte'))).toBe(true);
+  });
+
+  it('un material `paraCosto` AUSENTE del snapshot se costea con la receta y AVISA (antes: $0 mudo)', async () => {
+    // El BOM creció después de explosionar: el botón ya no está en el snapshot.
+    await cliente.requerimientoOrden.deleteMany({ where: { idOrden, idAvio } });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const boton = real.materiales.find((m) => m.idAvio === idAvio);
+    expect(boton).toBeDefined();
+    expect(boton?.requerido).toBe(400); // 4 por prenda × 100 cortadas (receta paraCosto)
+    expect(boton?.importe).toBe(1200); // × $3 de catálogo — NO cero
+    expect(real.avisos.some((a) => a.includes('Botón') && a.includes('explosión'))).toBe(true);
+  });
+
+  it('un material del snapshot que NO es `paraCosto` no se valúa, pero su compra sí cuenta', async () => {
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo, idAvio },
+      data: { paraCosto: false },
+    });
+    await crearOc({ estatus: 'autorizada', lineas: [{ idAvio, cantidad: 400, precio: 5 }] });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const boton = real.materiales.find((m) => m.idAvio === idAvio);
+    // No se valúa consumo suyo (requerido 0), pero los $2,000 comprados SÍ son costo de la orden.
+    expect(boton?.requerido).toBe(0);
+    expect(boton?.importeDirecto).toBe(2000);
+    expect(real.avisos.some((a) => a.includes('se considera al costear'))).toBe(true);
+    // Solo el hilo genérico (10 conos × $50 de catálogo) se valúa: 500 + 2,000 comprados.
+    expect(real.avios).toBe(2500);
+  });
+});
+
+describe('costoRealOrden — la SOBRE-COMPRA se costea completa (aclaración de Daniel)', () => {
+  /**
+   * DANIEL: «si se cortaron 1,000 prendas pero la orden de etiquetas se hizo por 1,100, se debe
+   * costear el costo de la orden COMPLETA entre lo cortado ⇒ 1.1 etiquetas por prenda».
+   * Aquí, a escala: 100 cortadas, 400 botones requeridos, 440 comprados (10 % de más).
+   */
+  it('se costean los 440 botones comprados (no los 400 requeridos) y el unitario los refleja', async () => {
+    await crearOc({ estatus: 'autorizada', lineas: [{ idAvio, cantidad: 440, precio: 5 }] });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const boton = real.materiales.find((m) => m.idAvio === idAvio);
+    expect(boton?.comprado).toBe(440);
+    expect(boton?.cantidadValuada).toBe(0);
+    expect(boton?.importeDirecto).toBe(2200); // 440 × $5 — NUNCA topado a 400 × $5
+    // Sobre-comprar es normal: no hay aviso de alarma por ello.
+    expect(real.avisos.some((a) => a.includes('Botón') && a.includes('CERO'))).toBe(false);
+
+    // Al costear, el unitario reparte los 440 entre las 100 cortadas ⇒ 4.4 botones por prenda.
+    const g = await guardarCostoOrden(
+      sesion(),
+      idOrden,
+      { telaCost: 0, procesosCost: 0, otros: 0, baseProrrateo: 'cortado' },
+      bd(),
+    );
+    // avíos = 440 × $5 (botones) + 10 conos × $50 (hilo genérico a catálogo) = 2,700.
+    expect(g.guardado?.aviosCost).toBe(2700);
+    const botonesPorPrenda = 2200 / 5 / (g.unitario.cantidadBase || 1);
+    expect(botonesPorPrenda).toBeCloseTo(4.4, 10);
+  });
 });
 
 describe('costoRealOrden — sin snapshot de MRP', () => {
@@ -388,6 +519,8 @@ describe('enganche con el costeo (obtenerCostoOrden / guardarCostoOrden)', () =>
     expect(c.teorico.tela).toBe(4000); // 2 × 20 × 100 cortadas (catálogo)
     expect(c.real.tela).toBe(5000); // 200 × 25 (lo comprado)
     expect(c.real.avios).toBe(2500); // 400 × 5 (botones) + 10 conos × $50 catálogo
+    expect(c.real.piezasBase).toBe(100); // la base del cálculo, visible para el usuario
+    expect(c.real.origenRequerido).toBe('snapshot-mrp');
     expect(c.guardado).toBeNull();
   });
 
@@ -423,5 +556,47 @@ describe('enganche con el costeo (obtenerCostoOrden / guardarCostoOrden)', () =>
     );
     expect(g.guardado?.telaCost).toBe(4321);
     expect(g.guardado?.telaReal).toBe(5000); // pero el real queda registrado para la traza
+  });
+
+  it('OMITIR un componente ya guardado lo CONSERVA (lo ya costeado no se mueve)', async () => {
+    await crearOc({ estatus: 'autorizada', lineas: [{ idTela, cantidad: 200, precio: 25 }] });
+    await guardarCostoOrden(
+      sesion(),
+      idOrden,
+      { telaCost: 4321, procesosCost: 111, aviosCost: 222, otros: 33, observaciones: 'nota' },
+      bd(),
+    );
+
+    // Segundo guardado que SOLO cambia la base: nada de lo capturado se pisa.
+    const g = await guardarCostoOrden(sesion(), idOrden, { baseProrrateo: 'vendido' }, bd());
+    expect(g.guardado?.telaCost).toBe(4321);
+    expect(g.guardado?.procesosCost).toBe(111);
+    expect(g.guardado?.aviosCost).toBe(222);
+    expect(g.guardado?.otros).toBe(33);
+    expect(g.guardado?.observaciones).toBe('nota');
+    expect(g.guardado?.baseProrrateo).toBe('vendido');
+  });
+
+  it('mandar `null` explícito SÍ borra el componente (omitir ≠ borrar)', async () => {
+    await guardarCostoOrden(sesion(), idOrden, { telaCost: 999, otros: 5 }, bd());
+    const g = await guardarCostoOrden(sesion(), idOrden, { telaCost: null, otros: null }, bd());
+    expect(g.guardado?.telaCost).toBeNull();
+    expect(g.guardado?.otros).toBeNull();
+  });
+
+  it('`calcularReal: false` (camino del ETL) NO calcula ni sella el real', async () => {
+    await crearOc({ estatus: 'autorizada', lineas: [{ idTela, cantidad: 200, precio: 25 }] });
+    const g = await guardarCostoOrden(
+      sesion(),
+      idOrden,
+      { telaCost: 1, procesosCost: 2, aviosCost: 3 },
+      bd(),
+      { calcularReal: false },
+    );
+    expect(g.guardado?.telaCost).toBe(1);
+    // Las columnas de traza quedan vacías: no se congela un número de HOY en una orden histórica.
+    const fila = await cliente.costoOrden.findUnique({ where: { idOrden } });
+    expect(fila?.telaReal).toBeNull();
+    expect(fila?.aviosReal).toBeNull();
   });
 });

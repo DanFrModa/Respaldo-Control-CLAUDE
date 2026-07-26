@@ -82,34 +82,67 @@ costo real del material  =  IMPORTE DIRECTO  +  IMPORTE VALUADO
 
 | Pieza | Qué es | Regla de Daniel |
 |---|---|---|
-| **Importe directo** | Σ (`cantidad × precio`) de las líneas de OC **ligadas a la orden** cuya OC esté `autorizada` / `recibida_parcial` / `recibida_total` (fuera: `borrador`, `pendiente_autorizacion`, `cancelada`). Sin impuestos ni descuentos: la OC no los modela. | 1 — *manda lo comprado: la OC autorizada* |
+| **Importe directo** | Σ (`cantidad × precio`) de las líneas de OC **ligadas a la orden** cuya OC esté `autorizada` / `recibida_parcial` / `recibida_total` (fuera: `borrador`, `pendiente_autorizacion`, `cancelada`). Sin impuestos ni descuentos: la OC no los modela. Entra **ÍNTEGRO**, nunca topado al requerido. | 1 — *manda lo comprado: la OC autorizada* |
 | **Importe valuado** | `max(0, requerido − comprado)` × **último precio de compra** del material (la línea de OC autorizada+ más reciente **de la empresa activa**, sin importar a qué orden estuviera ligada). | 2 — *los genéricos, a último precio de compra*<br>3 — *la compra compartida se prorratea* |
 
 - **El prorrateo (regla 3) sale solo:** una compra grande sin `idOrden` se vuelve "último precio"; cada
   orden se valúa por **su** consumo ⇒ el reparto es proporcional al consumo. No hay una tabla de
   prorrateo que mantener.
-- **Requerido** = snapshot del MRP (`RequerimientoOrden.cantidadRequerida`, el consumo **BRUTO** antes
-  del neteo contra stock — por eso el genérico sí se costea aunque salga del almacén). Sin snapshot,
-  receta `paraCosto` × piezas **cortadas** (o pedidas si aún no hay corte): la misma base del teórico.
-- **Fallbacks que AVISAN** (nunca se callan, mismo criterio que los `avisos` del MRP): material nunca
-  comprado → **precio de catálogo**; sin catálogo → **0**; línea de OC de un material fuera del
-  requerido → **entra al costo** con aviso; renglones de **compra LIBRE** (`descripcionLibre`) →
-  se reportan aparte y **NO** entran a tela ni a avíos (captúralos en "Otros" si aplican).
+- **La SOBRE-COMPRA se costea COMPLETA** (aclaración de Daniel, 26-jul-2026): *"si se cortaron 1,000
+  prendas pero la orden de etiquetas se hizo por 1,100, se debe costear el costo de la orden COMPLETA
+  entre lo cortado ⇒ 1.1 etiquetas por prenda"*. El directo **jamás** se recorta a
+  `min(comprado, requerido)`; el `max(0, …)` es solo para el remanente NO comprado. Comprar de más es
+  normal: **no** genera aviso. El "1.1 por prenda" cae solo del `costoTotal ÷ cortado` (D2).
+- **Requerido — SIEMPRE sobre las piezas CORTADAS** (la base del teórico), para que los dos números
+  sean comparables y el default no meta un sesgo. El snapshot del MRP **no se usa tal cual**: nace de
+  la receta `paraProduccion` y de las piezas **PEDIDAS**, así que se **ESCALA** `× (cortadas ÷ pedidas)`
+  y se **RECONCILIA contra el BOM `paraCosto`** en ambos sentidos:
+  - material `paraCosto` **ausente** del snapshot ⇒ se costea con la receta × cortadas **y avisa**
+    (antes salía en **$0 sin decir nada**: BOM que creció, o avío `paraCosto` sin `paraProduccion`);
+  - material del snapshot que **no es `paraCosto`** ⇒ **no se valúa** y avisa (su compra directa sí
+    cuenta: es dinero gastado en la orden).
+  Sin snapshot: receta `paraCosto` × cortadas. Sin corte: requerido 0 (solo cuenta lo comprado, con
+  aviso). Se usa la cantidad **BRUTA** (antes del neteo contra stock): por eso el genérico sí se costea.
+- **Fallbacks y guardas que AVISAN** (nunca se callan, mismo criterio que los `avisos` del MRP):
+  material nunca comprado → **precio de catálogo**; sin catálogo → **0**; línea de OC de un material
+  fuera del requerido → **entra al costo** con aviso; renglones de **compra LIBRE**
+  (`descripcionLibre`) → se reportan aparte y **NO** entran a tela ni a avíos; **línea ligada con
+  precio en cero**; **material requerido cuyo costo real queda en cero**; y el **comparativo**: un
+  componente real por debajo de la **MITAD** de su teórico (umbral `UMBRAL_REAL_SOSPECHOSO = 0.5`).
+- **Los avisos NUNCA llevan una cifra de dinero** en el texto: viajan por el mismo canal para todos,
+  así que un usuario con `costos.ver` y sin `consultas.ver-importes` no puede deducir importes de
+  ellos (lo verifican el test unitario y el de integración).
 - **Unidades (R1):** el importe directo no se convierte (la invariante de valuación dice que
   `cantidad × precio` no cambia). La **cantidad comprada** y el **último precio** sí se normalizan a
   unidad de consumo con **la misma cascada que la recepción** (`recepciones.ts`): tela → factor 1;
   avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion` → 1. Así el
-  real cuadra con el costo que entra al kardex.
+  real cuadra con el costo que entra al kardex. ⚠️ Con **factor ≠ 1** el renglón puede venir sesgado
+  por una **deuda conocida de F4** (`mrp.generarOCDesdeExplosion` escribe la línea en unidad de
+  consumo; la recepción la lee como presentación) → el motor **AVISA** por cada material afectado; la
+  reproducción exacta está en `HOJA-DE-RUTA.md` §4.
 - **Alcance:** solo **TELA** y **AVÍOS**. Los **procesos** (maquila/arte/bordados) no se compran con OC
-  de material y siguen 100 % en el teórico.
-- **El DEFAULT al guardar** (el corazón de la petición): si la orden **tiene compras ligadas**,
-  `telaCost`/`aviosCost` caen al **REAL**; si no, al **teórico** (comportamiento previo intacto).
-  `procesosCost` sigue al teórico. El usuario siempre puede teclear su valor, y lo ya costeado no se
-  reescribe.
+  de material y siguen 100 % en el teórico. Solo cuenta la liga **por renglón**
+  (`OrdenCompraLinea.idOrden`); la liga N:N de **encabezado** (`OrdenCompraOrden`) no es atribución
+  directa — esas compras entran por la valuación a último precio (prorrateo por consumo).
+- **Redondeo:** una sola vez y de abajo hacia arriba (compra → material → componente → total), para
+  que el desglose **cuadre al centavo** con el encabezado.
+- **Robustez:** `RequerimientoOrden` no tiene `@@unique(idOrden, material)`; las filas repetidas se
+  **fusionan** (suma) al calcular. Se prefirió el dedupe defensivo a un índice único + migración para
+  no arriesgar que la migración truene con duplicados ya existentes.
+- **El DEFAULT al guardar** (el corazón de la petición): en el **PRIMER** costeo, si la orden **tiene
+  compras ligadas**, `telaCost`/`aviosCost` caen al **REAL**; si no, al **teórico** (comportamiento
+  previo intacto). `procesosCost` sigue al teórico. El usuario siempre puede teclear su valor. Y si la
+  orden **ya estaba costeada**, **omitir** un componente lo **CONSERVA** (para borrarlo hay que mandar
+  `null` explícito) — antes omitirlo lo pisaba con el default. Aplica igual a
+  `otros`/`descOtros`/`observaciones`.
 - **Trazabilidad:** el real se **congela** al guardar en `CostoOrden.telaReal`/`aviosReal` (columnas
   nuevas, nullable ⇒ NULL en todo lo costeado antes; **no** entran a `costoTotal`) y
   `GET /api/costos/ordenes/{idOrden}/real` devuelve el **desglose por material**: qué se compró, a qué
-  proveedor, a qué precio, cuánto se valuó y con qué precio.
+  proveedor, a qué precio, cuánto se valuó y con qué precio. El **ETL de migración** llama a
+  `guardarCostoOrden` con **`calcularReal: false`** (manda los tres componentes explícitos del CSV
+  viejo): no calcula el real ni sella las columnas `*Real` — congelarlo sería estampar un número de
+  HOY en una orden de los 90. La respuesta de `guardarCostoOrden` se arma con lo que la propia
+  transacción ya leyó: **el real no se recalcula** para responder.
 - **Permisos:** ninguno nuevo — `costos.ver` para consultar, `costos.capturar` para guardar, importes
   en `null` sin `consultas.ver-importes` (las **cantidades** sí se ven: no son dinero).
 - **El EDR no cambia**: sigue recalculando desde `CostoOrden` al leer (D1).

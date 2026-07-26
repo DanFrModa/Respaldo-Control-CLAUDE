@@ -65,6 +65,7 @@ function costoOrden(over: Partial<CostoOrden['real']> = {}): CostoOrden {
       importeLibre: 0,
       hayCompras: true,
       origenRequerido: 'snapshot-mrp',
+      piezasBase: 100,
       avisos: [],
       ...over,
     },
@@ -122,6 +123,23 @@ describe('CosteoOrdenPagina — los tres números (real / teórico / capturado)'
     montar(costoOrden({ avisos: ['«Felpa» nunca se ha comprado…'] }));
     expect(screen.getByTestId('costeo-avisos-real')).toHaveTextContent('Felpa');
   });
+
+  it('dice SOBRE QUÉ se calculó el real (base del cálculo, en lenguaje de Daniel)', () => {
+    montar(costoOrden());
+    const origen = screen.getByTestId('costeo-origen-requerido');
+    expect(origen).toHaveTextContent('explosión de materiales');
+    expect(origen).toHaveTextContent('100 pzas cortadas');
+  });
+
+  it('sin corte, avisa que solo cuenta lo comprado', () => {
+    montar(costoOrden({ piezasBase: 0 }));
+    expect(screen.getByTestId('costeo-origen-requerido')).toHaveTextContent('aún no tiene corte');
+  });
+
+  it('con la receta (sin explosión) también lo dice', () => {
+    montar(costoOrden({ origenRequerido: 'receta' }));
+    expect(screen.getByTestId('costeo-origen-requerido')).toHaveTextContent('receta del modelo');
+  });
 });
 
 describe('CosteoOrdenPagina — desglose del real', () => {
@@ -141,6 +159,7 @@ describe('CosteoOrdenPagina — desglose del real', () => {
       importeLibre: 0,
       hayCompras: true,
       origenRequerido: 'snapshot-mrp',
+      piezasBase: 100,
       avisos: [],
       materiales: [
         {

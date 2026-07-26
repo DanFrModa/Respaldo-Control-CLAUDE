@@ -141879,12 +141879,18 @@
                           ],
                           "description": "De dónde salieron las cantidades requeridas."
                         },
+                        "piezasBase": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                        },
                         "avisos": {
                           "type": "array",
                           "items": {
                             "type": "string"
                           },
-                          "description": "Avisos del cálculo (nunca truena en silencio)."
+                          "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
                         }
                       },
                       "required": [
@@ -141896,6 +141902,7 @@
                         "importeLibre",
                         "hayCompras",
                         "origenRequerido",
+                        "piezasBase",
                         "avisos"
                       ],
                       "additionalProperties": false,
@@ -142674,12 +142681,18 @@
                           ],
                           "description": "De dónde salieron las cantidades requeridas."
                         },
+                        "piezasBase": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                        },
                         "avisos": {
                           "type": "array",
                           "items": {
                             "type": "string"
                           },
-                          "description": "Avisos del cálculo (nunca truena en silencio)."
+                          "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
                         }
                       },
                       "required": [
@@ -142691,6 +142704,7 @@
                         "importeLibre",
                         "hayCompras",
                         "origenRequerido",
+                        "piezasBase",
                         "avisos"
                       ],
                       "additionalProperties": false,
@@ -143195,12 +143209,18 @@
                       ],
                       "description": "De dónde salieron las cantidades requeridas."
                     },
+                    "piezasBase": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico)."
+                    },
                     "avisos": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       },
-                      "description": "Avisos del cálculo (nunca truena en silencio)."
+                      "description": "Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe."
                     },
                     "idOrden": {
                       "type": "integer",
@@ -143441,6 +143461,10 @@
                                     "maximum": 9007199254740991,
                                     "description": "Folio de la OC del último precio."
                                   },
+                                  "estatus": {
+                                    "type": "string",
+                                    "description": "Estatus de esa OC (autorizada / recibida_*)."
+                                  },
                                   "fecha": {
                                     "anyOf": [
                                       {
@@ -143466,6 +143490,7 @@
                                 "required": [
                                   "idOrdenCompra",
                                   "numCompra",
+                                  "estatus",
                                   "fecha",
                                   "idProveedor",
                                   "proveedor"
@@ -143522,6 +143547,7 @@
                     "importeLibre",
                     "hayCompras",
                     "origenRequerido",
+                    "piezasBase",
                     "avisos",
                     "idOrden",
                     "folio",

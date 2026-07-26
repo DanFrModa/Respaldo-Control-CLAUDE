@@ -60696,7 +60696,9 @@ export interface paths {
                  * @enum {string}
                  */
                 origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
-                /** @description Avisos del cálculo (nunca truena en silencio). */
+                /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+                piezasBase: number;
+                /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
                 avisos: string[];
               };
               /** @description Costo guardado (o null si no se ha costeado). */
@@ -60941,7 +60943,9 @@ export interface paths {
                  * @enum {string}
                  */
                 origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
-                /** @description Avisos del cálculo (nunca truena en silencio). */
+                /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+                piezasBase: number;
+                /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
                 avisos: string[];
               };
               /** @description Costo guardado (o null si no se ha costeado). */
@@ -61130,7 +61134,9 @@ export interface paths {
                * @enum {string}
                */
               origenRequerido: 'snapshot-mrp' | 'receta' | 'sin-requerido';
-              /** @description Avisos del cálculo (nunca truena en silencio). */
+              /** @description Piezas CORTADAS sobre las que se calculó el consumo requerido (la base del teórico). */
+              piezasBase: number;
+              /** @description Avisos del cálculo (nunca truena en silencio). NUNCA contienen un importe. */
               avisos: string[];
               /** @description Id de la orden. */
               idOrden: number;
@@ -61199,6 +61205,8 @@ export interface paths {
                   idOrdenCompra: number;
                   /** @description Folio de la OC del último precio. */
                   numCompra: number;
+                  /** @description Estatus de esa OC (autorizada / recibida_*). */
+                  estatus: string;
                   /** @description Fecha de esa OC (YYYY-MM-DD) o null. */
                   fecha: string | null;
                   /** @description Proveedor de esa OC. */

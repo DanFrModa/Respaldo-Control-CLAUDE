@@ -3,19 +3,23 @@
  * (petición de Daniel, 26-jul-2026 — `DECISIONES.md` §Post-F9.5): `combinarCostoReal`.
  *
  * Cubren las tres reglas de Daniel y sus bordes:
- *  • manda lo COMPRADO (atribución directa de las líneas de OC ligadas a la orden),
+ *  • manda lo COMPRADO (atribución directa de las líneas de OC ligadas a la orden), **completa y sin
+ *    tope** aunque exceda el requerido (aclaración de Daniel: el caso de las 1,100 etiquetas),
  *  • los GENÉRICOS (y todo consumo sin compra propia) se valúan a ÚLTIMO PRECIO DE COMPRA,
  *  • una compra que surte a varias órdenes se PRORRATEA de facto (cada orden se lleva su consumo).
- * Más: mezcla directo+valuado, sobre-compra, material nunca comprado (catálogo), material sin
- * precio, compras LIBRES y compras de material fuera del requerido.
+ * Más: mezcla directo+valuado, material nunca comprado (catálogo), material sin precio, compras
+ * LIBRES, compras fuera del requerido, los AVISOS anti-subvaluación, que ningún aviso lleve una
+ * cifra de dinero, el cuadre de centavos y la fusión de requeridos repetidos.
  *
- * El filtrado por estatus de la OC (borrador/cancelada fuera) y por empresa (A9) es de BASE DE
- * DATOS: vive en `costo-real-compras.int.test.ts` (lo corre CI).
+ * El filtrado por estatus de la OC (borrador/cancelada fuera), la empresa (A9), el escalado del
+ * snapshot del MRP y la reconciliación con el BOM `paraCosto` son de BASE DE DATOS: viven en
+ * `costo-real-compras.int.test.ts` (lo corre CI).
  */
 import { describe, expect, it } from 'vitest';
 
 import {
   combinarCostoReal,
+  type CostoRealCalculado,
   type LineaCompraLigada,
   type ReferenciaCompra,
   type RequeridoMaterial,
@@ -50,7 +54,7 @@ function requerido(over: Partial<RequeridoMaterial> & { clave: string }): Requer
   };
 }
 
-/** Una línea de OC ligada a la orden. */
+/** Una línea de OC ligada a la orden (precio 1 por defecto: 0 dispara el aviso de precio en cero). */
 function ligada(over: Partial<LineaCompraLigada> & { clave: string }): LineaCompraLigada {
   const cantidad = over.cantidad ?? 0;
   return {
@@ -61,10 +65,22 @@ function ligada(over: Partial<LineaCompraLigada> & { clave: string }): LineaComp
     cantidad,
     cantidadConsumo: over.cantidadConsumo ?? cantidad,
     unidad: 'm',
-    precio: 0,
+    precio: 1,
     compra: compra(100),
     ...over,
   };
+}
+
+/** ¿Este texto trae una cifra que parezca DINERO? (signo de pesos o número con centavos). */
+function pareceImporte(texto: string): boolean {
+  return /\$|\d+[.,]\d{2}\b/.test(texto);
+}
+
+/** Falla si algún aviso del resultado deja escapar un importe (gate `consultas.ver-importes`). */
+function esperarAvisosSinDinero(r: CostoRealCalculado): void {
+  for (const aviso of r.avisos) {
+    expect(pareceImporte(aviso), `aviso con importe: ${aviso}`).toBe(false);
+  }
 }
 
 describe('combinarCostoReal — regla 1: manda lo COMPRADO (OC autorizada ligada a la orden)', () => {
@@ -114,15 +130,64 @@ describe('combinarCostoReal — regla 1: manda lo COMPRADO (OC autorizada ligada
     expect(r.tela).toBe(1600);
     expect(r.materiales[0]?.compras.map((c) => c.proveedor)).toEqual(['Textiles SA', 'Telas MX']);
   });
+});
 
-  it('la SOBRE-compra (se compró más de lo requerido) entra completa y no deja nada por valuar', () => {
+describe('combinarCostoReal — la SOBRE-COMPRA se costea COMPLETA (aclaración de Daniel)', () => {
+  /**
+   * DANIEL, textual (26-jul-2026): «si se cortaron 1,000 prendas pero la orden de etiquetas se hizo
+   * por 1,100, se debe costear —para efectos reales— el costo de la orden COMPLETA entre lo cortado.
+   * En este caso debería costar 1.1 etiquetas por prenda (o más bien su costo equivalente)».
+   */
+  it('1,100 etiquetas compradas / 1,000 prendas cortadas ⇒ 1.1 etiquetas por prenda', () => {
+    const CORTADAS = 1000;
+    const PRECIO_ETIQUETA = 0.5;
     const r = combinarCostoReal(
-      [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 10 })],
+      [
+        requerido({
+          clave: 'avio-7',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 7,
+          material: 'ETQ — Etiqueta',
+          unidad: 'pza',
+          // 1 etiqueta por prenda × 1,000 cortadas: el requerido va en la base del COSTEO.
+          requerido: CORTADAS,
+          ultimoPrecio: PRECIO_ETIQUETA,
+          precioCatalogo: PRECIO_ETIQUETA,
+        }),
+      ],
+      [
+        ligada({
+          clave: 'avio-7',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 7,
+          material: 'ETQ — Etiqueta',
+          cantidad: 1100, // se compró de MÁS, a propósito
+          precio: PRECIO_ETIQUETA,
+        }),
+      ],
+    );
+
+    // El importe directo entra ÍNTEGRO: NUNCA se topa a min(comprado, requerido) = 1,000.
+    expect(r.avios).toBe(550); // 1,100 × 0.50 — no 500
+    expect(r.materiales[0]?.comprado).toBe(1100);
+    expect(r.materiales[0]?.cantidadValuada).toBe(0); // no queda remanente por valuar
+    expect(r.importeValuado).toBe(0);
+
+    // El "1.1 por prenda" cae solo al dividir entre lo CORTADO (base de prorrateo D2, costo-orden.ts).
+    const etiquetasEquivalentesPorPrenda = r.avios / PRECIO_ETIQUETA / CORTADAS;
+    expect(etiquetasEquivalentesPorPrenda).toBeCloseTo(1.1, 10);
+  });
+
+  it('comprar de más es NORMAL: no genera ningún aviso de alarma', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 10, precioCatalogo: 10 })],
       [ligada({ clave: 'tela-1', cantidad: 130, precio: 10 })],
     );
     expect(r.tela).toBe(1300);
     expect(r.materiales[0]?.cantidadValuada).toBe(0);
-    expect(r.importeValuado).toBe(0);
+    expect(r.avisos).toEqual([]);
   });
 });
 
@@ -256,11 +321,57 @@ describe('combinarCostoReal — casos que NO se callan (avisos)', () => {
     expect(r.materiales[0]?.origenPrecio).toBe('sin-precio');
     expect(r.materiales[0]?.precioValuado).toBeNull();
     expect(r.avisos[0]).toContain('Rib sin precio');
+    // Un solo aviso: el de "sin precio" ya dice que quedó en cero (no se duplica con el de importe 0).
+    expect(r.avisos).toHaveLength(1);
   });
 
-  it('compras LIBRES: se reportan aparte, NO entran al total, y avisan', () => {
+  it('una línea de OC ligada con PRECIO EN CERO avisa (subvaluación silenciosa)', () => {
     const r = combinarCostoReal(
-      [requerido({ clave: 'tela-1', requerido: 10, ultimoPrecio: 10 })],
+      [requerido({ clave: 'tela-1', material: 'Felpa', requerido: 100, precioCatalogo: 20 })],
+      [ligada({ clave: 'tela-1', cantidad: 100, precio: 0 })],
+    );
+    expect(r.tela).toBe(0);
+    expect(r.hayCompras).toBe(true);
+    expect(r.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(true);
+    // Y además: se requiere y su costo quedó en cero.
+    expect(r.avisos.some((a) => a.includes('quedó en CERO'))).toBe(true);
+    esperarAvisosSinDinero(r);
+  });
+
+  it('un material con requerido > 0 y costo CERO (catálogo en cero) avisa', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', material: 'Manta', requerido: 100, precioCatalogo: 0 })],
+      [],
+    );
+    expect(r.tela).toBe(0);
+    expect(r.materiales[0]?.origenPrecio).toBe('catalogo');
+    expect(r.avisos.some((a) => a.includes('quedó en CERO'))).toBe(true);
+  });
+
+  it('avisa cuando el real queda por debajo de la MITAD del teórico del mismo componente', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 4, precioCatalogo: 20 })],
+      [],
+      { teorico: { tela: 2000, avios: 0 } },
+    );
+    expect(r.tela).toBe(400); // menos de la mitad de 2,000
+    expect(r.avisos.some((a) => a.includes('TELA') && a.includes('MITAD'))).toBe(true);
+    esperarAvisosSinDinero(r);
+  });
+
+  it('NO avisa cuando el real es solo un poco menor que el teórico (buen precio negociado)', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 15, precioCatalogo: 20 })],
+      [],
+      { teorico: { tela: 2000, avios: 0 } },
+    );
+    expect(r.tela).toBe(1500);
+    expect(r.avisos).toEqual([]);
+  });
+
+  it('compras LIBRES: se reportan aparte, NO entran al total, y avisan SIN decir el monto', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10, ultimoPrecio: 10, precioCatalogo: 10 })],
       [
         ligada({
           clave: 'libre:Flete',
@@ -278,11 +389,14 @@ describe('combinarCostoReal — casos que NO se callan (avisos)', () => {
     expect(r.hayCompras).toBe(false); // una compra libre no habilita el default del real
     expect(r.avisos.some((a) => a.includes('LIBRE'))).toBe(true);
     expect(r.materiales.find((m) => m.tipo === 'libre')?.importe).toBe(0);
+    // El monto del flete NO puede aparecer en el texto (fuga del gate de importes).
+    expect(r.avisos.join(' ')).not.toContain('850');
+    esperarAvisosSinDinero(r);
   });
 
   it('compra de un material FUERA del requerido: su compra SÍ entra al costo, con aviso', () => {
     const r = combinarCostoReal(
-      [requerido({ clave: 'tela-1', requerido: 10, ultimoPrecio: 10 })],
+      [requerido({ clave: 'tela-1', requerido: 10, ultimoPrecio: 10, precioCatalogo: 10 })],
       [
         ligada({
           clave: 'avio-77',
@@ -300,6 +414,35 @@ describe('combinarCostoReal — casos que NO se callan (avisos)', () => {
     expect(r.total).toBe(300);
     expect(r.hayCompras).toBe(true);
     expect(r.avisos.some((a) => a.includes('Etiqueta especial'))).toBe(true);
+  });
+
+  it('no repite el aviso genérico si el lector ya declaró el material como NO costeable', () => {
+    const r = combinarCostoReal(
+      [],
+      [
+        ligada({
+          clave: 'avio-77',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 77,
+          material: 'Bolsa de empaque',
+          cantidad: 10,
+          precio: 2,
+        }),
+      ],
+      {
+        clavesNoCosteables: new Set(['avio-77']),
+        avisosPrevios: ['«Bolsa de empaque» viene de la explosión pero no es de costo.'],
+      },
+    );
+    expect(r.avios).toBe(20); // su compra SÍ cuenta (dinero gastado en la orden)
+    expect(r.avisos).toHaveLength(1); // solo el aviso del lector, sin el genérico duplicado
+    expect(r.avisos[0]).toContain('Bolsa de empaque');
+  });
+
+  it('arrastra los avisos que trae el lector de BD (escalado del MRP, factores de conversión)', () => {
+    const r = combinarCostoReal([], [], { avisosPrevios: ['aviso del lector'] });
+    expect(r.avisos).toEqual(['aviso del lector']);
   });
 
   it('orden sin requerido y sin compras: todo en cero, sin avisos y sin default de real', () => {
@@ -322,9 +465,50 @@ describe('combinarCostoReal — casos que NO se callan (avisos)', () => {
     expect(r.avisos).toEqual([]);
     expect(r.materiales[0]?.origenPrecio).toBe('sin-precio');
   });
+
+  it('NINGÚN aviso lleva un importe, ni con todos los casos disparados a la vez', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({ clave: 'tela-1', material: 'Felpa', requerido: 100, precioCatalogo: 12.75 }),
+        requerido({ clave: 'tela-2', idTela: 2, material: 'Rib', requerido: 40 }),
+        requerido({
+          clave: 'avio-3',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 3,
+          material: 'BOT — Botón',
+          requerido: 200,
+          precioCatalogo: 0,
+        }),
+      ],
+      [
+        ligada({ clave: 'tela-1', cantidad: 10, precio: 0 }),
+        ligada({
+          clave: 'libre:Flete',
+          tipo: 'libre',
+          idTela: null,
+          material: 'Flete',
+          cantidad: 1,
+          precio: 1234.56,
+        }),
+        ligada({
+          clave: 'avio-99',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 99,
+          material: 'Extra',
+          cantidad: 3,
+          precio: 99.99,
+        }),
+      ],
+      { teorico: { tela: 100000, avios: 100000 }, avisosPrevios: ['aviso previo del lector'] },
+    );
+    expect(r.avisos.length).toBeGreaterThan(5);
+    esperarAvisosSinDinero(r);
+  });
 });
 
-describe('combinarCostoReal — unidades y redondeo', () => {
+describe('combinarCostoReal — unidades, redondeo y datos repetidos', () => {
   it('resta del requerido la cantidad ya CONVERTIDA a unidad de consumo (R1)', () => {
     // 2 cajas × 144 pzas = 288 pzas de consumo; el importe (2 × $720) NO cambia al convertir.
     const r = combinarCostoReal(
@@ -362,8 +546,71 @@ describe('combinarCostoReal — unidades y redondeo', () => {
   it('redondea los importes a 2 decimales (sin artefactos de float)', () => {
     const r = combinarCostoReal(
       [requerido({ clave: 'tela-1', requerido: 3, ultimoPrecio: 0.1 })],
-      [ligada({ clave: 'tela-1', cantidad: 0, precio: 0 })],
+      [],
     );
     expect(r.tela).toBe(0.3);
+  });
+
+  it('el DESGLOSE cuadra con el encabezado al centavo (compras → material → total)', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({ clave: 'tela-1', requerido: 10, ultimoPrecio: 0.335, precioCatalogo: 1 }),
+        requerido({
+          clave: 'avio-2',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 2,
+          requerido: 7,
+          ultimoPrecio: 0.005,
+        }),
+      ],
+      [
+        ligada({ clave: 'tela-1', cantidad: 3, precio: 0.335 }),
+        ligada({ clave: 'tela-1', cantidad: 3, precio: 0.335 }),
+      ],
+    );
+
+    for (const m of r.materiales) {
+      // Cada material: sus compras suman su importe directo, y directo + valuado = su importe.
+      expect(m.compras.reduce((s, c) => s + c.importe, 0)).toBeCloseTo(m.importeDirecto, 10);
+      expect(m.importeDirecto + m.importeValuado).toBeCloseTo(m.importe, 10);
+    }
+    // El encabezado: tela + avíos = total, y Σ de los materiales = total.
+    expect(r.tela + r.avios).toBeCloseTo(r.total, 10);
+    const sumaMateriales = r.materiales
+      .filter((m) => m.tipo !== 'libre')
+      .reduce((s, m) => s + m.importe, 0);
+    expect(sumaMateriales).toBeCloseTo(r.total, 10);
+  });
+
+  it('FUSIONA requeridos repetidos del mismo material (RequerimientoOrden no tiene @@unique)', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({ clave: 'tela-1', requerido: 60, ultimoPrecio: 10 }),
+        requerido({ clave: 'tela-1', requerido: 40, ultimoPrecio: 10 }),
+      ],
+      [],
+    );
+    expect(r.materiales).toHaveLength(1);
+    expect(r.materiales[0]?.requerido).toBe(100);
+    expect(r.tela).toBe(1000);
+  });
+
+  it('la fusión conserva el marcado de genérico si cualquiera de las filas lo trae', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({ clave: 'avio-1', tipo: 'avio', idTela: null, idAvio: 1, requerido: 5 }),
+        requerido({
+          clave: 'avio-1',
+          tipo: 'avio',
+          idTela: null,
+          idAvio: 1,
+          requerido: 5,
+          esGenerico: true,
+        }),
+      ],
+      [],
+    );
+    expect(r.materiales[0]?.esGenerico).toBe(true);
   });
 });
