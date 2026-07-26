@@ -353,23 +353,73 @@ export const esquemaCostoOrdenSalida = z
 /** Forma del costo de una orden. */
 export type CostoOrdenSalida = z.infer<typeof esquemaCostoOrdenSalida>;
 
-/** Cuerpo para GUARDAR/ajustar el costo de una orden (PUT). */
+/**
+ * Cuerpo para GUARDAR/ajustar el costo de una orden (PUT).
+ *
+ * SEMÁNTICA DE LOS CAMPOS OPCIONALES (26-jul-2026): **omitir = CONSERVAR** lo ya guardado (o caer al
+ * valor propuesto si es el primer costeo); **`null` = BORRAR** el componente. `baseProrrateo` es la
+ * ÚNICA excepción: tiene default, así que omitirla la manda a `cortado`.
+ */
 export const esquemaCostoOrdenGuardarCuerpo = z
   .object({
-    telaCost: z.number().min(0).nullable().optional().describe('Tela guardada (≥0) o null.'),
+    telaCost: z
+      .number()
+      .min(0)
+      .nullable()
+      .optional()
+      .describe(
+        'Tela guardada (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real ' +
+          'de compras si la orden tiene compras, y si no el teórico). `null` = borrar.',
+      ),
     procesosCost: z
       .number()
       .min(0)
       .nullable()
       .optional()
-      .describe('Procesos guardados (≥0) o null.'),
-    aviosCost: z.number().min(0).nullable().optional().describe('Avíos guardados (≥0) o null.'),
-    otros: z.number().min(0).nullable().optional().describe('Otros costos (≥0) o null.'),
-    descOtros: z.string().trim().max(200).nullable().optional().describe('Descripción de otros.'),
-    baseProrrateo: esquemaBaseProrrateo.default('cortado').describe('Base de prorrateo.'),
-    observaciones: z.string().trim().max(500).nullable().optional().describe('Observaciones.'),
+      .describe(
+        'Procesos guardados (≥0). OMITIR = conservar lo ya guardado (o el teórico en el primer ' +
+          'costeo: los procesos no se compran con OC). `null` = borrar.',
+      ),
+    aviosCost: z
+      .number()
+      .min(0)
+      .nullable()
+      .optional()
+      .describe(
+        'Avíos guardados (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real ' +
+          'de compras si la orden tiene compras, y si no el teórico). `null` = borrar.',
+      ),
+    otros: z
+      .number()
+      .min(0)
+      .nullable()
+      .optional()
+      .describe('Otros costos (≥0). OMITIR = conservar lo ya guardado. `null` = borrar.'),
+    descOtros: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .optional()
+      .describe('Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar.'),
+    baseProrrateo: esquemaBaseProrrateo
+      .default('cortado')
+      .describe(
+        'Base de prorrateo. ÚNICA EXCEPCIÓN a "omitir = conservar": tiene default, así que ' +
+          'OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.',
+      ),
+    observaciones: z
+      .string()
+      .trim()
+      .max(500)
+      .nullable()
+      .optional()
+      .describe('Observaciones. OMITIR = conservar lo ya guardado. `null` = borrar.'),
   })
-  .describe('Componentes guardados del costo de una orden (el total lo arma el servidor).');
+  .describe(
+    'Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un ' +
+      'componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default).',
+  );
 
 /** Cuerpo para guardar el costo de una orden. */
 export type CostoOrdenGuardarCuerpo = z.infer<typeof esquemaCostoOrdenGuardarCuerpo>;

@@ -134,7 +134,11 @@ costo real del material  =  IMPORTE DIRECTO  +  IMPORTE VALUADO
   previo intacto). `procesosCost` sigue al teórico. El usuario siempre puede teclear su valor. Y si la
   orden **ya estaba costeada**, **omitir** un componente lo **CONSERVA** (para borrarlo hay que mandar
   `null` explícito) — antes omitirlo lo pisaba con el default. Aplica igual a
-  `otros`/`descOtros`/`observaciones`.
+  `otros`/`descOtros`/`observaciones`. **`baseProrrateo` es la ÚNICA excepción**: su Zod trae
+  `.default('cortado')`, así que nunca llega `undefined` al dominio y **omitirla la resetea a
+  `cortado`**, cambiando el costo unitario (el total no se mueve; el divisor sí). Se dejó así a
+  propósito — cambiarla a `.optional()` sería un cambio de contrato y hoy la UI la manda siempre y el
+  ETL usa el default a conciencia; hay que revisarlo si algún día se expone un PATCH parcial.
 - **Trazabilidad:** el real se **congela** al guardar en `CostoOrden.telaReal`/`aviosReal` (columnas
   nuevas, nullable ⇒ NULL en todo lo costeado antes; **no** entran a `costoTotal`) y
   `GET /api/costos/ordenes/{idOrden}/real` devuelve el **desglose por material**: qué se compró, a qué

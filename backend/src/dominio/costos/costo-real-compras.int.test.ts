@@ -447,6 +447,19 @@ describe('costoRealOrden — el requerido va SIEMPRE en la base del COSTEO (piez
     expect(real.avisos.some((a) => a.includes('Botón') && a.includes('explosión'))).toBe(true);
   });
 
+  it('si la explosión no aporta NINGÚN material costeable, la base se reporta como `receta`', async () => {
+    // Toda la receta se desmarca de costo salvo la tela, y el snapshot se queda solo con avíos:
+    // ningún renglón del snapshot es `paraCosto` ⇒ el 100 % del requerido salió de la receta.
+    await cliente.requerimientoOrden.deleteMany({ where: { idOrden, idTela } });
+    await cliente.modeloAvio.updateMany({ where: { idModelo }, data: { paraCosto: false } });
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.origenRequerido).toBe('receta'); // NO 'snapshot-mrp': sería una etiqueta optimista
+    expect(real.materiales.find((m) => m.idTela === idTela)?.requerido).toBe(200);
+    // Y no se habla de "ajustar la explosión" cuando la explosión no aportó nada.
+    expect(real.avisos.some((a) => a.includes('CORTADAS'))).toBe(false);
+  });
+
   it('un material del snapshot que NO es `paraCosto` no se valúa, pero su compra sí cuenta', async () => {
     await cliente.modeloAvio.updateMany({
       where: { idModelo, idAvio },

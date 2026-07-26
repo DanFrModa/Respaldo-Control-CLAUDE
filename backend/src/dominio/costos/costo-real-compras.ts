@@ -895,21 +895,7 @@ async function armarRequerido(
 
   // ── Con explosión: se ESCALA de piezas PEDIDAS (su base, `mrp.ts`) a piezas CORTADAS ────────────
   const piezasSnapshot = cant.pedido;
-  let escala = 1;
-  if (piezasSnapshot > 0) {
-    escala = piezasBase / piezasSnapshot;
-    if (Math.abs(escala - 1) > TOLERANCIA) {
-      avisos.push(
-        `La explosión de materiales se calculó sobre las piezas PEDIDAS y el costo se prorratea ` +
-          `sobre las CORTADAS: el consumo requerido se ajustó a esa proporción.`,
-      );
-    }
-  } else if (piezasBase > 0) {
-    avisos.push(
-      `No se pudo ajustar la explosión de materiales a las piezas cortadas (la orden no tiene ` +
-        `matriz de tallas): se usó el consumo de la explosión tal cual.`,
-    );
-  }
+  const escala = piezasSnapshot > 0 ? piezasBase / piezasSnapshot : 1;
 
   // Suma el snapshot por material (no hay índice único que lo garantice) y descarta lo no costeable.
   const requeridoSnapshot = new Map<string, { cantidad: number; unidad: string | null }>();
@@ -933,6 +919,24 @@ async function armarRequerido(
       cantidad: (previo?.cantidad ?? 0) + num(r.cantidadRequerida),
       unidad: previo?.unidad ?? r.unidad,
     });
+  }
+
+  // Los avisos del ESCALADO solo tienen sentido si el snapshot aportó algo costeable (si no aportó
+  // nada, ningún requerido salió de él y hablar de "ajustar la explosión" sería mentira).
+  if (requeridoSnapshot.size > 0) {
+    if (piezasSnapshot > 0) {
+      if (Math.abs(escala - 1) > TOLERANCIA) {
+        avisos.push(
+          `La explosión de materiales se calculó sobre las piezas PEDIDAS y el costo se prorratea ` +
+            `sobre las CORTADAS: el consumo requerido se ajustó a esa proporción.`,
+        );
+      }
+    } else if (piezasBase > 0) {
+      avisos.push(
+        `No se pudo ajustar la explosión de materiales a las piezas cortadas (la orden no tiene ` +
+          `matriz de tallas): se usó el consumo de la explosión tal cual.`,
+      );
+    }
   }
 
   const filas = bom.map((b) => {
@@ -959,7 +963,12 @@ async function armarRequerido(
   });
 
   return {
-    origen: filas.length === 0 ? 'sin-requerido' : 'snapshot-mrp',
+    // HONESTIDAD DE LA ETIQUETA: `snapshot-mrp` solo si el snapshot APORTÓ al menos un material
+    // costeable. Que exista `RequerimientoOrden` no basta: si la reconciliación lo descartó entero
+    // (ningún material suyo es `paraCosto`), el 100 % del requerido salió de la receta y eso es lo
+    // que hay que decir — la pantalla lo muestra al usuario como "de dónde salió la base".
+    origen:
+      filas.length === 0 ? 'sin-requerido' : requeridoSnapshot.size > 0 ? 'snapshot-mrp' : 'receta',
     piezasBase,
     filas,
     clavesNoCosteables,

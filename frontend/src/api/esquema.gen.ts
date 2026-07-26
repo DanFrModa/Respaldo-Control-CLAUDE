@@ -60845,27 +60845,27 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). */
+      /** @description Componentes guardados del costo de una orden (el total lo arma el servidor). Omitir un componente lo CONSERVA; mandar `null` lo borra; `baseProrrateo` es la excepción (default). */
       requestBody: {
         content: {
           'application/json': {
-            /** @description Tela guardada (≥0) o null. */
+            /** @description Tela guardada (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar. */
             telaCost?: number | null;
-            /** @description Procesos guardados (≥0) o null. */
+            /** @description Procesos guardados (≥0). OMITIR = conservar lo ya guardado (o el teórico en el primer costeo: los procesos no se compran con OC). `null` = borrar. */
             procesosCost?: number | null;
-            /** @description Avíos guardados (≥0) o null. */
+            /** @description Avíos guardados (≥0). OMITIR = conservar lo ya guardado (o, en el primer costeo, el real de compras si la orden tiene compras, y si no el teórico). `null` = borrar. */
             aviosCost?: number | null;
-            /** @description Otros costos (≥0) o null. */
+            /** @description Otros costos (≥0). OMITIR = conservar lo ya guardado. `null` = borrar. */
             otros?: number | null;
-            /** @description Descripción de otros. */
+            /** @description Descripción de otros. OMITIR = conservar lo ya guardado. `null` = borrar. */
             descOtros?: string | null;
             /**
-             * @description Base de prorrateo.
+             * @description Base de prorrateo. ÚNICA EXCEPCIÓN a "omitir = conservar": tiene default, así que OMITIRLA la deja en `cortado` y con ello cambia el costo unitario. Mándala siempre.
              * @default cortado
              * @enum {string}
              */
             baseProrrateo?: 'cortado' | 'recibido' | 'vendido';
-            /** @description Observaciones. */
+            /** @description Observaciones. OMITIR = conservar lo ya guardado. `null` = borrar. */
             observaciones?: string | null;
           };
         };

@@ -286,8 +286,19 @@ export interface OpcionesGuardarCosto {
  *    SIEMPRE al teórico (los procesos no se compran con OC de material).
  * Lo mismo aplica a `otros`/`descOtros`/`observaciones`: omitir = conservar; `null` = borrar.
  *
+ * ⚠️ **`baseProrrateo` es la ÚNICA excepción a "omitir = conservar"**, y es a propósito: su esquema
+ * Zod trae `.default('cortado')`, así que NUNCA llega `undefined` al dominio — un PUT que la omita
+ * la manda a `cortado` y con eso **cambia el costo unitario** (el total no se mueve; el divisor sí).
+ * No se convirtió a `.optional()` porque eso sería un cambio de CONTRATO (hoy la respuesta garantiza
+ * que `baseProrrateo` siempre viene) y ningún llamador lo necesita: la UI la manda siempre y el ETL
+ * de migración deja adrede el default. Si algún día se expone un PATCH parcial, esto hay que
+ * revisarlo primero.
+ *
  * El objeto de salida se arma con lo que esta misma función ya leyó/escribió: **no se recalcula** el
- * costo real para responder.
+ * costo real para responder. Consecuencia deliberada: a diferencia de antes (cuando el retorno
+ * pasaba por `obtenerCostoOrden`), aquí **ya NO se re-verifica `costos.ver`** — se considera
+ * implicado por `costos.capturar` (quien captura, ve lo que captura), la ruta ya exige
+ * `costos.capturar` (A4) y el ocultamiento de importes sigue gobernado por `consultas.ver-importes`.
  */
 export async function guardarCostoOrden(
   sesion: SesionUsuario,
