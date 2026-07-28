@@ -12,6 +12,7 @@ import { ErrorDeApi } from './errores';
 import type {
   CostoOrden,
   CostoOrdenGuardar,
+  CostoRealOrden,
   ListaCostos,
   ListaCostosQuery,
   ListaPrecios,
@@ -84,6 +85,29 @@ export function useCostoOrden(idOrden: number | null): UseQueryResult<CostoOrden
     queryKey: [...CLAVE_COSTOS, 'orden', idOrden],
     queryFn: () => obtenerCostoOrden(idOrden as number),
     enabled: idOrden !== null,
+  });
+}
+
+async function obtenerCostoRealOrden(idOrden: number): Promise<CostoRealOrden> {
+  const { data, error } = await api.GET('/api/costos/ordenes/{idOrden}/real', {
+    params: { path: { idOrden } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * DESGLOSE del costo REAL de materiales de una orden (qué se compró, a quién, a qué precio y qué se
+ * valuó a último precio de compra). Se pide BAJO DEMANDA: solo cuando el usuario abre el desglose.
+ */
+export function useCostoRealOrden(
+  idOrden: number | null,
+  habilitado: boolean,
+): UseQueryResult<CostoRealOrden, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_COSTOS, 'orden-real', idOrden],
+    queryFn: () => obtenerCostoRealOrden(idOrden as number),
+    enabled: idOrden !== null && habilitado,
   });
 }
 
