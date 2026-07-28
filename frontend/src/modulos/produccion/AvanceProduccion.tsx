@@ -37,6 +37,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
+import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -157,7 +158,8 @@ export interface PropsAvanceProduccion {
 
 /**
  * Panel de AVANCE de una orden, a pantalla completa (proto `#procScrim`/`#procPanel`). Se cierra
- * con Esc, el botón ✕ o el clic en el fondo.
+ * con Esc, el botón ✕, el clic en el fondo o el "atrás" del teléfono (el panel no es una ruta:
+ * sin eso el "regresar" del celular sacaría al usuario del Centro de Órdenes).
  */
 export function AvanceProduccion({
   idOrden,
@@ -165,6 +167,8 @@ export function AvanceProduccion({
   alCerrar,
 }: PropsAvanceProduccion): React.JSX.Element {
   const { tienePermiso } = useSesion();
+  // El panel solo existe montado (el llamador lo renderiza condicionalmente): siempre está abierto.
+  useCerrarConAtras(true, alCerrar);
   const queryClient = useQueryClient();
 
   const orden = useOrden(idOrden);

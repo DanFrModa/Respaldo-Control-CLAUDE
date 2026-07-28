@@ -888,3 +888,71 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
   `png.test.ts` + `empresas-logo.test.ts` (los PNG malos) · `cache-documentos.test.ts` +
   `auditorias.int.test.ts` + `logo.rutas.test.ts` (no-store sí, logo no) ·
   `CentroOrdenesPagina.test.tsx` / `DialogoOrden.test.tsx` (el "Falta: …").
+
+---
+
+## 2026-07-28 — En el CELULAR: "regresar" vuelve al listado + el botón de avance ya sirve
+
+Daniel: *"Si estoy en OC, y me meto al detalle de una en el celular, le doy regresar y me manda a
+la página de almacenes. Debería de regresar al listado de órdenes. Y ahí mismo el botón de avances
+de producción no sirve."*
+
+Dos cosas distintas, las dos **solo en el teléfono** y las dos en `Órdenes de producción`
+(`/produccion/ordenes`, `CentroOrdenesPagina`). No se tocó nada del backend.
+
+### A) El "regresar" del teléfono te sacaba de la pantalla
+
+En el celular el detalle de la orden **no es una página aparte**: es un **cajón** que se desliza
+encima del listado. El navegador no sabe nada de ese cajón, así que el botón "atrás" del teléfono
+hacía lo único que sabe hacer —retroceder a la pantalla anterior— y te sacaba de Órdenes (a Almacenes,
+o a donde hubieras estado antes). Lo natural es lo contrario: **el "atrás" cierra el cajón y te deja
+en el listado**, que es justo lo que hay debajo.
+
+- Mientras el cajón está abierto, el sistema **le reserva un lugar en el historial** del navegador
+  (misma pantalla, misma dirección: no hay navegación ni parpadeo). El "atrás" gasta ese lugar y lo
+  único que pasa es que **el cajón se cierra**. Si cierras con la ✕, con Esc o tocando afuera, el
+  lugar se devuelve solo.
+- Aplica a **todas las pantallas** que usan el cajón de detalle (Órdenes, Pedidos, Modelos,
+  Clientes, Proveedores, Compras, Notas de salida, Calidad, Usuarios, Roles, Bitácora, CxC, CxP…),
+  no solo a Órdenes: era el mismo problema en todas.
+- También aplica al **panel de "Avance de producción"** a pantalla completa, que tenía el mismo
+  defecto.
+- Con **dos cajones encimados** (el detalle de la orden y, sobre él, "Avíos" o "Ruta crítica"), el
+  "atrás" cierra **solo el de encima** y te deja en el de abajo.
+- **En la computadora** el comportamiento también cambia, y para bien: el botón "Atrás" del
+  navegador ahora **cierra el cajón** en vez de salirse de la pantalla.
+- Lo que **no** cambia (y es a propósito): si con el cajón abierto te vas a otro módulo desde un
+  mosaico del propio detalle (Modelo, Avíos, Notas, O.C., Ruta crítica…), eso **sí** es una
+  navegación de verdad y el "atrás" te regresa a Órdenes, como debe ser. Nunca se deshace una
+  navegación que el usuario pidió.
+
+### B) El botón "Registrar avance de producción" no hacía nada
+
+No estaba muerto: **se abría por debajo del cajón**. El cajón se dibuja "por encima de todo", y el
+panel de avance se dibuja dentro de la página, así que el panel quedaba tapado y los toques caían en
+el cajón. Ese cuidado ya existía para el botón **Modificar** (cierra el cajón antes de abrir el
+diálogo), pero al avance se le había pasado.
+
+- Ahora **abrir el avance cierra el cajón**, así que el panel queda al frente y usable.
+- Se puso en la función que abre el avance —no en el botón— para que cubra **todas las formas de
+  entrar**: el botón del detalle y el **doble clic** sobre un renglón de la lista (o sobre una
+  tarjeta, en móvil).
+
+### Nota de despliegue (para Gabriel)
+
+**Nada que hacer.** Es un cambio de puro frontend: **sin migración**, **sin permisos nuevos** (→ no
+hace falta `SEED_ON_START`) y **sin scripts que correr**. Conviene refrescar una vez con
+**Ctrl+Shift+R** para soltar el JavaScript viejo que el navegador tenga guardado.
+
+### Archivos tocados
+
+- **Frontend (nuevos):** `src/lib/useCerrarConAtras.ts` (el motor: le reserva su lugar en el
+  historial a cada capa abierta y lo empareja solo) + `src/lib/useCerrarConAtras.test.tsx`.
+- **Frontend (modificados):** `src/components/dominio/CajonDetalle.tsx` (el cajón que usan las 17
+  pantallas) · `src/modulos/produccion/AvanceProduccion.tsx` (el panel a pantalla completa) ·
+  `src/modulos/ordenes/CentroOrdenesPagina.tsx` (abrir el avance cierra el cajón).
+- **Pruebas:** `useCerrarConAtras.test.tsx` (10 casos: el "atrás" cierra en vez de salirse, cajones
+  encimados, cerrar por la UI devuelve el lugar, cerrar dos a la vez, cerrar uno y abrir otro en el
+  mismo instante —el caso del botón de avance—, modo estricto de desarrollo, el deep-link que limpia
+  su estado, no deshacer una navegación legítima y el lugar huérfano que se salta solo) ·
+  `CentroOrdenesPagina.test.tsx` (en móvil, abrir el avance cierra el cajón).
