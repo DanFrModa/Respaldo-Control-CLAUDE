@@ -7,6 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 
 /** Ancho máximo del cajón — la elección la manda el CONTENIDO, no la pantalla. */
@@ -36,8 +37,10 @@ const CLASES_ANCHO: Record<AnchoCajon, string> = {
  * y el detalle del renglon elegido se asoma sin navegar.
  *
  * Controlado por el llamador (`abierto`/`alCambiarAbierto`); el contenido lo
- * arma cada pantalla (secciones, chips, tablas). Cerrar: la X del sheet, Esc o
- * clic fuera.
+ * arma cada pantalla (secciones, chips, tablas). Cerrar: la X del sheet, Esc,
+ * clic fuera o el botón "atrás" del teléfono (ver `useCerrarConAtras`: el cajón
+ * no es una ruta, así que sin eso el "regresar" del celular sacaba al usuario de
+ * la pantalla en vez de devolverlo a la lista que está debajo).
  *
  * El `ancho` lo decide el CONTENIDO: `normal` para VER un detalle simple (default),
  * `amplio` / `maximo` para contenido denso o de edición (tablas, matrices,
@@ -66,6 +69,9 @@ export function CajonDetalle({
   /** Ancho del cajón según su contenido (ver `CLASES_ANCHO`). Default `normal`. */
   ancho?: AnchoCajon;
 }): React.JSX.Element {
+  // El "atrás" del teléfono cierra el cajón en vez de salirse de la pantalla.
+  useCerrarConAtras(abierto, () => alCambiarAbierto(false));
+
   return (
     <Sheet open={abierto} onOpenChange={alCambiarAbierto}>
       <SheetContent

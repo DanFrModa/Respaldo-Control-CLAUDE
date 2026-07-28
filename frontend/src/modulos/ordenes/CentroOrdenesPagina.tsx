@@ -251,6 +251,11 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
   function abrirAvance(fila: { id: number; folioPedido: number | null }): void {
     setAvanceDe({ id: fila.id, folioPedido: fila.folioPedido });
+    // En móvil el detalle vive en el cajón (Sheet PORTALIZADO al body, por encima del panel de
+    // avance, que se pinta en línea): sin cerrarlo, el botón "no hacía nada" porque el panel abría
+    // DEBAJO del cajón (reporte de Daniel, jul-2026). Mismo motivo que `alModificar`. Va aquí y no
+    // en el llamador para cubrir TODAS las entradas (botón del detalle + doble clic de la lista).
+    setCajonAbierto(false);
   }
 
   function alClicFila(fila: OrdenCentro): void {

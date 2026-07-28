@@ -65,6 +65,10 @@ vi.mock('@/api/ordenes-consulta', () => ({
 // Paneles pesados del detalle: no intervienen en estas pruebas.
 vi.mock('./PanelPreciosOrden', () => ({ PanelPreciosOrden: () => null }));
 vi.mock('@/modulos/ruta-critica/PanelRutaOrden', () => ({ PanelRutaOrden: () => null }));
+// El panel de avance se simula: aquí solo importa DÓNDE se abre, no su contenido.
+vi.mock('@/modulos/produccion/AvanceProduccion', () => ({
+  AvanceProduccion: () => <div data-testid="avance-produccion">Avance</div>,
+}));
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 function fila(id: number, folio: number): OrdenCentro {
@@ -370,5 +374,39 @@ describe('<CentroOrdenesPagina>', () => {
     await usuario.click(screen.getByTestId('centro-filtro-mes-limpiar'));
     expect(select).toHaveValue('');
     expect(screen.queryByTestId('centro-filtro-mes-limpiar')).not.toBeInTheDocument();
+  });
+
+  // En móvil el detalle vive en el CAJÓN (Sheet portalizado al body), y el panel de avance se pinta
+  // EN LÍNEA dentro de la página: con el cajón abierto quedaba tapado y el botón "no servía"
+  // (reporte de Daniel, jul-2026). Abrir el avance tiene que cerrar el cajón.
+  it('en móvil abrir el avance CIERRA el cajón (si no, el panel quedaba debajo)', async () => {
+    const usuario = userEvent.setup();
+    const anchoReal = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { value: 500, writable: true, configurable: true });
+    try {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+      // Tocar el renglón abre el cajón (pantalla angosta).
+      await usuario.click(screen.getAllByTestId('centro-fila')[0] as HTMLElement);
+      expect(document.querySelector('[data-slot="cajon-detalle"]')).not.toBeNull();
+
+      // El botón del detalle DENTRO del cajón: abre el avance y deja el cajón cerrado.
+      const botones = screen.getAllByTestId('centro-registrar-avance');
+      const enElCajon = botones.find((b) => b.closest('[data-slot="cajon-detalle"]') !== null);
+      expect(enElCajon).toBeDefined();
+      await usuario.click(enElCajon as HTMLElement);
+
+      expect(screen.getByTestId('avance-produccion')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(document.querySelector('[data-slot="cajon-detalle"]')).toBeNull();
+      });
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        value: anchoReal,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 });
