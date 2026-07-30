@@ -675,3 +675,14 @@ Cómo quedó resuelto (motor `backend/src/dominio/costos/costo-real-compras.ts`)
 - **NO se tocó el EDR** (sigue recalculando desde `CostoOrden` al leer, D1) ni la regla del estado "completa" de la orden ni el MRP.
 - **Aplica en:** rama `claude/costo-real-oc`; motor `backend/src/dominio/costos/costo-real-compras.ts`; endpoint `GET /api/costos/ordenes/{idOrden}/real`; migración `20260726140000_costo_orden_real_compras` (aditiva, sin permisos nuevos ni re-seed).
 - **Fecha:** 2026-07-26.
+
+#### (Post-F9.6) — Los campos numéricos NO se incrementan con el mouse ni con las flechas (DANIEL, 28-jul-2026)
+
+Daniel, revisando la captura del avance de producción (WIP): *"En general en todos los campos para meter datos de corte, maquilas, incluso en la OP… pones una casilla con flechitas arriba y abajo para ir aumentando con el mouse… no funciona. Siempre se van a meter escribiendo o copiando los datos. Nunca se usarán esas flechitas. Quítalas por favor."*
+
+- **Regla de UI, GLOBAL:** ningún campo numérico del sistema ofrece incremento por gesto. Las cantidades se **teclean o se pegan**, siempre. Aplica a los ~123 campos `number` (captura de corte/maquilas/recibos/entregas, matriz color×talla, precios, cantidades, configuración), no solo a los de producción.
+- **Se apagan los TRES caminos del mismo control**, no solo el que se ve: (1) el **widget de flechitas**, con CSS; (2) la **rueda del mouse** sobre el campo enfocado; (3) las **flechas ↑/↓** del teclado. Los dos últimos son los peligrosos porque cambian la cantidad **en silencio** — el usuario creía estar haciendo scroll, o bajando al siguiente renglón de la matriz. El de las flechas **ya mordía**: la matriz de captura mueve el foco con ↑/↓ y solo cancelaba el incremento cuando había celda destino, así que en el **último renglón** un ↓ por costumbre dejaba 120 en 119 (hallazgo del reviewer, 28-jul).
+- **Los campos siguen siendo `type="number"`** (no se pasaron a texto): eso conserva el **teclado numérico en el celular** y la validación del navegador. Lo único que se apaga es el incremento por gesto.
+- **Trade-off aceptado en la rueda:** se le quita el **foco** al campo en vez de cancelar el evento, porque cancelarlo apagaría también el **scroll de la página** mientras el puntero esté encima de la celda — y quien gira la rueda quiere scrollear. El costo es que el siguiente **Tab** arranca desde el principio del documento; en las matrices se navega con ↑/↓ y con clic, no con Tab, y se recupera con un clic. Perder la posición del Tab se ve; una cantidad cambiada en silencio, no.
+- **Aplica en:** rama `claude/cambios-prueba-xv95r8`; CSS en `frontend/src/index.css` (`@layer base`) + guarda global `frontend/src/lib/sin-incrementos-numericos.ts` (instalada en `main.tsx`). Frontend-only: sin migración, sin permisos, sin seed.
+- **Fecha:** 2026-07-28.
