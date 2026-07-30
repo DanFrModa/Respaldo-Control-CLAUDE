@@ -1105,3 +1105,67 @@ hace falta `SEED_ON_START`) y **sin scripts que correr**. Conviene refrescar una
   mismo instante —el caso del botón de avance—, modo estricto de desarrollo, el deep-link que limpia
   su estado, no deshacer una navegación legítima y el lugar huérfano que se salta solo) ·
   `CentroOrdenesPagina.test.tsx` (en móvil, abrir el avance cierra el cajón).
+
+---
+
+## 2026-07-28 — Los campos de cantidad ya no se "mueven solos"
+
+Daniel: *"En general en todos los campos para meter datos de corte, maquilas, incluso en la OP…
+pones una casilla con flechitas arriba y abajo para ir aumentando con el mouse… no funciona. Siempre
+se van a meter escribiendo o copiando los datos. Nunca se usarán esas flechitas. Quítalas por
+favor."*
+
+### Qué se quitó
+
+Las **flechitas** desaparecieron de **todos** los campos de cantidad del sistema — son 123, y están
+por todos lados: captura de corte, entrega y recibo de maquila, entrega a cliente, matriz color ×
+talla, precios, cantidades de compra, configuración. No se fue campo por campo: es **una sola regla
+de estilo** aplicada a todo el sistema, así que ninguna pantalla nueva vuelve a traerlas.
+
+Los campos **siguen siendo numéricos**. Eso importa por dos cosas que no se quieren perder: en el
+**celular sigue saliendo el teclado de números** (no el de letras), y el navegador sigue impidiendo
+que se escriban letras donde va una cantidad.
+
+### Y de paso, dos formas de "moverse solo" que nadie había visto
+
+La casilla numérica tiene **tres** maneras de subir o bajar el valor con un gesto, no una. Las otras
+dos no se ven, y son peores porque **cambian la cantidad sin que nadie se dé cuenta**:
+
+1. **La rueda del mouse.** Con el cursor dentro de la casilla, girar la rueda —creyendo que uno está
+   haciendo scroll para ver el resto de la pantalla— **cambiaba el número**. Ya no: al girar la
+   rueda, el campo simplemente suelta el cursor y la página hace scroll normal.
+2. **Las flechas ↑ ↓ del teclado.** En la matriz color × talla las flechas sirven para **bajar al
+   siguiente renglón**, y así se usan. Pero en el **último renglón** no hay a dónde bajar… y ahí la
+   flecha le restaba 1 a la cantidad recién tecleada: quien escribía **120** y bajaba por costumbre
+   se quedaba con **119**, sin ningún aviso. (Lo mismo hacia arriba en el primer renglón, sumando
+   1.) Ya no: las flechas siguen moviendo el cursor entre celdas, pero **nunca tocan la cantidad**.
+
+Este segundo caso **no era nuevo**: llevaba tiempo ahí, y es de los que no se descubren revisando
+pantallas, sino cuadrando un corte que no da. Salió al revisar el cambio de las flechitas.
+
+### Un efecto secundario, a propósito
+
+Cuando se gira la rueda sobre una casilla, esta **suelta el cursor**. Si en ese momento se usara la
+tecla **Tab**, el sistema salta al principio de la pantalla en vez de a la casilla siguiente. Se
+eligió así porque la alternativa era peor: cancelar la rueda **congelaría el scroll** de la página
+mientras el puntero esté sobre la casilla, que es justo lo contrario de lo que uno quiere al girar
+la rueda. En las matrices se avanza con las flechas y con el clic, no con Tab, y se recupera con un
+clic. Si en el uso real estorba, se cambia.
+
+### Nota de despliegue (para Gabriel)
+
+**Nada que hacer.** Frontend puro: **sin migración**, **sin permisos nuevos** (→ no hace falta
+`SEED_ON_START`), sin scripts. Un **Ctrl+Shift+R** la primera vez para soltar el estilo viejo que el
+navegador tenga guardado.
+
+### Archivos tocados
+
+- **Frontend (nuevos):** `src/lib/sin-incrementos-numericos.ts` (la guarda global de la rueda y las
+  flechas) + `src/lib/sin-incrementos-numericos.test.ts` · `e2e/campos-numericos.spec.ts`.
+- **Frontend (modificados):** `src/index.css` (la regla que apaga las flechitas, en la base) ·
+  `src/main.tsx` (instala la guarda).
+- **Pruebas:** 9 unitarias (la rueda solo actúa sobre el campo numérico **enfocado**, no estorba en
+  texto ni en el scroll horizontal; ↑/↓ cancelan el incremento **sin** romper la navegación de la
+  matriz; ←/→ y Enter intactos; instalación idempotente) y **1 e2e en navegador real**, que es la
+  única que puede comprobar que el valor **no se mueve** — el entorno de pruebas unitarias no
+  implementa ni la rueda ni el incremento por flechas.

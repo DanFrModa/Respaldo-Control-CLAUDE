@@ -339,6 +339,31 @@
     @apply font-sans;
   }
 
+  /*
+   * Campos numéricos SIN "flechitas" (petición de Daniel, 28-jul-2026: *"pones una casilla con
+   * flechitas arriba y abajo para ir aumentando con el mouse… no funciona. Siempre se van a meter
+   * escribiendo o copiando los datos. Nunca se usarán esas flechitas"*).
+   *
+   * Va aquí, en la base, y NO campo por campo: son 123 `type="number"` repartidos por todo el
+   * sistema (captura de corte, envío, recibo, matriz color×talla, precios, cantidades…), y un
+   * `type="text"` masivo perdería el teclado numérico del celular y la validación del navegador.
+   * El `type` se conserva; lo único que se apaga es el control de incremento con el mouse.
+   *
+   * Los otros dos caminos del MISMO control —la RUEDA del mouse y las FLECHAS ↑/↓ del teclado, que
+   * cambian el valor sin que nadie lo note— se apagan en JS (`src/lib/sin-incrementos-numericos.ts`):
+   * no hay forma de hacerlo con CSS.
+   */
+  input[type='number'] {
+    appearance: textfield; /* Firefox */
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+
   ::selection {
     background: color-mix(in srgb, var(--primary) 30%, transparent);
   }
