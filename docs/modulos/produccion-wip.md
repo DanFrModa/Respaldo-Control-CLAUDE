@@ -36,7 +36,7 @@ aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
   disponible para ese proceso, suma directa bajo lock). Cancelación SUAVE + motivo + bitácora.
 - `produccion/recibos.ts` (F3-E4) ⭐ — **recibo de maquila**, la etapa CENTRAL: de UNA captura, en UNA
   transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas), la validación
-  `recibido ≤ enviado` (estricto, g), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
+  `recibido ≤ enviado` **POR MAQUILERO** (estricto, g; ver abajo), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
   almacén primeras, segundas→segundas), y un **`EsMaCargo(propuesto)` para TODO proceso** (cantidad
   recibida × precio del envío). Emite evento `recibo-registrado` post-commit (gancho RC F5).
 - `produccion/entregas-cliente.ts` (F3-E5) — **entrega a cliente** (cierre del ciclo): el "gemelo de
@@ -55,9 +55,33 @@ aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
 
 - Por cortar = pedido(orden) − cortado
 - Cortado por enviar = cortado − enviado (por `TipoProceso`)
-- Por recibir = enviado − recibido (por `TipoProceso`)
+- Por recibir = enviado − recibido (por `TipoProceso`, **y desglosado por MAQUILERO**)
 - Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
 - Por entregar = recibido(procesos `generaEntradaPt`) − entregado a cliente
+
+### El saldo del recibo se lleva POR MAQUILERO (regla de Daniel, 28-jul-2026)
+
+*"No puedo recibir un corte de un maquilero diferente al que se lo entregué."* (`DECISIONES.md
+§(Post-F9.7)`.) La invariante del recibo **cambió**: antes era `recibido ≤ enviado` del **proceso
+entero**; ahora es del **tercero**. Con dos maquileros trabajando la misma orden, lo anterior dejaba
+cargarle a uno lo que devolvió el otro y falseaba EsMa y las existencias en poder del maquilero.
+
+- `wip.ts` exporta **`pendientePorMaquilero(cliente, idOrden, idTipoProceso, meta)`**: `enviado −
+  recibido` por tercero y por color×talla, más los totales del proceso PLEGADOS de la misma lectura.
+  Lo consumen el drill-down (`wipDeOrden`) **y** `pendientesPorRecibir` (recibos.ts), para que las
+  DOS pantallas de recibo —el panel de avance y `/produccion/recibos`— ofrezcan y topen lo mismo.
+- Enumera a todo tercero con envío **o** recibo vivo: un maquilero con recibos y sin envío (posible
+  en lo migrado) sale con pendiente NEGATIVO. Si se enumeraran solo los envíos, `Σ porMaquilero ≠
+  totalPendiente` y el drill-down contradiría a "Existencias en poder del maquilero".
+- `registrarReciboMaquila` **re-valida** (una lista filtrada en pantalla se brinca por API): rechaza
+  recibirle a quien no tiene envío vivo —nombrando a quienes sí— y topa contra el saldo de ESE
+  tercero. La liga opcional `idEtapaEnvio` también exige el mismo maquilero.
+- **Histórico migrado sin tercero** (`idTercero` NULL): no hay a quién recibirle, y las dos capas lo
+  DICEN tal cual ("entrega viva SIN maquilero: hay que corregirla antes de recibir") en vez de
+  responder "esta orden no tiene entregas", que era falso.
+- **Guard de cancelación de envío** (`etapas.ts`): sigue bloqueando cancelar un envío con recibos
+  vivos del mismo proceso. Con la regla nueva es MÁS conservador de lo necesario (bloquea el envío
+  de B si A tiene recibos vivos); se conserva a propósito — relajarlo pide su propio análisis.
 
 ## Permisos (RBAC, A4)
 

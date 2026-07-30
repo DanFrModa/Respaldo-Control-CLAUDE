@@ -84736,6 +84736,88 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Total pendiente por recibir de este proceso."
+                          },
+                          "porMaquilero": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idMaquilero": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Maquilero (Proveedor), o null si el histórico migrado no lo trae."
+                                },
+                                "maquilero": {
+                                  "type": "string",
+                                  "description": "Nombre del maquilero (o \"Sin asignar\" en lo migrado sin dato)."
+                                },
+                                "celdas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idColor": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Id del color."
+                                      },
+                                      "color": {
+                                        "type": "string",
+                                        "description": "Nombre del color."
+                                      },
+                                      "idTalla": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Id de la talla."
+                                      },
+                                      "etiquetaTalla": {
+                                        "type": "string",
+                                        "description": "Etiqueta visible de la talla."
+                                      },
+                                      "cantidad": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Pendiente por recibir (enviado − recibido)."
+                                      }
+                                    },
+                                    "required": [
+                                      "idColor",
+                                      "color",
+                                      "idTalla",
+                                      "etiquetaTalla",
+                                      "cantidad"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "description": "enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0)."
+                                },
+                                "totalPendiente": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Total pendiente de ese maquilero (NEGATIVO si recibió sin envío)."
+                                }
+                              },
+                              "required": [
+                                "idMaquilero",
+                                "maquilero",
+                                "celdas",
+                                "totalPendiente"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo)."
                           }
                         },
                         "required": [
@@ -84744,7 +84826,8 @@
                           "codigoProceso",
                           "generaEntradaPt",
                           "celdas",
-                          "totalPendiente"
+                          "totalPendiente",
+                          "porMaquilero"
                         ],
                         "additionalProperties": false
                       },
@@ -88188,6 +88271,88 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Total pendiente de este proceso (derivado)."
+                          },
+                          "porMaquilero": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idMaquilero": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Maquilero (Proveedor), o null si el histórico migrado no lo trae."
+                                },
+                                "maquilero": {
+                                  "type": "string",
+                                  "description": "Nombre del maquilero (o \"Sin asignar\" en lo migrado sin dato)."
+                                },
+                                "celdas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idColor": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Id del color."
+                                      },
+                                      "color": {
+                                        "type": "string",
+                                        "description": "Nombre del color."
+                                      },
+                                      "idTalla": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Id de la talla."
+                                      },
+                                      "etiquetaTalla": {
+                                        "type": "string",
+                                        "description": "Etiqueta visible de la talla."
+                                      },
+                                      "cantidad": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Cantidad (puede ser negativa por sobre-corte)."
+                                      }
+                                    },
+                                    "required": [
+                                      "idColor",
+                                      "color",
+                                      "idTalla",
+                                      "etiquetaTalla",
+                                      "cantidad"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "description": "Celdas pendientes (≠ 0) de ese maquilero."
+                                },
+                                "totalPendiente": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío)."
+                                }
+                              },
+                              "required": [
+                                "idMaquilero",
+                                "maquilero",
+                                "celdas",
+                                "totalPendiente"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso)."
                           }
                         },
                         "required": [
@@ -88196,11 +88361,12 @@
                           "codigoProceso",
                           "generaEntradaPt",
                           "celdas",
-                          "totalPendiente"
+                          "totalPendiente",
+                          "porMaquilero"
                         ],
                         "additionalProperties": false
                       },
-                      "description": "enviado − recibido por proceso, color×talla."
+                      "description": "enviado − recibido por proceso, color×talla, con desglose por maquilero."
                     },
                     "entregadoCeldas": {
                       "type": "array",

@@ -53,6 +53,15 @@ export function aLineasApi(
     .filter((l) => l.tallas.length > 0);
 }
 
+/**
+ * Piezas que de verdad se le pueden recibir a un maquilero: SOLO las celdas positivas. El total
+ * puede dar 0 con celdas +5/−5 (recibo capturado en la talla equivocada en el Access) y entonces
+ * decir "0 pza(s)" sería falso — sí hay 5 por recibir (hallazgo del reviewer).
+ */
+export function piezasPorRecibir(celdas: readonly { cantidad: number }[]): number {
+  return celdas.reduce((s, c) => s + Math.max(0, c.cantidad), 0);
+}
+
 /** Mapa `clave(color:talla) → cantidad` de un arreglo de celdas de pendientes. */
 export function mapaPendiente(
   celdas: readonly { idColor: number; idTalla: number; cantidad: number }[],

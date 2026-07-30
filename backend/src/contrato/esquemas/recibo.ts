@@ -225,6 +225,28 @@ const esquemaPendienteRecibirCelda = z.object({
   cantidad: z.number().int().describe('Pendiente por recibir (enviado − recibido).'),
 });
 
+/**
+ * Lo que UN maquilero tiene pendiente de devolver de un proceso (enviado − recibido de ESE tercero).
+ * Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
+ * pantallas de recibo —el panel de avance y `/produccion/recibos`— tienen que ofrecer y topar
+ * exactamente lo mismo: no se recibe de quien no recibió el corte (regla de Daniel, 28-jul-2026).
+ */
+const esquemaPendienteRecibirMaquilero = z.object({
+  idMaquilero: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Maquilero (Proveedor), o null si el histórico migrado no lo trae.'),
+  maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
+  celdas: z
+    .array(esquemaPendienteRecibirCelda)
+    .describe('enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0).'),
+  totalPendiente: z
+    .number()
+    .int()
+    .describe('Total pendiente de ese maquilero (NEGATIVO si recibió sin envío).'),
+});
+
 /** Pendiente por recibir de un proceso de maquila: enviado − recibido a ESE proceso. */
 const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
@@ -235,6 +257,11 @@ const esquemaPendienteRecibirProceso = z.object({
     .array(esquemaPendienteRecibirCelda)
     .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),
   totalPendiente: z.number().int().describe('Total pendiente por recibir de este proceso.'),
+  porMaquilero: z
+    .array(esquemaPendienteRecibirMaquilero)
+    .describe(
+      'El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo).',
+    ),
 });
 
 /**

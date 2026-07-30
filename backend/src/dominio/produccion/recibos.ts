@@ -70,6 +70,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import { pendientePorMaquilero, type MetaCelda } from './wip.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
@@ -275,9 +276,19 @@ async function sumarCeldas(
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso: number,
+  /** Acota la suma a UN maquilero (el saldo de recibo se lleva por tercero, no por proceso). */
+  idTercero?: number,
 ): Promise<Map<string, number>> {
   const filas = await tx.etapaMovimientoDet.findMany({
-    where: { etapaMov: { idOrden, tipo, idTipoProceso, canceladoEn: null } },
+    where: {
+      etapaMov: {
+        idOrden,
+        tipo,
+        idTipoProceso,
+        canceladoEn: null,
+        ...(idTercero === undefined ? {} : { idTercero }),
+      },
+    },
     select: { idColor: true, idTalla: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
@@ -286,6 +297,36 @@ async function sumarCeldas(
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
+}
+
+/**
+ * Maquileros CON ENVÍO VIVO de un proceso en una orden — los únicos a los que se les puede recibir.
+ * Solo para redactar el error: dice a quién SÍ se le puede, en vez de dejar al usuario adivinando.
+ * `sinMaquilero` marca el caso del histórico migrado (entrega viva con `idTercero` NULL), que no
+ * tiene a quién nombrar pero SÍ existe: callarlo hacía que el mensaje dijera lo contrario.
+ */
+async function maquilerosConEnvio(
+  tx: Tx,
+  idOrden: number,
+  idTipoProceso: number,
+): Promise<{ nombres: string[]; sinMaquilero: boolean }> {
+  const envios = await tx.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      idTipoProceso,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+    },
+    select: { idTercero: true, tercero: { select: { nombre: true } } },
+    distinct: ['idTercero'],
+  });
+  return {
+    nombres: envios
+      .map((e) => e.tercero?.nombre ?? null)
+      .filter((n): n is string => n !== null)
+      .sort((a, b) => a.localeCompare(b, 'es')),
+    sinMaquilero: envios.some((e) => e.idTercero === null),
+  };
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
@@ -453,7 +494,10 @@ export async function registrarReciboMaquila(
       proceso.nombre,
     );
 
-    // Si liga un envío, debe ser de la MISMA orden+proceso y estar vivo (defensa de la liga (d)).
+    // Si liga un envío, debe ser de la MISMA orden+proceso, del MISMO maquilero y estar vivo
+    // (defensa de la liga (d)). Lo del maquilero es de la regla del 28-jul-2026: sin ese filtro se
+    // podía registrar un recibo de un maquilero colgado del envío de OTRO — el saldo por tercero
+    // cuadraba y la liga mentía (hallazgo del reviewer).
     if (datos.idEtapaEnvio !== undefined) {
       const envio = await tx.etapaMovimiento.findFirst({
         where: {
@@ -462,38 +506,68 @@ export async function registrarReciboMaquila(
           idEmpresa: orden.idEmpresa,
           tipo: TipoEtapaMovimiento.envio_maquila,
           idTipoProceso: datos.idTipoProceso,
+          idTercero: datos.idMaquilero,
           canceladoEn: null,
         },
         select: { id: true },
       });
       if (envio === null) {
         throw new ErrorValidacion(
-          'El envío ligado no existe, está cancelado o no es de esta orden y proceso.',
+          'El envío ligado no existe, está cancelado, o no es de esta orden, proceso y maquilero.',
         );
       }
     }
 
     // Concurrencia + decisión (g): serializa la orden y valida recibido ≤ enviado por suma directa.
     await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+    // El saldo se lleva POR MAQUILERO, no por proceso (regla de Daniel, 28-jul-2026: *"no puedo
+    // recibir un corte de un maquilero diferente al que se lo entregué"*). Antes se validaba
+    // recibido ≤ enviado del PROCESO ENTERO: con dos maquileros trabajando la misma orden se podía
+    // cargarle a uno lo que devolvió el otro, y la cuenta de cada quien (EsMa, existencias en poder
+    // del maquilero) quedaba falseada sin que nada lo impidiera. El filtro de la pantalla no basta:
+    // una lista filtrada se brinca llamando al API.
     const enviado = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.envio_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
     const yaRecibido = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.recibo_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
+    if (enviado.size === 0) {
+      const { nombres, sinMaquilero } = await maquilerosConEnvio(
+        tx,
+        datos.idOrden,
+        datos.idTipoProceso,
+      );
+      const detalle =
+        nombres.length > 0
+          ? `Tiene entrega viva: ${nombres.join(', ')}.`
+          : sinMaquilero
+            ? // Histórico migrado: el Access no siempre traía el maquilero de la entrega. Decirlo
+              // tal cual — antes este caso respondía "no tiene ninguna entrega", que era falso y
+              // dejaba al operador sin saber qué corregir (hallazgo del reviewer).
+              'Esta orden tiene entrega viva SIN maquilero (histórico migrado): hay que corregir ' +
+              'esa entrega —o cancelarla y recapturarla con su maquilero— antes de poder recibir.'
+            : 'Esta orden todavía no tiene ninguna entrega de ese proceso.';
+      throw new ErrorConflicto(
+        `A ese maquilero no se le entregó el corte de "${proceso.nombre}" en esta orden, así que ` +
+          `no se le puede recibir. ${detalle}`,
+      );
+    }
     for (const c of celdas) {
       const clave = claveCelda(c.idColor, c.idTalla);
       const disponible = (enviado.get(clave) ?? 0) - (yaRecibido.get(clave) ?? 0);
       if (c.cantidad > disponible) {
         throw new ErrorConflicto(
           `No se puede recibir ${c.cantidad} pza(s) de ese color/talla de "${proceso.nombre}": ` +
-            `solo quedan ${disponible} enviada(s) sin recibir.`,
+            `a ese maquilero solo le quedan ${disponible} enviada(s) sin recibir.`,
         );
       }
     }
@@ -870,13 +944,6 @@ export async function pendientesPorRecibir(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  interface MetaCelda {
-    idColor: number;
-    color: string;
-    idTalla: number;
-    etiquetaTalla: string;
-    ordenTalla: number;
-  }
   const meta = new Map<string, MetaCelda>();
   for (const linea of orden.lineas) {
     for (const t of linea.tallas) {
@@ -911,17 +978,13 @@ export async function pendientesPorRecibir(
   const porRecibir = [];
   for (const proc of procesosEnviados) {
     if (proc.idTipoProceso === null) continue;
-    const enviado = await sumarCeldas(
+    // MISMO derivado que el drill-down del WIP (helper compartido): el pendiente por proceso y su
+    // desglose POR MAQUILERO, para que esta pantalla ofrezca y tope igual que el panel de avance.
+    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
       cliente,
       idOrden,
-      TipoEtapaMovimiento.envio_maquila,
       proc.idTipoProceso,
-    );
-    const recibido = await sumarCeldas(
-      cliente,
-      idOrden,
-      TipoEtapaMovimiento.recibo_maquila,
-      proc.idTipoProceso,
+      meta,
     );
     const claves = new Set<string>([...enviado.keys(), ...recibido.keys()]);
     const celdas = [...claves]
@@ -954,6 +1017,7 @@ export async function pendientesPorRecibir(
       generaEntradaPt: proc.tipoProceso?.generaEntradaPt ?? false,
       celdas,
       totalPendiente,
+      porMaquilero,
     });
   }
 

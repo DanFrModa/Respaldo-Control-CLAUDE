@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Ban, Loader2, Plus, Route, X } from 'lucide-react';
+import { Ban, Loader2, Plus, Route, Scissors, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -20,7 +21,7 @@ import { useTiposProceso } from '@/api/tipos-proceso';
 import type { EtapaHistorial, TipoProceso, WipOrden } from '@/api/tipos';
 import { CLAVE_WIP, useWipOrden } from '@/api/wip';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
-import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
+import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { claveCelda, MatrizColorTalla } from '@/components/dominio/MatrizColorTalla';
 import { StepperEtapas, type PasoEtapa } from '@/components/dominio/StepperEtapas';
 import { Avatar } from '@/components/dominio/visuales';
@@ -37,6 +38,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
+import { piezasPorRecibir } from './matriz-orden';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -45,8 +47,8 @@ import { useSesion } from '@/sesion/useSesion';
  * AVANCE DE PRODUCCIÓN (rediseño R2, §4.3 — el form "Proceso" del Access, reconstruido): panel de
  * pantalla completa que se abre con DOBLE CLIC en una orden (o el botón "Registrar avance").
  *
- *  - Stepper de 5 ETAPAS (Corte / Entrega a maquila / Recibo de maquila / Entrega aplicación /
- *    Recibo aplicación) con su avance `x/total` y color de estado. Los totales salen DERIVADOS del
+ *  - Stepper de 5 ETAPAS (Corte / Entrega a maquila / Recibo de maquila / Entrega de Arte /
+ *    Recibo de Arte) con su avance `x/total` y color de estado. Los totales salen DERIVADOS del
  *    servidor (`wipDeOrden`, F3-E5): aquí solo se combinan (costura = procesos que meten a PT).
  *  - Cada etapa es una LISTA de movimientos (multi-proveedor, §4.3): proveedor + fecha + desglose
  *    color×talla + "capturado por · fecha" (§4.4.4) + cancelar con motivo (suave, D3).
@@ -69,8 +71,11 @@ const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor:
   { clave: 'corte', etiqueta: 'Corte', etiquetaProveedor: 'Cortador' },
   { clave: 'entrega-maquila', etiqueta: 'Entrega a maquila', etiquetaProveedor: 'Maquilero' },
   { clave: 'recibo-maquila', etiqueta: 'Recibo de maquila', etiquetaProveedor: 'Maquilero' },
-  { clave: 'entrega-aplicacion', etiqueta: 'Entrega aplicación', etiquetaProveedor: 'Aplicador' },
-  { clave: 'recibo-aplicacion', etiqueta: 'Recibo aplicación', etiquetaProveedor: 'Aplicador' },
+  // Vocabulario de Daniel (24-jul + 28-jul-2026): la aplicación (estampado/bordado) se llama ARTE
+  // y su proveedor, Prov. de Arte. El CÓDIGO conserva `aplicacion` (es el concepto del dominio y
+  // los subtipos Bordado/Estampado siguen existiendo); lo que cambia es lo que el usuario lee.
+  { clave: 'entrega-aplicacion', etiqueta: 'Entrega de Arte', etiquetaProveedor: 'Prov. de Arte' },
+  { clave: 'recibo-aplicacion', etiqueta: 'Recibo de Arte', etiquetaProveedor: 'Prov. de Arte' },
 ];
 
 /** Fecha de hoy (YYYY-MM-DD) para el default de captura. */
@@ -135,13 +140,13 @@ export function pasosDesdeWip(wip: WipOrden): PasoEtapa[] {
     },
     {
       clave: 'entrega-aplicacion',
-      etiqueta: 'Entrega aplicación',
+      etiqueta: 'Entrega de Arte',
       hecho: enviadoAplicacion,
       total: wip.pedido,
     },
     {
       clave: 'recibo-aplicacion',
-      etiqueta: 'Recibo aplicación',
+      etiqueta: 'Recibo de Arte',
       hecho: recibidoAplicacion,
       total: wip.pedido,
     },
@@ -170,6 +175,7 @@ export function AvanceProduccion({
   // El panel solo existe montado (el llamador lo renderiza condicionalmente): siempre está abierto.
   useCerrarConAtras(true, alCerrar);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const orden = useOrden(idOrden);
   const wip = useWipOrden(idOrden);
@@ -310,10 +316,47 @@ export function AvanceProduccion({
                 <Route className="size-3.5 text-primary" aria-hidden />
                 Se marca en Ruta Crítica automáticamente
               </span>
+              {/* CORTAR = DESCARGAR TELA (petición de Daniel, 28-jul-2026: *"a la hora de cortar es
+                  necesario descargar la tela de los inventarios… estaría bueno que en el mismo
+                  avance de producción podamos poner un enlace"*). No se duplica la captura: se va a
+                  la pantalla que YA es la única vía que descuenta tela hacia una orden (F4-E1),
+                  llevándose la orden puesta. La otra vía —la nota de salida abierta— sigue viviendo
+                  en su módulo, porque no cuelga de una orden. */}
+              {etapaActiva === 'corte' && tienePermiso('inventario-telas.mover') ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => {
+                    // Salir de aquí es una NAVEGACIÓN de verdad: el panel de avance no es una ruta,
+                    // así que la captura abierta se pierde y no se reabre al volver. Con la matriz
+                    // ya tecleada (decenas de celdas en una orden real) hay que preguntar antes
+                    // (hallazgo del reviewer).
+                    if (
+                      capturaAbierta &&
+                      !window.confirm(
+                        'Se va a salir del avance para descargar la tela y se perderá lo que ' +
+                          'lleves capturado en el corte. ¿Continuar?',
+                      )
+                    ) {
+                      return;
+                    }
+                    void navigate('/inventarios/telas/salida-orden', { state: { idOrden } });
+                  }}
+                  data-testid="avance-descargar-tela"
+                >
+                  <Scissors aria-hidden />
+                  Descargar tela del inventario
+                </Button>
+              ) : null}
               {puedeCapturar(etapaActiva, tienePermiso) ? (
                 <Button
                   size="sm"
-                  className="ml-auto"
+                  className={cn(
+                    etapaActiva === 'corte' && tienePermiso('inventario-telas.mover')
+                      ? ''
+                      : 'ml-auto',
+                  )}
                   onClick={() => setCapturaAbierta((v) => !v)}
                   data-testid="avance-abrir-captura"
                 >
@@ -490,7 +533,13 @@ function CapturaMovimiento({
 }): React.JSX.Element {
   const { sesion } = useSesion();
   const [fecha, setFecha] = useState(hoy());
-  const [idProveedor, setIdProveedor] = useState<number | null>(null);
+  // ENTREGA A MAQUILA: arranca con el maquilero YA PROGRAMADO en la OP (petición de Daniel,
+  // 28-jul-2026: *"si ya tengo un maquilero programado en la OP… que me ponga por default el
+  // maquilero que ya estaba definido"*). Es un default editable, no un candado. Solo aplica a
+  // costura: la OP no programa Prov. de Arte (el que se ve en el Centro sale del primer envío).
+  const [idProveedor, setIdProveedor] = useState<number | null>(
+    etapa === 'entrega-maquila' ? (orden.idMaquilero ?? null) : null,
+  );
   const [idProcesoAplicacion, setIdProcesoAplicacion] = useState<string>('');
   const [observaciones, setObservaciones] = useState('');
   const [valores, setValores] = useState<Record<string, number>>({});
@@ -524,18 +573,58 @@ function CapturaMovimiento({
         : rolDelProceso(procesoElegido.codigo);
   const idRol =
     codigoRol === undefined ? undefined : roles.data?.find((r) => r.codigo === codigoRol)?.id;
-  const proveedores = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRol === undefined ? {} : { rol: idRol }),
-    ...(busquedaProveedor === '' ? {} : { busqueda: busquedaProveedor }),
-  });
-  const opcionesProveedor = (proveedores.data?.datos ?? []).map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-  }));
+  // En el RECIBO la lista sale del WIP (los que tienen entrega viva), así que el catálogo ni se
+  // consulta: la consulta queda deshabilitada en vez de traer 100 proveedores que nadie mira.
+  const proveedores = useProveedores(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      direccion: 'asc',
+      ...(idRol === undefined ? {} : { rol: idRol }),
+      ...(busquedaProveedor === '' ? {} : { busqueda: busquedaProveedor }),
+    },
+    { enabled: !esRecibo },
+  );
+
+  // ── RECIBO: solo los maquileros a los que SÍ se les entregó ─────────────────────────────────
+  // Regla de Daniel (28-jul-2026): *"no puedo recibir un corte de un maquilero diferente al que se
+  // lo entregué"*. El desglose `porMaquilero` (enviado − recibido POR TERCERO) lo deriva el
+  // servidor (A1/B2); aquí NO se pivotea nada. El servidor además lo RE-VALIDA al guardar: esta
+  // lista es la comodidad, no el candado. Se ofrecen solo los que aún deben piezas — a quien ya
+  // devolvió todo no hay nada que recibirle.
+  const entradaRecibo = esRecibo
+    ? wip.porRecibir.find((p) =>
+        etapa === 'recibo-maquila'
+          ? p.generaEntradaPt
+          : String(p.idTipoProceso) === idProcesoAplicacion,
+      )
+    : undefined;
+  // Se mira `celdas`, no el total: en el histórico migrado un maquilero puede traer +5 en una talla
+  // y −5 en otra (recibo capturado en la talla equivocada en el Access) → total 0 pero el servidor
+  // SÍ aceptaría recibirle esas 5 (hallazgo del reviewer).
+  const maquilerosPendientes = (entradaRecibo?.porMaquilero ?? []).filter(
+    (m): m is typeof m & { idMaquilero: number } =>
+      m.idMaquilero !== null && m.celdas.some((c) => c.cantidad > 0),
+  );
+  // Entrega migrada SIN maquilero (`idTercero` NULL): no hay a quién recibirle, pero el pendiente
+  // EXISTE — se dice, en vez de fingir que no hay nada que recibir (hallazgo del reviewer).
+  const pendienteSinMaquilero = (entradaRecibo?.porMaquilero ?? [])
+    .filter((m) => m.idMaquilero === null)
+    .reduce((s, m) => s + piezasPorRecibir(m.celdas), 0);
+
+  const opcionesProveedor: { id: number; nombre: string; pendiente: number | undefined }[] =
+    esRecibo
+      ? maquilerosPendientes.map((m) => ({
+          id: m.idMaquilero,
+          nombre: m.maquilero,
+          pendiente: piezasPorRecibir(m.celdas),
+        }))
+      : (proveedores.data?.datos ?? []).map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          pendiente: undefined,
+        }));
 
   // Almacenes destino (solo el recibo de COSTURA mete a PT).
   const almacenes = useAlmacenes({
@@ -607,9 +696,19 @@ function CapturaMovimiento({
     if (entrada === undefined) {
       return null;
     }
-    for (const c of entrada.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+    // El pendiente del RECIBO es el de ESE maquilero, no el del proceso entero: con dos maquileros
+    // en la misma orden, la referencia del proceso le ofrecería a uno lo que el otro tiene en su
+    // taller (y el servidor lo rechazaría al guardar). Sin maquilero elegido no hay referencia.
+    if (idProveedor === null) {
+      return null;
+    }
+    const delMaquilero = entrada.porMaquilero.find((m) => m.idMaquilero === idProveedor);
+    if (delMaquilero === undefined) {
+      return null;
+    }
+    for (const c of delMaquilero.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
     return mapa;
-  }, [etapa, wip, orden, idProcesoAplicacion]);
+  }, [etapa, wip, orden, idProcesoAplicacion, idProveedor]);
   const totalReferencia =
     referencia === null
       ? undefined
@@ -724,12 +823,57 @@ function CapturaMovimiento({
             opciones={opcionesProveedor}
             valor={idProveedor}
             onChange={setIdProveedor}
-            alCambiarTexto={setTextoProveedor}
-            cargando={proveedores.isFetching}
-            placeholder={`Escribe el ${etiquetaProveedor.toLowerCase()}…`}
+            // En el RECIBO la lista es corta y ya viene del WIP (los que tienen entrega viva): el
+            // filtro es LOCAL y no se consulta el catálogo. En corte/entrega sigue el typeahead
+            // server-side (hay >1,700 proveedores y la página de 100 no basta).
+            {...(esRecibo
+              ? {
+                  renderOpcion: (o: { nombre: string; pendiente?: number | undefined }) => (
+                    <OpcionRica
+                      principal={o.nombre}
+                      secundario={
+                        o.pendiente === undefined
+                          ? null
+                          : `${o.pendiente.toLocaleString('es-MX')} pza(s) por recibirle`
+                      }
+                    />
+                  ),
+                }
+              : { alCambiarTexto: setTextoProveedor, cargando: proveedores.isFetching })}
+            // Default de la ENTREGA: el maquilero de la OP puede no venir en la página de 100 del
+            // catálogo; sin su etiqueta el campo se vería vacío con el valor puesto.
+            // Se pasa SOLO mientras la selección siga siendo la de la OP: si el usuario elige a
+            // otro y el typeahead se resetea (la página vuelve sin él), esta etiqueta fija le
+            // pisaría el nombre y el campo mostraría un maquilero DISTINTO del que se va a
+            // guardar (bloqueante del reviewer).
+            {...(etapa === 'entrega-maquila' &&
+            orden.maquilero !== null &&
+            idProveedor === orden.idMaquilero
+              ? { etiquetaSeleccion: orden.maquilero }
+              : {})}
+            placeholder={
+              esRecibo
+                ? esAplicacion && idProcesoAplicacion === ''
+                  ? 'Elige primero el tipo de arte…'
+                  : maquilerosPendientes.length === 0
+                    ? 'Nadie tiene piezas por devolver'
+                    : 'Elige a quién le recibes…'
+                : `Escribe el ${etiquetaProveedor.toLowerCase()}…`
+            }
+            textoVacio={
+              esRecibo
+                ? 'Solo se puede recibir de quien tiene entrega viva en esta orden'
+                : 'Sin coincidencias'
+            }
             etiqueta={etiquetaProveedor}
             testid="avance-proveedor"
           />
+          {pendienteSinMaquilero > 0 ? (
+            <p className="text-xs text-warn" data-testid="avance-sin-maquilero">
+              Hay {pendienteSinMaquilero.toLocaleString('es-MX')} pza(s) entregadas SIN maquilero
+              (histórico migrado): hay que corregir esa entrega antes de poder recibirlas.
+            </p>
+          ) : null}
         </Field>
         {esAplicacion ? (
           <Field>
