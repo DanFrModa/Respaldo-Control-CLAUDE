@@ -1169,3 +1169,112 @@ navegador tenga guardado.
   matriz; ←/→ y Enter intactos; instalación idempotente) y **1 e2e en navegador real**, que es la
   única que puede comprobar que el valor **no se mueve** — el entorno de pruebas unitarias no
   implementa ni la rueda ni el incremento por flechas.
+
+---
+
+## 2026-07-28 — Avance de producción: maquileros y descarga de tela
+
+Tres peticiones de Daniel sobre la captura del avance (WIP) dentro de la OP, en la misma sesión que
+las flechitas.
+
+### A) La entrega a maquila ya llega con el maquilero puesto
+
+Daniel: *"Si ya tengo un maquilero programado en la OP… que cuando le dé en entrega a maquila, me
+ponga por default el maquilero que ya estaba definido."*
+
+Al abrir **Entrega a maquila**, el campo del maquilero arranca con el que la OP ya tiene asignado en
+su encabezado. Es un **default, no un candado**: si esta vez se manda a otro taller, se cambia y ya.
+
+Aplica a **costura**. Para **Arte** no hay default que poner: la OP no programa un Prov. de Arte (el
+que se ve en el Centro de Órdenes sale del primer envío que se le hizo, no de una asignación previa).
+
+### B) Solo se le puede recibir a quien se le entregó
+
+Daniel: *"En recibo de maquila me debe de filtrar solo a los maquileros que se le haya entregado el
+corte. **No puedo recibir un corte de un maquilero diferente al que se lo entregué.** Misma lógica
+para los maquileros de arte."*
+
+Esto resultó ser **más que un filtro de pantalla**, y vale la pena decirlo claro: hasta hoy el
+sistema cuidaba que no se recibiera más de lo enviado **en total del proceso**, pero **no llevaba la
+cuenta por maquilero**. Con dos talleres trabajando la misma orden, se le podía cargar a uno lo que
+devolvió el otro — y la cuenta de cada quien (su estado de cuenta EsMa, sus existencias en poder de
+maquila) quedaba mal **sin que nada lo impidiera**.
+
+Ahora:
+
+- La lista del recibo ofrece **únicamente** a los maquileros con entrega viva en esa orden, y al lado
+  de cada uno dice **cuántas piezas le faltan devolver**. Al que ya devolvió todo no se le ofrece:
+  no hay nada que recibirle.
+- Las cantidades que se teclean se comparan contra **lo que ese maquilero tiene**, no contra el
+  total del proceso.
+- **El servidor lo vuelve a revisar al guardar.** Una lista filtrada en pantalla se brinca; la regla
+  de Daniel no. Si se intenta, el mensaje dice a quién **sí** se le puede recibir.
+
+Lo mismo aplica al **Recibo de Arte**.
+
+Aplica en **las dos pantallas** donde se recibe: el panel de avance dentro de la OP y la pantalla
+`Recibo de maquila` del menú (a la que manda la Ruta Crítica). Las dos leen el mismo dato del
+servidor, así que no pueden decir cosas distintas.
+
+> **Notas para Gabriel, con los ojos abiertos:**
+>
+> 1. Si en los datos migrados hubiera recibos viejos que no cuadran contra su entrega, una orden
+>    antigua podría rechazar un recibo nuevo. Se eligió el **bloqueo duro** —que es lo que dijo
+>    Daniel— en vez de un aviso que se puede ignorar. El mensaje de error dice quién sí tiene entrega
+>    viva, así que el caso se diagnostica solo.
+> 2. Hay entregas del histórico que **no traen maquilero** (el Access no siempre lo guardaba). A esas
+>    piezas no se les puede recibir: la pantalla lo **avisa** ("hay N pza(s) entregadas SIN maquilero:
+>    hay que corregir esa entrega antes de poder recibirlas") en vez de decir que no hay nada
+>    pendiente. Vale la pena contar cuántas son en `prueba` después de cargar los datos: si son
+>    muchas, conviene una forma de asignarle el maquilero a esas entregas (hoy la salida es cancelar
+>    la entrega y recapturarla).
+
+### C) "Aplicación" ahora se llama Arte
+
+Las etapas pasaron a llamarse **Entrega de Arte** y **Recibo de Arte**, y su proveedor, **Prov. de
+Arte** — tanto en el avance por etapas de arriba como en el encabezado de cada etapa. Completa el
+barrido de vocabulario del 24 de julio.
+
+### D) Al cortar, un enlace para descargar la tela
+
+Daniel: *"A la hora de cortar, es necesario descargar la tela de los inventarios… estaría bueno que
+en el mismo avance de producción podamos poner un enlace para descargar las telas cortadas."*
+
+Buena noticia: **las dos vías que describe ya existen** desde F4 y no había que construirlas —
+la **salida de tela a una orden** (la única que descuenta tela ligándola a una OP y deja la traza) y
+la **nota de salida abierta** (que no cuelga de ninguna orden, y por eso sigue en su módulo). Lo que
+faltaba era el **puente**.
+
+En la etapa de **Corte** aparece ahora el botón **"Descargar tela del inventario"**, que abre esa
+pantalla **con la orden ya seleccionada**, sin volver a buscarla. Solo lo ve quien tiene permiso
+para mover inventario de telas.
+
+**Lo que NO se hizo, a propósito:** descontar la tela **automáticamente** al registrar el corte. El
+corte se captura en **piezas por color y talla**; la salida de tela se descuenta en **metros o kilos,
+por tela y por lote**, y eso no se deduce del corte — depende del tendido real, de la tela dispuesta
+y del lote del que se jaló. Inventar ese número descuadraría el inventario con algo que nadie
+capturó. El enlace deja la captura en manos de quien sabe, que es lo que Daniel pidió.
+
+### Nota de despliegue (para Gabriel)
+
+**Nada que hacer.** **Sin migración**, **sin permisos nuevos** (→ no hace falta `SEED_ON_START`),
+sin scripts. Hay cambio de contrato (el API del avance ahora desglosa el pendiente por maquilero),
+pero se despliega con el mismo deploy: backend y frontend van juntos.
+
+### Archivos tocados
+
+- **Backend:** `src/contrato/esquemas/wip.ts` (desglose `porMaquilero` en "por recibir") ·
+  `src/dominio/produccion/wip.ts` (lo deriva el servidor, nunca se pivotea en el cliente) ·
+  `src/dominio/produccion/recibos.ts` (el saldo del recibo se lleva por maquilero + el mensaje que
+  dice a quién sí) · `openapi.json`.
+- **Frontend:** `src/modulos/produccion/AvanceProduccion.tsx` (el default, la lista filtrada con su
+  pendiente, el vocabulario Arte y el enlace de tela) ·
+  `src/modulos/produccion/ReciboMaquilaPagina.tsx` (la misma regla en la pantalla del menú) ·
+  `src/modulos/inventarios/SalidaTelaOrdenPagina.tsx` (recibe la orden por deep-link) ·
+  `openapi.json` + `src/api/esquema.gen.ts` regenerados.
+- **Pruebas:** `recibos.int.test.ts` (**contra Postgres en CI**: rechaza recibirle a quien no se le
+  entregó —y nombra a quien sí—, y con dos maquileros a cada uno solo se le recibe lo suyo, con el
+  desglose del WIP cuadrando) · `AvanceCaptura.test.tsx` (**nuevo**: el default de la OP, que sin
+  maquilero asignado el campo queda vacío, la lista filtrada con su pendiente, que el que ya devolvió
+  todo no se ofrece, y el enlace de tela con su permiso) · `SalidaTelaOrdenPagina.test.tsx` (el
+  deep-link llega con la orden puesta y sin deep-link no se pide nada al servidor).

@@ -1563,6 +1563,7 @@ export {
   type WipTotales,
   type TableroWipPagina,
   type WipOrden,
+  type WipMaquileroPendiente,
   type ExistenciaMaquileroQuery,
   type ExistenciaMaquileroFila,
   type ExistenciaMaquileroLista,

@@ -168,6 +168,39 @@ const esquemaWipProcesoPendiente = z.object({
 });
 
 /**
+ * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
+ * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
+ * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
+ * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
+ * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
+ */
+const esquemaWipMaquileroPendiente = z.object({
+  idMaquilero: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Maquilero (Proveedor), o null si el histórico migrado no lo trae.'),
+  maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
+  celdas: z.array(esquemaWipCelda).describe('Celdas pendientes (≠ 0) de ese maquilero.'),
+  totalPendiente: z
+    .number()
+    .int()
+    .describe('Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío).'),
+});
+
+/** Forma del pendiente por recibir de UN maquilero. */
+export type WipMaquileroPendiente = z.infer<typeof esquemaWipMaquileroPendiente>;
+
+/** Pendiente POR RECIBIR de un proceso, con su desglose por maquilero. */
+const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
+  porMaquilero: z
+    .array(esquemaWipMaquileroPendiente)
+    .describe(
+      'enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso).',
+    ),
+});
+
+/**
  * DRILL-DOWN de UNA orden: el avance completo (totales + pendientes por etapa) con el detalle
  * color×talla. Cubre "órdenes incompletas / qué falta": cada etapa muestra su faltante real por
  * celda ("faltan 12 pzas talla 6 color rojo"). Todo DERIVADO (sin acumuladores).
@@ -197,8 +230,8 @@ export const esquemaWipOrden = z
       .array(esquemaWipProcesoPendiente)
       .describe('cortado − enviado por proceso, color×talla.'),
     porRecibir: z
-      .array(esquemaWipProcesoPendiente)
-      .describe('enviado − recibido por proceso, color×talla.'),
+      .array(esquemaWipProcesoPorRecibir)
+      .describe('enviado − recibido por proceso, color×talla, con desglose por maquilero.'),
     entregadoCeldas: z
       .array(esquemaWipCelda)
       .describe('Entregado a cliente por color×talla (Σ de entregas vivas).'),

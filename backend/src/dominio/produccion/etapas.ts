@@ -698,9 +698,14 @@ export async function cancelarEtapaMovimiento(
     }
 
     if (etapa.tipo === TipoEtapaMovimiento.envio_maquila) {
-      // Espejo del guard del corte: el ENVÍO sostiene los recibos. `recibos.ts` valida `recibido ≤
-      // enviado` al AGREGADO orden+proceso (y un recibo ligado por `idEtapaEnvio` es del mismo
-      // orden+proceso), así que cancelar el envío bajaría el enviado y dejaría recibos "colgando".
+      // Espejo del guard del corte: el ENVÍO sostiene los recibos. Desde el 28-jul-2026
+      // `recibos.ts` valida `recibido ≤ enviado` POR MAQUILERO (no al agregado orden+proceso, como
+      // decía antes este comentario), así que cancelar un envío bajaría el enviado de ESE tercero y
+      // dejaría sus recibos "colgando". El conteo de abajo sigue siendo por orden+proceso, o sea
+      // MÁS conservador de lo estrictamente necesario: bloquea cancelar el envío de B si A tiene
+      // recibos vivos del mismo proceso. Se conserva a propósito —acotarlo al tercero pide su
+      // propio análisis (¿qué pasa con los recibos del histórico sin envío?)— y de todos modos
+      // cancelar un envío con producción devuelta viva es algo que hay que mirar a mano.
       // Se bloquea la orden para que un recibo concurrente no se cuele entre la verificación y la
       // cancelación (mismo lock que el recibo usa al validar).
       await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, etapa.idOrden);

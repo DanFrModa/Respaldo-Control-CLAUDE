@@ -34889,6 +34889,28 @@ export interface paths {
                 }[];
                 /** @description Total pendiente por recibir de este proceso. */
                 totalPendiente: number;
+                /** @description El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo). */
+                porMaquilero: {
+                  /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
+                  idMaquilero: number | null;
+                  /** @description Nombre del maquilero (o "Sin asignar" en lo migrado sin dato). */
+                  maquilero: string;
+                  /** @description enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0). */
+                  celdas: {
+                    /** @description Id del color. */
+                    idColor: number;
+                    /** @description Nombre del color. */
+                    color: string;
+                    /** @description Id de la talla. */
+                    idTalla: number;
+                    /** @description Etiqueta visible de la talla. */
+                    etiquetaTalla: string;
+                    /** @description Pendiente por recibir (enviado − recibido). */
+                    cantidad: number;
+                  }[];
+                  /** @description Total pendiente de ese maquilero (NEGATIVO si recibió sin envío). */
+                  totalPendiente: number;
+                }[];
               }[];
             };
           };
@@ -36383,7 +36405,7 @@ export interface paths {
                 /** @description Total pendiente de este proceso (derivado). */
                 totalPendiente: number;
               }[];
-              /** @description enviado − recibido por proceso, color×talla. */
+              /** @description enviado − recibido por proceso, color×talla, con desglose por maquilero. */
               porRecibir: {
                 /** @description Id del tipo de proceso. */
                 idTipoProceso: number;
@@ -36408,6 +36430,28 @@ export interface paths {
                 }[];
                 /** @description Total pendiente de este proceso (derivado). */
                 totalPendiente: number;
+                /** @description enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
+                porMaquilero: {
+                  /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
+                  idMaquilero: number | null;
+                  /** @description Nombre del maquilero (o "Sin asignar" en lo migrado sin dato). */
+                  maquilero: string;
+                  /** @description Celdas pendientes (≠ 0) de ese maquilero. */
+                  celdas: {
+                    /** @description Id del color. */
+                    idColor: number;
+                    /** @description Nombre del color. */
+                    color: string;
+                    /** @description Id de la talla. */
+                    idTalla: number;
+                    /** @description Etiqueta visible de la talla. */
+                    etiquetaTalla: string;
+                    /** @description Cantidad (puede ser negativa por sobre-corte). */
+                    cantidad: number;
+                  }[];
+                  /** @description Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío). */
+                  totalPendiente: number;
+                }[];
               }[];
               /** @description Entregado a cliente por color×talla (Σ de entregas vivas). */
               entregadoCeldas: {

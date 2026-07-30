@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useSalidaTelaAOrden } from '@/api/inventario-materiales';
+import { useOrden } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +21,15 @@ function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Lee `state.idOrden` del deep-link (enlace "Descargar tela" del avance de producción). */
+function leerIdOrdenDeepLink(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
+    return null;
+  }
+  const id = state.idOrden;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
 /**
  * SALIDA DE TELA A UNA ORDEN (F4-E1, doc 04-Inventarios §"Cómo conecta"). Es LA única vía que
  * descuenta tela hacia una orden de producción (conserva la traza orden↔salida); la nota de salida
@@ -29,6 +40,14 @@ function hoy(): string {
 export function SalidaTelaOrdenPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
+
+  // DEEP-LINK desde el avance de producción (petición de Daniel, 28-jul-2026: al cortar hay que
+  // descargar la tela, y el enlace debe traer la orden ya puesta). Se consume el `state` en cuanto
+  // llega para que un refresh o un "atrás" no lo vuelvan a aplicar (patrón de NotasPorOrdenPagina).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [idDeepLink] = useState<number | null>(() => leerIdOrdenDeepLink(location.state));
+  const ordenDeepLink = useOrden(idDeepLink ?? undefined);
 
   const [orden, setOrden] = useState<Orden | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<string>('');
@@ -43,6 +62,21 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
     direccion: 'asc',
   });
   const crear = useSalidaTelaAOrden();
+
+  // La orden del deep-link se fija SOLO una vez y solo si el usuario no eligió otra a mano.
+  const ordenDeepLinkData = ordenDeepLink.data;
+  useEffect(() => {
+    if (idDeepLink === null) {
+      return;
+    }
+    if (ordenDeepLinkData !== undefined) {
+      setOrden((actual) => actual ?? ordenDeepLinkData);
+    }
+    // Se limpia el state aunque la orden falle (404/sin permiso): el deep-link ya se atendió.
+    if (ordenDeepLinkData !== undefined || ordenDeepLink.isError) {
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate]);
 
   const total = renglones.reduce((s, r) => s + r.cantidad, 0);
   const puedeGuardar =

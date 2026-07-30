@@ -38,6 +38,7 @@ const wipBase: WipOrden = {
       generaEntradaPt: true,
       celdas: [],
       totalPendiente: 226, // enviado costura 1726 − recibido costura 1500
+      porMaquilero: [],
     },
     {
       idTipoProceso: 6,
@@ -46,6 +47,7 @@ const wipBase: WipOrden = {
       generaEntradaPt: false,
       celdas: [],
       totalPendiente: 374,
+      porMaquilero: [],
     },
   ],
   entregadoCeldas: [],
