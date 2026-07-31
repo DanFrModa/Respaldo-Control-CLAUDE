@@ -236,7 +236,7 @@ async function procesarModelo(
       (idViejo !== undefined && pre.modelosId.has(idViejo.trim())) ||
       pre.modelosCodigo.has(codigoNorm);
     if (!usado) {
-      reporte.agregar(
+      reporte.agregarMuestra(
         'Modelos FUERA de ventana (sin uso en la ventana — NO migrados)',
         `codigo="${codigoCrudo}" (IdModelos=${idViejo ?? '?'})`,
       );

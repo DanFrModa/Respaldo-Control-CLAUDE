@@ -114,7 +114,7 @@ async function procesarAvio(
   }
   // Ventana por USO: avío sin uso → fuera, con su propio bucket (muestra en el reporte).
   if (pre !== null && (idViejo === undefined || !pre.aviosId.has(idViejo.trim()))) {
-    reporte.agregar(
+    reporte.agregarMuestra(
       'Avíos FUERA de ventana (sin uso — NO migrados)',
       `clave="${claveCruda}" (IdHabilitacion=${idViejo ?? '?'})`,
     );

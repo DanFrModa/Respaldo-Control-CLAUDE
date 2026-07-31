@@ -109,7 +109,7 @@ async function procesarBordado(
   }
   // Ventana por USO: bordado sin uso → fuera, con su propio bucket (muestra en el reporte).
   if (pre !== null && (idViejo === undefined || !pre.bordadosId.has(idViejo.trim()))) {
-    reporte.agregar(
+    reporte.agregarMuestra(
       'Bordados FUERA de ventana (sin uso — NO migrados)',
       `"${nombreCrudo}" (IdBordados=${idViejo ?? '?'})`,
     );

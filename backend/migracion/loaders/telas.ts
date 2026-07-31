@@ -194,7 +194,7 @@ async function procesarTelaBase(
   // Ventana por USO: tela sin uso (ni por IdTelas ni por su TelaDis unificada) → fuera. Su
   // pareja TelasDis (si la hay) también quedará fuera en la pasada (2) — mismo criterio.
   if (!telaBaseUsada(pre, idViejo, disMatch)) {
-    reporte.agregar(
+    reporte.agregarMuestra(
       'Telas FUERA de ventana (sin uso — NO migradas)',
       `"${nombreOriginal}" (IdTelas=${idViejo ?? '?'})`,
     );
@@ -303,7 +303,7 @@ async function procesarTelaDisSinTela(
   // Ventana por USO: TelaDis sin uso (por IdTelasDis) → fuera, con su propio bucket.
   const idDis = (d.IdTelasDis ?? '').trim();
   if (pre !== null && (idDis === '' || !pre.telasIdTelasDis.has(idDis))) {
-    reporte.agregar(
+    reporte.agregarMuestra(
       'TelasDis FUERA de ventana (sin uso — NO migradas)',
       `"${nombreOriginal}" (IdTelasDis=${d.IdTelasDis ?? '?'})`,
     );

@@ -153,7 +153,7 @@ export async function cargarProveedores(
   /** Cuenta y reporta un tercero excluido por la ventana (conteo agregado + muestra). */
   function excluirTercero(origen: string, idViejo: string | undefined, nombre: string): void {
     fueraVentana += 1;
-    reporte.agregar(
+    reporte.agregarMuestra(
       'Terceros FUERA de ventana (sin uso — NO migrados)',
       `"${nombre}" (${origen}, id=${idViejo ?? '?'})`,
     );

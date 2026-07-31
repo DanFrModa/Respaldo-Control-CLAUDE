@@ -97,7 +97,7 @@ export async function cargarClientes(
     // Exclusión por ventana (conteo agregado + lista acotada por el propio Reporte).
     if (prescan !== null && !prescan.clientesEnVentana.has((idViejo ?? '').trim())) {
       fueraVentana += 1;
-      reporte.agregar(
+      reporte.agregarMuestra(
         'Clientes FUERA de ventana (sin uso en pedidos/órdenes dentro de la ventana — NO migrados)',
         `IdClientes=${idViejo ?? '?'} "${nombreCrudo}"`,
       );
