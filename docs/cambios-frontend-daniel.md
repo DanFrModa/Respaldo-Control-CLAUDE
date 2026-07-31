@@ -1225,9 +1225,10 @@ servidor, así que no pueden decir cosas distintas.
 > 2. Hay entregas del histórico que **no traen maquilero** (el Access no siempre lo guardaba). A esas
 >    piezas no se les puede recibir: la pantalla lo **avisa** ("hay N pza(s) entregadas SIN maquilero:
 >    hay que corregir esa entrega antes de poder recibirlas") en vez de decir que no hay nada
->    pendiente. Vale la pena contar cuántas son en `prueba` después de cargar los datos: si son
->    muchas, conviene una forma de asignarle el maquilero a esas entregas (hoy la salida es cancelar
->    la entrega y recapturarla).
+>    pendiente. **Resuelto por Gabriel (30-jul-2026):** los datos de hoy son de prueba y se van a
+>    recargar, así que **la inconsistencia vieja se deja quieta** y **no se construye** una pantalla
+>    para asignarle maquilero a esas entregas; lo que se captura en v2 no puede nacer inconsistente,
+>    que es de lo que se trataba el candado.
 
 ### C) "Aplicación" ahora se llama Arte
 
