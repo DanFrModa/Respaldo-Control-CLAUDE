@@ -16,9 +16,18 @@
 import type { ConfiguracionEmpresa, Empresa } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  invalidarLogoEmpresa,
+  MIME_LOGO_PERMITIDOS,
+  obtenerLogoEmpresa,
+  TAMANO_MAXIMO_LOGO_BYTES,
+  type LogoResuelto,
+} from '../../comun/logo-empresa.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { problemaPngParaPdf } from '../../comun/png.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -27,10 +36,19 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { esRfcValido } from '../../contrato/esquemas/fiscal.js';
 
 const esquemaCrearEmpresa = z.object({
   nombre: z.string().trim().min(1, 'El nombre es obligatorio.').max(100),
   razonSocial: z.string().trim().max(200).optional(),
+  /** RFC fiscal (F9-E3): valida la forma del RFC mexicano si viene; '' = no capturado. */
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13)
+    .refine((v) => v === '' || esRfcValido(v), 'El RFC no tiene una forma válida.')
+    .optional(),
   /** Identificador corto para folios e impresos (viejo: `Identificador`). */
   identificador: z.string().trim().max(20).optional(),
   favorita: z.boolean().default(false),
@@ -67,6 +85,10 @@ const esquemaConfiguracion = z
     regaliasBase: z.number().min(0).max(1000).nullable().optional(),
     /** Días de colchón que la Ruta Crítica suma a la costura (viejo: `ColchonCostura`). */
     colchonCostura: z.number().int().min(0).max(365).nullable().optional(),
+    /** Fin de la 1ª cubeta de aging (días de atraso, F9-E5/D15d). NO nullable: siempre hay valor. */
+    agingLimite1: z.number().int().min(1).max(3650).optional(),
+    /** Fin de la 2ª cubeta de aging (días de atraso, F9-E5/D15d). NO nullable: siempre hay valor. */
+    agingLimite2: z.number().int().min(1).max(3650).optional(),
     /** Fecha del último inventario físico de telas (viejo: `InvFisico`). */
     fechaInventarioTelas: z.date().nullable().optional(),
     /** Fecha del último inventario físico de PT (viejo: `InvFisicoPT`). */
@@ -126,6 +148,7 @@ export async function crearEmpresa(
         data: {
           nombre: datos.nombre,
           razonSocial: datos.razonSocial ?? null,
+          rfc: datos.rfc === undefined || datos.rfc === '' ? null : datos.rfc,
           identificador: datos.identificador ?? null,
           favorita: datos.favorita,
           paraIpt: datos.paraIpt,
@@ -191,6 +214,7 @@ export async function actualizarEmpresa(
         data: {
           ...(datos.nombre === undefined ? {} : { nombre: datos.nombre }),
           ...(datos.razonSocial === undefined ? {} : { razonSocial: datos.razonSocial }),
+          ...(datos.rfc === undefined ? {} : { rfc: datos.rfc === '' ? null : datos.rfc }),
           ...(datos.identificador === undefined ? {} : { identificador: datos.identificador }),
           ...(datos.favorita === undefined ? {} : { favorita: datos.favorita }),
           ...(datos.paraIpt === undefined ? {} : { paraIpt: datos.paraIpt }),
@@ -367,6 +391,23 @@ export async function actualizarConfiguracion(
   return enTransaccion(async (tx) => {
     await exigirEmpresa(tx, idEmpresa);
 
+    // Aging (D15d): el 1er límite debe ser MENOR que el 2º. Como la edición es parcial, se valida el
+    // par EFECTIVO (lo que llega ∪ lo ya guardado), no solo lo del cuerpo. Si el registro aún no
+    // existe (empresa del seed sin configuración), los ausentes caen al default 30/60.
+    if (datos.agingLimite1 !== undefined || datos.agingLimite2 !== undefined) {
+      const actualCfg = await tx.configuracionEmpresa.findUnique({
+        where: { idEmpresa },
+        select: { agingLimite1: true, agingLimite2: true },
+      });
+      const l1 = datos.agingLimite1 ?? actualCfg?.agingLimite1 ?? 30;
+      const l2 = datos.agingLimite2 ?? actualCfg?.agingLimite2 ?? 60;
+      if (l1 >= l2) {
+        throw new ErrorValidacion(
+          'El primer límite de antigüedad debe ser menor que el segundo (p. ej. 30 y 60).',
+        );
+      }
+    }
+
     if (datos.idAlmacenPtDefault !== undefined && datos.idAlmacenPtDefault !== null) {
       const almacen = await tx.almacen.findFirst({
         where: {
@@ -388,6 +429,8 @@ export async function actualizarConfiguracion(
       ...(datos.utilidadSugerida === undefined ? {} : { utilidadSugerida: datos.utilidadSugerida }),
       ...(datos.regaliasBase === undefined ? {} : { regaliasBase: datos.regaliasBase }),
       ...(datos.colchonCostura === undefined ? {} : { colchonCostura: datos.colchonCostura }),
+      ...(datos.agingLimite1 === undefined ? {} : { agingLimite1: datos.agingLimite1 }),
+      ...(datos.agingLimite2 === undefined ? {} : { agingLimite2: datos.agingLimite2 }),
       ...(datos.fechaInventarioTelas === undefined
         ? {}
         : { fechaInventarioTelas: datos.fechaInventarioTelas }),
@@ -418,4 +461,366 @@ export async function actualizarConfiguracion(
 
     return configuracion;
   }, bd);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGO de la empresa (post-F9, petición de Daniel del 25-jul-2026)
+//
+// "Hay que brandear todos los formatos de impresión con el logo de la empresa así
+// como el sistema… ponerlo en algún lado donde podamos actualizar el logo y que se
+// actualice de manera automática": ese "algún lado" es ESTO. Un solo archivo en R2
+// por empresa (`Empresa.idArchivoLogo`) que alimenta los 23 impresos PDF (vía
+// `comun/impresos-estilos.ts` → `EncabezadoDocumento`) y la app (riel + login).
+// Cambiarlo aquí actualiza TODO sin desplegar; si no hay, se usa el empaquetado.
+//
+// Calca el flujo presigned de la foto de bordado (F1-E3): POST de metadatos → el
+// backend crea el `Archivo` y liga la FK → el navegador hace PUT directo a R2.
+// Cada operación tira la caché en memoria del logo para que el cambio se vea ya.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Carpeta lógica de los logos dentro del bucket. */
+const CARPETA_LOGOS = 'empresas/logos';
+
+/** Resultado de preparar la subida del logo (registro + URL PUT prefirmada). */
+export interface SubidaLogoEmpresa {
+  idArchivo: string;
+  nombreOriginal: string;
+  urlSubida: string;
+  expiraEnSegundos: number;
+}
+
+/** Logo de una empresa con su URL de descarga prefirmada (todo `null` si no tiene). */
+export interface LogoEmpresaConUrl {
+  idArchivo: string | null;
+  nombreOriginal: string | null;
+  tipoMime: string | null;
+  tamanoBytes: number | null;
+  urlDescarga: string | null;
+}
+
+/** Datos que manda el navegador para preparar la subida del logo. */
+export interface EntradaSubidaLogo {
+  nombreOriginal: string;
+  tipoMime: string;
+  tamanoBytes: number;
+}
+
+/**
+ * Validación del logo. Más ESTRECHA que la de una foto cualquiera, y a propósito:
+ *  • Solo PNG/JPEG — `@react-pdf/renderer` no sabe incrustar SVG ni WEBP por `<Image src>`, y un
+ *    logo que no se puede imprimir no sirve para lo que Daniel pidió.
+ *  • Tope de 5 MB — es un membrete: los bytes viajan dentro de CADA PDF (data-URL) y se cachean en
+ *    memoria del servidor; un archivo enorme inflaría todos los impresos.
+ * El servidor es la autoridad: el navegador valida lo mismo, pero solo por UX.
+ */
+const esquemaSubidaLogo = z.object({
+  nombreOriginal: z
+    .string({ error: 'El nombre del archivo es obligatorio' })
+    .trim()
+    .min(1, 'El nombre del archivo es obligatorio.')
+    .max(255),
+  tipoMime: z
+    .string({ error: 'El tipo de archivo es obligatorio' })
+    .trim()
+    .toLowerCase()
+    .refine(
+      (valor) => (MIME_LOGO_PERMITIDOS as readonly string[]).includes(valor),
+      'El logo debe ser una imagen PNG o JPG (son los formatos que se pueden imprimir en los PDF).',
+    ),
+  tamanoBytes: z
+    .number({ error: 'El tamaño es obligatorio' })
+    .int('El tamaño debe ser un entero de bytes.')
+    .positive('El archivo está vacío.')
+    .max(TAMANO_MAXIMO_LOGO_BYTES, 'El logo no puede pesar más de 5 MB.'),
+});
+
+/**
+ * PASO 1 de la subida del LOGO: crea el registro `Archivo` (carpeta `empresas/logos/<id>`, key
+ * ordenada por id — A5) y devuelve la URL PUT prefirmada para que el navegador suba DIRECTO a R2.
+ * Exige `empresas.administrar`.
+ *
+ * **NO toca el logo vigente**: ni lo desliga ni lo borra. Eso pasa en {@link confirmarLogo}, cuando
+ * el PUT ya salió bien. Es a propósito y se apartó del patrón de la foto de bordado (que sí
+ * reemplaza en la solicitud) porque el logo NO es un adjunto más: si el PUT falla o el usuario
+ * cierra la pestaña a media subida, con el patrón viejo el logo bueno ya estaba borrado y la
+ * empresa quedaba apuntando a un objeto inexistente — es decir, la marca del sistema entero rota,
+ * y encima con un viaje fallido a R2 en CADA impreso (los fallos no se cachean, a propósito).
+ * Con el orden nuevo, una subida a medias no cambia nada: el logo anterior sigue en su lugar.
+ *
+ * El precio es un `Archivo` (y su objeto en R2) huérfano si nadie confirma — el mismo trade-off ya
+ * aceptado en el repo para las subidas presigned, y muchísimo más barato que perder la marca.
+ */
+export async function solicitarSubidaLogo(
+  sesion: SesionUsuario,
+  idEmpresa: number,
+  entrada: EntradaSubidaLogo,
+  bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
+): Promise<SubidaLogoEmpresa> {
+  verificarPermiso(sesion, 'empresas.administrar');
+  const datos = validarEntrada(esquemaSubidaLogo, entrada);
+
+  return enTransaccion(async (tx) => {
+    await exigirEmpresa(tx, idEmpresa);
+
+    const preparada = await archivos.solicitarSubida(tx, sesion, {
+      nombreOriginal: datos.nombreOriginal,
+      tipoMime: datos.tipoMime,
+      tamanoBytes: datos.tamanoBytes,
+      carpeta: `${CARPETA_LOGOS}/${String(idEmpresa)}`,
+    });
+
+    return {
+      idArchivo: preparada.archivo.id,
+      nombreOriginal: datos.nombreOriginal,
+      urlSubida: preparada.urlSubida,
+      expiraEnSegundos: preparada.expiraEnSegundos,
+    };
+  }, bd);
+}
+
+/**
+ * Rechaza los PNG que el generador de PDFs pinta MAL (16 bits por canal, o paleta con
+ * transparencia). Es la ÚNICA oportunidad de mirar los bytes: la subida va DIRECTA del navegador a
+ * R2 con una URL prefirmada, así que el servidor no los ve hasta que le confirman la key.
+ *
+ * ⚠️ Se ejecuta **FUERA de la transacción** (ver {@link confirmarLogo}): baja hasta 5 MB de R2, y
+ * una transacción interactiva de Prisma tiene timeout (un round-trip lento la reventaría con
+ * `P2028` → 500 opaco) además de retener una conexión del pool durante toda la espera.
+ *
+ * Se aplica solo a los PNG (los JPG no tienen el problema). Si R2 no responde NO se bloquea la
+ * confirmación: el logo se acepta —perder la marca por un bache de red sería peor que un logo con
+ * el color corrido— y queda el aviso en el log. El veredicto lo da la función pura
+ * `problemaPngParaPdf` (`comun/png.ts`), probada aparte.
+ */
+async function exigirPngImprimible(
+  archivo: { key: string; tipoMime: string | null },
+  archivos: ServicioArchivos | undefined,
+): Promise<void> {
+  if (archivo.tipoMime?.toLowerCase() !== 'image/png') return;
+
+  let bytes: Buffer;
+  try {
+    // El servicio se resuelve AQUÍ (no como default del parámetro): construirlo exige la config de
+    // R2 y no tiene por qué pedirse cuando el logo es un JPG.
+    bytes = await (archivos ?? servicioArchivos()).descargarContenido(
+      archivo.key,
+      TAMANO_MAXIMO_LOGO_BYTES,
+    );
+  } catch (error) {
+    console.warn(
+      `No se pudo leer el logo recién subido (${archivo.key}) para validar su PNG; se acepta sin revisar.`,
+      error,
+    );
+    return;
+  }
+
+  const problema = problemaPngParaPdf(bytes);
+  if (problema !== null) {
+    throw new ErrorValidacion(problema);
+  }
+}
+
+/**
+ * Lectura previa (SIN transacción) para inspeccionar el PNG antes de confirmarlo. Se salta en los
+ * casos que la transacción va a resolver igual (ya vigente = idempotente; archivo inexistente;
+ * archivo de otra entidad): no tiene caso bajar bytes para eso.
+ */
+async function inspeccionarLogoAntesDeConfirmar(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  idArchivo: string,
+  archivos: ServicioArchivos | undefined,
+): Promise<void> {
+  const empresa = await cliente.empresa.findUnique({
+    where: { id: idEmpresa },
+    select: { idArchivoLogo: true },
+  });
+  if (empresa === null || empresa.idArchivoLogo === idArchivo) return;
+
+  const archivo = await cliente.archivo.findUnique({
+    where: { id: idArchivo },
+    select: { key: true, tipoMime: true },
+  });
+  if (archivo === null) return;
+  if (!archivo.key.startsWith(`${CARPETA_LOGOS}/${String(idEmpresa)}/`)) return;
+
+  await exigirPngImprimible(archivo, archivos);
+}
+
+/**
+ * PASO 2 de la subida del LOGO: con el objeto YA en R2, liga el `Archivo` a la empresa y borra el
+ * logo anterior, todo en UNA transacción (A2). Solo aquí cambia la marca del sistema, así que una
+ * subida que no llegó a terminar NUNCA deja a la empresa sin logo. Exige `empresas.administrar`.
+ *
+ * Es IDEMPOTENTE: confirmar dos veces el mismo archivo no hace nada la segunda. El archivo debe
+ * existir y haber nacido de {@link solicitarSubidaLogo} para ESTA empresa (se comprueba por el
+ * prefijo de su key), para que no se pueda apropiar el adjunto de otra entidad.
+ *
+ * Al terminar invalida la caché en memoria del logo: el siguiente impreso y la siguiente carga de
+ * la app ya salen con el logo nuevo.
+ *
+ * La INSPECCIÓN del PNG va ANTES de abrir la transacción (baja el objeto de R2; ver
+ * {@link exigirPngImprimible}). Lo que valida afuera se vuelve a validar adentro —existencia del
+ * archivo y pertenencia por prefijo de key—, así que la comprobación previa nunca es la autoridad:
+ * solo evita bajar bytes de un archivo que la transacción va a rechazar igual.
+ */
+export async function confirmarLogo(
+  sesion: SesionUsuario,
+  idEmpresa: number,
+  idArchivo: string,
+  bd?: ContextoBd,
+  archivos?: ServicioArchivos,
+): Promise<void> {
+  verificarPermiso(sesion, 'empresas.administrar');
+
+  await inspeccionarLogoAntesDeConfirmar(clienteLectura(bd), idEmpresa, idArchivo, archivos);
+
+  await enTransaccion(async (tx) => {
+    const actual = await exigirEmpresa(tx, idEmpresa);
+    if (actual.idArchivoLogo === idArchivo) {
+      return; // ya confirmado: idempotente
+    }
+
+    const archivo = await tx.archivo.findUnique({
+      where: { id: idArchivo },
+      select: { id: true, key: true, nombreOriginal: true, tipoMime: true },
+    });
+    if (archivo === null) {
+      throw new ErrorNoEncontrado('Archivo del logo', idArchivo);
+    }
+    if (!archivo.key.startsWith(`${CARPETA_LOGOS}/${String(idEmpresa)}/`)) {
+      throw new ErrorValidacion('Ese archivo no es un logo de esta empresa.');
+    }
+
+    await tx.empresa.update({
+      where: { id: idEmpresa },
+      data: { idArchivoLogo: idArchivo, ...datosModificacion(sesion) },
+    });
+
+    // El logo anterior queda huérfano: se borra en la MISMA transacción (la FK ya apunta al nuevo,
+    // así que el SetNull del borrado no toca al nuevo). El objeto R2 huérfano es inofensivo.
+    if (actual.idArchivoLogo !== null) {
+      await tx.archivo.deleteMany({ where: { id: actual.idArchivoLogo } });
+    }
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Empresa',
+      idEntidad: idEmpresa,
+      accion: 'MODIFICAR',
+      datos: {
+        logo: actual.idArchivoLogo === null ? 'agregar' : 'reemplazar',
+        archivo: archivo.nombreOriginal,
+      },
+    });
+  }, bd);
+
+  invalidarLogoEmpresa(idEmpresa);
+}
+
+/**
+ * Quita el LOGO de la empresa en UNA transacción (A2): borra el `Archivo` (el `onDelete SetNull` de
+ * la FK deja `idArchivoLogo` en null, sin huérfanos) y deja constancia en la bitácora. A partir de
+ * ahí, impresos y app vuelven al logo EMPAQUETADO del repo. Requiere `empresas.administrar`; si la
+ * empresa no tiene logo → `ErrorConflicto` (la pantalla estaba desactualizada).
+ */
+export async function quitarLogo(
+  sesion: SesionUsuario,
+  idEmpresa: number,
+  bd?: ContextoBd,
+): Promise<void> {
+  verificarPermiso(sesion, 'empresas.administrar');
+
+  await enTransaccion(async (tx) => {
+    const actual = await exigirEmpresa(tx, idEmpresa);
+    if (actual.idArchivoLogo === null) {
+      throw new ErrorConflicto(`La empresa "${actual.nombre}" no tiene logo.`);
+    }
+
+    // `deleteMany` (no `delete`): con dos peticiones de "quitar" en paralelo, ambas leen el mismo
+    // `idArchivoLogo` y la segunda encontraría la fila ya borrada. `delete` lanzaría P2025 → 500;
+    // `deleteMany` devuelve 0 y aquí se traduce al 409 que corresponde ("ya no tenía logo").
+    const borrados = await tx.archivo.deleteMany({ where: { id: actual.idArchivoLogo } });
+    if (borrados.count === 0) {
+      throw new ErrorConflicto(`La empresa "${actual.nombre}" no tiene logo.`);
+    }
+    await tx.empresa.update({ where: { id: idEmpresa }, data: { ...datosModificacion(sesion) } });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Empresa',
+      idEntidad: idEmpresa,
+      accion: 'MODIFICAR',
+      datos: { logo: 'quitar' },
+    });
+  }, bd);
+
+  invalidarLogoEmpresa(idEmpresa);
+}
+
+/**
+ * Devuelve el LOGO de la empresa con su URL GET prefirmada (o todo en `null` si no tiene). Lo usa
+ * la pantalla de Administración › Empresas para la vista previa.
+ *
+ * Su ruta exige `empresas.administrar`: entrega una URL PREFIRMADA de R2 de CUALQUIER empresa por
+ * id, y eso es acceso al almacenamiento, no marca. La marca que necesita toda la app (el riel, el
+ * login) se sirve aparte por `imagenLogoEmpresa` / `GET /api/empresas/logo`, que solo devuelve los
+ * bytes de la imagen de la empresa de la sesión, así que restringir esto no deja a nadie sin logo.
+ *
+ * La `sesion` no se usa aquí (el guard de la ruta ya autorizó); se recibe para mantener la firma
+ * uniforme del resto del módulo.
+ */
+export async function logoEmpresa(
+  _sesion: SesionUsuario,
+  idEmpresa: number,
+  bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
+): Promise<LogoEmpresaConUrl> {
+  const empresa = await clienteLectura(bd).empresa.findUnique({
+    where: { id: idEmpresa },
+    select: {
+      id: true,
+      archivoLogo: {
+        select: { id: true, key: true, nombreOriginal: true, tipoMime: true, tamanoBytes: true },
+      },
+    },
+  });
+  if (empresa === null) {
+    throw new ErrorNoEncontrado('Empresa', idEmpresa);
+  }
+
+  const logo = empresa.archivoLogo;
+  if (logo === null) {
+    return {
+      idArchivo: null,
+      nombreOriginal: null,
+      tipoMime: null,
+      tamanoBytes: null,
+      urlDescarga: null,
+    };
+  }
+
+  return {
+    idArchivo: logo.id,
+    nombreOriginal: logo.nombreOriginal,
+    tipoMime: logo.tipoMime,
+    tamanoBytes: logo.tamanoBytes,
+    urlDescarga: await archivos.urlDescarga(logo.key),
+  };
+}
+
+/**
+ * IMAGEN del logo, lista para servirla por HTTP: los bytes del logo subido o, si no hay (o R2
+ * falla), los del PNG empaquetado. **Nunca falla** — es el mismo resolutor que usan los impresos
+ * (`comun/logo-empresa.ts`), con su caché en memoria.
+ *
+ * `sesion === null` (petición SIN autenticar, que es el caso de la pantalla de login) devuelve el
+ * logo de la empresa PREDETERMINADA. Es deliberado: un logo es marca PÚBLICA —va impreso en los
+ * documentos que se mandan a clientes y proveedores— y sin esto el login sería el único rincón del
+ * sistema que no se actualizaría al cambiar el logo, justo lo contrario de lo que se pidió. No se
+ * expone nada más: solo los bytes de una imagen (ni nombre de empresa, ni ids, ni URLs de R2).
+ *
+ * Con sesión, el logo es el de la EMPRESA ACTIVA (A9): quien opera la empresa B ve la marca de B.
+ */
+export async function imagenLogoEmpresa(sesion: SesionUsuario | null): Promise<LogoResuelto> {
+  return obtenerLogoEmpresa(sesion?.idEmpresaActiva);
 }

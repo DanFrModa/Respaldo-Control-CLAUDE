@@ -2,7 +2,6 @@ import { Calculator, FileText, ListChecks, Shirt, TrendingUp, type LucideIcon } 
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -19,7 +18,6 @@ interface SubvistaCostos {
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  tono: Tono;
   permiso: ClavePermiso;
 }
 
@@ -30,7 +28,6 @@ const SUB_VISTAS: readonly SubvistaCostos[] = [
     descripcion: 'Costo estimado de un modelo a partir de su receta y los precios de catálogo.',
     ruta: '/costos/pre-costo',
     icono: Shirt,
-    tono: 'telas',
     permiso: 'precostos.consultar',
   },
   {
@@ -39,7 +36,6 @@ const SUB_VISTAS: readonly SubvistaCostos[] = [
     descripcion: 'Precio de venta sugerido por modelo (utilidad + regalías), con PDF por género.',
     ruta: '/costos/lista-precios',
     icono: FileText,
-    tono: 'avios',
     permiso: 'precostos.consultar',
   },
   {
@@ -48,7 +44,6 @@ const SUB_VISTAS: readonly SubvistaCostos[] = [
     descripcion: 'Costo real de una orden: teórico vs guardado, con su costo unitario por base.',
     ruta: '/costos/costeo',
     icono: Calculator,
-    tono: 'pt',
     permiso: 'costos.ver',
   },
   {
@@ -57,7 +52,6 @@ const SUB_VISTAS: readonly SubvistaCostos[] = [
     descripcion: 'Órdenes ya costeadas con su costo total y unitario.',
     ruta: '/costos/lista',
     icono: ListChecks,
-    tono: 'servicios',
     permiso: 'costos.ver',
   },
   {
@@ -66,7 +60,6 @@ const SUB_VISTAS: readonly SubvistaCostos[] = [
     descripcion: 'Importe, margen promedio, margen ponderado y margen $ por pieza (PDF/Excel).',
     ruta: '/costos/margenes',
     icono: TrendingUp,
-    tono: 'neutro',
     permiso: 'costos.ver',
   },
 ];
@@ -78,18 +71,11 @@ export function CostosPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <Calculator className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Costos</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pre-costo por modelo, costo real por orden y márgenes por pedido. La regalía va sobre
-              la venta, no en el costo.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Costos</h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Pre-costo por modelo, costo real por orden y márgenes por pedido. La regalía va sobre la
+          venta, no en el costo.
+        </p>
 
         {visibles.length === 0 ? (
           <p className="mt-6 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -108,7 +94,7 @@ export function CostosPagina(): React.JSX.Element {
                   aria-hidden
                   className={cn(
                     'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                    avatarPorTono(sub.tono),
+                    'bg-primary-soft text-primary-soft-foreground',
                   )}
                 >
                   <sub.icono className="size-5" aria-hidden />

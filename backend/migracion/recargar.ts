@@ -4,7 +4,9 @@
  * Orquesta, en SECUENCIA y con banner por paso: limpieza opcional de la BD (reusa
  * `limpiar-datos.ts`) → seed de fundación (el MISMO `prisma/seed.ts` idempotente que dispara
  * `SEED_ON_START` vía `prisma db seed`; correrlo aquí evita esperar un redeploy para poder
- * cargar) → los 12 ETL en el orden documentado del README → los 6 cuadres.
+ * cargar) → los 12 ETL en el orden documentado del README → los ETL de F9 SI se pasaron sus
+ * banderas (opcionales: sus fuentes aún no existen) → el **realineado del estado de las
+ * órdenes** (paso final obligatorio de toda carga) → los cuadres.
  *
  * USO (desde `backend/`, como todos los ETL — ver README):
  *
@@ -20,7 +22,12 @@
  *    `--limpiar`) significa "ejecuta la carga sin vaciar antes" — es el modo de REANUDAR.
  *  • `--limpiar`: vacía la BD antes de cargar (TRUNCATE, reusa `limpiar-datos.ts`) y agrega
  *    el paso de seed. Como todo, solo ejecuta con `--confirmar`.
- *  • `--sin-cuadres`: se salta los cuadres del final.
+ *  • `--sin-cuadres`: se salta los cuadres del final (el realineado SÍ corre: es carga, no
+ *    verificación).
+ *  • `--saldos-terceros=<ruta.csv>` / `--cfdi=<carpeta>` (F9, OPCIONALES): activan
+ *    `etl-terceros-saldos` (+ `cuadre-f9`) y `etl-cfdi-masivo`. Sin ellas esos pasos se
+ *    OMITEN y el plan lo dice — sus fuentes (corte de SINUBE / export del contador) aún no
+ *    existen (D15c), así que meterlos por defecto tronaría por archivo faltante.
  *
  * Cada ETL corre como SUBPROCESO (no import): cada script ya es standalone con su propio
  * cliente Prisma y su reporte; el spawn es portable (Windows/Linux: `process.execPath` + el
@@ -60,10 +67,12 @@ const RAIZ_BACKEND = fileURLToPath(new URL('..', import.meta.url));
  */
 const TSX_CLI = createRequire(import.meta.url).resolve('tsx/cli');
 
-/** Un paso del plan: etiqueta legible + script tsx a correr (relativo a `backend/`). */
+/** Un paso del plan: etiqueta legible + script tsx a correr (relativo a `backend/`) + args. */
 interface Paso {
   etiqueta: string;
   script: string;
+  /** Argumentos que se le pasan al script (p. ej. `--archivo=saldos.csv` de los ETL de F9). */
+  args?: string[];
 }
 
 /** ETLs en el ORDEN documentado del README (la cadena de mapeos/FKs importa). */
@@ -98,6 +107,52 @@ const PASO_SEED: Paso = {
   script: 'prisma/seed.ts',
 };
 
+/**
+ * MANTENIMIENTO OBLIGATORIO al terminar cualquier carga (su propio encabezado lo exige): el ETL
+ * es fiel a Access (`crearOrdenMigrada` copia el `estado` tal cual) pero la regla de `completa`
+ * es de v2 (tallas + avíos + arte si aplica) → sin este paso el semáforo de "Órdenes
+ * incompletas" queda desalineado recién cargada la base.
+ *
+ * Va DESPUÉS de los ETL y ANTES de los cuadres a propósito: los cuadres deben reportar el estado
+ * FINAL de la BD. Es seguro en cualquier orden — ningún cuadre lee `Orden.estado` (verificado:
+ * `cuadre-f2` cuenta órdenes sin filtrar por estado y el `estado` de `cuadre-f6` es el de
+ * `EsMaCargo`), así que ninguna cifra del cuadre cambia por correrlo antes.
+ */
+const PASO_REALINEAR: Paso = {
+  etiqueta: 'Realinear estado de órdenes (completa/capturada — obligatorio tras cargar)',
+  script: 'migracion/realinear-estado-ordenes.ts',
+};
+
+/**
+ * F9 (Finanzas) — OPCIONALES: sus fuentes NO vienen de Access sino del corte de SINUBE / export
+ * del contador, y **aún no existen** (D15c). Por eso NUNCA entran al flujo por defecto (tronarían
+ * por archivo faltante): solo con `--saldos-terceros=<csv>` / `--cfdi=<carpeta>`.
+ */
+function pasosF9(args: Argumentos): { etl: Paso[]; cuadre: Paso[] } {
+  const etl: Paso[] = [];
+  const cuadre: Paso[] = [];
+  if (args.saldosTerceros !== null) {
+    etl.push({
+      etiqueta: 'F9 · saldos iniciales de terceros (CxC/CxP)',
+      script: 'migracion/etl-terceros-saldos.ts',
+      args: [`--archivo=${args.saldosTerceros}`],
+    });
+    cuadre.push({
+      etiqueta: 'Cuadre F9 (corte vs aperturas cargadas)',
+      script: 'migracion/cuadre-f9.ts',
+      args: [`--archivo=${args.saldosTerceros}`],
+    });
+  }
+  if (args.cfdi !== null) {
+    etl.push({
+      etiqueta: 'F9 · CFDI históricos (carpeta de XML)',
+      script: 'migracion/etl-cfdi-masivo.ts',
+      args: [`--dir=${args.cfdi}`],
+    });
+  }
+  return { etl, cuadre };
+}
+
 /** Resultado de un paso ya corrido (para la tabla del resumen final). */
 interface PasoCorrido {
   etiqueta: string;
@@ -124,8 +179,8 @@ function banner(numero: number, total: number, etiqueta: string): void {
  * Corre un script con tsx como subproceso SECUENCIAL, con la salida heredada (se ve el output
  * normal del ETL). Devuelve el exit code (null del SO se trata como fallo).
  */
-function correrScript(script: string): number {
-  const res = spawnSync(process.execPath, [TSX_CLI, script], {
+function correrScript(script: string, args: string[] = []): number {
+  const res = spawnSync(process.execPath, [TSX_CLI, script, ...args], {
     cwd: RAIZ_BACKEND,
     stdio: 'inherit',
     env: process.env, // hereda ETL_DESDE + todo el .env del padre
@@ -143,21 +198,37 @@ interface Argumentos {
   limpiar: boolean;
   confirmar: boolean;
   sinCuadres: boolean;
+  /** F9 opcional: ruta del CSV del corte de saldos de terceros (SINUBE). */
+  saldosTerceros: string | null;
+  /** F9 opcional: carpeta con los XML de CFDI históricos. */
+  cfdi: string | null;
 }
+
+/** Uso del comando (se imprime ante una bandera desconocida). */
+const USO =
+  '  npx tsx --env-file=.env migracion/recargar.ts [--desde=YYYY-MM-DD] [--limpiar] [--confirmar]\n' +
+  '      [--sin-cuadres] [--saldos-terceros=<ruta.csv>] [--cfdi=<carpeta>]';
 
 /** Parsea los argumentos; bandera desconocida → aborta (mejor que ignorarla en silencio). */
 function parsearArgumentos(argv: string[]): Argumentos {
-  const args: Argumentos = { desde: null, limpiar: false, confirmar: false, sinCuadres: false };
+  const args: Argumentos = {
+    desde: null,
+    limpiar: false,
+    confirmar: false,
+    sinCuadres: false,
+    saldosTerceros: null,
+    cfdi: null,
+  };
   for (const crudo of argv) {
     if (crudo.startsWith('--desde=')) args.desde = crudo.slice('--desde='.length);
+    else if (crudo.startsWith('--saldos-terceros='))
+      args.saldosTerceros = crudo.slice('--saldos-terceros='.length);
+    else if (crudo.startsWith('--cfdi=')) args.cfdi = crudo.slice('--cfdi='.length);
     else if (crudo === '--limpiar') args.limpiar = true;
     else if (crudo === '--confirmar') args.confirmar = true;
     else if (crudo === '--sin-cuadres') args.sinCuadres = true;
     else {
-      console.error(
-        `Bandera desconocida: "${crudo}". Uso:\n` +
-          '  npx tsx --env-file=.env migracion/recargar.ts [--desde=YYYY-MM-DD] [--limpiar] [--confirmar] [--sin-cuadres]',
-      );
+      console.error(`Bandera desconocida: "${crudo}". Uso:\n${USO}`);
       process.exit(1);
     }
   }
@@ -165,7 +236,7 @@ function parsearArgumentos(argv: string[]): Argumentos {
 }
 
 /** Imprime el plan de pasos (modo plan y arranque). Con `conLimpieza` antepone el paso 0. */
-function imprimirPlan(pasos: Paso[], conLimpieza: boolean): void {
+function imprimirPlan(pasos: Paso[], conLimpieza: boolean, args: Argumentos): void {
   console.log('\nPlan de pasos (en este orden):');
   if (conLimpieza) {
     console.log(
@@ -173,13 +244,32 @@ function imprimirPlan(pasos: Paso[], conLimpieza: boolean): void {
     );
   }
   pasos.forEach((p, i) => {
-    console.log(`  ${String(i + 1).padStart(2)}. ${p.etiqueta}  (${p.script})`);
+    const args_ = p.args === undefined || p.args.length === 0 ? '' : ` ${p.args.join(' ')}`;
+    console.log(`  ${String(i + 1).padStart(2)}. ${p.etiqueta}  (${p.script}${args_})`);
   });
+  // Lo OMITIDO también se dice (nada en silencio): F9 no corre sin sus banderas.
+  const omitidos: string[] = [];
+  if (args.saldosTerceros === null) {
+    omitidos.push(
+      '   • F9 · saldos iniciales de terceros + cuadre F9 — OMITIDOS (sin --saldos-terceros=<ruta.csv>;\n' +
+        '     la fuente es el corte de SINUBE/contador y aún no existe, D15c)',
+    );
+  }
+  if (args.cfdi === null) {
+    omitidos.push(
+      '   • F9 · CFDI históricos — OMITIDO (sin --cfdi=<carpeta>; la carpeta de XML aún no existe)',
+    );
+  }
+  omitidos.push(
+    '   • Fotos masivas de modelos/bordados — OMITIDAS (se corren aparte cuando exista la carpeta física)',
+  );
+  console.log('\nPasos OPCIONALES que NO se van a correr:');
+  for (const o of omitidos) console.log(o);
 }
 
 /**
  * Arma el comando exacto de `recargar.ts` para los mensajes (modo plan / reanudación),
- * preservando `--desde`/`--sin-cuadres` tal como vinieron y forzando `--confirmar`.
+ * preservando las banderas tal como vinieron y forzando `--confirmar`.
  */
 function comandoRecargar(args: Argumentos, opciones: { conLimpiar: boolean }): string {
   return (
@@ -187,7 +277,9 @@ function comandoRecargar(args: Argumentos, opciones: { conLimpiar: boolean }): s
     (args.desde !== null ? ` --desde=${args.desde}` : '') +
     (opciones.conLimpiar ? ' --limpiar' : '') +
     ' --confirmar' +
-    (args.sinCuadres ? ' --sin-cuadres' : '')
+    (args.sinCuadres ? ' --sin-cuadres' : '') +
+    (args.saldosTerceros !== null ? ` --saldos-terceros=${args.saldosTerceros}` : '') +
+    (args.cfdi !== null ? ` --cfdi=${args.cfdi}` : '')
   );
 }
 
@@ -231,10 +323,15 @@ async function main(): Promise<void> {
   );
 
   // Plan de pasos (la limpieza va aparte: no es subproceso, corre en este mismo proceso).
+  // Orden: seed → ETL → F9 opcional → REALINEADO (obligatorio, cierra la carga) → cuadres
+  // (leen la BD ya final; ninguno depende de `Orden.estado`, ver el TSDoc de PASO_REALINEAR).
+  const f9 = pasosF9(args);
   const pasos: Paso[] = [
     ...(args.limpiar ? [PASO_SEED] : []), // el seed solo hace falta tras vaciar (es idempotente)
     ...PASOS_ETL,
-    ...(args.sinCuadres ? [] : PASOS_CUADRE),
+    ...f9.etl,
+    PASO_REALINEAR,
+    ...(args.sinCuadres ? [] : [...PASOS_CUADRE, ...f9.cuadre]),
   ];
 
   // ── MODO PLAN: sin --confirmar NUNCA se ejecuta nada (ni siquiera la carga sin limpieza) ───
@@ -253,7 +350,7 @@ async function main(): Promise<void> {
         await cliente.$disconnect();
       }
     }
-    imprimirPlan(pasos, args.limpiar);
+    imprimirPlan(pasos, args.limpiar, args);
     console.log('\nPara ejecutar de verdad: agrega --confirmar');
     console.log(comandoRecargar(args, { conLimpiar: args.limpiar }));
     return; // exit 0: solo plan
@@ -280,7 +377,7 @@ async function main(): Promise<void> {
     }
   }
 
-  imprimirPlan(pasos, false);
+  imprimirPlan(pasos, false, args);
 
   // ── Pasos secuenciales (seed → ETLs → cuadres) ─────────────────────────────────────────────
   const corridos: PasoCorrido[] = pasos.map((p) => ({
@@ -295,7 +392,7 @@ async function main(): Promise<void> {
     if (paso === undefined || corrido === undefined) continue;
     banner(i + 1, pasos.length, paso.etiqueta);
     const inicio = Date.now();
-    const exit = correrScript(paso.script);
+    const exit = correrScript(paso.script, paso.args ?? []);
     corrido.segundos = (Date.now() - inicio) / 1000;
     corrido.estado = exit === 0 ? 'OK' : 'FALLÓ';
     if (exit !== 0) {

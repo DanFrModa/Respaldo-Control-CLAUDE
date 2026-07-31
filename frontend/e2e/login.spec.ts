@@ -43,32 +43,68 @@ test.describe('Inicio de sesión', () => {
     await expect(page.getByText('La contraseña es obligatoria')).toBeVisible();
   });
 
-  test('el admin entra y ve el layout con todos sus módulos', async ({ page }) => {
+  test('el admin entra y ve el riel con los grupos aprobados del rediseño', async ({ page }) => {
     await entrarComoAdmin(page);
 
-    // Entró a la app (inicio).
+    // Entró a la app (el Resumen operativo del rediseño R9).
     await expect(page).toHaveURL(/\/$|\/$/);
-    await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
 
-    // El admin (todos los permisos) ve el menú completo. NO se fija un número exacto de links: cada
-    // fase suma módulos/sub-vistas y un `toHaveCount` exacto se rompería en cada etapa. Se valida un
-    // PISO razonable y la presencia de módulos representativos de varias áreas.
+    // El admin (todos los permisos) ve el menú del rediseño R1: GRUPOS con
+    // desplegables de 2 niveles (estructura aprobada por Daniel, 4-jul-2026).
     const navegacion = page.getByRole('navigation', { name: 'Módulos' }).first();
-    const links = navegacion.getByRole('link');
-    expect(await links.count()).toBeGreaterThanOrEqual(20);
-    for (const modulo of [
-      'Catálogos',
-      'Producción',
+
+    // Los 6 rótulos de grupo (Resumen va suelto, sin rótulo).
+    for (const grupo of [
+      'Operación',
       'Inventarios',
-      'Ruta Crítica',
-      // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
-      'Concentrado planeado vs real',
-      // Calidad (F6-E1): módulo + sub-vista de defectos.
-      'Calidad',
-      'Administración',
+      'Comercial',
+      'Finanzas',
+      'Análisis',
+      'Sistema',
     ]) {
-      await expect(links.filter({ hasText: modulo }).first()).toBeVisible();
+      await expect(navegacion.getByText(grupo, { exact: true })).toBeVisible();
     }
+
+    // Hojas directas visibles sin desplegar nada.
+    for (const hoja of ['Resumen', 'Pedidos', 'Proveedores', 'Cuentas por cobrar']) {
+      await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
+    }
+
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 5 padres desplegables
+    // (Desarrollo, Producción, Calidad, Clientes, Catálogos base), ni uno más.
+    const padres = navegacion.getByRole('button');
+    expect(await padres.count()).toBe(5);
+    // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
+    // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
+    // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
+    await expect(
+      navegacion.getByRole('link', { name: 'Notas de salida', exact: true }),
+    ).toBeVisible();
+    await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toHaveCount(0);
+    // El padre sigue siendo desplegable: un clic la cierra y otro la reabre.
+    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
+    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
+    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
+    // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su
+    // configuración interna vive DENTRO de la pantalla, no como sub-menú del riel.
+    await expect(
+      navegacion.getByRole('link', { name: 'Procesos y responsables', exact: true }),
+    ).toBeVisible();
+    await expect(
+      navegacion.getByRole('link', { name: 'Usuarios y accesos', exact: true }),
+    ).toBeVisible();
+    // El concentrado planeado-vs-real ya NO es entrada del riel (se llega por ⌘K/URL).
+    await expect(
+      navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
+    ).toHaveCount(0);
+
+    // El badge de alertas RC del encabezado está montado (dato real del backend).
+    await expect(page.getByTestId('badge-alertas-rc')).toBeVisible();
     // La empresa activa aparece en el encabezado.
     await expect(page.getByTestId('empresa-activa')).toHaveText(CREDENCIALES_ADMIN.empresa);
   });

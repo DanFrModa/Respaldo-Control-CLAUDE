@@ -57,14 +57,37 @@ export {
   esquemaEmpresaSalida,
   esquemaConfiguracionEmpresaActualizar,
   esquemaConfiguracionEmpresaSalida,
+  esquemaEmpresaLogoCrear,
+  esquemaEmpresaLogoConfirmar,
+  esquemaEmpresaLogoSubida,
+  esquemaEmpresaLogoSalida,
   type DatosEmpresaCrear,
   type DatosEmpresaEditar,
   type EmpresaSalida,
   type DatosConfiguracionEmpresaActualizar,
   type ConfiguracionEmpresaSalida,
+  type DatosEmpresaLogoCrear,
+  type DatosEmpresaLogoConfirmar,
+  type EmpresaLogoSubida,
+  type EmpresaLogoSalida,
 } from './esquemas/empresa.js';
 
-export { esquemaRolSalida, type RolSalida } from './esquemas/rol.js';
+export {
+  esquemaRolSalida,
+  esquemaCrearRolBody,
+  esquemaActualizarRolBody,
+  esquemaAsignarPermisosBody,
+  esquemaPermisoCatalogoSalida,
+  esquemaModuloPermisosSalida,
+  esquemaCatalogoPermisosSalida,
+  type RolSalida,
+  type CrearRolBody,
+  type ActualizarRolBody,
+  type AsignarPermisosBody,
+  type PermisoCatalogoSalida,
+  type ModuloPermisosSalida,
+  type CatalogoPermisosSalida,
+} from './esquemas/rol.js';
 
 // ── Catálogos (F1-E1): maestros globales (ADR-0007) ──────────────────────────
 export {
@@ -83,6 +106,9 @@ export {
   esquemaProveedorAdjuntoSubida,
   esquemaProveedorAdjuntoSalida,
   esquemaProveedorAdjuntosLista,
+  esquemaProveedorAvioSalida,
+  esquemaProveedorAviosLista,
+  esquemaProveedorAvioAsignar,
   type DatosProveedorCrear,
   type DatosProveedorEditar,
   type DatosProveedorPatchCuerpo,
@@ -96,6 +122,9 @@ export {
   type ProveedorAdjuntoSubida,
   type ProveedorAdjuntoSalida,
   type ProveedorAdjuntosLista,
+  type ProveedorAvioSalida,
+  type ProveedorAviosLista,
+  type DatosProveedorAvioAsignar,
 } from './esquemas/proveedor.js';
 
 export {
@@ -362,6 +391,120 @@ export {
   type PedidoRealesLista,
 } from './esquemas/pedido.js';
 
+// ── Adjuntos del pedido interno (rediseño R3, B3) ──
+export {
+  esquemaPedidoAdjuntoCrear,
+  esquemaPedidoAdjuntoSubida,
+  esquemaPedidoAdjuntoSalida,
+  esquemaPedidoAdjuntosLista,
+  type DatosPedidoAdjuntoCrear,
+  type PedidoAdjuntoSubida,
+  type PedidoAdjuntoSalida,
+  type PedidoAdjuntosLista,
+} from './esquemas/adjunto-pedido.js';
+
+// ── Salida a producción + candidatos de desarrollo (rediseño R3, B4/B6) ──
+export {
+  esquemaSalidaProduccionCuerpo,
+  esquemaSalidaProduccionSalida,
+  esquemaCandidatosDesarrolloQuery,
+  esquemaCandidatoDesarrollo,
+  esquemaCandidatosDesarrolloSalida,
+  type DatosSalidaProduccion,
+  type SalidaProduccionSalida,
+  type CandidatosDesarrolloQuery,
+  type CandidatoDesarrollo,
+  type CandidatosDesarrolloSalida,
+} from './esquemas/salida-produccion.js';
+
+// ── Importador del pedido del cliente (rediseño R8, B15 — proto §4.1 "Etapa 3") ──
+export {
+  esquemaRolColumnaImportacion,
+  esquemaMapeoColumna,
+  esquemaMapeoImportacion,
+  esquemaPlantillaImportacionSalida,
+  esquemaPlantillaImportacionVigente,
+  esquemaPlantillaImportacionGuardar,
+  esquemaAnalizarImportacionCuerpo,
+  esquemaGrupoImportacion,
+  esquemaPreviewImportacion,
+  esquemaAnalizarImportacionSalida,
+  esquemaResolucionImportacion,
+  esquemaConfirmarImportacionCuerpo,
+  esquemaOrdenImportada,
+  esquemaConfirmarImportacionSalida,
+  esquemaFormatoImportacion,
+  esquemaCampoPdfCya,
+  esquemaCampoVariableImportacion,
+  esquemaPorcentajeAdicional,
+  type RolColumnaImportacion,
+  type MapeoColumna,
+  type MapeoImportacion,
+  type PlantillaImportacionSalida,
+  type PlantillaImportacionVigente,
+  type DatosPlantillaImportacionGuardar,
+  type DatosAnalizarImportacion,
+  type GrupoImportacion,
+  type PreviewImportacion,
+  type AnalizarImportacionSalida,
+  type DatosResolucionImportacion,
+  type DatosConfirmarImportacion,
+  type OrdenImportada,
+  type ConfirmarImportacionSalida,
+  type FormatoImportacion,
+  type CampoPdfCya,
+  type CampoVariableImportacion,
+} from './esquemas/importacion-pedido.js';
+
+// ── Importador de OC del cliente por PDF (petición Daniel — plantilla C&A) ──
+export {
+  esquemaArchivoPdf,
+  esquemaAjusteTallaPdf,
+  esquemaArchivoPdfConfirmar,
+  esquemaAnalizarPdfCyaCuerpo,
+  esquemaTallaPdfCya,
+  esquemaCeldaSobrepedido,
+  esquemaGrupoSobrepedido,
+  esquemaAdvertenciaPdf,
+  esquemaRenglonPdfPreview,
+  esquemaAnalizarPdfCyaSalida,
+  esquemaLigaModeloPdf,
+  esquemaConfirmarPdfCyaCuerpo,
+  esquemaOrdenPdfImportada,
+  esquemaPdfNoReconocido,
+  esquemaConfirmarPdfCyaSalida,
+  MAX_ARCHIVOS_PDF,
+  type ArchivoPdf,
+  type ArchivoPdfConfirmar,
+  type DatosAnalizarPdfCya,
+  type TallaPdfCya,
+  type CeldaSobrepedido,
+  type GrupoSobrepedido,
+  type AdvertenciaPdf,
+  type RenglonPdfPreview,
+  type AnalizarPdfCyaSalida,
+  type DatosLigaModeloPdf,
+  type DatosConfirmarPdfCya,
+  type OrdenPdfImportada,
+  type PdfNoReconocido,
+  type ConfirmarPdfCyaSalida,
+} from './esquemas/importacion-pdf.js';
+
+// ── Consulta de pedidos por mes (rediseño R3, B6 — proto §4.1) ──
+export {
+  esquemaPedidosPorMesQuery,
+  esquemaEstatusPedidoMes,
+  esquemaPedidoMesRenglon,
+  esquemaPedidoMesFila,
+  esquemaPedidosPorMesTotales,
+  esquemaPedidosPorMesSalida,
+  type PedidosPorMesQuery,
+  type PedidoMesRenglon,
+  type PedidoMesFila,
+  type PedidosPorMesTotales,
+  type PedidosPorMesSalida,
+} from './esquemas/pedidos-mes.js';
+
 // ── Órdenes de producción (Módulo ÓRDENES, F2-E2; doc 03-Produccion) ──────────
 export {
   esquemaOrdenTallaEntrada,
@@ -376,6 +519,7 @@ export {
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenComentarioCuerpo,
   esquemaEstadoOrden,
+  esquemaRequisitosOrden,
   esquemaOrdenTallaSalida,
   esquemaOrdenLineaSalida,
   esquemaOrdenReferenciaSalida,
@@ -395,6 +539,7 @@ export {
   type DatosOrdenReferenciaEntrada,
   type DatosOrdenReferencias,
   type DatosOrdenComentario,
+  type RequisitosOrdenSalida,
   type OrdenTallaSalida,
   type OrdenLineaSalida,
   type OrdenReferenciaSalida,
@@ -435,6 +580,32 @@ export {
   type OrdenesBuscarQuery,
 } from './esquemas/orden-consulta.js';
 
+// ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3; brecha B1) ──
+export {
+  esquemaCampoPrecioOrden,
+  esquemaOrdenPreciosPatchCuerpo,
+  esquemaOrdenPrecioUltimoEvento,
+  esquemaOrdenPreciosSalida,
+  esquemaOrdenPrecioEventoSalida,
+  esquemaOrdenPrecioEventosLista,
+  type CampoPrecioOrdenApi,
+  type DatosOrdenPreciosPatch,
+  type OrdenPrecioUltimoEvento,
+  type OrdenPreciosSalida,
+  type OrdenPrecioEventoSalida,
+  type OrdenPrecioEventosLista,
+} from './esquemas/orden-precios.js';
+
+// ── Centro de comando de Órdenes (rediseño R2, §4.2; brecha B2) ───────────────
+export {
+  esquemaOrdenCentroFila,
+  esquemaOrdenesCentroPagina,
+  esquemaOrdenesCentroQuery,
+  type OrdenCentroFila,
+  type OrdenesCentroPagina,
+  type OrdenesCentroQuery,
+} from './esquemas/orden-centro.js';
+
 // ── Órdenes de COMPRA (Módulo 3, F4-E2; doc 03-Produccion §OC) ────────────────
 export {
   esquemaCompraLineaTallaEntrada,
@@ -449,6 +620,8 @@ export {
   esquemaCompraSalida,
   esquemaListarCompras,
   esquemaComprasPagina,
+  esquemaResumenComprasQuery,
+  esquemaResumenCompras,
   type DatosCompraLineaTallaEntrada,
   type DatosCompraLineaEntrada,
   type DatosCompraCrear,
@@ -460,6 +633,8 @@ export {
   type CompraSalida,
   type ListarCompras,
   type ComprasPagina,
+  type ResumenComprasQuery,
+  type ResumenCompras,
 } from './esquemas/compra.js';
 
 // ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
@@ -490,6 +665,8 @@ export {
   esquemaNotaSalidaSalida,
   esquemaNotasSalidaQuery,
   esquemaNotasSalidaPagina,
+  esquemaResumenNotasQuery,
+  esquemaResumenNotasSalida,
   type DatosNotaSalidaLineaEntrada,
   type DatosNotaSalidaCrear,
   type DatosNotaSalidaEditar,
@@ -498,6 +675,8 @@ export {
   type NotaSalidaSalida,
   type NotasSalidaQuery,
   type NotasSalidaPagina,
+  type ResumenNotasQuery,
+  type ResumenNotasSalida,
 } from './esquemas/nota-salida.js';
 
 // ── Explosión MRP / requerimiento de materiales por orden (Módulo 3, F4-E4; R3/R7) ──
@@ -526,6 +705,16 @@ export {
   type EstatusMaterialesSalida,
 } from './esquemas/mrp.js';
 
+// ── Habilitación / surtido de avíos por orden (rediseño R6, B13; §4.6) ──
+export {
+  esquemaEstadoHabilitacion,
+  esquemaHabilitacionAvio,
+  esquemaHabilitacionOrden,
+  type EstadoHabilitacion,
+  type HabilitacionAvio,
+  type HabilitacionOrden,
+} from './esquemas/habilitacion.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,
@@ -539,6 +728,240 @@ export {
   type TiposProcesoQuery,
   type TiposProcesoPagina,
 } from './esquemas/tipo-proceso.js';
+
+// ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1; D13/R16–R20) ──
+export {
+  esquemaConceptoCostoCrear,
+  esquemaConceptoCostoEditar,
+  esquemaConceptoCostoSalida,
+  esquemaConceptosCostoQuery,
+  esquemaConceptosCostoPagina,
+  type DatosConceptoCostoCrear,
+  type DatosConceptoCostoEditar,
+  type ConceptoCostoSalida,
+  type ConceptosCostoQuery,
+  type ConceptosCostoPagina,
+} from './esquemas/concepto-costo.js';
+
+export {
+  esquemaEstadoListaCrear,
+  esquemaEstadoListaEditar,
+  esquemaEstadoListaSalida,
+  esquemaEstadosListaQuery,
+  esquemaEstadosListaPagina,
+  type DatosEstadoListaCrear,
+  type DatosEstadoListaEditar,
+  type EstadoListaSalida,
+  type EstadosListaQuery,
+  type EstadosListaPagina,
+} from './esquemas/estado-lista.js';
+
+export {
+  esquemaClienteDepartamentoCrear,
+  esquemaClienteDepartamentoEditar,
+  esquemaClienteDepartamentoSalida,
+  esquemaClienteDepartamentosLista,
+  type DatosClienteDepartamentoCrear,
+  type DatosClienteDepartamentoEditar,
+  type ClienteDepartamentoSalida,
+  type ClienteDepartamentosLista,
+} from './esquemas/cliente-departamento.js';
+
+// ── Factores del cliente para la lista de precios (Módulo 15, F8-E4; D13/R20a) ──
+export {
+  esquemaClienteFactoresGuardar,
+  esquemaClienteFactoresSalida,
+  esquemaClienteFactoresLista,
+  type DatosClienteFactoresGuardar,
+  type ClienteFactoresSalida,
+  type ClienteFactoresLista,
+} from './esquemas/cliente-factores.js';
+
+export {
+  esquemaTelaProveedorColorEntrada,
+  esquemaTelaProveedorCrear,
+  esquemaTelaProveedorEditar,
+  esquemaTelaProveedorPatchCuerpo,
+  esquemaTelaProveedorColorSalida,
+  esquemaTelaProveedorSalida,
+  esquemaTelaProveedoresLista,
+  type DatosTelaProveedorColorEntrada,
+  type DatosTelaProveedorCrear,
+  type DatosTelaProveedorEditar,
+  type DatosTelaProveedorPatchCuerpo,
+  type TelaProveedorColorSalida,
+  type TelaProveedorSalida,
+  type TelaProveedoresLista,
+} from './esquemas/tela-proveedor.js';
+
+export {
+  esquemaModeloAvioTallaEntrada,
+  esquemaMedidasAvioGuardar,
+  esquemaModeloAvioTallaSalida,
+  esquemaModeloAvioMedidasSalida,
+  type DatosModeloAvioTallaEntrada,
+  type DatosMedidasAvioGuardar,
+  type ModeloAvioTallaSalida,
+  type ModeloAvioMedidasSalida,
+} from './esquemas/modelo-avio-talla.js';
+
+// ── Desarrollo: proyectos + desarrollos (Módulo 15, F8-E2; D13/R16) ──
+export {
+  ESTADOS_DESARROLLO,
+  esquemaEstadoDesarrollo,
+  esquemaDesarrolloCrear,
+  esquemaDesarrolloEditar,
+  esquemaDesarrolloApagarCuerpo,
+  esquemaDesarrolloSalida,
+  type EstadoDesarrolloClave,
+  type DatosDesarrolloCrear,
+  type DatosDesarrolloEditar,
+  type DatosDesarrolloApagar,
+  type DesarrolloSalida,
+} from './esquemas/desarrollo.js';
+
+export {
+  esquemaProyectoCrear,
+  esquemaProyectoEditar,
+  esquemaConteosDesarrollo,
+  esquemaProyectoSalida,
+  esquemaProyectoDetalleSalida,
+  esquemaProyectosQuery,
+  esquemaProyectosPagina,
+  type DatosProyectoCrear,
+  type DatosProyectoEditar,
+  type ConteosDesarrollo,
+  type ProyectoSalida,
+  type ProyectoDetalleSalida,
+  type ProyectosQuery,
+  type ProyectosPagina,
+} from './esquemas/proyecto.js';
+
+// ── Precosto persistido por desarrollo (Módulo 15, F8-E3; D13/R17–R19) ──
+export {
+  esquemaEstadoPrecosto,
+  esquemaOrigenPrecostoLinea,
+  esquemaPrecostoLineaManualCrear,
+  esquemaPrecostoLineaEditar,
+  esquemaPrecostoLineaSalida,
+  esquemaPrecostoSalida,
+  esquemaPrecostoResumen,
+  esquemaPrecostosDesarrolloLista,
+  type EstadoPrecostoClave,
+  type OrigenPrecostoLineaClave,
+  type DatosPrecostoLineaManualCrear,
+  type DatosPrecostoLineaEditar,
+  type PrecostoLineaSalida,
+  type PrecostoSalida,
+  type PrecostoResumen,
+  type PrecostosDesarrolloLista,
+} from './esquemas/precosto.js';
+
+// ── Lista de precios por Cliente+Departamento (Módulo 15, F8-E4; D13/R20a) ──
+export {
+  esquemaListaPreciosCrear,
+  esquemaListaFactoresEditar,
+  esquemaAjustarPrecioLinea,
+  esquemaListaPreciosLineaSalida,
+  esquemaListaPreciosDetalle,
+  esquemaListaPreciosResumen,
+  esquemaListasPreciosLista,
+  esquemaListasPreciosQuery,
+  esquemaCandidatoLista,
+  esquemaCandidatosLista,
+  esquemaCandidatosQuery,
+  esquemaGrupoDesgloseCosto,
+  esquemaDesgloseCostoLinea,
+  type DatosListaPreciosCrear,
+  type DatosListaFactoresEditar,
+  type DatosAjustarPrecioLinea,
+  type ListaPreciosLineaSalida,
+  type ListaPreciosDetalle,
+  type ListaPreciosResumen,
+  type ListasPreciosLista,
+  type ListasPreciosQuery,
+  type CandidatoLista,
+  type CandidatosLista,
+  type CandidatosQuery,
+  type GrupoDesgloseCosto,
+  type DesgloseCostoLinea,
+} from './esquemas/lista-precios.js';
+
+// ── Negociación por versiones de la lista (Módulo 15, F8-E5; D13/R20b) ──
+export {
+  esquemaRondaRegistrar,
+  esquemaAcuerdoRegistrar,
+  esquemaCambiarEstadoLista,
+  esquemaSimularNegociacionQuery,
+  esquemaNegociacionEventoSalida,
+  esquemaNegociacionEventos,
+  esquemaSimulacionNegociacion,
+  type DatosRondaRegistrar,
+  type DatosAcuerdoRegistrar,
+  type DatosCambiarEstadoLista,
+  type DatosSimularNegociacion,
+  type NegociacionEventoSalida,
+  type NegociacionEventos,
+  type SimulacionNegociacion,
+} from './esquemas/negociacion.js';
+
+// ── Adjuntos de la orden de producción (R6, F8-E6) ──
+export {
+  esquemaOrdenAdjuntoCrear,
+  esquemaOrdenAdjuntoSubida,
+  esquemaOrdenAdjuntoSalida,
+  esquemaOrdenAdjuntosLista,
+  type DatosOrdenAdjuntoCrear,
+  type OrdenAdjuntoSubida,
+  type OrdenAdjuntoSalida,
+  type OrdenAdjuntosLista,
+} from './esquemas/adjunto-orden.js';
+
+// ── Adjuntos / tech pack del desarrollo (rediseño R5, B16) ──
+export {
+  esquemaDesarrolloAdjuntoCrear,
+  esquemaDesarrolloAdjuntoSubida,
+  esquemaDesarrolloAdjuntoSalida,
+  esquemaDesarrolloAdjuntosLista,
+  type DatosDesarrolloAdjuntoCrear,
+  type DesarrolloAdjuntoSubida,
+  type DesarrolloAdjuntoSalida,
+  type DesarrolloAdjuntosLista,
+} from './esquemas/adjunto-desarrollo.js';
+
+// ── Medidas de un avío "por medida" (rediseño R5, B11) ──
+export {
+  esquemaAvioMedidaEntrada,
+  esquemaAvioMedidasCuerpo,
+  esquemaAvioMedidaSalida,
+  esquemaAvioMedidasLista,
+  type DatosAvioMedidaEntrada,
+  type DatosAvioMedidas,
+  type AvioMedidaSalida,
+  type AvioMedidasLista,
+} from './esquemas/avio-medida.js';
+
+// ── Enganche Desarrollo ↔ Producción (Módulo 15, F8-E6; D13/R16) ──
+export {
+  esquemaLigarOrdenCuerpo,
+  esquemaLigaOrdenSalida,
+  esquemaLigaEstadoSalida,
+  esquemaCandidatoLigaSalida,
+  esquemaSugerenciaLigaSalida,
+  esquemaExpedientePrecosto,
+  esquemaExpedienteLista,
+  esquemaExpedienteOrdenSalida,
+  esquemaTableroDesarrollosQuery,
+  esquemaTableroDesarrollosSalida,
+  type DatosLigarOrden,
+  type LigaOrdenSalida,
+  type LigaEstadoSalida,
+  type CandidatoLigaSalida,
+  type SugerenciaLigaSalida,
+  type ExpedienteOrdenSalida,
+  type TableroDesarrollosQuery,
+  type TableroDesarrollosSalida,
+} from './esquemas/liga-orden.js';
 
 export {
   DIRECCIONES_MOVIMIENTO,
@@ -572,6 +995,7 @@ export {
   type TraspasoPtSalida,
   type ExistenciasPtQuery,
   type ExistenciaPtFila,
+  type ExistenciaPtCelda,
   type ExistenciasPtLista,
   type KardexPtQuery,
   type KardexPtRenglon,
@@ -639,6 +1063,7 @@ export {
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
   esquemaEtapasOrdenLista,
+  esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
@@ -648,6 +1073,7 @@ export {
   type DatosEtapaLineaEntrada,
   type EtapaSalida,
   type EtapasOrdenLista,
+  type EtapasOrdenQuery,
   type PendientesOrden,
   type CorteSemanalQuery,
   type CorteSemanalLista,
@@ -761,6 +1187,135 @@ export {
   type RevisionSalida,
 } from './esquemas/esma.js';
 
+// ── Motor de cuenta corriente de terceros (Módulo 14, F9-E1; D12/D15/R10) ──
+export {
+  TIPOS_TERCERO,
+  ORIGENES_MOVIMIENTO_TERCERO,
+  ETIQUETAS_ORIGEN_MOVIMIENTO_TERCERO,
+  VISTAS_TERCERO,
+  FUENTES_MOVIMIENTO_TERCERO,
+  esquemaLimitesAging,
+  esquemaMovimientoTerceroCrear,
+  esquemaMovimientoTerceroCancelar,
+  esquemaMovimientoTerceroSalida,
+  esquemaSaldoTerceroSalida,
+  esquemaEstadoCuentaTerceroQuery,
+  esquemaEstadoCuentaTerceroSalida,
+  type TipoTerceroClave,
+  type OrigenMovimientoTerceroClave,
+  type VistaTerceroClave,
+  type FuenteMovimientoTerceroClave,
+  type LimitesAgingSalida,
+  type DatosMovimientoTerceroCrear,
+  type DatosMovimientoTerceroCancelar,
+  type MovimientoTerceroSalida,
+  type SaldoTerceroSalida,
+  type EstadoCuentaTerceroQuery,
+  type EstadoCuentaTerceroSalida,
+} from './esquemas/terceros.js';
+
+// ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2; D12/D15/R10) ──
+export {
+  ORIGENES_MOVIMIENTO_CXP,
+  ETIQUETAS_ORIGEN_CXP,
+  FILTROS_BANDEJA_CXP,
+  esquemaMovimientoCxpCrear,
+  esquemaBandejaCxpQuery,
+  esquemaBandejaCxpFila,
+  esquemaResumenCxpSalida,
+  esquemaBandejaCxpSalida,
+  type OrigenMovimientoCxpClave,
+  type FiltroBandejaCxpClave,
+  type DatosMovimientoCxpCrear,
+  type BandejaCxpQuery,
+  type BandejaCxpFila,
+  type ResumenCxpSalida,
+  type BandejaCxpSalida,
+} from './esquemas/cxp.js';
+
+// ── Importación de CFDI de proveedores (Módulo 14, F9-E3; D12/R11) ──
+export {
+  TIPOS_COMPROBANTE_CFDI,
+  ETIQUETAS_TIPO_COMPROBANTE_CFDI,
+  REF_TIPOS_CFDI,
+  esquemaCfdiConcepto,
+  esquemaCfdiDatos,
+  esquemaCfdiCandidatoProveedor,
+  esquemaCfdiCandidatoOc,
+  esquemaCfdiXml,
+  esquemaCfdiPrevisualizacion,
+  esquemaCfdiImportarEntrada,
+  esquemaCfdiImportarSalida,
+  type TipoComprobanteCfdiClave,
+  type RefTipoCfdiClave,
+  type CfdiDatos,
+  type CfdiCandidatoProveedor,
+  type CfdiCandidatoOc,
+  type DatosCfdiXml,
+  type CfdiPrevisualizacion,
+  type DatosCfdiImportar,
+  type CfdiImportarSalida,
+} from './esquemas/cfdi.js';
+
+// ── CxC: cuentas por cobrar de clientes (Módulo 14, F9-E4; D12/D15/R10/R12) ──
+export {
+  ORIGENES_MOVIMIENTO_CXC,
+  ETIQUETAS_ORIGEN_CXC,
+  FILTROS_BANDEJA_CXC,
+  esquemaMovimientoCxcCrear,
+  esquemaBandejaCxcQuery,
+  esquemaBandejaCxcFila,
+  esquemaResumenCxcSalida,
+  esquemaBandejaCxcSalida,
+  type OrigenMovimientoCxcClave,
+  type FiltroBandejaCxcClave,
+  type DatosMovimientoCxcCrear,
+  type BandejaCxcQuery,
+  type BandejaCxcFila,
+  type ResumenCxcSalida,
+  type BandejaCxcSalida,
+} from './esquemas/cxc.js';
+
+// ── Importación de CFDI de ventas (Módulo 14, F9-E4; D12/R12) ──
+export {
+  REF_TIPOS_CFDI_VENTA,
+  esquemaCfdiVentaDatos,
+  esquemaCfdiCandidatoCliente,
+  esquemaCfdiCandidatoPedido,
+  esquemaCfdiVentaPrevisualizacion,
+  esquemaCfdiVentaImportarEntrada,
+  esquemaCfdiVentaImportarSalida,
+  type RefTipoCfdiVentaClave,
+  type CfdiVentaDatos,
+  type CfdiCandidatoCliente,
+  type CfdiCandidatoPedido,
+  type CfdiVentaPrevisualizacion,
+  type DatosCfdiVentaImportar,
+  type CfdiVentaImportarSalida,
+} from './esquemas/cfdi-ventas.js';
+
+// ── Reportes fiscales para el contador (Módulo 14, F9-E5; D12/R13) ──
+export {
+  TIPOS_MOVIMIENTO_FISCAL,
+  FILTROS_CFDI,
+  esquemaReporteFiscalQuery,
+  esquemaReporteFiscalFila,
+  esquemaTotalesFiscales,
+  esquemaReporteFiscalSalida,
+  esquemaSaludFiscalQuery,
+  esquemaSaldoFiscalTercero,
+  esquemaSaludFiscalSalida,
+  type TipoMovimientoFiscalClave,
+  type FiltroCfdiClave,
+  type ReporteFiscalQuery,
+  type ReporteFiscalFila,
+  type TotalesFiscales,
+  type ReporteFiscalSalida,
+  type SaludFiscalQuery,
+  type SaldoFiscalTercero,
+  type SaludFiscalSalida,
+} from './esquemas/reportes-fiscales.js';
+
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {
   esquemaEntregaClienteCrear,
@@ -787,6 +1342,10 @@ export {
   esquemaListaPreciosSalida,
   esquemaCostoOrdenSalida,
   esquemaCostoOrdenGuardarCuerpo,
+  esquemaOrigenPrecioReal,
+  esquemaOrigenRequerido,
+  esquemaCostoRealResumen,
+  esquemaCostoRealOrdenSalida,
   esquemaListaCostosQuery,
   esquemaListaCostosFila,
   esquemaListaCostosPagina,
@@ -799,6 +1358,10 @@ export {
   type ListaPreciosSalida,
   type CostoOrdenSalida,
   type CostoOrdenGuardarCuerpo,
+  type OrigenPrecioReal,
+  type OrigenRequerido,
+  type CostoRealResumen,
+  type CostoRealOrdenSalida,
   type ListaCostosQuery,
   type ListaCostosPagina,
   type MargenesQuery,
@@ -842,6 +1405,18 @@ export {
   type EdrPorAnioEmpresa,
   type EdrPorAnioSalida,
 } from './esquemas/edr.js';
+
+// ── Ventas: vista comercial de la facturación por modelo sobre el EDR (proto vVentas; F7-E2) ──
+export {
+  esquemaVentasQuery,
+  esquemaVentaLinea,
+  esquemaVentasResumen,
+  esquemaVentasSalida,
+  type VentasQuery,
+  type VentaLinea,
+  type VentasResumen,
+  type VentasSalida,
+} from './esquemas/ventas.js';
 
 // ── Indicadores: tableros directivos calculados en segundo plano (Módulo Indicadores, F7-E3; plan §11) ──
 export {
@@ -977,6 +1552,7 @@ export {
 export {
   esquemaTableroWipQuery,
   esquemaWipOrdenFila,
+  esquemaWipTotales,
   esquemaTableroWipPagina,
   esquemaWipOrden,
   esquemaExistenciaMaquileroQuery,
@@ -984,8 +1560,10 @@ export {
   esquemaExistenciaMaquileroLista,
   type TableroWipQuery,
   type WipOrdenFila,
+  type WipTotales,
   type TableroWipPagina,
   type WipOrden,
+  type WipMaquileroPendiente,
   type ExistenciaMaquileroQuery,
   type ExistenciaMaquileroFila,
   type ExistenciaMaquileroLista,
@@ -1054,6 +1632,9 @@ export {
   esquemaDuracionAplicacionCrear,
   esquemaDuracionAplicacionPatchCuerpo,
   esquemaDuracionAplicacionSalida,
+  esquemaRangoDificultadCrear,
+  esquemaRangoDificultadPatchCuerpo,
+  esquemaRangoDificultadSalida,
   esquemaCalendarioActualizar,
   esquemaCalendarioSalida,
   esquemaFestivosQuery,
@@ -1081,6 +1662,9 @@ export {
   type DatosDuracionAplicacionCrear,
   type DatosDuracionAplicacionPatchCuerpo,
   type DuracionAplicacionSalida,
+  type DatosRangoDificultadCrear,
+  type DatosRangoDificultadPatchCuerpo,
+  type RangoDificultadSalida,
   type DatosCalendarioActualizar,
   type CalendarioSalida,
   type FestivosQuery,
@@ -1101,6 +1685,7 @@ export {
   esquemaCapturarProceso,
   esquemaMarcarChecklist,
   esquemaEstadoSemaforo,
+  esquemaSecuenciaEstampadoCuerpo,
   esquemaRutaChecklistSalida,
   esquemaRutaProcesoSalida,
   esquemaRutaOrdenSalida,
@@ -1108,20 +1693,48 @@ export {
   type DatosAjustarRuta as DatosAjustarRutaContrato,
   type DatosCapturarProceso,
   type DatosMarcarChecklist,
+  type DatosSecuenciaEstampado,
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 
-// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5) ──
+// ── Ruta Crítica: hitos de la orden (cierre del hueco de emisores, post-F9) ──
+export {
+  TIPOS_HITO_ORDEN,
+  esquemaParamOrdenHito,
+  esquemaRegistrarHitoCuerpo,
+  esquemaCancelarHitoCuerpo,
+  esquemaHitoOrdenSalida,
+  esquemaHitosOrdenSalida,
+  type TipoHitoOrdenClave,
+  type DatosRegistrarHito,
+  type DatosCancelarHito,
+  type HitoOrdenSalida,
+  type HitosOrdenSalida,
+} from './esquemas/ruta-critica-hitos.js';
+
+// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5; R4) ──
 export {
   esquemaBandejaRcQuery,
   esquemaBandejaChecklistSalida,
   esquemaBandejaTareaSalida,
   esquemaBandejaRcPagina,
   esquemaAlertasRcConteo,
+  esquemaUrgenciaPendiente,
+  esquemaTipoEventoRc,
+  esquemaResumenPendientesQuery,
+  esquemaResumenProcesoPendiente,
+  esquemaResumenPendientes,
+  esquemaResponsableRc,
+  esquemaResponsablesRc,
   type BandejaRcQuery,
   type BandejaTareaSalida,
   type BandejaRcPagina,
   type AlertasRcConteo,
+  type UrgenciaPendiente,
+  type TipoEventoRcContrato,
+  type ResumenPendientesQuery,
+  type ResumenPendientes,
+  type ResponsableRc,
 } from './esquemas/ruta-critica-bandeja.js';
 
 // ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ──
@@ -1137,6 +1750,29 @@ export {
   type ConcentradoFila,
   type ConcentradoPagina,
 } from './esquemas/ruta-critica-concentrado.js';
+
+// ── Ruta Crítica: tablero de gestión "Análisis RC" (Módulo 8, rediseño R7, B14) ──
+export {
+  esquemaOrdenAtencion,
+  esquemaAnalisisSalud,
+  esquemaEntregaCiclo,
+  esquemaOrdenAlerta,
+  esquemaRiesgoCliente,
+  esquemaCuelloProceso,
+  esquemaAnalisisRc,
+  esquemaBadgeDesempeno,
+  esquemaPersonaDesempeno,
+  esquemaParametrosDesempeno,
+  esquemaDesempenoRc,
+  type OrdenAtencion,
+  type OrdenAlerta,
+  type RiesgoCliente,
+  type CuelloProceso,
+  type AnalisisRc,
+  type BadgeDesempeno,
+  type PersonaDesempeno,
+  type DesempenoRc,
+} from './esquemas/ruta-critica-analisis.js';
 
 // ── Calidad: base configurable — defectos, tipos de producto y planes AQL (Módulo 8, F6-E1) ──
 export {
@@ -1186,6 +1822,24 @@ export {
   type ResolverPlanSalida,
 } from './esquemas/calidad.js';
 
+// ── Calidad: catálogo de auditores (Módulo 8, rediseño R9 — proto `CAT_AUDITORES`) ──
+export {
+  ROLES_AUDITOR,
+  NIVELES_AQL_AUDITOR,
+  esquemaAuditorCrear,
+  esquemaAuditorEditar,
+  esquemaAuditorSalida,
+  esquemaAuditoresQuery,
+  esquemaAuditoresPagina,
+  type RolAuditorClave,
+  type NivelAqlAuditorClave,
+  type DatosAuditorCrear,
+  type DatosAuditorEditar,
+  type AuditorSalida,
+  type AuditoresQuery,
+  type AuditoresPagina,
+} from './esquemas/auditor.js';
+
 // ── Calidad — núcleo de auditorías (F6-E2) ──
 export {
   RESULTADOS_AUDITORIA,
@@ -1212,6 +1866,9 @@ export {
   esquemaAuditoriaCancelarCuerpo,
   esquemaHistorialMaquileroQuery,
   esquemaHistorialMaquileroSalida,
+  esquemaResumenAuditoriasQuery,
+  esquemaDefectoPrincipal,
+  esquemaResumenAuditorias,
   type ResultadoAuditoriaClave,
   type TipoAuditoriaClave,
   type SugerenciaAqlClave,
@@ -1228,6 +1885,9 @@ export {
   type DatosAuditoriaCancelar,
   type HistorialMaquileroQuery,
   type HistorialMaquileroSalida,
+  type ResumenAuditoriasQuery,
+  type DefectoPrincipal,
+  type ResumenAuditorias,
 } from './esquemas/auditorias.js';
 
 // ── Bitácora: consulta del log de auditoría A7 (transversal, F6-E1) ──
@@ -1242,6 +1902,14 @@ export {
   type BitacoraQuery,
   type BitacoraPagina,
 } from './esquemas/bitacora.js';
+
+// ── Resumen operativo de la portada (rediseño R9, proto vResumen) ──
+export {
+  esquemaResumenOperativo,
+  type ResumenOperativo,
+  type OrdenPorVencer,
+  type CorteSemanaResumen,
+} from './esquemas/resumen.js';
 
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 

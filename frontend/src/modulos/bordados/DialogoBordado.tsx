@@ -15,7 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -123,7 +130,7 @@ export function DialogoBordado({
         { id: bordado.id, cuerpo: aCuerpoEditar(datos) },
         {
           onSuccess: (resultado) => {
-            toast.success(`Bordado "${resultado.nombre}" actualizado.`);
+            toast.success(`Arte "${resultado.nombre}" actualizado.`);
             alCambiarAbierto(false);
           },
           onError: (error) => toast.error(error.message),
@@ -133,7 +140,7 @@ export function DialogoBordado({
     }
     crear.mutate(aCuerpoCrear(datos), {
       onSuccess: (resultado) => {
-        toast.success(`Bordado "${resultado.nombre}" creado.`);
+        toast.success(`Arte "${resultado.nombre}" creado.`);
         alCambiarAbierto(false);
       },
       onError: (error) => toast.error(error.message),
@@ -148,21 +155,25 @@ export function DialogoBordado({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={(e) => void enviar(e)} noValidate>
           <DialogHeader>
-            <DialogTitle>{esEdicion ? 'Editar bordado' : 'Nuevo bordado'}</DialogTitle>
+            <DialogTitle>{esEdicion ? 'Editar arte' : 'Nuevo arte'}</DialogTitle>
             <DialogDescription>
               {esEdicion
-                ? 'Cambia los datos de este bordado/estampado.'
-                : 'Captura los datos del nuevo bordado/estampado del catálogo.'}
+                ? 'Cambia los datos de este arte.'
+                : 'Captura los datos del nuevo arte del catálogo.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
             <FieldGroup>
+              <LeyendaObligatorios />
               <Field data-invalid={Boolean(errors.nombre)}>
-                <FieldLabel htmlFor="bordado-nombre">Nombre</FieldLabel>
+                <FieldLabel htmlFor="bordado-nombre" required>
+                  Nombre
+                </FieldLabel>
                 <Input
                   id="bordado-nombre"
                   autoFocus
+                  placeholder="Ej. Logo Marilyn pecho izq."
                   aria-invalid={Boolean(errors.nombre)}
                   disabled={guardando}
                   {...registrar('nombre')}
@@ -194,12 +205,12 @@ export function DialogoBordado({
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  placeholder="Opcional"
+                  placeholder="Ej. 8500"
                   aria-invalid={Boolean(errors.puntadas)}
                   disabled={guardando}
                   {...registrar('puntadas')}
                 />
-                <FieldDescription>Informativo (alimenta el costeo del bordado).</FieldDescription>
+                <FieldDescription>Informativo (alimenta el costeo del arte).</FieldDescription>
                 <FieldError errors={[errors.puntadas]} />
               </Field>
 
@@ -211,7 +222,7 @@ export function DialogoBordado({
                   inputMode="decimal"
                   min={0}
                   step="0.01"
-                  placeholder="Opcional"
+                  placeholder="Ej. 12.00"
                   aria-invalid={Boolean(errors.precio)}
                   disabled={guardando}
                   {...registrar('precio')}
@@ -223,6 +234,7 @@ export function DialogoBordado({
                 <FieldLabel htmlFor="bordado-descripcion">Descripción</FieldLabel>
                 <Input
                   id="bordado-descripcion"
+                  placeholder="Ej. 3 tintas, frente izquierdo"
                   aria-invalid={Boolean(errors.descripcion)}
                   disabled={guardando}
                   {...registrar('descripcion')}
@@ -237,7 +249,7 @@ export function DialogoBordado({
                   <FotoBordado bordado={bordado} deshabilitado={guardando} />
                 ) : (
                   <p className="text-sm text-muted-foreground" data-testid="foto-aviso-alta">
-                    Guarda el bordado primero para poder subir su foto.
+                    Guarda el arte primero para poder subir su foto.
                   </p>
                 )}
               </Field>
@@ -253,9 +265,14 @@ export function DialogoBordado({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-bordado">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-bordado"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-              {esEdicion ? 'Guardar cambios' : 'Crear bordado'}
+              {esEdicion ? 'Guardar cambios' : 'Crear arte'}
             </Button>
           </DialogFooter>
         </form>

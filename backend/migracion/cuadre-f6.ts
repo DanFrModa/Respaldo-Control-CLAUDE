@@ -14,7 +14,7 @@
  *      (F3) vs cargado (EsMa) — criterio de salida "EsMa cuadra contra los recibos del periodo".
  *  (+) INCONSISTENCIAS de origen LISTADAS (no se corrigen): cargos sin cabecera EsMa (los 12 con
  *      `IdEsMa=0`, incl. el estampado `IdEsMa_Recibos=5811`), movimientos con maquilero sin mapeo en
- *      v2 (los de empresas viejas no migradas, pendientes F9), pagos con `IdEsMa` sin cabecera.
+ *      v2 (los de empresas viejas no migradas, pendientes F10), pagos con `IdEsMa` sin cabecera.
  *
  * Solo LECTURA (no carga nada). Correr aparte con: npx tsx --env-file=.env migracion/cuadre-f6.ts
  */
@@ -100,13 +100,13 @@ async function calcularConteos(cliente: PrismaClient): Promise<RenglonCuadreF6[]
       entidad: 'Abonos (EsMa_Abonos)',
       v1: v1Abonos,
       v2: v2Abonos,
-      nota: 'v2 ≤ v1 por abonos con maquilero sin mapeo (empresas viejas, F9). Montos negativos ("saldo anterior") preservados.',
+      nota: 'v2 ≤ v1 por abonos con maquilero sin mapeo (empresas viejas, F10). Montos negativos ("saldo anterior") preservados.',
     },
     {
       entidad: 'Descuentos (EsMa_Desc)',
       v1: v1Descuentos,
       v2: v2Descuentos,
-      nota: 'v2 ≤ v1 por descuentos con maquilero sin mapeo (F9).',
+      nota: 'v2 ≤ v1 por descuentos con maquilero sin mapeo (F10).',
     },
     {
       entidad: 'Pagos (EsMa_Pagos)',
@@ -374,9 +374,9 @@ async function calcularConciliacion(cliente: PrismaClient): Promise<Conciliacion
 export interface InconsistenciasF6 {
   /** Cargos con `IdEsMa=0` (sin cabecera) — los 12, incluye el estampado 5811. */
   cargosSinCabecera: string[];
-  /** # de cargos con maquilero sin mapeo en v2 (empresas viejas, F9). */
+  /** # de cargos con maquilero sin mapeo en v2 (empresas viejas, F10). */
   cargosMaquileroSinMapeo: number;
-  /** # de abonos/descuentos/pagos con maquilero sin mapeo en v2 (F9). */
+  /** # de abonos/descuentos/pagos con maquilero sin mapeo en v2 (F10). */
   abonosSinMapeo: number;
   descuentosSinMapeo: number;
   pagosSinMapeo: number;
@@ -542,18 +542,18 @@ export function formatearCuadreF6(c: CuadreF6): string {
   );
   for (const d of inc.cargosSinCabecera.slice(0, 20)) p.push(`    - ${d}`);
   p.push(
-    `  Cargos con maquilero SIN mapeo en v2 (empresas viejas, F9): ${String(inc.cargosMaquileroSinMapeo)}`,
+    `  Cargos con maquilero SIN mapeo en v2 (empresas viejas, F10): ${String(inc.cargosMaquileroSinMapeo)}`,
   );
-  p.push(`  Abonos con maquilero SIN mapeo (F9)   : ${String(inc.abonosSinMapeo)}`);
-  p.push(`  Descuentos con maquilero SIN mapeo (F9): ${String(inc.descuentosSinMapeo)}`);
-  p.push(`  Pagos con maquilero SIN mapeo (F9)    : ${String(inc.pagosSinMapeo)}`);
+  p.push(`  Abonos con maquilero SIN mapeo (F10)   : ${String(inc.abonosSinMapeo)}`);
+  p.push(`  Descuentos con maquilero SIN mapeo (F10): ${String(inc.descuentosSinMapeo)}`);
+  p.push(`  Pagos con maquilero SIN mapeo (F10)    : ${String(inc.pagosSinMapeo)}`);
   p.push(`  Pagos con IdEsMa SIN cabecera         : ${String(inc.pagosSinCabecera)}`);
   p.push('');
   p.push(
     '  Nota: un maquilero con Proceso=1 (estampado) puede no tener el rol `estampado` en v2 (solo',
   );
   p.push(
-    '  `maquila-costura`); no afecta la validez del cargo, solo los filtros de UI por tipo (refinamiento F9).',
+    '  `maquila-costura`); no afecta la validez del cargo, solo los filtros de UI por tipo (refinamiento F10).',
   );
 
   return p.join('\n');

@@ -24,7 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 import {
@@ -244,13 +250,17 @@ export function DialogoAvio({
           </DialogHeader>
 
           {/* Cuerpo desplazable: el formulario puede crecer. */}
-          <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
             <FieldGroup>
               <Field data-invalid={Boolean(errors.clave)}>
-                <FieldLabel htmlFor="avio-clave">Clave</FieldLabel>
+                <FieldLabel htmlFor="avio-clave" required>
+                  Clave
+                </FieldLabel>
                 <Input
                   id="avio-clave"
                   autoFocus
+                  placeholder="Ej. RES-16"
                   aria-invalid={Boolean(errors.clave)}
                   disabled={guardando}
                   {...registrar('clave')}
@@ -259,9 +269,12 @@ export function DialogoAvio({
               </Field>
 
               <Field data-invalid={Boolean(errors.descripcion)}>
-                <FieldLabel htmlFor="avio-descripcion">Descripción</FieldLabel>
+                <FieldLabel htmlFor="avio-descripcion" required>
+                  Descripción
+                </FieldLabel>
                 <Input
                   id="avio-descripcion"
+                  placeholder="Ej. Resorte elástico 16 mm negro"
                   aria-invalid={Boolean(errors.descripcion)}
                   disabled={guardando}
                   {...registrar('descripcion')}
@@ -271,10 +284,12 @@ export function DialogoAvio({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(errors.unidad)}>
-                  <FieldLabel htmlFor="avio-unidad">Unidad</FieldLabel>
+                  <FieldLabel htmlFor="avio-unidad" required>
+                    Unidad
+                  </FieldLabel>
                   <Input
                     id="avio-unidad"
-                    placeholder="pza, m, kg…"
+                    placeholder="Ej. m"
                     aria-invalid={Boolean(errors.unidad)}
                     disabled={guardando}
                     {...registrar('unidad')}
@@ -283,12 +298,14 @@ export function DialogoAvio({
                 </Field>
 
                 <Field data-invalid={Boolean(errors.presentacion)}>
-                  <FieldLabel htmlFor="avio-presentacion">Presentación</FieldLabel>
+                  <FieldLabel htmlFor="avio-presentacion" required>
+                    Presentación
+                  </FieldLabel>
                   {/* Combobox: lista sugerida + texto libre (datalist no restringe). */}
                   <Input
                     id="avio-presentacion"
                     list="avio-presentaciones"
-                    placeholder="PIEZA, CAJA, ROLLO…"
+                    placeholder="Ej. ROLLO"
                     aria-invalid={Boolean(errors.presentacion)}
                     disabled={guardando}
                     {...registrar('presentacion')}
@@ -385,7 +402,12 @@ export function DialogoAvio({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-avio">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-avio"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear avío'}
             </Button>

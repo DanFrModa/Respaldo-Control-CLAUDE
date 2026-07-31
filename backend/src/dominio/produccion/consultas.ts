@@ -122,9 +122,10 @@ function aOrdenLigera(fila: FilaLigera, totalPiezas: number): OrdenLigeraSalida 
 /**
  * Suma de piezas (Σ de `OrdenLineaTalla.cantidad`) POR orden, para un conjunto de ids, en UNA sola
  * consulta agregada (no trae la matriz a memoria). Devuelve un mapa `idOrden -> total`; las órdenes
- * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0.
+ * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0. Exportada: el centro
+ * de comando (R2) la reusa para la columna "Cant. ordenada".
  */
-async function totalesPorOrden(
+export async function totalesPorOrden(
   cliente: ReturnType<typeof clienteLectura>,
   idsOrden: number[],
 ): Promise<Map<number, number>> {
@@ -245,11 +246,17 @@ export async function consultarOrdenes(
 // ── Incompletas (capturadas sin matriz, con semáforo) ────────────────────────────────
 
 /**
- * Órdenes INCOMPLETAS de la empresa activa: las que están en `estado='capturada'` (no se ha
- * guardado su matriz; paridad con `FechaDet Is Null` del viejo). Proyección ligera + `diasAntiguedad`
- * (desde `creadoEn`, con `fecha` como respaldo) + el `semaforo` DERIVADO (> 7 días = urgente). El
- * orden por defecto es por antigüedad descendente (las más viejas/urgentes primero). El total de
- * piezas de una incompleta es 0 (no tiene matriz), así que no se agrega.
+ * Órdenes INCOMPLETAS de la empresa activa: las que están en `estado='capturada'`, es decir, las
+ * que NO cumplen todavía los requisitos de la regla (tallas + avíos, y arte si aplica — ver
+ * `requisitos-orden.ts`). Proyección ligera + `diasAntiguedad` (desde `creadoEn`, con `fecha` como
+ * respaldo) + el `semaforo` DERIVADO (> 7 días = urgente). El orden por defecto es por antigüedad
+ * descendente (las más viejas primero).
+ *
+ * ⚠️ Ya NO es "paridad con `FechaDet Is Null`" del viejo (26-jul-2026). Con el estado automático,
+ * `capturada` significa "le falta un requisito", no "no tiene matriz": una incompleta PUEDE tener
+ * matriz (le puede faltar la receta de avíos) y hasta puede traer `fechaCompletada` de cuando sí
+ * estuvo completa (esa fecha se sella una vez y nunca se borra). Por eso las piezas SÍ se agregan
+ * —antes se proyectaban como 0— y por eso el filtro es por `estado`, no por la fecha.
  *
  * Para PROVOCAR el estado URGENTE en pruebas manuales: crear una orden (queda 'capturada') con una
  * `creadoEn` de hace > 7 días, o usar el script de demo (`scripts/datos-demo-ordenes.ts`), que
@@ -282,11 +289,16 @@ export async function consultarIncompletas(
     }),
   ]);
 
+  const totales = await totalesPorOrden(
+    cliente,
+    (filas as FilaLigera[]).map((f) => f.id),
+  );
+
   const datos: OrdenIncompletaSalida[] = (filas as FilaLigera[]).map((f) => {
     const referencia = f.creadoEn ?? f.fecha ?? ahora;
     const dias = diasDesde(referencia, ahora);
     return {
-      ...aOrdenLigera(f, 0),
+      ...aOrdenLigera(f, totales.get(f.id) ?? 0),
       diasAntiguedad: dias,
       semaforo: semaforoPorDias(dias),
     };

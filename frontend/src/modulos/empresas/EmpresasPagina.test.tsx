@@ -31,6 +31,10 @@ vi.mock('@/api/empresas', () => ({
   // Configuracion (dialogo secundario): no se ejercita aqui.
   useConfiguracionEmpresa: () => ({ data: undefined, isPending: true, isError: false }),
   useActualizarConfiguracion: () => ({ mutate: vi.fn(), isPending: false }),
+  // Logo (seccion del cajon): su comportamiento propio se prueba en `LogoEmpresa.test.tsx`.
+  useLogoEmpresa: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useSubirLogoEmpresa: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarLogoEmpresa: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 /** Empresa de ejemplo (OJO: flag `activa`). */
@@ -39,8 +43,10 @@ function empresa(id: number, nombre: string, sobre: Partial<Empresa> = {}): Empr
     id,
     nombre,
     razonSocial: null,
+    rfc: null,
     identificador: null,
     favorita: false,
+    idArchivoLogo: null,
     paraIpt: false,
     paraEdr: false,
     activa: true,
@@ -66,9 +72,18 @@ function consultaConDatos(datos: Empresa[]): EstadoConsulta {
 
 const ADMIN = ['empresas.administrar'] as const;
 
-/** Atajo: el panel de detalle (donde viven las acciones del registro seleccionado). */
+/** Atajo: el cuerpo del cajón de detalle (datos/banderas de la empresa). */
 function detalle(): HTMLElement {
   return screen.getByTestId('detalle-empresa');
+}
+
+/** Atajo: el cajón completo (su TÍTULO trae el estado Activo/Inactivo y la Favorita). */
+function cajon(): HTMLElement {
+  const el = detalle().closest('[data-slot="cajon-detalle"]');
+  if (el === null) {
+    throw new Error('No se encontró el cajón de detalle.');
+  }
+  return el as HTMLElement;
 }
 
 describe('<EmpresasPagina>', () => {
@@ -85,10 +100,9 @@ describe('<EmpresasPagina>', () => {
     );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // Dos renglones; la primera queda auto-seleccionada (su nombre aparece tambien
-    // en el detalle), por eso se busca con getAllByText.
+    // Tabla-first: el detalle NO se auto-abre; cada empresa sale en su renglón.
     expect(screen.getAllByTestId('fila-empresa')).toHaveLength(2);
-    expect(screen.getAllByText('FR Moda').length).toBeGreaterThan(0);
+    expect(screen.getByText('FR Moda')).toBeInTheDocument();
     expect(screen.getByText('Otra SA')).toBeInTheDocument();
   });
 
@@ -128,7 +142,8 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(7, 'Vieja SA')]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // La empresa queda auto-seleccionada: "Desactivar" es un boton directo del detalle.
+    // Tabla-first: primero se abre el cajón con clic en el renglón; "Desactivar" vive ahí.
+    await u.click(screen.getByTestId('fila-empresa'));
     await u.click(screen.getByTestId('desactivar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
@@ -143,15 +158,19 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(9, 'Apagada SA', { activa: false })]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // Por defecto las inactivas se ocultan: hay que mostrarlas.
+    // Por defecto las inactivas se ocultan: hay que mostrarlas (chip "Todas") y abrir su cajón.
     await u.click(screen.getByTestId('mostrar-desactivados'));
+    await u.click(screen.getByTestId('fila-empresa'));
 
-    expect(within(detalle()).getByText('Inactivo')).toBeInTheDocument();
+    // El estado "Inactivo" se pinta en el título del cajón; el detalle ofrece "Activar".
+    expect(within(cajon()).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-empresa')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-empresa')).not.toBeInTheDocument();
 
     await u.click(screen.getByTestId('activar-empresa'));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Reactivar es no destructivo: NO abre diálogo de confirmación (ojo: el cajón
+    // abierto también es un dialog, por eso se consulta el botón de confirmar).
+    expect(screen.queryByTestId('confirmar-accion')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
 
@@ -162,8 +181,7 @@ describe('<EmpresasPagina>', () => {
     );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // "Activa SA" queda auto-seleccionada (aparece en lista y detalle).
-    expect(screen.getAllByText('Activa SA').length).toBeGreaterThan(0);
+    expect(screen.getByText('Activa SA')).toBeInTheDocument();
     expect(screen.queryByText('Inactiva SA')).not.toBeInTheDocument();
 
     await u.click(screen.getByTestId('mostrar-desactivados'));
@@ -175,7 +193,8 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(5, 'Config SA')]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // "Configurar" es una accion extra del detalle de la empresa seleccionada.
+    // "Configurar" vive en las acciones del cajón: primero se abre con clic en el renglón.
+    await u.click(screen.getByTestId('fila-empresa'));
     await u.click(screen.getByTestId('configurar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
@@ -189,11 +208,12 @@ describe('<EmpresasPagina>', () => {
     );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // "Editar" es un boton directo del detalle de la empresa auto-seleccionada.
+    // "Editar" vive en las acciones del cajón: primero se abre con clic en el renglón.
+    await u.click(screen.getByTestId('fila-empresa'));
     await u.click(screen.getByTestId('editar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
-    const identificador = within(dialogo).getByLabelText('Identificador (RFC)');
+    const identificador = within(dialogo).getByLabelText('Identificador');
     expect(identificador).toHaveValue('MS-01');
 
     await u.clear(identificador);
@@ -206,5 +226,23 @@ describe('<EmpresasPagina>', () => {
     ];
     expect(args.id).toBe(3);
     expect(args.cuerpo.identificador).toBe('MS-02');
+  });
+
+  it('captura el RFC fiscal (F9-E3) y lo envía en el cuerpo del PATCH', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(consultaConDatos([empresa(4, 'Fiscal SA', { rfc: null })]));
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+    await u.click(screen.getByTestId('fila-empresa'));
+    await u.click(screen.getByTestId('editar-empresa'));
+
+    const dialogo = await screen.findByRole('dialog');
+    const rfc = within(dialogo).getByLabelText('RFC');
+    await u.type(rfc, 'XAXX010101000');
+    await u.click(screen.getByTestId('guardar-empresa'));
+
+    const [args] = actualizarMutate.mock.calls[0] as [{ id: number; cuerpo: { rfc?: string } }];
+    expect(args.id).toBe(4);
+    expect(args.cuerpo.rfc).toBe('XAXX010101000');
   });
 });

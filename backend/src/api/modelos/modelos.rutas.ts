@@ -60,6 +60,7 @@ import {
   listarAviosBom,
   listarBordadosBom,
   listarTelasBom,
+  marcarBordadoPrincipal,
   obtenerFichaModelo,
   reemplazarAviosBom,
   reemplazarBordadosBom,
@@ -72,6 +73,7 @@ import {
 import {
   actualizarFoto,
   listarFotos,
+  marcarFotoPrincipal,
   quitarFoto,
   solicitarSubidaFoto,
   type FotoModeloConUrl,
@@ -84,6 +86,7 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     id: modelo.id,
     codigo: modelo.codigo,
     descripcion: modelo.descripcion,
+    composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
     idTemporada: modelo.idTemporada,
     temporada: modelo.temporada?.nombre ?? null,
@@ -93,9 +96,20 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     genero: modelo.genero?.nombre ?? null,
     idTipoProducto: modelo.idTipoProducto,
     tipoProducto: modelo.tipoProducto?.nombre ?? null,
+    numOperaciones: modelo.numOperaciones,
+    corteBase: modelo.corteBase === null ? null : modelo.corteBase.toNumber(),
+    idMaquileroCotizado: modelo.idMaquileroCotizado,
+    maquileroCotizado: modelo.maquileroCotizado?.nombre ?? null,
+    secuenciaEstampado: modelo.secuenciaEstampado,
+    llevaArte: modelo.llevaArte,
     cantidadFotos: modelo._count.fotos,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,
+    // Agregados del listado (proto vModelos, R9): tela principal, stock PT y costo del último
+    // costeo. Solo el LISTADO los resuelve; en alta/edición/ficha vienen `null` (no aplican).
+    telaPrincipal: modelo.telaPrincipal ?? null,
+    stockPt: modelo.stockPt ?? null,
+    costoActual: modelo.costoActual ?? null,
     activo: modelo.activo,
     creadoEn: modelo.creadoEn.toISOString(),
     creadoPorId: modelo.creadoPorId,
@@ -201,6 +215,20 @@ const esquemaParamFoto = z.object({
     .int()
     .positive()
     .describe('Id de la foto.'),
+});
+
+/** Parámetros `:id` (modelo) + `:idBordado` (arte del BOM) para marcar el arte principal. */
+const esquemaParamBordado = z.object({
+  id: z.coerce
+    .number({ error: 'El id del modelo debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del modelo.'),
+  idBordado: z.coerce
+    .number({ error: 'El id del arte debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del arte (bordado/estampado) del BOM.'),
 });
 
 /** Querystring del selector de géneros. */
@@ -468,6 +496,29 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
+  // Marcar UN arte como el PRINCIPAL del modelo (lo mueve al primer lugar y reindexa el resto).
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/bom/bordados/:idBordado/principal',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Marcar un arte del BOM como el principal del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamBordado,
+      response: { 200: esquemaModeloBomBordadosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const bordados = await marcarBordadoPrincipal(
+        sesion,
+        request.params.id,
+        request.params.idBordado,
+      );
+      return { datos: bordados.map(aBordadoBomSalida) };
+    },
+  });
+
   // ── Copiar el BOM de otro modelo (atómico) ──────────────────────────────────
   app.route({
     method: 'POST',
@@ -557,6 +608,25 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       const sesion = await exigirSesion(() => request.obtenerSesion());
       await actualizarFoto(sesion, request.params.id, request.params.idFoto, request.body);
       return reply.code(204).send(null);
+    },
+  });
+
+  // Marcar UNA foto como la PRINCIPAL del modelo (la mueve al primer lugar y reindexa el resto).
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/fotos/:idFoto/principal',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Marcar una foto como la principal del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamFoto,
+      response: { 200: esquemaModeloFotosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const fotos = await marcarFotoPrincipal(sesion, request.params.id, request.params.idFoto);
+      return { datos: fotos.map(aFotoSalida) };
     },
   });
 

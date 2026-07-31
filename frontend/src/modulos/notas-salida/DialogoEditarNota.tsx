@@ -1,9 +1,11 @@
-import { Loader2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { DownloadIcon, InfoIcon, Loader2Icon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useAvios } from '@/api/avios';
+import { useHabilitacionOrden } from '@/api/habilitacion';
+import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { useProveedores } from '@/api/proveedores';
@@ -24,29 +26,50 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import {
   capturaDesdeNota,
+  nuevaClaveRenglon,
   renglonApi,
   renglonCompleto,
   renglonVacio,
   type RenglonNotaCaptura,
 } from './captura';
-import { EditorRenglonesNota } from './EditorRenglonesNota';
+import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
+export interface PrefillRenglonNota {
+  idOrden: number;
+  idAvio: number;
+  cantidad: number;
+  unidad: string | null;
+}
+
+/** Datos para PRE-CARGAR el constructor desde la habilitación ("Pasar a nota de salida"). */
+export interface PrefillNota {
+  idMaquilero?: number | null;
+  idAlmacen?: number | null;
+  renglones?: PrefillRenglonNota[];
+  /** Recetas conocidas (idOrden → ids de avío de su receta) para el flag ✓/⚠ ya pre-cargado. */
+  recetaPorOrden?: Record<number, number[]>;
+}
+
 /**
- * Diálogo de CAPTURA / EDICIÓN de una nota de salida (F4-E5). Si recibe `nota`, edita; si no, da de
- * alta. Encabezado (maquilero, almacén origen [decisión g], fechas, observaciones) + renglones
- * (editor avío/tela). Una nota confirmada/cancelada va en `soloLectura` (el backend igual bloquea,
- * A1). Acciones de escritura gobernadas por `notas.administrar` (la pantalla oculta el botón que abre
- * el diálogo); el backend es la autoridad. Reemplaza Notas/NotasSub del sistema viejo.
+ * Diálogo de CAPTURA / EDICIÓN de una nota de salida (F4-E5; rediseño R6 §4.6). Si recibe `nota`,
+ * edita; si recibe `prefill`, da de alta PRE-CARGADO (desde "Pasar a nota de salida" de la
+ * habilitación); si no, alta vacía. Encabezado (maquilero, almacén origen [decisión g], fechas,
+ * observaciones) + **"Traer avíos de la orden"** (carga la receta con su cantidad sugerida, PROPONE
+ * no LIMITA) + renglones (editor avío/tela con flag de receta ✓/⚠ y existencia). Una nota
+ * confirmada/cancelada va en `soloLectura`. Acciones gobernadas por `notas.administrar`; el backend
+ * es la autoridad (A1).
  */
 export function DialogoEditarNota({
   abierto,
   alCambiarAbierto,
   nota,
+  prefill,
   soloLectura = false,
   alGuardada,
 }: {
@@ -54,6 +77,8 @@ export function DialogoEditarNota({
   alCambiarAbierto: (abierto: boolean) => void;
   /** Nota a editar; `undefined` = alta de un borrador nuevo. */
   nota?: NotaSalida | undefined;
+  /** Datos para pre-cargar el alta (desde la habilitación); ignorado en edición. */
+  prefill?: PrefillNota | undefined;
   /** Bloquea toda edición (nota confirmada/cancelada); el backend re-valida. */
   soloLectura?: boolean;
   /** Callback con el id de la nota guardada (para enfocarla en la lista). */
@@ -78,12 +103,43 @@ export function DialogoEditarNota({
   const [fechaEnvio, setFechaEnvio] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonNotaCaptura[]>([]);
+  // Recetas conocidas por orden (idOrden → ids de avío) para el flag ✓/⚠ del editor.
+  const [recetas, setRecetas] = useState<Record<number, number[]>>({});
+  // Orden elegida en el selector "Traer avíos de la orden".
+  const [ordenTraer, setOrdenTraer] = useState<number | null>(null);
 
-  // Al abrir, carga los datos de la nota (edición) o limpia (alta).
+  // Habilitación de la orden elegida para "Traer avíos" (trae la receta + cantidad sugerida).
+  const habTraer = useHabilitacionOrden(ordenTraer ?? undefined);
+  const habLista =
+    habTraer.data !== undefined && ordenTraer !== null && habTraer.data.idOrden === ordenTraer;
+
+  // Existencias de avío del almacén origen elegido (aviso "excede"; apagada sin almacén).
+  const existencias = useExistenciasAvio(
+    idAlmacen === null ? {} : { idAlmacen, incluirCeros: 'true' },
+    { habilitado: idAlmacen !== null },
+  );
+  const existenciaPorAvio = useMemo(() => {
+    const mapa = new Map<number, ExistenciaAvioNota>();
+    if (idAlmacen === null) return mapa;
+    for (const f of existencias.data?.filas ?? []) {
+      if (f.idAlmacen === idAlmacen)
+        mapa.set(f.idAvio, { existencia: f.existencia, unidad: f.unidad });
+    }
+    return mapa;
+  }, [existencias.data, idAlmacen]);
+
+  const recetaPorOrden = useMemo(() => {
+    const mapa = new Map<number, Set<number>>();
+    for (const [clave, ids] of Object.entries(recetas)) mapa.set(Number(clave), new Set(ids));
+    return mapa;
+  }, [recetas]);
+
+  // Al abrir, carga los datos de la nota (edición), el prefill (alta pre-cargada) o limpia (alta).
   useEffect(() => {
     if (!abierto) {
       return;
     }
+    setOrdenTraer(null);
     if (nota !== undefined) {
       setIdMaquilero(nota.idMaquilero);
       setIdAlmacen(nota.idAlmacen);
@@ -91,6 +147,27 @@ export function DialogoEditarNota({
       setFechaEnvio(nota.fechaEnvio ?? '');
       setObservaciones(nota.observaciones ?? '');
       setRenglones(capturaDesdeNota(nota));
+      setRecetas({});
+    } else if (prefill !== undefined) {
+      setIdMaquilero(prefill.idMaquilero ?? null);
+      setIdAlmacen(prefill.idAlmacen ?? null);
+      setFechaElaboracion(hoy());
+      setFechaEnvio('');
+      setObservaciones('');
+      setRenglones(
+        (prefill.renglones ?? []).map((r) => ({
+          clave: nuevaClaveRenglon(),
+          tipo: 'avio' as const,
+          idOrden: r.idOrden,
+          idAvio: r.idAvio,
+          idTela: null,
+          idLote: null,
+          idMovimientoSalidaTela: null,
+          cantidad: String(r.cantidad),
+          unidad: r.unidad ?? '',
+        })),
+      );
+      setRecetas(prefill.recetaPorOrden ?? {});
     } else {
       setIdMaquilero(null);
       setIdAlmacen(null);
@@ -98,8 +175,46 @@ export function DialogoEditarNota({
       setFechaEnvio('');
       setObservaciones('');
       setRenglones([renglonVacio()]);
+      setRecetas({});
     }
-  }, [abierto, nota]);
+  }, [abierto, nota, prefill]);
+
+  /** Carga los avíos de la receta de la orden elegida (cantidad = requerido); PROPONE, no LIMITA. */
+  function traerAvios(): void {
+    if (!habLista || habTraer.data === undefined) {
+      toast.error('Elige una orden y espera a que cargue su receta.');
+      return;
+    }
+    const data = habTraer.data;
+    const deReceta = data.avios.filter((a) => !a.esExtra);
+    if (deReceta.length === 0) {
+      toast.error('La orden no tiene avíos en su receta.');
+      return;
+    }
+    const nuevos: RenglonNotaCaptura[] = deReceta.map((a) => ({
+      clave: nuevaClaveRenglon(),
+      tipo: 'avio',
+      idOrden: data.idOrden,
+      idAvio: a.idAvio,
+      idTela: null,
+      idLote: null,
+      idMovimientoSalidaTela: null,
+      cantidad: String(a.requerido),
+      unidad: a.unidad ?? '',
+    }));
+    // Conserva los renglones ya capturados (descarta los vacíos, como en el proto).
+    setRenglones((prev) => {
+      const conContenido = prev.filter(
+        (r) => r.idAvio !== null || r.idTela !== null || r.idOrden !== null || r.cantidad !== '',
+      );
+      return [...conContenido, ...nuevos];
+    });
+    setRecetas((prev) => ({ ...prev, [data.idOrden]: deReceta.map((a) => a.idAvio) }));
+    if (idMaquilero === null && data.idMaquilero !== null) setIdMaquilero(data.idMaquilero);
+    toast.success(
+      `${nuevos.length} avíos de la orden ${data.folioOrden} agregados desde su receta.`,
+    );
+  }
 
   const renglonesValidos = renglones.length > 0 && renglones.every(renglonCompleto);
   const puedeGuardar =
@@ -108,6 +223,9 @@ export function DialogoEditarNota({
     idAlmacen !== null &&
     fechaElaboracion !== '' &&
     renglonesValidos;
+
+  // Totales vivos (# órdenes distintas · # renglones), §4.6.
+  const numOrdenes = new Set(renglones.map((r) => r.idOrden).filter((o) => o !== null)).size;
 
   function confirmar(): void {
     if (idMaquilero === null) {
@@ -251,15 +369,69 @@ export function DialogoEditarNota({
             </Field>
           </div>
 
+          {/* Traer avíos de la orden (la receta PROPONE, no LIMITA — §4.6). */}
+          {!soloLectura ? (
+            <div
+              className="flex flex-col gap-2 rounded-md border bg-panel-2 p-3 sm:flex-row sm:items-end"
+              data-testid="nota-traer-avios"
+            >
+              <p className="flex items-start gap-1.5 text-xs text-muted-foreground sm:flex-1">
+                <InfoIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                La receta del modelo ya dice qué avíos lleva la orden. Tráelos ya cargados con su
+                cantidad sugerida.
+              </p>
+              <div className="flex items-end gap-2">
+                <label className="text-xs text-muted-foreground">
+                  Orden
+                  <SelectNativo
+                    className="mt-1"
+                    aria-label="Orden para traer sus avíos"
+                    value={ordenTraer === null ? '' : String(ordenTraer)}
+                    onChange={(e) =>
+                      setOrdenTraer(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    data-testid="nota-traer-orden"
+                  >
+                    <option value="">Elige una orden…</option>
+                    {(ordenes.data?.datos ?? []).map((o) => (
+                      <option key={o.id} value={String(o.id)}>
+                        Orden {o.folio} · {o.codigoModelo}
+                      </option>
+                    ))}
+                  </SelectNativo>
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={traerAvios}
+                  disabled={ordenTraer === null || (ordenTraer !== null && habTraer.isPending)}
+                  data-testid="nota-traer-boton"
+                >
+                  <DownloadIcon aria-hidden />
+                  Traer avíos de la orden
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {/* Renglones */}
           <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">Renglones</h3>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground">Renglones</h3>
+              <span className="text-xs text-muted-foreground" data-testid="nota-totales">
+                {numOrdenes} {numOrdenes === 1 ? 'orden' : 'órdenes'} · {renglones.length}{' '}
+                {renglones.length === 1 ? 'renglón' : 'renglones'}
+              </span>
+            </div>
             <EditorRenglonesNota
               renglones={renglones}
               alCambiar={setRenglones}
               avios={avios.data?.datos ?? []}
               telas={telas.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
+              recetaPorOrden={recetaPorOrden}
+              existenciaPorAvio={existenciaPorAvio}
               soloLectura={soloLectura}
             />
           </div>

@@ -1,14 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del CRUD de Clientes (F1-E2, D7) contra el stack real, en la estructura LISTA +
- * DETALLE (rediseño "Teal fresco"). Cubre el ciclo completo del cliente (crear ->
- * lista -> seleccionar -> editar -> desactivar con confirmación -> mostrar desactivados
- * -> reactivar -> buscar) y, sobre todo, los CAMPOS DE REFERENCIA (D7): agregar un
- * campo, verlo, y que una etiqueta DUPLICADA en el mismo cliente se rechace (caso de la
- * ficha). Usa un nombre único por corrida.
+ * E2E del CRUD de Clientes (F1-E2, D7) contra el stack real, re-vestido R9 a TABLA-FIRST
+ * + CAJÓN de detalle. Cubre el ciclo completo del cliente (crear -> lista -> seleccionar
+ * (abre el cajón) -> editar -> desactivar con confirmación -> mostrar desactivados ->
+ * reactivar -> buscar) y, sobre todo, los CAMPOS DE REFERENCIA (D7): agregar un campo,
+ * verlo, y que una etiqueta DUPLICADA en el mismo cliente se rechace (caso de la ficha).
+ * Usa un nombre único por corrida. El nombre y el estado (Activo/Inactivo) viven en el
+ * TÍTULO del cajón; el contacto y los editores, en su cuerpo — por eso `detalle` apunta
+ * al cajón completo.
  */
 test.describe('CRUD de Clientes', () => {
   test('crear, editar, desactivar, reactivar y buscar un cliente', async ({ page }) => {
@@ -18,16 +20,16 @@ test.describe('CRUD de Clientes', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos -> Clientes (descubrible por clic, no solo por URL).
+    // Navega Comercial · Clientes -> Catálogo (descubrible por clic, no solo por URL).
+    await abrirDesplegableMenu(page, 'Clientes');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Catálogo', exact: true })
       .click();
-    await page.getByTestId('catalogo-clientes').click();
     await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-cliente');
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
 
     // ── Crear ─────────────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-cliente').click();
@@ -62,6 +64,9 @@ test.describe('CRUD de Clientes', () => {
     await expect(filaEditada).toBeVisible();
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
+    // El cajón sigue abierto (el nombre editado aún casa la búsqueda); ciérralo antes de
+    // volver a clickear la fila del fondo (el overlay modal impide estabilizar el clic).
+    await cerrarCajon(page);
     await filaEditada.click();
     await expect(detalle.getByRole('heading', { name: nombreEditado })).toBeVisible();
     await page.getByTestId('desactivar-cliente').click();
@@ -75,6 +80,7 @@ test.describe('CRUD de Clientes', () => {
     );
 
     // ── Mostrar desactivados → seleccionar → Inactivo ──────────────────────────
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-cliente').filter({ hasText: nombreEditado });
     await expect(filaInactiva).toBeVisible();
@@ -88,6 +94,7 @@ test.describe('CRUD de Clientes', () => {
     await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
+    await cerrarCajon(page);
     await page.getByTestId('buscar-cliente').fill(nombreEditado);
     await expect(page.getByTestId('fila-cliente').filter({ hasText: nombreEditado })).toBeVisible();
     await page.getByTestId('buscar-cliente').fill('zzz-no-existe-zzz');
@@ -123,7 +130,7 @@ test.describe('Campos de referencia del cliente (D7)', () => {
     await page.getByTestId('buscar-cliente').fill(nombre);
     await page.getByTestId('fila-cliente').filter({ hasText: nombre }).click();
 
-    const detalle = page.getByTestId('detalle-cliente');
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
     await expect(detalle.getByText('Campos de referencia (D7)')).toBeVisible();
 
     /** Agrega un campo desde el editor del detalle. */

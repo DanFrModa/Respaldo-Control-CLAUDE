@@ -6,18 +6,6 @@
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 
-/** Paleta teal del sistema (coherente con los impresos de costos/EDR). */
-export const COLORES = {
-  teal: '#0d9488',
-  gris: '#64748b',
-  grisBorde: '#e2e8f0',
-  tinta: '#0f172a',
-  encabezadoFondo: '#f1f5f9',
-} as const;
-
-/** Teal para exceljs (ARGB). */
-export const TEAL_XLSX = 'FF0D9488';
-
 /** Razón social (o nombre) de la empresa activa para el encabezado del impreso. */
 export async function razonSocialEmpresa(sesion: SesionUsuario, bd?: ContextoBd): Promise<string> {
   const empresa = await clienteLectura(bd).empresa.findUnique({

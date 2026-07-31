@@ -1,9 +1,10 @@
-import { Calculator, Printer, ShoppingCart } from 'lucide-react';
+import { Info, Printer, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 
 import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { Requerimiento } from '@/api/tipos';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -70,17 +71,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <Calculator className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Explosión de materiales</h1>
-          <p className="text-sm text-muted-foreground">
-            Qué y cuánto comprar para una orden, agrupado por proveedor.
+      <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Explosión de materiales · MRP
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Qué y cuánto comprar para una orden (make-to-order), agrupado por proveedor
           </p>
         </div>
       </div>
@@ -162,13 +159,44 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               </div>
             </div>
 
+            {comprables.length > 0 ? (
+              <div
+                className="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-2 text-xs text-info"
+                data-testid="exp-banner-faltantes"
+              >
+                <Info className="size-4 shrink-0" aria-hidden />
+                <span>
+                  <b>{comprables.length}</b> material(es) por comprar para esta orden —
+                  selecciónalos y genera las OC (una por proveedor).
+                </span>
+              </div>
+            ) : null}
+
             {datos?.huboCambios ? (
               <p
-                className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800"
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
                 data-testid="exp-aviso-cambios"
               >
                 El BOM cambió desde la última explosión: los renglones afectados están marcados.
               </p>
+            ) : null}
+
+            {/* Avisos del enganche (F8-E6): tela amarrada multi-color con precios distintos (se usó el
+                precio base), avío por talla (R18) sin medida capturada, etc. Nada truena en silencio. */}
+            {(datos?.avisos ?? []).length > 0 ? (
+              <div
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                data-testid="exp-avisos"
+              >
+                <p className="font-medium">Avisos de la explosión:</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {(datos?.avisos ?? []).map((aviso, i) => (
+                    <li key={i} data-testid="exp-aviso">
+                      {aviso}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             {generar.isError ? (
@@ -178,7 +206,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
             ) : null}
             {generar.isSuccess ? (
               <p
-                className="mb-3 rounded-md border border-emerald-300 bg-emerald-50 p-2 text-sm text-emerald-800"
+                className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-sm text-ok"
                 data-testid="exp-ok-generar"
               >
                 Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
@@ -303,12 +331,9 @@ function DiffBadge({ diff }: { diff: Requerimiento['diff'] }): React.JSX.Element
   const etiqueta =
     diff === 'nuevo' ? 'Nuevo' : diff === 'eliminado' ? 'Retirado' : 'Cantidad cambiada';
   return (
-    <span
-      className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
-      data-testid="exp-diff-badge"
-    >
+    <ChipEstado tono="warn" sinPunto data-testid="exp-diff-badge">
       {etiqueta}
-    </span>
+    </ChipEstado>
   );
 }
 
@@ -319,13 +344,8 @@ function GenericoBadge({ renglon }: { renglon: Requerimiento }): React.JSX.Eleme
   }
   const cubierto = renglon.estadoGenerico === 'cubierto-por-stock';
   return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-        cubierto ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
-      }`}
-      data-testid="exp-generico-badge"
-    >
+    <ChipEstado tono={cubierto ? 'ok' : 'info'} sinPunto data-testid="exp-generico-badge">
       {cubierto ? 'Cubierto por stock' : 'Genérico · faltante'}
-    </span>
+    </ChipEstado>
   );
 }

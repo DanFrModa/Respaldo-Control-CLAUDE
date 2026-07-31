@@ -9,15 +9,52 @@ export const CREDENCIALES_ADMIN = {
 
 /**
  * Inicia sesion como admin desde la pantalla de login y espera a estar dentro de
- * la app (inicio con el saludo). Lo usan las pruebas que parten de una sesion
- * valida.
+ * la app (el Resumen operativo del rediseño R9, con la sesion del admin en el
+ * menu de usuario). Lo usan las pruebas que parten de una sesion valida.
  */
 export async function entrarComoAdmin(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Usuario').fill(CREDENCIALES_ADMIN.usuario);
   await page.getByLabel('Contraseña').fill(CREDENCIALES_ADMIN.password);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
+  await expect(page.getByTestId('menu-usuario')).toContainText('Administrador');
+}
+
+/**
+ * Abre (si hace falta) un DESPLEGABLE del riel (rediseño R1) para poder clickear a sus hijos.
+ * IDEMPOTENTE a propósito: el botón de un padre TOGGLEA, y el riel auto-abre al padre cuya ruta
+ * está activa (p. ej. tras un `goto` a un hijo suyo, como `/catalogos/bordados` bajo Desarrollo);
+ * un click ciego en ese estado lo CERRARÍA y el hijo desaparecería (causa del timeout de
+ * `modelos.spec` en CI, R1). Por eso solo clickea cuando `aria-expanded` no es `true`, y siempre
+ * termina verificando que quedó abierto.
+ */
+export async function abrirDesplegableMenu(page: Page, nombre: string): Promise<void> {
+  const boton = page
+    .getByRole('navigation', { name: 'Módulos' })
+    .first()
+    .getByRole('button', { name: nombre, exact: true });
+  if ((await boton.getAttribute('aria-expanded')) !== 'true') {
+    await boton.click();
+  }
+  await expect(boton).toHaveAttribute('aria-expanded', 'true');
+}
+
+/**
+ * Cierra el CAJÓN de detalle (rediseño R9, `[data-slot="cajon-detalle"]`) si está abierto, y espera
+ * a que se desmonte. Es un Radix Dialog MODAL: mientras está abierto, su overlay + scroll-lock cubren
+ * la lista y el encabezado, así que un `.click()` sobre un renglón o un botón del fondo NO se
+ * estabiliza (el scroll-into-view de Playwright pelea con el scroll-lock → timeout "not stable"). Por
+ * eso, en los CRUD de cajón (clientes/modelos/proveedores) se cierra el cajón ANTES de cada
+ * interacción de fondo por CLIC (mismo patrón que `ordenes`/`pedidos`, que hacen `Escape`).
+ * Idempotente: si no hay cajón abierto, no hace nada (Escape solo se manda si está montado).
+ */
+export async function cerrarCajon(page: Page): Promise<void> {
+  const cajon = page.locator('[data-slot="cajon-detalle"]');
+  if ((await cajon.count()) > 0) {
+    await page.keyboard.press('Escape');
+    await expect(cajon).toHaveCount(0);
+  }
 }
 
 /**

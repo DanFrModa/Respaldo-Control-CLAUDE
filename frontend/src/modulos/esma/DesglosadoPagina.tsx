@@ -1,22 +1,22 @@
-import { FileSpreadsheet, FileText, Printer } from 'lucide-react';
+import { FileSpreadsheet, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { descargarExcelEstadoCuenta, imprimirEstadoCuenta, useDesglosado } from '@/api/esma';
 import type { EsMaEstadoCuentaQuery } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
 import { SelectorMaquilero, type TipoMaquilero } from './SelectorMaquilero';
@@ -50,14 +50,13 @@ export function DesglosadoPagina(): React.JSX.Element {
   const datos = consulta.data;
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="desglosado-esma">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="desglosado-esma">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <FileText className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Estado de cuenta desglosado</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Estado de cuenta desglosado
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             El detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta.
           </p>
         </div>
@@ -164,49 +163,47 @@ export function DesglosadoPagina(): React.JSX.Element {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table data-testid="desg-tabla">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Orden</TableHead>
-                        <TableHead>Modelo</TableHead>
-                        <TableHead>Proceso</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                        <TableHead className="text-right">Precio</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <TablaDensa data-testid="desg-tabla">
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Fecha</TablaDensaHead>
+                        <TablaDensaHead>Orden</TablaDensaHead>
+                        <TablaDensaHead>Modelo</TablaDensaHead>
+                        <TablaDensaHead>Proceso</TablaDensaHead>
+                        <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                        <TablaDensaHead numerica>Precio</TablaDensaHead>
+                        <TablaDensaHead numerica>Importe</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
                       {(datos?.cargos ?? []).map((c) => (
-                        <TableRow key={c.idCargo} data-testid="desg-fila">
-                          <TableCell>{c.fecha}</TableCell>
-                          <TableCell>#{c.folioOrden}</TableCell>
-                          <TableCell>
+                        <TablaDensaFila key={c.idCargo} data-testid="desg-fila">
+                          <TablaDensaCelda>{c.fecha}</TablaDensaCelda>
+                          <TablaDensaCelda>#{c.folioOrden}</TablaDensaCelda>
+                          <TablaDensaCelda>
                             {c.descripcionModelo
                               ? `${c.codigoModelo} — ${c.descripcionModelo}`
                               : c.codigoModelo}
-                          </TableCell>
-                          <TableCell>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
                             {c.tipoProceso}
                             {c.sinCosto ? (
                               <span className="ml-1 text-xs text-muted-foreground">
                                 (sin costo)
                               </span>
                             ) : null}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {c.cantidad === null ? '—' : c.cantidad.toLocaleString('es-MX')}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {moneda(c.precio)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(c.precio)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {c.sinCosto ? moneda(0) : moneda(c.importe)}
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
                 </div>
               )}
             </CardContent>

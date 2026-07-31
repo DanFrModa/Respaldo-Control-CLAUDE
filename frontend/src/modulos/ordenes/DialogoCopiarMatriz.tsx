@@ -20,7 +20,7 @@ import { useDebounce } from '@/lib/useDebounce';
 /**
  * Diálogo de COPIAR MATRIZ desde otra orden (F2-E3): se elige una orden ORIGEN (búsqueda) y el
  * backend copia su matriz (colores × tallas) a la orden destino. Útil para reusar la curva de una
- * orden parecida. El backend re-valida (misma empresa) y deriva el estado a 'completa'.
+ * orden parecida. El backend re-valida (misma empresa) y recalcula el estado de la orden.
  */
 export function DialogoCopiarMatriz({
   abierto,

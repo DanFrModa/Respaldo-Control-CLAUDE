@@ -35,6 +35,11 @@ export interface MatrizLinea {
   color: string;
   /** Cantidades por talla: `{ [idTalla]: cantidad }`. Una talla ausente = 0. */
   cantidades: Record<number, number>;
+  /**
+   * Código PANTONE de este color (petición Daniel), opcional. Sólo se MUESTRA/EDITA cuando el flujo lo
+   * usa (pasando `onPantoneChange` o filas con pantone); los flujos que no lo manejan lo ignoran.
+   */
+  pantone?: string | null;
 }
 
 /** Un color disponible para elegir/agregar como fila. */
@@ -57,6 +62,12 @@ export interface PropsMatrizColorTalla {
   onLineasChange: (lineas: MatrizLinea[]) => void;
   /** Emite el nuevo set de columnas tras agregar/quitar una talla. */
   onTallasChange: (tallas: MatrizTalla[]) => void;
+  /**
+   * Si se pasa, cada color muestra un campo PANTONE editable (petición Daniel). Si NO se pasa, el
+   * pantone sólo se MUESTRA (read-only) cuando la fila lo trae. Los flujos que no capturan pantone
+   * simplemente omiten esta prop y no ven nada nuevo.
+   */
+  onPantoneChange?: (idColor: number, pantone: string) => void;
   /** Solo lectura (orden cancelada / sin permiso): oculta toda edición y deja la matriz visible. */
   soloLectura?: boolean;
   /** Base de los `data-testid` (por defecto "matriz"). */
@@ -105,6 +116,7 @@ function MatrizColorTallaBase({
   tallasDisponibles,
   onLineasChange,
   onTallasChange,
+  onPantoneChange,
   soloLectura = false,
   testid = 'matriz',
 }: PropsMatrizColorTalla): React.JSX.Element {
@@ -295,7 +307,12 @@ function MatrizColorTallaBase({
           <table className="w-full border-collapse text-sm" data-testid={`${testid}-tabla`}>
             <thead>
               <tr className="border-b">
-                <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Color</th>
+                {/* Primera columna CONGELADA en el scroll-x: `left-0` + bg opaco (bg-card, el
+                    color de la superficie que la contiene) para que las tallas no se transparenten
+                    debajo del color al desplazar. */}
+                <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-medium text-muted-foreground">
+                  Color
+                </th>
                 {tallas.map((talla) => (
                   <th
                     key={talla.idTalla}
@@ -324,7 +341,28 @@ function MatrizColorTallaBase({
             <tbody>
               {lineas.map((linea, indiceFila) => (
                 <tr key={linea.idColor} className="border-b" data-testid={`${testid}-fila`}>
-                  <td className="px-2 py-1 font-medium whitespace-nowrap">{linea.color}</td>
+                  <td className="sticky left-0 z-10 bg-card px-2 py-1 font-medium whitespace-nowrap">
+                    <span>{linea.color}</span>
+                    {onPantoneChange !== undefined && !soloLectura ? (
+                      <Input
+                        value={linea.pantone ?? ''}
+                        onChange={(e) => onPantoneChange(linea.idColor, e.target.value)}
+                        placeholder="PANTONE"
+                        aria-label={`Pantone del color ${linea.color}`}
+                        className="mt-1 h-6 w-28 text-[11px]"
+                        data-testid={`${testid}-pantone`}
+                      />
+                    ) : linea.pantone !== null &&
+                      linea.pantone !== undefined &&
+                      linea.pantone !== '' ? (
+                      <span
+                        className="mt-0.5 block text-[11px] font-normal text-muted-foreground"
+                        data-testid={`${testid}-pantone`}
+                      >
+                        PANTONE {linea.pantone}
+                      </span>
+                    ) : null}
+                  </td>
                   {tallas.map((talla, indiceColumna) => {
                     const cantidad = linea.cantidades[talla.idTalla] ?? 0;
                     return (
@@ -379,7 +417,9 @@ function MatrizColorTallaBase({
             </tbody>
             <tfoot>
               <tr className="font-medium">
-                <td className="px-2 py-1.5 text-muted-foreground">Total</td>
+                <td className="sticky left-0 z-10 bg-card px-2 py-1.5 text-muted-foreground">
+                  Total
+                </td>
                 {tallas.map((talla) => (
                   <td
                     key={talla.idTalla}

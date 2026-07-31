@@ -40,7 +40,7 @@ import {
   type PendientesRecibir,
   type RecibosSemanalesLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -53,14 +53,13 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   type LineaMovimientoPt,
 } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -70,7 +69,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import { pendientePorMaquilero, type MetaCelda } from './wip.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
@@ -276,9 +276,19 @@ async function sumarCeldas(
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso: number,
+  /** Acota la suma a UN maquilero (el saldo de recibo se lleva por tercero, no por proceso). */
+  idTercero?: number,
 ): Promise<Map<string, number>> {
   const filas = await tx.etapaMovimientoDet.findMany({
-    where: { etapaMov: { idOrden, tipo, idTipoProceso, canceladoEn: null } },
+    where: {
+      etapaMov: {
+        idOrden,
+        tipo,
+        idTipoProceso,
+        canceladoEn: null,
+        ...(idTercero === undefined ? {} : { idTercero }),
+      },
+    },
     select: { idColor: true, idTalla: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
@@ -287,6 +297,36 @@ async function sumarCeldas(
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
+}
+
+/**
+ * Maquileros CON ENVÍO VIVO de un proceso en una orden — los únicos a los que se les puede recibir.
+ * Solo para redactar el error: dice a quién SÍ se le puede, en vez de dejar al usuario adivinando.
+ * `sinMaquilero` marca el caso del histórico migrado (entrega viva con `idTercero` NULL), que no
+ * tiene a quién nombrar pero SÍ existe: callarlo hacía que el mensaje dijera lo contrario.
+ */
+async function maquilerosConEnvio(
+  tx: Tx,
+  idOrden: number,
+  idTipoProceso: number,
+): Promise<{ nombres: string[]; sinMaquilero: boolean }> {
+  const envios = await tx.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      idTipoProceso,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+    },
+    select: { idTercero: true, tercero: { select: { nombre: true } } },
+    distinct: ['idTercero'],
+  });
+  return {
+    nombres: envios
+      .map((e) => e.tercero?.nombre ?? null)
+      .filter((n): n is string => n !== null)
+      .sort((a, b) => a.localeCompare(b, 'es')),
+    sinMaquilero: envios.some((e) => e.idTercero === null),
+  };
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
@@ -309,10 +349,17 @@ const incluirRecibo = {
 
 type ReciboConDetalle = Prisma.EtapaMovimientoGetPayload<{ include: typeof incluirRecibo }>;
 
-/** Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma. */
+/**
+ * Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma.
+ * `ocultarPrecio` (rediseño R2, §4.4.3 — triage del lead): la respuesta de la CANCELACIÓN redacta
+ * `precioPactado` sin `ordenes.ver-precio-real-maquila` (el cancelador NO tecleó ese precio); la
+ * de CAPTURA lo conserva (quien capturó acaba de teclearlo — mismo criterio que el PATCH de
+ * precios de la orden).
+ */
 async function aReciboSalida(
   recibo: ReciboConDetalle,
   bd: ContextoBd | undefined,
+  ocultarPrecio = false,
 ): Promise<ReciboSalida> {
   // PRIMER movimiento de kardex generado por el recibo (si lo hubo), trazado por origen recibo. Un
   // recibo de costura con primeras Y segundas genera DOS movimientos de entrada (uno por almacén);
@@ -373,7 +420,8 @@ async function aReciboSalida(
     idAlmacenSegundas: recibo.idAlmacenSegundas,
     almacenSegundas: recibo.almacenSegundas?.nombre ?? null,
     fecha: recibo.fecha.toISOString().slice(0, 10),
-    precioPactado: recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
+    precioPactado:
+      ocultarPrecio || recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
     observaciones: recibo.observaciones,
     cancelado: recibo.canceladoEn !== null,
     canceladoEn: recibo.canceladoEn === null ? null : recibo.canceladoEn.toISOString(),
@@ -387,17 +435,6 @@ async function aReciboSalida(
     creadoEn: recibo.creadoEn.toISOString(),
     creadoPorId: recibo.creadoPorId,
   };
-}
-
-/** Emite un evento de recibo post-commit, best-effort (gancho RC F5). */
-async function emitirRecibo(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
 }
 
 /**
@@ -457,7 +494,10 @@ export async function registrarReciboMaquila(
       proceso.nombre,
     );
 
-    // Si liga un envío, debe ser de la MISMA orden+proceso y estar vivo (defensa de la liga (d)).
+    // Si liga un envío, debe ser de la MISMA orden+proceso, del MISMO maquilero y estar vivo
+    // (defensa de la liga (d)). Lo del maquilero es de la regla del 28-jul-2026: sin ese filtro se
+    // podía registrar un recibo de un maquilero colgado del envío de OTRO — el saldo por tercero
+    // cuadraba y la liga mentía (hallazgo del reviewer).
     if (datos.idEtapaEnvio !== undefined) {
       const envio = await tx.etapaMovimiento.findFirst({
         where: {
@@ -466,38 +506,68 @@ export async function registrarReciboMaquila(
           idEmpresa: orden.idEmpresa,
           tipo: TipoEtapaMovimiento.envio_maquila,
           idTipoProceso: datos.idTipoProceso,
+          idTercero: datos.idMaquilero,
           canceladoEn: null,
         },
         select: { id: true },
       });
       if (envio === null) {
         throw new ErrorValidacion(
-          'El envío ligado no existe, está cancelado o no es de esta orden y proceso.',
+          'El envío ligado no existe, está cancelado, o no es de esta orden, proceso y maquilero.',
         );
       }
     }
 
     // Concurrencia + decisión (g): serializa la orden y valida recibido ≤ enviado por suma directa.
     await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+    // El saldo se lleva POR MAQUILERO, no por proceso (regla de Daniel, 28-jul-2026: *"no puedo
+    // recibir un corte de un maquilero diferente al que se lo entregué"*). Antes se validaba
+    // recibido ≤ enviado del PROCESO ENTERO: con dos maquileros trabajando la misma orden se podía
+    // cargarle a uno lo que devolvió el otro, y la cuenta de cada quien (EsMa, existencias en poder
+    // del maquilero) quedaba falseada sin que nada lo impidiera. El filtro de la pantalla no basta:
+    // una lista filtrada se brinca llamando al API.
     const enviado = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.envio_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
     const yaRecibido = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.recibo_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
+    if (enviado.size === 0) {
+      const { nombres, sinMaquilero } = await maquilerosConEnvio(
+        tx,
+        datos.idOrden,
+        datos.idTipoProceso,
+      );
+      const detalle =
+        nombres.length > 0
+          ? `Tiene entrega viva: ${nombres.join(', ')}.`
+          : sinMaquilero
+            ? // Histórico migrado: el Access no siempre traía el maquilero de la entrega. Decirlo
+              // tal cual — antes este caso respondía "no tiene ninguna entrega", que era falso y
+              // dejaba al operador sin saber qué corregir (hallazgo del reviewer).
+              'Esta orden tiene entrega viva SIN maquilero (histórico migrado): hay que corregir ' +
+              'esa entrega —o cancelarla y recapturarla con su maquilero— antes de poder recibir.'
+            : 'Esta orden todavía no tiene ninguna entrega de ese proceso.';
+      throw new ErrorConflicto(
+        `A ese maquilero no se le entregó el corte de "${proceso.nombre}" en esta orden, así que ` +
+          `no se le puede recibir. ${detalle}`,
+      );
+    }
     for (const c of celdas) {
       const clave = claveCelda(c.idColor, c.idTalla);
       const disponible = (enviado.get(clave) ?? 0) - (yaRecibido.get(clave) ?? 0);
       if (c.cantidad > disponible) {
         throw new ErrorConflicto(
           `No se puede recibir ${c.cantidad} pza(s) de ese color/talla de "${proceso.nombre}": ` +
-            `solo quedan ${disponible} enviada(s) sin recibir.`,
+            `a ese maquilero solo le quedan ${disponible} enviada(s) sin recibir.`,
         );
       }
     }
@@ -662,7 +732,6 @@ export async function registrarReciboMaquila(
   }, bd);
 
   const salida = await obtenerRecibo(sesion, idRecibo, bd);
-  await emitirReciboPorId(idRecibo, EVENTOS_PRODUCCION.reciboRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -812,14 +881,23 @@ export async function cancelarReciboMaquila(
   }, bd);
 
   dispararPublicacion();
-  return obtenerRecibo(sesion, idRecibo, bd);
+  // Triage del lead (R2 §4.4.3): el cancelador NO tecleó el precio pactado — sin el permiso de
+  // ver precios reales, la respuesta lo redacta (la de captura sí lo devuelve a quien lo tecleó).
+  return obtenerRecibo(sesion, idRecibo, bd, {
+    ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+  });
 }
 
-/** Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
+/**
+ * Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
+ * `opciones.ocultarPrecio`: el llamador decide si redactar `precioPactado` (lo usa la cancelación
+ * para quien no puede ver precios reales; la captura y el impreso lo conservan).
+ */
 export async function obtenerRecibo(
   sesion: SesionUsuario,
   idRecibo: number,
   bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<ReciboSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
   const recibo = await clienteLectura(bd).etapaMovimiento.findFirst({
@@ -833,19 +911,7 @@ export async function obtenerRecibo(
   if (recibo === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idRecibo);
   }
-  return aReciboSalida(recibo, bd);
-}
-
-/** Re-lee el recibo para emitir su evento post-commit (best-effort). */
-async function emitirReciboPorId(
-  idRecibo: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idRecibo } });
-  if (etapa !== null) {
-    await emitirRecibo(evento, etapa);
-  }
+  return aReciboSalida(recibo, bd, opciones.ocultarPrecio ?? false);
 }
 
 /**
@@ -878,13 +944,6 @@ export async function pendientesPorRecibir(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  interface MetaCelda {
-    idColor: number;
-    color: string;
-    idTalla: number;
-    etiquetaTalla: string;
-    ordenTalla: number;
-  }
   const meta = new Map<string, MetaCelda>();
   for (const linea of orden.lineas) {
     for (const t of linea.tallas) {
@@ -919,17 +978,13 @@ export async function pendientesPorRecibir(
   const porRecibir = [];
   for (const proc of procesosEnviados) {
     if (proc.idTipoProceso === null) continue;
-    const enviado = await sumarCeldas(
+    // MISMO derivado que el drill-down del WIP (helper compartido): el pendiente por proceso y su
+    // desglose POR MAQUILERO, para que esta pantalla ofrezca y tope igual que el panel de avance.
+    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
       cliente,
       idOrden,
-      TipoEtapaMovimiento.envio_maquila,
       proc.idTipoProceso,
-    );
-    const recibido = await sumarCeldas(
-      cliente,
-      idOrden,
-      TipoEtapaMovimiento.recibo_maquila,
-      proc.idTipoProceso,
+      meta,
     );
     const claves = new Set<string>([...enviado.keys(), ...recibido.keys()]);
     const celdas = [...claves]
@@ -962,6 +1017,7 @@ export async function pendientesPorRecibir(
       generaEntradaPt: proc.tipoProceso?.generaEntradaPt ?? false,
       celdas,
       totalPendiente,
+      porMaquilero,
     });
   }
 
@@ -1050,23 +1106,4 @@ export async function recibosSemanalesPorMaquilero(
       b.anioSemana.localeCompare(a.anioSemana) || a.maquilero.localeCompare(b.maquilero, 'es'),
   );
   return { filas };
-}
-
-/**
- * Año-semana ISO 8601 ("2026-W25") y el LUNES de esa semana (YYYY-MM-DD). Copia del de `etapas.ts`
- * (cálculo en UTC porque la fecha de la etapa es `@db.Date` a medianoche UTC).
- */
-function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
-  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const diaIso = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-  const lunes = new Date(d);
-  lunes.setUTCDate(d.getUTCDate() - (diaIso - 1));
-  const jueves = new Date(d);
-  jueves.setUTCDate(d.getUTCDate() + (4 - diaIso));
-  const anioIso = jueves.getUTCFullYear();
-  const primerEnero = new Date(Date.UTC(anioIso, 0, 1));
-  const numSemana = Math.ceil(((jueves.getTime() - primerEnero.getTime()) / 86_400_000 + 1) / 7);
-  const anioSemana = `${anioIso}-W${String(numSemana).padStart(2, '0')}`;
-  const inicioSemana = lunes.toISOString().slice(0, 10);
-  return { anioSemana, inicioSemana };
 }

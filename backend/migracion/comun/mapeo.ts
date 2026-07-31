@@ -1,7 +1,7 @@
 /**
  * Helpers de la tabla de MAPEO `MapeoMigracion` (F1-E6).
  *
- * Es el entregable persistido que reutilizan los ETLs de fases futuras (E7/F2/F4/F9) para
+ * Es el entregable persistido que reutilizan los ETLs de fases futuras (E7/F2/F4/F10) para
  * traducir las FKs viejas a ids nuevos. Aquí va el ÚNICO acceso directo a esa tabla por
  * Prisma (la regla A1 — "nada de `prisma.create` directo de catálogos" — aplica a los
  * CATÁLOGOS; la tabla de mapeo es metadato técnico de la migración y la maneja el ETL).
@@ -18,7 +18,7 @@ import type { Tx } from '../../src/comun/transaccion.js';
 /** Cliente que sirve tanto al singleton como a una transacción/cliente de pruebas. */
 export type ClienteMapeo = Tx | PrismaClient;
 
-/** Claves de `entidad` de la tabla de mapeo (estables; las usan E7/F2/F4/F9). */
+/** Claves de `entidad` de la tabla de mapeo (estables; las usan E7/F2/F4/F10). */
 export const ENTIDAD_MAPEO = {
   color: 'Color',
   cliente: 'Cliente',
@@ -107,6 +107,9 @@ export const ENTIDAD_MAPEO = {
   muestrario: 'Muestrario',
   /** F7-E6 (indicadores): IdAlm_InvCic viejo → InventarioCiclico.id nuevo (histórico Proscai, D6). */
   inventarioCiclicoHist: 'InventarioCiclicoHist',
+  /** F9-E6: clave natural de una APERTURA de saldo de tercero (folio de origen · UUID · `neto:<tipo>:<id>`)
+   * → MovimientoTercero.id nuevo. Idempotencia del ETL de saldos iniciales (SINUBE). */
+  aperturaTercero: 'AperturaTercero',
 } as const;
 
 /** Una clave de entidad de mapeo. */

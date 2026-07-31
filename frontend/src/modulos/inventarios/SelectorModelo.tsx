@@ -1,22 +1,26 @@
-import { Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { useModelos, type Modelo } from '@/api/modelos';
-import { Input } from '@/components/ui/input';
+import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { useDebounce } from '@/lib/useDebounce';
 
 /**
- * SELECTOR DE MODELO reutilizable (F3-E3): busca modelos por código o descripción y al elegir uno
- * emite el modelo completo. Lo usan las pantallas de movimientos, traspasos y kardex para fijar el
- * modelo sobre el que se opera. Presentación pura (A1): solo consulta y emite.
+ * SELECTOR DE MODELO reutilizable (F3-E3, pulido R9): combobox con búsqueda server-side por código
+ * o descripción; al elegir emite el modelo completo. Lo usan las pantallas de movimientos,
+ * traspasos, kardex y existencias para fijar el modelo sobre el que se opera. La lista vive en el
+ * POPOVER del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera,
+ * no infla el layout del toolbar). Presentación pura (A1): solo consulta y emite.
  */
 export function SelectorModelo({
   idSeleccionado,
   alSeleccionar,
+  alLimpiar,
   testid = 'selector-modelo',
 }: {
   idSeleccionado: number | undefined;
   alSeleccionar: (modelo: Modelo) => void;
+  /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
+  alLimpiar?: () => void;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -30,57 +34,36 @@ export function SelectorModelo({
   });
 
   const modelos = consulta.data?.datos ?? [];
+  // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
+  // ofrecer las opciones viejas — clickearlas seleccionaba el modelo EQUIVOCADO (carrera del e2e).
+  const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
-    <div className="space-y-2" data-testid={testid}>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          className="pl-9"
-          placeholder="Buscar modelo por código o descripción…"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          aria-label="Buscar modelo"
-          data-testid={`${testid}-busqueda`}
-        />
-      </div>
-
-      {consulta.isError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {consulta.error.message}
-        </p>
-      ) : null}
-
-      <ul className="divide-y rounded-md border">
-        {modelos.length === 0 ? (
-          <li className="p-3 text-sm text-muted-foreground">
-            {consulta.isPending ? 'Buscando…' : 'No hay modelos que coincidan.'}
-          </li>
-        ) : (
-          modelos.map((modelo) => (
-            <li key={modelo.id}>
-              <button
-                type="button"
-                onClick={() => alSeleccionar(modelo)}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
-                  idSeleccionado === modelo.id ? 'bg-sidebar-accent/40 font-medium' : ''
-                }`}
-                data-testid={`${testid}-opcion`}
-              >
-                <span className="flex flex-col">
-                  <span className="font-medium">{modelo.codigo}</span>
-                  {modelo.descripcion !== null ? (
-                    <span className="text-xs text-muted-foreground">{modelo.descripcion}</span>
-                  ) : null}
-                </span>
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
-    </div>
+    <ComboboxBuscable
+      opciones={modelos.map((m) => ({ ...m, nombre: m.codigo }))}
+      valor={idSeleccionado ?? null}
+      onChange={(id) => {
+        if (id === null) {
+          alLimpiar?.();
+          return;
+        }
+        const modelo = modelos.find((m) => m.id === id);
+        if (modelo !== undefined) {
+          alSeleccionar(modelo);
+        }
+      }}
+      alCambiarTexto={setTexto}
+      busquedaServidor
+      renderOpcion={(o) => <OpcionRica principal={o.codigo} secundario={o.descripcion} />}
+      mensajeError={consulta.isError ? consulta.error.message : undefined}
+      conLupa
+      permitirLimpiar={alLimpiar !== undefined}
+      cargando={resolviendo}
+      placeholder="Buscar modelo por código o descripción…"
+      etiqueta="Buscar modelo"
+      textoVacio="No hay modelos que coincidan."
+      testid={testid}
+      testidInput={`${testid}-busqueda`}
+    />
   );
 }

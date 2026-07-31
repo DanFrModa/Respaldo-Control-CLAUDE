@@ -66,8 +66,20 @@ function archivosFalsos(): ServicioArchivos {
       });
       return { archivo, urlSubida: `https://r2.fake/put/${key}`, expiraEnSegundos: 900 };
     },
+    subirContenido() {
+      throw new Error(
+        'Este flujo usa solicitarSubida (presigned), no subirContenido (server-side).',
+      );
+    },
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
+    },
+    descargarContenido(key) {
+      // El fake no guarda bytes: solo cumple el contrato del servicio (nadie lo usa aquí).
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
+    eliminarObjeto() {
+      return Promise.resolve();
     },
   };
 }

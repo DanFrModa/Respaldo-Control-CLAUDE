@@ -400,3 +400,54 @@ export const esquemaComprasPagina = z
 
 /** Forma de la respuesta paginada de OC. */
 export type ComprasPagina = z.infer<typeof esquemaComprasPagina>;
+
+// ── Resumen de cabecera (KPIs `vCompras`, rediseño R9) ─────────────────────────────────
+
+/**
+ * Filtros del resumen de OC (querystring). Sub-conjunto de los del listado que ACOTAN el universo
+ * de "OC abiertas": proveedor, rango de fecha de emisión, búsqueda (folio/proveedor) y orden ligada.
+ * El estatus NO se recibe: el resumen SIEMPRE mira las OC abiertas (autorizada + recibida_parcial).
+ */
+export const esquemaResumenComprasQuery = z
+  .object({
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Texto a buscar (folio o nombre de proveedor).'),
+    idProveedor: z.coerce.number().int().positive().optional().describe('Filtra por proveedor.'),
+    fechaDesde: z.iso.date().optional().describe('Filtra por fecha de emisión ≥ (YYYY-MM-DD).'),
+    fechaHasta: z.iso.date().optional().describe('Filtra por fecha de emisión ≤ (YYYY-MM-DD).'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra las OC ligadas a una orden de producción (R7).'),
+  })
+  .describe('Filtros del resumen de órdenes de compra (KPIs de cabecera).');
+
+/** Parámetros del resumen de OC ya coaccionados desde la URL. */
+export type ResumenComprasQuery = z.infer<typeof esquemaResumenComprasQuery>;
+
+/**
+ * Resumen de cabecera de OC (KPIs `vCompras`): número de OC ABIERTAS (autorizada + recibida_parcial)
+ * y el importe TODAVÍA por recibir = Σ sobre las líneas de esas OC de (cantidad − recibido) ×
+ * precio, donde `recibido` es la Σ de lo recibido por línea en recepciones ACTIVAS (mismo criterio
+ * que el recálculo de estatus de `recepciones.ts`). El pendiente por línea nunca es negativo.
+ */
+export const esquemaResumenCompras = z
+  .object({
+    ocAbiertas: z
+      .number()
+      .int()
+      .describe('# de OC abiertas (autorizada + recibida_parcial) que cumplen el filtro.'),
+    porRecibir: z
+      .number()
+      .describe('Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0).'),
+  })
+  .describe('Resumen de cabecera de órdenes de compra (KPIs).');
+
+/** Forma del resumen de OC. */
+export type ResumenCompras = z.infer<typeof esquemaResumenCompras>;

@@ -36,6 +36,10 @@ vi.mock('@/api/inventario-materiales', () => ({
 }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
+// El filtro de tela del toolbar (SelectorTela, combobox popover) consulta el catálogo de telas.
+vi.mock('@/api/telas', () => ({
+  useTelas: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+}));
 
 describe('ExistenciasTelasPagina (F4-E1)', () => {
   it('muestra la fila + total con tabla (escritorio) y tarjetas (móvil)', () => {

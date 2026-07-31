@@ -67,6 +67,12 @@ vi.mock('@/api/esma', () => ({
   }),
 }));
 
+/** Elige el maquilero en el combobox buscable (abre el popover y clickea la única opción). */
+async function elegirMaquilero(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByTestId('mov-maquilero-busqueda'));
+  await user.click(screen.getByTestId('mov-maquilero-opcion'));
+}
+
 describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
@@ -77,7 +83,7 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
     renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {
       sesion: estadoSesionDePrueba(['esma.ver-pagos']),
     });
-    await user.selectOptions(screen.getByTestId('mov-maquilero'), '5');
+    await elegirMaquilero(user);
     await user.type(screen.getByTestId('mov-monto'), '500');
     expect(screen.getByTestId('mov-guardar')).toBeDisabled();
   });
@@ -87,7 +93,7 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
     renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {
       sesion: estadoSesionDePrueba(['esma.modificar']),
     });
-    await user.selectOptions(screen.getByTestId('mov-maquilero'), '5');
+    await elegirMaquilero(user);
     await user.type(screen.getByTestId('mov-monto'), '500');
     await user.click(screen.getByTestId('mov-guardar'));
 
@@ -106,7 +112,7 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
     renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {
       sesion: estadoSesionDePrueba(['esma.modificar', 'esma.ver-pagos']),
     });
-    await user.selectOptions(screen.getByTestId('mov-maquilero'), '5');
+    await elegirMaquilero(user);
     // La fila del histórico muestra "—" en el importe (monto null) y el saldo también.
     expect(screen.getByTestId('mov-fila')).toHaveTextContent('—');
     expect(screen.getByTestId('saldo-saldo')).toHaveTextContent('—');
@@ -120,8 +126,9 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
         state: { idMaquilero: 5, monto: '750', observaciones: 'Copia de anticipo' },
       },
     });
-    // Maquilero, importe y observaciones llegan pre-llenados de la partida origen.
-    expect(screen.getByTestId('mov-maquilero')).toHaveValue('5');
+    // Maquilero, importe y observaciones llegan pre-llenados de la partida origen. El combobox
+    // resuelve el nombre del maquilero (id 5) desde la lista y lo muestra en el input.
+    expect(screen.getByTestId('mov-maquilero-busqueda')).toHaveValue('Maquila SA');
     expect(screen.getByTestId('mov-monto')).toHaveValue(750);
     expect(screen.getByDisplayValue('Copia de anticipo')).toBeInTheDocument();
   });

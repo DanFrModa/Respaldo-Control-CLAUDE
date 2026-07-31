@@ -1,14 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, en la estructura LISTA + DETALLE
- * ("Teal fresco"). Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío, 1
- * bordado) → crear un modelo → subir una foto (red de R2 mockeada) → armar su receta (1 tela
- * con banderas + 1 avío + 1 bordado con precio) → crear un 2º modelo y COPIAR la receta del
- * primero → descontinuar → reactivar → buscar por código y por descripción. Nombres únicos por
- * corrida.
+ * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, re-vestido R9 a TABLA-FIRST + CAJÓN.
+ * Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío, 1 bordado) → crear un
+ * modelo → subir una foto (red de R2 mockeada) → armar su receta (1 tela con banderas + 1 avío + 1
+ * bordado con precio) → crear un 2º modelo y COPIAR la receta del primero → descontinuar → reactivar
+ * → buscar por código y por descripción. Nombres únicos por corrida. El código y el estado
+ * (Activo/Inactivo) viven en el TÍTULO del cajón; fotos, BOM y campos, en su cuerpo — por eso
+ * `detalle` apunta al cajón completo.
  *
  * NOTA: requiere que la integración haya cableado el plugin de rutas, el menú (Modelos) y la
  * ruta `/modelos` en App.tsx; de lo contrario estas pruebas se omiten en CI hasta el cierre.
@@ -40,12 +41,12 @@ async function crearAvio(page: Page, clave: string): Promise<void> {
 
 async function crearBordado(page: Page, nombre: string): Promise<void> {
   await page.goto('/catalogos/bordados');
-  await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
   await page.getByTestId('nuevo-bordado').click();
   const dialogo = page.getByRole('dialog');
   await dialogo.getByLabel('Nombre').fill(nombre);
   await page.getByTestId('guardar-bordado').click();
-  await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
+  await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
 }
 
 test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
@@ -67,20 +68,21 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await crearAvio(page, avio);
     await crearBordado(page, bordado);
 
-    // ── Navega a Modelos (descubrible por el menú) ──────────────────────────────
+    // ── Navega a Modelos (Operación · Desarrollo, desplegable del rediseño) ────
+    await abrirDesplegableMenu(page, 'Desarrollo');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
       .getByRole('link', {
-        // exact: el menú también tiene "Galería de modelos" (sub-vista F1-E5), que haría
-        // match parcial con "Modelos" y violaría el strict mode de Playwright.
+        // exact: el desplegable también tiene "Galería de modelos" (sub-vista F1-E5), que
+        // haría match parcial con "Modelos" y violaría el strict mode de Playwright.
         name: 'Modelos',
         exact: true,
       })
       .click();
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-modelo');
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
 
     // ── Crear el modelo ──────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-modelo').click();
@@ -145,9 +147,12 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
       .getByTestId(/^renglon-bom-bordado-\d+$/);
     await renglonBordado.getByRole('spinbutton').fill('45');
     await detalle.getByTestId('guardar-bom-bordados').click();
-    await expect(page.getByText('Bordados de la receta guardados.')).toBeVisible();
+    await expect(page.getByText('Arte de la receta guardado.')).toBeVisible();
 
     // ── Crear un 2º modelo y COPIAR la receta del primero ───────────────────────
+    // El cajón del 1er modelo sigue abierto; ciérralo antes de tocar el botón del fondo
+    // (el overlay modal impide estabilizar el clic sobre "Nuevo modelo").
+    await cerrarCajon(page);
     await page.getByTestId('nuevo-modelo').click();
     const dialogoDestino = page.getByRole('dialog');
     await dialogoDestino.getByLabel('Código').fill(codigoDestino);
@@ -181,6 +186,8 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" actualizado.`)).toBeVisible();
 
     // ── Descontinuar (borrado suave) y reactivar ────────────────────────────────
+    // El cajón del 2º modelo sigue abierto tras editar; ciérralo antes de clickear su fila.
+    await cerrarCajon(page);
     await page.getByTestId('buscar-modelo').fill(codigoEditado);
     await page.getByTestId('fila-modelo').filter({ hasText: codigoEditado }).click();
     await page.getByTestId('desactivar-modelo').click();
@@ -190,6 +197,9 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" descontinuado.`)).toBeVisible();
     await expect(page.getByTestId('fila-modelo').filter({ hasText: codigoEditado })).toHaveCount(0);
 
+    // Tras descontinuar, el cajón del modelo sigue abierto (la selección se retiene);
+    // ciérralo antes del toggle del fondo para que su overlay no bloquee el clic.
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-modelo').filter({ hasText: codigoEditado });
     await expect(filaInactiva).toBeVisible();
@@ -199,6 +209,8 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" reactivado.`)).toBeVisible();
 
     // ── Buscar por descripción (el primer modelo) ───────────────────────────────
+    // Tras reactivar, el cajón del modelo quedó abierto; ciérralo antes del toggle del fondo.
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     await page.getByTestId('buscar-modelo').fill('Sudadera E2E');
     await expect(page.getByTestId('fila-modelo').filter({ hasText: codigo })).toBeVisible();

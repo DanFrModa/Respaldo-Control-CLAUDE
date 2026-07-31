@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esRfcValido } from './fiscal.js';
+
 /**
  * Contrato Zod de Cliente + ClienteCampo (F1-E2, PIEZA C — Clientes, D7).
  *
@@ -96,8 +98,18 @@ export type ClienteCamposLista = z.infer<typeof esquemaClienteCamposLista>;
 
 // ── Campos de contacto reutilizables (mismas reglas en alta y edición) ────────────
 
-/** Datos de contacto del cliente (todos opcionales). El `email`, si viene, debe ser válido. */
+/**
+ * Datos de contacto y fiscales/comerciales del cliente (todos opcionales). El `email`, si viene, debe
+ * ser válido. El `rfc` (F9-E4, R12) se usa para conciliar el receptor de un CFDI de venta; si viene,
+ * debe tener la forma del RFC mexicano (vacío = sin capturar). `diasCredito` (F9-E4, D15d) es la base
+ * del aging de CxC; null o 0 = contado.
+ */
 const camposContacto = {
+  razonSocial: z
+    .string()
+    .trim()
+    .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
+    .optional(),
   contacto: z
     .string()
     .trim()
@@ -117,6 +129,21 @@ const camposContacto = {
     .trim()
     .max(300, { error: 'La dirección no puede tener más de 300 caracteres' })
     .optional(),
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' })
+    .refine((v) => v === '' || esRfcValido(v), {
+      error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
+    })
+    .optional(),
+  diasCredito: z.coerce
+    .number({ error: 'Los días de crédito deben ser un número' })
+    .int({ error: 'Los días de crédito deben ser un entero' })
+    .min(0, { error: 'Los días de crédito no pueden ser negativos' })
+    .max(3650, { error: 'Los días de crédito son demasiado altos' })
+    .optional(),
 } as const;
 
 /**
@@ -126,15 +153,24 @@ const camposContacto = {
  * conservando sus reglas. Omitir = no tocar; `null` = borrar.
  */
 const camposContactoEditar = {
+  razonSocial: camposContacto.razonSocial.nullable(),
   contacto: camposContacto.contacto.nullable(),
   telefono: camposContacto.telefono.nullable(),
   email: camposContacto.email.nullable(),
   direccion: camposContacto.direccion.nullable(),
+  rfc: camposContacto.rfc.nullable(),
+  diasCredito: camposContacto.diasCredito.nullable(),
 } as const;
 
 // ── Cliente ─────────────────────────────────────────────────────────────────────
 
-/** Alta de cliente (catálogo global F1-E2). El `nombre` es la clave de negocio (único global). */
+/**
+ * Alta de cliente (catálogo global F1-E2). El `nombre` es la clave de negocio (único global).
+ * `departamentos` (D13/R16) es opcional: nombres de los departamentos (NIÑOS, DAMAS…) a dar de
+ * alta EN LA MISMA transacción que el cliente (A2). El dominio los deduplica por nombre (insensible
+ * a mayúsculas); cada nombre sigue las mismas reglas que `ClienteDepartamento` (obligatorio, ≤100).
+ * Su gestión posterior (editar/desactivar) vive en el detalle del cliente, no en el alta.
+ */
 export const esquemaClienteCrear = z.object({
   nombre: z
     .string({ error: 'El nombre es obligatorio' })
@@ -142,6 +178,18 @@ export const esquemaClienteCrear = z.object({
     .min(1, { error: 'El nombre es obligatorio' })
     .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
   ...camposContacto,
+  departamentos: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, { error: 'El nombre del departamento es obligatorio' })
+        .max(100, { error: 'El nombre del departamento no puede tener más de 100 caracteres' }),
+    )
+    .optional()
+    .describe(
+      'Departamentos a dar de alta junto con el cliente (D13/R16); se deduplican por nombre.',
+    ),
 });
 
 /** Datos validados de alta de cliente. */
@@ -183,10 +231,17 @@ export const esquemaClienteSalida = z
   .object({
     id: z.number().int().describe('Id del cliente.'),
     nombre: z.string().describe('Nombre del cliente.'),
+    razonSocial: z.string().nullable().describe('Razón social (nombre legal), o null.'),
     contacto: z.string().nullable().describe('Persona de contacto, o null.'),
     telefono: z.string().nullable().describe('Teléfono, o null.'),
     email: z.string().nullable().describe('Email, o null.'),
     direccion: z.string().nullable().describe('Dirección, o null.'),
+    rfc: z.string().nullable().describe('RFC fiscal del cliente (F9-E4), o null.'),
+    diasCredito: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Días de crédito del cliente (F9-E4); null = contado.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

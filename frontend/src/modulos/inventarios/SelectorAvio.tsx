@@ -1,23 +1,27 @@
-import { Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { useAvios, type Avio } from '@/api/avios';
+import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
 
 /**
- * SELECTOR DE AVÍO reutilizable (F4-E1): busca avíos por clave/descripción y al elegir uno emite el
- * avío completo. Distingue los GENÉRICOS de stock (R4) con un badge. Lo usan el kardex de avíos y el
- * ajuste/traspaso de avíos. Presentación pura (A1).
+ * SELECTOR DE AVÍO reutilizable (F4-E1, pulido R9): combobox con búsqueda server-side por
+ * clave/descripción; al elegir emite el avío completo. Distingue los GENÉRICOS de stock (R4) con
+ * un badge en la opción. Lo usan el kardex de avíos, el ajuste/traspaso de avíos y el filtro de
+ * existencias. La lista vive en el POPOVER del {@link ComboboxBuscable} unificado del kit (modo
+ * `busquedaServidor`: anti-carrera). Presentación pura (A1).
  */
 export function SelectorAvio({
   idSeleccionado,
   alSeleccionar,
+  alLimpiar,
   testid = 'selector-avio',
 }: {
   idSeleccionado: number | undefined;
   alSeleccionar: (avio: Avio) => void;
+  /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
+  alLimpiar?: () => void;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -31,60 +35,48 @@ export function SelectorAvio({
   });
 
   const avios = consulta.data?.datos ?? [];
+  // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
+  // ofrecer las opciones viejas — clickearlas seleccionaba el avío EQUIVOCADO (carrera del e2e).
+  const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
-    <div className="space-y-2" data-testid={testid}>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
+    <ComboboxBuscable
+      opciones={avios.map((a) => ({ ...a, nombre: a.clave }))}
+      valor={idSeleccionado ?? null}
+      onChange={(id) => {
+        if (id === null) {
+          alLimpiar?.();
+          return;
+        }
+        const avio = avios.find((a) => a.id === id);
+        if (avio !== undefined) {
+          alSeleccionar(avio);
+        }
+      }}
+      alCambiarTexto={setTexto}
+      busquedaServidor
+      renderOpcion={(o) => (
+        <OpcionRica
+          principal={o.clave}
+          secundario={o.descripcion}
+          extra={
+            o.esGenerico ? (
+              <Badge variant="secondary" className="shrink-0">
+                Genérico
+              </Badge>
+            ) : null
+          }
         />
-        <Input
-          className="pl-9"
-          placeholder="Buscar avío por clave o descripción…"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          aria-label="Buscar avío"
-          data-testid={`${testid}-busqueda`}
-        />
-      </div>
-
-      {consulta.isError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {consulta.error.message}
-        </p>
-      ) : null}
-
-      <ul className="divide-y rounded-md border">
-        {avios.length === 0 ? (
-          <li className="p-3 text-sm text-muted-foreground">
-            {consulta.isPending ? 'Buscando…' : 'No hay avíos que coincidan.'}
-          </li>
-        ) : (
-          avios.map((avio) => (
-            <li key={avio.id}>
-              <button
-                type="button"
-                onClick={() => alSeleccionar(avio)}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
-                  idSeleccionado === avio.id ? 'bg-sidebar-accent/40 font-medium' : ''
-                }`}
-                data-testid={`${testid}-opcion`}
-              >
-                <span className="flex flex-col">
-                  <span className="font-medium">{avio.clave}</span>
-                  <span className="text-xs text-muted-foreground">{avio.descripcion}</span>
-                </span>
-                {avio.esGenerico ? (
-                  <Badge variant="secondary" className="shrink-0">
-                    Genérico
-                  </Badge>
-                ) : null}
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
-    </div>
+      )}
+      mensajeError={consulta.isError ? consulta.error.message : undefined}
+      conLupa
+      permitirLimpiar={alLimpiar !== undefined}
+      cargando={resolviendo}
+      placeholder="Buscar avío por clave o descripción…"
+      etiqueta="Buscar avío"
+      textoVacio="No hay avíos que coincidan."
+      testid={testid}
+      testidInput={`${testid}-busqueda`}
+    />
   );
 }

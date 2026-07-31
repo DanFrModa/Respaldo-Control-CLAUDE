@@ -1,11 +1,15 @@
 /*
  * Hoja de estilos raiz de CONTROL v2 — Tailwind v4 + tokens de shadcn/ui.
  *
- * Tema "Teal fresco" (rediseño visual, propuesta 3): paleta verde teal, claro por
- * DEFECTO y un oscuro elegante (teal profundo, no neon). Recolorear estos tokens
- * (variables CSS) retematiza TODA la app: los componentes de `components/ui` usan
- * las utilidades de Tailwind (`bg-background`, `text-primary`, `border-border`, …)
- * que `@theme inline` mapea a estas variables.
+ * REDISEÑO R1 "verde, denso" (spec congelada en docs/rediseno/REDISENO-FRONTEND.md
+ * y maqueta aprobada docs/rediseno/prototipo.html): paleta VERDE PINO de marca
+ * (ya no la paleta anterior), neutros con leve sesgo verde, riel verde muy oscuro
+ * (IGUAL en claro y oscuro — ancla de marca), semanticos separados de la marca
+ * (--ok/--warn/--crit/--info + sus *-soft) y densidad de ERP (base 13px, filas de
+ * tabla ~28–34px, radio 9px). Recolorear estos tokens (variables CSS) retematiza
+ * TODA la app: los componentes de `components/ui` usan las utilidades de Tailwind
+ * (`bg-background`, `text-primary`, `border-border`, …) que `@theme inline` mapea
+ * a estas variables.
  *
  * Sistema de tema (claro / oscuro), heredado y CONSERVADO de E1.1:
  *   - El tema por defecto es CLARO (`:root`). NO se sigue `prefers-color-scheme`
@@ -14,11 +18,13 @@
  *   - El tema OSCURO se activa con la clase `dark` en `<html>` (la pone el
  *     script anti-parpadeo de `index.html` antes del render, y la alterna
  *     `useTema`). El `@custom-variant dark` de abajo hace que las utilidades
- *     `dark:*` de Tailwind respondan a esa clase.
+ *     `dark:*` de Tailwind respondan a esa clase. (El prototipo usa
+ *     `data-theme="dark"`; aqui se conserva el mecanismo existente de clase.)
  *   - La persistencia vive en localStorage bajo la clave `control-v2-tema`.
  *
- * Tipografia: Inter Variable (importada en `main.tsx` desde
- * `@fontsource-variable/inter`), con caida a la pila del sistema.
+ * Tipografia: pila del SISTEMA (`ui-sans-serif, system-ui, …`) — Inter se retiro
+ * en R1 (decision de la spec: densidad y nitidez nativas). Cifras y codigos en
+ * monoespaciada con `tabular-nums` (utilidades `.num` / `.mono` de abajo).
  */
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -34,32 +40,71 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  /* Texto terciario y superficie secundaria del proto (--faint / --panel-2). */
+  --color-faint: var(--faint);
+  --color-panel-2: var(--panel-2);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
   /*
-   * Realce suave de marca (teal claro): chips, iconos de campo, fondos de
-   * acento informativo. Es un token propio del rediseño (no estandar de shadcn);
+   * Realce suave de marca (verde claro): chips, iconos de campo, fondos de
+   * acento informativo. Token propio del rediseño (no estandar de shadcn);
    * usalo con `bg-primary-soft` / `text-primary-soft-foreground`.
    */
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-foreground: var(--primary-soft-foreground);
+  /* Verde de marca "brillante" (acentos: barra activa del riel, logo). */
+  --color-primary-bright: var(--brand-bright);
 
-  /* Estado semantico (heredado de E1.1). */
-  --color-exito: var(--exito);
-  --color-error: var(--error);
-  --color-aviso: var(--aviso);
+  /*
+   * Semanticos del rediseño (SEPARADOS del verde de marca, spec §2): estado
+   * bien/atencion/critico/informativo, cada uno con su fondo suave. Generan
+   * `bg-ok`, `text-warn`, `bg-crit-soft`, … y los usan `ChipEstado`/`Semaforo`.
+   */
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
 
-  /* Sidebar (la cascara de la app). */
+  /* Estado semantico legado (E1.1): alias de los semanticos nuevos. */
+  --color-exito: var(--ok);
+  --color-error: var(--crit);
+  --color-aviso: var(--warn);
+
+  /*
+   * RIEL de navegacion (la cascara): verde muy oscuro IGUAL en ambos temas
+   * (ancla de marca, spec §2). Tokens nuevos del rediseño; los usa
+   * `CascaronSistema`/`NavegacionModulos` (`bg-rail`, `text-rail-fg`, …).
+   */
+  --color-rail: var(--rail-bg);
+  --color-rail-panel: var(--rail-panel);
+  --color-rail-fg: var(--rail-fg);
+  --color-rail-fg-strong: var(--rail-fg-strong);
+  --color-rail-active: var(--rail-active-bg);
+  --color-rail-active-fg: var(--rail-active-fg);
+  --color-rail-border: var(--rail-border);
+
+  /*
+   * Tokens `sidebar` de shadcn CONSERVADOS como acento de marca sobre paneles
+   * claros: muchas pantallas usan `bg-sidebar-accent/40 text-sidebar-accent-foreground`
+   * para sus chips de icono. Mapean al realce suave de marca (el riel oscuro usa
+   * los tokens `rail-*` de arriba, no estos).
+   */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -79,7 +124,18 @@
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
 
-  --radius-sm: calc(var(--radius) * 0.6);
+  /*
+   * DENSIDAD (spec §2): base 13px. Se redefine la escala tipografica que la app
+   * usa como "cuerpo" para que TODO baje de golpe: `text-sm` (el tamaño de
+   * trabajo de casi todos los componentes) pasa de 14px a 13px y `text-xs` de
+   * 12px a 11.5px (etiquetas, encabezados de tabla).
+   */
+  --text-sm: 13px;
+  --text-sm--line-height: 1.45;
+  --text-xs: 11.5px;
+  --text-xs--line-height: 1.4;
+
+  --radius-sm: calc(var(--radius) * 0.66);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
@@ -119,101 +175,148 @@
 }
 
 :root {
-  /* Tema CLARO "Teal fresco" — base por defecto. */
-  --background: #f4fbfa; /* velo teal muy claro */
-  --foreground: #0c2b29; /* verde casi negro, alto contraste */
-  --card: #ffffff;
-  --card-foreground: #0c2b29;
+  /* ── Tema CLARO (por defecto) — hex EXACTOS del prototipo aprobado ────────── */
+  /* Superficies: neutros con leve sesgo verde. */
+  --background: #f4f7f4; /* --bg del proto */
+  --foreground: #101c16; /* --text */
+  --card: #ffffff; /* --panel */
+  --card-foreground: #101c16;
   --popover: #ffffff;
-  --popover-foreground: #0c2b29;
-  --primary: #0d9488; /* teal-600 */
-  --primary-foreground: #ffffff;
-  --primary-soft: #ccfbf1; /* teal-100 */
-  --primary-soft-foreground: #0f766e; /* teal-700 */
-  --secondary: #e6f4f1; /* teal apagado para superficies secundarias */
-  --secondary-foreground: #0f5e57;
-  --muted: #ecf6f4;
-  --muted-foreground: #557571; /* gris verdoso legible */
-  --accent: #ccfbf1; /* mismo realce suave que primary-soft */
-  --accent-foreground: #0f766e;
-  --destructive: #dc2626; /* rojo claro (red-600) */
-  --border: #d8ebe7;
-  --input: #d8ebe7;
-  --ring: #0d9488;
+  --popover-foreground: #101c16;
+  /* Superficie secundaria (toolbar de tabla, chips): --panel-2 del proto. */
+  --panel-2: #fafbfa;
 
-  /* Estado semantico, legible en tema claro (heredado de E1.1). */
-  --exito: #15803d;
-  --error: #dc2626;
-  --aviso: #b45309;
+  /* Marca — verde pino/esmeralda (la paleta anterior queda retirada). */
+  --primary: #0e7c47; /* --brand */
+  --primary-hover: #0b6a3c; /* --brand-hover */
+  --primary-foreground: #ffffff; /* --brand-fg */
+  --primary-soft: #e2f2e9; /* --brand-soft */
+  --primary-soft-foreground: #0b6a3c; /* --brand-soft-fg */
+  --brand-bright: #16a05c;
 
-  --chart-1: #0d9488;
-  --chart-2: #0f766e;
-  --chart-3: #14b8a6;
-  --chart-4: #5eead4;
-  --chart-5: #134e4a;
+  --secondary: #f1f5f2; /* --hover del proto: superficie secundaria neutra */
+  --secondary-foreground: #101c16;
+  --muted: #f1f5f2; /* --hover: fondos de hover/atenuados */
+  --muted-foreground: #5b6b62; /* --muted del proto (texto secundario) */
+  --faint: #8b988f; /* --faint: texto terciario (placeholders, conteos) */
+  --accent: #e2f2e9; /* mismo realce suave que primary-soft */
+  --accent-foreground: #0b6a3c;
+  --destructive: #cf3b3f; /* --crit */
+  --border: #e3e9e4;
+  --border-strong: #d2dbd5;
+  --input: #e3e9e4;
+  --ring: #0e7c47;
 
-  --radius: 0.625rem;
+  /* Semanticos separados de la marca (spec §2), con su fondo suave. */
+  --ok: #12864e;
+  --ok-soft: #e3f2e9;
+  --warn: #b3790c;
+  --warn-soft: #f8efd6;
+  --crit: #cf3b3f;
+  --crit-soft: #fbe3e3;
+  --info: #2b7f9e;
+  --info-soft: #e0eef3;
 
-  /* Sidebar claro: blanco, con el activo en teal suave. */
+  /* Riel de navegacion — verde muy oscuro, IGUAL en claro y oscuro (ancla de
+     marca). NO se redefine en `.dark` a proposito. */
+  --rail-bg: #0b1712;
+  --rail-panel: #0e1c15;
+  --rail-fg: #aebfb5;
+  --rail-fg-strong: #ecf3ef;
+  --rail-active-fg: #55e39a;
+  --rail-active-bg: rgba(52, 217, 138, 0.12);
+  --rail-border: rgba(255, 255, 255, 0.07);
+
+  --chart-1: #0e7c47;
+  --chart-2: #16a05c;
+  --chart-3: #2b7f9e;
+  --chart-4: #b3790c;
+  --chart-5: #0b6a3c;
+
+  /* Densidad/forma (spec §2): radio 9px (chips redondos van con rounded-full). */
+  --radius: 9px;
+
+  /* Sombras del proto (paneles y capas flotantes). */
+  --shadow: 0 1px 2px rgba(10, 30, 20, 0.04), 0 8px 24px -12px rgba(10, 30, 20, 0.18);
+  --shadow-lg: 0 24px 60px -20px rgba(8, 24, 16, 0.35);
+
+  /* Tokens `sidebar` de shadcn = acento de marca sobre panel claro (ver arriba). */
   --sidebar: #ffffff;
-  --sidebar-foreground: #0c2b29;
-  --sidebar-primary: #0d9488;
+  --sidebar-foreground: #101c16;
+  --sidebar-primary: #0e7c47;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ccfbf1; /* fondo del modulo activo */
-  --sidebar-accent-foreground: #0f766e; /* texto del modulo activo */
-  --sidebar-border: #d8ebe7;
-  --sidebar-ring: #0d9488;
+  --sidebar-accent: #e2f2e9;
+  --sidebar-accent-foreground: #0b6a3c;
+  --sidebar-border: #e3e9e4;
+  --sidebar-ring: #0e7c47;
 
+  /* Pila del SISTEMA (Inter se retiro en R1; spec §2 Tipografia). */
   --font-sans:
-    'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   color-scheme: light;
 }
 
 .dark {
-  /* Tema OSCURO "Teal fresco" (clase en <html>): teal profundo, elegante. */
-  --background: #07201d; /* teal casi negro */
-  --foreground: #e4f3ef;
-  --card: #0d2a26;
-  --card-foreground: #e4f3ef;
-  --popover: #0d2a26;
-  --popover-foreground: #e4f3ef;
-  --primary: #2dd4bf; /* teal-400, vivo pero no neon */
-  --primary-foreground: #04231f;
-  --primary-soft: #143f39; /* teal profundo para chips */
-  --primary-soft-foreground: #5eead4; /* teal-300 */
-  --secondary: #113530;
-  --secondary-foreground: #cfeae4;
-  --muted: #102e2a;
-  --muted-foreground: #8fb3ac;
-  --accent: #143f39;
-  --accent-foreground: #5eead4;
-  --destructive: #f87171; /* rojo claro legible sobre fondo oscuro */
-  --border: oklch(1 0 0 / 12%); /* blanco translucido */
-  --input: oklch(1 0 0 / 16%);
-  --ring: #2dd4bf;
+  /* ── Tema OSCURO (clase en <html>) — verde profundo elegante (hex del proto). */
+  --background: #0a120e;
+  --foreground: #e7efe9;
+  --card: #0f1813;
+  --card-foreground: #e7efe9;
+  --popover: #0f1813;
+  --popover-foreground: #e7efe9;
+  --panel-2: #12211a;
 
-  /* Estado semantico, legible en tema oscuro (heredado de E1.1). */
-  --exito: #4ade80;
-  --error: #f87171;
-  --aviso: #fbbf24;
+  --primary: #22b56c;
+  --primary-hover: #2cc678;
+  --primary-foreground: #04140c;
+  --primary-soft: #12291d;
+  --primary-soft-foreground: #63e4a4;
+  --brand-bright: #34d98a;
 
-  --chart-1: #2dd4bf;
-  --chart-2: #5eead4;
-  --chart-3: #14b8a6;
-  --chart-4: #0d9488;
-  --chart-5: #99f6e4;
+  --secondary: #16261d; /* --hover oscuro */
+  --secondary-foreground: #e7efe9;
+  --muted: #16261d;
+  --muted-foreground: #93a69b;
+  --faint: #6f8377;
+  --accent: #12291d;
+  --accent-foreground: #63e4a4;
+  --destructive: #e5686b;
+  --border: #1d2b23;
+  --border-strong: #28382e;
+  --input: #1d2b23;
+  --ring: #22b56c;
 
-  --sidebar: #0d2a26;
-  --sidebar-foreground: #e4f3ef;
-  --sidebar-primary: #2dd4bf;
-  --sidebar-primary-foreground: #04231f;
-  --sidebar-accent: #143f39; /* fondo del modulo activo */
-  --sidebar-accent-foreground: #5eead4; /* texto del modulo activo */
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: #2dd4bf;
+  --ok: #3ac081;
+  --ok-soft: #12291d;
+  --warn: #d9a441;
+  --warn-soft: #2c2510;
+  --crit: #e5686b;
+  --crit-soft: #2e1717;
+  --info: #5ab4d1;
+  --info-soft: #112630;
+
+  /* El riel NO cambia en oscuro (mismos --rail-* de :root, spec §2). */
+
+  --chart-1: #22b56c;
+  --chart-2: #34d98a;
+  --chart-3: #5ab4d1;
+  --chart-4: #d9a441;
+  --chart-5: #63e4a4;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 30px 70px -24px rgba(0, 0, 0, 0.7);
+
+  --sidebar: #0f1813;
+  --sidebar-foreground: #e7efe9;
+  --sidebar-primary: #22b56c;
+  --sidebar-primary-foreground: #04140c;
+  --sidebar-accent: #12291d;
+  --sidebar-accent-foreground: #63e4a4;
+  --sidebar-border: #1d2b23;
+  --sidebar-ring: #22b56c;
 
   color-scheme: dark;
 }
@@ -225,9 +328,57 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Base densa del rediseño (proto: body 13px / 1.45). */
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   html {
     @apply font-sans;
   }
+
+  /*
+   * Campos numéricos SIN "flechitas" (petición de Daniel, 28-jul-2026: *"pones una casilla con
+   * flechitas arriba y abajo para ir aumentando con el mouse… no funciona. Siempre se van a meter
+   * escribiendo o copiando los datos. Nunca se usarán esas flechitas"*).
+   *
+   * Va aquí, en la base, y NO campo por campo: son 123 `type="number"` repartidos por todo el
+   * sistema (captura de corte, envío, recibo, matriz color×talla, precios, cantidades…), y un
+   * `type="text"` masivo perdería el teclado numérico del celular y la validación del navegador.
+   * El `type` se conserva; lo único que se apaga es el control de incremento con el mouse.
+   *
+   * Los otros dos caminos del MISMO control —la RUEDA del mouse y las FLECHAS ↑/↓ del teclado, que
+   * cambian el valor sin que nadie lo note— se apagan en JS (`src/lib/sin-incrementos-numericos.ts`):
+   * no hay forma de hacerlo con CSS.
+   */
+  input[type='number'] {
+    appearance: textfield; /* Firefox */
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+}
+
+/*
+ * Utilidades del rediseño (proto `.num` / `.mono`):
+ *   - `num`  → cifras alineadas (tabular-nums) en TODA columna numerica.
+ *   - `mono` → codigos/folios en monoespaciada, tambien tabulares.
+ */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

@@ -1,21 +1,20 @@
-import { Scale } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useSaldosTodos } from '@/api/esma';
 import type { EsMaSaldosTodosQuery } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { moneda } from './comun';
 
@@ -38,14 +37,13 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="saldos-maquileros">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="saldos-maquileros">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Scale className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Saldos de maquileros</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Saldos de maquileros
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Maquileros activos con saldo distinto de cero. Toca uno para ver su estado de cuenta.
           </p>
         </div>
@@ -115,51 +113,43 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
               </div>
 
               {/* Escritorio: tabla. */}
-              <div className="hidden overflow-x-auto md:block">
-                <Table data-testid="saldos-tabla">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Maquilero</TableHead>
-                      <TableHead className="text-right">Cargos</TableHead>
-                      <TableHead className="text-right">Abonos</TableHead>
-                      <TableHead className="text-right">Pagos</TableHead>
-                      <TableHead className="text-right">Descuentos</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <div className="hidden md:block">
+                <TablaDensa data-testid="saldos-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead numerica>Cargos</TablaDensaHead>
+                      <TablaDensaHead numerica>Abonos</TablaDensaHead>
+                      <TablaDensaHead numerica>Pagos</TablaDensaHead>
+                      <TablaDensaHead numerica>Descuentos</TablaDensaHead>
+                      <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {filas.map((f) => (
-                      <TableRow
+                      <TablaDensaFila
                         key={f.idMaquilero}
                         className="cursor-pointer"
                         onClick={() => verEstadoCuenta(f.idMaquilero)}
                         data-testid="saldos-fila"
                       >
-                        <TableCell className="font-medium">
+                        <TablaDensaCelda className="font-medium">
                           {f.maquilero}
                           {f.corto ? (
                             <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
                           ) : null}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {moneda(f.totalCargos)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {moneda(f.totalAbonos)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {moneda(f.totalPagos)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {moneda(f.totalDescuentos)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.totalCargos)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.totalAbonos)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.totalPagos)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.totalDescuentos)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
                           {moneda(f.saldo)}
-                        </TableCell>
-                      </TableRow>
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
                     ))}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
 
               <div className="mt-3 flex justify-end">

@@ -43,8 +43,23 @@ export interface DiasPorAplicacion {
   dias: number;
 }
 
+/**
+ * Un rango de dificultad por # de operaciones ya cargado del catálogo (`RangoDificultad`, R4/B7).
+ * `opsHasta` null = rango abierto hacia arriba ("33+").
+ */
+export interface RangoDificultadCalculo {
+  opsDesde: number;
+  opsHasta: number | null;
+  diasCostura: number;
+}
+
 /** Cómo se calcula la duración del proceso (espejo de `TipoDuracionProceso`). */
-export type TipoDuracion = 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+export type TipoDuracion =
+  | 'fija'
+  | 'porCantidad'
+  | 'porTipoTela'
+  | 'porAplicacion'
+  | 'porDificultad';
 
 /** Datos del proceso + de la orden + catálogos que necesita el cálculo. */
 export interface EntradaCalculoDuracion {
@@ -62,6 +77,10 @@ export interface EntradaCalculoDuracion {
   tela?: DiasPorTela | null;
   /** Días de la aplicación ELEGIDA para la orden (o `null` si no se eligió). */
   aplicacion?: DiasPorAplicacion | null;
+  /** # de operaciones del MODELO de la orden (R4/B7), o `null` si no se ha capturado. */
+  numOperaciones?: number | null;
+  /** Rangos de dificultad ACTIVOS del catálogo (R4/B7), para la regla `porDificultad`. */
+  rangosDificultad?: readonly RangoDificultadCalculo[];
 }
 
 /** Resultado del cálculo: días + advertencias (no fatales) sobre supuestos tomados. */
@@ -87,6 +106,22 @@ export function factorPorCantidad(
     }
   }
   return { factor: 1, enRango: false };
+}
+
+/**
+ * Rango de DIFICULTAD donde cae un # de operaciones (R4/B7): `opsDesde ≤ ops` y (`opsHasta` null =
+ * abierto, o `ops ≤ opsHasta`). Devuelve `null` si ningún rango activo lo contiene. PURA.
+ */
+export function rangoPorOperaciones(
+  numOperaciones: number,
+  rangos: readonly RangoDificultadCalculo[],
+): RangoDificultadCalculo | null {
+  for (const r of rangos) {
+    if (numOperaciones >= r.opsDesde && (r.opsHasta === null || numOperaciones <= r.opsHasta)) {
+      return r;
+    }
+  }
+  return null;
 }
 
 /**
@@ -142,6 +177,28 @@ export function calcularDuracion(entrada: EntradaCalculoDuracion): ResultadoDura
       // aplicación es "Sin Aplicación" (dias 0) → 0 (el proceso se auto-completará al generar).
       const dias = Math.max(0, Math.round(entrada.aplicacion.dias * factor));
       return { dias, advertencias };
+    }
+
+    case 'porDificultad': {
+      // R4/B7: los días salen del RANGO de # de operaciones del modelo (tabla configurable). Si
+      // el modelo no tiene ops capturadas o ningún rango lo contiene, FALLBACK al tiempo estándar
+      // del proceso — la generación de la ruta JAMÁS truena por esto (solo avisa).
+      if (entrada.numOperaciones == null) {
+        advertencias.push(
+          'El modelo no tiene # de operaciones capturado; se usó el tiempo estándar del proceso ' +
+            'como duración (la dificultad se deriva de las operaciones — captúralas en el desarrollo).',
+        );
+        return { dias: Math.max(0, entrada.tiempoEstandar), advertencias };
+      }
+      const rango = rangoPorOperaciones(entrada.numOperaciones, entrada.rangosDificultad ?? []);
+      if (rango === null) {
+        advertencias.push(
+          `Ningún rango de dificultad contiene ${String(entrada.numOperaciones)} operaciones; ` +
+            'se usó el tiempo estándar del proceso como duración (revisa la tabla de dificultad).',
+        );
+        return { dias: Math.max(0, entrada.tiempoEstandar), advertencias };
+      }
+      return { dias: Math.max(0, rango.diasCostura), advertencias };
     }
   }
 }

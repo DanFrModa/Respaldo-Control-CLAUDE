@@ -1,4 +1,4 @@
-import { Loader2, Route, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -107,12 +107,11 @@ export function ProgramarRcPagina(): React.JSX.Element {
       <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-              <Route className="size-5" aria-hidden />
-            </span>
             <div>
-              <h1 className="text-xl font-semibold">Programar Ruta Crítica</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+                Programar Ruta Crítica
+              </h1>
+              <p className="text-[12.5px] text-muted-foreground">
                 {orden.data
                   ? `Orden ${orden.data.folio} · ${orden.data.codigoModelo} · ${orden.data.cliente}`
                   : 'Genera la ruta de procesos con sus fechas a partir de la plantilla.'}

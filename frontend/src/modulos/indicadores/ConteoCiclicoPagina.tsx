@@ -1,4 +1,3 @@
-import { ClipboardCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -53,20 +52,15 @@ export function ConteoCiclicoPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="ciclico-conteo">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <ClipboardCheck className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold">
-              Conteo cíclico{consulta.data ? ` #${consulta.data.folio}` : ''}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {consulta.data ? `Almacén: ${consulta.data.almacen}` : 'Captura la cantidad física.'}
-            </p>
-          </div>
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="ciclico-conteo">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Conteo cíclico{consulta.data ? ` #${consulta.data.folio}` : ''}
+          </h1>
+          <p className="truncate text-xs text-muted-foreground">
+            {consulta.data ? `Almacén: ${consulta.data.almacen}` : 'Captura la cantidad física.'}
+          </p>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link to="/indicadores/ciclicos">Volver</Link>

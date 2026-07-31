@@ -1,4 +1,4 @@
-import { CalendarDays, Loader2Icon, Plus, Power, RotateCcw, Save } from 'lucide-react';
+import { Loader2Icon, Plus, Power, RotateCcw, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -60,15 +60,15 @@ export function ConfiguracionRcPagina(): React.JSX.Element {
   }, [empresas.data, idEmpresa]);
 
   return (
-    <div className="flex flex-col gap-5 p-4" data-testid="config-rc-pagina">
-      <header className="flex items-center gap-3">
-        <CalendarDays className="size-6 text-primary" aria-hidden />
-        <div>
-          <h1 className="text-lg font-semibold">Configuración de la Ruta Crítica</h1>
-          <p className="text-sm text-muted-foreground">
-            Colchón de costura, calendario laboral y festivos por empresa.
-          </p>
-        </div>
+    <div className="flex h-full flex-col gap-5 overflow-y-auto p-4" data-testid="config-rc-pagina">
+      {/* page-head del proto: título + sub, SIN icono. */}
+      <header>
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          Configuración de la Ruta Crítica
+        </h1>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Colchón de costura, calendario laboral y festivos por empresa
+        </p>
       </header>
 
       <Field className="max-w-xs">
@@ -324,8 +324,8 @@ function Festivos({
         <TableBody>
           {(consulta.data ?? []).map((f) => (
             <TableRow key={f.id} className={f.activo ? '' : 'opacity-50'}>
-              <TableCell>{f.fecha}</TableCell>
-              <TableCell>{f.descripcion}</TableCell>
+              <TableCell className="num whitespace-nowrap">{f.fecha}</TableCell>
+              <TableCell className="max-w-[38vw] truncate lg:max-w-none">{f.descripcion}</TableCell>
               <TableCell>{f.activo ? 'Activo' : 'Inactivo'}</TableCell>
               <TableCell>
                 {puedeAdministrar ? (

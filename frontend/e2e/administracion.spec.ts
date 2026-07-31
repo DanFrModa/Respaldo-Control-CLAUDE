@@ -34,11 +34,13 @@ test.describe('Administración — Usuarios y RBAC', () => {
     // ── 1) Como admin: crear el usuario con el rol `Basico` ─────────────────────
     await entrarComoAdmin(page);
 
+    // "Usuarios y accesos" es HOJA DIRECTA del riel (Daniel) → abre el Panel de administración.
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Administración' })
+      .getByRole('link', { name: 'Usuarios y accesos', exact: true })
       .click();
+    await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible();
     await page.getByTestId('administracion-usuarios').click();
     await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
 
@@ -67,14 +69,18 @@ test.describe('Administración — Usuarios y RBAC', () => {
     await page.getByLabel('Usuario').fill(username);
     await page.getByLabel('Contraseña').fill(PASSWORD_PRUEBA);
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await expect(page.getByRole('heading', { name: /Hola, Usuario Básico E2E/ })).toBeVisible();
+    // Entró al Resumen operativo (R9) con la sesión del usuario nuevo (el saludo por
+    // nombre ya no existe: la identidad se verifica en el menú de usuario).
+    await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
+    await expect(page.getByTestId('menu-usuario')).toContainText('Usuario Básico E2E');
 
-    // No es admin: no debería ver el módulo de Administración en el menú.
+    // No es admin: no debería ver "Usuarios y accesos" en el menú (la hoja directa se
+    // oculta cuando sus permisos no se cumplen, A4).
     await expect(
       page
         .getByRole('navigation', { name: 'Módulos' })
         .first()
-        .getByRole('link', { name: 'Administración' }),
+        .getByRole('link', { name: 'Usuarios y accesos', exact: true }),
     ).toHaveCount(0);
 
     // ── 4) La portada de Catálogos no ofrece ningún sub-catálogo ────────────────

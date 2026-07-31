@@ -3,17 +3,17 @@ import { expect, test } from '@playwright/test';
 import { entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del CRUD de Bordados/estampados (F1-E3) contra el stack real, en la estructura
+ * E2E del CRUD de Arte (bordado/estampado, F1-E3) contra el stack real, en la estructura
  * LISTA + DETALLE ("Teal fresco"). Cubre el ciclo: crear un ESTAMPADO → aparece →
  * seleccionar → editar → se refleja → desactivar (con confirmacion) → oculto → mostrar
  * desactivados → reactivar → vuelve a activo → buscar. Las acciones (editar/desactivar/
  * activar) son botones DIRECTOS del detalle. Nombre unico por corrida.
  *
  * NOTA: requiere que la integracion haya cableado el plugin de rutas, los links de menu
- * (Catalogos → Bordados / Galería de bordados) y las rutas en App.tsx; de lo contrario
+ * (Catalogos → Arte / Galería de arte) y las rutas en App.tsx; de lo contrario
  * estas pruebas se omiten en CI hasta el cierre de integracion.
  */
-test.describe('CRUD de Bordados', () => {
+test.describe('CRUD de Arte', () => {
   test('crear un estampado, editar, desactivar, reactivar y buscar', async ({ page }) => {
     const sufijo = Date.now().toString().slice(-6);
     const nombre = `Bordado E2E ${sufijo}`;
@@ -21,27 +21,25 @@ test.describe('CRUD de Bordados', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catalogos -> Bordados (descubrible por clic).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
-      .click();
-    await page.getByTestId('catalogo-bordados').click();
-    await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
+    // Bordados (receta/BOM de modelos) salió del riel — Desarrollo ahora solo lista Modelos,
+    // Pre-costeos y Cotizaciones: la pantalla sigue viva por URL directa (y por ⌘K).
+    await page.goto('/catalogos/bordados');
+    await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-bordado');
 
     // ── Crear un ESTAMPADO ──────────────────────────────────────────────────────
     await page.getByTestId('nuevo-bordado').click();
     const dialogoAlta = page.getByRole('dialog');
-    await expect(dialogoAlta.getByRole('heading', { name: 'Nuevo bordado' })).toBeVisible();
+    await expect(
+      dialogoAlta.getByRole('heading', { name: 'Nuevo arte', exact: true }),
+    ).toBeVisible();
     await dialogoAlta.getByLabel('Nombre').fill(nombre);
     await dialogoAlta.getByLabel('Tipo').selectOption('ESTAMPADO');
     await dialogoAlta.getByLabel('Puntadas').fill('12000');
     await page.getByTestId('guardar-bordado').click();
 
-    await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
     await page.getByTestId('buscar-bordado').fill(nombre);
     const filaNueva = page.getByTestId('fila-bordado').filter({ hasText: nombre });
     await expect(filaNueva).toBeVisible();
@@ -55,12 +53,14 @@ test.describe('CRUD de Bordados', () => {
     // ── Editar ──────────────────────────────────────────────────────────────────
     await page.getByTestId('editar-bordado').click();
     const dialogoEdicion = page.getByRole('dialog');
-    await expect(dialogoEdicion.getByRole('heading', { name: 'Editar bordado' })).toBeVisible();
+    await expect(
+      dialogoEdicion.getByRole('heading', { name: 'Editar arte', exact: true }),
+    ).toBeVisible();
     await expect(dialogoEdicion.getByLabel('Nombre')).toHaveValue(nombre);
     await dialogoEdicion.getByLabel('Nombre').fill(nombreEditado);
     await page.getByTestId('guardar-bordado').click();
 
-    await expect(page.getByText(`Bordado "${nombreEditado}" actualizado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombreEditado}" actualizado.`)).toBeVisible();
     await page.getByTestId('buscar-bordado').fill(nombreEditado);
     const filaEditada = page.getByTestId('fila-bordado').filter({ hasText: nombreEditado });
     await expect(filaEditada).toBeVisible();
@@ -69,10 +69,12 @@ test.describe('CRUD de Bordados', () => {
     await filaEditada.click();
     await page.getByTestId('desactivar-bordado').click();
     const confirmacion = page.getByRole('dialog');
-    await expect(confirmacion.getByRole('heading', { name: 'Desactivar bordado' })).toBeVisible();
+    await expect(
+      confirmacion.getByRole('heading', { name: 'Desactivar arte', exact: true }),
+    ).toBeVisible();
     await page.getByTestId('confirmar-accion').click();
 
-    await expect(page.getByText(`Bordado "${nombreEditado}" desactivado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombreEditado}" desactivado.`)).toBeVisible();
     await expect(page.getByTestId('fila-bordado').filter({ hasText: nombreEditado })).toHaveCount(
       0,
     );
@@ -85,12 +87,12 @@ test.describe('CRUD de Bordados', () => {
     await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
     await page.getByTestId('activar-bordado').click();
 
-    await expect(page.getByText(`Bordado "${nombreEditado}" activado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombreEditado}" activado.`)).toBeVisible();
     await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
     await page.getByTestId('buscar-bordado').fill('zzz-no-existe-zzz');
-    await expect(page.getByText('No hay bordados que coincidan con la búsqueda.')).toBeVisible();
+    await expect(page.getByText('No hay arte que coincida con la búsqueda.')).toBeVisible();
   });
 
   test('subir la foto de un bordado (red de R2 mockeada) y verla', async ({ page }) => {
@@ -99,14 +101,14 @@ test.describe('CRUD de Bordados', () => {
 
     await entrarComoAdmin(page);
     await page.goto('/catalogos/bordados');
-    await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
 
     // Crea un bordado minimo para poder subir su foto en edicion.
     await page.getByTestId('nuevo-bordado').click();
     const dialogoAlta = page.getByRole('dialog');
     await dialogoAlta.getByLabel('Nombre').fill(nombre);
     await page.getByTestId('guardar-bordado').click();
-    await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
 
     await page.getByTestId('buscar-bordado').fill(nombre);
     await page.getByTestId('fila-bordado').filter({ hasText: nombre }).click();
@@ -146,10 +148,10 @@ test.describe('CRUD de Bordados', () => {
 });
 
 /**
- * E2E de la GALERIA de fotos de bordados: la rejilla visual paginada de servidor. Verifica
+ * E2E de la GALERIA de fotos de arte: la rejilla visual paginada de servidor. Verifica
  * que carga, que la busqueda/filtro funcionan y que tocar una celda lleva a la ficha.
  */
-test.describe('Galería de bordados', () => {
+test.describe('Galería de arte', () => {
   test('la galería lista bordados y al tocar una celda abre la ficha', async ({ page }) => {
     const sufijo = Date.now().toString().slice(-6);
     const nombre = `Bordado Galería ${sufijo}`;
@@ -161,14 +163,14 @@ test.describe('Galería de bordados', () => {
     await page.getByTestId('nuevo-bordado').click();
     await page.getByRole('dialog').getByLabel('Nombre').fill(nombre);
     await page.getByTestId('guardar-bordado').click();
-    await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
+    await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
 
     // Navega a la galería desde el PORTAL de Catálogos: la tarjeta vive en `/catalogos`, no en la
     // pantalla de bordados donde quedamos tras crear el bordado.
     await page.goto('/catalogos');
     await expect(page.getByRole('heading', { name: 'Catálogos' })).toBeVisible();
     await page.getByTestId('catalogo-galeria-bordados').click();
-    await expect(page.getByRole('heading', { name: 'Galería de bordados' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Galería de arte', exact: true })).toBeVisible();
 
     // Busca el bordado creado; su celda aparece.
     await page.getByTestId('buscar-galeria').fill(nombre);
@@ -177,6 +179,6 @@ test.describe('Galería de bordados', () => {
 
     // Al tocarla, lleva a la ficha (pantalla de bordados).
     await celda.click();
-    await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
   });
 });

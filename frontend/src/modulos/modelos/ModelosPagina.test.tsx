@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,10 +62,24 @@ vi.mock('@/api/modelos', () => ({
   useSubirFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarcarFotoPrincipal: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarcarArtePrincipal: () => ({ mutate: vi.fn(), isPending: false }),
   useReemplazarTelasBom: () => ({ mutate: vi.fn(), isPending: false }),
   useReemplazarAviosBom: () => ({ mutate: vi.fn(), isPending: false }),
   useReemplazarBordadosBom: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarBom: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// Existencias PT del cajón (matriz color×talla): mock con rollup vacío por defecto; los tests
+// de la matriz lo sobreescriben. La página lo consulta SOLO con `inventario-pt.ver`.
+const useExistenciasPtMock = vi.fn<(query: unknown, habilitado?: boolean) => unknown>(() => ({
+  data: undefined,
+  isPending: false,
+  isError: false,
+}));
+vi.mock('@/api/inventarios', () => ({
+  useExistenciasPt: (query: unknown, habilitado?: boolean) =>
+    useExistenciasPtMock(query, habilitado),
 }));
 
 // Catálogos para los selectores (no se ejercita su red aquí).
@@ -91,6 +105,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     id,
     codigo,
     descripcion: null,
+    composicion: null,
     maquilaBase: null,
     idTemporada: null,
     temporada: null,
@@ -102,6 +117,15 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     urlFotoPrincipal: null,
     idTipoProducto: null,
     tipoProducto: null,
+    numOperaciones: null,
+    corteBase: null,
+    idMaquileroCotizado: null,
+    maquileroCotizado: null,
+    secuenciaEstampado: 'antes',
+    llevaArte: true,
+    telaPrincipal: null,
+    stockPt: null,
+    costoActual: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -142,6 +166,8 @@ describe('<ModelosPagina>', () => {
     useModelos.mockReset();
     useFichaModelo.mockReset();
     useFotosModelo.mockReset();
+    useExistenciasPtMock.mockReset();
+    useExistenciasPtMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     descontinuarMutate.mockReset();
     reactivarMutate.mockReset();
     ultimaQuery = undefined;
@@ -159,9 +185,13 @@ describe('<ModelosPagina>', () => {
     renderConProveedores(<ModelosPagina />, {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
+    // Tabla-first: el detalle NO se auto-abre; cada modelo sale en su renglón. La tabla y las
+    // tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la tabla de
+    // escritorio para no chocar con el duplicado de la tarjeta.
     expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
-    expect(screen.getAllByText('501').length).toBeGreaterThan(0);
-    expect(screen.getByText('777')).toBeInTheDocument();
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    expect(tabla.getByText('501')).toBeInTheDocument();
+    expect(tabla.getByText('777')).toBeInTheDocument();
   });
 
   it('muestra en el detalle los datos generales y la galería NoFoto', () => {
@@ -176,11 +206,40 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    // Tabla-first: se abre el cajón con clic en el renglón.
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     const detalle = screen.getByTestId('detalle-modelo');
     expect(within(detalle).getByText('Sudadera')).toBeInTheDocument();
     expect(within(detalle).getByText('$35.00')).toBeInTheDocument();
     // Sin fotos → placeholder NoFoto.
     expect(within(detalle).getByTestId('modelo-sin-fotos')).toBeInTheDocument();
+  });
+
+  // ── ¿Lleva arte? (Daniel 26-jul-2026) ──
+  it('la ficha avisa cuando el modelo LLEVA arte y aún no está capturado', () => {
+    const m = modelo(1, '501', true, { llevaArte: true });
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m))); // BOM sin arte
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(within(detalle).getByText('Lleva arte — falta capturarlo')).toBeInTheDocument();
+  });
+
+  it('la ficha dice "No lleva arte" cuando la casilla está desmarcada (prenda lisa)', () => {
+    const m = modelo(1, '501', true, { llevaArte: false });
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(within(detalle).getByText('No lleva arte')).toBeInTheDocument();
   });
 
   it('muestra las 3 pestañas del BOM y cambia de sección al hacer clic', async () => {
@@ -192,6 +251,7 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    await usuario.click(screen.getByTestId('fila-modelo'));
     // Pestañas presentes; por defecto Telas.
     expect(screen.getByTestId('tab-bom-telas')).toBeInTheDocument();
     expect(screen.getByTestId('tab-bom-avios')).toBeInTheDocument();
@@ -200,6 +260,75 @@ describe('<ModelosPagina>', () => {
 
     await usuario.click(screen.getByTestId('tab-bom-bordados'));
     expect(screen.getByTestId('seccion-bom-bordados')).toBeInTheDocument();
+  });
+
+  it('pinta las columnas Tela principal, Stock PT y Costo con los agregados del listado', () => {
+    useModelos.mockReturnValue(
+      listaConDatos([
+        modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
+        // Sin BOM/costeo (o sin permiso de importes): guiones; stock 0 se pinta atenuado.
+        modelo(2, '777', true, { telaPrincipal: null, stockPt: 0, costoActual: null }),
+      ]),
+    );
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    // Acotado a la tabla de escritorio: las tarjetas móviles repiten estos datos en el DOM de jsdom.
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    expect(tabla.getByText('Felpa premium')).toBeInTheDocument();
+    expect(tabla.getByText('1,240')).toBeInTheDocument();
+    expect(tabla.getByText('$118.00')).toBeInTheDocument();
+    // El segundo renglón trae el stock en 0 y los guiones de tela/costo.
+    const filas = screen.getAllByTestId('fila-modelo');
+    expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(filas[1] as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('la matriz del cajón consume el rollup `porColorTalla` del servidor (sin pivote local)', () => {
+    const m = modelo(1, '501');
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    useExistenciasPtMock.mockReturnValue({
+      data: {
+        filas: [],
+        totalExistencia: 55,
+        porColorTalla: [
+          {
+            idColor: 1,
+            color: 'Rojo',
+            idTalla: 1,
+            etiquetaTalla: 'CH',
+            ordenTalla: 1,
+            existencia: 50,
+          },
+          {
+            idColor: 1,
+            color: 'Rojo',
+            idTalla: 2,
+            etiquetaTalla: 'M',
+            ordenTalla: 2,
+            existencia: 5,
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'inventario-pt.ver']),
+    });
+
+    fireEvent.click(screen.getByTestId('fila-modelo'));
+    // La consulta pide el rollup al servidor (agrupar=color-talla) para ESTE modelo.
+    expect(useExistenciasPtMock).toHaveBeenLastCalledWith(
+      { idModelo: 1, agrupar: 'color-talla' },
+      true,
+    );
+    const matriz = screen.getByTestId('matriz-existencia-modelo');
+    expect(within(matriz).getByText('Rojo')).toBeInTheDocument();
+    expect(within(matriz).getByText('50')).toBeInTheDocument();
+    expect(within(matriz).getByText('5')).toBeInTheDocument();
+    // Σ del renglón = 55 (las celdas ya vienen sumadas del servidor).
+    expect(within(matriz).getByText('55')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay resultados', () => {
@@ -227,6 +356,8 @@ describe('<ModelosPagina>', () => {
     useModelos.mockReturnValue(listaConDatos([m]));
     useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
     renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    // Abre el cajón (lectura): igual no debe haber acciones de escritura.
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     expect(screen.queryByTestId('nuevo-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('editar-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-modelo')).not.toBeInTheDocument();
@@ -244,9 +375,9 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    await usuario.click(screen.getByTestId('fila-modelo'));
     await usuario.click(screen.getByTestId('desactivar-modelo'));
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Descontinuar modelo')).toBeInTheDocument();
+    // El diálogo de confirmación es el que trae `confirmar-accion`.
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(descontinuarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
@@ -277,9 +408,10 @@ describe('<ModelosPagina>', () => {
       rutaInicial: { pathname: '/modelos', state: { idModelo: 2 } },
     });
 
-    // El detalle muestra el modelo 777 (el del deep-link), no el primero (501).
+    // El cajón se abre con el modelo 777 (el del deep-link), no el primero (501).
+    // El código va en el TÍTULO del cajón (h2, junto al badge de estado); la descripción, en el cuerpo.
+    expect(await screen.findByRole('heading', { name: /777/ })).toBeInTheDocument();
     const detalle = screen.getByTestId('detalle-modelo');
-    expect(await within(detalle).findByRole('heading', { name: '777' })).toBeInTheDocument();
     expect(within(detalle).getByText('Modelo deep-link')).toBeInTheDocument();
   });
 
@@ -299,15 +431,15 @@ describe('<ModelosPagina>', () => {
       rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
     });
 
+    expect(await screen.findByRole('heading', { name: /DEEP-999/ })).toBeInTheDocument();
     const detalle = screen.getByTestId('detalle-modelo');
-    expect(await within(detalle).findByRole('heading', { name: 'DEEP-999' })).toBeInTheDocument();
     expect(within(detalle).getByText('Fuera de página')).toBeInTheDocument();
     // Y aparece como un renglón inyectado en la lista (junto al visible 501): 2 renglones.
     expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
     expect(screen.getAllByText('DEEP-999').length).toBeGreaterThan(0);
   });
 
-  it('sin `state.idModelo` selecciona el primero (comportamiento por defecto intacto)', () => {
+  it('sin `state.idModelo` NO auto-abre el cajón; se abre al hacer clic en un renglón', () => {
     useModelos.mockReturnValue(listaConDatos([modelo(1, '501'), modelo(2, '777')]));
     useFichaModelo.mockImplementation((id) =>
       id === undefined
@@ -320,8 +452,10 @@ describe('<ModelosPagina>', () => {
       rutaInicial: '/modelos',
     });
 
-    // Sin deep-link, el detalle muestra el PRIMER modelo (501).
-    const detalle = screen.getByTestId('detalle-modelo');
-    expect(within(detalle).getByRole('heading', { name: '501' })).toBeInTheDocument();
+    // Tabla-first: sin deep-link no hay detalle abierto.
+    expect(screen.queryByTestId('detalle-modelo')).not.toBeInTheDocument();
+    // Al hacer clic en el primer renglón se abre su ficha (501).
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.getByRole('heading', { name: /501/ })).toBeInTheDocument();
   });
 });

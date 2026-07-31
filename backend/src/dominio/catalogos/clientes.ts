@@ -43,6 +43,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { idsPorNombreSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -52,6 +53,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { agregarDepartamentoCliente } from './cliente-departamentos.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearCliente = z.input<typeof esquemaClienteCrear>;
@@ -131,8 +133,16 @@ async function exigirClienteActivo(tx: Tx, id: number): Promise<Cliente> {
   return cliente;
 }
 
-/** Campos de contacto editables (clave del payload === clave del modelo). */
-const CAMPOS_CONTACTO_EDITABLES = ['contacto', 'telefono', 'email', 'direccion'] as const;
+/** Campos de texto editables del cliente (clave del payload === clave del modelo). Incluye el `rfc`
+ * fiscal (F9-E4). El `diasCredito` (numérico) se maneja aparte en {@link aplicarContactoEditar}. */
+const CAMPOS_CONTACTO_EDITABLES = [
+  'razonSocial',
+  'contacto',
+  'telefono',
+  'email',
+  'direccion',
+  'rfc',
+] as const;
 
 /**
  * Aplica los campos de contacto que VENGAN en la edición al `update` y registra qué
@@ -161,6 +171,15 @@ function aplicarContactoEditar(
       detalle[campo] = { de: anterior, a: nuevo };
     }
   }
+  // Días de crédito (F9-E4, numérico): omitir (`undefined`) = no tocar; `null` = vaciar (contado).
+  if (datos.diasCredito !== undefined) {
+    const nuevo = datos.diasCredito;
+    const anterior = actual.diasCredito;
+    if (nuevo !== anterior) {
+      cambios.diasCredito = nuevo;
+      detalle.diasCredito = { de: anterior, a: nuevo };
+    }
+  }
   return detalle;
 }
 
@@ -169,11 +188,41 @@ function datosContactoCrear(
   datos: z.output<typeof esquemaClienteCrear>,
 ): Partial<Prisma.ClienteCreateInput> {
   const data: Partial<Prisma.ClienteCreateInput> = {};
+  // Razón social (nombre legal): vacío ('') se omite (queda null); con valor, tal cual.
+  if (datos.razonSocial !== undefined && datos.razonSocial !== '')
+    data.razonSocial = datos.razonSocial;
   if (datos.contacto !== undefined) data.contacto = datos.contacto;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.email !== undefined) data.email = datos.email;
   if (datos.direccion !== undefined) data.direccion = datos.direccion;
+  // Fiscal/comercial (F9-E4): el RFC vacío ('') se omite (queda null); días de crédito, tal cual.
+  if (datos.rfc !== undefined && datos.rfc !== '') data.rfc = datos.rfc;
+  if (datos.diasCredito !== undefined) data.diasCredito = datos.diasCredito;
   return data;
+}
+
+/**
+ * Deduplica los nombres de departamento del alta (D13/R16), insensible a mayúsculas y
+ * conservando el orden de la primera aparición. Los nombres ya vienen recortados del
+ * esquema; el `@@unique([idCliente, nombre])` de la base es el respaldo final, pero
+ * dedup aquí evita que dos entradas que solo difieren en mayúsculas ("NIÑOS"/"niños")
+ * choquen contra la unicidad y aborten toda el alta.
+ */
+function dedupNombresDepartamento(nombres: readonly string[] | undefined): string[] {
+  if (nombres === undefined) {
+    return [];
+  }
+  const vistos = new Set<string>();
+  const unicos: string[] = [];
+  for (const nombre of nombres) {
+    const clave = nombre.toLocaleLowerCase();
+    if (vistos.has(clave)) {
+      continue;
+    }
+    vistos.add(clave);
+    unicos.push(nombre);
+  }
+  return unicos;
 }
 
 /**
@@ -182,8 +231,15 @@ function datosContactoCrear(
  * después con `agregarCampoCliente`); auditoría y bitácora en la misma transacción
  * (A2/A7).
  *
+ * Si el alta trae `departamentos` (D13/R16), se dan de alta EN LA MISMA transacción
+ * (A2) reutilizando `agregarDepartamentoCliente` — así cada uno queda con su misma
+ * unicidad, auditoría y bitácora (`MODIFICAR` con `departamento: 'agregar'`), y si
+ * cualquiera falla se revierte también el cliente. Los nombres se deduplican antes
+ * (insensible a mayúsculas). La salida NO embebe los departamentos (se leen por su
+ * propio sub-recurso `GET /clientes/:id/departamentos`).
+ *
  * @example
- * const c = await crearCliente(sesion, { nombre: "Liverpool", email: "compras@liverpool.mx" });
+ * const c = await crearCliente(sesion, { nombre: "C&A", departamentos: ["NIÑOS", "DAMAS"] });
  */
 export async function crearCliente(
   sesion: SesionUsuario,
@@ -192,6 +248,7 @@ export async function crearCliente(
 ): Promise<ClienteConCampos> {
   verificarPermiso(sesion, 'clientes.administrar');
   const datos = validarEntrada(esquemaClienteCrear, entrada);
+  const departamentos = dedupNombresDepartamento(datos.departamentos);
 
   try {
     return await enTransaccion(async (tx) => {
@@ -211,6 +268,11 @@ export async function crearCliente(
         accion: 'CREAR',
         datos: { nombre: cliente.nombre },
       });
+
+      // Departamentos opcionales (D13/R16): en la MISMA tx, con su unicidad/bitácora propias.
+      for (const nombre of departamentos) {
+        await agregarDepartamentoCliente(sesion, cliente.id, { nombre }, { tx });
+      }
 
       return tx.cliente.findUniqueOrThrow({ where: { id: cliente.id }, include: incluirCampos });
     }, bd);
@@ -373,15 +435,20 @@ export async function listarClientes(
 ): Promise<Pagina<ClienteConCampos>> {
   verificarPermiso(sesion, 'clientes.ver');
   const filtros = validarEntrada(esquemaListarClientes, parametros);
+  const cliente = clienteLectura(bd);
+
+  // Búsqueda por nombre SIN acentos ni mayúsculas (R2 §4.4.1: "oscar" encuentra a "Óscar"):
+  // pre-filtro de ids vía unaccent (comun/busqueda.ts), compuesto con el resto del where.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorNombreSinAcentos(cliente, 'cliente', filtros.busqueda);
 
   const where: Prisma.ClienteWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.cliente.count({ where }),
     cliente.cliente.findMany({

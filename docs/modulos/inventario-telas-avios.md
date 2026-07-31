@@ -89,7 +89,7 @@ ajuste va como **movimiento documentado**, jamás un parche silencioso.
 
 **Relación con el go-live (decisión (c) de Daniel, 21-jun):** el ETL de F4-E6 reconstruye el
 histórico de movimientos/consumos por orden para el **cuadre** y la trazabilidad. El **saldo de
-existencia de telas al go-live = 0** (F9): el inventario de telas se inicializa desde conteo/cero, no
+existencia de telas al go-live = 0** (F10): el inventario de telas se inicializa desde conteo/cero, no
 hereda el stock viejo. Lo que se conserva es el **registro de consumos por orden**. Avíos: sin
 histórico (R4 nuevo) → arrancan en cero; el conteo inicial entra como ajuste con la pantalla de E1.
 

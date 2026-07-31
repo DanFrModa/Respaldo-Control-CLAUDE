@@ -1,4 +1,4 @@
-import { PackageOpen, Warehouse } from 'lucide-react';
+import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
 
 import { useProveedores } from '@/api/proveedores';
@@ -50,14 +50,16 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
   const filas = consulta.data?.filas ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="existencias-maquilero">
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid="existencias-maquilero"
+    >
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackageOpen className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Existencias en poder del maquilero</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Existencias en poder del maquilero
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Piezas enviadas que el maquilero aún no devuelve (enviado − recibido), por orden y
             proceso.
           </p>

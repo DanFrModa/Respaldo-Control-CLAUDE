@@ -1,17 +1,17 @@
-import { CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePagosSemanales } from '@/api/esma';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { finSemana, inicioSemana, moneda } from './comun';
 
@@ -35,14 +35,13 @@ export function PagosSemanalesPagina(): React.JSX.Element {
   const filas = consulta.data?.filas ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="pagos-semanales">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="pagos-semanales">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <CalendarClock className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pagos semanales</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pagos semanales
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Los pagos a maquileros de la semana, con su total.
           </p>
         </div>
@@ -106,36 +105,34 @@ export function PagosSemanalesPagina(): React.JSX.Element {
                 <strong>{moneda(consulta.data?.total ?? null)}</strong>.
               </p>
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Maquilero</TableHead>
-                      <TableHead>Facturación</TableHead>
-                      <TableHead className="text-right">Cargos</TableHead>
-                      <TableHead>Revisión</TableHead>
-                      <TableHead className="text-right">Importe</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Fecha</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead>Facturación</TablaDensaHead>
+                      <TablaDensaHead numerica>Cargos</TablaDensaHead>
+                      <TablaDensaHead>Revisión</TablaDensaHead>
+                      <TablaDensaHead numerica>Importe</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {filas.map((p) => (
-                      <TableRow key={p.id} data-testid="pagsem-fila">
-                        <TableCell>{p.fecha}</TableCell>
-                        <TableCell className="font-medium">{p.maquilero}</TableCell>
-                        <TableCell>
+                      <TablaDensaFila key={p.id} data-testid="pagsem-fila">
+                        <TablaDensaCelda>{p.fecha}</TablaDensaCelda>
+                        <TablaDensaCelda className="font-medium">{p.maquilero}</TablaDensaCelda>
+                        <TablaDensaCelda>
                           {p.conFactura === null ? '—' : p.conFactura ? 'Con' : 'Sin'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {p.numAplicaciones}
-                        </TableCell>
-                        <TableCell>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{p.numAplicaciones}</TablaDensaCelda>
+                        <TablaDensaCelda>
                           {p.estadoRevision === 'revisado' ? 'Revisado' : 'Capturado'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{moneda(p.monto)}</TableCell>
-                      </TableRow>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(p.monto)}</TablaDensaCelda>
+                      </TablaDensaFila>
                     ))}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
             </>
           )}

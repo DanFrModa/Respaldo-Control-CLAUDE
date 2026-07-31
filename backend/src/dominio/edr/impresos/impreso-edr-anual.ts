@@ -15,6 +15,14 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+} from '../../../comun/impresos-estilos.js';
+
 import type { EdrPorAnioSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
@@ -47,126 +55,90 @@ export async function armarDatosImpresoEdrAnual(
   return { membrete, anual };
 }
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: { borderBottomWidth: 1, borderBottomColor: TEAL, paddingBottom: 8, marginBottom: 12 },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  seccion: { fontSize: 11, fontFamily: 'Helvetica-Bold', marginTop: 12, marginBottom: 6 },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
-  celdaTotal: { backgroundColor: '#f8fafc', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna PROPIOS (lo compartido vive en `estilosDoc`).
   colMes: { width: 74 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colNum: { width: 80, textAlign: 'right' },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
 });
 
 function pagina(datos: DatosImpresoEdrAnual): ReactElement {
   const a = datos.anual;
   const enc = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colMes] }, 'Mes'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Ventas'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Costo'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Gastos'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Resultado'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMes] }, 'Mes'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Ventas'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Costo'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Gastos'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Resultado'),
   );
   const filas = a.meses.map((m, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `m-${i}`, wrap: false },
-      h(Text, { style: [estilos.celda, estilos.colMes] }, MESES_ES[m.mes] ?? String(m.mes)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(m.ventas)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(m.costo)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(m.gastos)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(m.resultado)),
+      { style: estilosDoc.filaTabla, key: `m-${i}`, wrap: false },
+      h(Text, { style: [estilosDoc.celda, estilos.colMes] }, MESES_ES[m.mes] ?? String(m.mes)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.ventas)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.costo)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.gastos)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.resultado)),
     ),
   );
   const total = h(
     View,
-    { style: estilos.filaTabla, key: 'total' },
-    h(Text, { style: [estilos.celda, estilos.celdaTotal, estilos.colMes] }, 'TOTAL'),
-    h(Text, { style: [estilos.celda, estilos.celdaTotal, estilos.colNum] }, pesos(a.totalVentas)),
-    h(Text, { style: [estilos.celda, estilos.celdaTotal, estilos.colNum] }, pesos(a.totalCosto)),
-    h(Text, { style: [estilos.celda, estilos.celdaTotal, estilos.colNum] }, ''),
+    { style: [estilosDoc.filaTabla, estilosDoc.filaTotal], key: 'total' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colMes] }, 'TOTAL'),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaTotal, estilos.colNum] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colNum] },
+      pesos(a.totalVentas),
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colNum] },
+      pesos(a.totalCosto),
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colNum] }, ''),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colNum] },
       pesos(a.totalResultado),
     ),
   );
 
   const encEmp = h(
     View,
-    { style: estilos.filaTabla, key: 'enc-emp' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Empresa'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Ventas'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Costo'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Utilidad'),
+    { style: estilosDoc.filaTabla, key: 'enc-emp' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] }, 'Empresa'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Ventas'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Costo'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Utilidad'),
   );
   const filasEmp = a.porEmpresa.map((c, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `e-${i}`, wrap: false },
-      h(Text, { style: [estilos.celda, estilos.colFlex] }, c.empresa),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(c.ventas)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(c.costo)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(c.utilidadBruta)),
+      { style: estilosDoc.filaTabla, key: `e-${i}`, wrap: false },
+      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, c.empresa),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(c.ventas)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(c.costo)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(c.utilidadBruta)),
     ),
   );
 
   return h(
     Page,
-    { size: 'A4', style: estilos.pagina },
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(Text, { style: estilos.empresa }, datos.membrete),
-      h(
-        Text,
-        { style: estilos.subtitulo },
-        `Estado de Resultados ${a.anio} · Comparativo mensual · Consolidado (costo actual)`,
-      ),
-    ),
-    h(Text, { style: estilos.seccion, key: 's1' }, 'Por mes'),
+    { size: 'A4', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.membrete,
+      titulo: `Estado de Resultados ${a.anio} · Comparativo mensual · Consolidado (costo actual)`,
+    }),
+    TituloSeccion('Por mes'),
     ...(a.meses.length === 0
-      ? [h(Text, { key: 'v', style: estilos.subtitulo }, 'Sin meses generados en el año.')]
+      ? [h(Text, { key: 'v', style: estilosDoc.subtitulo }, 'Sin meses generados en el año.')]
       : [enc, ...filas, total]),
-    h(Text, { style: estilos.seccion, key: 's2' }, 'Por empresa (año)'),
+    TituloSeccion('Por empresa (año)'),
     ...(a.porEmpresa.length === 0 ? [] : [encEmp, ...filasEmp]),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.membrete} · Estado de Resultados ${a.anio}`,
-    ),
+    PieDocumento({ contexto: `CONTROL v2 · ${datos.membrete} · Estado de Resultados ${a.anio}` }),
   );
 }
 
@@ -195,5 +167,7 @@ export async function impresoEdrAnual(
   deps: DepsImpresoEdrAnual = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoEdrAnual(sesion, anio, bd, deps);
-  return { buffer: await generarPdfEdrAnual(datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('edr-anual', datos, { idEmpresa: sesion.idEmpresaActiva }),
+  };
 }

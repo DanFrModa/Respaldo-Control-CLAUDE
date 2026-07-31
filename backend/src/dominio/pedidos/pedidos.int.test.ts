@@ -13,7 +13,7 @@ import {
   type ServicioArchivos,
 } from '../../comun/archivos.js';
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorPermiso } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Cliente, Empresa, Modelo, PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -374,5 +374,114 @@ describe('Pedidos (F2-E1) — cancelación suave (doc 02 §4.2)', () => {
     await expect(cancelarPedido(s, pedido.id, bd(), archivos)).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
+  });
+});
+
+describe('Pedidos (R3, B4) — coherencia de los amarres a desarrollo (H1 del reviewer)', () => {
+  /** Siembra depto + proyecto (empresa de prueba) + desarrollo del cliente/modelo dados. */
+  async function sembrarDesarrollo(idCliente: number, idModelo: number): Promise<number> {
+    const depto = await cliente.clienteDepartamento.create({
+      data: { idCliente, nombre: `Depto ${String(Date.now())}-${String(Math.random())}` },
+    });
+    const proyecto = await cliente.proyecto.create({
+      data: {
+        folio: BigInt(Math.floor(Math.random() * 1_000_000) + 1),
+        idEmpresa: empresa.id,
+        idCliente,
+        idClienteDepartamento: depto.id,
+        nombre: 'Joggers PV26',
+      },
+    });
+    const desarrollo = await cliente.desarrollo.create({
+      data: { idProyecto: proyecto.id, idModelo },
+    });
+    return desarrollo.id;
+  }
+
+  it('H1a: cambiar el CLIENTE del pedido sin re-mandar renglones rechaza si hay amarres al cliente anterior', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const idDesarrollo = await sembrarDesarrollo(clienteNegocio.id, modeloA.id);
+    const otroCliente = await cliente.cliente.create({ data: { nombre: 'Suburbia' } });
+
+    const pedido = await crearPedido(
+      s,
+      {
+        idCliente: clienteNegocio.id,
+        lineas: [{ idModelo: modeloA.id, cantidadPedida: 10, precio: 50, idDesarrollo }],
+      },
+      bd(),
+      archivos,
+    );
+
+    // Sin `lineas` en el PATCH: el amarre persistido al desarrollo del cliente VIEJO bloquea el
+    // cambio con un error claro (jamás se auto-desliga en silencio).
+    await expect(
+      actualizarPedido(s, { id: pedido.id, idCliente: otroCliente.id }, bd(), archivos),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // Nada cambió (A2): el pedido conserva su cliente y su amarre.
+    const intacto = await obtenerPedido(s, pedido.id, bd(), archivos);
+    expect(intacto.idCliente).toBe(clienteNegocio.id);
+    expect(intacto.lineas[0]?.idDesarrollo).toBe(idDesarrollo);
+
+    // Desligando el renglon (idDesarrollo: null) el cambio de cliente ya procede.
+    const idLinea = pedido.lineas[0]?.id as number;
+    await actualizarPedido(
+      s,
+      {
+        id: pedido.id,
+        lineas: [{ id: idLinea, idModelo: modeloA.id, cantidadPedida: 10, idDesarrollo: null }],
+      },
+      bd(),
+      archivos,
+    );
+    const cambiado = await actualizarPedido(
+      s,
+      { id: pedido.id, idCliente: otroCliente.id },
+      bd(),
+      archivos,
+    );
+    expect(cambiado.idCliente).toBe(otroCliente.id);
+  });
+
+  it('H1b: cambiar el MODELO de un renglon omitiendo idDesarrollo rechaza (conservaria el amarre del modelo viejo)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const idDesarrollo = await sembrarDesarrollo(clienteNegocio.id, modeloA.id);
+
+    const pedido = await crearPedido(
+      s,
+      {
+        idCliente: clienteNegocio.id,
+        lineas: [{ idModelo: modeloA.id, cantidadPedida: 10, precio: 50, idDesarrollo }],
+      },
+      bd(),
+      archivos,
+    );
+    const idLinea = pedido.lineas[0]?.id as number;
+
+    // Omitir idDesarrollo = "no tocar" (M1): el amarre PERSISTIDO se valida contra el modelo NUEVO.
+    await expect(
+      actualizarPedido(
+        s,
+        { id: pedido.id, lineas: [{ id: idLinea, idModelo: modeloB.id, cantidadPedida: 10 }] },
+        bd(),
+        archivos,
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    const intacto = await obtenerPedido(s, pedido.id, bd(), archivos);
+    expect(intacto.lineas[0]?.idModelo).toBe(modeloA.id);
+    expect(intacto.lineas[0]?.idDesarrollo).toBe(idDesarrollo);
+
+    // Desligando en el MISMO patch (idDesarrollo: null), el cambio de modelo procede.
+    const cambiado = await actualizarPedido(
+      s,
+      {
+        id: pedido.id,
+        lineas: [{ id: idLinea, idModelo: modeloB.id, cantidadPedida: 10, idDesarrollo: null }],
+      },
+      bd(),
+      archivos,
+    );
+    expect(cambiado.lineas[0]?.idModelo).toBe(modeloB.id);
+    expect(cambiado.lineas[0]?.idDesarrollo).toBeNull();
   });
 });

@@ -39,6 +39,12 @@ vi.mock('@/api/clientes', () => ({
   useActualizarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  // Hooks del editor de departamentos (montado en el detalle): inertes.
+  useDepartamentosCliente: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useAgregarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useDesactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 /** Cliente de ejemplo (con sus campos embebidos, vacíos por defecto). */
@@ -46,10 +52,13 @@ function cliente(id: number, nombre: string, activo = true): Cliente {
   return {
     id,
     nombre,
+    razonSocial: null,
     contacto: null,
     telefono: null,
     email: null,
     direccion: null,
+    rfc: null,
+    diasCredito: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -91,8 +100,8 @@ describe('<ClientesPagina>', () => {
     });
 
     expect(screen.getAllByTestId('fila-cliente')).toHaveLength(2);
-    // El primero queda auto-seleccionado: aparece también en el detalle (getAllByText).
-    expect(screen.getAllByText('Liverpool').length).toBeGreaterThan(0);
+    // Tabla-first: el detalle NO se auto-abre; ambos clientes salen en sus renglones.
+    expect(screen.getByText('Liverpool')).toBeInTheDocument();
     expect(screen.getByText('Pumas')).toBeInTheDocument();
   });
 
@@ -142,11 +151,12 @@ describe('<ClientesPagina>', () => {
       sesion: estadoSesionDePrueba(['clientes.ver', 'clientes.administrar']),
     });
 
+    // Tabla-first: primero se abre el cajón haciendo clic en el renglón.
+    await usuario.click(screen.getByTestId('fila-cliente'));
     await usuario.click(screen.getByTestId('desactivar-cliente'));
 
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Desactivar cliente')).toBeInTheDocument();
-
+    // El diálogo de confirmación es el que trae el botón `confirmar-accion` (el cajón
+    // también es role="dialog").
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
@@ -158,13 +168,16 @@ describe('<ClientesPagina>', () => {
       sesion: estadoSesionDePrueba(['clientes.ver', 'clientes.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-cliente');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('fila-cliente'));
+    // El estado "Inactivo" se pinta en el título del cajón.
+    const cajon = screen.getByTestId('detalle-cliente').closest('[data-slot="cajon-detalle"]');
+    expect(cajon).not.toBeNull();
+    expect(within(cajon as HTMLElement).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-cliente')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-cliente')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-cliente'));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confirmar-accion')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
 
@@ -181,7 +194,8 @@ describe('<ClientesPagina>', () => {
     await vi.waitFor(() => expect(ultimaQuery?.busqueda).toBe('liver'));
   });
 
-  it('muestra el contacto del cliente en el detalle (solo lo capturado)', () => {
+  it('muestra el contacto del cliente en el detalle (solo lo capturado)', async () => {
+    const usuario = userEvent.setup();
     const conContacto = cliente(3, 'Liverpool');
     conContacto.contacto = 'Ana López';
     conContacto.email = 'compras@liverpool.mx';
@@ -190,24 +204,28 @@ describe('<ClientesPagina>', () => {
       sesion: estadoSesionDePrueba(['clientes.ver']),
     });
 
+    await usuario.click(screen.getByTestId('fila-cliente'));
     const detalle = screen.getByTestId('detalle-cliente');
     expect(within(detalle).getByText('Datos de contacto')).toBeInTheDocument();
     expect(within(detalle).getByText('Ana López')).toBeInTheDocument();
     expect(within(detalle).getByText('compras@liverpool.mx')).toBeInTheDocument();
   });
 
-  it('muestra la sección de campos de referencia (D7) y el editor si puede administrar', () => {
+  it('muestra la sección de campos de referencia (D7) y el editor si puede administrar', async () => {
+    const usuario = userEvent.setup();
     useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
     renderConProveedores(<ClientesPagina />, {
       sesion: estadoSesionDePrueba(['clientes.ver', 'clientes.administrar']),
     });
 
+    await usuario.click(screen.getByTestId('fila-cliente'));
     const detalle = screen.getByTestId('detalle-cliente');
     expect(within(detalle).getByText('Campos de referencia (D7)')).toBeInTheDocument();
     expect(within(detalle).getByTestId('editor-campos-cliente')).toBeInTheDocument();
   });
 
-  it('en modo lectura lista los campos embebidos del cliente sin acciones', () => {
+  it('en modo lectura lista los campos embebidos del cliente sin acciones', async () => {
+    const usuario = userEvent.setup();
     const conCampos = cliente(4, 'Liverpool');
     conCampos.campos = [
       {
@@ -228,6 +246,7 @@ describe('<ClientesPagina>', () => {
       sesion: estadoSesionDePrueba(['clientes.ver']),
     });
 
+    await usuario.click(screen.getByTestId('fila-cliente'));
     const lectura = screen.getByTestId('campos-solo-lectura');
     expect(within(lectura).getByText('No. pedido')).toBeInTheDocument();
     // No hay editor ni botones de acción de campo.

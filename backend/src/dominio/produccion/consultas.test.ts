@@ -137,7 +137,7 @@ describe('dominio Consultas Órdenes (F2-E4) — incompletas con semáforo', () 
     expect(salida.datos).toHaveLength(1);
     expect(salida.datos[0]?.diasAntiguedad).toBe(10);
     expect(salida.datos[0]?.semaforo).toBe('urgente');
-    expect(salida.datos[0]?.totalPiezas).toBe(0); // una incompleta no tiene matriz
+    expect(salida.datos[0]?.totalPiezas).toBe(0); // esta incompleta aún no tiene matriz
   });
 });
 
@@ -192,6 +192,10 @@ function bdIncompletas(creadoEn: Date): ContextoBd {
         Promise.resolve([{ ...filaLigera(creadoEn), estado: 'capturada' as const }]),
       ),
     },
+    // Desde que el estado es automático, una incompleta PUEDE tener matriz (le puede faltar la
+    // receta de avíos): las piezas se agregan igual que en el listado normal. Aquí no tiene.
+    ordenLineaTalla: { groupBy: vi.fn(() => Promise.resolve([])) },
+    ordenLinea: { findMany: vi.fn(() => Promise.resolve([])) },
   } as unknown as Tx;
   return { tx };
 }

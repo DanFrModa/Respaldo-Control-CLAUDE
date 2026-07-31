@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de Tallas y curvas (F1-E2, PIEZA B — D4) contra el stack real, en la estructura
@@ -21,16 +21,14 @@ test.describe('Tallas y curvas (D4)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos → Tallas (descubrible por clic).
+    // Navega Sistema · Catálogos base → Tallas (descubrible por clic).
+    await abrirDesplegableMenu(page, 'Catálogos base');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Tallas', exact: true })
       .click();
-    await page.getByTestId('catalogo-tallas').click();
     await expect(page.getByRole('heading', { name: 'Tallas' })).toBeVisible();
-
-    const detalle = page.getByTestId('detalle-talla');
 
     // ── Crear ─────────────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-talla').click();
@@ -44,14 +42,11 @@ test.describe('Tallas y curvas (D4)', () => {
     await page.getByTestId('buscar-talla').fill(etiqueta);
     const filaNueva = page.getByTestId('fila-talla').filter({ hasText: etiqueta });
     await expect(filaNueva).toBeVisible();
+    // Tabla-first: el estado se lee en el renglón (no hay panel de detalle).
+    await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
 
-    // ── Seleccionar → detalle ──────────────────────────────────────────────────
-    await filaNueva.click();
-    await expect(detalle.getByRole('heading', { name: etiqueta })).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
-
-    // ── Editar ─────────────────────────────────────────────────────────────────
-    await page.getByTestId('editar-talla').click();
+    // ── Editar (botón inline del renglón) ──────────────────────────────────────
+    await filaNueva.getByTestId('editar-talla').click();
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByLabel('Etiqueta')).toHaveValue(etiqueta);
     await dialogoEdicion.getByLabel('Etiqueta').fill(etiquetaEditada);
@@ -63,8 +58,7 @@ test.describe('Tallas y curvas (D4)', () => {
     await expect(filaEditada).toBeVisible();
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
-    await filaEditada.click();
-    await page.getByTestId('desactivar-talla').click();
+    await filaEditada.getByTestId('desactivar-talla').click();
     const confirmacion = page.getByRole('dialog');
     await expect(confirmacion.getByRole('heading', { name: 'Desactivar talla' })).toBeVisible();
     await page.getByTestId('confirmar-accion').click();
@@ -78,12 +72,15 @@ test.describe('Tallas y curvas (D4)', () => {
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-talla').filter({ hasText: etiquetaEditada });
     await expect(filaInactiva).toBeVisible();
-    await filaInactiva.click();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toBeVisible();
 
-    await page.getByTestId('activar-talla').click();
+    await filaInactiva.getByTestId('activar-talla').click();
     await expect(page.getByText(`Talla "${etiquetaEditada}" activada.`)).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId('fila-talla').filter({ hasText: etiquetaEditada }).getByText('Activo', {
+        exact: true,
+      }),
+    ).toBeVisible();
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
     await page.getByTestId('buscar-talla').fill('zzz-no-existe-zzz');
@@ -127,10 +124,11 @@ test.describe('Tallas y curvas (D4)', () => {
 
     await expect(page.getByText(`Curva "${nombreCurva}" creada.`)).toBeVisible();
 
-    // En el detalle de la curva, las tallas se ven en orden (A antes que B).
+    // Tabla-first: en el renglón de la curva, las tallas se ven en orden (A antes que B).
     await page.getByTestId('buscar-curva').fill(nombreCurva);
-    await page.getByTestId('fila-curva').filter({ hasText: nombreCurva }).click();
-    const tallasDetalle = page.getByTestId('detalle-curva-tallas');
+    const filaCurva = page.getByTestId('fila-curva').filter({ hasText: nombreCurva });
+    await expect(filaCurva).toBeVisible();
+    const tallasDetalle = filaCurva.getByTestId('detalle-curva-tallas');
     await expect(tallasDetalle.getByText(a, { exact: true })).toBeVisible();
     await expect(tallasDetalle.getByText(b, { exact: true })).toBeVisible();
   });
@@ -160,19 +158,21 @@ test.describe('Tallas y curvas (D4)', () => {
     await page.getByTestId('guardar-curva').click();
     await expect(page.getByText(`Curva "${nombreCurva}" creada.`)).toBeVisible();
 
-    // Vuelve a Tallas e intenta desactivar la talla en uso.
+    // Vuelve a Tallas e intenta desactivar la talla en uso (botón inline del renglón).
     await page.getByTestId('pestana-tallas').click();
     await page.getByTestId('buscar-talla').fill(etiqueta);
-    await page.getByTestId('fila-talla').filter({ hasText: etiqueta }).click();
-    await page.getByTestId('desactivar-talla').click();
+    const filaTalla = page.getByTestId('fila-talla').filter({ hasText: etiqueta });
+    await expect(filaTalla).toBeVisible();
+    await filaTalla.getByTestId('desactivar-talla').click();
     await page.getByTestId('confirmar-accion').click();
 
     // El backend la rechaza (la usa una curva activa); la UI muestra el error y la talla
-    // sigue activa.
+    // sigue activa (el renglón la marca Activo).
     await expect(page.getByText(/No se puede desactivar la talla/)).toBeVisible();
-    await page.getByTestId('fila-talla').filter({ hasText: etiqueta }).click();
     await expect(
-      page.getByTestId('detalle-talla').getByText('Activo', { exact: true }),
+      page.getByTestId('fila-talla').filter({ hasText: etiqueta }).getByText('Activo', {
+        exact: true,
+      }),
     ).toBeVisible();
   });
 });

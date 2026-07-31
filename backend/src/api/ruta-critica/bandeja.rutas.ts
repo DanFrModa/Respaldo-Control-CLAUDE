@@ -4,9 +4,11 @@
  * `src/contrato`), autorizan (`conPermiso`, A4) y delegan al dominio `dominio/ruta-critica/bandeja`.
  * CERO lógica de negocio aquí — el semáforo/atraso/orden los DERIVA el dominio.
  *
- * Endpoints (ambos GET, ambos `rc.ruta-ver`, ambos por la empresa activa = A9):
- *  • `GET /ruta-critica/bandeja`        → tareas activas del usuario (o todas, con supervisión), paginadas.
- *  • `GET /ruta-critica/alertas/conteo` → { atrasados, enRiesgo } de MIS tareas (badge del header).
+ * Endpoints (todos GET, todos por la empresa activa = A9):
+ *  • `GET /ruta-critica/bandeja`              → tareas activas del usuario (o todas / de otro, con supervisión), paginadas. `rc.ruta-ver`.
+ *  • `GET /ruta-critica/bandeja/resumen`      → KPIs + grupos por proceso de "Mis pendientes" (R4). `rc.ruta-ver`.
+ *  • `GET /ruta-critica/bandeja/responsables` → usuarios del selector "Viendo pendientes de:" (R4). `rc.programar`.
+ *  • `GET /ruta-critica/alertas/conteo`       → { atrasados, enRiesgo } de MIS tareas (badge del header). `rc.ruta-ver`.
  *
  * NOTA DE INTEGRACIÓN: este plugin se registra en `app.ts`
  * (`await app.register(rutasBandejaRc, { prefix: '/api' })`), junto a las demás rutas de ruta-crítica.
@@ -18,10 +20,18 @@ import {
   esquemaBandejaRcPagina,
   esquemaBandejaRcQuery,
   esquemaErrorApi,
+  esquemaResponsablesRc,
+  esquemaResumenPendientes,
+  esquemaResumenPendientesQuery,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
-import { consultarBandeja, contarAlertas } from '../../dominio/ruta-critica/bandeja.js';
+import {
+  consultarBandeja,
+  contarAlertas,
+  listarResponsablesRc,
+  resumenPendientes,
+} from '../../dominio/ruta-critica/bandeja.js';
 
 /** Respuestas de error comunes a toda ruta protegida (para documentar el contrato). */
 const respuestasError = {
@@ -59,6 +69,42 @@ export const rutasBandejaRc: FastifyPluginCallbackZod = (app, _opciones, done) =
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return consultarBandeja(sesion, request.query);
+    },
+  });
+
+  // Resumen "Mis pendientes" (R4): KPIs + grupos por tipo de proceso — agregado EN SERVIDOR (A1).
+  app.route({
+    method: 'GET',
+    url: '/ruta-critica/bandeja/resumen',
+    preHandler: app.conPermiso('rc.ruta-ver'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Resumen de "Mis pendientes": KPIs (vencidas/hoy/semana/total) y grupos por proceso',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaResumenPendientesQuery,
+      response: { 200: esquemaResumenPendientes, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return resumenPendientes(sesion, request.query);
+    },
+  });
+
+  // Usuarios del selector "Viendo pendientes de:" (R4). Supervisión: exige `rc.programar`.
+  app.route({
+    method: 'GET',
+    url: '/ruta-critica/bandeja/responsables',
+    preHandler: app.conPermiso('rc.programar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary:
+        'Usuarios con roles responsables de la Ruta Crítica (selector "Viendo pendientes de:")',
+      security: SEGURIDAD_SESION,
+      response: { 200: esquemaResponsablesRc, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarResponsablesRc(sesion);
     },
   });
 

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, PackagePlus } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -8,7 +8,6 @@ import { useCrearMovimientoPt, useTiposMovimiento } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
@@ -19,6 +18,7 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
 import { aLineasApi, coloresOpciones, tallasColumnas, totalMatriz } from './matriz-inventario';
 
@@ -78,6 +78,16 @@ export function MovimientosPtPagina(): React.JSX.Element {
     [tallasCat.data],
   );
 
+  // Aviso reintentable si falla algún catálogo de la captura.
+  const catalogoError =
+    tiposMov.isError || almacenes.isError || colores.isError || tallasCat.isError;
+  function reintentarCatalogos(): void {
+    void tiposMov.refetch();
+    void almacenes.refetch();
+    void colores.refetch();
+    void tallasCat.refetch();
+  }
+
   const total = totalMatriz(lineas);
   const puedeGuardar =
     puedeMover &&
@@ -116,129 +126,147 @@ export function MovimientosPtPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackagePlus className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Movimientos de inventario</h1>
-          <p className="text-sm text-muted-foreground">
-            Entradas, salidas y ajustes de producto terminado por color × talla.
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 md:p-5">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Movimientos de inventario
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Entradas, salidas y ajustes de producto terminado por color × talla
           </p>
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Modelo</CardTitle>
-            <CardDescription>Elige el modelo a mover.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SelectorModelo idSeleccionado={modelo?.id} alSeleccionar={setModelo} />
-          </CardContent>
-        </Card>
+      {catalogoError ? (
+        <div
+          className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+          role="alert"
+          data-testid="mov-error-catalogo"
+        >
+          <p className="text-sm text-destructive">
+            No se pudieron cargar los catálogos de la captura (tipos, almacenes, colores o tallas).
+          </p>
+          <Button size="sm" variant="outline" onClick={reintentarCatalogos}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{modelo ? `Modelo ${modelo.codigo}` : 'Datos del movimiento'}</CardTitle>
-            <CardDescription>
-              {modelo
-                ? (modelo.descripcion ?? 'Captura el movimiento de este modelo.')
-                : 'Selecciona un modelo para capturar su movimiento.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {modelo === undefined ? (
-              <p className="text-sm text-muted-foreground">Sin modelo seleccionado.</p>
-            ) : (
-              <>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field>
-                    <FieldLabel htmlFor="tipo-mov">Tipo de movimiento</FieldLabel>
-                    <SelectNativo
-                      id="tipo-mov"
-                      value={idTipoMov}
-                      onChange={(e) => setIdTipoMov(e.target.value)}
-                      disabled={!puedeMover}
-                      data-testid="mov-tipo"
-                    >
-                      <option value="">Elige un tipo…</option>
-                      {tiposCaptura.map((t) => (
-                        <option key={t.id} value={String(t.id)}>
-                          {t.nombre} ({t.direccion === 'entrada' ? '+' : '−'})
-                        </option>
-                      ))}
-                    </SelectNativo>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="almacen">Almacén</FieldLabel>
-                    <SelectNativo
-                      id="almacen"
-                      value={idAlmacen}
-                      onChange={(e) => setIdAlmacen(e.target.value)}
-                      disabled={!puedeMover}
-                      data-testid="mov-almacen"
-                    >
-                      <option value="">Elige un almacén…</option>
-                      {(almacenes.data?.datos ?? []).map((a) => (
-                        <option key={a.id} value={String(a.id)}>
-                          {a.nombre}
-                        </option>
-                      ))}
-                    </SelectNativo>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="fecha">Fecha</FieldLabel>
-                    <Input
-                      id="fecha"
-                      type="date"
-                      value={fecha}
-                      onChange={(e) => setFecha(e.target.value)}
-                      disabled={!puedeMover}
-                      data-testid="mov-fecha"
-                    />
-                  </Field>
-                </div>
+      {/* ── Card única: riel del módulo + captura (estándar del grupo, proto `vInventarios`) ── */}
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+          <PestanasInventarioPt activa="movimientos" />
+          <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorModelo
+              idSeleccionado={modelo?.id}
+              alSeleccionar={setModelo}
+              alLimpiar={() => setModelo(undefined)}
+            />
+          </div>
+          {/* Identidad VISIBLE del modelo elegido: código + descripción (el value del input no
+              es un nodo de texto). */}
+          {modelo !== undefined ? (
+            <span className="truncate text-xs text-muted-foreground" data-testid="mov-modelo-sel">
+              <span className="num font-medium text-foreground">{modelo.codigo}</span>
+              {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
+            </span>
+          ) : null}
+        </div>
 
+        <div className="space-y-4 p-4">
+          {modelo === undefined ? (
+            <p className="text-sm text-muted-foreground">
+              Selecciona un modelo para capturar su movimiento.
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
                 <Field>
-                  <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
-                  <Input
-                    id="obs"
-                    value={observaciones}
-                    onChange={(e) => setObservaciones(e.target.value)}
-                    placeholder="Opcional"
+                  <FieldLabel htmlFor="tipo-mov">Tipo de movimiento</FieldLabel>
+                  <SelectNativo
+                    id="tipo-mov"
+                    value={idTipoMov}
+                    onChange={(e) => setIdTipoMov(e.target.value)}
                     disabled={!puedeMover}
+                    data-testid="mov-tipo"
+                  >
+                    <option value="">Elige un tipo…</option>
+                    {tiposCaptura.map((t) => (
+                      <option key={t.id} value={String(t.id)}>
+                        {t.nombre} ({t.direccion === 'entrada' ? '+' : '−'})
+                      </option>
+                    ))}
+                  </SelectNativo>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="almacen">Almacén</FieldLabel>
+                  <SelectNativo
+                    id="almacen"
+                    value={idAlmacen}
+                    onChange={(e) => setIdAlmacen(e.target.value)}
+                    disabled={!puedeMover}
+                    data-testid="mov-almacen"
+                  >
+                    <option value="">Elige un almacén…</option>
+                    {(almacenes.data?.datos ?? []).map((a) => (
+                      <option key={a.id} value={String(a.id)}>
+                        {a.nombre}
+                      </option>
+                    ))}
+                  </SelectNativo>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="fecha">Fecha</FieldLabel>
+                  <Input
+                    id="fecha"
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    disabled={!puedeMover}
+                    data-testid="mov-fecha"
                   />
                 </Field>
+              </div>
 
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Cantidades (color × talla)</h3>
-                  <MatrizColorTalla
-                    testid="mov-matriz"
-                    tallas={tallas}
-                    lineas={lineas}
-                    coloresDisponibles={coloresDisponibles}
-                    tallasDisponibles={tallasDisponibles}
-                    onLineasChange={setLineas}
-                    onTallasChange={setTallas}
-                    soloLectura={!puedeMover}
-                  />
-                </div>
+              <Field>
+                <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+                <Input
+                  id="obs"
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Opcional"
+                  disabled={!puedeMover}
+                />
+              </Field>
 
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">
-                    Total: <strong>{total.toLocaleString('es-MX')}</strong> pzas
-                  </span>
-                  <Button onClick={guardar} disabled={!puedeGuardar} data-testid="mov-guardar">
-                    {crear.isPending ? 'Guardando…' : 'Guardar movimiento'}
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Cantidades (color × talla)</h3>
+                <MatrizColorTalla
+                  testid="mov-matriz"
+                  tallas={tallas}
+                  lineas={lineas}
+                  coloresDisponibles={coloresDisponibles}
+                  tallasDisponibles={tallasDisponibles}
+                  onLineasChange={setLineas}
+                  onTallasChange={setTallas}
+                  soloLectura={!puedeMover}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Barra al pie (estándar de totales del grupo): total capturado + guardar ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-secondary px-3 py-1.5">
+          <span className="flex items-baseline gap-1.5 text-xs">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Total:</span>
+            <b className="num text-primary">{total.toLocaleString('es-MX')} pzas</b>
+          </span>
+          <Button size="sm" onClick={guardar} disabled={!puedeGuardar} data-testid="mov-guardar">
+            {crear.isPending ? 'Guardando…' : 'Guardar movimiento'}
+          </Button>
+        </div>
       </div>
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">

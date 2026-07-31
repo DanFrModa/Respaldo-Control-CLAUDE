@@ -31,7 +31,13 @@
  */
 import { z } from 'zod';
 
-import type { ExistenciaMaquileroLista, TableroWipPagina, WipOrden } from '../../contrato/index.js';
+import type {
+  ExistenciaMaquileroLista,
+  TableroWipPagina,
+  WipMaquileroPendiente,
+  WipOrden,
+  WipTotales,
+} from '../../contrato/index.js';
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
@@ -96,8 +102,11 @@ async function totalesPorOrden(
   return totales;
 }
 
-/** Total pedido (Σ de la matriz `OrdenLineaTalla`) por orden, para un conjunto de órdenes. */
-async function pedidoPorOrden(
+/**
+ * Total pedido (Σ de la matriz `OrdenLineaTalla`) por orden, para un conjunto de órdenes.
+ * Exportada: el Resumen operativo (R9) la reusa para las piezas de "órdenes por vencer".
+ */
+export async function pedidoPorOrden(
   cliente: ClienteLectura,
   idsOrden: number[],
 ): Promise<Map<number, number>> {
@@ -150,6 +159,134 @@ async function sumarCeldasOrden(
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
+}
+
+/**
+ * Igual que {@link sumarCeldasOrden} pero AGRUPANDO POR TERCERO (el maquilero del movimiento):
+ * devuelve, por cada `idTercero` (o `null` en lo migrado sin dato), su matriz color×talla y el
+ * nombre para pintarlo. Es la base del desglose "por recibir POR MAQUILERO" (regla de Daniel del
+ * 28-jul-2026: no se recibe de quien no recibió el corte).
+ *
+ * `Sin asignar` es el MISMO literal que usa {@link consultarExistenciaMaquilero} para el histórico
+ * migrado sin tercero: las dos vistas del módulo tienen que nombrar igual al mismo hueco.
+ */
+async function sumarCeldasPorTercero(
+  cliente: ClienteLectura,
+  idOrden: number,
+  tipo: TipoEtapaMovimiento,
+  idTipoProceso: number,
+): Promise<Map<number | null, { nombre: string; celdas: Map<string, number> }>> {
+  const filas = await cliente.etapaMovimientoDet.findMany({
+    where: { etapaMov: { idOrden, tipo, idTipoProceso, canceladoEn: null } },
+    select: {
+      idColor: true,
+      idTalla: true,
+      cantidad: true,
+      etapaMov: { select: { idTercero: true, tercero: { select: { nombre: true } } } },
+    },
+  });
+  const porTercero = new Map<number | null, { nombre: string; celdas: Map<string, number> }>();
+  for (const f of filas) {
+    const idTercero = f.etapaMov.idTercero;
+    let grupo = porTercero.get(idTercero);
+    if (grupo === undefined) {
+      grupo = { nombre: f.etapaMov.tercero?.nombre ?? 'Sin asignar', celdas: new Map() };
+      porTercero.set(idTercero, grupo);
+    }
+    const clave = claveCelda(f.idColor, f.idTalla);
+    grupo.celdas.set(clave, (grupo.celdas.get(clave) ?? 0) + f.cantidad);
+  }
+  return porTercero;
+}
+
+/** Pliega el agrupado por tercero en la matriz TOTAL del proceso (evita repetir la consulta). */
+function plegarPorTercero(
+  porTercero: Map<number | null, { nombre: string; celdas: Map<string, number> }>,
+): Map<string, number> {
+  const total = new Map<string, number>();
+  for (const grupo of porTercero.values()) {
+    for (const [clave, cantidad] of grupo.celdas) {
+      total.set(clave, (total.get(clave) ?? 0) + cantidad);
+    }
+  }
+  return total;
+}
+
+/**
+ * "Por recibir" de un proceso DESGLOSADO POR MAQUILERO: `enviado − recibido` de cada tercero, por
+ * color×talla. Lo comparten el drill-down del WIP y los pendientes del recibo (`recibos.ts`) para
+ * que las dos pantallas de recibo que existen ofrezcan y topen EXACTAMENTE lo mismo.
+ *
+ * Se enumeran los terceros que aparecen en envíos **o** en recibos vivos: un maquilero con recibos
+ * y sin envío (posible en lo migrado, donde `Recibos.IdMaquileros` era independiente de
+ * `Entregas.IdMaquileros`) tiene pendiente NEGATIVO y no puede desaparecer del desglose — si no,
+ * `Σ porMaquilero ≠ totalPendiente` y el drill-down contradiría a "Existencias en poder del
+ * maquilero", que sí lo cuenta (hallazgo del reviewer).
+ */
+export async function pendientePorMaquilero(
+  cliente: ClienteLectura,
+  idOrden: number,
+  idTipoProceso: number,
+  meta: Map<string, MetaCelda>,
+): Promise<{
+  porMaquilero: WipMaquileroPendiente[];
+  enviado: Map<string, number>;
+  recibido: Map<string, number>;
+}> {
+  const enviadoPorTercero = await sumarCeldasPorTercero(
+    cliente,
+    idOrden,
+    TipoEtapaMovimiento.envio_maquila,
+    idTipoProceso,
+  );
+  const recibidoPorTercero = await sumarCeldasPorTercero(
+    cliente,
+    idOrden,
+    TipoEtapaMovimiento.recibo_maquila,
+    idTipoProceso,
+  );
+
+  const terceros = new Set<number | null>([
+    ...enviadoPorTercero.keys(),
+    ...recibidoPorTercero.keys(),
+  ]);
+  const porMaquilero = [...terceros].map((idTercero) => {
+    const grupoEnviado = enviadoPorTercero.get(idTercero);
+    const grupoRecibido = recibidoPorTercero.get(idTercero);
+    const claves = new Set<string>([
+      ...(grupoEnviado?.celdas.keys() ?? []),
+      ...(grupoRecibido?.celdas.keys() ?? []),
+    ]);
+    const celdas = ordenarCeldas(
+      [...claves].map((clave) => {
+        const m = metaPara(meta, clave);
+        return {
+          ...m,
+          cantidad:
+            (grupoEnviado?.celdas.get(clave) ?? 0) - (grupoRecibido?.celdas.get(clave) ?? 0),
+        };
+      }),
+    )
+      .filter((c) => c.cantidad !== 0)
+      .map(({ ordenTalla: _o, ...resto }) => resto);
+    return {
+      idMaquilero: idTercero,
+      maquilero: grupoEnviado?.nombre ?? grupoRecibido?.nombre ?? 'Sin asignar',
+      celdas,
+      totalPendiente:
+        [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) -
+        [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
+    };
+  });
+  porMaquilero.sort((a, b) => a.maquilero.localeCompare(b.maquilero, 'es'));
+
+  // Los totales del proceso se PLIEGAN de lo ya traído: sin esto serían dos consultas idénticas
+  // más (el mismo rowset, solo que sin el join del tercero).
+  return {
+    porMaquilero,
+    enviado: plegarPorTercero(enviadoPorTercero),
+    recibido: plegarPorTercero(recibidoPorTercero),
+  };
 }
 
 // ── Tablero WIP: listado de órdenes con su avance agregado ──────────────────────────────────────
@@ -209,6 +346,64 @@ export function tienePendiente(t: TotalesOrden): boolean {
 }
 
 /**
+ * AGREGADO por etapa (piezas) sobre TODO el universo filtrado (no solo la página) — KPIs de vistazo
+ * del proto. Se deriva por suma directa de `EtapaMovimientoDet` (D3/D4) con el MISMO criterio que las
+ * filas del tablero y que `kpisWip` de Indicadores: cada dimensión es UNA agregación en la base
+ * (`_sum`) acotada por el `where` de las órdenes (relación anidada `etapaMov.orden`/`ordenLinea.orden`);
+ * nunca se traen los detalles a memoria. `recibidoCostura` = recibos de procesos que meten a PT
+ * (`generaEntradaPt`), base de "por entregar". Los pendientes se derivan con {@link pendientesDerivados}.
+ *
+ * El filtro `soloPendientes` del listado NO participa aquí: se aplica en memoria sobre las filas y una
+ * orden sin nada pendiente aporta 0 a cada etapa pendiente, por lo que la Σ es idéntica. Así el
+ * agregado refleja exactamente el `where` SQL (empresa/estado/modelo/cliente/búsqueda).
+ *
+ * Exportada: el Resumen operativo (R9) la reusa para "en producción (WIP)" (mismo criterio D3/D4,
+ * sin duplicar la derivación).
+ */
+export async function agregadoWip(
+  cliente: ClienteLectura,
+  where: Prisma.OrdenWhereInput,
+): Promise<WipTotales> {
+  const sumaEtapa = async (
+    tipo: TipoEtapaMovimiento,
+    opciones: { soloEntradaPt?: boolean } = {},
+  ): Promise<number> => {
+    const r = await cliente.etapaMovimientoDet.aggregate({
+      where: {
+        etapaMov: {
+          tipo,
+          canceladoEn: null,
+          orden: where,
+          ...(opciones.soloEntradaPt ? { tipoProceso: { generaEntradaPt: true } } : {}),
+        },
+      },
+      _sum: { cantidad: true },
+    });
+    return r._sum.cantidad ?? 0;
+  };
+  const [pedidoAgg, cortado, enviado, recibido, recibidoCostura, entregado] = await Promise.all([
+    cliente.ordenLineaTalla.aggregate({
+      where: { ordenLinea: { orden: where } },
+      _sum: { cantidad: true },
+    }),
+    sumaEtapa(TipoEtapaMovimiento.corte),
+    sumaEtapa(TipoEtapaMovimiento.envio_maquila),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
+    sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
+  ]);
+  const t: TotalesOrden = {
+    pedido: pedidoAgg._sum.cantidad ?? 0,
+    cortado,
+    enviado,
+    recibido,
+    recibidoCostura,
+    entregado,
+  };
+  return { ...t, ...pendientesDerivados(t) };
+}
+
+/**
  * TABLERO WIP de la empresa activa (A9): lista LIGERA de órdenes con su avance AGREGADO por etapa
  * (totales por etapa + pendientes derivados, form `Proceso`). Filtros por modelo/cliente/estado +
  * búsqueda combinada (folio, modelo, cliente, valor de referencia D7, reusa `armarBusqueda`).
@@ -258,7 +453,7 @@ export async function consultarWip(
   // Sin `soloPendientes`: paginamos en la base (lo común). Con el filtro: traemos las órdenes que
   // cumplen el WHERE, derivamos y filtramos/paginamos en memoria (el universo vivo es acotado).
   if (!filtros.soloPendientes) {
-    const [total, filas] = await Promise.all([
+    const [total, filas, totalesAgg] = await Promise.all([
       cliente.orden.count({ where }),
       cliente.orden.findMany({
         where,
@@ -267,6 +462,7 @@ export async function consultarWip(
         skip: (paginacion.pagina - 1) * paginacion.porPagina,
         take: paginacion.porPagina,
       }),
+      agregadoWip(cliente, where),
     ]);
     const totales = await totalesDeOrdenes(
       cliente,
@@ -275,6 +471,7 @@ export async function consultarWip(
     const datos = filas.map((f) => aFilaTablero(f, totales.get(f.id) ?? totalesVacios()));
     return {
       datos,
+      totales: totalesAgg,
       total,
       pagina: paginacion.pagina,
       porPagina: paginacion.porPagina,
@@ -282,7 +479,10 @@ export async function consultarWip(
     };
   }
 
-  const filas = await cliente.orden.findMany({ where, orderBy, select: seleccion });
+  const [filas, totalesAgg] = await Promise.all([
+    cliente.orden.findMany({ where, orderBy, select: seleccion }),
+    agregadoWip(cliente, where),
+  ]);
   const totales = await totalesDeOrdenes(
     cliente,
     filas.map((f) => f.id),
@@ -294,6 +494,7 @@ export async function consultarWip(
   const datos = pagina.map((f) => aFilaTablero(f, totales.get(f.id) ?? totalesVacios()));
   return {
     datos,
+    totales: totalesAgg,
     total,
     pagina: paginacion.pagina,
     porPagina: paginacion.porPagina,
@@ -381,7 +582,7 @@ function aFilaTablero(
 // ── Drill-down de una orden ───────────────────────────────────────────────────────────────────
 
 /** Metadato de presentación de una celda (color/talla). */
-interface MetaCelda {
+export interface MetaCelda {
   idColor: number;
   color: string;
   idTalla: number;
@@ -513,17 +714,13 @@ export async function wipDeOrden(
   let recibidoCostura = 0;
   for (const proc of procesos) {
     if (proc.idTipoProceso === null) continue;
-    const enviado = await sumarCeldasOrden(
+    // Envío y recibo del proceso, DESGLOSADOS por maquilero y plegados a los totales del proceso:
+    // una sola pasada por tipo de movimiento (el helper lo comparte con `pendientesPorRecibir`).
+    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
       cliente,
       idOrden,
-      TipoEtapaMovimiento.envio_maquila,
       proc.idTipoProceso,
-    );
-    const recibido = await sumarCeldasOrden(
-      cliente,
-      idOrden,
-      TipoEtapaMovimiento.recibo_maquila,
-      proc.idTipoProceso,
+      meta,
     );
     const generaEntradaPt = proc.tipoProceso?.generaEntradaPt ?? false;
     const sumaRecibido = [...recibido.values()].reduce((s, v) => s + v, 0);
@@ -571,6 +768,7 @@ export async function wipDeOrden(
       totalPendiente:
         [...enviado.values()].reduce((s, v) => s + v, 0) -
         [...recibido.values()].reduce((s, v) => s + v, 0),
+      porMaquilero,
     });
   }
 

@@ -28,6 +28,7 @@ import {
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
   esquemaEtapasOrdenLista,
+  esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
@@ -176,14 +177,18 @@ export const rutasEtapasProduccion: FastifyPluginCallbackZod = (app, _opciones, 
     preHandler: app.conPermiso('produccion.wip-ver'),
     schema: {
       tags: ['produccion'],
-      summary: 'Historial de etapas (cortes y envíos) de una orden, vivas y canceladas',
+      summary:
+        'Historial de etapas (cortes y envíos; con incluirRecibos también recibos) de una orden',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
+      querystring: esquemaEtapasOrdenQuery,
       response: { 200: esquemaEtapasOrdenLista, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return listarEtapasOrden(sesion, request.params.id);
+      return listarEtapasOrden(sesion, request.params.id, undefined, {
+        incluirRecibos: request.query.incluirRecibos,
+      });
     },
   });
 

@@ -127,7 +127,99 @@ export const esquemaModeloBordados = z
     error: 'Hay bordados repetidos en el modelo',
   });
 
+// ── Secuencia de estampado (rediseño R4/R5, B10) ───────────────────────────────
+
+/** Secuencia del estampado/bordado respecto a la costura (por modelo). Espejo del enum de BD. */
+export const esquemaSecuenciaEstampado = z
+  .enum(['antes', 'despues', 'flexible'])
+  .describe('Secuencia del estampado respecto a la costura: antes | después | flexible.');
+
+/** Clave de la secuencia de estampado. */
+export type SecuenciaEstampadoClave = z.infer<typeof esquemaSecuenciaEstampado>;
+
+// ── ¿La prenda LLEVA arte? (decisión de Daniel, 26-jul-2026) ────────────────────
+
+/**
+ * ¿El modelo LLEVA arte (bordado/estampado)? Decisión de Daniel: *"por default sí lleva; a menos
+ * que la marques como que no lleva… si no meten la información del arte, o no desmarcan la
+ * casilla, está como incompleto"*. Es el requisito ARTE del estado automático de la orden: con
+ * `true` la orden no se completa hasta que el modelo tenga su arte capturado; con `false` el arte
+ * no aplica. Default `true` en BD (también para lo migrado).
+ */
+export const esquemaLlevaArte = z
+  .boolean({ error: '"Lleva arte" debe ser verdadero o falso' })
+  .describe(
+    '¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta.',
+  );
+
+// ── Dificultad DERIVADA del # de operaciones (rediseño R5, B7) ──────────────────
+
+/** Querystring del resolvedor de dificultad: el # de operaciones a evaluar. */
+export const esquemaDificultadQuery = z
+  .object({
+    ops: z.coerce
+      .number({ error: 'El # de operaciones debe ser un número' })
+      .int({ error: 'El # de operaciones debe ser entero' })
+      .nonnegative({ error: 'El # de operaciones no puede ser negativo' })
+      .describe('# de operaciones de costura a evaluar contra la tabla de rangos.'),
+  })
+  .describe('Parámetros del resolvedor de dificultad por # de operaciones.');
+
+/** Forma del rango de dificultad que casó con el # de operaciones (o null si ninguno). */
+export const esquemaDificultadResuelta = z
+  .object({
+    numOperaciones: z.number().int().describe('# de operaciones evaluado.'),
+    rango: z
+      .object({
+        id: z.number().int().describe('Id del rango de dificultad.'),
+        nombre: z.string().describe('Nombre del nivel (ej. "Muy complejo").'),
+        diasCostura: z.number().int().describe('Días de costura del CPM para este nivel.'),
+        opsDesde: z.number().int().describe('Límite inferior del rango.'),
+        opsHasta: z
+          .number()
+          .int()
+          .nullable()
+          .describe('Límite superior del rango (null = abierto).'),
+      })
+      .nullable()
+      .describe('El rango que casó, o null si ningún rango cubre ese # de operaciones.'),
+  })
+  .describe('Dificultad derivada del # de operaciones (R5, B7).');
+
+/** Forma de la dificultad resuelta. */
+export type DificultadResuelta = z.infer<typeof esquemaDificultadResuelta>;
+
 // ── Modelo (datos generales) ───────────────────────────────────────────────────
+
+/**
+ * Campo `# de operaciones de costura` (rediseño R4/R5, B7): dato objetivo que deriva la DIFICULTAD
+ * contra la tabla `RangoDificultad` (y de ahí los días de costura del CPM). Entero no negativo.
+ */
+const esquemaNumOperaciones = z
+  .number({ error: 'El # de operaciones debe ser un número' })
+  .int({ error: 'El # de operaciones debe ser entero' })
+  .nonnegative({ error: 'El # de operaciones no puede ser negativo' });
+
+/** Costo de CORTE por prenda (rediseño R5, B8): separado de la maquila, sin proveedor. No negativo. */
+const esquemaCorteBase = z
+  .number({ error: 'El corte debe ser un número' })
+  .nonnegative({ error: 'El corte no puede ser negativo' });
+
+/** Maquilero (costura) cotizado (rediseño R5, B9): id de un Proveedor. */
+const esquemaIdMaquilero = z
+  .number({ error: 'El id del maquilero debe ser un número' })
+  .int({ error: 'El id del maquilero debe ser entero' })
+  .positive({ error: 'El id del maquilero debe ser positivo' });
+
+/**
+ * COMPOSICIÓN textil del modelo (decisión de Daniel, 24-jul-2026): se captura en la ficha del
+ * modelo (el desarrollo) y toda orden de ese modelo la HEREDA sola. Mismo tope que la composición
+ * de la orden (2000 caracteres) para que la herencia nunca se trunque.
+ */
+const esquemaComposicionModelo = z
+  .string()
+  .trim()
+  .max(2000, { error: 'La composición no puede tener más de 2000 caracteres' });
 
 /** Campos opcionales del modelo (mismas reglas de longitud en alta y edición). */
 const camposOpcionalesModelo = {
@@ -136,6 +228,7 @@ const camposOpcionalesModelo = {
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
     .optional(),
+  composicion: esquemaComposicionModelo.optional(),
 } as const;
 
 /**
@@ -179,6 +272,16 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id del tipo de producto debe ser entero' })
     .positive({ error: 'El id del tipo de producto debe ser positivo' })
     .optional(),
+  /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. Opcional. */
+  numOperaciones: esquemaNumOperaciones.optional(),
+  /** Costo de corte por prenda (R5/B8), separado de la maquila, sin proveedor. Opcional. */
+  corteBase: esquemaCorteBase.optional(),
+  /** Maquilero (costura) cotizado (R5/B9). Si viene, el dominio exige Proveedor existente/activo. */
+  idMaquileroCotizado: esquemaIdMaquilero.optional(),
+  /** Secuencia de estampado (R5/B10): antes | después | flexible. Opcional (default 'antes' en BD). */
+  secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+  /** ¿La prenda lleva arte? Opcional; omitir = `true` (default de Daniel, ver el esquema de salida). */
+  llevaArte: esquemaLlevaArte.optional(),
   ...camposOpcionalesModelo,
 });
 
@@ -233,7 +336,19 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id del tipo de producto debe ser positivo' })
       .nullable()
       .optional(),
+    /** `null` quita el # de operaciones; un número lo fija; omitir = no tocar (R5/B7). */
+    numOperaciones: esquemaNumOperaciones.nullable().optional(),
+    /** `null` quita el corte; un número lo fija; omitir = no tocar (R5/B8). */
+    corteBase: esquemaCorteBase.nullable().optional(),
+    /** `null` quita el maquilero cotizado; un id lo fija; omitir = no tocar (R5/B9). */
+    idMaquileroCotizado: esquemaIdMaquilero.nullable().optional(),
+    /** Cambia la secuencia de estampado; omitir = no tocar (R5/B10). No es nullable (tiene default). */
+    secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+    /** Marca/desmarca "lleva arte"; omitir = no tocar. No es nullable (tiene default `true`). */
+    llevaArte: esquemaLlevaArte.optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
+    /** `null`/'' borra la composición del modelo; omitir = no tocar. */
+    composicion: camposOpcionalesModelo.composicion.nullable(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
   })
   .extend({
@@ -302,6 +417,10 @@ export const esquemaModeloSalida = z
     id: z.number().int().describe('Id del modelo.'),
     codigo: z.string().describe('Código/clave de negocio del modelo (único global).'),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
+    composicion: z
+      .string()
+      .nullable()
+      .describe('Composición textil del modelo (la heredan sus órdenes), o null.'),
     maquilaBase: z.number().nullable().describe('Costo de maquila base, o null.'),
     idTemporada: z.number().int().nullable().describe('Id de la temporada, o null.'),
     temporada: z.string().nullable().describe('Nombre de la temporada, o null.'),
@@ -315,6 +434,25 @@ export const esquemaModeloSalida = z
       .nullable()
       .describe('Id del tipo de producto, o null (F6-E1).'),
     tipoProducto: z.string().nullable().describe('Nombre del tipo de producto, o null.'),
+    numOperaciones: z
+      .number()
+      .int()
+      .nullable()
+      .describe('# de operaciones de costura (R5/B7), o null si no se capturó.'),
+    corteBase: z.number().nullable().describe('Costo de corte por prenda (R5/B8), o null.'),
+    idMaquileroCotizado: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del maquilero (costura) cotizado (R5/B9), o null.'),
+    maquileroCotizado: z
+      .string()
+      .nullable()
+      .describe('Nombre del maquilero cotizado (R5/B9), o null.'),
+    secuenciaEstampado: esquemaSecuenciaEstampado.describe(
+      'Secuencia de estampado del modelo (R5/B10; default "antes").',
+    ),
+    llevaArte: esquemaLlevaArte,
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o
@@ -325,6 +463,35 @@ export const esquemaModeloSalida = z
       .string()
       .nullable()
       .describe('URL prefirmada de la foto principal del modelo, o null si no tiene fotos.'),
+    /**
+     * Nombre de la TELA PRINCIPAL del modelo = el PRIMER renglón del BOM de telas (mismo orden
+     * que la ficha: por nombre de tela). Solo el LISTADO lo resuelve (columna del proto
+     * `vModelos`, sin N+1); en las demás salidas viene `null` (igual que `urlFotoPrincipal`).
+     */
+    telaPrincipal: z
+      .string()
+      .nullable()
+      .describe('Nombre de la tela principal (primer renglón del BOM), o null.'),
+    /**
+     * Existencia TOTAL de PT del modelo en la EMPRESA ACTIVA (Σ de movimientos de kardex, D3,
+     * vía la vista `existencia_pt`; suma de todos los almacenes/órdenes). Solo el LISTADO lo
+     * resuelve; en las demás salidas viene `null` (la ficha usa la consulta de existencias).
+     */
+    stockPt: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado.'),
+    /**
+     * Costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa activa =
+     * `costoTotal / cantidadDeBase(baseProrrateo)` — EXACTAMENTE el criterio de la Lista de
+     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, si la
+     * sesión no tiene `consultas.ver-importes` (mismo candado que Costos) o fuera del listado.
+     */
+    costoActual: z
+      .number()
+      .nullable()
+      .describe('Costo unitario del último costeo del modelo (F7), o null.'),
     activo: z.boolean().describe('Falso si está descontinuado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

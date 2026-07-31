@@ -16,7 +16,6 @@ import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -32,15 +31,13 @@ import { useSesion } from '@/sesion/useSesion';
  * la toma el backend en cada ruta (A1).
  */
 
-/** Un sub-catalogo ya construido (CRUD real), con la ruta, el icono, su tono y permiso. */
+/** Un sub-catalogo ya construido (CRUD real), con la ruta, el icono y su permiso. */
 interface SubcatalogoListo {
   clave: string;
   titulo: string;
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  /** Tono explicativo del icono. */
-  tono: Tono;
   /** Permiso `.ver` que hace visible el catalogo. */
   permiso: ClavePermiso;
 }
@@ -60,7 +57,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Catálogo de almacenes del kardex único (PT, telas y avíos).',
     ruta: '/catalogos/almacenes',
     icono: Warehouse,
-    tono: 'pt',
     permiso: 'almacenes.ver',
   },
   {
@@ -69,7 +65,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Proveedores de telas, avíos y servicios.',
     ruta: '/catalogos/proveedores',
     icono: Truck,
-    tono: 'avios',
     permiso: 'proveedores.ver',
   },
   {
@@ -78,7 +73,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Ciclos comerciales del año.',
     ruta: '/catalogos/temporadas',
     icono: CalendarRange,
-    tono: 'neutro',
     permiso: 'temporadas.ver',
   },
   {
@@ -87,7 +81,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Etiquetas de marca y su porcentaje de regalías.',
     ruta: '/catalogos/etiquetas-marca',
     icono: Tags,
-    tono: 'telas',
     permiso: 'etiquetas-marca.ver',
   },
   {
@@ -96,7 +89,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Catálogo de colores.',
     ruta: '/catalogos/colores',
     icono: Palette,
-    tono: 'servicios',
     permiso: 'colores.ver',
   },
   // ── Catálogos estructurados (F1-E2) ──────────────────────────────────────────
@@ -108,7 +100,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Tallas y curvas de tallas (ilimitadas, D4).',
     ruta: '/catalogos/tallas',
     icono: Ruler,
-    tono: 'neutro',
     permiso: 'tallas.ver',
   },
   {
@@ -117,7 +108,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Clientes y sus campos de referencia (D7).',
     ruta: '/catalogos/clientes',
     icono: Contact,
-    tono: 'avios',
     permiso: 'clientes.ver',
   },
   // ── Catálogos de materiales (F1-E3) ──────────────────────────────────────────
@@ -127,34 +117,30 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     descripcion: 'Catálogo unificado de telas (BOM e inventario) con sus colores.',
     ruta: '/catalogos/telas',
     icono: Layers,
-    tono: 'telas',
     permiso: 'telas.ver',
   },
   {
     clave: 'avios',
     titulo: 'Avíos',
-    descripcion: 'Habilitación: hilos, botones, etiquetas… con sus proveedores y precios.',
+    descripcion: 'Avíos: hilos, botones, etiquetas… con sus proveedores y precios.',
     ruta: '/catalogos/avios',
     icono: Boxes,
-    tono: 'avios',
     permiso: 'avios.ver',
   },
   {
     clave: 'bordados',
-    titulo: 'Bordados y estampados',
-    descripcion: 'Catálogo de bordados y estampados con su foto.',
+    titulo: 'Arte',
+    descripcion: 'Catálogo de arte (bordado y estampado) con su foto.',
     ruta: '/catalogos/bordados',
     icono: Stamp,
-    tono: 'servicios',
     permiso: 'bordados.ver',
   },
   {
     clave: 'galeria-bordados',
-    titulo: 'Galería de bordados',
-    descripcion: 'Vista visual de los bordados y estampados con foto.',
+    titulo: 'Galería de arte',
+    descripcion: 'Vista visual del arte (bordado y estampado) con foto.',
     ruta: '/catalogos/galeria-bordados',
     icono: Images,
-    tono: 'pt',
     permiso: 'bordados.ver',
   },
 ];
@@ -170,8 +156,8 @@ export function CatalogosPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Catálogos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Catálogos</h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
           Datos maestros del sistema. Elige un catálogo para administrarlo.
         </p>
 
@@ -187,7 +173,7 @@ export function CatalogosPagina(): React.JSX.Element {
                 aria-hidden
                 className={cn(
                   'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                  avatarPorTono(sub.tono),
+                  'bg-primary-soft text-primary-soft-foreground',
                 )}
               >
                 <sub.icono className="size-5" aria-hidden />

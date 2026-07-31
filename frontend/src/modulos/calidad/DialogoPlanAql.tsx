@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -155,11 +161,15 @@ export function DialogoPlanAql({
 
           <div className="max-h-[65vh] overflow-y-auto py-4 pr-1">
             <FieldGroup>
+              <LeyendaObligatorios />
               <Field data-invalid={Boolean(errors.nombre)}>
-                <FieldLabel htmlFor="plan-nombre">Nombre</FieldLabel>
+                <FieldLabel htmlFor="plan-nombre" required>
+                  Nombre
+                </FieldLabel>
                 <Input
                   id="plan-nombre"
                   autoFocus
+                  placeholder="Ej. Plan AQL general"
                   aria-invalid={Boolean(errors.nombre)}
                   disabled={guardando}
                   {...formulario.register('nombre')}
@@ -171,7 +181,13 @@ export function DialogoPlanAql({
             {/* Renglones */}
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Renglones del plan</p>
+                <div>
+                  <p className="text-sm font-medium">Renglones del plan</p>
+                  <p className="text-sm text-muted-foreground">
+                    Cada renglón es un rango de tamaño de lote con su muestra y sus límites Ac/Re.
+                    Agrega al menos uno.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -372,7 +388,12 @@ export function DialogoPlanAql({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-plan-aql">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-plan-aql"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear plan'}
             </Button>

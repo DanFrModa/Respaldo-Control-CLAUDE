@@ -32,9 +32,14 @@ vi.mock('@/api/ordenes', () => ({
   }),
 }));
 
+// Configurables: se re-programan por test para probar el gate `enabled` y el aviso de error.
+const useProveedoresMock =
+  vi.fn<(query: unknown, opciones?: { enabled?: boolean }) => Record<string, unknown>>();
+const useRolesProveedorMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 7, nombre: 'Corte SA' }] } }),
-  useRolesProveedor: () => ({ data: [{ id: 9, codigo: 'corte', nombre: 'Corte' }] }),
+  useProveedores: (query: unknown, opciones?: { enabled?: boolean }) =>
+    useProveedoresMock(query, opciones),
+  useRolesProveedor: () => useRolesProveedorMock(),
 }));
 
 // ── Datos de prueba ──────────────────────────────────────────────────────────
@@ -63,7 +68,15 @@ const orden: Orden = {
   obsMaquila: null,
   noCostear: false,
   fechaCompletada: '2026-06-18T00:00:00.000Z',
+  requisitos: {
+    tallas: true,
+    avios: true,
+    arte: 'no-aplica' as const,
+    completa: true,
+    faltantes: [],
+  },
   motivoCancelada: null,
+  ocCliente: null,
   tallasV1: null,
   maquilaOrd: null,
   aplicacionOrd: null,
@@ -76,6 +89,7 @@ const orden: Orden = {
       id: 1,
       idColor: 3,
       color: 'Rojo',
+      pantone: null,
       tallas: [{ idTalla: 4, etiquetaTalla: 'CH', cantidad: 10 }],
       totalPiezas: 10,
     },
@@ -102,14 +116,51 @@ const pendientes: PendientesOrden = {
 const sesion = () =>
   estadoSesionDePrueba(['produccion.corte', 'produccion.wip-ver', 'produccion.cancelar']);
 
-/** Selecciona la orden de prueba (clic en la opción del selector). */
+/** Selecciona la orden de prueba (abre el popover del selector y clic en la opción). */
 async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await usuario.click(screen.getByTestId('selector-orden-busqueda'));
   await usuario.click(screen.getByTestId('selector-orden-opcion'));
 }
 
 describe('CapturaCortePagina (F3-E2)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    useProveedoresMock.mockReset();
+    useRolesProveedorMock.mockReset();
+    useProveedoresMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Corte SA' }] },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useRolesProveedorMock.mockReturnValue({
+      data: [{ id: 9, codigo: 'corte', nombre: 'Corte' }],
+      isError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('NO consulta cortadores sin rol resuelto (enabled=false, nunca lista sin filtro)', () => {
+    // Roles aún sin resolver → idRolCorte undefined → la query de cortadores va deshabilitada.
+    useRolesProveedorMock.mockReturnValue({ data: undefined, isError: false, refetch: vi.fn() });
+    renderConProveedores(<CapturaCortePagina />, { sesion: sesion() });
+
+    const ultima = useProveedoresMock.mock.calls.at(-1);
+    expect(ultima?.[1]).toEqual({ enabled: false });
+  });
+
+  it('consulta cortadores con enabled=true una vez resuelto el rol "corte"', () => {
+    renderConProveedores(<CapturaCortePagina />, { sesion: sesion() });
+
+    const ultima = useProveedoresMock.mock.calls.at(-1);
+    expect(ultima?.[1]).toEqual({ enabled: true });
+  });
+
+  it('avisa (reintentable) si falla el catálogo de cortadores', () => {
+    useProveedoresMock.mockReturnValue({ data: undefined, isError: true, refetch: vi.fn() });
+    renderConProveedores(<CapturaCortePagina />, { sesion: sesion() });
+
+    expect(screen.getByTestId('corte-error-catalogo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
   });
 
   it('el botón guardar arranca DESHABILITADO (sin cortador ni cantidades)', async () => {

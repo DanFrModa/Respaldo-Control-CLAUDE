@@ -1,39 +1,29 @@
-import type { EstatusNotaSalida, NotaSalidaLinea } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import type { EstatusNotaSalida, NotaSalida, NotaSalidaLinea } from '@/api/tipos';
+import type { TonoEstado } from '@/components/dominio/ChipEstado';
 
 /**
- * Piezas compartidas del módulo NOTAS DE SALIDA (F4-E5): el badge de estatus y los helpers de
- * presentación que reusan el listado, la captura y las consultas. SOLO presentación (A1): el estatus
- * lo controla el backend (borrador → confirmada / cancelada); aquí únicamente se pinta.
+ * Piezas compartidas del módulo NOTAS DE SALIDA (F4-E5, re-vestidas R9): el tono del chip de
+ * estatus y los helpers de presentación que reusan el listado, la captura y las consultas. SOLO
+ * presentación (A1): el estatus lo controla el backend (borrador → confirmada / cancelada); aquí
+ * únicamente se pinta.
  */
 
-/** Etiqueta legible (es) de cada estatus de nota de salida. */
-export const ETIQUETA_ESTATUS_NOTA: Record<EstatusNotaSalida, string> = {
-  borrador: 'Borrador',
-  confirmada: 'Confirmada',
-  cancelada: 'Cancelada',
+/** Tono del `ChipEstado` por estatus (proto `notaBadge`; lo comparten listado y consultas R9). */
+export const TONO_ESTATUS_NOTA: Record<EstatusNotaSalida, { tono: TonoEstado; texto: string }> = {
+  borrador: { tono: 'warn', texto: 'Borrador' },
+  confirmada: { tono: 'ok', texto: 'Confirmada' },
+  cancelada: { tono: 'crit', texto: 'Cancelada' },
 };
 
-/** Variante del badge por estatus (cancelada = destructiva; confirmada = sólida). */
-function varianteEstatus(
-  estatus: EstatusNotaSalida,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (estatus === 'cancelada') {
-    return 'destructive';
+/** Folios ÚNICOS de las órdenes surtidas por una nota (derivación de la propia fila, proto `notaOrdenes`). */
+export function ordenesDeNota(nota: NotaSalida): number[] {
+  const folios = new Set<number>();
+  for (const linea of nota.lineas) {
+    if (linea.folioOrden !== null) {
+      folios.add(linea.folioOrden);
+    }
   }
-  if (estatus === 'confirmada') {
-    return 'default';
-  }
-  return 'secondary';
-}
-
-/** Badge del estatus de una nota de salida. */
-export function EstatusNotaBadge({ estatus }: { estatus: EstatusNotaSalida }): React.JSX.Element {
-  return (
-    <Badge variant={varianteEstatus(estatus)} data-testid="estatus-nota">
-      {ETIQUETA_ESTATUS_NOTA[estatus]}
-    </Badge>
-  );
+  return [...folios];
 }
 
 /** Formatea una fecha date-only `YYYY-MM-DD` como "20 jun 2026" sin desfase de zona. */

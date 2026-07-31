@@ -26,7 +26,7 @@ import { DialogoPlantillaRc } from './DialogoPlantillaRc';
 
 /**
  * Pantalla de PLANTILLAS DE RUTA (Módulo 8, F5-E2) — CRUD del catálogo de plantillas sobre el motor
- * LISTA + DETALLE (estándar teal). El detalle muestra los procesos de la plantilla con su tiempo
+ * LISTA + DETALLE (estándar visual). El detalle muestra los procesos de la plantilla con su tiempo
  * estándar y su encadenamiento PROPIO; la edición (incluida la familia/artículo y el set de
  * procesos) va en el diálogo. El rechazo de ciclos lo hace el backend (mensaje en vivo).
  *

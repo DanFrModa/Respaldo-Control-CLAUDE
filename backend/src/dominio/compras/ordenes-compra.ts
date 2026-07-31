@@ -39,6 +39,7 @@ import type {
   DatosCompraLineaEntrada,
   CompraSalida,
   CompraLineaSalida,
+  ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
   OrdenCompra,
@@ -46,9 +47,17 @@ import type {
   OrdenCompraLineaTalla,
   Prisma,
 } from '../../datos/index.js';
+import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_RC_ORDEN,
+  registrarEventoOutbox,
+  type EventoRcOrden,
+} from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -464,6 +473,33 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
   return valor;
 }
 
+/**
+ * Emite `oc-tela-resuelta` (post-F9, cierre del hueco de emisores) para CADA orden de producción
+ * ligada a una línea de TELA de esta OC — dentro de la MISMA tx del hecho (A2). El auto-avance de la
+ * RC re-evalúa el proceso `compraTela` de esas órdenes: relee el estado físico (¿hay una OC de tela
+ * VIVA autorizada/recibida ligada a la orden?) y auto-completa o des-completa (idempotente). Se llama
+ * al AUTORIZAR y al CANCELAR una OC; el consumidor decide el efecto según el estado actual.
+ */
+async function emitirOcTelaResuelta(tx: Tx, idEmpresa: number, idOC: number): Promise<void> {
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: { idOrdenCompra: idOC, idTela: { not: null }, idOrden: { not: null } },
+    select: { idOrden: true },
+  });
+  const idsOrden = [
+    ...new Set(lineas.map((l) => l.idOrden).filter((x): x is number => x !== null)),
+  ];
+  for (const idOrden of idsOrden) {
+    const payload: EventoRcOrden = { idEmpresa, idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.ocTelaResuelta,
+      VERSION_EVENTO_RC_ORDEN,
+      idEmpresa,
+      payload,
+    );
+  }
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
@@ -628,13 +664,13 @@ export async function autorizarOC(
       accion: 'OTRO',
       datos: { autorizada: true, numCompra: Number(actual.numCompra) },
     });
-    // F5-E6: NO se emite evento de auto-avance al autorizar una OC. El catálogo de procesos de la RC
-    // no tiene un `tipoEvento` para "autorización de OC": el único `autorizacionArte` es de ARTE, no
-    // de OC (ver seed-ruta-critica). El gancho de compras con la RC es `recepcionTela` (al RECIBIR el
-    // material, en recepciones.ts), no al autorizar la compra. Si algún día existe un proceso RC
-    // ligado a la autorización de OC, se añade aquí el `registrarEventoOutbox` correspondiente.
+    // OUTBOX (post-F9): la autorización de la OC de tela completa el proceso RC `compraTela` de las
+    // órdenes ligadas. (El otro gancho de compras con la RC es `recepcionTela` al RECIBIR el material,
+    // en recepciones.ts.) El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 
@@ -697,8 +733,12 @@ export async function cancelarOC(
       accion: 'CANCELAR',
       datos: { numCompra: Number(actual.numCompra), motivo: datos.motivo },
     });
+    // OUTBOX (post-F9): al cancelar la OC, la RC re-evalúa `compraTela` de las órdenes ligadas (si ya
+    // no queda una OC de tela viva autorizada para la orden, el proceso se des-completa — decisión (f)).
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 
@@ -839,6 +879,90 @@ export async function listarOC(
 
   const salida = datos.map((o) => aCompraSalida(o as OCConDetalle));
   return armarPagina(salida, total, filtros);
+}
+
+/** Estatus "abiertos" (con material pendiente de recibir) para el resumen de cabecera. */
+const ESTATUS_ABIERTOS: readonly EstatusOrdenCompra[] = [
+  EstatusOrdenCompra.autorizada,
+  EstatusOrdenCompra.recibida_parcial,
+];
+
+/**
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
+ * del listado que ACOTAN el universo de OC abiertas (proveedor/fecha/búsqueda/orden ligada); el
+ * estatus NO entra (el resumen SIEMPRE mira las abiertas).
+ */
+const esquemaResumenOCDominio = z.object({
+  busqueda: z.string().trim().max(200).optional(),
+  idProveedor: z.number().int().positive().optional(),
+  fechaDesde: z.iso.date().optional(),
+  fechaHasta: z.iso.date().optional(),
+  idOrden: z.number().int().positive().optional(),
+});
+
+/** Parámetros del resumen (los reutiliza la ruta REST). */
+export type ParametrosResumenOC = z.input<typeof esquemaResumenOCDominio>;
+
+/**
+ * Resumen de cabecera de OC (KPIs `vCompras`, R9): # OC ABIERTAS (autorizada + recibida_parcial) que
+ * cumplen el filtro, e importe TODAVÍA por recibir. Este último = Σ, sobre las líneas de esas OC, de
+ * `max(0, cantidad − recibido) × precio`, donde `recibido` es la Σ de lo recibido por línea en
+ * recepciones ACTIVAS (reversadaEn = null) — EXACTAMENTE el criterio de `recalcularEstatusOC`
+ * (`recepciones.ts`), no una derivación distinta. El pendiente por línea nunca es negativo (una
+ * línea sobre-recibida aporta 0). Permiso `compras.ver` (A4); todo acotado por empresa activa (A9).
+ */
+export async function resumenOC(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenOC = {},
+  bd?: ContextoBd,
+): Promise<ResumenCompras> {
+  verificarPermiso(sesion, 'compras.ver');
+  const filtros = validarEntrada(esquemaResumenOCDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  const where: Prisma.OrdenCompraWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    estatus: { in: [...ESTATUS_ABIERTOS] },
+    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
+    ...(filtros.idOrden === undefined
+      ? {}
+      : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
+    ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
+    ...armarBusqueda(filtros.busqueda),
+  };
+
+  const abiertas = await cliente.ordenCompra.findMany({
+    where,
+    select: { id: true, lineas: { select: { id: true, cantidad: true, precio: true } } },
+  });
+  const ocAbiertas = abiertas.length;
+  if (ocAbiertas === 0) {
+    return { ocAbiertas: 0, porRecibir: 0 };
+  }
+
+  // Σ recibido por línea de OC en recepciones ACTIVAS (reversadaEn = null): MISMO criterio que
+  // `recalcularEstatusOC`. Un solo groupBy para todas las líneas de las OC abiertas.
+  const idsLinea = abiertas.flatMap((oc) => oc.lineas.map((l) => l.id));
+  const recibidoPorLinea = new Map<number, number>();
+  if (idsLinea.length > 0) {
+    const sumas = await cliente.recepcionCompraLinea.groupBy({
+      by: ['idOrdenCompraLinea'],
+      where: { idOrdenCompraLinea: { in: idsLinea }, recepcionCompra: { reversadaEn: null } },
+      _sum: { cantidadRecibida: true },
+    });
+    for (const s of sumas) {
+      recibidoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0));
+    }
+  }
+
+  let porRecibir = 0;
+  for (const oc of abiertas) {
+    for (const l of oc.lineas) {
+      const pendiente = Math.max(0, l.cantidad.toNumber() - (recibidoPorLinea.get(l.id) ?? 0));
+      porRecibir += pendiente * l.precio.toNumber();
+    }
+  }
+  return { ocAbiertas, porRecibir: redondear2(porRecibir) };
 }
 
 /** Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR. */

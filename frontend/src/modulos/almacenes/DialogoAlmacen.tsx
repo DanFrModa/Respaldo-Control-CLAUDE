@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -102,11 +109,15 @@ export function DialogoAlmacen({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="almacen-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="almacen-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="almacen-nombre"
                 autoFocus
+                placeholder="Ej. Bodega PT Central"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={guardando}
                 {...formulario.register('nombre')}
@@ -128,6 +139,9 @@ export function DialogoAlmacen({
                   </option>
                 ))}
               </SelectNativo>
+              <FieldDescription>
+                Qué guarda: PT = producto terminado · Telas · Avíos.
+              </FieldDescription>
               <FieldError errors={[errors.tipo]} />
             </Field>
           </FieldGroup>
@@ -141,7 +155,12 @@ export function DialogoAlmacen({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-almacen">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-almacen"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear almacén'}
             </Button>

@@ -1,30 +1,26 @@
-import { Loader2Icon, MinusCircle, PlusCircle } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { useAbonosMaquilero, useCrearMovimientoEsMa, useDescuentosMaquilero } from '@/api/esma';
 import {
-  useAbonosMaquilero,
-  useCrearMovimientoEsMa,
-  useDescuentosMaquilero,
-  useMaquilerosEsMa,
-} from '@/api/esma';
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
+import { ComboboxMaquilero } from './SelectorMaquilero';
 import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
@@ -48,7 +44,6 @@ export function CapturaMovimientoPagina({
 
   const esAbono = concepto === 'abonos';
   const etiqueta = esAbono ? 'abono' : 'descuento';
-  const Icono = esAbono ? PlusCircle : MinusCircle;
 
   // "Duplicar partida" (F6-E5): valores iniciales por router state (pre-llenan el formulario).
   const inicial = (location.state ?? null) as PartidaInicial | null;
@@ -59,8 +54,6 @@ export function CapturaMovimientoPagina({
   const [fecha, setFecha] = useState(hoyISO());
   const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
   const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
-
-  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
   // Las listas de cuenta solo se piden si el usuario puede leerlas (`esma.ver-pagos`).
@@ -102,14 +95,16 @@ export function CapturaMovimientoPagina({
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid={`captura-${concepto}`}>
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid={`captura-${concepto}`}
+    >
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Icono className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">{esAbono ? 'Abonos' : 'Descuentos'}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            {esAbono ? 'Abonos' : 'Descuentos'}
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Captura un {etiqueta} a la cuenta corriente de un maquilero.
           </p>
         </div>
@@ -124,19 +119,11 @@ export function CapturaMovimientoPagina({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="mov-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="mov-maquilero"
-                value={idMaquilero}
-                onChange={(e) => setIdMaquilero(e.target.value)}
-                data-testid="mov-maquilero"
-              >
-                <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.filas ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              <ComboboxMaquilero
+                idMaquilero={idMaquilero}
+                onCambioMaquilero={setIdMaquilero}
+                testid="mov-maquilero"
+              />
             </Field>
             <Field data-invalid={monto !== '' && montoInvalido}>
               <FieldLabel htmlFor="mov-monto">Importe</FieldLabel>
@@ -217,30 +204,28 @@ export function CapturaMovimientoPagina({
                 <p className="text-sm text-muted-foreground">Sin movimientos.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Facturación</TableHead>
-                        <TableHead>Observaciones</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <TablaDensa>
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Fecha</TablaDensaHead>
+                        <TablaDensaHead>Facturación</TablaDensaHead>
+                        <TablaDensaHead>Observaciones</TablaDensaHead>
+                        <TablaDensaHead numerica>Importe</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
                       {(lista.data?.filas ?? []).map((m) => (
-                        <TableRow key={m.id} data-testid="mov-fila">
-                          <TableCell>{m.fecha}</TableCell>
-                          <TableCell>
+                        <TablaDensaFila key={m.id} data-testid="mov-fila">
+                          <TablaDensaCelda>{m.fecha}</TablaDensaCelda>
+                          <TablaDensaCelda>
                             {m.conFactura === null ? '—' : m.conFactura ? 'Con' : 'Sin'}
-                          </TableCell>
-                          <TableCell>{m.observaciones ?? '—'}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {moneda(m.monto)}
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>{m.observaciones ?? '—'}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(m.monto)}</TablaDensaCelda>
+                        </TablaDensaFila>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
                 </div>
               )}
             </CardContent>

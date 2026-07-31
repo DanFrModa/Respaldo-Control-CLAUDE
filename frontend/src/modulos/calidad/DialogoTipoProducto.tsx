@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -89,11 +95,15 @@ export function DialogoTipoProducto({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="tipo-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="tipo-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="tipo-nombre"
                 autoFocus
+                placeholder="Ej. Playera"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={guardando}
                 {...formulario.register('nombre')}
@@ -111,7 +121,12 @@ export function DialogoTipoProducto({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-tipo-producto">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-tipo-producto"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear tipo'}
             </Button>

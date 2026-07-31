@@ -119,6 +119,38 @@ export const esquemaAlmacenFormulario = z.object({
 /** Datos del formulario de almacen. */
 export type DatosAlmacenFormulario = z.infer<typeof esquemaAlmacenFormulario>;
 
+// ── Auditores (espejo de `esquemaAuditorCrear`/`Editar` del backend) ──────────
+
+/** Roles de auditor (proto `CAT_AUDITORES`: badge Auditor / Sr. Auditor). */
+export const ROLES_AUDITOR = ['Auditor', 'Sr. Auditor'] as const;
+
+/** Clave de rol de auditor. */
+export type RolAuditorClave = (typeof ROLES_AUDITOR)[number];
+
+/** Niveles AQL de certificación de un auditor (texto: 1.0 / 1.5 / 2.5 / 4.0). */
+export const NIVELES_AQL_AUDITOR = ['1.0', '1.5', '2.5', '4.0'] as const;
+
+/** Clave de nivel AQL de auditor. */
+export type NivelAqlAuditorClave = (typeof NIVELES_AQL_AUDITOR)[number];
+
+/**
+ * Captura del formulario de auditor (alta y edicion comparten forma). El backend
+ * distingue alta (POST) de edicion (PATCH); en el formulario el `rol` y el `nivelAql`
+ * siempre se eligen y el `nombre` siempre se captura, asi que los tres son obligatorios.
+ */
+export const esquemaAuditorFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(120, { error: 'El nombre no puede tener más de 120 caracteres' }),
+  rol: z.enum(ROLES_AUDITOR, { error: 'El rol debe ser Auditor o Sr. Auditor' }),
+  nivelAql: z.enum(NIVELES_AQL_AUDITOR, { error: 'El nivel AQL debe ser 1.0, 1.5, 2.5 o 4.0' }),
+});
+
+/** Datos del formulario de auditor. */
+export type DatosAuditorFormulario = z.infer<typeof esquemaAuditorFormulario>;
+
 // ── Proveedores (espejo de `esquemaProveedorCrear`/`Editar` del backend) ──────
 
 /** Tipos de proveedor (clasificacion de negocio). */
@@ -528,9 +560,9 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social e identificador (RFC) son opcionales. Las
+ * `nombre` es obligatorio; razon social, RFC e identificador son opcionales. Las
  * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
- * schema de texto.
+ * schema de texto. El RFC (F9-E3) valida su forma en el backend (A1); aquí solo el largo.
  */
 export const esquemaEmpresaFormulario = z.object({
   nombre: z
@@ -542,6 +574,11 @@ export const esquemaEmpresaFormulario = z.object({
     .string()
     .trim()
     .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
   identificador: z
     .string()
     .trim()
@@ -574,6 +611,16 @@ export const esquemaConfiguracionEmpresa = z.object({
     mensajeNoNumero: 'El colchón de costura debe ser un número',
     mensajeMin: 'El colchón de costura no puede ser negativo',
   }).describe('Colchón de costura (vacío = sin valor).'),
+  agingLimite1: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El primer límite de antigüedad debe ser un número',
+    mensajeMin: 'El primer límite debe ser de al menos 1 día',
+  }).describe('Fin de la 1ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
+  agingLimite2: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El segundo límite de antigüedad debe ser un número',
+    mensajeMin: 'El segundo límite debe ser de al menos 1 día',
+  }).describe('Fin de la 2ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),
   idAlmacenPtDefault: numeroOpcional({
@@ -625,7 +672,7 @@ export type CondicionAplicabilidadClave = (typeof CONDICIONES_APLICABILIDAD)[num
 /** Etiquetas para UI de cada condición. */
 export const ETIQUETAS_CONDICION_APLICABILIDAD: Record<CondicionAplicabilidadClave, string> = {
   ninguna: 'Siempre aplica',
-  soloSiLlevaAplicacion: 'Solo si la orden lleva aplicación/estampado',
+  soloSiLlevaAplicacion: 'Solo si la orden lleva arte (aplicación/estampado)',
 };
 
 /** Tipos de evento de proceso (espejo del backend). */
@@ -640,6 +687,15 @@ export const TIPOS_EVENTO_PROCESO = [
   'autorizacionArte',
   'entregaCliente',
   'manual',
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  'revisionOp',
+  'autorizacionFit',
+  'autorizacionTono',
+  'autorizacionAvios',
+  'compraTela',
+  'surtidoAvios',
+  'auditoriaCorte',
+  'empaque',
 ] as const;
 /** Clave de tipo de evento. */
 export type TipoEventoProcesoClave = (typeof TIPOS_EVENTO_PROCESO)[number];
@@ -649,12 +705,20 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   corte: 'Corte',
   envioCostura: 'Envío a costura',
   reciboCostura: 'Recibo de costura',
-  envioEstampado: 'Envío a estampado',
-  reciboEstampado: 'Recibo de estampado',
+  envioEstampado: 'Envío a arte',
+  reciboEstampado: 'Recibo de arte',
   auditoria: 'Auditoría de calidad',
   autorizacionArte: 'Autorización de arte',
   entregaCliente: 'Entrega a cliente',
   manual: 'Manual (sin evento del sistema)',
+  revisionOp: 'Revisión de la orden',
+  autorizacionFit: 'Autorización de fit',
+  autorizacionTono: 'Autorización de tono de tela',
+  autorizacionAvios: 'Autorización de avíos',
+  compraTela: 'Orden de compra de tela',
+  surtidoAvios: 'Surtido de avíos',
+  auditoriaCorte: 'Auditoría de corte',
+  empaque: 'Empaque',
 };
 
 /** Tipos de duración de proceso (espejo del backend). */
@@ -663,6 +727,7 @@ export const TIPOS_DURACION_PROCESO = [
   'porCantidad',
   'porTipoTela',
   'porAplicacion',
+  'porDificultad',
 ] as const;
 /** Clave de tipo de duración. */
 export type TipoDuracionProcesoClave = (typeof TIPOS_DURACION_PROCESO)[number];
@@ -672,6 +737,7 @@ export const ETIQUETAS_TIPO_DURACION_PROCESO: Record<TipoDuracionProcesoClave, s
   porCantidad: 'Escala con la cantidad de piezas',
   porTipoTela: 'Según el tipo de tela',
   porAplicacion: 'Según la aplicación',
+  porDificultad: 'Por dificultad (# de operaciones del modelo)',
 };
 
 /**
@@ -735,8 +801,8 @@ export const ETIQUETAS_RESULTADO_AUDITORIA: Record<ResultadoAuditoriaClave, stri
   no_calificado: 'Sin calificar',
 };
 
-/** Tipos de auditoría (en piso / final / sin definir). */
-export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida'] as const;
+/** Tipos de auditoría (en piso / final / de corte / sin definir). */
+export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida', 'corte'] as const;
 /** Clave de tipo de auditoría. */
 export type TipoAuditoriaClave = (typeof TIPOS_AUDITORIA)[number];
 /** Etiquetas para UI de cada tipo. */
@@ -744,6 +810,7 @@ export const ETIQUETAS_TIPO_AUDITORIA: Record<TipoAuditoriaClave, string> = {
   en_piso: 'En piso',
   final: 'Final',
   no_definida: 'Sin definir',
+  corte: 'De corte',
 };
 
 /** Etiquetas de la accion de bitacora (espejo del backend, A7). */

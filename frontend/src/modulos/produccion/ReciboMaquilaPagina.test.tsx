@@ -38,30 +38,38 @@ vi.mock('@/api/ordenes', () => ({
   }),
 }));
 
+// Configurable: se re-programa por test para probar el aviso de error de catálogo.
+const useTiposProcesoMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/tipos-proceso', () => ({
-  useTiposProceso: () => ({
-    data: {
-      datos: [
-        {
-          id: 6,
-          codigo: 'estampado',
-          nombre: 'Estampado',
-          generaEntradaPt: false,
-          activo: true,
-          creadoEn: '',
-          creadoPorId: null,
-          modificadoEn: '',
-          modificadoPorId: null,
-        },
-      ],
-    },
-    isPending: false,
-    isError: false,
-  }),
+  useTiposProceso: () => useTiposProcesoMock(),
 }));
 
+const PROCESOS_OK = {
+  data: {
+    datos: [
+      {
+        id: 6,
+        codigo: 'estampado',
+        nombre: 'Estampado',
+        generaEntradaPt: false,
+        activo: true,
+        creadoEn: '',
+        creadoPorId: null,
+        modificadoEn: '',
+        modificadoPorId: null,
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  refetch: vi.fn(),
+};
+
+// El catálogo de proveedores se mockea con un tercero SIN entrega en la orden: si la pantalla
+// volviera a listar el catálogo (en vez del pendiente de la orden), aparecería y las pruebas de
+// abajo lo cazarían.
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 30, nombre: 'Estampados SA' }] } }),
+  useProveedores: () => ({ data: { datos: [{ id: 77, nombre: 'Maquila Fantasma SA' }] } }),
   useRolesProveedor: () => ({
     data: [{ id: 12, codigo: 'estampado', nombre: 'Estampado' }],
   }),
@@ -97,7 +105,15 @@ const orden: Orden = {
   obsMaquila: null,
   noCostear: false,
   fechaCompletada: '2026-06-18T00:00:00.000Z',
+  requisitos: {
+    tallas: true,
+    avios: true,
+    arte: 'no-aplica' as const,
+    completa: true,
+    faltantes: [],
+  },
   motivoCancelada: null,
+  ocCliente: null,
   tallasV1: null,
   maquilaOrd: null,
   aplicacionOrd: null,
@@ -110,6 +126,7 @@ const orden: Orden = {
       id: 1,
       idColor: 3,
       color: 'Rojo',
+      pantone: null,
       tallas: [{ idTalla: 4, etiquetaTalla: 'CH', cantidad: 10 }],
       totalPiezas: 10,
     },
@@ -133,8 +150,24 @@ const pendientes: PendientesRecibir = {
       tipoProceso: 'Estampado',
       codigoProceso: 'estampado',
       generaEntradaPt: false,
-      celdas: [{ idColor: 3, color: 'Rojo', idTalla: 4, etiquetaTalla: 'CH', cantidad: 5 }],
-      totalPendiente: 5,
+      // Pendiente del PROCESO: 7 (5 de uno + 2 del otro). Los dos niveles NO pueden coincidir, o
+      // topar contra el proceso y topar contra el maquilero serían indistinguibles.
+      celdas: [{ idColor: 3, color: 'Rojo', idTalla: 4, etiquetaTalla: 'CH', cantidad: 7 }],
+      totalPendiente: 7,
+      porMaquilero: [
+        {
+          idMaquilero: 30,
+          maquilero: 'Estampados SA',
+          celdas: [{ idColor: 3, color: 'Rojo', idTalla: 4, etiquetaTalla: 'CH', cantidad: 5 }],
+          totalPendiente: 5,
+        },
+        {
+          idMaquilero: 31,
+          maquilero: 'Otro Estampado SA',
+          celdas: [{ idColor: 3, color: 'Rojo', idTalla: 4, etiquetaTalla: 'CH', cantidad: 2 }],
+          totalPendiente: 2,
+        },
+      ],
     },
   ],
 };
@@ -143,12 +176,29 @@ const sesion = () =>
   estadoSesionDePrueba(['produccion.recibo', 'produccion.wip-ver', 'produccion.cancelar']);
 
 async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  // El selector es un combobox popover: se abre (foco) y se elige la opción.
+  await usuario.click(screen.getByTestId('recibo-selector-orden-busqueda'));
   await usuario.click(screen.getByTestId('recibo-selector-orden-opcion'));
 }
 
 describe('ReciboMaquilaPagina (F3-E4)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    useTiposProcesoMock.mockReset();
+    useTiposProcesoMock.mockReturnValue(PROCESOS_OK);
+  });
+
+  it('avisa (reintentable) si falla un catálogo de la captura', () => {
+    useTiposProcesoMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch: vi.fn(),
+    });
+    renderConProveedores(<ReciboMaquilaPagina />, { sesion: sesion() });
+
+    expect(screen.getByTestId('recibo-error-catalogo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
   });
 
   it('no deja exceder lo enviado: avisa y deshabilita guardar', async () => {
@@ -199,5 +249,45 @@ describe('ReciboMaquilaPagina (F3-E4)', () => {
       idMaquilero: 30,
       lineas: [{ idColor: 3, tallas: [{ idTalla: 4, cantidad: 5 }] }],
     });
+  });
+
+  // Regla de Daniel (28-jul-2026): solo se le recibe a quien se le entregó, y solo LO SUYO.
+  it('ofrece SOLO a los maquileros con entrega viva (no al catálogo)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ReciboMaquilaPagina />, { sesion: sesion() });
+    await elegirOrden(usuario);
+    await usuario.selectOptions(screen.getByTestId('recibo-proceso'), '6');
+
+    const opciones = [...screen.getByTestId('recibo-maquilero').querySelectorAll('option')].map(
+      (o) => o.textContent,
+    );
+    // Los dos que tienen entrega, con SUS piezas…
+    expect(opciones.some((t) => t?.includes('Estampados SA') && t.includes('5'))).toBe(true);
+    expect(opciones.some((t) => t?.includes('Otro Estampado SA') && t.includes('2'))).toBe(true);
+    // …y NADIE del catálogo general.
+    expect(opciones.some((t) => t?.includes('Maquila Fantasma'))).toBe(false);
+  });
+
+  it('topa la matriz contra el pendiente de ESE maquilero, no del proceso', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ReciboMaquilaPagina />, { sesion: sesion() });
+    await elegirOrden(usuario);
+    await usuario.selectOptions(screen.getByTestId('recibo-proceso'), '6');
+    // El segundo maquilero solo tiene 2 (el proceso entero tiene 7).
+    await usuario.selectOptions(screen.getByTestId('recibo-maquilero'), '31');
+
+    const celda = screen.getByTestId('recibo-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '5');
+
+    // 5 cabría en el pendiente del PROCESO (7) pero NO en el de este maquilero (2).
+    expect(screen.getByTestId('recibo-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('recibo-guardar')).toBeDisabled();
+
+    // Lo suyo (2) sí pasa.
+    await usuario.clear(celda);
+    await usuario.type(celda, '2');
+    expect(screen.queryByTestId('recibo-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('recibo-guardar')).toBeEnabled();
   });
 });

@@ -81,7 +81,7 @@ describe('<DialogoTela>', () => {
 
     const dialogo = screen.getByRole('dialog');
     expect(within(dialogo).getByRole('heading', { name: 'Nueva tela' })).toBeInTheDocument();
-    expect(within(dialogo).getByLabelText('Nombre')).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText(/^Nombre/)).toBeInTheDocument();
     expect(within(dialogo).getByTestId('tela-categoria')).toBeInTheDocument();
     expect(screen.getByTestId('editor-colores-mock')).toBeInTheDocument();
   });
@@ -98,7 +98,7 @@ describe('<DialogoTela>', () => {
       <DialogoTela abierto alCambiarAbierto={alCambiarAbierto} tela={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Jersey nuevo');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Jersey nuevo');
     await usuario.click(screen.getByTestId('guardar-tela'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -125,7 +125,7 @@ describe('<DialogoTela>', () => {
     );
     renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Con categoría');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Con categoría');
     await usuario.selectOptions(screen.getByTestId('tela-categoria'), '7');
     await usuario.click(screen.getByTestId('guardar-tela'));
 
@@ -143,7 +143,7 @@ describe('<DialogoTela>', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: 'Editar tela' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Nombre')).toHaveValue('Felpa');
+    expect(screen.getByLabelText(/^Nombre/)).toHaveValue('Felpa');
     expect(screen.getByLabelText('Unidad de medida')).toHaveValue('KILOGRAMO');
     expect(screen.getByTestId('tela-favorito')).toBeChecked();
   });

@@ -39,6 +39,15 @@ describe('esquemaModeloCrear', () => {
   it('rechaza maquila base negativa', () => {
     expect(esquemaModeloCrear.safeParse({ codigo: 'X', maquilaBase: -1 }).success).toBe(false);
   });
+
+  it('acepta la composición del desarrollo y la recorta (Daniel 24-jul-2026)', () => {
+    const datos = esquemaModeloCrear.parse({ codigo: 'X', composicion: '  60% ALGODÓN  ' });
+    expect(datos.composicion).toBe('60% ALGODÓN');
+    expect(esquemaModeloCrear.parse({ codigo: 'X' }).composicion).toBeUndefined();
+    expect(
+      esquemaModeloCrear.safeParse({ codigo: 'X', composicion: 'a'.repeat(2001) }).success,
+    ).toBe(false);
+  });
 });
 
 describe('esquemaModeloEditar (PATCH parcial, M1)', () => {
@@ -58,12 +67,14 @@ describe('esquemaModeloEditar (PATCH parcial, M1)', () => {
       idCurvaTalla: null,
       idGenero: null,
       descripcion: null,
+      composicion: null,
     });
     expect(datos.maquilaBase).toBeNull();
     expect(datos.idTemporada).toBeNull();
     expect(datos.idCurvaTalla).toBeNull();
     expect(datos.idGenero).toBeNull();
     expect(datos.descripcion).toBeNull();
+    expect(datos.composicion).toBeNull();
   });
 
   it('NO permite null en código (clave de negocio obligatoria)', () => {

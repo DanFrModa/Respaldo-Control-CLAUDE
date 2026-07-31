@@ -4,7 +4,7 @@
  * Carga los catálogos del sistema viejo (Access, CSV en `Respaldo CLAUDE/TABLAS/`) a la BD
  * de v2, VÍA los servicios de dominio (A1: nunca `prisma.create` directo de catálogos), de
  * forma IDEMPOTENTE y re-ejecutable (§7). Persiste la tabla de MAPEO `mapeo_migracion`
- * (clave-vieja → id-nuevo), entregable que reutilizan E7/F2/F4/F9.
+ * (clave-vieja → id-nuevo), entregable que reutilizan E7/F2/F4/F10.
  *
  * Lo corre Gabriel en Railway/`prueba` con `npm run etl:catalogos` (tsx). NO toca la API ni
  * el frontend. NO sube fotos (eso es E7). Al final imprime el reporte de cuadre (conteos v1

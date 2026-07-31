@@ -1,10 +1,9 @@
-import { Ban, Loader2Icon, PackageCheck, Printer } from 'lucide-react';
+import { Ban, Loader2Icon, Printer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useOrden } from '@/api/ordenes';
-import { useProveedores, useRolesProveedor } from '@/api/proveedores';
 import {
   useCancelarRecibo,
   useCrearRecibo,
@@ -38,6 +37,7 @@ import {
   coloresDeOrden,
   lineasVaciasDeOrden,
   mapaPendiente,
+  piezasPorRecibir,
   tallasDeOrden,
   totalMatriz,
 } from './matriz-orden';
@@ -46,15 +46,6 @@ import { HistorialEtapasOrden } from './HistorialEtapasOrden';
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-/**
- * Mapeo `TipoProceso.codigo` → `RolProveedor.codigo` (espejo del dominio, D12/R15): costura usa el
- * rol `maquila-costura`; el resto es identidad. Sirve para filtrar el maquilero por proceso en la
- * UI; el servidor es la AUTORIDAD (re-valida el rol).
- */
-function rolDelProceso(codigoProceso: string): string {
-  return codigoProceso === 'costura' ? 'maquila-costura' : codigoProceso;
 }
 
 /**
@@ -100,19 +91,31 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
   const codigoProceso = procesoSel?.codigo;
   const generaEntradaPt = procesoSel?.generaEntradaPt ?? false;
 
-  // Maquilero filtrado por el rol que mapea al proceso elegido.
-  const roles = useRolesProveedor();
-  const idRolMaquilero =
-    codigoProceso === undefined
-      ? undefined
-      : roles.data?.find((r) => r.codigo === rolDelProceso(codigoProceso))?.id;
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRolMaquilero === undefined ? {} : { rol: idRolMaquilero }),
-  });
+  // Solo se le puede recibir a quien SÍ recibió el corte (regla de Daniel, 28-jul-2026): la lista
+  // sale del pendiente POR MAQUILERO que deriva el servidor, no del catálogo por rol. El servidor
+  // lo re-valida al guardar; esto es la comodidad, no el candado. Se ofrecen los que aún deben
+  // piezas: al que ya devolvió todo no hay nada que recibirle. Se mira `celdas`, no el total: en el
+  // histórico migrado un maquilero puede traer +5 en una talla y −5 en otra (recibo capturado en la
+  // talla equivocada en el Access) y el servidor SÍ aceptaría recibirle esas 5.
+  const maquilerosPendientes = useMemo(() => {
+    const entrada = pendientes.data?.porRecibir.find(
+      (p) => procesoSel !== undefined && p.idTipoProceso === procesoSel.id,
+    );
+    return (entrada?.porMaquilero ?? []).filter(
+      (m): m is typeof m & { idMaquilero: number } =>
+        m.idMaquilero !== null && m.celdas.some((c) => c.cantidad > 0),
+    );
+  }, [pendientes.data, procesoSel]);
+  // Entrega migrada SIN maquilero (`idTercero` NULL): no se le puede recibir a nadie, pero el
+  // pendiente EXISTE — se dice, en vez de fingir que no hay nada (hallazgo del reviewer).
+  const pendienteSinMaquilero = useMemo(() => {
+    const entrada = pendientes.data?.porRecibir.find(
+      (p) => procesoSel !== undefined && p.idTipoProceso === procesoSel.id,
+    );
+    return (entrada?.porMaquilero ?? [])
+      .filter((m) => m.idMaquilero === null)
+      .reduce((s, m) => s + piezasPorRecibir(m.celdas), 0);
+  }, [pendientes.data, procesoSel]);
 
   // Almacenes destino (solo se usan cuando el proceso mete a PT).
   const almacenes = useAlmacenes({
@@ -122,7 +125,17 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
     direccion: 'asc',
   });
 
-  // Al cambiar de proceso, limpia el maquilero elegido (su rol pudo dejar de aplicar).
+  // Aviso reintentable si falla algún catálogo de la captura.
+  // Los maquileros ya NO salen de un catálogo (vienen del pendiente de la orden), así que aquí solo
+  // quedan los dos catálogos que la captura sí consulta.
+  const catalogoError = procesos.isError || almacenes.isError;
+  function reintentarCatalogos(): void {
+    void procesos.refetch();
+    void almacenes.refetch();
+  }
+
+  // Al cambiar de proceso, limpia el maquilero elegido: el pendiente por maquilero es de OTRO
+  // proceso, así que quien estaba elegido puede no tener nada que devolver en el nuevo.
   useEffect(() => {
     setIdMaquilero('');
   }, [idTipoProceso]);
@@ -135,13 +148,14 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
     setUltimoRecibo(null);
   }
 
-  // Pendiente por recibir para ESTE proceso, por celda (limita la matriz en UI).
+  // Pendiente por recibir, por celda, del MAQUILERO elegido (limita la matriz en UI). Antes topaba
+  // contra el pendiente del PROCESO entero: con dos maquileros en la orden, la pantalla dejaba
+  // capturar lo que tenía el otro y el servidor lo rechazaba al guardar. Sin maquilero elegido no
+  // hay referencia (todo excede) — el botón de guardar ya exige elegirlo.
   const porRecibir = useMemo(() => {
-    const entrada = pendientes.data?.porRecibir.find(
-      (p) => procesoSel !== undefined && p.idTipoProceso === procesoSel.id,
-    );
-    return mapaPendiente(entrada?.celdas ?? []);
-  }, [pendientes.data, procesoSel]);
+    const delMaquilero = maquilerosPendientes.find((m) => String(m.idMaquilero) === idMaquilero);
+    return mapaPendiente(delMaquilero?.celdas ?? []);
+  }, [maquilerosPendientes, idMaquilero]);
 
   // Aviso de exceso en UI (el server bloquea; aquí solo informamos en vivo).
   const excede = useMemo(() => {
@@ -272,18 +286,32 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
   const esEstampado = codigoProceso === 'estampado' || codigoProceso === 'aplicacion';
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackageCheck className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Recibo de maquila</h1>
-          <p className="text-sm text-muted-foreground">
-            Recibe prenda terminada de costura o estampado. Lo de costura entra a inventario PT.
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Recibo de maquila
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
+            Recibe prenda terminada de costura o arte. Lo de costura entra a inventario PT.
           </p>
         </div>
       </header>
+
+      {catalogoError ? (
+        <div
+          className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+          role="alert"
+          data-testid="recibo-error-catalogo"
+        >
+          <p className="text-sm text-destructive">
+            No se pudieron cargar los catálogos de la captura (procesos, maquileros o almacenes).
+          </p>
+          <Button variant="outline" size="sm" onClick={reintentarCatalogos}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         <Card>
@@ -334,7 +362,7 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="maquilero">
-                      {esEstampado ? 'Estampador' : 'Maquilero'}
+                      {esEstampado ? 'Prov. de Arte' : 'Maquilero'}
                     </FieldLabel>
                     <SelectNativo
                       id="maquilero"
@@ -344,14 +372,28 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
                       data-testid="recibo-maquilero"
                     >
                       <option value="">
-                        {idTipoProceso === '' ? 'Elige el proceso primero…' : 'Elige uno…'}
+                        {idTipoProceso === ''
+                          ? 'Elige el proceso primero…'
+                          : pendientes.isPending
+                            ? 'Cargando pendientes…'
+                            : maquilerosPendientes.length === 0
+                              ? 'Nadie tiene piezas por devolver'
+                              : 'Elige a quién le recibes…'}
                       </option>
-                      {(maquileros.data?.datos ?? []).map((m) => (
-                        <option key={m.id} value={String(m.id)}>
-                          {m.nombre}
+                      {maquilerosPendientes.map((m) => (
+                        <option key={m.idMaquilero} value={String(m.idMaquilero)}>
+                          {m.maquilero} · {piezasPorRecibir(m.celdas).toLocaleString('es-MX')}{' '}
+                          pza(s)
                         </option>
                       ))}
                     </SelectNativo>
+                    {pendienteSinMaquilero > 0 ? (
+                      <p className="text-xs text-warn" data-testid="recibo-sin-maquilero">
+                        Hay {pendienteSinMaquilero.toLocaleString('es-MX')} pza(s) entregadas SIN
+                        maquilero (histórico migrado): hay que corregir esa entrega antes de poder
+                        recibirlas.
+                      </p>
+                    ) : null}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="fecha-recibo">Fecha de recibo</FieldLabel>

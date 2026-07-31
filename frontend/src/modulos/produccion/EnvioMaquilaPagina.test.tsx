@@ -115,7 +115,15 @@ const orden: Orden = {
   obsMaquila: null,
   noCostear: false,
   fechaCompletada: '2026-06-18T00:00:00.000Z',
+  requisitos: {
+    tallas: true,
+    avios: true,
+    arte: 'no-aplica' as const,
+    completa: true,
+    faltantes: [],
+  },
   motivoCancelada: null,
+  ocCliente: null,
   tallasV1: null,
   maquilaOrd: null,
   aplicacionOrd: null,
@@ -128,6 +136,7 @@ const orden: Orden = {
       id: 1,
       idColor: 3,
       color: 'Rojo',
+      pantone: null,
       tallas: [{ idTalla: 4, etiquetaTalla: 'CH', cantidad: 10 }],
       totalPiezas: 10,
     },
@@ -163,6 +172,8 @@ const sesion = () =>
   estadoSesionDePrueba(['produccion.envio', 'produccion.wip-ver', 'produccion.cancelar']);
 
 async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  // El selector es un combobox popover: se abre (foco) y se elige la opción.
+  await usuario.click(screen.getByTestId('envio-selector-orden-busqueda'));
   await usuario.click(screen.getByTestId('envio-selector-orden-opcion'));
 }
 

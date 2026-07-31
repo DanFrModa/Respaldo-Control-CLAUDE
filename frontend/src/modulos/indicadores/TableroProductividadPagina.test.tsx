@@ -43,8 +43,10 @@ describe('TableroProductividadPagina', () => {
       sesion: estadoSesionDePrueba(['indicadores.ip-productividad']),
     });
 
-    expect(screen.getByText('2026-W23')).toBeInTheDocument();
-    expect(screen.getByText('Laura')).toBeInTheDocument();
+    // El dato aparece en la tabla (≥lg) y en la tarjeta móvil (<lg); se afirma sobre la fila de la
+    // tabla (ambas viven en el DOM en JSDOM, sin media queries).
+    expect(screen.getByTestId('tp-fila')).toHaveTextContent('2026-W23');
+    expect(screen.getByTestId('tp-fila')).toHaveTextContent('Laura');
     expect(screen.getByTestId('tp-fila')).toHaveTextContent('15');
   });
 

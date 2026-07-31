@@ -1,4 +1,3 @@
-import { Shirt } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -41,14 +40,13 @@ export function PreCostoPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="pre-costo">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="pre-costo">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Shirt className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pre-costo por modelo</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pre-costo por modelo
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Costo estimado del modelo (receta × precios de catálogo + maquila) y precio sugerido.
           </p>
         </div>
@@ -189,11 +187,11 @@ export function PreCostoPagina(): React.JSX.Element {
                 </section>
 
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold">Bordados / estampados</h3>
+                  <h3 className="mb-2 text-sm font-semibold">Arte</h3>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Bordado</TableHead>
+                        <TableHead>Arte</TableHead>
                         <TableHead className="text-right">Precio</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -201,7 +199,7 @@ export function PreCostoPagina(): React.JSX.Element {
                       {pre.data.bordados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={2} className="text-muted-foreground">
-                            Sin bordados.
+                            Sin arte.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -215,7 +213,7 @@ export function PreCostoPagina(): React.JSX.Element {
                     </TableBody>
                   </Table>
                   <p className="mt-1 text-right text-sm font-medium">
-                    Total bordado: {moneda(pre.data.totalBordado)} · Maquila:{' '}
+                    Total arte: {moneda(pre.data.totalBordado)} · Maquila:{' '}
                     {moneda(pre.data.maquila)}
                   </p>
                 </section>

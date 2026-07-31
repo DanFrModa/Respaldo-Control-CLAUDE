@@ -17,6 +17,9 @@ import {
   type Styles,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { estilosDoc, FUENTE, PALETA, PieDocumento } from '../../../comun/impresos-estilos.js';
+
 /** Un estilo de react-pdf (los valores de `StyleSheet.create`). */
 type Style = Styles[string];
 
@@ -24,48 +27,23 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 
 import { leerConteoParaHoja } from '../inventario-ciclico.js';
-import { COLORES, razonSocialEmpresa } from './comun.js';
+import { razonSocialEmpresa } from './comun.js';
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 34,
-    paddingHorizontal: 38,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: COLORES.tinta,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORES.teal,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: COLORES.teal },
-  subtitulo: { fontSize: 8, color: COLORES.gris, marginTop: 2 },
-  metaDer: { textAlign: 'right' },
-  metaTitulo: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  filaTabla: { flexDirection: 'row' },
+  // Estilos PROPIOS de la hoja (lo compartido vive en `estilosDoc`).
+  metaDer: { alignItems: 'flex-end' },
+  metaTitulo: { fontSize: 12, fontFamily: FUENTE.negrita, color: PALETA.tinta },
+  metaLinea: { fontSize: 8, color: PALETA.muted, marginTop: 2 },
+  // Celda con más alto (renglón para anotar el conteo físico a mano) — conteo ciego.
   celda: {
     borderWidth: 0.5,
-    borderColor: COLORES.grisBorde,
+    borderColor: PALETA.borde,
     paddingVertical: 4,
     paddingHorizontal: 4,
     fontSize: 8,
+    color: PALETA.tinta,
   },
-  celdaEncabezado: { backgroundColor: COLORES.encabezadoFondo, fontFamily: 'Helvetica-Bold' },
   celdaContar: { minHeight: 18 },
-  pie: {
-    position: 'absolute',
-    bottom: 22,
-    left: 38,
-    right: 38,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
 });
 
 /** Una columna de la hoja. */
@@ -101,22 +79,40 @@ export async function impresoHojaConteo(
 ): Promise<{ buffer: Buffer }> {
   const datos = await leerConteoParaHoja(sesion, idInventarioCiclico, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'hoja-conteo',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
+}
+
+/** Payload YA resuelto de la hoja de conteo (para el render en worker). */
+export interface PayloadPdfHojaConteo {
+  pagador: string;
+  datos: Awaited<ReturnType<typeof leerConteoParaHoja>>;
+}
+
+/** Render PURO de la hoja de conteo ciega (datos ya resueltos → Buffer). */
+export async function generarPdfHojaConteo(payload: PayloadPdfHojaConteo): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = `Hoja de conteo — Cíclico #${String(datos.folio)}`;
 
   const enc = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
+    { style: estilosDoc.filaTabla, key: 'enc' },
     ...COLUMNAS.map((c, i) =>
-      h(Text, { key: `h-${i}`, style: [...estiloCol(c), estilos.celdaEncabezado] }, c.titulo),
+      h(Text, { key: `h-${i}`, style: [...estiloCol(c), estilosDoc.celdaEncabezado] }, c.titulo),
     ),
   );
   const cuerpo =
     datos.renglones.length === 0
-      ? [h(Text, { key: 'vacio', style: estilos.subtitulo }, 'Sin artículos que contar.')]
+      ? [h(Text, { key: 'vacio', style: estilosDoc.subtitulo }, 'Sin artículos que contar.')]
       : datos.renglones.map((r, idx) =>
           h(
             View,
-            { style: estilos.filaTabla, key: `f-${r.idDet}`, wrap: false },
+            { style: estilosDoc.filaTabla, key: `f-${r.idDet}`, wrap: false },
             h(Text, { key: 'c0', style: estiloCol(COLUMNAS[0]!) }, String(idx + 1)),
             h(Text, { key: 'c1', style: estiloCol(COLUMNAS[1]!) }, r.modelo),
             h(Text, { key: 'c2', style: estiloCol(COLUMNAS[2]!) }, r.color),
@@ -136,18 +132,18 @@ export async function impresoHojaConteo(
     { title: titulo, author: pagador, subject: titulo },
     h(
       Page,
-      { size: 'A4', style: estilos.pagina },
+      { size: 'A4', style: estilosDoc.pagina },
       h(
         View,
-        { style: estilos.encabezado, key: 'header' },
+        { style: estilosDoc.encabezado, key: 'header' },
         h(
           View,
           {},
-          h(Text, { style: estilos.empresa }, pagador),
-          h(Text, { style: estilos.subtitulo }, 'Hoja de conteo — CONTROL v2'),
+          h(Text, { style: estilosDoc.marca }, pagador),
+          h(Text, { style: estilosDoc.subtitulo }, 'Hoja de conteo — CONTROL v2'),
           h(
             Text,
-            { style: estilos.subtitulo },
+            { style: estilosDoc.subtitulo },
             `Almacén: ${datos.almacen}  ·  Fecha: ${datos.fecha}`,
           ),
         ),
@@ -155,18 +151,14 @@ export async function impresoHojaConteo(
           View,
           { style: estilos.metaDer },
           h(Text, { style: estilos.metaTitulo }, `Cíclico #${String(datos.folio)}`),
-          h(Text, { style: estilos.subtitulo }, `Artículos: ${String(datos.renglones.length)}`),
-          h(Text, { style: estilos.subtitulo }, 'Contó: __________________'),
+          h(Text, { style: estilos.metaLinea }, `Artículos: ${String(datos.renglones.length)}`),
+          h(Text, { style: estilos.metaLinea }, 'Contó: __________________'),
         ),
       ),
       h(View, { key: 'tabla' }, enc, ...cuerpo),
-      h(
-        Text,
-        { style: estilos.pie, key: 'pie', fixed: true },
-        `CONTROL v2 · ${pagador} · ${titulo}`,
-      ),
+      PieDocumento({ contexto: `CONTROL v2 · ${pagador} · ${titulo}` }),
     ),
   );
 
-  return { buffer: await renderToBuffer(documento) };
+  return renderToBuffer(documento);
 }

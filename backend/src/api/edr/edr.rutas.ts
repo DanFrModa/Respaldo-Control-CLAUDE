@@ -34,6 +34,8 @@ import {
   esquemaEdrPorAnioSalida,
   esquemaEdrPorMesQuery,
   esquemaEdrPorMesSalida,
+  esquemaVentasQuery,
+  esquemaVentasSalida,
   esquemaErrorApi,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -49,9 +51,11 @@ import {
   generarEdrMes,
   listarLineasEdr,
 } from '../../dominio/edr/edr.js';
+import { listarVentas } from '../../dominio/edr/ventas.js';
 import { impresoEdrMensual } from '../../dominio/edr/impresos/impreso-edr-mensual.js';
 import { impresoEdrAnual } from '../../dominio/edr/impresos/impreso-edr-anual.js';
 import { excelEdr } from '../../dominio/edr/impresos/excel-edr.js';
+import { excelVentas } from '../../dominio/edr/impresos/excel-ventas.js';
 
 /** Parámetro de ruta `:id` (EDR). */
 const esquemaParamEdr = z.object({
@@ -159,6 +163,46 @@ export const rutasEdr: FastifyPluginCallbackZod = (app, _opciones, done) => {
       reply
         .header('Content-Type', 'application/pdf')
         .header('Content-Disposition', `inline; filename="edr-${request.query.anio}.pdf"`);
+      return reply.send(buffer as unknown as never);
+    },
+  });
+
+  // ── Ventas: la vista comercial de la facturación por modelo (proto vVentas). Estática ANTES de
+  //    `/edr/:id` (find-my-way prioriza el estático). Reusa `edr.ver` (es data del EDR). ──
+  app.route({
+    method: 'GET',
+    url: '/edr/ventas',
+    preHandler: app.conPermiso('edr.ver'),
+    schema: {
+      tags: ['edr'],
+      summary: 'Ventas por período (facturación por modelo): resumen + líneas paginadas',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaVentasQuery,
+      response: { 200: esquemaVentasSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarVentas(sesion, request.query);
+    },
+  });
+
+  app.route({
+    method: 'GET',
+    url: '/edr/ventas/excel',
+    preHandler: app.conPermiso('edr.ver'),
+    schema: {
+      tags: ['edr'],
+      summary: 'Ventas del período en Excel (.xlsx) — todo el filtro, no solo la página',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaVentasQuery,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer } = await excelVentas(sesion, request.query);
+      reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', 'attachment; filename="ventas.xlsx"');
       return reply.send(buffer as unknown as never);
     },
   });

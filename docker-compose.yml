@@ -52,6 +52,11 @@ services:
       R2_ACCESS_KEY_ID: dev
       R2_SECRET_ACCESS_KEY: dev
       R2_BUCKET: control-v2-dev
+      # Subida SERVER-SIDE en modo LOCAL (no-op) para dev/CI: la importacion de CFDI
+      # (F9-E3) sube el XML desde el servidor (no presigned), y con R2 dummy un
+      # PutObject real fallaria. En modo local se salta la red y solo devuelve la
+      # key. En produccion (Railway) NO se setea -> subida real a R2.
+      R2_SUBIDA_LOCAL: 'true'
     # Healthcheck con node (la imagen no trae curl): solo pasa a "healthy" cuando
     # /api/health responde 200. Durante migrate deploy + seed (corren ANTES de
     # arrancar el server) la sonda recibe conexion rechazada porque el server aun

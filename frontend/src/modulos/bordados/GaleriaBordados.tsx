@@ -1,4 +1,4 @@
-import { ImageIcon, SearchIcon } from 'lucide-react';
+import { SearchIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -71,16 +71,12 @@ export function GaleriaBordados(): React.JSX.Element {
     <div className="flex h-full flex-col">
       {/* Encabezado */}
       <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <ImageIcon className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Galería de bordados</h1>
-          <p className="text-sm text-muted-foreground">
-            Vista visual de los bordados y estampados con foto.
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Galería de arte
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
+            Vista visual del arte (bordado y estampado) con foto.
           </p>
         </div>
       </div>
@@ -98,14 +94,14 @@ export function GaleriaBordados(): React.JSX.Element {
             className="pl-8"
             value={textoBusqueda}
             onChange={(e) => alBuscar(e.target.value)}
-            aria-label="Buscar bordados por nombre"
+            aria-label="Buscar arte por nombre"
             data-testid="buscar-galeria"
           />
         </div>
         <SelectNativo
           value={tipoFiltro}
           onChange={(e) => alCambiarTipo(e.target.value)}
-          aria-label="Filtrar bordados por tipo"
+          aria-label="Filtrar arte por tipo"
           data-testid="filtro-tipo-galeria"
           className="sm:w-56"
         >
@@ -136,7 +132,7 @@ export function GaleriaBordados(): React.JSX.Element {
           </div>
         ) : (datos?.datos ?? []).length === 0 ? (
           <p className="px-2 py-10 text-center text-sm text-muted-foreground">
-            No hay bordados que coincidan con la búsqueda.
+            No hay arte que coincida con la búsqueda.
           </p>
         ) : (
           <ul

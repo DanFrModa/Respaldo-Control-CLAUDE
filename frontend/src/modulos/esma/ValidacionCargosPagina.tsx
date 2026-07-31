@@ -1,4 +1,4 @@
-import { Banknote, BadgeCheck, Loader2Icon } from 'lucide-react';
+import { BadgeCheck, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,17 +15,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { moneda } from './comun';
@@ -59,14 +59,13 @@ export function ValidacionCargosPagina(): React.JSX.Element {
   const filas = consulta.data?.filas ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Banknote className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Validación de cargos de maquila</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Validación de cargos de maquila
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Revisa y valida los cargos a la cuenta del maquilero que proponen los recibos.
           </p>
         </div>
@@ -158,40 +157,36 @@ export function ValidacionCargosPagina(): React.JSX.Element {
             className="hidden overflow-x-auto rounded-md border md:block"
             data-testid="cargos-tabla"
           >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Maquilero</TableHead>
-                  <TableHead>Orden</TableHead>
-                  <TableHead>Proceso</TableHead>
-                  <TableHead className="text-right">Cant. prop.</TableHead>
-                  <TableHead className="text-right">Importe prop.</TableHead>
-                  <TableHead className="text-right">Importe real</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acción</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Maquilero</TablaDensaHead>
+                  <TablaDensaHead>Orden</TablaDensaHead>
+                  <TablaDensaHead>Proceso</TablaDensaHead>
+                  <TablaDensaHead numerica>Cant. prop.</TablaDensaHead>
+                  <TablaDensaHead numerica>Importe prop.</TablaDensaHead>
+                  <TablaDensaHead numerica>Importe real</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead numerica>Acción</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
                 {filas.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.maquilero}</TableCell>
-                    <TableCell>#{c.folioOrden}</TableCell>
-                    <TableCell>{c.tipoProceso}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                  <TablaDensaFila key={c.id}>
+                    <TablaDensaCelda className="font-medium">{c.maquilero}</TablaDensaCelda>
+                    <TablaDensaCelda>#{c.folioOrden}</TablaDensaCelda>
+                    <TablaDensaCelda>{c.tipoProceso}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
                       {c.cantidadPropuesta.toLocaleString('es-MX')}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {moneda(c.importePropuesto)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {moneda(c.importeReal)}
-                    </TableCell>
-                    <TableCell>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(c.importePropuesto)}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(c.importeReal)}</TablaDensaCelda>
+                    <TablaDensaCelda>
                       <Badge variant={BADGE_ESTADO[c.estado].variant}>
                         {BADGE_ESTADO[c.estado].texto}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
                       {c.estado === 'propuesto' ? (
                         <Button
                           variant="outline"
@@ -203,11 +198,11 @@ export function ValidacionCargosPagina(): React.JSX.Element {
                           <BadgeCheck className="mr-1.5 size-4" aria-hidden /> Validar
                         </Button>
                       ) : null}
-                    </TableCell>
-                  </TableRow>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
                 ))}
-              </TableBody>
-            </Table>
+              </TablaDensaCuerpo>
+            </TablaDensa>
           </div>
         </>
       )}

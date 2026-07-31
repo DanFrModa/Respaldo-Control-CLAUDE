@@ -3,13 +3,13 @@ import { expect, test } from '@playwright/test';
 import { entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del CRUD de Telas unificadas (F1-E3) contra el stack real, en la estructura LISTA +
- * DETALLE (rediseño "Teal fresco"). Cubre el ciclo completo de una tela CON su grid de
- * colores: crear (con categoría de alta rápida + un color con precio) -> aparece en la
- * lista -> seleccionar -> el detalle muestra el color con su precio -> editar -> desactivar
- * (con confirmación) -> queda oculta -> mostrar desactivados -> reactivar -> buscar. Se
- * SELECCIONA la fila (click) y las acciones son botones DIRECTOS del detalle. Usa un nombre
- * único por corrida.
+ * E2E del CRUD de Telas unificadas (F1-E3) contra el stack real, re-vestido R9 a TABLA-FIRST
+ * con filas EXPANDIBLES. Cubre el ciclo completo de una tela CON su grid de colores: crear
+ * (con categoría de alta rápida + un color con precio) -> aparece en la lista -> expandir el
+ * renglón -> el detalle muestra el color con su precio -> editar -> desactivar (con
+ * confirmación) -> queda oculta -> mostrar desactivados -> reactivar -> buscar. El estado
+ * (Activo/Inactivo) vive en el propio renglón; las acciones son botones del detalle expandido.
+ * Usa un nombre único por corrida.
  */
 test.describe('CRUD de Telas (unificadas, con colores)', () => {
   test('crear con categoría y un color, editar, desactivar, reactivar y buscar', async ({
@@ -22,13 +22,9 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos -> Telas (descubrible por clic, no solo por URL).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
-      .click();
-    await page.getByTestId('catalogo-telas').click();
+    // En el riel "Telas" va a Existencias; el CATÁLOGO de telas salió del riel (R2–R4) y se
+    // alcanza por URL directa (sigue vivo) o por ⌘K.
+    await page.goto('/catalogos/telas');
     await expect(page.getByRole('heading', { name: 'Telas' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-tela');
@@ -61,13 +57,13 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     const filaNueva = page.getByTestId('fila-tela').filter({ hasText: nombre });
     await expect(filaNueva).toBeVisible();
 
-    // ── Seleccionar → el detalle muestra la tela, su estado y el color con precio ─
+    // ── Expandir el renglón → el detalle muestra el color con precio (R9: filas expandibles) ─
+    // El estado (Activo) vive en el propio renglón; el detalle, al expandir.
+    await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
     await filaNueva.click();
-    await expect(detalle.getByRole('heading', { name: nombre })).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
     await expect(detalle.getByTestId('tela-colores-detalle')).toBeVisible();
 
-    // ── Editar (botón directo del detalle) ─────────────────────────────────────
+    // ── Editar (botón del detalle expandido) ───────────────────────────────────
     await page.getByTestId('editar-tela').click();
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByRole('heading', { name: 'Editar tela' })).toBeVisible();
@@ -82,7 +78,7 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
     await filaEditada.click();
-    await expect(detalle.getByRole('heading', { name: nombreEditado })).toBeVisible();
+    await expect(page.getByTestId('desactivar-tela')).toBeVisible();
     await page.getByTestId('desactivar-tela').click();
     const confirmacion = page.getByRole('dialog');
     await expect(confirmacion.getByRole('heading', { name: 'Desactivar tela' })).toBeVisible();
@@ -91,17 +87,17 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await expect(page.getByText(`Tela "${nombreEditado}" desactivada.`)).toBeVisible();
     await expect(page.getByTestId('fila-tela').filter({ hasText: nombreEditado })).toHaveCount(0);
 
-    // ── Mostrar desactivados → seleccionar → el detalle la marca Inactivo ───────
+    // ── Mostrar desactivados → el renglón la marca Inactivo; al expandir ofrece Activar ─
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-tela').filter({ hasText: nombreEditado });
     await expect(filaInactiva).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toBeVisible();
     await filaInactiva.click();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
 
-    // ── Reactivar (botón directo del detalle) ──────────────────────────────────
+    // ── Reactivar (botón del detalle expandido) ────────────────────────────────
     await page.getByTestId('activar-tela').click();
     await expect(page.getByText(`Tela "${nombreEditado}" activada.`)).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(filaInactiva.getByText('Activo', { exact: true })).toBeVisible();
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
     await page.getByTestId('buscar-tela').fill('zzz-no-existe-zzz');

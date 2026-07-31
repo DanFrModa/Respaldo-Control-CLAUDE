@@ -83,12 +83,17 @@ export function DependenciasPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4" data-testid="dependencias-pagina">
+    <div
+      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      data-testid="dependencias-pagina"
+    >
       <header className="flex items-center gap-3">
         <GitBranch className="size-6 text-primary" aria-hidden />
         <div>
-          <h1 className="text-lg font-semibold">Dependencias de la Ruta Crítica</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Dependencias de la Ruta Crítica
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Define qué procesos deben ocurrir ANTES de cada proceso. No se admiten ciclos.
           </p>
         </div>

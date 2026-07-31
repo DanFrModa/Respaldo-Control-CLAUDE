@@ -292,6 +292,61 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
     expect(fila?.porEntregar).toBe(5); // recibidoCostura 25 − entregado 20
   });
 
+  it('totales: agregado por etapa (piezas) del universo filtrado = Σ de las filas', async () => {
+    // Recién creada: solo pedido; todo lo demás 0; porCortar = pedido.
+    const recien = await consultarWip(sesion(), {}, bd());
+    expect(recien.totales.pedido).toBe(35);
+    expect(recien.totales.cortado).toBe(0);
+    expect(recien.totales.porCortar).toBe(35);
+    expect(recien.totales.enviado).toBe(0);
+    expect(recien.totales.porRecibir).toBe(0);
+    expect(recien.totales.porEntregar).toBe(0);
+
+    // Mismo avance que el test anterior; el agregado (una sola orden) cuadra con la fila.
+    await cortar30();
+    await enviarCostura30();
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-10',
+        idAlmacenPrimeras: almacenPrimeras.id,
+        idAlmacenSegundas: almacenSegundas.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 10 },
+              { idTalla: tallaM.id, cantidad: 15 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+    await capturarEntregaCliente(
+      [
+        { idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 10 },
+        { idColor: colorRojo.id, idTalla: tallaM.id, cantidad: 10 },
+      ],
+      1001n,
+    );
+
+    const conAvance = await consultarWip(sesion(), {}, bd());
+    expect(conAvance.totales.pedido).toBe(35);
+    expect(conAvance.totales.cortado).toBe(30);
+    expect(conAvance.totales.porCortar).toBe(5);
+    expect(conAvance.totales.enviado).toBe(30);
+    expect(conAvance.totales.cortadoPorEnviar).toBe(0);
+    expect(conAvance.totales.recibido).toBe(25);
+    expect(conAvance.totales.recibidoCostura).toBe(25);
+    expect(conAvance.totales.porRecibir).toBe(5);
+    expect(conAvance.totales.entregado).toBe(20);
+    expect(conAvance.totales.porEntregar).toBe(5);
+  });
+
   it('el drill-down baja a color×talla con el faltante real por celda', async () => {
     await cortar30(); // Rojo CH10/M20 (Azul M5 sin cortar)
     await enviarCostura30();

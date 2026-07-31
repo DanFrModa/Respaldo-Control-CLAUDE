@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   calcularDuracion,
   factorPorCantidad,
+  rangoPorOperaciones,
+  type RangoDificultadCalculo,
   type RangoFactorCantidad,
 } from './calcularDuracion.js';
 
@@ -218,6 +220,87 @@ describe('calcularDuracion — regla porAplicacion (PRENDE el factor de cantidad
       aplicacion: null,
     });
     expect(r.dias).toBe(5);
+    expect(r.advertencias).toHaveLength(1);
+  });
+});
+
+// Tabla de dificultad del seed de R4 (spec §4.9, Excel de Daniel).
+const RANGOS_DIF: RangoDificultadCalculo[] = [
+  { opsDesde: 1, opsHasta: 8, diasCostura: 6 },
+  { opsDesde: 9, opsHasta: 14, diasCostura: 8 },
+  { opsDesde: 15, opsHasta: 22, diasCostura: 11 },
+  { opsDesde: 23, opsHasta: 32, diasCostura: 15 },
+  { opsDesde: 33, opsHasta: null, diasCostura: 20 },
+];
+
+describe('rangoPorOperaciones', () => {
+  it('encuentra el rango donde caen las operaciones (bordes inclusive)', () => {
+    expect(rangoPorOperaciones(1, RANGOS_DIF)?.diasCostura).toBe(6);
+    expect(rangoPorOperaciones(8, RANGOS_DIF)?.diasCostura).toBe(6); // borde superior
+    expect(rangoPorOperaciones(9, RANGOS_DIF)?.diasCostura).toBe(8); // borde inferior
+    expect(rangoPorOperaciones(22, RANGOS_DIF)?.diasCostura).toBe(11);
+  });
+
+  it('el rango abierto (opsHasta null) atrapa cualquier valor grande', () => {
+    expect(rangoPorOperaciones(33, RANGOS_DIF)?.diasCostura).toBe(20);
+    expect(rangoPorOperaciones(500, RANGOS_DIF)?.diasCostura).toBe(20);
+  });
+
+  it('fuera de todo rango devuelve null', () => {
+    expect(rangoPorOperaciones(0, RANGOS_DIF)).toBeNull();
+    expect(rangoPorOperaciones(5, [])).toBeNull();
+  });
+});
+
+describe('calcularDuracion — regla porDificultad (R4, B7)', () => {
+  it('18 operaciones → rango Medio → 11 días de costura', () => {
+    const r = calcularDuracion({
+      tipoDuracion: 'porDificultad',
+      tiempoEstandar: 4,
+      cantidad: 1200,
+      factoresCantidad: FACTORES,
+      numOperaciones: 18,
+      rangosDificultad: RANGOS_DIF,
+    });
+    expect(r.dias).toBe(11);
+    expect(r.advertencias).toEqual([]);
+  });
+
+  it('40 operaciones cae en el rango abierto "33+" → 20 días', () => {
+    const r = calcularDuracion({
+      tipoDuracion: 'porDificultad',
+      tiempoEstandar: 4,
+      cantidad: 1200,
+      factoresCantidad: FACTORES,
+      numOperaciones: 40,
+      rangosDificultad: RANGOS_DIF,
+    });
+    expect(r.dias).toBe(20);
+  });
+
+  it('sin # de operaciones capturado → FALLBACK al tiempo estándar + advertencia', () => {
+    const r = calcularDuracion({
+      tipoDuracion: 'porDificultad',
+      tiempoEstandar: 4,
+      cantidad: 1200,
+      factoresCantidad: FACTORES,
+      numOperaciones: null,
+      rangosDificultad: RANGOS_DIF,
+    });
+    expect(r.dias).toBe(4);
+    expect(r.advertencias).toHaveLength(1);
+  });
+
+  it('operaciones sin rango que las contenga → FALLBACK al tiempo estándar + advertencia', () => {
+    const r = calcularDuracion({
+      tipoDuracion: 'porDificultad',
+      tiempoEstandar: 7,
+      cantidad: 1200,
+      factoresCantidad: FACTORES,
+      numOperaciones: 12,
+      rangosDificultad: [], // tabla vacía: nada matchea
+    });
+    expect(r.dias).toBe(7);
     expect(r.advertencias).toHaveLength(1);
   });
 });

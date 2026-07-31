@@ -16,6 +16,8 @@ import type {
   OrdenCompraEditar,
   OrdenesCompraPagina,
   OrdenesCompraQuery,
+  ResumenCompras,
+  ResumenComprasQuery,
 } from './tipos';
 
 /**
@@ -50,11 +52,9 @@ async function listarOc(query: OrdenesCompraQuery): Promise<OrdenesCompraPagina>
   return data;
 }
 
-/** Obtiene una OC por id (encabezado + líneas + matriz + órdenes ligadas + total). */
-async function obtenerOc(id: number): Promise<OrdenCompra> {
-  const { data, error } = await api.GET('/api/ordenes-compra/{id}', {
-    params: { path: { id } },
-  });
+/** Resumen de cabecera: # OC abiertas + $ por recibir del universo filtrado (KPIs). */
+async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
+  const { data, error } = await api.GET('/api/ordenes-compra/resumen', { params: { query } });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -131,12 +131,14 @@ export function useOrdenesCompra(
   });
 }
 
-/** Obtiene el detalle de una OC (deshabilitada si no hay id). */
-export function useOrdenCompra(id: number | undefined): UseQueryResult<OrdenCompra, ErrorDeApi> {
+/** Resumen de cabecera de OC (KPIs: # abiertas + $ por recibir) bajo el filtro dado. */
+export function useResumenOc(
+  query: ResumenComprasQuery,
+): UseQueryResult<ResumenCompras, ErrorDeApi> {
   return useQuery({
-    queryKey: claveOc(id ?? 0),
-    queryFn: () => obtenerOc(id as number),
-    enabled: id !== undefined,
+    queryKey: [...CLAVE_OC, 'resumen', query],
+    queryFn: () => resumenOc(query),
+    placeholderData: keepPreviousData,
   });
 }
 

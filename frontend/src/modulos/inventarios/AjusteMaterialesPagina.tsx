@@ -1,4 +1,4 @@
-import { ClipboardCheck, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -25,6 +25,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
+import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorTela } from './SelectorTela';
 
 type Dimension = 'tela' | 'avio';
@@ -218,65 +219,38 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ClipboardCheck className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Ajuste / inventario físico</h1>
-          <p className="text-sm text-muted-foreground">
-            Toda corrección es un movimiento auditado (nunca se edita la existencia). El motivo es
-            obligatorio.
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 md:p-5">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Ajuste / inventario físico
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Toda corrección es un movimiento auditado (nunca se edita la existencia) · el motivo es
+            obligatorio
           </p>
         </div>
       </header>
 
       <div className="flex flex-wrap gap-3">
-        <div className="inline-flex rounded-md border p-0.5">
-          <button
-            type="button"
-            onClick={() => setDimension('tela')}
-            className={`rounded px-3 py-1.5 text-sm transition-colors ${
-              dimension === 'tela' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-            }`}
-            data-testid="ajuste-dim-tela"
-          >
-            Telas
-          </button>
-          <button
-            type="button"
-            onClick={() => setDimension('avio')}
-            className={`rounded px-3 py-1.5 text-sm transition-colors ${
-              dimension === 'avio' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-            }`}
-            data-testid="ajuste-dim-avio"
-          >
-            Avíos
-          </button>
-        </div>
-        <div className="inline-flex rounded-md border p-0.5">
-          <button
-            type="button"
-            onClick={() => setDireccion('entrada')}
-            className={`rounded px-3 py-1.5 text-sm transition-colors ${
-              direccion === 'entrada' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-            }`}
-            data-testid="ajuste-dir-entrada"
-          >
-            Entrada
-          </button>
-          <button
-            type="button"
-            onClick={() => setDireccion('salida')}
-            className={`rounded px-3 py-1.5 text-sm transition-colors ${
-              direccion === 'salida' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-            }`}
-            data-testid="ajuste-dir-salida"
-          >
-            Salida
-          </button>
-        </div>
+        <PestanasSegmentadas<Dimension>
+          opciones={[
+            { valor: 'tela', etiqueta: 'Telas', testid: 'ajuste-dim-tela' },
+            { valor: 'avio', etiqueta: 'Avíos', testid: 'ajuste-dim-avio' },
+          ]}
+          valor={dimension}
+          alCambiar={setDimension}
+          etiqueta="Tipo de material"
+        />
+        <PestanasSegmentadas<Direccion>
+          opciones={[
+            { valor: 'entrada', etiqueta: 'Entrada', testid: 'ajuste-dir-entrada' },
+            { valor: 'salida', etiqueta: 'Salida', testid: 'ajuste-dir-salida' },
+          ]}
+          valor={direccion}
+          alCambiar={setDireccion}
+          etiqueta="Dirección del ajuste"
+        />
       </div>
 
       <Card>

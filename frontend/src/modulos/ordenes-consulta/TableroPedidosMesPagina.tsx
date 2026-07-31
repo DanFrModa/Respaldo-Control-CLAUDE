@@ -1,4 +1,4 @@
-import { CalendarRange, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -60,15 +60,11 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
     <div className="h-full overflow-y-auto" data-testid="tablero-pedidos-mes">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6">
         <div className="flex flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-          >
-            <CalendarRange className="size-5" />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold tracking-tight">Pedidos por mes</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Pedidos por mes
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
               Órdenes y piezas agregadas por mes. Toca un mes para ver sus órdenes.
             </p>
           </div>

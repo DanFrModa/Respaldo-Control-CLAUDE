@@ -19,8 +19,14 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
 
   return (
     <div className="space-y-4">
+      {/* `min-w` da aire a la columna Material y ACTIVA el scroll-x del contenedor en pantallas
+          angostas (el cajón móvil son 390px): sin él, `w-full` encoge la tabla y parte el material
+          en ~10 líneas. En escritorio el cajón es más ancho que este mínimo, así que no cambia. */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm" data-testid="tabla-renglones-oc">
+        <table
+          className="w-full min-w-[520px] border-collapse text-sm"
+          data-testid="tabla-renglones-oc"
+        >
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="px-2 py-1.5 font-medium">Material</th>

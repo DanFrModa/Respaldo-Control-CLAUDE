@@ -1,23 +1,22 @@
-import { Download, Printer, TrendingUp } from 'lucide-react';
+import { Download, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { descargarExcelMargenes, imprimirMargenes, useMargenes } from '@/api/costos';
 import type { MargenesQuery } from '@/api/tipos';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
-import { moneda, porcentaje } from './comun';
+import { fechaCorta, moneda, porcentaje } from './comun';
 
 const MESES = [
   'Enero',
@@ -35,10 +34,14 @@ const MESES = [
 ];
 
 /**
- * COSTOS Y MÁRGENES POR PEDIDO (F7-E1; doc 06-Costos-y-EDR §5): importe, margen promedio, margen
- * ponderado y margen $ por pieza de cada pedido (fórmula D2: 1 − costo/precio). Filtrable por año/mes
- * y cliente, con impreso PDF (R9) y export a Excel. Solo lectura (`costos.ver`); importes/márgenes en
- * "—" sin `consultas.ver-importes`.
+ * COSTOS Y MÁRGENES POR PEDIDO (F7-E1; doc 06-Costos-y-EDR §5; proto `vCostos` — re-vestida R9 a
+ * TABLA-FIRST): importe, margen promedio, margen ponderado y margen $ por pieza de cada pedido (fórmula
+ * D2: 1 − costo/precio). page-head + KPIs de vistazo (Σ de SERVIDOR: pedidos · piezas · importe) +
+ * toolbar (año/mes) + TABLA DENSA + barra de totales al pie. Impreso PDF (R9) y export Excel. Solo
+ * lectura (`costos.ver`); importes/márgenes en "—" sin `consultas.ver-importes`.
+ *
+ * A1: los totales (piezas/importe) los agrega el SERVIDOR (`totalPiezas`/`totalImporte`); el margen
+ * promedio del periodo NO se pivotea en cliente (sería mezclar márgenes ponderados) → no va como KPI.
  */
 export function MargenesPagina(): React.JSX.Element {
   const [anio, setAnio] = useState('');
@@ -49,125 +52,213 @@ export function MargenesPagina(): React.JSX.Element {
     ...(mes === '' ? {} : { mes: Number(mes) }),
   };
   const consulta = useMargenes(query);
-  const filas = consulta.data?.filas ?? [];
+  const datos = consulta.data;
+  const filas = datos?.filas ?? [];
+
+  const kpis: Kpi[] = [
+    {
+      clave: 'pedidos',
+      etiqueta: 'Pedidos',
+      valor: filas.length.toLocaleString('es-MX'),
+      pie: 'con órdenes costeadas',
+    },
+    {
+      clave: 'piezas',
+      etiqueta: 'Piezas',
+      valor: (datos?.totalPiezas ?? 0).toLocaleString('es-MX'),
+      pie: 'del periodo',
+    },
+    {
+      clave: 'importe',
+      etiqueta: 'Importe',
+      valor: moneda(datos?.totalImporte ?? 0),
+      pie: 'ventas del periodo',
+    },
+  ];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="margenes">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <TrendingUp className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Costos y márgenes por pedido</h1>
-          <p className="text-sm text-muted-foreground">
-            Margen = 1 − (costo unitario ÷ precio de venta). Solo pedidos con órdenes costeadas.
+    <div
+      className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible"
+      data-testid="margenes"
+    >
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Costos y márgenes por pedido
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Margen = 1 − (costo unitario ÷ precio de venta) · solo pedidos con órdenes costeadas
           </p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => imprimirMargenes(query)}
+          data-testid="mg-pdf"
+        >
+          <Printer aria-hidden />
+          PDF
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => descargarExcelMargenes(query)}
+          data-testid="mg-excel"
+        >
+          <Download aria-hidden />
+          Excel
+        </Button>
       </header>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Márgenes</CardTitle>
-              <CardDescription>
-                {consulta.data
-                  ? `${filas.length} pedido(s) · ${consulta.data.totalPiezas} piezas · Importe ${moneda(consulta.data.totalImporte)}`
-                  : ''}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field className="w-28">
-                <FieldLabel htmlFor="mg-anio">Año</FieldLabel>
-                <Input
-                  id="mg-anio"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => setAnio(e.target.value)}
-                  placeholder="2026"
-                  data-testid="mg-anio"
-                />
-              </Field>
-              <Field className="w-40">
-                <FieldLabel htmlFor="mg-mes">Mes</FieldLabel>
-                <SelectNativo
-                  id="mg-mes"
-                  value={mes}
-                  onChange={(e) => setMes(e.target.value)}
-                  data-testid="mg-mes"
-                >
-                  <option value="">Todos</option>
-                  {MESES.map((m, i) => (
-                    <option key={m} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => imprimirMargenes(query)}
-                data-testid="mg-pdf"
-              >
-                <Printer className="mr-2 size-4" aria-hidden />
-                PDF
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => descargarExcelMargenes(query)}
-                data-testid="mg-excel"
-              >
-                <Download className="mr-2 size-4" aria-hidden />
-                Excel
-              </Button>
-            </div>
+      {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <Input
+            type="number"
+            className="h-8 w-24 text-sm"
+            value={anio}
+            onChange={(e) => setAnio(e.target.value)}
+            placeholder="Año"
+            aria-label="Filtrar por año"
+            data-testid="mg-anio"
+          />
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            aria-label="Filtrar por mes"
+            data-testid="mg-mes"
+          >
+            <option value="">Todos los meses</option>
+            {MESES.map((m, i) => (
+              <option key={m} value={i + 1}>
+                {m}
+              </option>
+            ))}
+          </SelectNativo>
+          <div className="ml-auto">
+            <span className="text-[12px] text-faint">
+              {filas.length.toLocaleString('es-MX')} pedidos
+            </span>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="overflow-auto lg:min-h-0 lg:flex-1">
           {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
           ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="p-6 text-sm text-destructive" role="alert">
               {consulta.error.message}
             </p>
           ) : filas.length === 0 ? (
-            <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               No hay pedidos con órdenes costeadas para los filtros elegidos.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Piezas</TableHead>
-                  <TableHead className="text-right">Importe</TableHead>
-                  <TableHead className="text-right">Margen prom.</TableHead>
-                  <TableHead className="text-right">Margen pond.</TableHead>
-                  <TableHead className="text-right">Margen $/pza</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Móvil (<lg): tarjetas compactas — la tabla de 8 columnas deja el MARGEN (la métrica
+                  que da nombre a la pantalla) fuera de la vista en teléfono. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="mg-tarjetas">
                 {filas.map((f) => (
-                  <TableRow key={f.idPedido} data-testid={`mg-fila-${f.idPedido}`}>
-                    <TableCell className="font-medium">#{f.folio}</TableCell>
-                    <TableCell>{f.cliente}</TableCell>
-                    <TableCell>{f.fechaHasta ?? '—'}</TableCell>
-                    <TableCell className="text-right">{f.cantidad}</TableCell>
-                    <TableCell className="text-right">{moneda(f.importe)}</TableCell>
-                    <TableCell className="text-right">{porcentaje(f.margenPromedio)}</TableCell>
-                    <TableCell className="text-right">{porcentaje(f.margenPonderado)}</TableCell>
-                    <TableCell className="text-right">{moneda(f.margenPesosPorPieza)}</TableCell>
-                  </TableRow>
+                  <div
+                    key={f.idPedido}
+                    className="rounded-lg border bg-card p-3"
+                    data-testid={`mg-tarjeta-${f.idPedido}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">#{f.folio}</div>
+                        <div className="truncate text-xs text-muted-foreground">{f.cliente}</div>
+                        <div className="num text-[11px] text-faint">{fechaCorta(f.fechaHasta)}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="num text-lg leading-tight font-bold">
+                          {porcentaje(f.margenPromedio)}
+                        </div>
+                        <div className="text-[10.5px] text-faint uppercase">margen prom.</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Pond <b className="num text-foreground">{porcentaje(f.margenPonderado)}</b>
+                      </span>
+                      <span>
+                        $/pza <b className="num text-foreground">{moneda(f.margenPesosPorPieza)}</b>
+                      </span>
+                      <span>
+                        Piezas{' '}
+                        <b className="num text-foreground">{f.cantidad.toLocaleString('es-MX')}</b>
+                      </span>
+                      <span>
+                        Importe <b className="num text-foreground">{moneda(f.importe)}</b>
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Escritorio (≥lg): tabla densa intacta. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Pedido</TablaDensaHead>
+                      <TablaDensaHead>Cliente</TablaDensaHead>
+                      <TablaDensaHead>Fecha</TablaDensaHead>
+                      <TablaDensaHead numerica>Piezas</TablaDensaHead>
+                      <TablaDensaHead numerica>Importe</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen prom.</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen pond.</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen $/pza</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f) => (
+                      <TablaDensaFila key={f.idPedido} data-testid={`mg-fila-${f.idPedido}`}>
+                        <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
+                        <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {fechaCorta(f.fechaHasta)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {f.cantidad.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.importe)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{porcentaje(f.margenPromedio)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{porcentaje(f.margenPonderado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.margenPesosPorPieza)}</TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Pedidos</span>
+            <b className="num">{filas.length.toLocaleString('es-MX')}</b>
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Piezas</span>
+            <b className="num">{(datos?.totalPiezas ?? 0).toLocaleString('es-MX')}</b>
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Importe</span>
+            <b className="num">{moneda(datos?.totalImporte ?? 0)}</b>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -18,9 +18,13 @@ const useConciliacionEsMa = vi.fn<
 
 vi.mock('@/api/esma', () => ({
   useConciliacionEsMa: () => useConciliacionEsMa(),
-}));
-vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Maquila SA' }] } }),
+  // El filtro de maquilero es ahora el combobox de maquileros (activos + rol de maquila), no
+  // useProveedores (que topaba en 100).
+  useMaquilerosEsMa: () => ({
+    data: { filas: [{ id: 5, nombre: 'Maquila SA', corto: null }] },
+    isPending: false,
+    isError: false,
+  }),
 }));
 
 function datos(): EsMaConciliacion {

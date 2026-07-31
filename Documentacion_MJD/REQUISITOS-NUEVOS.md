@@ -20,6 +20,11 @@
 | R13 | Información detallada para el contador | Reportes/exportación de clientes, proveedores y sus movimientos **fiscales** | 🟡 | ✅ Registrado |
 | R14 | Timbrado nativo vía PAC (**futuro**) | Emitir + timbrar desde CONTROL; R10–R12 ya dejan la estructura lista | 🟢 Futuro | ✅ Registrado |
 | R15 | Catálogo de proveedores enriquecido | Catálogo único con **roles multi-valor** + campos fiscales/contacto/pago/operativos; va en **F1** | 🟡 | ✅ Registrado |
+| R16 | Proyectos de desarrollo (Cliente + Departamento) | Proyectos temáticos por cliente/departamento que agrupan **desarrollos** (modelo con nº del cliente y el nuestro); departamentos de cliente como catálogo | 🔴 | ✅ Registrado |
+| R17 | Precio de insumo amarrado (proveedor + producto + precio) | Por insumo del BOM: proveedor sugerido + producto + precio, editable al comprar; **telas con precio por proveedor** y, en ciertos proveedores, **por color** | 🔴 | ✅ Registrado |
+| R18 | Medidas por talla en ciertos avíos | Cierres, elástico…: medida por talla guardada; el precosteo usa promedio, la compra usa las medidas exactas | 🔴 | ✅ Registrado |
+| R19 | Conceptos de costo extensibles | Tela+avíos+maquila siempre; + estampado/bordado/otros procesos/otros conceptos, como datos (sin límite) | 🟡 | ✅ Registrado |
+| R20 | Listas de precios por cliente + negociación por versiones | Lista por **Cliente+Departamento** desde los precostos con factores del cliente; aprobación del dueño modelo por modelo; **re-costeo por versiones** con acuerdos; estados configurables; historial aunque no cierre | 🔴 | ✅ Registrado |
 
 ---
 
@@ -110,6 +115,7 @@ flowchart LR
 - **Qué resuelve:** poder **adjuntar archivos** de cualquier tipo (imágenes, PDF, Excel, fotos de muestra, contramuestras, etc.) ligados a una orden de producción.
 - **Cómo funciona (propuesta):** repositorio de adjuntos por orden (y quizá por modelo), con metadatos (tipo, fecha, quién subió). Almacenamiento configurable (no rutas fijas, ver MEJORAS A5).
 - **Nota del dueño:** la **ficha técnica (R5)** y los **archivos generales (R6)** probablemente sean **cosas independientes** — una es estructurada, el otro es un repositorio libre.
+- **Estado / cuándo (2026-07-04):** Daniel lo **re-priorizó** al arrancar F8 — quiere subir Excel/PDF de apoyo a las órdenes ahora que Desarrollo/Cotización arranca **sin ETL** (para no perder los archivos viejos). **Programación: F8-E6 — CONFIRMADO por Gabriel (2026-07-04)**; se construye junto con la vista 360 de la orden. Reutiliza el motor de archivos + Cloudflare R2 ya existente (el mismo de las fotos de modelos/bordados).
 
 ---
 
@@ -138,8 +144,9 @@ flowchart LR
 > **Origen:** decisión **D12** (ver [DECISIONES.md](DECISIONES.md)). Detalle completo e insumo
 > original en [PROPUESTA-Finanzas-y-Proveedores.md](PROPUESTA-Finanzas-y-Proveedores.md). La meta
 > de fondo es **apagar SINUBE** por etapas, **sin tocar la contabilidad** (esa sigue con el
-> contador). Encaje: módulo **14 (Finanzas)** + **fase F8 (Finanzas)** entre F7 y Go-live (que
-> pasa a **F9**); **R15 en F1** (etapa F1-E1B).
+> contador). Encaje: módulo **14 (Finanzas)** + **fase F9 (Finanzas)** — originalmente F8;
+> renumerada el 2026-07-04 al insertarse **F8 · Desarrollo y Cotización** (D13), y Go-live pasó
+> a **F10** —; **R15 en F1** (etapa F1-E1B).
 
 Hoy Daniel factura/timbra **fuera** de CONTROL (SINUBE) y ahí lleva cuentas de clientes y
 proveedores. La meta: que CONTROL **amarre cada documento fiscal con su operación real**
@@ -192,6 +199,72 @@ El catálogo viejo era muy pobre. Se enriquece **en paralelo a los campos por cl
 
 ---
 
+## 🧵 Desarrollo y cotización por cliente (R16–R20)
+
+> **Origen:** decisión **D13** (ver [DECISIONES.md](DECISIONES.md)). Detalle completo e insumo
+> original en [PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md](PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md).
+> Encaje: módulo **15 (Desarrollo y Cotización)** + **fase F8** (nueva, entre F7 y Finanzas —que
+> pasa a F9; Go-live a F10—). Las sub-decisiones ya las resolvió Daniel (2026-07-04, ver D13).
+
+Hoy el sistema arranca en "modelo terminado" y "pedido": falta la **capa previa** donde se
+desarrolla y cotiza para cada cliente. La negociación vive en Excel. Estos 5 requisitos la traen
+al sistema, de punta a punta:
+
+### R16 — Proyectos de desarrollo (Cliente + Departamento)
+- **Qué resuelve:** un lugar donde concentrar los desarrollos de cada cliente/departamento.
+- **Cómo funciona:** `Proyecto` = **1 cliente + 1 departamento** del cliente (catálogo nuevo de
+  departamentos por cliente, ej. C&A / NIÑOS), con **nombre/tema** (joggers, Disney, básicos…);
+  varios proyectos por departamento/temporada. Cada **desarrollo** del proyecto es un modelo con
+  **dos números**: el del cliente y el nuestro. Si no llega a producción, **se apaga** (archivado).
+
+### R17 — Precio de insumo amarrado: proveedor + producto + precio
+- **Qué resuelve:** que el precosteo deje de usar precios genéricos y quede **amarrado a la
+  realidad de compra** (y que Compras herede eso al generar la OC).
+- **Cómo funciona:** por insumo del BOM se predefine **proveedor sugerido + producto de ese
+  proveedor + precio** (del catálogo **o a mano** — ambos), editable al comprar. **Telas** (el
+  hueco grande): precio **por proveedor** (hoy solo los avíos lo tienen, `AvioProveedor`) y, en
+  **ciertos proveedores marcados, por color** (la misma tela cuesta distinto por color). El
+  precosteo lee de ese catálogo; el MRP deja de sacar las telas "a captura manual".
+
+### R18 — Medidas por talla en ciertos avíos
+- **Qué resuelve:** comprar bien los avíos cuyo consumo depende de la talla (cierres, elástico,
+  resortes…).
+- **Cómo funciona:** el avío del BOM se marca "consumo por talla" y se capturan las **medidas por
+  talla**; el **precosteo usa un promedio** (es estimación), pero la **explosión/OC usa la medida
+  exacta × las cantidades por talla de la orden**. Las telas NO llevan talla (consumo por modelo
+  completo) ni color.
+
+### R19 — Conceptos de costo extensibles
+- **Qué resuelve:** hoy el costo se arma de renglones fijos (tela/avíos/maquila/bordado); hay
+  prendas con estampado, lavado u otros conceptos.
+- **Cómo funciona:** catálogo `ConceptoCosto` como **datos** (patrón `TipoProceso`): tela, avíos
+  y maquila **fijos** (siempre presentes); estampado, bordado, otros procesos y otros conceptos
+  **ampliables sin código**. El precosteo/costeo suma N conceptos.
+
+### R20 — Listas de precios por cliente + negociación por versiones
+- **Qué resuelve:** la lista de precios de F7 es por **modelo** con parámetros por **empresa**;
+  falta la lista **por cliente** con su negociación (hoy en Excel).
+- **Cómo funciona:** la lista se genera desde los **precostos** aplicando los **factores del
+  cliente** (margen objetivo, % descuentos, regalías, % costo de ventas) → el **dueño aprueba o
+  modifica a mano, modelo por modelo** → la toma comercial. **Negociación = re-costeo por
+  VERSIONES**: se cambia el desarrollo (ej. quitar bolsas), se re-costea y queda registrado el
+  **acuerdo de diseño + precio acordado**, versión por versión. La lista vive **por
+  Cliente + Departamento** con estados **configurables** (abierta / en negociación / cerrada /
+  ya pedida…) y se **archiva aunque no cierre**. La lista **NO dispara pedidos**: el pedido nace
+  de la **OC del cliente** (flujo actual); al ligar modelo→orden de producción, el registro
+  completo queda pegado a la orden y alimenta **nuestra OC a proveedores**.
+
+---
+
+## 🧾 Calidad — flujo del auditor (R21, pendiente de diseño de Daniel)
+
+### R21 — Formato del auditor: captura con fotos de hallazgos + reporte para el maquilero
+- **Qué resuelve (Daniel, 2026-07-10 / D14):** los **usuarios auditores** necesitan un formato dentro del sistema para **capturar sus auditorías**, **registrar FOTOS de los hallazgos**, y **generar un reporte impreso para el maquilero** (dejarle una copia con los comentarios de la revisión).
+- **Estado:** **el formato NO está diseñado aún** — NO se construye hasta que Daniel lo diseñe. Cuando lo haga, se decide también cómo se liga el auditor (el catálogo `Auditor` del rediseño vs. `Usuario.esAuditor`) a la captura de auditorías (F6).
+- **Base existente:** auditorías AQL (F6), motor de archivos R2 (fotos), impresos @react-pdf (R9), catálogo de auditores (rediseño R9).
+
+---
+
 ## 🗓️ Etapa 2 (futuro)
 
 ### R8 — Importar pedidos de clientes → generar órdenes automáticamente
@@ -199,7 +272,7 @@ El catálogo viejo era muy pobre. Se enriquece **en paralelo a los campos por cl
 - **Quién lo usa:** Ventas / Planeación.
 - **Cómo funciona (idea):** importar el pedido del cliente (archivo/portal/EDI) → mapear a modelos y cantidades → crear el pedido y sus órdenes.
 - **Relación:** se apoya en los **campos de referencia por cliente (D7)** y en el modelo **Pedido / Pedido Real** ([02 — Pedidos](02-Pedidos.md)).
-- **Nota:** **explícitamente Etapa 2** (no en el primer desarrollo).
+- **Estado (2026-07-08): ✅ CONSTRUIDO (versión Excel) en el rediseño (R8 del plan de rediseño, PR #107).** El importador vive en Pedidos → "Importar de cliente": plantilla de **mapeo de columnas por cliente** (se enseña UNA vez), parseo del **Excel** de la OC del cliente, amarre modelo-del-cliente ↔ desarrollo por `numeroCliente`, resolución manual de no reconocidos, y **alta transaccional** pedido + OPs + RC (reusa `salidaAProduccion`). La variante **PDF con extracción asistida por IA** sigue pendiente (idea original de Daniel del 2026-07-04) — queda como iteración futura del importador.
 
 ---
 

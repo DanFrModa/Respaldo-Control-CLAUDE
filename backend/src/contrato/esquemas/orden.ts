@@ -82,6 +82,14 @@ export const esquemaOrdenLineaEntrada = z.object({
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' })
     .describe('Color del catálogo (F1; en v1 era texto libre).'),
+  pantone: z
+    .string()
+    .trim()
+    .max(60)
+    .nullish()
+    .describe(
+      'Código PANTONE de este color (petición Daniel: campo propio, opcional; null = sin pantone).',
+    ),
   tallas: z
     .array(esquemaOrdenTallaEntrada)
     .default([])
@@ -296,6 +304,28 @@ export const esquemaEstadoOrden = z
   .enum(['capturada', 'completa', 'cancelada'])
   .describe('Estado DERIVADO de la orden (no editable).');
 
+/**
+ * REQUISITOS que sostienen el estado `completa` (Daniel 26-jul-2026): la orden dice POR QUÉ está
+ * como está. Regla: **tallas + avíos, y arte si aplica**. `arte: "no-aplica"` = el modelo no lleva
+ * arte (no bloquea). `faltantes` es lo que la UI muestra como "Falta: …".
+ */
+export const esquemaRequisitosOrden = z
+  .object({
+    tallas: z.boolean().describe('La orden tiene su matriz de tallas capturada (≥1 renglón).'),
+    avios: z.boolean().describe('El modelo tiene su receta de avíos de producción (≥1 avío).'),
+    arte: z
+      .union([z.literal('no-aplica'), z.boolean()])
+      .describe('El modelo tiene su arte; "no-aplica" si el modelo no lleva arte.'),
+    completa: z.boolean().describe('Se cumplen todos los requisitos que aplican.'),
+    faltantes: z
+      .array(z.enum(['tallas', 'avios', 'arte']))
+      .describe('Requisitos que hoy faltan (vacío si está completa).'),
+  })
+  .describe('Por qué la orden está (o no) completa.');
+
+/** Forma de los requisitos de una orden en la API. */
+export type RequisitosOrdenSalida = z.infer<typeof esquemaRequisitosOrden>;
+
 /** Cantidad por talla en la salida (con la etiqueta de la talla para la UI). */
 export const esquemaOrdenTallaSalida = z
   .object({
@@ -314,6 +344,7 @@ export const esquemaOrdenLineaSalida = z
     id: z.number().int().describe('Id del renglón (color).'),
     idColor: z.number().int().describe('Id del color.'),
     color: z.string().describe('Nombre del color (para la UI).'),
+    pantone: z.string().nullable().describe('Código PANTONE de este color, o null.'),
     tallas: z.array(esquemaOrdenTallaSalida).describe('Cantidades por talla.'),
     totalPiezas: z.number().int().describe('Suma de las cantidades de las tallas de este color.'),
   })
@@ -386,9 +417,16 @@ export const esquemaOrdenSalida = z
       .datetime()
       .nullable()
       .describe(
-        'Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null.',
+        'Fecha en que la orden quedó completa por PRIMERA vez (se sella una vez y no se borra), o null.',
       ),
+    requisitos: esquemaRequisitosOrden,
     motivoCancelada: z.string().nullable().describe('Motivo de la cancelación, o null.'),
+    ocCliente: z
+      .string()
+      .nullable()
+      .describe(
+        'SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice.',
+      ),
     // ── Datos de v1 conservados de SOLO LECTURA (sin motor; ETL los puebla). ──
     tallasV1: z
       .string()

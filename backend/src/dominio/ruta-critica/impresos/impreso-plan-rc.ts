@@ -27,6 +27,16 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+} from '../../../comun/impresos-estilos.js';
+
 import { ErrorNoEncontrado, ErrorValidacion } from '../../../comun/errores.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
@@ -104,8 +114,8 @@ export async function armarDatosImpresoPlanRc(
   const cliente = clienteLectura(bd);
 
   // Encabezado de la orden (folio + nombres de cliente/modelo), SCOPEADO por la empresa activa (A9):
-  // una orden de otra empresa "no existe" → 404. (`obtenerRutaOrden` no filtra por empresa, así que el
-  // scope se IMPONE aquí, en el impreso, para no filtrar el plan de otra empresa.)
+  // una orden de otra empresa "no existe" → 404. (`obtenerRutaOrden` ya filtra por empresa activa —B1—;
+  // este lookup del encabezado se mantiene scopeado como defensa en profundidad.)
   const orden = await cliente.orden.findFirst({
     where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
     select: {
@@ -185,94 +195,32 @@ const ETIQUETA_ESTADO: Record<EstadoProceso, string> = {
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-const AMBAR = '#b45309';
-const ROJO = '#b91c1c';
-const VERDE = '#15803d';
-
 /** Color del texto del semáforo (mismo criterio que la UI: rojo/ámbar/verde). */
 function colorSemaforo(estado: EstadoSemaforo): string {
-  if (estado === 'atrasado') return ROJO;
-  if (estado === 'enRiesgo') return AMBAR;
-  return VERDE;
+  if (estado === 'atrasado') return PALETA.crit;
+  if (estado === 'enRiesgo') return PALETA.warn;
+  return PALETA.ok;
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  semaforoChip: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginTop: 4 },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  campo: { width: '33%', marginBottom: 6, paddingRight: 8 },
-  etiquetaCampo: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorCampo: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
-  seccion: { marginTop: 10 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Estilos PROPIOS del plan (lo compartido vive en `estilosDoc`).
+  semaforoChip: { fontSize: 9, fontFamily: FUENTE.negrita, marginTop: 6, marginBottom: 4 },
   celdaNum: { width: 24, textAlign: 'center' },
   celdaProceso: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   celdaFecha: { width: 60, textAlign: 'center' },
   celdaDuracion: { width: 40, textAlign: 'center' },
   celdaResponsables: { width: 110, textAlign: 'left' },
   celdaEstado: { width: 58, textAlign: 'center' },
-  textoCritico: { color: ROJO, fontFamily: 'Helvetica-Bold' },
-  vacio: { fontSize: 8, color: GRIS },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  textoCritico: { color: PALETA.crit, fontFamily: FUENTE.negrita },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
 function campo(etiqueta: string, valor: string | null): ReactElement {
   return h(
     View,
-    { style: estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiquetaCampo }, etiqueta),
-    h(Text, { style: estilos.valorCampo }, valor ?? '—'),
+    { style: estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorCampo }, valor ?? '—'),
   );
 }
 
@@ -280,52 +228,68 @@ function campo(etiqueta: string, valor: string | null): ReactElement {
 function tablaProcesos(datos: DatosImpresoPlanRc): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, '#'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaProceso] }, 'Proceso'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaFecha] }, 'Planeada'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaDuracion] }, 'Días'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, '#'),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaResponsables] },
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaProceso] },
+      'Proceso',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaFecha] },
+      'Planeada',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaDuracion] },
+      'Días',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaResponsables] },
       'Responsables',
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaEstado] }, 'Estado'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaFecha] }, 'Real'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaEstado] },
+      'Estado',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaFecha] }, 'Real'),
   );
 
   const filas = datos.procesos.map((p, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `fila-${i}`, wrap: false },
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, String(i + 1)),
+      { style: estilosDoc.filaTabla, key: `fila-${i}`, wrap: false },
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, String(i + 1)),
       h(
         Text,
         {
           style: [
-            estilos.celda,
+            estilosDoc.celda,
             estilos.celdaProceso,
             ...(p.critico ? [estilos.textoCritico] : []),
           ],
         },
         p.critico ? `${p.nombreProceso} (crítico)` : p.nombreProceso,
       ),
-      h(Text, { style: [estilos.celda, estilos.celdaFecha] }, p.fechaPlaneada ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.celdaDuracion] }, String(p.duracionDias)),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaFecha] }, p.fechaPlaneada ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaDuracion] }, String(p.duracionDias)),
       h(
         Text,
-        { style: [estilos.celda, estilos.celdaResponsables] },
+        { style: [estilosDoc.celda, estilos.celdaResponsables] },
         p.responsables.length === 0 ? '—' : p.responsables.join(', '),
       ),
-      h(Text, { style: [estilos.celda, estilos.celdaEstado] }, ETIQUETA_ESTADO[p.estado]),
-      h(Text, { style: [estilos.celda, estilos.celdaFecha] }, p.fechaReal ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaEstado] }, ETIQUETA_ESTADO[p.estado]),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaFecha] }, p.fechaReal ?? '—'),
     ),
   );
 
   return h(
     View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Procesos de la Ruta Crítica'),
+    { style: estilosDoc.seccion },
+    TituloSeccion('Procesos de la Ruta Crítica'),
     filaEncabezado,
     ...filas,
   );
@@ -334,30 +298,19 @@ function tablaProcesos(datos: DatosImpresoPlanRc): ReactElement {
 /** Una página del plan de la RC. */
 function paginaPlan(datos: DatosImpresoPlanRc, clave: string): ReactElement {
   const hijos: ReactElement[] = [
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Plan de la Ruta Crítica por orden — CONTROL v2',
+      derecha: { etiqueta: 'Orden', valor: String(datos.folioOrden), grande: true },
+    }),
     h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Plan de la Ruta Crítica por orden — CONTROL v2'),
-        h(
-          Text,
-          { style: [estilos.semaforoChip, { color: colorSemaforo(datos.semaforo) }] },
-          `Semáforo: ${ETIQUETA_SEMAFORO[datos.semaforo]}`,
-        ),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Orden'),
-        h(Text, { style: estilos.folioValor }, String(datos.folioOrden)),
-      ),
+      Text,
+      { style: [estilos.semaforoChip, { color: colorSemaforo(datos.semaforo) }], key: 'semaforo' },
+      `Semáforo: ${ETIQUETA_SEMAFORO[datos.semaforo]}`,
     ),
     h(
       View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Cliente', datos.cliente),
       campo('Modelo', datos.modelo),
       campo('Entrega RC', datos.fechaEntregaRC),
@@ -365,13 +318,11 @@ function paginaPlan(datos: DatosImpresoPlanRc, clave: string): ReactElement {
       campo('Resurtido', datos.esResurtido ? 'Sí' : 'No'),
     ),
     tablaProcesos(datos),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Orden ${datos.folioOrden} · ${datos.procesos.length} procesos`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Orden ${datos.folioOrden} · ${datos.procesos.length} procesos`,
+    }),
   ];
-  return h(Page, { key: clave, size: 'A4', style: estilos.pagina }, ...hijos);
+  return h(Page, { key: clave, size: 'A4', style: estilosDoc.pagina }, ...hijos);
 }
 
 /** Documento del PLAN de la RC de UNA orden. */
@@ -406,5 +357,8 @@ export async function impresoPlanRc(
   deps: DepsImpresoPlanRc = {},
 ): Promise<ImpresoPlanRc> {
   const datos = await armarDatosImpresoPlanRc(sesion, idOrden, bd, deps);
-  return { buffer: await generarPdfPlanRc(datos), folioOrden: datos.folioOrden };
+  return {
+    buffer: await renderizarPdfEnWorker('plan-rc', datos, { idEmpresa: sesion.idEmpresaActiva }),
+    folioOrden: datos.folioOrden,
+  };
 }

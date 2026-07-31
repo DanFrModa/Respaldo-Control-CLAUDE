@@ -45,7 +45,7 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
   });
 
   // Valores vigentes de Propiedades.csv: UtilidadSujerida=50, Regalias=10, ColchonCostura=1.
-  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F8).
+  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F10).
   await prisma.configuracionEmpresa.upsert({
     where: { idEmpresa: empresa.id },
     update: {},
@@ -156,6 +156,31 @@ function definirRoles(): {
     // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos). El
     // `calidad.ver` y la consulta de bitácora cascadean (siguen en el conjunto del directivo).
     'calidad.administrar-catalogo',
+    // F8-E1 — catálogos de configuración de Desarrollo/Cotización (conceptos de costo R19,
+    // estados de lista R20): administrar solo Administrador y AdministracionDireccion (mismo
+    // reparto que el resto de catálogos). El `.ver` y los permisos de desarrollo/listas cascadean.
+    'concepto-costo.administrar',
+    'estado-lista.administrar',
+    // F5 — catálogo de Ruta Crítica (procesos/plantillas/reglas/calendario laboral): administrar
+    // solo Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos
+    // maestros). `rc.catalogo-ver` y el motor de RC cascadean. (Fix de pentest: antes se colaba a
+    // roles clericales.)
+    'rc.catalogo-administrar',
+    // F9-E1 — cuenta corriente de terceros (Finanzas, D12/D15): CAPTURAR/CANCELAR movimientos
+    // (`terceros.administrar`) y la VISTA FISCAL (`terceros.fiscal`) quedan solo para Administrador
+    // y AdministracionDireccion (mismo reparto que los catálogos maestros y por prudencia
+    // financiera; sé conservador como el fix de pentest de los `*.administrar`). El `terceros.ver`
+    // NO se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo), como EsMa.
+    'terceros.administrar',
+    'terceros.fiscal',
+    // F9-E2 — CxP: capturar/cancelar movimientos (`cxp.administrar`) queda solo para Administrador y
+    // AdministracionDireccion (mismo reparto que `terceros.administrar`). El `cxp.ver` NO se corta aquí:
+    // baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxp.administrar',
+    // F9-E4 — CxC: capturar/cancelar movimientos e importar CFDI de venta (`cxc.administrar`) queda solo
+    // para Administrador y AdministracionDireccion (mismo reparto que `cxp.administrar`). El `cxc.ver` NO
+    // se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxc.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
@@ -169,6 +194,10 @@ function definirRoles(): {
     'costos.capturar',
     'edr.ver',
     'edr.capturar',
+    // F8-E4 — aprobar precios de lista es del DUEÑO (Administrador/AdministracionDireccion/
+    // Directivo, decisión (h)): Gerencial NO aprueba. Conserva ver/administrar/negociar de listas
+    // y todo desarrollo.*.
+    'listas.aprobar',
   );
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
@@ -176,7 +205,25 @@ function definirRoles(): {
   // doc 02-Pedidos §3). Ventas SÍ captura pedidos (alta/edición), solo no ve los importes.
   // Los TABLEROS directivos de indicadores (F7-E3, `indicadores.ver`) son de DIRECCIÓN/GERENCIA →
   // se cortan aquí (los conservan Administrador, AdministracionDireccion, Directivo y Gerencial).
-  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes', 'indicadores.ver');
+  const ventas = sin(
+    gerencial,
+    'consultas.ver-importes',
+    'pedidos.importes',
+    'indicadores.ver',
+    // F8-E5 — negociar/mover estados de lista es del dueño y el gerente comercial (decisión (h)):
+    // Ventas NO negocia. Conserva desarrollo.* (pre-venta) y listas.ver/.administrar.
+    'listas.negociar',
+    // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
+    // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
+    // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.
+    'terceros.ver',
+    // F9-E2 — CxP: `cxp.ver` (bandeja por pagar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `terceros.ver`.
+    'cxp.ver',
+    // F9-E4 — CxC: `cxc.ver` (bandeja por cobrar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `cxp.ver`.
+    'cxc.ver',
+  );
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
   // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no
@@ -191,6 +238,13 @@ function definirRoles(): {
     'ordenes.cancelar',
     // Nivel 47 y abajo ya no acceden al pre-costo (era ≤45): Directivo/Gerencial/Ventas sí.
     'precostos.consultar',
+    // F8 — Desarrollo/Cotización (D13): armar proyectos/desarrollos, precostear y administrar
+    // listas de precios es trabajo de PRE-VENTA (Directivo/Gerencial/Ventas). De Logística hacia
+    // abajo se corta administrar/precostear (mismo precedente que `precostos.consultar`, ≤45).
+    // `desarrollo.ver` y `listas.ver` NO se cortan: la CONSULTA cascadea amplia (hasta Secretarial).
+    'desarrollo.administrar',
+    'desarrollo.precostear',
+    'listas.administrar',
   );
 
   // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC
@@ -303,8 +357,10 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  { codigo: 'estampado', nombre: 'Estampado' },
-  { codigo: 'bordado', nombre: 'Bordado' },
+  // Vocabulario unificado (Daniel, jul-2026): estampado y bordado son ARTE; el proveedor que los
+  // presta es un "Prov. de Arte". Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
+  { codigo: 'estampado', nombre: 'Prov. de Arte (estampado)' },
+  { codigo: 'bordado', nombre: 'Prov. de Arte (bordado)' },
   { codigo: 'lavado', nombre: 'Lavado' },
   { codigo: 'aplicacion', nombre: 'Aplicación' },
   // Venta de materiales (proveedores comerciales).
@@ -636,8 +692,8 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[] = [
   { clave: 'InfGeneral', etiqueta: 'Información general', orden: 1 },
   { clave: 'InfTela', etiqueta: 'Información de tela', orden: 2 },
-  { clave: 'InfHab', etiqueta: 'Información de habilitación', orden: 3 },
-  { clave: 'Medidas', etiqueta: 'Medidas de habilitación', orden: 4 },
+  { clave: 'InfHab', etiqueta: 'Información de avíos', orden: 3 },
+  { clave: 'Medidas', etiqueta: 'Medidas de avíos', orden: 4 },
   { clave: 'Dibujo', etiqueta: 'Dibujo', orden: 5 },
   { clave: 'InfEtiqueta', etiqueta: 'Información de etiqueta', orden: 6 },
   { clave: 'EspCostura', etiqueta: 'Especificaciones de costura', orden: 7 },
@@ -651,6 +707,77 @@ async function sembrarReactivosFicha(prisma: PrismaClient): Promise<void> {
       // Idempotente: no pisa etiqueta/orden/activo si ya existe (pudieron editarse en producción).
       update: {},
       create: { clave: reactivo.clave, etiqueta: reactivo.etiqueta, orden: reactivo.orden },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3h. Conceptos de costo (F8-E1, R19) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Conceptos de costo del precosto (F8-E1, R19 — propuesta §3/§7-C). Catálogo que gobierna por DATO
+ * los renglones del precosto (como `TipoProceso` gobierna el kardex). `fijo=true` (tela/avíos/
+ * maquila) ⇒ NO desactivable (lo exige el dominio de admin). El resto son ampliables. La REGALÍA NO
+ * es concepto (D2: va sobre la venta — factor de la lista, E4). Se siembran por `codigo`; `update`
+ * NO pisa nombre/orden/fijo/activo si ya existe (idempotente; pudo editarse en producción).
+ */
+const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fijo: boolean }[] = [
+  { codigo: 'tela', nombre: 'Tela', orden: 1, fijo: true },
+  { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
+  { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
+  { codigo: 'estampado', nombre: 'Estampado', orden: 4, fijo: false },
+  { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+  { codigo: 'otros-procesos', nombre: 'Otros procesos', orden: 6, fijo: false },
+  { codigo: 'otros', nombre: 'Otros', orden: 7, fijo: false },
+  // Corte (rediseño R5, B8): costo fijo por prenda SEPARADO de la maquila (decisión Daniel). El
+  // precosto crea su renglón fijo auto (`lineaCorte`). REQUIERE re-seed en `prueba` (SEED_ON_START):
+  // sin este concepto, `generarPrecosto` truena ("falta el concepto de costo base corte").
+  { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+];
+
+async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
+  for (const concepto of CONCEPTOS_COSTO_BASE) {
+    await prisma.conceptoCosto.upsert({
+      where: { codigo: concepto.codigo },
+      update: {},
+      create: {
+        codigo: concepto.codigo,
+        nombre: concepto.nombre,
+        orden: concepto.orden,
+        fijo: concepto.fijo,
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3i. Estados de lista de precios (F8-E1, R20) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Estados de una lista de precios (F8-E1, R20 — propuesta §4). Catálogo configurable (ampliable,
+ * decisión de Daniel). `esCierre=true` (cerrada/ya-pedida) bloquea nuevas rondas de negociación
+ * (regla de dominio, E5). Se siembran por `codigo`; `update` NO pisa nombre/orden/esCierre/activo.
+ */
+const ESTADOS_LISTA_BASE: { codigo: string; nombre: string; orden: number; esCierre: boolean }[] = [
+  { codigo: 'abierta', nombre: 'Abierta', orden: 1, esCierre: false },
+  { codigo: 'en-negociacion', nombre: 'En negociación', orden: 2, esCierre: false },
+  { codigo: 'cerrada', nombre: 'Cerrada', orden: 3, esCierre: true },
+  { codigo: 'ya-pedida', nombre: 'Ya pedida', orden: 4, esCierre: true },
+];
+
+async function sembrarEstadosLista(prisma: PrismaClient): Promise<void> {
+  for (const estado of ESTADOS_LISTA_BASE) {
+    await prisma.estadoLista.upsert({
+      where: { codigo: estado.codigo },
+      update: {},
+      create: {
+        codigo: estado.codigo,
+        nombre: estado.nombre,
+        orden: estado.orden,
+        esCierre: estado.esCierre,
+      },
     });
   }
 }
@@ -720,6 +847,11 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
   // filas configurables (A6). Idempotente por clave.
   await sembrarReactivosFicha(prisma);
+  // Desarrollo/Cotización (F8-E1): conceptos de costo (R19; tela/avíos/maquila fijos) y estados de
+  // lista (R20; cerrada/ya-pedida son de cierre). Idempotentes por `codigo`. Entran por SEED (no por
+  // migración) → el deploy a `prueba` requiere SEED_ON_START=true.
+  await sembrarConceptosCosto(prisma);
+  await sembrarEstadosLista(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").

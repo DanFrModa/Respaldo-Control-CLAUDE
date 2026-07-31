@@ -37,6 +37,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
     totalPiezas: 30,
     huboCambios: false,
     regenerado: false,
+    avisos: [],
     grupos: [
       {
         idProveedor: 7,

@@ -272,3 +272,54 @@ export const esquemaNotasSalidaPagina = z
 
 /** Forma de la página de notas de salida. */
 export type NotasSalidaPagina = z.infer<typeof esquemaNotasSalidaPagina>;
+
+// ── Resumen de cabecera (KPIs `vNotasSalida`, rediseño R9) ──────────────────────────────────────
+
+/**
+ * Filtros del resumen de notas (querystring). Sub-conjunto de los del listado que ACOTA el
+ * universo (búsqueda/maquilero/orden). El estatus NO se recibe: el resumen DESGLOSA por estatus
+ * él mismo (mismo criterio que el resumen de OC, que tampoco recibe estatus).
+ */
+export const esquemaResumenNotasQuery = z
+  .object({
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Texto a buscar (folio o nombre del maquilero).'),
+    idMaquilero: z.coerce.number().int().positive().optional().describe('Filtra por maquilero.'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Notas que envían material a esta orden de producción.'),
+  })
+  .describe('Filtros del resumen de notas de salida (KPIs de cabecera).');
+
+/** Parámetros del resumen de notas ya coaccionados desde la URL. */
+export type ResumenNotasQuery = z.infer<typeof esquemaResumenNotasQuery>;
+
+/**
+ * Resumen de cabecera de notas de salida (KPIs `vNotasSalida`): conteos por estatus del universo
+ * filtrado + órdenes de producción DISTINTAS con material enviado (renglones de notas
+ * CONFIRMADAS). Todo agregado EN SERVIDOR (A1) con el MISMO `where` del listado.
+ */
+export const esquemaResumenNotasSalida = z
+  .object({
+    notas: z
+      .number()
+      .int()
+      .describe('Total de notas del filtro (todas: borradores + confirmadas + canceladas).'),
+    borradores: z.number().int().describe('# de notas en borrador (sin descontar).'),
+    confirmadas: z.number().int().describe('# de notas confirmadas (material descontado).'),
+    ordenesSurtidas: z
+      .number()
+      .int()
+      .describe('# de órdenes de producción distintas en renglones de notas CONFIRMADAS.'),
+  })
+  .describe('Resumen de cabecera de notas de salida (KPIs).');
+
+/** Forma del resumen de notas de salida. */
+export type ResumenNotasSalida = z.infer<typeof esquemaResumenNotasSalida>;

@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { existenciaAvioBloqueada, existenciaTelaBloqueada } from '../../comun/kardex.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type {
@@ -23,6 +28,7 @@ import {
   confirmarNotaSalida,
   crearNotaSalida,
   listarNotasSalida,
+  resumenNotasSalida,
 } from './notas-salida.js';
 
 /**
@@ -700,5 +706,111 @@ describe('Notas de salida (F4-E5) — consultas', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+describe('Notas de salida — resumen de cabecera (KPIs vNotasSalida, R9)', () => {
+  /** Crea una nota (un renglón de avío por orden) y devuelve su id. */
+  async function crearNota(idsOrden: number[]): Promise<number> {
+    const nota = await crearNotaSalida(
+      sesion(PERM_ADMIN),
+      {
+        idMaquilero: maquilero.id,
+        idAlmacen: almacen.id,
+        fechaElaboracion: '2026-06-21',
+        lineas: idsOrden.map((idOrden) => ({
+          idOrden,
+          idAvio: avioBoton.id,
+          cantidad: 5,
+          unidad: 'pza',
+        })),
+      },
+      bd(),
+    );
+    return nota.id;
+  }
+
+  /** Otra orden del mismo modelo/cliente (folios distintos para no chocar con la del beforeEach). */
+  async function crearOrden(folio: number): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: BigInt(folio),
+        idEmpresa: empresa.id,
+        idModelo: modeloId,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+      },
+    });
+    return orden.id;
+  }
+
+  it('cuenta por estatus y las órdenes surtidas DISTINTAS de notas confirmadas (sumas a mano)', async () => {
+    await sembrarAvio(1000);
+    const orden2 = await crearOrden(2);
+    const orden3 = await crearOrden(3);
+
+    // A mano: 1 borrador + 2 confirmadas + 1 cancelada = 4 notas.
+    await crearNota([ordenId]); // borrador
+    const n2 = await crearNota([ordenId]);
+    await confirmarNotaSalida(sesion(PERM_ADMIN), n2, bd());
+    const n3 = await crearNota([ordenId, orden2]); // 2 renglones, 2 órdenes
+    await confirmarNotaSalida(sesion(PERM_ADMIN), n3, bd());
+    const n4 = await crearNota([orden3]);
+    await confirmarNotaSalida(sesion(PERM_ADMIN), n4, bd());
+    await cancelarNotaSalida(
+      sesion(PERM_CANCELAR),
+      n4,
+      { motivo: 'Se equivocó el capturista' },
+      bd(),
+    );
+
+    const resumen = await resumenNotasSalida(sesion(PERM_ADMIN), {}, bd());
+    expect(resumen.notas).toBe(4);
+    expect(resumen.borradores).toBe(1);
+    expect(resumen.confirmadas).toBe(2);
+    // Órdenes surtidas = {ordenId, orden2} de las CONFIRMADAS; la orden3 NO cuenta (su nota se
+    // canceló y el material regresó) aunque la nota sí cuenta en el total.
+    expect(resumen.ordenesSurtidas).toBe(2);
+  });
+
+  it('acota el universo con los MISMOS filtros del listado (maquilero) y por empresa (A9)', async () => {
+    await sembrarAvio(1000);
+    const otroMaquilero = await cliente.proveedor.create({ data: { nombre: 'Maquila del Norte' } });
+
+    const n1 = await crearNota([ordenId]);
+    await confirmarNotaSalida(sesion(PERM_ADMIN), n1, bd());
+    await crearNotaSalida(
+      sesion(PERM_ADMIN),
+      {
+        idMaquilero: otroMaquilero.id,
+        idAlmacen: almacen.id,
+        fechaElaboracion: '2026-06-21',
+        lineas: [{ idOrden: ordenId, idAvio: avioBoton.id, cantidad: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+
+    // Filtro por maquilero: solo el universo del Norte (1 borrador, 0 confirmadas).
+    const porMaquilero = await resumenNotasSalida(
+      sesion(PERM_ADMIN),
+      { idMaquilero: otroMaquilero.id },
+      bd(),
+    );
+    expect(porMaquilero).toEqual({ notas: 1, borradores: 1, confirmadas: 0, ordenesSurtidas: 0 });
+
+    // Búsqueda por nombre (mismo criterio que el listado).
+    const porBusqueda = await resumenNotasSalida(sesion(PERM_ADMIN), { busqueda: 'Sur' }, bd());
+    expect(porBusqueda.notas).toBe(1);
+    expect(porBusqueda.confirmadas).toBe(1);
+
+    // Otra empresa NO ve nada (A9).
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    const deOtraEmpresa = await resumenNotasSalida(sesion(PERM_ADMIN, otraEmpresa.id), {}, bd());
+    expect(deOtraEmpresa).toEqual({ notas: 0, borradores: 0, confirmadas: 0, ordenesSurtidas: 0 });
+  });
+
+  it('deny-by-default (A4): sin `notas.ver` el resumen se rechaza', async () => {
+    await expect(resumenNotasSalida(sesion([]), {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
   });
 });

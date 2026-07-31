@@ -88,9 +88,18 @@ function consultaConDatos(datos: Usuario[]): EstadoConsulta {
 
 const ADMIN = ['usuarios.administrar'] as const;
 
-/** Atajo: el panel de detalle (donde viven las acciones del registro seleccionado). */
+/** Atajo: el cuerpo del cajón de detalle (donde viven datos/roles del usuario). */
 function detalle(): HTMLElement {
   return screen.getByTestId('detalle-usuario');
+}
+
+/** Atajo: el cajón completo (su TÍTULO trae el estado Activo/Inactivo/Bloqueado). */
+function cajon(): HTMLElement {
+  const el = screen.getByTestId('detalle-usuario').closest('[data-slot="cajon-detalle"]');
+  if (el === null) {
+    throw new Error('No se encontró el cajón de detalle.');
+  }
+  return el as HTMLElement;
 }
 
 describe('<UsuariosPagina>', () => {
@@ -113,10 +122,9 @@ describe('<UsuariosPagina>', () => {
     useUsuarios.mockReturnValue(consultaConDatos([usuario('u1', 'admin'), usuario('u2', 'ana')]));
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // Dos renglones; el primero queda auto-seleccionado (su @usuario aparece tambien
-    // en el detalle), por eso se busca con getAllByText.
+    // Tabla-first: el detalle NO se auto-abre; cada usuario sale en su renglón (@usuario).
     expect(screen.getAllByTestId('fila-usuario')).toHaveLength(2);
-    expect(screen.getAllByText('@admin').length).toBeGreaterThan(0);
+    expect(screen.getByText('@admin')).toBeInTheDocument();
     expect(screen.getByText('@ana')).toBeInTheDocument();
   });
 
@@ -158,12 +166,11 @@ describe('<UsuariosPagina>', () => {
     useUsuarios.mockReturnValue(consultaConDatos([usuario('u7', 'pedro')]));
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    // Tabla-first: primero se abre el cajón con clic en el renglón; "Desactivar" vive ahí.
+    await u.click(screen.getByTestId('fila-usuario'));
     await u.click(screen.getByTestId('desactivar-usuario'));
 
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Desactivar usuario')).toBeInTheDocument();
-
+    // El diálogo de confirmación es el que trae el botón `confirmar-accion`.
     await u.click(screen.getByTestId('confirmar-accion'));
     expect(desactivarMutate).toHaveBeenCalledWith('u7', expect.anything());
   });
@@ -173,14 +180,15 @@ describe('<UsuariosPagina>', () => {
     useUsuarios.mockReturnValue(consultaConDatos([usuario('u9', 'apagado', { activo: false })]));
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
-    expect(within(detalle()).getByText('Inactivo')).toBeInTheDocument();
+    await u.click(screen.getByTestId('fila-usuario'));
+    // El estado "Inactivo" se pinta en el título del cajón; el detalle ofrece "Activar".
+    expect(within(cajon()).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-usuario')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-usuario')).not.toBeInTheDocument();
 
     await u.click(screen.getByTestId('activar-usuario'));
-    // Reactivar es no destructivo: NO abre diálogo.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Reactivar es no destructivo: NO abre diálogo de confirmación.
+    expect(screen.queryByTestId('confirmar-accion')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith('u9', expect.anything());
   });
 
@@ -191,27 +199,32 @@ describe('<UsuariosPagina>', () => {
     );
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // El detalle del usuario seleccionado lo marca como bloqueado.
-    expect(within(detalle()).getByText('Bloqueado')).toBeInTheDocument();
+    await u.click(screen.getByTestId('fila-usuario'));
+    // El título del cajón lo marca como bloqueado.
+    expect(within(cajon()).getByText('Bloqueado')).toBeInTheDocument();
 
     // "Desbloquear" es una accion extra del detalle (directa, sin diálogo).
     await u.click(screen.getByTestId('desbloquear-usuario'));
     expect(desbloquearMutate).toHaveBeenCalledWith('u3', expect.anything());
   });
 
-  it('un usuario sin bloqueo no ofrece la acción de desbloquear', () => {
+  it('un usuario sin bloqueo no ofrece la acción de desbloquear', async () => {
+    const u = userEvent.setup();
     useUsuarios.mockReturnValue(consultaConDatos([usuario('u1', 'admin')]));
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
+    await u.click(screen.getByTestId('fila-usuario'));
     expect(screen.queryByTestId('desbloquear-usuario')).not.toBeInTheDocument();
   });
 
-  it('muestra los roles del usuario seleccionado en el detalle', () => {
+  it('muestra los roles del usuario seleccionado en el detalle', async () => {
+    const u = userEvent.setup();
     useUsuarios.mockReturnValue(
       consultaConDatos([usuario('u1', 'admin', { roles: [rol(1, 'Administrador')] })]),
     );
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
+    await u.click(screen.getByTestId('fila-usuario'));
     expect(within(detalle()).getByText('Administrador')).toBeInTheDocument();
   });
 
@@ -228,9 +241,9 @@ describe('<UsuariosPagina>', () => {
     expect(within(dialogo).getByTestId('selector-roles')).toBeInTheDocument();
     expect(within(dialogo).getByText('Administrador')).toBeInTheDocument();
 
-    await u.type(within(dialogo).getByLabelText('Usuario'), 'nuevo');
-    await u.type(within(dialogo).getByLabelText('Nombre'), 'Persona Nueva');
-    await u.type(within(dialogo).getByLabelText('Contraseña'), 'secreto-largo');
+    await u.type(within(dialogo).getByLabelText(/^Usuario/), 'nuevo');
+    await u.type(within(dialogo).getByLabelText(/^Nombre/), 'Persona Nueva');
+    await u.type(within(dialogo).getByLabelText(/^Contraseña/), 'secreto-largo');
     // Marca el rol "Básico" (id 2).
     await u.click(within(dialogo).getByTestId('rol-opcion-2'));
 
@@ -249,7 +262,8 @@ describe('<UsuariosPagina>', () => {
     useUsuarios.mockReturnValue(consultaConDatos([usuario('u4', 'cambia')]));
     renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    // "Cambiar contraseña" es una accion extra del detalle del usuario seleccionado.
+    // "Cambiar contraseña" es una accion extra del detalle: primero se abre el cajón.
+    await u.click(screen.getByTestId('fila-usuario'));
     await u.click(screen.getByTestId('contrasena-usuario'));
 
     const dialogo = await screen.findByRole('dialog');

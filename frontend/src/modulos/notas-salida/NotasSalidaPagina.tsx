@@ -1,95 +1,162 @@
 import {
-  Building2,
-  Calendar,
   CheckCircle2,
-  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
   Pencil,
+  Plus,
   Printer,
-  Send,
-  Truck,
-  UserRound,
-  Warehouse,
+  Search,
   XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { imprimirNota, useConfirmarNota, useNotasSalida } from '@/api/notas-salida';
+import { useEmpresas } from '@/api/empresas';
+import {
+  imprimirNota,
+  useConfirmarNota,
+  useNotasSalida,
+  useResumenNotas,
+} from '@/api/notas-salida';
 import { useProveedores } from '@/api/proveedores';
-import type { EstatusNotaSalida, NotaSalida, NotasSalidaQuery } from '@/api/tipos';
-import { Avatar } from '@/components/dominio/visuales';
+import type { NotaSalida, NotasSalidaQuery, ResumenNotasQuery } from '@/api/tipos';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
-import { DetalleRenglonesNota } from './DetalleRenglonesNota';
+import { TarjetaNota } from './TarjetaNota';
 import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
-import { ETIQUETA_ESTATUS_NOTA, EstatusNotaBadge, fechaCortaNota } from './piezas';
+import { DialogoNotaTela } from './DialogoNotaTela';
+import {
+  TONO_ESTATUS_NOTA as TONO_NOTA,
+  descripcionMaterialNota,
+  fechaCortaNota,
+  ordenesDeNota,
+} from './piezas';
 
-/** Renglones por página del listado. */
-const POR_PAGINA = 10;
+/** Renglones por página del listado (tabla densa). */
+const POR_PAGINA = 20;
 
-/** Estatus para el filtro (todos los del enum). */
-const ESTATUS_FILTRO: readonly EstatusNotaSalida[] = ['borrador', 'confirmada', 'cancelada'];
+/** Chips de filtro por estatus (proto: Todas / Borradores / Confirmadas / Canceladas). */
+const FILTROS_ESTATUS = [
+  { clave: 'todas', etiqueta: 'Todas' },
+  { clave: 'borrador', etiqueta: 'Borradores' },
+  { clave: 'confirmada', etiqueta: 'Confirmadas' },
+  { clave: 'cancelada', etiqueta: 'Canceladas' },
+] as const;
+
+type FiltroEstatus = (typeof FILTROS_ESTATUS)[number]['clave'];
 
 /**
- * Pantalla de NOTAS DE SALIDA (F4-E5) sobre el motor LISTA + DETALLE. La lista busca (folio /
- * maquilero) con paginación de servidor y filtros (maquilero, estatus); el detalle muestra el
- * encabezado, los renglones (avío/tela con su traza al kardex) y las acciones. Crear/editar exigen
- * `notas.administrar`; confirmar también; cancelar `notas.cancelar`. Las acciones de escritura se
- * ocultan sin permiso; la decisión real la toma el backend (A1). Reemplaza Notas / NotasSub.
+ * Pantalla de NOTAS DE SALIDA (F4-E5, re-vestida R9 al proto `vNotasSalida`): page-head + card con
+ * chips de estatus/búsqueda + TABLA DENSA (nota, maquilero, empresa, órdenes surtidas, renglones,
+ * estatus) y CAJÓN de detalle al elegir un renglón (encabezado, material por orden y acciones según
+ * estatus). Crear/editar exigen `notas.administrar`; confirmar también; cancelar `notas.cancelar`.
+ * Las acciones de escritura se ocultan sin permiso; la decisión real la toma el backend (A1).
+ * Reemplaza Notas / NotasSub.
  */
 export function NotasSalidaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('notas.administrar');
   const puedeCancelar = tienePermiso('notas.cancelar');
+  // La nota de TELAS reusa el motor F4 (salida de tela a orden) → permiso propio (§4.6 dec. 2).
+  const puedeMoverTela = tienePermiso('inventario-telas.mover');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [incluirCanceladas, setIncluirCanceladas] = useState(false);
+  const [filtroEstatus, setFiltroEstatus] = useState<FiltroEstatus>('todas');
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);
-  const [estatus, setEstatus] = useState<EstatusNotaSalida | ''>('');
   const [pagina, setPagina] = useState(1);
+  const [idSeleccion, setIdSeleccion] = useState<number | null>(null);
 
   const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  // El listado solo trae `idEmpresa`: el nombre sale del catálogo (lookup de presentación).
+  const empresas = useEmpresas();
+  const nombreEmpresa = useMemo(() => {
+    const porId = new Map<number, string>();
+    for (const e of empresas.data ?? []) {
+      porId.set(e.id, e.nombre);
+    }
+    return porId;
+  }, [empresas.data]);
 
   const query: NotasSalidaQuery = {
     pagina,
     porPagina: POR_PAGINA,
     ordenarPor: 'numNota',
     direccion: 'desc',
-    incluirCanceladas: incluirCanceladas ? 'true' : 'false',
+    // "Todas" y "Canceladas" incluyen las canceladas; Borradores/Confirmadas no las necesitan.
+    incluirCanceladas:
+      filtroEstatus === 'todas' || filtroEstatus === 'cancelada' ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(idMaquilero !== null ? { idMaquilero } : {}),
-    ...(estatus !== '' ? { estatus } : {}),
+    ...(filtroEstatus !== 'todas' ? { estatus: filtroEstatus } : {}),
   };
 
   const consulta = useNotasSalida(query);
   const confirmar = useConfirmarNota();
 
+  // Resumen de cabecera (KPIs vNotasSalida): mismo universo por búsqueda/maquilero, agregado EN
+  // SERVIDOR (A1); el estatus no se manda (el resumen desglosa por estatus él mismo).
+  const resumenQuery: ResumenNotasQuery = {
+    ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(idMaquilero !== null ? { idMaquilero } : {}),
+  };
+  const resumen = useResumenNotas(resumenQuery);
+  const kpis: Kpi[] = [
+    {
+      clave: 'notas',
+      etiqueta: 'Notas de salida',
+      valor: (resumen.data?.notas ?? 0).toLocaleString('es-MX'),
+      pie: 'del filtro actual',
+    },
+    {
+      clave: 'borradores',
+      etiqueta: 'Borradores',
+      valor: (resumen.data?.borradores ?? 0).toLocaleString('es-MX'),
+      pie: 'por confirmar · sin descontar',
+    },
+    {
+      clave: 'confirmadas',
+      etiqueta: 'Confirmadas',
+      valor: (resumen.data?.confirmadas ?? 0).toLocaleString('es-MX'),
+      pie: 'material descontado',
+    },
+    {
+      clave: 'ordenes-surtidas',
+      etiqueta: 'Órdenes surtidas',
+      valor: (resumen.data?.ordenesSurtidas ?? 0).toLocaleString('es-MX'),
+      pie: 'con material enviado',
+    },
+  ];
+
   // ── Diálogos ───────────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ nota?: NotaSalida; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<NotaSalida | null>(null);
-  const [idAEnfocar, setIdAEnfocar] = useState<number | null>(null);
+  const [notaTelaAbierta, setNotaTelaAbierta] = useState(false);
 
   function alGuardada(idNueva: number): void {
+    // La nota recién guardada queda a la vista (folio desc → página 1) y abierta en el cajón.
     setTextoBusqueda('');
     setPagina(1);
-    setIdAEnfocar(idNueva);
-  }
-
-  function alBuscar(valor: string): void {
-    setTextoBusqueda(valor);
-    setPagina(1);
-  }
-  function alAlternarCanceladas(): void {
-    setIncluirCanceladas((v) => !v);
-    setPagina(1);
+    setIdSeleccion(idNueva);
   }
 
   function confirmarNota(nota: NotaSalida): void {
@@ -101,151 +168,296 @@ export function NotasSalidaPagina(): React.JSX.Element {
   }
 
   const datos = consulta.data;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
-      }
-    : undefined;
-
-  const filtros = (
-    <div className="space-y-2">
-      <SelectNativo
-        aria-label="Filtrar por maquilero"
-        value={idMaquilero === null ? '' : String(idMaquilero)}
-        onChange={(e) => {
-          setIdMaquilero(e.target.value === '' ? null : Number(e.target.value));
-          setPagina(1);
-        }}
-        data-testid="filtro-maquilero-nota"
-      >
-        <option value="">Todos los maquileros</option>
-        {(proveedores.data?.datos ?? []).map((p) => (
-          <option key={p.id} value={String(p.id)}>
-            {p.nombre}
-          </option>
-        ))}
-      </SelectNativo>
-      <SelectNativo
-        aria-label="Filtrar por estatus"
-        value={estatus}
-        onChange={(e) => {
-          setEstatus(e.target.value as EstatusNotaSalida | '');
-          setPagina(1);
-        }}
-        data-testid="filtro-estatus-nota"
-      >
-        <option value="">Todos los estatus</option>
-        {ESTATUS_FILTRO.map((s) => (
-          <option key={s} value={s}>
-            {ETIQUETA_ESTATUS_NOTA[s]}
-          </option>
-        ))}
-      </SelectNativo>
-    </div>
-  );
+  const filas = datos?.datos ?? [];
+  const total = datos?.total ?? 0;
+  const totalPaginas = datos?.totalPaginas ?? 1;
+  const notaSeleccionada = filas.find((n) => n.id === idSeleccion);
 
   return (
-    <>
-      <ListaDetalle<NotaSalida>
-        testid="nota"
-        titulo="Notas de salida"
-        descripcion="Envío de material (telas y avíos) a maquileros contra una orden."
-        icono={Send}
-        registros={datos?.datos ?? []}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(n) => n.id}
-        obtenerTitulo={(n) => `Nota ${n.numNota}`}
-        obtenerActivo={(n) => n.estatus !== 'cancelada'}
-        obtenerSecundaria={(n) => `${n.maquilero} · ${fechaCortaNota(n.fechaElaboracion)}`}
-        renderAvatarLista={(n) => <Avatar nombre={n.maquilero} tono="neutro" tamano="sm" />}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        filtros={filtros}
-        incluirInactivos={incluirCanceladas}
-        alAlternarInactivos={alAlternarCanceladas}
-        textoVacio="No hay notas de salida que coincidan con la búsqueda."
-        paginacion={paginacion}
-        seleccionInicialId={idAEnfocar}
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={() => setEditar({ soloLectura: false })}
-        textoNuevo="Nueva nota"
-        alEditar={() => undefined}
-        alDesactivar={() => undefined}
-        alReactivar={() => undefined}
-        renderAvatarDetalle={(n) => <Avatar nombre={n.maquilero} tono="neutro" tamano="lg" />}
-        renderMeta={(n) => (
-          <span className="flex flex-wrap items-center gap-2">
-            <EstatusNotaBadge estatus={n.estatus} />
-            <span className="text-sm text-muted-foreground">{n.maquilero}</span>
-          </span>
-        )}
-        ocultarAccionesBase
-        accionesExtra={(n) => (
-          <span className="flex flex-wrap items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
+      {/* ── Encabezado de página (proto `page-head`) ─────────────────────── */}
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Notas de salida
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Envío de material (telas y avíos) a maquileros · descuenta el inventario · por orden de
+            producción
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {puedeMoverTela ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => imprimirNota(n.id)}
-              data-testid="imprimir-nota"
+              onClick={() => setNotaTelaAbierta(true)}
+              data-testid="nueva-nota-tela"
             >
-              <Printer aria-hidden />
-              Imprimir
+              <Layers aria-hidden />
+              Nueva nota de telas
             </Button>
-            {puedeAdministrar && n.estatus === 'borrador' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditar({ nota: n, soloLectura: false })}
-                data-testid="editar-nota"
-              >
-                <Pencil aria-hidden />
-                Editar
-              </Button>
-            ) : puedeAdministrar ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditar({ nota: n, soloLectura: true })}
-                data-testid="ver-nota"
-              >
-                <FileText aria-hidden />
-                Ver
-              </Button>
-            ) : null}
-            {puedeAdministrar && n.estatus === 'borrador' ? (
-              <Button
-                size="sm"
-                onClick={() => confirmarNota(n)}
-                disabled={confirmar.isPending}
-                data-testid="confirmar-nota-accion"
-              >
-                <CheckCircle2 aria-hidden />
-                Confirmar
-              </Button>
-            ) : null}
-            {puedeCancelar && n.estatus !== 'cancelada' ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setACancelar(n)}
-                data-testid="cancelar-nota"
-              >
-                <XCircle aria-hidden />
-                Cancelar
-              </Button>
-            ) : null}
+          ) : null}
+          {puedeAdministrar ? (
+            <Button
+              size="sm"
+              onClick={() => setEditar({ soloLectura: false })}
+              data-testid="nuevo-nota"
+            >
+              <Plus aria-hidden />
+              Nueva nota
+            </Button>
+          ) : null}
+        </div>
+      </header>
+
+      {/* ── KPIs de vistazo (resumen de cabecera, agregado en servidor) ──── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
+
+      {/* ── Card: chips de estatus + búsqueda + tabla + paginación ───────── */}
+      <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <ChipsFiltro
+            etiqueta="Filtrar por estatus"
+            opciones={FILTROS_ESTATUS.map((f) => ({
+              valor: f.clave,
+              etiqueta: f.etiqueta,
+              testid: `notas-chip-${f.clave}`,
+            }))}
+            valor={filtroEstatus}
+            alCambiar={(valor) => {
+              setFiltroEstatus(valor);
+              setPagina(1);
+            }}
+          />
+          <div className="relative w-[200px]">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              value={textoBusqueda}
+              onChange={(e) => {
+                setTextoBusqueda(e.target.value);
+                setPagina(1);
+              }}
+              placeholder="Buscar nota, maquilero, orden…"
+              className="h-8 pl-8 text-sm"
+              aria-label="Buscar notas de salida"
+              data-testid="notas-busqueda"
+            />
+          </div>
+          {/* Filtro por maquilero (funcional, se conserva del F4-E5; el proto no lo trae). */}
+          <SelectNativo
+            className="w-44 h-8 text-sm"
+            aria-label="Filtrar por maquilero"
+            value={idMaquilero === null ? '' : String(idMaquilero)}
+            onChange={(e) => {
+              setIdMaquilero(e.target.value === '' ? null : Number(e.target.value));
+              setPagina(1);
+            }}
+            data-testid="filtro-maquilero-nota"
+          >
+            <option value="">Todos los maquileros</option>
+            {(proveedores.data?.datos ?? []).map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.nombre}
+              </option>
+            ))}
+          </SelectNativo>
+          <span className="ml-auto text-[12px] text-faint">
+            {total.toLocaleString('es-MX')} notas
           </span>
+        </div>
+
+        <div className="overflow-auto lg:min-h-0 lg:flex-1">
+          {consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando notas…</p>
+          ) : consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : filas.length === 0 ? (
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="notas-vacio"
+            >
+              No hay notas de salida que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla densa se apachurra en teléfono. Mismo
+                  clic (selecciona → cajón) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="notas-tarjetas">
+                {filas.map((nota) => (
+                  <TarjetaNota
+                    key={nota.id}
+                    nota={nota}
+                    nombreEmpresa={nombreEmpresa.get(nota.idEmpresa) ?? `Empresa ${nota.idEmpresa}`}
+                    seleccionada={nota.id === idSeleccion}
+                    onClick={() => setIdSeleccion(nota.id)}
+                    testid="nota"
+                  />
+                ))}
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block">
+                <TablaDensa data-testid="notas-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Nota</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead>Empresa</TablaDensaHead>
+                      <TablaDensaHead>Órdenes surtidas</TablaDensaHead>
+                      <TablaDensaHead numerica>Renglones</TablaDensaHead>
+                      <TablaDensaHead>Estatus</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((nota) => {
+                      const chip = TONO_NOTA[nota.estatus];
+                      const ordenes = ordenesDeNota(nota);
+                      return (
+                        <TablaDensaFila
+                          key={nota.id}
+                          seleccionada={nota.id === idSeleccion}
+                          onClick={() => setIdSeleccion(nota.id)}
+                          className="cursor-pointer"
+                          data-testid="nota-fila"
+                        >
+                          <TablaDensaCelda>
+                            <span className="flex items-center gap-[9px]">
+                              {/* Proto `.thumb`: cuadro 30px verde con "NS". */}
+                              <span
+                                aria-hidden
+                                className="flex size-[30px] shrink-0 items-center justify-center rounded-[7px] bg-linear-150 from-[#7bd6a6] to-[#2f9c66] text-[11px] font-bold text-[#04140c]"
+                              >
+                                NS
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block font-medium">Nota {nota.numNota}</span>
+                                <span className="num block text-[11px] text-faint">
+                                  {fechaCortaNota(nota.fechaElaboracion)}
+                                </span>
+                              </span>
+                            </span>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda className="font-medium">
+                            {nota.maquilero}
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <ChipEstado tono="neutro">
+                              {nombreEmpresa.get(nota.idEmpresa) ?? `Empresa ${nota.idEmpresa}`}
+                            </ChipEstado>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
+                            {/* Proto `opChips`: máx 3 folios + "+N". */}
+                            <span className="inline-flex flex-wrap gap-1">
+                              {ordenes.slice(0, 3).map((folio) => (
+                                <span
+                                  key={folio}
+                                  className="num inline-flex h-5 items-center rounded-md bg-primary-soft px-[7px] text-[11.5px] font-semibold text-primary-soft-foreground"
+                                >
+                                  {folio}
+                                </span>
+                              ))}
+                              {ordenes.length > 3 ? (
+                                <span className="num inline-flex h-5 items-center rounded-md bg-muted px-[7px] text-[11.5px] font-semibold text-muted-foreground">
+                                  +{ordenes.length - 3}
+                                </span>
+                              ) : null}
+                              {ordenes.length === 0 ? <span className="text-faint">—</span> : null}
+                            </span>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{nota.lineas.length}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <ChipEstado tono={chip.tono}>{chip.texto}</ChipEstado>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
+                      );
+                    })}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Paginación de servidor. */}
+        <div className="flex shrink-0 items-center justify-between border-t px-3 py-1.5 text-xs text-muted-foreground">
+          <span>
+            Página {pagina} de {totalPaginas} · {total.toLocaleString('es-MX')} notas
+          </span>
+          <span className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina <= 1 || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina >= totalPaginas || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </Button>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle (proto `drawerNotaSalida`) ──────────────────── */}
+      <CajonDetalle
+        abierto={idSeleccion !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setIdSeleccion(null);
+        }}
+        titulo={
+          notaSeleccionada !== undefined ? (
+            <span className="flex items-center gap-2">
+              Nota {notaSeleccionada.numNota}
+              <ChipEstado tono={TONO_NOTA[notaSeleccionada.estatus].tono}>
+                {TONO_NOTA[notaSeleccionada.estatus].texto}
+              </ChipEstado>
+            </span>
+          ) : (
+            'Nota de salida'
+          )
+        }
+        subtitulo={
+          notaSeleccionada !== undefined
+            ? `${notaSeleccionada.maquilero} · ${
+                nombreEmpresa.get(notaSeleccionada.idEmpresa) ?? '—'
+              }`
+            : undefined
+        }
+      >
+        {notaSeleccionada !== undefined ? (
+          <DetalleNota
+            nota={notaSeleccionada}
+            empresa={nombreEmpresa.get(notaSeleccionada.idEmpresa) ?? '—'}
+            puedeAdministrar={puedeAdministrar}
+            puedeCancelar={puedeCancelar}
+            confirmando={confirmar.isPending}
+            alEditar={() => setEditar({ nota: notaSeleccionada, soloLectura: false })}
+            alConfirmar={() => confirmarNota(notaSeleccionada)}
+            alCancelar={() => setACancelar(notaSeleccionada)}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Cargando nota…</p>
         )}
-        renderDetalle={(n) => <DetalleNota nota={n} />}
-      />
+      </CajonDetalle>
 
       {editar !== null ? (
         <DialogoEditarNota
@@ -270,62 +482,218 @@ export function NotasSalidaPagina(): React.JSX.Element {
         }}
         nota={aCancelar ?? undefined}
       />
-    </>
+
+      <DialogoNotaTela
+        abierto={notaTelaAbierta}
+        alCambiarAbierto={setNotaTelaAbierta}
+        alGuardada={() => void consulta.refetch()}
+      />
+    </div>
   );
 }
 
-/** Panel de DETALLE de una nota: encabezado, renglones y traza al kardex. */
-function DetalleNota({ nota }: { nota: NotaSalida }): React.JSX.Element {
+/** Campo etiqueta/valor chico del cajón (proto `.field`). */
+function Campo({ k, v }: { k: string; v: React.ReactNode }): React.JSX.Element {
   return (
-    <>
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => imprimirNota(nota.id)}
-          data-testid="imprimir-nota-detalle"
-        >
-          <Printer aria-hidden />
-          Imprimir PDF
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <p className="text-[10.5px] font-medium text-faint">{k}</p>
+      <p className="truncate text-xs font-medium">{v}</p>
+    </div>
+  );
+}
 
-      <SeccionDetalle titulo="Datos de la nota" icono={Send}>
-        <RejillaCampos>
-          <CampoDetalle icono={UserRound} etiqueta="Maquilero">
-            <span className="font-medium">{nota.maquilero}</span>
-          </CampoDetalle>
-          <CampoDetalle icono={Building2} etiqueta="Estatus">
-            <EstatusNotaBadge estatus={nota.estatus} />
-          </CampoDetalle>
-          <CampoDetalle icono={Warehouse} etiqueta="Almacén origen">
-            {nota.almacen}
-          </CampoDetalle>
-          <CampoDetalle icono={Calendar} etiqueta="Elaboración">
-            {fechaCortaNota(nota.fechaElaboracion)}
-          </CampoDetalle>
-          <CampoDetalle icono={Truck} etiqueta="Envío">
-            {fechaCortaNota(nota.fechaEnvio)}
-          </CampoDetalle>
-        </RejillaCampos>
+/**
+ * Cuerpo del cajón (proto `drawerNotaSalida`): encabezado en rejilla, material enviado AGRUPADO por
+ * orden (derivación de la propia nota) y las acciones según estatus + permisos al pie.
+ */
+function DetalleNota({
+  nota,
+  empresa,
+  puedeAdministrar,
+  puedeCancelar,
+  confirmando,
+  alEditar,
+  alConfirmar,
+  alCancelar,
+}: {
+  nota: NotaSalida;
+  empresa: string;
+  puedeAdministrar: boolean;
+  puedeCancelar: boolean;
+  confirmando: boolean;
+  alEditar: () => void;
+  alConfirmar: () => void;
+  alCancelar: () => void;
+}): React.JSX.Element {
+  const ordenes = ordenesDeNota(nota);
+  const sinOrden = nota.lineas.filter((l) => l.folioOrden === null);
 
-        {nota.observaciones ? (
-          <p className="rounded-md border bg-muted/30 p-3 text-sm">{nota.observaciones}</p>
-        ) : null}
-
-        {nota.estatus === 'cancelada' && nota.motivoCancelacion ? (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-            <span className="font-medium text-destructive">Cancelada:</span>{' '}
-            {nota.motivoCancelacion}
+  return (
+    <div className="space-y-4" data-testid="detalle-nota">
+      <section>
+        <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Encabezado
+        </h4>
+        <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
+          <Campo k="Maquilero" v={nota.maquilero} />
+          <Campo k="Empresa" v={empresa} />
+          <Campo k="Almacén origen (avíos)" v={nota.almacen} />
+          <Campo k="Fecha de elaboración" v={fechaCortaNota(nota.fechaElaboracion)} />
+          <Campo
+            k="Fecha de envío"
+            v={
+              nota.fechaEnvio === null ? (
+                <span className="text-faint">pendiente</span>
+              ) : (
+                fechaCortaNota(nota.fechaEnvio)
+              )
+            }
+          />
+          <Campo
+            k="Renglones"
+            v={`${nota.lineas.length.toLocaleString('es-MX')} en ${ordenes.length} orden${
+              ordenes.length === 1 ? '' : 'es'
+            }`}
+          />
+        </div>
+        {nota.observaciones !== null && nota.observaciones !== '' ? (
+          <p className="mt-2 rounded-md bg-panel-2 px-2.5 py-1.5 text-xs text-muted-foreground">
+            <b className="text-foreground">Observaciones:</b> {nota.observaciones}
           </p>
         ) : null}
-      </SeccionDetalle>
+      </section>
 
-      <SeccionDetalle titulo="Renglones" icono={Send}>
-        <DetalleRenglonesNota nota={nota} />
-      </SeccionDetalle>
+      <section>
+        <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Material enviado — por orden
+        </h4>
+        <div className="space-y-2">
+          {ordenes.map((folio) => (
+            <GrupoOrden
+              key={folio}
+              titulo={
+                <>
+                  Orden <b className="num">{folio}</b>
+                </>
+              }
+              lineas={nota.lineas.filter((l) => l.folioOrden === folio)}
+            />
+          ))}
+          {sinOrden.length > 0 ? <GrupoOrden titulo="Sin orden" lineas={sinOrden} /> : null}
+        </div>
+      </section>
 
-      <Historial creadoEn={nota.creadoEn} modificadoEn={nota.modificadoEn} />
-    </>
+      {/* Rastro del documento (proto `audit-hint`; el listado no trae el NOMBRE de quién capturó). */}
+      {nota.estatus === 'cancelada' ? (
+        <p className="rounded-md bg-crit-soft px-2.5 py-1.5 text-xs text-crit" role="note">
+          Nota cancelada{nota.motivoCancelacion !== null ? `: ${nota.motivoCancelacion}` : ''} — el
+          material se reingresó al inventario con el movimiento inverso.
+        </p>
+      ) : (
+        <p
+          className="rounded-md bg-panel-2 px-2.5 py-1.5 text-xs text-muted-foreground"
+          role="note"
+        >
+          {nota.estatus === 'confirmada'
+            ? 'Confirmada · material descontado del inventario.'
+            : 'Borrador · no se descuenta nada hasta confirmar.'}
+        </p>
+      )}
+
+      {/* Pie de acciones según estatus (gate visual; el backend re-decide, A1). */}
+      <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+        {puedeAdministrar && nota.estatus === 'borrador' ? (
+          <Button variant="outline" size="sm" onClick={alEditar} data-testid="editar-nota">
+            <Pencil aria-hidden />
+            Editar
+          </Button>
+        ) : null}
+        {puedeCancelar && nota.estatus !== 'cancelada' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-crit hover:text-crit"
+            onClick={alCancelar}
+            data-testid="cancelar-nota"
+          >
+            <XCircle aria-hidden />
+            Cancelar nota
+          </Button>
+        ) : null}
+        {puedeAdministrar && nota.estatus === 'borrador' ? (
+          <Button
+            size="sm"
+            className="ml-auto"
+            onClick={alConfirmar}
+            disabled={confirmando}
+            data-testid="confirmar-nota-accion"
+          >
+            <CheckCircle2 aria-hidden />
+            Confirmar y descontar
+          </Button>
+        ) : (
+          <Button
+            variant={nota.estatus === 'confirmada' ? 'default' : 'outline'}
+            size="sm"
+            className="ml-auto"
+            onClick={() => imprimirNota(nota.id)}
+            data-testid="imprimir-nota"
+          >
+            <Printer aria-hidden />
+            Imprimir nota
+          </Button>
+        )}
+      </div>
+    </div>
   );
+}
+
+/** Un grupo de renglones de la MISMA orden (proto `.nsl-group`). */
+function GrupoOrden({
+  titulo,
+  lineas,
+}: {
+  titulo: React.ReactNode;
+  lineas: NotaSalida['lineas'];
+}): React.JSX.Element {
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex items-center justify-between bg-panel-2 px-3 py-1.5 text-[11px] text-muted-foreground">
+        <span>{titulo}</span>
+        <span>
+          {lineas.length} renglón{lineas.length === 1 ? '' : 'es'}
+        </span>
+      </div>
+      {lineas.map((linea) => (
+        <div
+          key={linea.id}
+          className="flex items-center justify-between gap-2 border-t px-3 py-1.5"
+          data-testid="nota-renglon"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-medium">
+              {descripcionMaterialNota(linea)}
+            </span>
+            <span className="num block text-[11px] text-faint">{trazaRenglon(linea)}</span>
+          </span>
+          <span className="num shrink-0 text-xs font-semibold">
+            {linea.cantidad.toLocaleString('es-MX')}
+            {linea.unidad !== null ? ` ${linea.unidad}` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Traza al kardex de un renglón (descuento de avío / salida-a-orden de tela). */
+function trazaRenglon(linea: NotaSalida['lineas'][number]): string {
+  if (linea.tipo === 'avio') {
+    return linea.folioMovimientoAvio === null
+      ? 'Avío · sin descontar (borrador)'
+      : `Avío · descuento #${String(linea.folioMovimientoAvio)}`;
+  }
+  return linea.folioMovimientoSalidaTela === null
+    ? 'Tela · sin salida referenciada'
+    : `Tela · salida-a-orden #${String(linea.folioMovimientoSalidaTela)}`;
 }

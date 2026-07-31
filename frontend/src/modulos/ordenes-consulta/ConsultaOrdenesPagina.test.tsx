@@ -82,7 +82,11 @@ describe('<ConsultaOrdenesPagina>', () => {
       sesion: estadoSesionDePrueba(['ordenes.ver']),
     });
     expect(screen.getAllByTestId('fila-consulta')).toHaveLength(2);
-    expect(screen.getByText('102')).toBeInTheDocument();
+    // La tabla y las tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): el folio se
+    // busca dentro de la tabla de escritorio para no chocar con el duplicado de la tarjeta.
+    expect(
+      within(screen.getByTestId('consulta-ordenes-tabla')).getByText('102'),
+    ).toBeInTheDocument();
   });
 
   it('la búsqueda se refleja en la query del API (con debounce)', async () => {

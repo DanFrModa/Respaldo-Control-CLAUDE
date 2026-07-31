@@ -27,20 +27,12 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { num, numOrNull, redondear2 } from './decimales.js';
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';
+import { resolverPrecioAvio, resolverPrecioTela } from './resolucion-precios.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
-
-/** Redondeo monetario a 2 decimales (evita artefactos de float en las sumas). */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Nº de un `Decimal` opcional (null → 0). Patrón ceronulo. */
-function num(d: Prisma.Decimal | null | undefined): number {
-  return d == null ? 0 : d.toNumber();
-}
 
 /**
  * Parámetros de precio (utilidad/regalías) de la empresa activa (A9). Si la config no los trae, cae a
@@ -60,7 +52,15 @@ export async function parametrosPrecioEmpresa(
   };
 }
 
-/** `include` para traer la receta paraPreCosto de un modelo con los precios de catálogo. */
+/**
+ * `include` para traer la receta paraPreCosto de un modelo con los precios de catálogo.
+ *
+ * F8-E1 (R17): además del precio genérico de catálogo (`Tela.precioSugerido`/`Avio.precioReferencia`,
+ * el de F7) se trae el AMARRE del BOM cuando existe — el renglón proveedor–producto–precio elegido
+ * por Desarrollo. El pre-costo es por modelo (SIN color/talla), así que la cascada de tela se reduce
+ * a amarre → sugerido, y la de avío a amarre → más barato → referencia. Un modelo SIN amarres
+ * precostea IDÉNTICO a F7 (no-regresión, ver `numerosPreCosto`).
+ */
 const incluirReceta = {
   genero: { select: { nombre: true } },
   telas: {
@@ -68,6 +68,8 @@ const incluirReceta = {
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      idTelaProveedor: true,
+      telaProveedor: { select: { precio: true, manejaPrecioPorColor: true } },
       tela: { select: { nombre: true, precioSugerido: true } },
     },
   },
@@ -76,7 +78,16 @@ const incluirReceta = {
     select: {
       idAvio: true,
       consumoPorPrenda: true,
-      avio: { select: { clave: true, descripcion: true, precioReferencia: true } },
+      idAvioProveedor: true,
+      avio: {
+        select: {
+          clave: true,
+          descripcion: true,
+          precioReferencia: true,
+          factorConversion: true,
+          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+        },
+      },
     },
   },
   bordados: {
@@ -113,12 +124,38 @@ interface NumerosPreCosto {
 function numerosPreCosto(modelo: ModeloConReceta): NumerosPreCosto {
   const telas = modelo.telas.map((t) => {
     const consumo = num(t.consumoPorPrenda);
-    const precio = num(t.tela.precioSugerido);
+    // F8-E1: si el BOM amarró un proveedor a esta tela, se resuelve por la cascada (amarre →
+    // sugerido); si NO hay amarre, se usa el precio sugerido genérico EXACTO como F7 (no-regresión).
+    const precio =
+      t.idTelaProveedor !== null && t.telaProveedor !== null
+        ? (resolverPrecioTela({
+            precioSugerido: numOrNull(t.tela.precioSugerido),
+            amarre: {
+              precio: numOrNull(t.telaProveedor.precio),
+              manejaPrecioPorColor: t.telaProveedor.manejaPrecioPorColor,
+            },
+          }).precio ?? 0)
+        : num(t.tela.precioSugerido);
     return { idTela: t.idTela, tela: t.tela.nombre, consumo, precio, importe: consumo * precio };
   });
   const avios = modelo.avios.map((a) => {
     const consumo = num(a.consumoPorPrenda);
-    const precio = num(a.avio.precioReferencia);
+    // F8-E1: si el BOM amarró un proveedor a este avío, se resuelve por la cascada (amarre → más
+    // barato → referencia, normalizando por factor); si NO hay amarre, se usa el precioReferencia
+    // EXACTO como F7 (no-regresión: F7 NO aplicaba "más barato" en el pre-costo).
+    const precio =
+      a.idAvioProveedor !== null
+        ? (resolverPrecioAvio({
+            precioReferencia: numOrNull(a.avio.precioReferencia),
+            factorConversionAvio: numOrNull(a.avio.factorConversion),
+            idAvioProveedor: a.idAvioProveedor,
+            proveedores: a.avio.proveedores.map((p) => ({
+              idProveedor: p.idProveedor,
+              precio: numOrNull(p.precio),
+              factorConversion: numOrNull(p.factorConversion),
+            })),
+          }).precio ?? 0)
+        : num(a.avio.precioReferencia);
     return {
       idAvio: a.idAvio,
       clave: a.avio.clave,

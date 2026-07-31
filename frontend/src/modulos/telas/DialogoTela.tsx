@@ -25,7 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { AvisoAlta } from '@/components/ui/aviso-alta';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -241,13 +249,17 @@ export function DialogoTela({
             </DialogHeader>
 
             {/* Cuerpo desplazable: el formulario puede crecer. */}
-            <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+              <LeyendaObligatorios />
               <FieldGroup>
                 <Field data-invalid={Boolean(errors.nombre)}>
-                  <FieldLabel htmlFor="tela-nombre">Nombre</FieldLabel>
+                  <FieldLabel htmlFor="tela-nombre" required>
+                    Nombre
+                  </FieldLabel>
                   <Input
                     id="tela-nombre"
                     autoFocus
+                    placeholder="Ej. Felpa perchada 280 g"
                     aria-invalid={Boolean(errors.nombre)}
                     disabled={guardando}
                     {...registrar('nombre')}
@@ -260,6 +272,7 @@ export function DialogoTela({
                   <textarea
                     id="tela-descripcion"
                     rows={2}
+                    placeholder="Ej. 95% algodón / 5% spandex, tubular"
                     aria-invalid={Boolean(errors.descripcion)}
                     disabled={guardando}
                     className="w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
@@ -347,6 +360,7 @@ export function DialogoTela({
                     min={0}
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="Ej. 78.00"
                     aria-invalid={Boolean(errors.precioSugerido)}
                     disabled={guardando}
                     {...registrar('precioSugerido')}
@@ -391,6 +405,12 @@ export function DialogoTela({
                   deshabilitado={guardando}
                 />
               </FieldGroup>
+
+              {!esEdicion ? (
+                <AvisoAlta>
+                  Después, en el detalle, agrega los precios de esta tela por proveedor y por color.
+                </AvisoAlta>
+              ) : null}
             </div>
 
             <DialogFooter>
@@ -402,7 +422,12 @@ export function DialogoTela({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={guardando} data-testid="guardar-tela">
+              <Button
+                type="submit"
+                disabled={guardando}
+                data-testid="guardar-tela"
+                className="w-full sm:w-auto"
+              >
                 {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
                 {esEdicion ? 'Guardar cambios' : 'Crear tela'}
               </Button>
@@ -485,10 +510,13 @@ function DialogoNuevaCategoria({
 
           <div className="py-4">
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="categoria-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="categoria-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="categoria-nombre"
                 autoFocus
+                placeholder="Ej. Felpa"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={crear.isPending}
                 {...formulario.register('nombre')}

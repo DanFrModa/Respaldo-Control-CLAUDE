@@ -21,10 +21,19 @@
  * capturan). La empresa de la orden = la empresa del PEDIDO (no la de la sesión), para no
  * desligar la orden de su pedido; se exige que esa empresa sea la de la sesión activa (A9).
  *
- * ESTADO DERIVADO (no editable por el usuario): `capturada` al abrir; `completa` cuando se guarda
- * la PRIMERA matriz con líneas (paridad con `OrdenesDet.Form_BeforeInsert`, que sellaba
- * `Ordenes.FechaDet = Now()` al insertar el primer renglón del detalle) — ahí se sella
- * `fechaCompletada` y NO se re-sella después; `cancelada` por `cancelarOrden`.
+ * ESTADO AUTOMÁTICO (no editable por el usuario; Daniel 26-jul-2026): la orden pasa sola a
+ * `completa` cuando cumple sus REQUISITOS —**tallas + avíos, y arte si aplica**—. La regla vive
+ * ENTERA en `requisitos-orden.ts` (función pura `requisitosOrden` + `recalcularEstadoOrden`), y
+ * este módulo la invoca en los tres puntos donde la orden cambia: alta, guardar matriz y copiar
+ * matriz. `fechaCompletada` se sella la PRIMERA vez que se completa y NUNCA se borra (paridad con
+ * `Ordenes.FechaDet = Now()` de v1). `cancelada` (por `cancelarOrden`) SIEMPRE gana.
+ *   DES-COMPLETAR es la excepción, no la regla: una orden solo vuelve de `completa` a `capturada`
+ * al editar LA MATRIZ DE ESA ORDEN y siempre que NO tenga actividad de producción viva (corte o
+ * envío sin cancelar). Los cambios del BOM del MODELO (`modelos/bom-modelo.ts`) SOLO pueden
+ * COMPLETAR órdenes de ese modelo, nunca degradarlas: editar un catálogo no puede sacar de los
+ * tableros a lo que ya se está produciendo ni degradar el histórico.
+ *   El estado es un SEMÁFORO DE CAPTURA, no una llave para operar: ninguna pantalla exige
+ * `completa` para cortar/enviar/recibir/entregar (lo único que bloquea es `cancelada`).
  *
  * UPC: ELIMINADO. Los códigos de barra de orden ya no se usan y la columna `Orden.upc` fue
  * borrada del modelo (decisión Gabriel 16-jun-2026): no hay dato, endpoint ni generación.
@@ -67,8 +76,8 @@
  *  | EnRiesgo           | enRiesgo (Bool?)    | F5                                                 |
  *  | SI_RC              | siRC (Bool?)        | F5                                                 |
  *  | FechaDet           | fechaCompletada     | deriva estado='completa'                           |
- *  | Composicion        | composicion         | String?                                            |
- *  | CompForzada        | compForzada (Bool)  |                                                    |
+ *  | Composicion        | composicion         | String? — se HEREDA de `Modelo.composicion`        |
+ *  | CompForzada        | compForzada (Bool)  | true = override manual de ESTA orden               |
  *  | Pagada             | pagada (Bool?)      | F6                                                 |
  *  | ObsMaquila         | obsMaquila          | String?                                            |
  *  | AplicacionOrd      | aplicacionOrd (Dec?)| dato F3/F6                                         |
@@ -97,14 +106,21 @@ import type { Orden, OrdenLinea, OrdenLineaTalla, Prisma } from '../../datos/ind
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  EVENTOS_OUTBOX,
+  registrarEventoOutbox,
+  VERSION_ORDEN_CREADA,
+  type EventoOrdenCreada,
+} from '../../comun/eventos-dominio.js';
 import {
   armarPagina,
   esquemaPaginacion,
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -113,6 +129,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN = 'orden';
@@ -147,7 +164,13 @@ export type ParametrosListarOrdenes = z.input<typeof esquemaListarOrdenesDominio
  * etiqueta/tela (para nombres en UI), su matriz (colores con sus tallas), referencias y comentarios.
  */
 type OrdenConDetalle = Orden & {
-  modelo: { codigo: string; descripcion: string | null };
+  modelo: {
+    codigo: string;
+    descripcion: string | null;
+    /** Bandera + conteos del BOM: insumos de la regla de "orden completa" (requisitos-orden.ts). */
+    llevaArte: boolean;
+    _count: { avios: number; bordados: number };
+  };
   cliente: { nombre: string };
   maquilero: { nombre: string } | null;
   etiquetaMarca: { nombre: string } | null;
@@ -167,7 +190,17 @@ type OrdenConDetalle = Orden & {
 
 /** `include` estándar para traer la orden con todo su detalle (ordenado de forma estable). */
 const incluirDetalle = {
-  modelo: { select: { codigo: true, descripcion: true } },
+  modelo: {
+    select: {
+      codigo: true,
+      descripcion: true,
+      // Insumos de la regla de "orden completa": la bandera "lleva arte" del modelo + los conteos
+      // de avíos de PRODUCCIÓN y artes del BOM. Van como `_count` (dos conteos en la misma
+      // consulta) para no traer las recetas enteras.
+      llevaArte: true,
+      _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+    },
+  },
   cliente: { select: { nombre: true } },
   maquilero: { select: { nombre: true } },
   etiquetaMarca: { select: { nombre: true } },
@@ -208,6 +241,14 @@ interface OrigenPedidoLinea {
   idModelo: number;
   idCliente: number;
   idEmpresa: number;
+  /** OC original del cliente en el pedido: se copia como SNAPSHOT a la orden (R3, B3). */
+  ocCliente: string | null;
+  /**
+   * COMPOSICIÓN capturada en la ficha del MODELO (Daniel 24-jul-2026): la orden la HEREDA sola.
+   * No es un snapshot congelado como `ocCliente`: mientras la orden no tenga override
+   * (`compForzada = false`) se vuelve a derivar cada vez que se guarda su encabezado.
+   */
+  composicionModelo: string | null;
 }
 
 /**
@@ -229,7 +270,7 @@ async function resolverOrigenPedido(
     where: { id: idPedidoLinea },
     select: {
       idModelo: true,
-      modelo: { select: { activo: true, codigo: true } },
+      modelo: { select: { activo: true, codigo: true, composicion: true } },
       pedido: {
         select: {
           idEmpresa: true,
@@ -237,6 +278,7 @@ async function resolverOrigenPedido(
           pedCancelado: true,
           noProducir: true,
           folio: true,
+          ocCliente: true,
         },
       },
     },
@@ -267,6 +309,8 @@ async function resolverOrigenPedido(
     idModelo: linea.idModelo,
     idCliente: linea.pedido.idCliente,
     idEmpresa: linea.pedido.idEmpresa,
+    ocCliente: linea.pedido.ocCliente,
+    composicionModelo: linea.modelo.composicion,
   };
 }
 
@@ -375,15 +419,18 @@ async function sincronizarMatriz(
   }
 
   for (const linea of set) {
+    // Pantone POR color (petición Daniel): sólo se toca si viene en el set (undefined = no lo mandó,
+    // se conserva; null = limpiarlo; string = capturarlo).
+    const datosPantone = linea.pantone !== undefined ? { pantone: linea.pantone } : {};
     if (linea.id !== undefined && idsActuales.has(linea.id)) {
       await tx.ordenLinea.update({
         where: { id: linea.id },
-        data: { idColor: linea.idColor, ...datosModificacion(sesion) },
+        data: { idColor: linea.idColor, ...datosPantone, ...datosModificacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, linea.id, linea.tallas);
     } else {
       const creada = await tx.ordenLinea.create({
-        data: { idOrden, idColor: linea.idColor, ...datosCreacion(sesion) },
+        data: { idOrden, idColor: linea.idColor, ...datosPantone, ...datosCreacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, creada.id, linea.tallas);
     }
@@ -437,8 +484,14 @@ async function reemplazarTallas(
 
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
-/** Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
+/**
+ * Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
+ * `ocultarPrecios` (rediseño R2, §4.4.3): desde que los precios de la orden se capturan en vivo
+ * (`precios-orden.ts`), `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado — sin el permiso
+ * `ordenes.ver-precio-real-maquila` van null también aquí (paridad con el acceso 36 del viejo;
+ * antes eran dato inerte del ETL y se exponían con solo `ordenes.ver`).
+ */
+function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSalida {
   let totalPiezas = 0;
   const lineas = orden.lineas.map((l) => {
     let totalLinea = 0;
@@ -451,6 +504,7 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
       id: l.id,
       idColor: l.idColor,
       color: l.color.nombre,
+      pantone: l.pantone,
       tallas,
       totalPiezas: totalLinea,
     };
@@ -481,10 +535,19 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
     obsMaquila: orden.obsMaquila,
     noCostear: orden.noCostear,
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
+    // Transparencia del estado (Daniel 26-jul-2026): la orden dice POR QUÉ está como está.
+    requisitos: requisitosOrden({
+      renglonesMatriz: orden.lineas.length,
+      aviosProduccion: orden.modelo._count.avios,
+      artesModelo: orden.modelo._count.bordados,
+      llevaArte: orden.modelo.llevaArte,
+    }),
     motivoCancelada: orden.motivoCancelada,
+    ocCliente: orden.ocCliente,
     tallasV1: orden.tallasV1,
-    maquilaOrd: orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
-    aplicacionOrd: orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
+    maquilaOrd: ocultarPrecios || orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
+    aplicacionOrd:
+      ocultarPrecios || orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
     pagada: orden.pagada,
     enRiesgo: orden.enRiesgo,
     siRC: orden.siRC,
@@ -529,6 +592,77 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
   return valor;
 }
 
+/**
+ * COMPOSICIÓN de la orden — decisión de DANIEL (24-jul-2026): «la composición no sale de la OC del
+ * cliente, sale del desarrollo del modelo; de ahí la jala». La fuente es `Modelo.composicion`; lo
+ * que se capture en la orden es un OVERRIDE de ESA orden, marcado con `compForzada = true`.
+ *
+ * Reglas (las mismas en el alta y en la edición del encabezado):
+ *  • Sin captura (`null`/'') → se HEREDA la del modelo y `compForzada = false`.
+ *  • Con captura IGUAL a la del MODELO → se trata como HEREDADA (`compForzada = false`): teclear
+ *    justo lo que ya dice el modelo no es "desconectarse" de él.
+ *  • Con captura DISTINTA de la guardada → override: se respeta el texto y `compForzada = true`.
+ *  • Con captura IGUAL a la guardada → no se toca la bandera (re-guardar el encabezado sin tocar
+ *    el campo NUNCA convierte una composición heredada en override).
+ *  • `compForzada` explícito en el cuerpo MANDA (lo usan el importador de OC y el ETL): `false`
+ *    fuerza la re-derivación del modelo, `true` conserva el texto capturado.
+ *
+ * 🔒 HEREDAR NUNCA DESTRUYE UN DATO (guard anti-pérdida). Si al heredar el modelo NO tiene
+ * composición y la orden SÍ tenía una, se CONSERVA la de la orden. Sin este guard, abrir una OP
+ * histórica (o importada por PDF) y guardar cualquier campo del encabezado la habría vaciado en
+ * silencio, porque `modelos.composicion` nació vacía. El guard cubre EXACTAMENTE ese caso: el
+ * guardado que NO tocó el campo (`capturada === actual`, incluido el campo omitido). Si el usuario
+ * escribió otra cosa —o lo vació, o el cuerpo pidió `compForzada: false`— manda lo que pidió, no el
+ * guard. La migración de datos `20260724130000_ordenes_composicion_historica` marca además esas
+ * órdenes como override.
+ *
+ * Re-derivación: solo ocurre donde la orden YA se está tocando (alta y guardado del encabezado) y
+ * solo si la orden NO tiene override. Cambiar la composición del MODELO no recalcula de golpe las
+ * órdenes históricas (sería un recálculo masivo silencioso); cada una la refresca al siguiente
+ * guardado de su encabezado. El modelo de una orden NO se puede cambiar (no está en el PATCH: se
+ * autorrellena del renglón de pedido al nacer), así que no hay caso de "cambió el modelo".
+ */
+function resolverComposicion(args: {
+  /** Lo que viene en el cuerpo (`undefined` = no se tocó el campo). */
+  capturada: string | null | undefined;
+  /** Bandera explícita del cuerpo (`undefined` = que la deduzca esta función). */
+  forzadaExplicita: boolean | undefined;
+  /** Composición guardada hoy en la orden (`null` en el alta). */
+  actual: string | null;
+  /** Bandera guardada hoy en la orden (`false` en el alta). */
+  forzadaActual: boolean;
+  /** Composición capturada en la ficha del modelo. */
+  delModelo: string | null;
+}): { composicion: string | null; compForzada: boolean } {
+  const capturada = args.capturada === undefined ? args.actual : (aTexto(args.capturada) ?? null);
+
+  let forzada: boolean;
+  if (args.forzadaExplicita !== undefined) {
+    forzada = args.forzadaExplicita;
+  } else if (capturada === null) {
+    // Vaciar el campo = "vuelve a la del modelo".
+    forzada = false;
+  } else if (capturada === args.delModelo) {
+    // Es exactamente la del modelo: sigue siendo heredada, no un override.
+    forzada = false;
+  } else if (capturada === args.actual) {
+    // Mismo texto que ya estaba: se conserva el estado actual de la bandera.
+    forzada = args.forzadaActual;
+  } else {
+    forzada = true;
+  }
+
+  if (forzada) {
+    return { composicion: capturada, compForzada: true };
+  }
+  // Guard anti-pérdida: heredar "nada" sobre un dato existente NO borra (ver 🔒 arriba). Solo
+  // aplica al guardado que NO tocó el campo; si se pidió otro texto (o vaciarlo), manda lo pedido.
+  if (args.delModelo === null && args.actual !== null && capturada === args.actual) {
+    return { composicion: args.actual, compForzada: args.forzadaActual };
+  }
+  return { composicion: args.delModelo, compForzada: false };
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
@@ -536,7 +670,19 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
  * (A2). AUTORRELLENO de modelo/cliente/empresa del renglón→pedido; el folio sale de la secuencia
  * atómica `"orden"` de la empresa del pedido (A3/A9). EXIGE el renglón de pedido y rechaza pedidos
  * cancelados/no-producir o modelos descontinuados. Permite N órdenes por renglón (resurtidos). Si
- * `lineas` viene, crea la matriz en la misma tx (deriva estado='completa'). Auditoría + bitácora.
+ * `lineas` viene, crea la matriz en la misma tx y el estado se deriva de la regla. Auditoría +
+ * bitácora.
+ *
+ * Rediseño R3: copia el SNAPSHOT `Pedido.ocCliente` → `Orden.ocCliente` (B3: la OC del cliente
+ * queda amarrada a CADA OP que nace del pedido) y publica el evento outbox `orden-creada` (B5:
+ * la RC se PROGRAMA SOLA; el consumidor de `rcAutomatica.ts` la genera en segundo plano). El
+ * evento se publica AQUÍ —el punto ÚNICO de nacimiento por captura— para que tanto la salida a
+ * producción del constructor como el alta directa de /captura la disparen sin duplicar lógica;
+ * el modo migración usa `crearOrdenMigrada` (migracion.ts), que NO pasa por aquí y NO encola.
+ *
+ * COMPOSICIÓN (Daniel 24-jul-2026): si el alta no la captura, la orden HEREDA
+ * `Modelo.composicion` con `compForzada = false`; si la captura, queda como override
+ * (`compForzada = true`). Ver `resolverComposicion`.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
@@ -561,6 +707,15 @@ export async function crearOrden(
 
     const folio = await siguienteFolio(tx, origen.idEmpresa, CLAVE_SECUENCIA_ORDEN);
 
+    // Composición: se HEREDA del modelo salvo que el alta capture una a mano (Daniel 24-jul-2026).
+    const composicion = resolverComposicion({
+      capturada: datos.composicion,
+      forzadaExplicita: datos.compForzada,
+      actual: null,
+      forzadaActual: false,
+      delModelo: origen.composicionModelo,
+    });
+
     const orden = await tx.orden.create({
       data: {
         folio,
@@ -574,22 +729,24 @@ export async function crearOrden(
         fecha: aDateColumna(datos.fecha) ?? null,
         fechaEntrega: aDateColumna(datos.fechaEntrega) ?? null,
         observaciones: aTexto(datos.observaciones) ?? null,
-        composicion: aTexto(datos.composicion) ?? null,
-        compForzada: datos.compForzada ?? false,
+        composicion: composicion.composicion,
+        compForzada: composicion.compForzada,
         obsMaquila: aTexto(datos.obsMaquila) ?? null,
         noCostear: datos.noCostear ?? false,
+        ocCliente: origen.ocCliente,
         ...datosCreacion(sesion),
       },
     });
 
-    // Matriz inicial opcional: la sincroniza y, si trae líneas, deriva el estado completa.
+    // Matriz inicial opcional: la sincroniza y deja que la regla derive el estado (tallas +
+    // avíos, y arte si aplica — `requisitos-orden.ts`). Una orden que nace ya con matriz y con
+    // la receta de avíos de su modelo nace COMPLETA sola; si le falta algo, nace `capturada`.
     if (datos.lineas !== undefined && datos.lineas.length > 0) {
       await sincronizarMatriz(tx, sesion, orden.id, datos.lineas);
-      await tx.orden.update({
-        where: { id: orden.id },
-        data: { estado: 'completa', fechaCompletada: new Date(), ...datosModificacion(sesion) },
-      });
     }
+    // `tocarAuditoria: false`: la orden ACABA de nacer con su `datosCreacion`; si el recálculo no
+    // cambia nada, no tiene por qué emitir un UPDATE extra ni re-sellar `modificadoEn`.
+    await recalcularEstadoOrden(tx, sesion, orden, { tocarAuditoria: false });
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -604,8 +761,23 @@ export async function crearOrden(
       },
     });
 
+    // Evento outbox `orden-creada` (R3, B5): en la MISMA tx (o quedan orden Y evento, o ninguno).
+    const payload: EventoOrdenCreada = { idEmpresa: origen.idEmpresa, idOrden: orden.id };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.ordenCreada,
+      VERSION_ORDEN_CREADA,
+      origen.idEmpresa,
+      payload,
+    );
+
     return orden.id;
   }, bd);
+
+  // Publica el outbox tras el commit (best-effort; el barrido periódico recupera). Si se compone
+  // bajo una `bd.tx` externa, publicar filas aún no commiteadas es un no-op inofensivo (el relay
+  // no las ve hasta el commit; el barrido las recoge después).
+  dispararPublicacion();
 
   return obtenerOrden(sesion, idOrden, bd);
 }
@@ -615,6 +787,11 @@ export async function crearOrden(
  * compForzada, observaciones, obsMaquila, noCostear) en UNA transacción (A2). NO toca el estado
  * derivado, el folio, el pedido de origen, el modelo/cliente (autorrellenados) ni la matriz. No
  * se puede editar una orden cancelada.
+ *
+ * COMPOSICIÓN (Daniel 24-jul-2026): editarla a mano deja la orden con override
+ * (`compForzada = true`) y ya no se pisa; VACIARLA la devuelve a la del modelo. Si la orden no
+ * tiene override, este guardado la RE-DERIVA de `Modelo.composicion` (así una corrección en la
+ * ficha del modelo baja a la orden sin recálculos masivos). Ver `resolverComposicion`.
  */
 export async function actualizarOrden(
   sesion: SesionUsuario,
@@ -652,8 +829,23 @@ export async function actualizarOrden(
       cambios.fechaEntrega = aDateColumna(datos.fechaEntrega) ?? null;
     if (datos.observaciones !== undefined)
       cambios.observaciones = aTexto(datos.observaciones) ?? null;
-    if (datos.composicion !== undefined) cambios.composicion = aTexto(datos.composicion) ?? null;
-    if (datos.compForzada !== undefined) cambios.compForzada = datos.compForzada;
+    // Composición (Daniel 24-jul-2026): la fuente es el MODELO; lo capturado aquí es el override
+    // de ESTA orden. Vaciar el campo la devuelve a la del modelo. Ver `resolverComposicion`.
+    if (datos.composicion !== undefined || datos.compForzada !== undefined) {
+      const modelo = await tx.modelo.findUniqueOrThrow({
+        where: { id: actual.idModelo },
+        select: { composicion: true },
+      });
+      const resuelta = resolverComposicion({
+        capturada: datos.composicion,
+        forzadaExplicita: datos.compForzada,
+        actual: actual.composicion,
+        forzadaActual: actual.compForzada,
+        delModelo: modelo.composicion,
+      });
+      cambios.composicion = resuelta.composicion;
+      cambios.compForzada = resuelta.compForzada;
+    }
     if (datos.obsMaquila !== undefined) cambios.obsMaquila = aTexto(datos.obsMaquila) ?? null;
     if (datos.noCostear !== undefined) cambios.noCostear = datos.noCostear;
 
@@ -673,9 +865,10 @@ export async function actualizarOrden(
 /**
  * Guarda la MATRIZ completa de una orden (colores × tallas) en UNA transacción (A2). Sincroniza
  * el set (agrega/edita/quita) conservando auditoría, valida color no repetido + tallas del
- * catálogo + cantidades ≥0. DERIVA `estado='completa'` + sella `fechaCompletada` en el PRIMER
- * guardado con líneas (paridad con `FechaDet` de v1); en guardados posteriores NO re-sella la
- * fecha. No se puede tocar la matriz de una orden cancelada. Bitácora A7 (entidad crítica).
+ * catálogo + cantidades ≥0. RECALCULA el estado con la regla única (`requisitos-orden.ts`): se
+ * completa sola si ya cumple todo, y si le vacían la matriz vuelve a `capturada`; `fechaCompletada`
+ * se sella la primera vez y no se re-sella ni se borra. No se puede tocar la matriz de una orden
+ * cancelada. Bitácora A7 (entidad crítica).
  */
 export async function guardarMatrizOrden(
   sesion: SesionUsuario,
@@ -694,14 +887,12 @@ export async function guardarMatrizOrden(
 
     const renglones = await sincronizarMatriz(tx, sesion, id, datos.lineas);
 
-    // Estado derivado: la PRIMERA vez que la orden tiene matriz con líneas se sella completa +
-    // fechaCompletada (paridad con OrdenesDet.Form_BeforeInsert sellando FechaDet). No se re-sella.
-    const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
-    if (renglones > 0 && actual.fechaCompletada === null) {
-      cambios.estado = 'completa';
-      cambios.fechaCompletada = new Date();
-    }
-    await tx.orden.update({ where: { id }, data: cambios });
+    // Estado derivado: lo decide la regla ÚNICA (`requisitos-orden.ts`). Si al guardar la matriz
+    // ya se cumple todo, la orden pasa sola a `completa` y se sella `fechaCompletada` la PRIMERA
+    // vez (paridad con `FechaDet` de v1, que nunca se borra). Este es el ÚNICO camino que puede
+    // DES-completar (vaciar la matriz), y aun así solo si la orden no tiene actividad de producción
+    // viva — una orden ya cortada/enviada no se degrada. El `modificadoPor` lo pone el recálculo.
+    await recalcularEstadoOrden(tx, sesion, actual);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -719,7 +910,7 @@ export async function guardarMatrizOrden(
  * las tallas por su ETIQUETA (las curvas/órdenes pueden tener tallas distintas: se reutiliza la
  * misma talla del catálogo por su etiqueta — como las dos órdenes usan el catálogo de tallas
  * global, basta con copiar `idTalla`). Ambas órdenes deben ser de la empresa activa. Sustituye la
- * matriz actual. Deriva estado='completa' como cualquier guardado de matriz con líneas.
+ * matriz actual. Recalcula el estado como cualquier guardado de matriz.
  */
 export async function copiarDetalleOrden(
   sesion: SesionUsuario,
@@ -756,12 +947,8 @@ export async function copiarDetalleOrden(
     }));
     const renglones = await sincronizarMatriz(tx, sesion, id, set);
 
-    const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
-    if (renglones > 0 && destino.fechaCompletada === null) {
-      cambios.estado = 'completa';
-      cambios.fechaCompletada = new Date();
-    }
-    await tx.orden.update({ where: { id }, data: cambios });
+    // Mismo estado derivado que cualquier guardado de matriz: lo decide la regla única.
+    await recalcularEstadoOrden(tx, sesion, destino);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -812,6 +999,12 @@ export async function cancelarOrden(
  * Guarda el SET COMPLETO de referencias de una orden (D7 — generaliza el `Monarch` del viejo).
  * Cada valor debe corresponder a un `ClienteCampo` ACTIVO del CLIENTE de la orden (rechaza un
  * campo de otro cliente o desactivado). Diff mínimo conservando auditoría; en UNA transacción.
+ *
+ * Las referencias son DATOS DE LA ORDEN (en el viejo eran columnas del propio registro), así que
+ * guardarlas SÍ marca la orden como modificada (`modificadoEn`/`modificadoPorId`) en la MISMA tx,
+ * igual que la matriz o el encabezado (A7). Faltaba: el "Historial" del detalle mentía tras
+ * guardar referencias, y la UI —que se re-sincroniza por `modificadoEn`— no se enteraba del
+ * guardado (defecto encontrado por el e2e de `ordenes.spec.ts`, 24-jul-2026).
  */
 export async function guardarReferenciasOrden(
   sesion: SesionUsuario,
@@ -830,6 +1023,9 @@ export async function guardarReferenciasOrden(
     await validarReferencias(tx, actual.idCliente, datos.referencias);
     await sincronizarReferencias(tx, sesion, id, datos.referencias);
 
+    // La orden CAMBIÓ: se sella su auditoría en la misma tx (calca lo que hace la matriz, A7).
+    await tx.orden.update({ where: { id }, data: { ...datosModificacion(sesion) } });
+
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
       idEntidad: id,
@@ -845,8 +1041,9 @@ export async function guardarReferenciasOrden(
  * Valida que cada `idClienteCampo` exista, esté ACTIVO y pertenezca al CLIENTE de la orden (D7).
  * Rechaza un campo de otro cliente con `ErrorValidacion`. Además exige que un campo no se repita
  * en el set (el `@@unique([idOrden, idClienteCampo])` lo respaldaría, pero damos error claro).
+ * Exportada para que `salidaAProduccion` (R3, B4) capture referencias en SU transacción.
  */
-async function validarReferencias(
+export async function validarReferencias(
   tx: Tx,
   idCliente: number,
   referencias: DatosOrdenReferenciaEntrada[],
@@ -878,8 +1075,11 @@ async function validarReferencias(
   }
 }
 
-/** Sincroniza las referencias al set deseado (diff mínimo por `idClienteCampo`), conserva auditoría. */
-async function sincronizarReferencias(
+/**
+ * Sincroniza las referencias al set deseado (diff mínimo por `idClienteCampo`), conserva auditoría.
+ * Exportada para que `salidaAProduccion` (R3, B4) capture referencias en SU transacción.
+ */
+export async function sincronizarReferencias(
   tx: Tx,
   sesion: SesionUsuario,
   idOrden: number,
@@ -961,7 +1161,7 @@ export async function obtenerOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', id);
   }
-  return aOrdenSalida(orden);
+  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'));
 }
 
 /**
@@ -1003,7 +1203,8 @@ export async function listarOrdenes(
     }),
   ]);
 
-  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle));
+  const ocultarPrecios = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
+  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios));
   return armarPagina(salida, total, filtros);
 }
 

@@ -1,12 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { configR2DesdeEnv, crearClienteR2, crearServicioArchivos } from '../../comun/archivos.js';
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import {
+  configR2DesdeEnv,
+  crearClienteR2,
+  crearServicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
+import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearModelo } from './modelos.js';
-import { copiarBom, reemplazarBordadosBom, reemplazarTelasBom } from './bom-modelo.js';
-import { solicitarSubidaFoto } from './fotos-modelo.js';
+import {
+  copiarBom,
+  marcarBordadoPrincipal,
+  reemplazarBordadosBom,
+  reemplazarTelasBom,
+} from './bom-modelo.js';
+import { marcarFotoPrincipal, solicitarSubidaFoto } from './fotos-modelo.js';
 
 /**
  * Unit del dominio de Modelos (F1-E4) — SIN Postgres. Cubre lo que no necesita la base: el
@@ -61,6 +71,18 @@ describe('dominio Modelos (F1-E4) — permisos (deny-by-default, A4)', () => {
         archivosDePrueba(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('marcar foto principal sin permiso administrar → ErrorPermiso', async () => {
+    await expect(
+      marcarFotoPrincipal(sesionSoloVer(), 1, 2, {}, archivosDePrueba()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('marcar arte principal sin permiso administrar → ErrorPermiso', async () => {
+    await expect(marcarBordadoPrincipal(sesionSoloVer(), 1, 2, {})).rejects.toBeInstanceOf(
+      ErrorPermiso,
+    );
   });
 });
 
@@ -166,5 +188,212 @@ describe('dominio Modelos (F1-E4) — la key de la foto se ordena por id (A5)', 
     expect(subida.idArchivo).toBe('arch_nuevo');
     expect(subida.idFoto).toBe(99);
     expect(new URL(subida.urlSubida).pathname.endsWith(keyCreada)).toBe(true);
+  });
+});
+
+/**
+ * "Marcar como PRINCIPAL" (jul-2026, petición de Daniel) contra un `tx` FALSO con estado en
+ * memoria: se puede verificar el reordenamiento REAL (qué `orden` queda en cada renglón), que la
+ * lectura devuelva la principal PRIMERO y que repetir la operación no escriba nada (idempotencia)
+ * sin necesidad de Postgres. La integridad transaccional se cubre en los `.int.test.ts` de CI.
+ */
+
+/** Servicio de archivos mínimo para `leerFotosModelo` (presigna cualquier key). */
+const archivosQuePresignan = {
+  solicitarSubida: vi.fn(),
+  urlDescarga: (key: string) => Promise.resolve(`https://r2/${key}`),
+} as unknown as ServicioArchivos;
+
+/** `tx` falso con las FOTOS de un modelo en memoria (el `orden` sí se muta con cada update). */
+function bdConFotos(idModelo: number, fotos: { id: number; orden: number }[]) {
+  const estado = fotos.map((f) => ({ ...f }));
+  const ordenadas = () => [...estado].sort((a, b) => a.orden - b.orden || a.id - b.id);
+  const update = vi.fn((args: { where: { id: number }; data: { orden: number } }) => {
+    const foto = estado.find((f) => f.id === args.where.id);
+    if (foto !== undefined) {
+      foto.orden = args.data.orden;
+    }
+    return Promise.resolve(foto);
+  });
+  const bitacora = vi.fn(() => Promise.resolve({}));
+  // `$executeRaw` = el `pg_advisory_xact_lock` que serializa el reordenamiento (se registra para
+  // comprobar que se toma ANTES de leer; en el fake no bloquea nada).
+  const lock = vi.fn(() => Promise.resolve(1));
+  const tx = {
+    $executeRaw: lock,
+    modelo: {
+      findUnique: vi.fn(() => Promise.resolve({ id: idModelo })),
+      update: vi.fn(() => Promise.resolve({})),
+    },
+    modeloFoto: {
+      findFirst: vi.fn((args: { where: { id: number } }) =>
+        Promise.resolve(estado.find((f) => f.id === args.where.id) ?? null),
+      ),
+      findMany: vi.fn(() =>
+        Promise.resolve(
+          ordenadas().map((f) => ({
+            ...f,
+            tipo: 'OTRO',
+            archivo: {
+              id: `arch-${String(f.id)}`,
+              key: `k${String(f.id)}`,
+              nombreOriginal: 'f.jpg',
+              tipoMime: 'image/jpeg',
+              tamanoBytes: 10,
+            },
+          })),
+        ),
+      ),
+      update,
+    },
+    bitacora: { create: bitacora },
+  } as unknown as Tx;
+  return { bd: { tx } as ContextoBd, update, bitacora, estado, lock };
+}
+
+/** `tx` falso con el ARTE (BOM) de un modelo en memoria. */
+function bdConArte(
+  idModelo: number,
+  artes: { idBordado: number; orden: number; nombre: string }[],
+) {
+  const estado = artes.map((a) => ({ ...a }));
+  const ordenadas = () =>
+    [...estado].sort(
+      (a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre) || a.idBordado - b.idBordado,
+    );
+  const update = vi.fn(
+    (args: { where: { idModelo_idBordado: { idBordado: number } }; data: { orden: number } }) => {
+      const arte = estado.find((a) => a.idBordado === args.where.idModelo_idBordado.idBordado);
+      if (arte !== undefined) {
+        arte.orden = args.data.orden;
+      }
+      return Promise.resolve(arte);
+    },
+  );
+  const bitacora = vi.fn(() => Promise.resolve({}));
+  const lock = vi.fn(() => Promise.resolve(1));
+  const tx = {
+    $executeRaw: lock,
+    modelo: {
+      findUnique: vi.fn(() => Promise.resolve({ id: idModelo })),
+      update: vi.fn(() => Promise.resolve({})),
+    },
+    modeloBordado: {
+      findMany: vi.fn(() =>
+        Promise.resolve(
+          ordenadas().map((a) => ({
+            idBordado: a.idBordado,
+            orden: a.orden,
+            precio: null,
+            bordado: { nombre: a.nombre, tipo: 'BORDADO', archivoFoto: null },
+          })),
+        ),
+      ),
+      update,
+    },
+    bitacora: { create: bitacora },
+  } as unknown as Tx;
+  return { bd: { tx } as ContextoBd, update, bitacora, estado, lock };
+}
+
+describe('dominio Modelos — foto PRINCIPAL del modelo (Daniel, jul-2026)', () => {
+  it('mueve la foto elegida al primer lugar y devuelve la galería con ella al frente', async () => {
+    const { bd, update, bitacora, estado, lock } = bdConFotos(7, [
+      { id: 1, orden: 0 },
+      { id: 2, orden: 1 },
+      { id: 3, orden: 2 },
+    ]);
+
+    const fotos = await marcarFotoPrincipal(sesionAdmin(), 7, 3, bd, archivosQuePresignan);
+
+    // La lectura devuelve la principal PRIMERO y el resto conserva su orden relativo.
+    expect(fotos.map((f) => f.idFoto)).toEqual([3, 1, 2]);
+    // El `orden` quedó compacto (0..N-1), sin huecos ni empates.
+    expect(estado.map((f) => ({ id: f.id, orden: f.orden }))).toEqual([
+      { id: 1, orden: 1 },
+      { id: 2, orden: 2 },
+      { id: 3, orden: 0 },
+    ]);
+    expect(update).toHaveBeenCalledTimes(3);
+    expect(bitacora).toHaveBeenCalledTimes(1);
+    // El lock de concurrencia se toma ANTES de escribir (y de leer): sin él, dos marcados
+    // simultáneos del mismo modelo dejarían `orden` duplicado y la principal equivocada.
+    expect(lock).toHaveBeenCalledTimes(1);
+    expect(lock.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      update.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('es IDEMPOTENTE: volver a marcar la misma foto no escribe ni deja bitácora vacía', async () => {
+    const { bd, update, bitacora } = bdConFotos(7, [
+      { id: 1, orden: 0 },
+      { id: 2, orden: 1 },
+    ]);
+
+    await marcarFotoPrincipal(sesionAdmin(), 7, 2, bd, archivosQuePresignan);
+    const escriturasPrimera = update.mock.calls.length;
+    const fotos = await marcarFotoPrincipal(sesionAdmin(), 7, 2, bd, archivosQuePresignan);
+
+    expect(fotos.map((f) => f.idFoto)).toEqual([2, 1]);
+    // La segunda pasada no agregó ni una escritura ni un renglón de bitácora.
+    expect(update.mock.calls.length).toBe(escriturasPrimera);
+    expect(bitacora).toHaveBeenCalledTimes(1);
+  });
+
+  it('una foto que no es del modelo → ErrorNoEncontrado (y no escribe nada)', async () => {
+    const { bd, update } = bdConFotos(7, [{ id: 1, orden: 0 }]);
+    await expect(
+      marcarFotoPrincipal(sesionAdmin(), 7, 99, bd, archivosQuePresignan),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe('dominio Modelos — arte PRINCIPAL del BOM (Daniel, jul-2026)', () => {
+  it('mueve el arte elegido al primer lugar y lo devuelve al frente del BOM', async () => {
+    const { bd, update, estado, lock } = bdConArte(7, [
+      { idBordado: 10, orden: 0, nombre: 'Aplicación' },
+      { idBordado: 20, orden: 0, nombre: 'Bordado pecho' },
+      { idBordado: 30, orden: 0, nombre: 'Estampa espalda' },
+    ]);
+
+    const artes = await marcarBordadoPrincipal(sesionAdmin(), 7, 30, bd);
+
+    expect(artes.map((a) => a.idBordado)).toEqual([30, 10, 20]);
+    expect(estado.map((a) => ({ id: a.idBordado, orden: a.orden }))).toEqual([
+      { id: 10, orden: 1 },
+      { id: 20, orden: 2 },
+      { id: 30, orden: 0 },
+    ]);
+    // El elegido ya valía 0: solo se reescriben los otros dos.
+    expect(update).toHaveBeenCalledTimes(2);
+    // Igual que las fotos: el lock va primero (serializa el reordenamiento de ESTE modelo).
+    expect(lock).toHaveBeenCalledTimes(1);
+    expect(lock.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      update.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('es IDEMPOTENTE: repetir la marca no vuelve a escribir', async () => {
+    const { bd, update, bitacora } = bdConArte(7, [
+      { idBordado: 10, orden: 0, nombre: 'Aplicación' },
+      { idBordado: 20, orden: 0, nombre: 'Bordado pecho' },
+    ]);
+
+    await marcarBordadoPrincipal(sesionAdmin(), 7, 20, bd);
+    const escriturasPrimera = update.mock.calls.length;
+    const artes = await marcarBordadoPrincipal(sesionAdmin(), 7, 20, bd);
+
+    expect(artes.map((a) => a.idBordado)).toEqual([20, 10]);
+    expect(update.mock.calls.length).toBe(escriturasPrimera);
+    expect(bitacora).toHaveBeenCalledTimes(1);
+  });
+
+  it('un arte que no está en el BOM del modelo → ErrorNoEncontrado', async () => {
+    const { bd, update } = bdConArte(7, [{ idBordado: 10, orden: 0, nombre: 'Aplicación' }]);
+    await expect(marcarBordadoPrincipal(sesionAdmin(), 7, 99, bd)).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 });

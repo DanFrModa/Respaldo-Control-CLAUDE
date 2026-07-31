@@ -24,7 +24,7 @@ npx tsx --env-file=.env migracion/_progreso.ts             # F4: chequeo rápido
 
 # F5 (Ruta Crítica) — un solo comando (idempotente):
 npx tsx --env-file=.env migracion/etl-ruta-critica.ts      # F5: catálogos + roles N:M + plantillas + UsuarioRol + rutas históricas + estado RC + colchón
-npx tsx --env-file=.env migracion/cuadre-f5.ts             # F5: solo el cuadre (v1 CSV vs v2 + huérfanas/pendientes-F9/FactorTela)
+npx tsx --env-file=.env migracion/cuadre-f5.ts             # F5: solo el cuadre (v1 CSV vs v2 + huérfanas/pendientes-F10/FactorTela)
 
 # F6 (Calidad + EsMa) — idempotentes (Calidad y EsMa son independientes):
 npx tsx --env-file=.env migracion/etl-calidad.ts           # F6: defectos + auditorías + detalles (modo migración, SIN eventos de RC)
@@ -35,7 +35,49 @@ npx tsx --env-file=.env migracion/cuadre-f6.ts             # F6: cuadre Calidad+
 npx tsx --env-file=.env migracion/etl-costos.ts            # F7: CostoOrd → CostoOrden (D2: regalía FUERA del costo)
 npx tsx --env-file=.env migracion/etl-indicadores.ts       # F7: personal/actividades + productividad IP/almacén + fichas + muestrarios + cíclico histórico (D6)
 npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos + análisis de la regalía D2)
+
+# F9 (Finanzas) — saldos iniciales de terceros + CFDI históricos. ⚠️ NO desde Access: la fuente es
+# el corte de SINUBE / export del contador. Se pasa el archivo/carpeta por flag (tras `--`):
+npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv   # F9: saldos iniciales CxC/CxP (aperturas)
+npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-historicos # F9: importación masiva de CFDI (XML)
+npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
+
+# ⚠️ AL FINAL DE TODA CARGA/RECARGA (obligatorio, ver abajo):
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone al día el estado completa/incompleta
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opcional) simula: reporta sin escribir
 ```
+
+## ⚠️ PASO OBLIGATORIO AL TERMINAR CUALQUIER CARGA: realinear el estado de las órdenes
+
+Después de correr los ETL (F10 completo o una re-corrida), hay que ejecutar **una vez**:
+
+```bash
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts
+```
+
+**Por qué.** El ETL es **fiel a la fuente**: `crearOrdenMigrada` escribe el `estado` y la
+`fechaCompletada` EXPLÍCITOS que traía Access (`FechaDet`/`OrdCancelada`) y **no recalcula** — así
+debe ser, migrar es copiar el histórico, no reinterpretarlo. Pero desde el 26-jul-2026 el estado de
+la orden es **automático** (`completa` = tallas + avíos, y arte si aplica; `DECISIONES.md
+§Post-F9.4`) y la pantalla **"Órdenes incompletas"** filtra por el estado GUARDADO. Sin este paso, el
+semáforo queda desalineado recién cargada la base y **el backlog que Daniel pidió atender queda
+invisible** (*"si no meten la información del arte, o no desmarcan la casilla, está como
+incompleto… siempre hay que atender ese tema"*).
+
+- **Idempotente y re-ejecutable**: la segunda corrida no escribe nada. Va por lotes (páginas de 500,
+  cada una en su transacción corta) y termina con un resumen (revisadas / a incompleta / a completa
+  / respetadas por producción viva).
+- **Reusa la regla del dominio** (`realinearEstadoOrdenes` → `requisitosOrden`): no hay una segunda
+  copia de la regla en el script. Respeta el mismo cinturón que la app: **nunca degrada una orden
+  con `EtapaMovimiento` viva**, no toca las canceladas y **no borra `fechaCompletada`**.
+- Deja **bitácora por orden** con `idUsuario` NULL (proceso de sistema).
+- Flags: `--empresa=<id>` (por defecto todas), `--lote=<n>` (default 500), `--dry-run` (simula: hace
+  el cálculo real y revierte, para ver el impacto antes de aplicarlo).
+
+*(En la base de HOY la migración `20260726130000_recalculo_estado_ordenes` ya aplicó esta MISMA
+REGLA, pero con menos alcance: corre **sola y UNA vez** y **solo DEGRADA** las `completa` que
+dejaron de cumplir. El script hace **las dos direcciones** —degrada y también completa las
+`capturada` que ya cumplían— y es re-ejecutable: es el que se corre después de cada carga.)*
 
 > **F7 (importante):** `etl-costos` y `etl-indicadores` son INDEPENDIENTES (entidades destino
 > disjuntas). **Costos (D2):** la **REGALÍA** (`RegaliasCost`) NO se migra como componente del costo
@@ -57,9 +99,9 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 > fechas y captura originales (KPI D11). Depende del mapeo de **órdenes de F2** (`ENTIDAD_MAPEO.orden`) y
 > del **SEED de F5-E1/E2** (`SEED_ON_START=true`). **Conteos del cuadre:** 26 procesos · 156 tiempos · 11
 > rangos · 7 telas · 9 aplicaciones · 19 roles (RBAC único) · 68 RC_ProcUsua = **54 vigentes + 14 huérfanas**
-> · 23 usuarios con tipo · 181 renglones RC · checklist IP3/IP4. **⚠️ `UsuarioRol` depende de F9:** los 137
-> usuarios del viejo aún NO están en v2 (eso es F9); el ETL asigna el rol a los que YA existen en v2 por su
-> login y **LISTA el resto como "pendiente F9"** — **re-correr este ETL tras la migración de usuarios (F9)
+> · 23 usuarios con tipo · 181 renglones RC · checklist IP3/IP4. **⚠️ `UsuarioRol` depende de F10:** los 137
+> usuarios del viejo aún NO están en v2 (eso es F10); el ETL asigna el rol a los que YA existen en v2 por su
+> login y **LISTA el resto como "pendiente F10"** — **re-correr este ETL tras la migración de usuarios (F10)
 > materializa esas asignaciones** (es idempotente). `RC_TipoTelas.FactorTela` se declara **no migrada a
 > propósito** (ADR-0012/E3: el viejo no la aplicaba). Cada corrida escribe `reporte-etl-f5e7-ruta-critica-*.txt`.
 
@@ -74,6 +116,47 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 > `etl-ipt` carga el kardex como **único** origen de existencias (`origenTipo = 'migracion'`). Así NO hay
 > doble conteo; el `cuadre-f3` lo verifica. Ambos ETL dependen de los mapeos de F1 (Empresa, Almacen:IPT,
 > modelos por código) y del SEED del catálogo de tipos de movimiento + almacenes (`SEED_ON_START=true`).
+
+> **F9 (importante — NO SE CORRE todavía):** la fase Finanzas se seeda desde el corte de **SINUBE /
+> export del contador**, NO desde Access. Los archivos fuente **aún no existen** (Daniel está sacando
+> el corte, decisión **D15c**): los scripts se construyeron y probaron con fixtures, y se ejecutan
+> cuando llegue el corte. Dos ETL + un cuadre, **INDEPENDIENTES** entre sí:
+>
+> - **`etl-terceros-saldos`** carga los **saldos iniciales** de CxC/CxP como movimientos de **APERTURA**
+>   (nunca un saldo editable, D3). El CSV es de **FORMATO FLEXIBLE** (encabezados case-insensitive, ver
+>   abajo). Cada renglón → un movimiento vía el **modo migración** del motor de terceros
+>   (`src/dominio/terceros/migracion.ts`), por **LOTES** (folio en bloque A3 + `createManyAndReturn`).
+>   **Idempotente** por `MapeoMigracion` (`AperturaTercero`) + la unique global del `uuidCfdi`.
+> - **`etl-cfdi-masivo`** recorre una **carpeta de XML**, decide **compra/venta** por el RFC de la
+>   empresa, resuelve el tercero por RFC y **REUSA** los importadores de E3/E4 (`importarCfdi` /
+>   `importarCfdiVenta`) para crear el cargo fiscal + subir el XML a R2. **Idempotente por UUID** (el
+>   comprobante repetido se cuenta como "duplicado", no error). Respeta `R2_SUBIDA_LOCAL`.
+> - **`cuadre-f9`** compara, por tercero, el **saldo esperado del corte** (columna `saldoEsperado`, o Σ
+>   de las aperturas del CSV con su signo) contra el **Σ monto de las aperturas cargadas**. Los
+>   descuadres se **LISTAN**, nunca se fuerzan (§7).
+>
+> **Formato del CSV de `etl-terceros-saldos`** (columnas por nombre, case-insensitive; alias entre
+> paréntesis):
+> - Comunes: **`tipo`** (`cliente`|`proveedor`; acepta `c`/`p`) · **`rfc`** y/o **`nombre`** (para
+>   localizar al tercero: primero por RFC, luego por nombre exacto). Opcionales: **`empresa`** (id o
+>   nombre; default = empresa favorita, o `--empresa`) · **`saldoEsperado`** (para el cuadre).
+> - **Modo DETALLE** (Daniel lo pidió: cada factura pendiente con SU fecha → el aging cuenta desde el
+>   día 1): **`fecha`** (`YYYY-MM-DD` o `DD/MM/YYYY`) + **`importe`** (`monto`/`total`) + (**`uuid`**
+>   y/o **`folio`**). Con `uuid` → cargo **fiscal** (`factura_proveedor`/`factura_cliente`); sin `uuid`
+>   → cargo **no fiscal** (`entrada_sin_factura`, requiere `folio` como clave de idempotencia).
+> - **Modo SALDO NETO**: **`saldo`** (± ; sin desglose). `saldo>0` → cargo (`entrada_sin_factura`);
+>   `saldo<0` → `abono`. `fecha` opcional (default = `--corte` o hoy).
+>
+>   Ejemplo mínimo (`saldos.csv`):
+>   ```csv
+>   tipo,rfc,nombre,fecha,importe,folio,uuid,saldo,saldoEsperado
+>   proveedor,AAA010101AA1,Telas del Norte,2026-01-15,1000,,UUID-DE-LA-FACTURA,,1000
+>   cliente,XAXX010101000,Cliente Uno,,,,,-300,-300
+>   ```
+>
+> El **signo** y el **vencimiento** (aging) NO los pone el ETL: el importe entra POSITIVO y el motor
+> aplica `signoDeOrigen` + `calcularVencimiento` (reusados de `cuenta-terceros.ts`, A1). El módulo
+> completo vive en `docs/modulos/finanzas.md`.
 
 **NO uses `npm run etl:*`.** Esos scripts del `package.json` corren `tsx migracion/...` **sin** `--env-file=.env`, así que `tsx` arranca sin la `DATABASE_URL` del `.env` y truena con un error de conexión / `no DATABASE_URL` **aunque la URL sí esté en el `.env`**.
 
@@ -100,9 +183,19 @@ Banderas:
 - **`--confirmar` (OBLIGATORIO para ejecutar)**: sin él, **cualquier** invocación es **MODO PLAN** — imprime el plan numerado (con la ventana que aplicaría y, si trae `--limpiar`, los conteos actuales de la BD) y sale con exit 0 **sin tocar nada**. `--confirmar` **sin** `--limpiar` significa "ejecuta la carga sin vaciar antes" — es el modo de **reanudar** una recarga interrumpida.
 - **`--desde=YYYY-MM-DD`** (opcional): la ventana temporal. Se valida al arrancar (mal formada → ABORTA con mensaje, nunca se ignora) y se exporta como `ETL_DESDE` a todos los pasos. **Sin `--desde` → recarga COMPLETA** (sin ventana, migra todo el histórico).
 - **`--limpiar`**: vacía la BD antes de cargar (TRUNCATE de todo `public` menos `_prisma_migrations`, reusa la lógica de `limpiar-datos.ts`) y agrega el paso de seed. Como todo, solo ejecuta con `--confirmar`.
-- **`--sin-cuadres`**: se salta los 6 cuadres del final.
+- **`--sin-cuadres`**: se salta los cuadres del final (el realineado de estado SÍ corre igual: es carga, no verificación).
+- **`--saldos-terceros=<ruta.csv>`** / **`--cfdi=<carpeta>`** (F9, opcionales): ver abajo. Sin ellas, esos pasos se OMITEN y el plan lo dice.
 
-Qué hace, en orden: **(0)** limpieza (si `--limpiar --confirmar`) → **(1)** el **seed de fundación** (el MISMO `prisma/seed.ts` idempotente que dispara `SEED_ON_START`; correrlo aquí evita esperar un redeploy para poder cargar) → **(2)** los ETL: `etl-catalogos` → `etl-modelos` (SIN fotos masivas; esas se corren aparte cuando exista la carpeta) → `etl-pedidos-ordenes` → `etl-produccion` → `etl-ipt` → `etl-compras-notas` → `etl-telas` → `etl-ruta-critica` → `etl-calidad` → `etl-esma` → `etl-costos` → `etl-indicadores` → **(3)** `cuadre-f2`…`cuadre-f7`. Cada paso corre como subproceso secuencial con banner y duración; al final imprime la tabla resumen.
+Qué hace, en orden: **(0)** limpieza (si `--limpiar --confirmar`) → **(1)** el **seed de fundación** (el MISMO `prisma/seed.ts` idempotente que dispara `SEED_ON_START`; correrlo aquí evita esperar un redeploy para poder cargar) → **(2)** los ETL: `etl-catalogos` → `etl-modelos` (SIN fotos masivas; esas se corren aparte cuando exista la carpeta) → `etl-pedidos-ordenes` → `etl-produccion` → `etl-ipt` → `etl-compras-notas` → `etl-telas` → `etl-ruta-critica` → `etl-calidad` → `etl-esma` → `etl-costos` → `etl-indicadores` → **(3)** F9 OPCIONAL, solo si pasas sus banderas (ver abajo) → **(4)** **`realinear-estado-ordenes`** (paso final obligatorio de toda carga) → **(5)** `cuadre-f2`…`cuadre-f7` (+ `cuadre-f9` si diste `--saldos-terceros`). Cada paso corre como subproceso secuencial con banner y duración; al final imprime la tabla resumen.
+
+**El realineado del estado de las órdenes va SIEMPRE** (no hace falta bandera): el ETL es fiel a Access, y la regla automática de `completa` es de v2 — sin este paso el semáforo de "Órdenes incompletas" queda desalineado recién cargada la base (ver la sección obligatoria de arriba). Corre **antes de los cuadres** a propósito: así los cuadres reportan el estado FINAL de la BD. Ningún cuadre lee `Orden.estado` (verificado: `cuadre-f2` cuenta órdenes sin filtrar por estado; el `estado` de `cuadre-f6` es el de `EsMaCargo`), así que el orden no altera ninguna cifra.
+
+**F9 (Finanzas) es OPCIONAL y NO corre por defecto**: sus fuentes (corte de SINUBE / export del contador) **aún no existen** (D15c), así que meterlas al flujo tronaría por archivo faltante. Se activan con banderas explícitas, y el plan dice claramente cuándo se omiten y por qué:
+
+- `--saldos-terceros=<ruta.csv>` → agrega `etl-terceros-saldos -- --archivo=<ruta>` y, al final, `cuadre-f9 -- --archivo=<ruta>`.
+- `--cfdi=<carpeta>` → agrega `etl-cfdi-masivo -- --dir=<carpeta>`.
+
+Si la ventana (`--desde`) está activa y el corte de SINUBE trae terceros que el prescan de uso excluyó, el propio `etl-terceros-saldos` los LISTA como *"Apertura con tercero sin resolver (OMITIDA)"* — la red de seguridad de siempre: se ve en su reporte, nunca se pierde en silencio.
 
 **Si un paso falla**, la recarga se detiene ahí con el mensaje de cómo seguir: los ETL son **idempotentes**, así que corriges la causa y re-corres con **`--confirmar` SIN `--limpiar`** — retoma desde donde quedó sin duplicar nada. **Caso especial:** si lo que falló fue el **seed** justo después de la limpieza, la BD quedó vacía y sin sembrar — ahí reanuda **CON `--limpiar --confirmar`** (volver a truncar una BD vacía es inocuo) o corre el seed a mano (`npx tsx --env-file=.env prisma/seed.ts`) y luego reanuda sin `--limpiar` (el propio comando imprime estas dos opciones).
 
@@ -158,36 +251,40 @@ npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts
 
 ## Scripts disponibles
 
-| Script                                  | Qué hace                                                                                                                                                                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `migracion/recargar.ts`                 | ⭐ **RECARGA de punta a punta en un comando** (limpieza opcional + seed + 12 ETL + 6 cuadres, secuencial con resumen; ver sección arriba)                                                                                            |
-| `migracion/limpiar-datos.ts`            | **VACÍA la BD** (TRUNCATE de todo `public` menos `_prisma_migrations`); sin `--confirmar` solo ensaya. Lo reusa `recargar.ts --limpiar`                                                                                              |
-| `migracion/etl-catalogos.ts`            | F1: catálogos, materiales, proveedores, mapeos                                                                                                                                                                                       |
-| `migracion/etl-modelos.ts`              | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-bordados` para las fotos masivas)                                                                                                                                                |
-| `migracion/etl-pedidos-ordenes.ts`      | **F2: pedidos + pedidos reales + órdenes + matriz + comentarios** (imprime el cuadre al final)                                                                                                                                       |
-| `migracion/etl-produccion.ts`           | **F3: corte + envío + recibo + cargos EsMa** (Pieza A; recibos SIN efecto de kardex)                                                                                                                                                 |
-| `migracion/etl-ipt.ts`                  | **F3: kardex histórico de inventario PT** (Pieza B; IPT_Movs → Movimiento, color/talla sentinela)                                                                                                                                    |
-| `migracion/etl-compras-notas.ts`        | **F4: OC + notas legacy** (OrdCompra*/Notas* → OrdenCompra/NotaSalida; texto libre, SIN kardex/RecepcionCompra)                                                                                                                      |
-| `migracion/etl-telas.ts`                | **F4: entradas/salidas/traspasos de tela + lotes legacy** (clasifica traspasos vs compra vs salida-a-orden)                                                                                                                          |
-| `migracion/cuadre-f4.ts`                | **F4: cuadre TelasColAlm** v1 vs Σ movimientos v2 (descuadres listados, nunca corregidos — D3)                                                                                                                                       |
-| `migracion/etl-ruta-critica.ts`         | **F5: Ruta Crítica completa** (catálogos + 54 ProcesoDefRol vigentes + plantillas CP_Tiempos + UsuarioRol + rutas históricas RC/IP3/IP4 + estado RC de órdenes + colchón); LISTA 14 huérfanas + pendientes F9                        |
-| `migracion/cuadre-f5.ts`                | **F5: cuadre** v1(CSV) vs v2(BD) + huérfanas/pendientes-F9/FactorTela no migrada                                                                                                                                                     |
-| `migracion/etl-calidad.ts`              | **F6: Calidad** — `CC_Catalogo`(40)→DefectoCatalogo + `CC_Auditorias`(488)/`CC_AuditoriasDet`(15,296)→Auditoria/AuditoriaDefecto (modo migración: folio preservado, sin evento de RC)                                                |
-| `migracion/etl-esma.ts`                 | **F6: EsMa** — cargos (fix estampado: +1,251 recuperados) + `EsMa_Abonos`(554)/`EsMa_Desc`(743)/`EsMa_Pagos`(5,935) planos (pagos LIBRES, sin aplicaciones)                                                                          |
-| `migracion/cuadre-f6.ts`                | **F6: cuadre** Calidad+EsMa (conteos v1/v2 + saldo por maquilero con fórmula derivada D3 + conciliación recibido-vs-cargado; incidencias listadas)                                                                                   |
-| `migracion/etl-costos.ts`               | **F7: Costos** — `CostoOrd`(2,513)→`CostoOrden` vía `guardarCostoOrden` (D2: regalía FUERA; procesos = maquila+bordado; avíos = habilitación)                                                                                        |
-| `migracion/etl-indicadores.ts`          | **F7: Indicadores** — personal/actividades + productividad IP (`IP_Productiv`)/almacén (`Alm_Prd`×`Alm_Prd_Det`) + fichas (`IP_InfConf`, despivota 8→8) + muestrarios (`IP_MuesPend`) + cíclico histórico Proscai (`Alm_InvCic`, D6) |
-| `migracion/cuadre-f7.ts`                | **F7: cuadre** (conteos v1/v2 + análisis empírico de la regalía D2: ¿el `Costo` viejo la incluía? + delta esperado)                                                                                                                  |
-| `migracion/cuadre.ts`                   | Cuadre F1 (conteos v1 CSV vs v2)                                                                                                                                                                                                     |
-| `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |
-| `migracion/cuadre-f2.ts`                | Cuadre F2 en dos niveles (filas/sumas + columnas) + incidencias                                                                                                                                                                      |
-| `migracion/cuadre-f3.ts`                | **Cuadre F3 en tres niveles** (conteos + existencias Σ kardex vs `IPT_Mod_Alm` + no-doble-conteo)                                                                                                                                    |
-| `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
+| Script | Qué hace |
+|---|---|
+| `migracion/recargar.ts` | ⭐ **RECARGA de punta a punta en un comando** (limpieza opcional + seed + 12 ETL + realineado de estado + 6 cuadres, secuencial con resumen; ver sección arriba) |
+| `migracion/limpiar-datos.ts` | **VACÍA la BD** (TRUNCATE de todo `public` menos `_prisma_migrations`); sin `--confirmar` solo ensaya. Lo reusa `recargar.ts --limpiar` |
+| `migracion/realinear-estado-ordenes.ts` | ⚠️ **MANTENIMIENTO OBLIGATORIO al terminar cualquier carga/recarga**: realinea el estado `completa`/`capturada` con la regla automática (`requisitosOrden`). Idempotente, por lotes; `--empresa=<id>` `--lote=<n>` `--dry-run`. Lo corre `recargar.ts` como paso final |
+| `migracion/etl-catalogos.ts` | F1: catálogos, materiales, proveedores, mapeos |
+| `migracion/etl-modelos.ts` | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-bordados` para las fotos masivas) |
+| `migracion/etl-pedidos-ordenes.ts` | **F2: pedidos + pedidos reales + órdenes + matriz + comentarios** (imprime el cuadre al final) |
+| `migracion/etl-produccion.ts` | **F3: corte + envío + recibo + cargos EsMa** (Pieza A; recibos SIN efecto de kardex) |
+| `migracion/etl-ipt.ts` | **F3: kardex histórico de inventario PT** (Pieza B; IPT_Movs → Movimiento, color/talla sentinela) |
+| `migracion/etl-compras-notas.ts` | **F4: OC + notas legacy** (OrdCompra*/Notas* → OrdenCompra/NotaSalida; texto libre, SIN kardex/RecepcionCompra) |
+| `migracion/etl-telas.ts` | **F4: entradas/salidas/traspasos de tela + lotes legacy** (clasifica traspasos vs compra vs salida-a-orden) |
+| `migracion/cuadre-f4.ts` | **F4: cuadre TelasColAlm** v1 vs Σ movimientos v2 (descuadres listados, nunca corregidos — D3) |
+| `migracion/etl-ruta-critica.ts` | **F5: Ruta Crítica completa** (catálogos + 54 ProcesoDefRol vigentes + plantillas CP_Tiempos + UsuarioRol + rutas históricas RC/IP3/IP4 + estado RC de órdenes + colchón); LISTA 14 huérfanas + pendientes F10 |
+| `migracion/cuadre-f5.ts` | **F5: cuadre** v1(CSV) vs v2(BD) + huérfanas/pendientes-F10/FactorTela no migrada |
+| `migracion/etl-calidad.ts` | **F6: Calidad** — `CC_Catalogo`(40)→DefectoCatalogo + `CC_Auditorias`(488)/`CC_AuditoriasDet`(15,296)→Auditoria/AuditoriaDefecto (modo migración: folio preservado, sin evento de RC) |
+| `migracion/etl-esma.ts` | **F6: EsMa** — cargos (fix estampado: +1,251 recuperados) + `EsMa_Abonos`(554)/`EsMa_Desc`(743)/`EsMa_Pagos`(5,935) planos (pagos LIBRES, sin aplicaciones) |
+| `migracion/cuadre-f6.ts` | **F6: cuadre** Calidad+EsMa (conteos v1/v2 + saldo por maquilero con fórmula derivada D3 + conciliación recibido-vs-cargado; incidencias listadas) |
+| `migracion/etl-costos.ts` | **F7: Costos** — `CostoOrd`(2,513)→`CostoOrden` vía `guardarCostoOrden` (D2: regalía FUERA; procesos = maquila+bordado; avíos = habilitación) |
+| `migracion/etl-indicadores.ts` | **F7: Indicadores** — personal/actividades + productividad IP (`IP_Productiv`)/almacén (`Alm_Prd`×`Alm_Prd_Det`) + fichas (`IP_InfConf`, despivota 8→8) + muestrarios (`IP_MuesPend`) + cíclico histórico Proscai (`Alm_InvCic`, D6) |
+| `migracion/cuadre-f7.ts` | **F7: cuadre** (conteos v1/v2 + análisis empírico de la regalía D2: ¿el `Costo` viejo la incluía? + delta esperado) |
+| `migracion/etl-terceros-saldos.ts` | **F9: saldos iniciales** de CxC/CxP (corte SINUBE → aperturas vía modo migración del motor; por lotes; `-- --archivo=<csv>`) |
+| `migracion/etl-cfdi-masivo.ts` | **F9: importación masiva de CFDI** (carpeta de XML → reusa E3/E4; compra/venta por RFC de empresa; `-- --dir=<carpeta>`) |
+| `migracion/cuadre-f9.ts` | **F9: cuadre** (saldo esperado del corte vs Σ aperturas cargadas; descuadres listados; `-- --archivo=<csv>`) |
+| `migracion/cuadre.ts` | Cuadre F1 (conteos v1 CSV vs v2) |
+| `migracion/cuadre-fase.ts` | Cuadre por fase |
+| `migracion/cuadre-f2.ts` | Cuadre F2 en dos niveles (filas/sumas + columnas) + incidencias |
+| `migracion/cuadre-f3.ts` | **Cuadre F3 en tres niveles** (conteos + existencias Σ kardex vs `IPT_Mod_Alm` + no-doble-conteo) |
+| `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
 
 ## Notas
 
 - **Idempotente:** una segunda corrida no duplica (resuelve "ya existe" por `MapeoMigracion` y/o el unique `(idEmpresa, folio)`). Si una corrida se corta a media, re-ejecutar retoma donde quedó.
-- **Re-ejecutable:** el ETL de F2 se vuelve a correr en F9 (al corte de go-live).
+- **Re-ejecutable:** el ETL de F2 se vuelve a correr en F10 (al corte de go-live).
 - **Reporte:** `etl-pedidos-ordenes.ts` escribe un `reporte-etl-f2e5-<timestamp>.txt` y `etl-ipt.ts` un `reporte-etl-f3-<timestamp>.txt` (ambos gitignored) con el cuadre y las incidencias a revisar con Daniel.

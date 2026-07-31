@@ -1,4 +1,4 @@
-import { Ban, BookOpenText, Loader2Icon } from 'lucide-react';
+import { Ban, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,9 +11,16 @@ import {
 } from '@/api/inventario-materiales';
 import type { Tela } from '@/api/telas';
 import type { KardexAvioRenglon, KardexTelaRenglon } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -23,68 +30,50 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
+import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorAvio } from './SelectorAvio';
 import { SelectorTela } from './SelectorTela';
 
 type Dimension = 'tela' | 'avio';
 
 /**
- * KARDEX de materiales (F4-E1, doc 04-Inventarios §B.4): movimientos cronológicos con SALDO CORRIDO.
- * Dos dimensiones en una pantalla (toggle): TELAS (por tela; entradas, salidas a orden visibles vía
- * origen) y AVÍOS (por avío). Las salidas ligadas a orden muestran su origen. Costos/importes solo si
- * la sesión tiene `telas.ver-totales` (el backend ya los omite si no — la UI no los asume). Consulta
- * MÓVIL (tarjetas en móvil, tabla en escritorio). `inventario-telas.ver`/`inventario-avios.ver`
- * gobiernan el acceso. Permite CANCELAR un movimiento (inverso auditado, D3) con `*.mover`.
+ * KARDEX de materiales (F4-E1, doc 04-Inventarios §B.4 — re-vestido R9 al estándar del grupo):
+ * movimientos cronológicos con SALDO CORRIDO en card única (toolbar con combobox + conteo plano +
+ * TABLA DENSA). Dos dimensiones en un riel segmentado (proto `.tabs`): TELAS (por tela; entradas,
+ * salidas a orden visibles vía origen) y AVÍOS (por avío). Las salidas ligadas a orden muestran su
+ * origen. Costos/importes solo si la sesión tiene `telas.ver-totales` (el backend ya los omite si
+ * no — la UI no los asume). Consulta MÓVIL (tarjetas en móvil, tabla en escritorio).
+ * `inventario-telas.ver`/`inventario-avios.ver` gobiernan el acceso. Permite CANCELAR un movimiento
+ * (inverso auditado, D3) con `*.mover`.
  */
 export function KardexMaterialesPagina(): React.JSX.Element {
   const [dimension, setDimension] = useState<Dimension>('tela');
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <BookOpenText className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Kardex de materiales</h1>
-          <p className="text-sm text-muted-foreground">
-            Movimientos con saldo corrido por tela (lote) o por avío.
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 md:p-5">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Kardex de materiales
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Movimientos con saldo corrido por tela (lote) o por avío
           </p>
         </div>
       </header>
 
-      <div className="inline-flex rounded-md border p-0.5">
-        <button
-          type="button"
-          onClick={() => setDimension('tela')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'tela' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-          }`}
-          data-testid="kardex-mat-dim-tela"
-        >
-          Telas
-        </button>
-        <button
-          type="button"
-          onClick={() => setDimension('avio')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'avio' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-          }`}
-          data-testid="kardex-mat-dim-avio"
-        >
-          Avíos
-        </button>
-      </div>
+      <PestanasSegmentadas<Dimension>
+        opciones={[
+          { valor: 'tela', etiqueta: 'Telas', testid: 'kardex-mat-dim-tela' },
+          { valor: 'avio', etiqueta: 'Avíos', testid: 'kardex-mat-dim-avio' },
+        ]}
+        valor={dimension}
+        alCambiar={setDimension}
+        etiqueta="Tipo de material"
+        className="w-fit"
+      />
 
       {dimension === 'tela' ? <KardexTela /> : <KardexAvio />}
     </div>
@@ -98,7 +87,7 @@ function efectoRenglon(entrada: number, salida: number): string {
   return '0';
 }
 
-/** Kardex por TELA. */
+/** Kardex por TELA (card estándar: toolbar con combobox + tabla densa). */
 function KardexTela(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
@@ -109,129 +98,133 @@ function KardexTela(): React.JSX.Element {
   const cancelar = useCancelarTela();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Tela</CardTitle>
-          <CardDescription>Elige la tela del kardex.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SelectorTela idSeleccionado={tela?.id} alSeleccionar={setTela} />
-        </CardContent>
-      </Card>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
+          <SelectorTela
+            idSeleccionado={tela?.id}
+            alSeleccionar={setTela}
+            alLimpiar={() => setTela(undefined)}
+          />
+        </div>
+        {/* Identidad VISIBLE de la tela consultada: nombre + descripción (el value del input no
+            es un nodo de texto; el kardex debe decir de QUÉ tela es). */}
+        {tela !== undefined ? (
+          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-tela-sel">
+            <span className="font-medium text-foreground">{tela.nombre}</span>
+            {tela.descripcion !== null ? <> — {tela.descripcion}</> : null}
+          </span>
+        ) : null}
+        {tela !== undefined ? (
+          <span className="ml-auto text-xs text-faint">
+            {renglones.length.toLocaleString('es-MX')} renglones
+          </span>
+        ) : null}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{tela ? `Kardex de ${tela.nombre}` : 'Kardex'}</CardTitle>
-          <CardDescription>
-            Movimientos en orden, con el saldo por lote tras cada uno.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {tela === undefined ? (
-            <p className="text-sm text-muted-foreground">Selecciona una tela.</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : renglones.length === 0 ? (
-            <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Esta tela no tiene movimientos.
-            </p>
-          ) : (
-            <>
-              {/* Móvil: tarjetas. */}
-              <div className="space-y-3 md:hidden" data-testid="kardex-tela-tarjetas">
-                {renglones.map((r, i) => (
-                  <Card key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}>
-                    <CardContent className="space-y-1 p-4 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">
-                          #{r.folio} · {r.tipoMov}
-                        </span>
-                        {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="tabular-nums">{efectoRenglon(r.entrada, r.salida)}</span>
-                        <span className="font-semibold tabular-nums">
-                          Saldo: {r.saldo.toLocaleString('es-MX')}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Escritorio: tabla. */}
+      {tela === undefined ? (
+        <p className="p-6 text-sm text-muted-foreground">
+          Busca una tela para ver su kardex (movimientos en orden, con el saldo por lote tras cada
+          uno).
+        </p>
+      ) : consulta.isError ? (
+        <p className="p-6 text-sm text-destructive" role="alert">
+          {consulta.error.message}
+        </p>
+      ) : consulta.isPending ? (
+        <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+      ) : renglones.length === 0 ? (
+        <p className="p-6 text-sm text-muted-foreground">Esta tela no tiene movimientos.</p>
+      ) : (
+        <>
+          {/* Móvil: tarjetas. */}
+          <div className="space-y-3 p-3 md:hidden" data-testid="kardex-tela-tarjetas">
+            {renglones.map((r, i) => (
               <div
-                className="hidden overflow-x-auto rounded-md border md:block"
-                data-testid="kardex-tela-tabla"
+                key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
+                className="space-y-1 rounded-lg border bg-card p-3 text-sm"
               >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Folio</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Movimiento</TableHead>
-                      <TableHead>Almacén</TableHead>
-                      <TableHead>Lote</TableHead>
-                      <TableHead className="text-right">Entrada</TableHead>
-                      <TableHead className="text-right">Salida</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      {puedeMover ? <TableHead /> : null}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renglones.map((r, i) => (
-                      <TableRow
-                        key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
-                        className={r.cancelado ? 'opacity-60' : ''}
-                      >
-                        <TableCell className="font-medium tabular-nums">{r.folio}</TableCell>
-                        <TableCell>{r.fecha}</TableCell>
-                        <TableCell className="flex items-center gap-1.5">
-                          {r.tipoMov}
-                          {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
-                        </TableCell>
-                        <TableCell>{r.almacen}</TableCell>
-                        <TableCell>{r.loteClave ?? '(sin lote)'}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
-                          {r.saldo.toLocaleString('es-MX')}
-                        </TableCell>
-                        {puedeMover ? (
-                          <TableCell className="text-right">
-                            {!r.cancelado ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setACancelar(r)}
-                                data-testid={`kardex-tela-cancelar-${r.idMovimiento}`}
-                              >
-                                <Ban className="size-4" aria-hidden />
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                        ) : null}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    #{r.folio} · {r.tipoMov}
+                  </span>
+                  {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
+                  <span className="num font-semibold">
+                    Saldo: {r.saldo.toLocaleString('es-MX')}
+                  </span>
+                </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+
+          {/* Escritorio: tabla densa. */}
+          <div className="hidden overflow-x-auto md:block" data-testid="kardex-tela-tabla">
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Folio</TablaDensaHead>
+                  <TablaDensaHead>Fecha</TablaDensaHead>
+                  <TablaDensaHead>Movimiento</TablaDensaHead>
+                  <TablaDensaHead>Almacén</TablaDensaHead>
+                  <TablaDensaHead>Lote</TablaDensaHead>
+                  <TablaDensaHead numerica>Entrada</TablaDensaHead>
+                  <TablaDensaHead numerica>Salida</TablaDensaHead>
+                  <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                  {puedeMover ? <TablaDensaHead /> : null}
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {renglones.map((r, i) => (
+                  <TablaDensaFila
+                    key={`${r.idMovimiento}-${r.idLote ?? 'sl'}-${i}`}
+                    className={r.cancelado ? 'opacity-60' : ''}
+                  >
+                    <TablaDensaCelda className="num font-medium">{r.folio}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <span className="flex items-center gap-1.5">
+                        {r.tipoMov}
+                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                      </span>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.loteClave ?? '(sin lote)'}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {r.saldo.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    {puedeMover ? (
+                      <TablaDensaCelda className="text-right">
+                        {!r.cancelado ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setACancelar(r)}
+                            data-testid={`kardex-tela-cancelar-${r.idMovimiento}`}
+                          >
+                            <Ban className="size-4" aria-hidden />
+                          </Button>
+                        ) : null}
+                      </TablaDensaCelda>
+                    ) : null}
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          </div>
+        </>
+      )}
 
       <DialogoCancelarMaterial
         abierto={aCancelar !== null}
@@ -256,7 +249,7 @@ function KardexTela(): React.JSX.Element {
   );
 }
 
-/** Kardex por AVÍO. */
+/** Kardex por AVÍO (card estándar: toolbar con combobox + tabla densa). */
 function KardexAvio(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-avios.mover');
@@ -267,125 +260,130 @@ function KardexAvio(): React.JSX.Element {
   const cancelar = useCancelarAvio();
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Avío</CardTitle>
-          <CardDescription>Elige el avío del kardex.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SelectorAvio idSeleccionado={avio?.id} alSeleccionar={setAvio} />
-        </CardContent>
-      </Card>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
+          <SelectorAvio
+            idSeleccionado={avio?.id}
+            alSeleccionar={setAvio}
+            alLimpiar={() => setAvio(undefined)}
+          />
+        </div>
+        {/* Identidad VISIBLE del avío consultado: clave + descripción (el value del input no
+            es un nodo de texto; el kardex debe decir de QUÉ avío es). */}
+        {avio !== undefined ? (
+          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-avio-sel">
+            <span className="num font-medium text-foreground">{avio.clave}</span> —{' '}
+            {avio.descripcion}
+          </span>
+        ) : null}
+        {avio !== undefined ? (
+          <span className="ml-auto text-xs text-faint">
+            {renglones.length.toLocaleString('es-MX')} renglones
+          </span>
+        ) : null}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{avio ? `Kardex de ${avio.clave}` : 'Kardex'}</CardTitle>
-          <CardDescription>Movimientos en orden, con el saldo por almacén.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {avio === undefined ? (
-            <p className="text-sm text-muted-foreground">Selecciona un avío.</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : renglones.length === 0 ? (
-            <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Este avío no tiene movimientos.
-            </p>
-          ) : (
-            <>
-              {/* Móvil: tarjetas. */}
-              <div className="space-y-3 md:hidden" data-testid="kardex-avio-tarjetas">
-                {renglones.map((r, i) => (
-                  <Card key={`${r.idMovimiento}-${i}`}>
-                    <CardContent className="space-y-1 p-4 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">
-                          #{r.folio} · {r.tipoMov}
-                        </span>
-                        {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {r.fecha} · {r.almacen}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="tabular-nums">{efectoRenglon(r.entrada, r.salida)}</span>
-                        <span className="font-semibold tabular-nums">
-                          Saldo: {r.saldo.toLocaleString('es-MX')}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Escritorio: tabla. */}
+      {avio === undefined ? (
+        <p className="p-6 text-sm text-muted-foreground">
+          Busca un avío para ver su kardex (movimientos en orden, con el saldo por almacén).
+        </p>
+      ) : consulta.isError ? (
+        <p className="p-6 text-sm text-destructive" role="alert">
+          {consulta.error.message}
+        </p>
+      ) : consulta.isPending ? (
+        <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+      ) : renglones.length === 0 ? (
+        <p className="p-6 text-sm text-muted-foreground">Este avío no tiene movimientos.</p>
+      ) : (
+        <>
+          {/* Móvil: tarjetas. */}
+          <div className="space-y-3 p-3 md:hidden" data-testid="kardex-avio-tarjetas">
+            {renglones.map((r, i) => (
               <div
-                className="hidden overflow-x-auto rounded-md border md:block"
-                data-testid="kardex-avio-tabla"
+                key={`${r.idMovimiento}-${i}`}
+                className="space-y-1 rounded-lg border bg-card p-3 text-sm"
               >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Folio</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Movimiento</TableHead>
-                      <TableHead>Almacén</TableHead>
-                      <TableHead className="text-right">Entrada</TableHead>
-                      <TableHead className="text-right">Salida</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      {puedeMover ? <TableHead /> : null}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renglones.map((r, i) => (
-                      <TableRow
-                        key={`${r.idMovimiento}-${i}`}
-                        className={r.cancelado ? 'opacity-60' : ''}
-                      >
-                        <TableCell className="font-medium tabular-nums">{r.folio}</TableCell>
-                        <TableCell>{r.fecha}</TableCell>
-                        <TableCell className="flex items-center gap-1.5">
-                          {r.tipoMov}
-                          {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
-                        </TableCell>
-                        <TableCell>{r.almacen}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">
-                          {r.saldo.toLocaleString('es-MX')}
-                        </TableCell>
-                        {puedeMover ? (
-                          <TableCell className="text-right">
-                            {!r.cancelado ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setACancelar(r)}
-                                data-testid={`kardex-avio-cancelar-${r.idMovimiento}`}
-                              >
-                                <Ban className="size-4" aria-hidden />
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                        ) : null}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    #{r.folio} · {r.tipoMov}
+                  </span>
+                  {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {r.fecha} · {r.almacen}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="num">{efectoRenglon(r.entrada, r.salida)}</span>
+                  <span className="num font-semibold">
+                    Saldo: {r.saldo.toLocaleString('es-MX')}
+                  </span>
+                </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+
+          {/* Escritorio: tabla densa. */}
+          <div className="hidden overflow-x-auto md:block" data-testid="kardex-avio-tabla">
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Folio</TablaDensaHead>
+                  <TablaDensaHead>Fecha</TablaDensaHead>
+                  <TablaDensaHead>Movimiento</TablaDensaHead>
+                  <TablaDensaHead>Almacén</TablaDensaHead>
+                  <TablaDensaHead numerica>Entrada</TablaDensaHead>
+                  <TablaDensaHead numerica>Salida</TablaDensaHead>
+                  <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                  {puedeMover ? <TablaDensaHead /> : null}
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {renglones.map((r, i) => (
+                  <TablaDensaFila
+                    key={`${r.idMovimiento}-${i}`}
+                    className={r.cancelado ? 'opacity-60' : ''}
+                  >
+                    <TablaDensaCelda className="num font-medium">{r.folio}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <span className="flex items-center gap-1.5">
+                        {r.tipoMov}
+                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                      </span>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {r.saldo.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    {puedeMover ? (
+                      <TablaDensaCelda className="text-right">
+                        {!r.cancelado ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setACancelar(r)}
+                            data-testid={`kardex-avio-cancelar-${r.idMovimiento}`}
+                          >
+                            <Ban className="size-4" aria-hidden />
+                          </Button>
+                        ) : null}
+                      </TablaDensaCelda>
+                    ) : null}
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          </div>
+        </>
+      )}
 
       <DialogoCancelarMaterial
         abierto={aCancelar !== null}

@@ -28,7 +28,6 @@ vi.mock('@/api/pedidos', () => ({
     ultimaQuery = query;
     return usePedidos(query);
   },
-  usePedido: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useCrearPedido: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarPedido: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarPedido: () => ({ mutate: vi.fn(), isPending: false }),
@@ -61,6 +60,8 @@ function renglon(id: number, codigo: string, cantidad: number, precio: number | 
     importe: precio === null ? null : cantidad * precio,
     entregadoParcialV1: null,
     cantFaltanteV1: null,
+    idDesarrollo: null,
+    numeroProduccion: null,
   };
 }
 
@@ -86,6 +87,7 @@ function pedido(
     entregadoTienda: false,
     noProducir: false,
     pedCancelado: opciones.cancelado ?? false,
+    ocCliente: null,
     idOrdCompraV1: null,
     totalPiezas: 10,
     totalImporte: precio === null ? null : 10 * precio,

@@ -16,7 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -96,11 +103,15 @@ export function DialogoColor({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="color-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="color-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="color-nombre"
                 autoFocus
+                placeholder="Ej. Azul marino"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={guardando}
                 {...formulario.register('nombre')}
@@ -125,7 +136,12 @@ export function DialogoColor({
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={guardando} data-testid="guardar-color">
+                <Button
+                  type="submit"
+                  disabled={guardando}
+                  data-testid="guardar-color"
+                  className="w-full sm:w-auto"
+                >
                   {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
                   Guardar cambios
                 </Button>
@@ -141,7 +157,12 @@ export function DialogoColor({
                 >
                   Listo
                 </Button>
-                <Button type="submit" disabled={guardando} data-testid="guardar-color">
+                <Button
+                  type="submit"
+                  disabled={guardando}
+                  data-testid="guardar-color"
+                  className="w-full sm:w-auto"
+                >
                   {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
                   Agregar color
                 </Button>

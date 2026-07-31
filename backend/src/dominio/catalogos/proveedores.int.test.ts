@@ -13,13 +13,16 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   actualizarProveedor,
   agregarAdjuntoProveedor,
+  asignarAvioProveedor,
   crearProveedor,
   desactivarProveedor,
   listarAdjuntosProveedor,
+  listarAviosDeProveedor,
   listarProveedores,
   listarRolesProveedor,
   obtenerProveedor,
   quitarAdjuntoProveedor,
+  quitarAvioProveedor,
   reactivarProveedor,
 } from './proveedores.js';
 
@@ -87,8 +90,20 @@ function archivosFalsos(): ServicioArchivos {
       });
       return { archivo, urlSubida: `https://r2.fake/put/${key}`, expiraEnSegundos: 900 };
     },
+    subirContenido() {
+      throw new Error(
+        'Este flujo usa solicitarSubida (presigned), no subirContenido (server-side).',
+      );
+    },
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
+    },
+    descargarContenido(key) {
+      // El fake no guarda bytes: solo cumple el contrato del servicio (nadie lo usa aquí).
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
+    eliminarObjeto() {
+      return Promise.resolve();
     },
   };
 }
@@ -469,6 +484,27 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(pagina.datos[0]?.roles).toHaveLength(3);
     });
 
+    it('la busqueda ignora ACENTOS y mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar")', async () => {
+      const sesion = sesionAdmin();
+      await crearProveedor(sesion, { nombre: 'Óscar Jiménez', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Óscar Hernández', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Rima Textil', roles: [rolMaquila] }, bd());
+
+      // Sin acento encuentra a los acentuados; con acento también; y el filtro por rol coexiste.
+      const sinAcento = await listarProveedores(sesion, { busqueda: 'oscar' }, bd());
+      expect(sinAcento.datos.map((p) => p.nombre).sort()).toEqual([
+        'Óscar Hernández',
+        'Óscar Jiménez',
+      ]);
+      const conAcento = await listarProveedores(sesion, { busqueda: 'óscar' }, bd());
+      expect(conAcento.total).toBe(2);
+      // "her" → solo Hernández (el requisito literal de Daniel).
+      const her = await listarProveedores(sesion, { busqueda: 'her' }, bd());
+      expect(her.datos.map((p) => p.nombre)).toEqual(['Óscar Hernández']);
+      // Sin coincidencias → página vacía limpia.
+      expect((await listarProveedores(sesion, { busqueda: 'zzz' }, bd())).total).toBe(0);
+    });
+
     it('excluye inactivos por defecto', async () => {
       const sesion = sesionAdmin();
       await crearProveedor(sesion, { nombre: 'Activo', roles: [rolMaquila] }, bd());
@@ -758,6 +794,144 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
           archivosFalsos(),
         ),
       ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+  });
+
+  // ── B17: avíos que surte el proveedor (lado proveedor de AvioProveedor, R9) ──
+  describe('avíos que surte el proveedor (B17, R9)', () => {
+    /** Crea un proveedor de prueba y devuelve su id. */
+    async function crearProv(nombre = 'Etiquetas Sol'): Promise<number> {
+      const p = await crearProveedor(
+        sesionAdmin(),
+        { nombre, tipo: 'AVIOS', roles: [rolMaquila] },
+        bd(),
+      );
+      return p.id;
+    }
+
+    /** Crea un avío de catálogo y devuelve su id. */
+    async function crearAvio(clave: string, activo = true): Promise<number> {
+      const a = await cliente.avio.create({
+        data: { clave, descripcion: `Avío ${clave}`, activo },
+      });
+      return a.id;
+    }
+
+    it('sin permiso de administrar no se puede asignar ni quitar', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-01');
+      const soloVer = sesionDePrueba({ permisos: ['proveedores.ver'] });
+      await expect(asignarAvioProveedor(soloVer, idProv, { idAvio }, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+      await expect(quitarAvioProveedor(soloVer, idProv, idAvio, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+      // Leer sí puede.
+      await expect(listarAviosDeProveedor(soloVer, idProv, bd())).resolves.toEqual([]);
+    });
+
+    it('sin ningún permiso no se puede ni listar', async () => {
+      const idProv = await crearProv();
+      await expect(listarAviosDeProveedor(sesionDePrueba(), idProv, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+    });
+
+    it('asigna un avío con su precio y lo lista con clave/descripcion embebidas', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-01');
+
+      const lista = await asignarAvioProveedor(
+        sesionAdmin(),
+        idProv,
+        { idAvio, precio: 1.25, condiciones: 'mínimo 1 millar' },
+        bd(),
+      );
+      expect(lista).toHaveLength(1);
+      expect(lista[0]).toMatchObject({
+        idAvio,
+        clave: 'BTN-01',
+        descripcion: 'Avío BTN-01',
+        precio: 1.25,
+        condiciones: 'mínimo 1 millar',
+      });
+
+      const releida = await listarAviosDeProveedor(sesionAdmin(), idProv, bd());
+      expect(releida).toEqual(lista);
+
+      // El vínculo se ve TAMBIÉN desde el lado del avío (misma tabla AvioProveedor).
+      const desdeAvio = await cliente.avioProveedor.findUnique({
+        where: { idAvio_idProveedor: { idAvio, idProveedor: idProv } },
+      });
+      expect(desdeAvio?.precio?.toString()).toBe('1.25');
+    });
+
+    it('asignar sin precio deja el precio en null', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-02');
+      const lista = await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd());
+      expect(lista).toHaveLength(1);
+      expect(lista[0]?.precio).toBeNull();
+      expect(lista[0]?.condiciones).toBeNull();
+    });
+
+    it('asignar dos veces el mismo avío → ErrorConflicto', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-03');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd());
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('no se puede asignar un avío desactivado → ErrorValidacion', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-04', false);
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('asignar a proveedor o avío inexistente → ErrorNoEncontrado', async () => {
+      const idProv = await crearProv();
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: 999999 }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+      const idAvio = await crearAvio('BTN-05');
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), 999999, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+
+    it('quita un avío que surte y actualiza la lista', async () => {
+      const idProv = await crearProv();
+      const idA = await crearAvio('BTN-06');
+      const idB = await crearAvio('BTN-07');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idA }, bd());
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idB }, bd());
+
+      const tras = await quitarAvioProveedor(sesionAdmin(), idProv, idA, bd());
+      expect(tras).toHaveLength(1);
+      expect(tras[0]?.idAvio).toBe(idB);
+    });
+
+    it('quitar un avío que el proveedor no surte → ErrorNoEncontrado', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-08');
+      await expect(quitarAvioProveedor(sesionAdmin(), idProv, idAvio, bd())).rejects.toBeInstanceOf(
+        ErrorNoEncontrado,
+      );
+    });
+
+    it('la lista sale ordenada por clave del avío', async () => {
+      const idProv = await crearProv();
+      const idZ = await crearAvio('ZZZ-01');
+      const idA = await crearAvio('AAA-01');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idZ }, bd());
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idA }, bd());
+      const lista = await listarAviosDeProveedor(sesionAdmin(), idProv, bd());
+      expect(lista.map((x) => x.clave)).toEqual(['AAA-01', 'ZZZ-01']);
     });
   });
 });

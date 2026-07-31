@@ -1,0 +1,22 @@
+-- ¿La prenda LLEVA arte (bordado/estampado)? — decisión de Daniel del 26-jul-2026, textual:
+-- "por default sí lleva. A menos que la marques como que no lleva. Y de esa manera si no meten la
+--  información del arte, o no desmarcan la casilla, está como incompleto. Es decir, siempre hay que
+--  atender ese tema".
+--
+-- Es el tercer requisito del ESTADO AUTOMÁTICO de la orden (tallas + avíos + arte si aplica, ver
+-- `backend/src/dominio/produccion/requisitos-orden.ts`). Hasta hoy "el modelo no tiene arte en el
+-- BOM" era ambiguo entre *no lleva* y *falta capturarlo*, así que el arte nunca podía faltar; con
+-- esta bandera la ambigüedad desaparece:
+--   lleva_arte = true  → la orden NO se completa hasta que el BOM del modelo tenga su arte
+--   lleva_arte = false → el arte NO aplica y no estorba (prendas lisas)
+--
+-- DEFAULT true, también para los ~miles de modelos migrados de Access: es EXACTAMENTE lo que pidió
+-- Daniel (que el tema se atienda siempre). Consecuencia intencional: muchas órdenes vivas quedarán
+-- "incompletas" hasta capturar su arte o desmarcar la casilla. El estado es INFORMATIVO — ninguna
+-- pantalla de captura (corte, envío, recibo, entrega, salida de tela, nota de tela, auditoría)
+-- filtra ni bloquea por él; lo único que bloquea la operación es `cancelada`.
+--
+-- Aditiva, con default: se aplica sola al desplegar. Sin backfill, sin permisos nuevos, sin re-seed.
+
+-- AlterTable
+ALTER TABLE "modelos" ADD COLUMN     "lleva_arte" BOOLEAN NOT NULL DEFAULT true;

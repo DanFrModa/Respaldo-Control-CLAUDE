@@ -4,7 +4,7 @@
  * Migra el histórico real del inventario de PRODUCTO TERMINADO (IPT_Movs/IPT_MovsDet) a la BD de v2
  * como movimientos del KARDEX único (D3), VÍA el MODO MIGRACIÓN de la capa de dominio
  * (`dominio/inventarios/migracion.ts`, A1: el motor de kardex es el único que escribe). Es
- * IDEMPOTENTE (por `Movimiento.origenId` = IdIPT_MovsDet) y re-ejecutable (se re-corre en F9).
+ * IDEMPOTENTE (por `Movimiento.origenId` = IdIPT_MovsDet) y re-ejecutable (se re-corre en F10).
  *
  * DEPENDE de los mapeos que dejaron los ETL previos (DEBEN haber corrido ANTES):
  *  • `etl-catalogos.ts`  → mapeos `Empresa`, `Almacen:IPT` (los 3 PT).

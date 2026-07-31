@@ -13,6 +13,8 @@ import type {
   Proveedor,
   ProveedorAdjunto,
   ProveedorAdjuntoCrear,
+  ProveedorAvio,
+  ProveedorAvioAsignar,
   ProveedorCrear,
   ProveedorEditar,
   ProveedoresPagina,
@@ -95,14 +97,22 @@ async function reactivarProveedor(id: number): Promise<Proveedor> {
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
-/** Lista proveedores con los filtros dados (mantiene la pagina previa al paginar/buscar). */
+/**
+ * Lista proveedores con los filtros dados (mantiene la pagina previa al paginar/buscar).
+ *
+ * `opciones.enabled` deshabilita la consulta cuando aun no se puede filtrar por rol: las pantallas
+ * de captura que listan un rol concreto (cortadores, maquileros) la apagan mientras el rol no esta
+ * resuelto, para NUNCA listar TODOS los proveedores sin filtro.
+ */
 export function useProveedores(
   query: ProveedoresQuery,
+  opciones?: { enabled?: boolean },
 ): UseQueryResult<ProveedoresPagina, ErrorDeApi> {
   return useQuery({
     queryKey: claveListaProveedores(query),
     queryFn: () => listarProveedores(query),
     placeholderData: keepPreviousData,
+    enabled: opciones?.enabled ?? true,
   });
 }
 
@@ -308,6 +318,110 @@ export function useQuitarAdjuntoProveedor(): UseMutationResult<
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: claveAdjuntos(variables.idProveedor) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES });
+    },
+  });
+}
+
+// ── Avíos que surte el proveedor (B17, R9 — lado proveedor de AvioProveedor) ───
+
+/** Clave de cache de los avíos que surte UN proveedor. */
+function claveAviosProveedor(idProveedor: number): readonly unknown[] {
+  return [...CLAVE_PROVEEDORES, 'avios', idProveedor];
+}
+
+/** Lista los avíos que surte un proveedor (`GET /api/proveedores/{id}/avios`). */
+async function listarAviosProveedor(idProveedor: number): Promise<ProveedorAvio[]> {
+  const { data, error } = await api.GET('/api/proveedores/{id}/avios', {
+    params: { path: { id: idProveedor } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Lista los avíos que surte un proveedor (deshabilitada si no hay id, p. ej. en alta). */
+export function useAviosProveedor(
+  idProveedor: number | undefined,
+): UseQueryResult<ProveedorAvio[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveAviosProveedor(idProveedor ?? 0),
+    queryFn: () => listarAviosProveedor(idProveedor as number),
+    enabled: idProveedor !== undefined,
+  });
+}
+
+/** Argumentos de la mutacion de asignar un avío que surte el proveedor. */
+export interface ArgsAsignarAvioProveedor {
+  idProveedor: number;
+  cuerpo: ProveedorAvioAsignar;
+}
+
+/** Asigna un avío que surte el proveedor (`POST /api/proveedores/{id}/avios`). */
+async function asignarAvioProveedor({
+  idProveedor,
+  cuerpo,
+}: ArgsAsignarAvioProveedor): Promise<ProveedorAvio[]> {
+  const { data, error } = await api.POST('/api/proveedores/{id}/avios', {
+    params: { path: { id: idProveedor } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Asigna un avío que surte el proveedor e invalida su lista de avíos. */
+export function useAsignarAvioProveedor(): UseMutationResult<
+  ProveedorAvio[],
+  ErrorDeApi,
+  ArgsAsignarAvioProveedor
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: asignarAvioProveedor,
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: claveAviosProveedor(variables.idProveedor),
+      });
+    },
+  });
+}
+
+/** Argumentos de la mutacion de quitar un avío que surte el proveedor. */
+export interface ArgsQuitarAvioProveedor {
+  idProveedor: number;
+  idAvio: number;
+}
+
+/** Quita un avío que surte el proveedor (`DELETE /api/proveedores/{id}/avios/{idAvio}`). */
+async function quitarAvioProveedor({
+  idProveedor,
+  idAvio,
+}: ArgsQuitarAvioProveedor): Promise<ProveedorAvio[]> {
+  const { data, error } = await api.DELETE('/api/proveedores/{id}/avios/{idAvio}', {
+    params: { path: { id: idProveedor, idAvio } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Quita un avío que surte el proveedor e invalida su lista de avíos. */
+export function useQuitarAvioProveedor(): UseMutationResult<
+  ProveedorAvio[],
+  ErrorDeApi,
+  ArgsQuitarAvioProveedor
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quitarAvioProveedor,
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: claveAviosProveedor(variables.idProveedor),
+      });
     },
   });
 }

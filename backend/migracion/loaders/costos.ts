@@ -141,6 +141,10 @@ async function procesarCosto(
       idOrden,
       { telaCost, aviosCost, procesosCost, otros, descOtros, observaciones },
       ctx.bd,
+      // El CSV viejo trae los TRES componentes explícitos: el REAL de compras no se usaría para
+      // ningún default, y calcularlo por cada una de las ~2,500 filas solo serviría para congelar
+      // un número de HOY en una orden de los 90. `telaReal`/`aviosReal` quedan NULL a propósito.
+      { calcularReal: false },
     ),
   );
   if (guardado === null) {

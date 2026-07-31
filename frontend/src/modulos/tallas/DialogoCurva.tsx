@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 import { ArmadorCurva } from './ArmadorCurva';
@@ -124,8 +130,11 @@ export function DialogoCurva({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="curva-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="curva-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="curva-nombre"
                 autoFocus

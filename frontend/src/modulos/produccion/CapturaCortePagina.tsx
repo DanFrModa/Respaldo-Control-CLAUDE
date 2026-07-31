@@ -1,4 +1,3 @@
-import { Scissors } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -57,16 +56,27 @@ export function CapturaCortePagina(): React.JSX.Element {
   const pendientes = usePendientesOrden(idOrden, idOrden !== undefined);
   const crear = useCrearCorte();
 
-  // Cortadores: proveedores con el rol "corte".
+  // Cortadores: proveedores con el rol "corte". La consulta queda DESHABILITADA hasta resolver el
+  // rol (idRolCorte definido): así nunca lista TODOS los proveedores sin filtro.
   const roles = useRolesProveedor();
   const idRolCorte = roles.data?.find((r) => r.codigo === 'corte')?.id;
-  const cortadores = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRolCorte === undefined ? {} : { rol: idRolCorte }),
-  });
+  const cortadores = useProveedores(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      direccion: 'asc',
+      ...(idRolCorte === undefined ? {} : { rol: idRolCorte }),
+    },
+    { enabled: idRolCorte !== undefined },
+  );
+
+  // Aviso reintentable si falla algún catálogo de la captura (roles o cortadores).
+  const catalogoError = roles.isError || cortadores.isError;
+  function reintentarCatalogos(): void {
+    void roles.refetch();
+    void cortadores.refetch();
+  }
 
   function alElegirOrden(o: Orden): void {
     setIdOrden(o.id);
@@ -121,19 +131,33 @@ export function CapturaCortePagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Scissors className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Captura de corte</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Captura de corte
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Registra el corte de una orden por color × talla. El sobre-corte se permite (solo
             avisa).
           </p>
         </div>
       </header>
+
+      {catalogoError ? (
+        <div
+          className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+          role="alert"
+          data-testid="corte-error-catalogo"
+        >
+          <p className="text-sm text-destructive">
+            No se pudieron cargar los catálogos de la captura (cortadores).
+          </p>
+          <Button variant="outline" size="sm" onClick={reintentarCatalogos}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         <Card>

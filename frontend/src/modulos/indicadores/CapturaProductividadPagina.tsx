@@ -1,4 +1,4 @@
-import { Ban, ClipboardList } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,19 +11,19 @@ import {
   useRegistrosProductividad,
 } from '@/api/productividad';
 import type { RegistroProductividadCrear } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { atajosFecha, numero, porcentaje } from './comun';
@@ -96,15 +96,17 @@ export function CapturaProductividadPagina(): React.JSX.Element {
   const filas = registros.data?.datos ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="captura-productividad">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ClipboardList className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Captura de productividad</h1>
-          <p className="text-sm text-muted-foreground">
-            Ingeniería del Producto y Almacén, en una sola pantalla.
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid="captura-productividad"
+    >
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Captura de productividad
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Ingeniería del Producto y Almacén, en una sola pantalla
           </p>
         </div>
       </header>
@@ -298,36 +300,38 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             <p className="text-sm text-muted-foreground">Sin registros.</p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Actividad</TableHead>
-                    <TableHead>{area === 'ip' ? 'Persona' : 'Cliente'}</TableHead>
-                    <TableHead className="text-right">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Fecha</TablaDensaHead>
+                    <TablaDensaHead>Actividad</TablaDensaHead>
+                    <TablaDensaHead>{area === 'ip' ? 'Persona' : 'Cliente'}</TablaDensaHead>
+                    <TablaDensaHead numerica>
                       {area === 'ip' ? 'Cantidad' : 'Piezas'}
-                    </TableHead>
-                    <TableHead className="text-right">Horas</TableHead>
-                    <TableHead className="text-right">Índice</TableHead>
-                    <TableHead className="text-right">% trab.</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                    </TablaDensaHead>
+                    <TablaDensaHead numerica>Horas</TablaDensaHead>
+                    <TablaDensaHead numerica>Índice</TablaDensaHead>
+                    <TablaDensaHead numerica>% trab.</TablaDensaHead>
+                    <TablaDensaHead />
+                  </TablaDensaFila>
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
                   {filas.map((r) => (
-                    <TableRow key={r.id} data-testid={`cap-registro-${r.id}`}>
-                      <TableCell>{r.fecha}</TableCell>
-                      <TableCell>{r.actividad}</TableCell>
-                      <TableCell>
+                    <TablaDensaFila key={r.id} data-testid={`cap-registro-${r.id}`}>
+                      <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                      <TablaDensaCelda>{r.actividad}</TablaDensaCelda>
+                      <TablaDensaCelda>
                         {area === 'ip' ? (r.persona ?? '—') : (r.cliente ?? '—')}
-                      </TableCell>
-                      <TableCell className="text-right">{numero(r.cantidad)}</TableCell>
-                      <TableCell className="text-right">{numero(r.horasTrabajadas)}</TableCell>
-                      <TableCell className="text-right font-medium">{numero(r.indice)}</TableCell>
-                      <TableCell className="text-right">
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica>{numero(r.cantidad)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica>{numero(r.horasTrabajadas)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica className="font-medium">
+                        {numero(r.indice)}
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica>
                         {porcentaje(r.porcentajeTrabajado)}
-                      </TableCell>
-                      <TableCell className="text-right">
+                      </TablaDensaCelda>
+                      <TablaDensaCelda className="text-right">
                         <Button
                           type="button"
                           variant="ghost"
@@ -347,11 +351,11 @@ export function CapturaProductividadPagina(): React.JSX.Element {
                         >
                           <Ban className="size-4" aria-hidden />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </TablaDensaCelda>
+                    </TablaDensaFila>
                   ))}
-                </TableBody>
-              </Table>
+                </TablaDensaCuerpo>
+              </TablaDensa>
             </div>
           )}
         </CardContent>

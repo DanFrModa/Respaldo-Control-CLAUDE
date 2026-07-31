@@ -45,8 +45,10 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
 import { exigirModelo, incluirRelacionesModelo, type ModeloConRelaciones } from './modelos.js';
+import { reordenarComoPrincipal } from './orden-principal.js';
 
 // ── Tipos de entrada (lo que recibe el dominio ANTES de validar: defaults opcionales) ──
 // El dominio re-valida con `validarEntrada` (mismo patrón que `EntradaCrear*`): por eso los
@@ -98,6 +100,13 @@ export type ModeloBordadoDetalle = {
   nombre: string;
   tipo: 'BORDADO' | 'ESTAMPADO';
   precio: number | null;
+  /**
+   * Key en R2 de la FOTO del bordado/arte (`Bordado.archivoFoto`), o `null` si no tiene. Campo
+   * ADITIVO (jul-2026, petición Daniel): lo usa el IMPRESO de la orden para presignar y embeber
+   * las imágenes del ARTE en el PDF. No cambia el contrato JSON: las rutas proyectan el BOM campo
+   * por campo (`aBordadoBomSalida`), así que la key NUNCA sale a la API (es interna del servidor).
+   */
+  keyFoto: string | null;
 };
 
 /** BOM completo de un modelo (las tres secciones), para embeber en la ficha. */
@@ -158,22 +167,50 @@ export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvio
   }));
 }
 
-/** Lee los bordados del BOM de un modelo (con nombre/tipo, ordenados por nombre). */
+/**
+ * Namespace del `pg_advisory_xact_lock` que serializa el REORDENAMIENTO del arte de UN modelo
+ * (`marcarBordadoPrincipal`). Distinto del de las fotos (`fotos-modelo.ts`, 20_545): marcar foto
+ * principal y arte principal del mismo modelo no tienen por qué esperarse entre sí. El inventario
+ * completo de la familia 20_5xx (varios son `const` NO exportados, invisibles a un grep de
+ * exports) está en el comentario de `NAMESPACE_LOCK_FOTOS` — consúltalo antes de estrenar otro.
+ */
+const NAMESPACE_LOCK_ARTE = 20_544;
+
+/**
+ * Orden de despliegue del ARTE del BOM (jul-2026): `orden` primero — el arte PRINCIPAL es el
+ * PRIMERO (`marcarBordadoPrincipal`) — y como el histórico está todo en `orden` 0, el desempate
+ * por nombre deja los modelos que nadie ha tocado exactamente como se listaban antes. `idBordado`
+ * cierra el criterio para que sea DETERMINISTA aun con nombres repetidos.
+ */
+const ORDEN_BORDADOS_BOM = [
+  { orden: 'asc' },
+  { bordado: { nombre: 'asc' } },
+  { idBordado: 'asc' },
+] as const;
+
+/**
+ * Lee los bordados del BOM de un modelo (con nombre/tipo), ORDENADOS con el arte principal
+ * primero (`orden`, desempate por nombre e id — ver {@link ORDEN_BORDADOS_BOM}). Trae además la
+ * `keyFoto` del arte (la del `Archivo` ligado a `Bordado.archivoFoto`, `null` si el bordado no
+ * tiene foto): es un JOIN barato al mismo renglón y lo aprovecha el impreso de la orden para
+ * incrustar las imágenes del arte. Los demás consumidores simplemente la ignoran.
+ */
 export async function leerBordadosBom(tx: Tx, idModelo: number): Promise<ModeloBordadoDetalle[]> {
   const filas = await tx.modeloBordado.findMany({
     where: { idModelo },
     select: {
       idBordado: true,
       precio: true,
-      bordado: { select: { nombre: true, tipo: true } },
+      bordado: { select: { nombre: true, tipo: true, archivoFoto: { select: { key: true } } } },
     },
-    orderBy: { bordado: { nombre: 'asc' } },
+    orderBy: [...ORDEN_BORDADOS_BOM],
   });
   return filas.map((f) => ({
     idBordado: f.idBordado,
     nombre: f.bordado.nombre,
     tipo: f.bordado.tipo,
     precio: f.precio === null ? null : f.precio.toNumber(),
+    keyFoto: f.bordado.archivoFoto?.key ?? null,
   }));
 }
 
@@ -259,12 +296,12 @@ async function exigirBordadosValidos(tx: Tx, ids: number[]): Promise<void> {
     select: { id: true, nombre: true, activo: true },
   });
   if (bordados.length !== ids.length) {
-    throw new ErrorValidacion('Uno o más bordados seleccionados no existen.');
+    throw new ErrorValidacion('Uno o más artes seleccionados no existen.');
   }
   const inactivo = bordados.find((b) => !b.activo);
   if (inactivo !== undefined) {
     throw new ErrorValidacion(
-      `El bordado "${inactivo.nombre}" está desactivado y no se puede agregar al modelo.`,
+      `El arte "${inactivo.nombre}" está desactivado y no se puede agregar al modelo.`,
     );
   }
 }
@@ -450,10 +487,20 @@ async function sincronizarBordados(
     await tx.modeloBordado.deleteMany({ where: { idModelo, idBordado: { in: aQuitar } } });
   }
   if (aAgregar.length > 0) {
+    // Los artes NUEVOS se agregan AL FINAL (máximo `orden` de los que se conservan + 1) y entre
+    // ellos conservan el orden en que vinieron en el cuerpo (el que el usuario ve en pantalla):
+    // guardar la receta no puede desbancar al arte PRINCIPAL que alguien marcó (si entraran con el
+    // default 0 empatarían con él y el desempate por nombre podría colarse al primer lugar). El
+    // `orden` de los renglones que ya estaban NO se toca (el update de abajo solo cambia el precio).
+    const ordenBase =
+      actuales
+        .filter((f) => deseadoPorId.has(f.idBordado))
+        .reduce((maximo, f) => Math.max(maximo, f.orden), -1) + 1;
     await tx.modeloBordado.createMany({
-      data: aAgregar.map((d) => ({
+      data: aAgregar.map((d, i) => ({
         idModelo,
         idBordado: d.idBordado,
+        orden: ordenBase + i,
         ...(d.precio === undefined ? {} : { precio: d.precio }),
         creadoPorId: sesion.id,
         modificadoPorId: sesion.id,
@@ -520,6 +567,11 @@ export async function reemplazarAviosBom(
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModelo(tx, sesion, idModelo);
+      // El BOM de avíos es uno de los REQUISITOS de "orden completa" (Daniel 26-jul-2026): las
+      // órdenes de ESTE modelo a las que solo les faltaba la receta se COMPLETAN en la MISMA
+      // transacción (A2). Solo COMPLETA: un cambio de catálogo NUNCA degrada órdenes (ver
+      // `recalcularEstadoOrdenesDeModelo`).
+      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -548,6 +600,10 @@ export async function reemplazarBordadosBom(
     const cambio = await sincronizarBordados(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModelo(tx, sesion, idModelo);
+      // El arte también entra en la regla de "orden completa" (aunque hoy nunca bloquee: ver el
+      // juicio documentado en `requisitos-orden.ts`). Se recalcula igual, por consistencia; como
+      // arriba, solo puede COMPLETAR.
+      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -555,6 +611,70 @@ export async function reemplazarBordadosBom(
         datos: { bom: 'bordados', bordados: deseados.map((d) => d.idBordado) },
       });
     }
+    return leerBordadosBom(tx, idModelo);
+  }, bd);
+}
+
+/**
+ * Marca UN arte (bordado/estampado) como el PRINCIPAL del modelo (jul-2026, petición de Daniel:
+ * *"y la primera del arte también"*). Igual que la foto principal, "principal" NO es una bandera:
+ * es **el primero** del BOM, así que marcarlo = moverlo a la posición 0 y reindexar los demás
+ * 0..N-1 conservando su orden relativo, en UNA transacción (A2).
+ *
+ * Requiere `modelos.administrar` — el MISMO permiso que ya rige editar el BOM (sin permisos nuevos
+ * → sin re-seed). Si el arte no está en el BOM del modelo → `ErrorNoEncontrado`. IDEMPOTENTE: si
+ * ya era el principal (y el orden ya estaba compacto) no escribe nada ni deja bitácora vacía.
+ * Devuelve el set de arte del modelo ya reordenado (el principal primero).
+ *
+ * CONCURRENCIA: igual que la foto principal, el reindexado es leer-calcular-escribir y bajo READ
+ * COMMITTED dos marcados simultáneos del MISMO modelo dejarían `orden` duplicado (y el desempate
+ * elegiría al arte equivocado). Lo PRIMERO de la transacción es un
+ * `pg_advisory_xact_lock(NAMESPACE, idModelo)` — el segundo espera, re-lee ya reordenado y calcula
+ * bien. Se libera al commit y solo serializa marcados de arte del MISMO modelo.
+ */
+export async function marcarBordadoPrincipal(
+  sesion: SesionUsuario,
+  idModelo: number,
+  idBordado: number,
+  bd?: ContextoBd,
+): Promise<ModeloBordadoDetalle[]> {
+  verificarPermiso(sesion, 'modelos.administrar');
+
+  return enTransaccion(async (tx) => {
+    // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_ARTE}::int, ${idModelo}::int)`;
+    await exigirModelo(tx, idModelo);
+
+    // MISMO orden que la lectura del BOM: de ahí sale el orden relativo que se conserva.
+    const actuales = await tx.modeloBordado.findMany({
+      where: { idModelo },
+      orderBy: [...ORDEN_BORDADOS_BOM],
+      select: { idBordado: true, orden: true },
+    });
+    if (!actuales.some((f) => f.idBordado === idBordado)) {
+      throw new ErrorNoEncontrado('Arte del modelo', idBordado);
+    }
+
+    const { cambios } = reordenarComoPrincipal(
+      actuales.map((f) => ({ clave: f.idBordado, orden: f.orden })),
+      idBordado,
+    );
+    if (cambios.length > 0) {
+      for (const cambio of cambios) {
+        await tx.modeloBordado.update({
+          where: { idModelo_idBordado: { idModelo, idBordado: cambio.clave } },
+          data: { orden: cambio.orden, ...datosModificacion(sesion) },
+        });
+      }
+      await tocarModelo(tx, sesion, idModelo);
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Modelo',
+        idEntidad: idModelo,
+        accion: 'MODIFICAR',
+        datos: { bom: 'arte-principal', idBordado },
+      });
+    }
+
     return leerBordadosBom(tx, idModelo);
   }, bd);
 }
@@ -640,7 +760,12 @@ export async function copiarBom(
     const [telasOrigen, aviosOrigen, bordadosOrigen] = await Promise.all([
       tx.modeloTela.findMany({ where: { idModelo: datos.idOrigen } }),
       tx.modeloAvio.findMany({ where: { idModelo: datos.idOrigen } }),
-      tx.modeloBordado.findMany({ where: { idModelo: datos.idOrigen } }),
+      // Ordenados como se despliegan: al FUSIONAR se reindexan detrás de lo que ya tiene el
+      // destino, así que el orden relativo del origen (su arte principal primero) se respeta.
+      tx.modeloBordado.findMany({
+        where: { idModelo: datos.idOrigen },
+        orderBy: [...ORDEN_BORDADOS_BOM],
+      }),
     ]);
 
     if (datos.reemplazar) {
@@ -698,10 +823,22 @@ export async function copiarBom(
       });
     }
     if (bordadosACrear.length > 0) {
+      // Al REEMPLAZAR, el destino quedó vacío: se copia el `orden` del origen tal cual (el arte
+      // principal del origen llega como principal del destino). Al FUSIONAR, los copiados se
+      // reindexan DETRÁS del arte que el destino ya tenía, para no desbancar a SU principal.
+      let ordenBase = 0;
+      if (!datos.reemplazar) {
+        const maximo = await tx.modeloBordado.aggregate({
+          where: { idModelo: idDestino },
+          _max: { orden: true },
+        });
+        ordenBase = (maximo._max.orden ?? -1) + 1;
+      }
       await tx.modeloBordado.createMany({
-        data: bordadosACrear.map((b) => ({
+        data: bordadosACrear.map((b, i) => ({
           idModelo: idDestino,
           idBordado: b.idBordado,
+          orden: datos.reemplazar ? b.orden : ordenBase + i,
           precio: b.precio,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
@@ -710,6 +847,10 @@ export async function copiarBom(
     }
 
     await tocarModelo(tx, sesion, idDestino);
+    // Copiar un BOM puede DARLE su receta de avíos al modelo destino: las órdenes suyas a las que
+    // solo les faltaba eso se COMPLETAN aquí mismo (A2). Al REEMPLAZAR también puede quitársela,
+    // pero eso NO degrada nada: el recálculo por catálogo solo asciende.
+    await recalcularEstadoOrdenesDeModelo(tx, sesion, idDestino);
     await registrarBitacora(tx, sesion, {
       entidad: 'Modelo',
       idEntidad: idDestino,

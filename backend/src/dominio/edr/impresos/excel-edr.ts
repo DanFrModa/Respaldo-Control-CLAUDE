@@ -6,14 +6,15 @@
  */
 import ExcelJS from 'exceljs';
 
+import type { EdrCalculado, EdrLineasSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 
 import { calcularEdr, listarLineasEdr } from '../edr.js';
 
 import { etiquetaPeriodo } from './comun-edr.js';
-
-const TEAL = 'FF0D9488';
 
 /** Dependencias inyectables (tests inyectan `calcularEdr`/`listarLineasEdr` fake). */
 export interface DepsExcelEdr {
@@ -21,25 +22,35 @@ export interface DepsExcelEdr {
   listarLineasEdr?: typeof listarLineasEdr;
 }
 
-/** Aplica el estilo teal a la fila de encabezado. */
+/** Datos PLANOS del EDR (cruzan al worker por structured clone). */
+export interface DatosExcelEdr {
+  edr: EdrCalculado;
+  detalle: EdrLineasSalida;
+}
+
+/** Aplica el estilo de marca a la fila de encabezado. */
 function estilarEncabezado(fila: ExcelJS.Row): void {
   fila.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   fila.alignment = { vertical: 'middle' };
 }
 
-/** Genera el `.xlsx` del EDR mensual (Resumen + Líneas). */
-export async function excelEdr(
+/** Resuelve el EDR + su detalle conciliado (A9 + permiso en el dominio). Corre en el HILO PRINCIPAL. */
+export async function armarDatosExcelEdr(
   sesion: SesionUsuario,
   idEdr: number,
   bd?: ContextoBd,
   deps: DepsExcelEdr = {},
-): Promise<{ buffer: Buffer }> {
+): Promise<DatosExcelEdr> {
   const obtenerEdr = deps.calcularEdr ?? calcularEdr;
   const obtenerLineas = deps.listarLineasEdr ?? listarLineasEdr;
   const edr = await obtenerEdr(sesion, idEdr, bd);
   const detalle = await obtenerLineas(sesion, idEdr, {}, bd);
+  return { edr, detalle };
+}
 
+/** Construye el `.xlsx` del EDR (Resumen + Líneas) a partir de datos ya resueltos. PURO: en el WORKER. */
+export async function construirExcelEdr({ edr, detalle }: DatosExcelEdr): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -116,6 +127,20 @@ export async function excelEdr(
   });
   filaTotal.font = { bold: true };
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` del EDR mensual (Resumen + Líneas). Datos en el hilo principal, libro en un worker
+ * (blindaje del event loop).
+ */
+export async function excelEdr(
+  sesion: SesionUsuario,
+  idEdr: number,
+  bd?: ContextoBd,
+  deps: DepsExcelEdr = {},
+): Promise<{ buffer: Buffer }> {
+  const datos = await armarDatosExcelEdr(sesion, idEdr, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-edr', datos) };
 }

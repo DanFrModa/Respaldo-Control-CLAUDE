@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /**
- * Motor LISTA + DETALLE (rediseño "Teal fresco"): el armazon comun de toda
+ * Motor LISTA + DETALLE (rediseño R1: verde y denso): el armazon comun de toda
  * pantalla de catalogo. A la izquierda una lista buscable/filtrable; a la derecha
  * el detalle del registro seleccionado (hero + secciones que arma cada pantalla).
  *
@@ -50,7 +50,11 @@ export interface PropsListaDetalle<T> {
   /** Encabezado de la pantalla. */
   titulo: string;
   descripcion: string;
-  icono: LucideIcon;
+  /**
+   * OBSOLETO (pasada global R9): el proto no pinta icono en el page-head, asi
+   * que ya NO se renderiza. Se acepta para no tocar a todos los llamadores.
+   */
+  icono?: LucideIcon;
 
   // ── Datos ──────────────────────────────────────────────────────────────────
   registros: readonly T[];
@@ -74,6 +78,12 @@ export interface PropsListaDetalle<T> {
   filtros?: React.ReactNode;
   incluirInactivos: boolean;
   alAlternarInactivos: () => void;
+  /**
+   * Oculta el botón "Mostrar/Ocultar desactivados": para entidades SIN borrado
+   * suave (p. ej. Roles, que se borran de verdad), donde el toggle no aplica.
+   * Por defecto se muestra.
+   */
+  ocultarToggleInactivos?: boolean | undefined;
   /** Texto del estado vacio (cuando no hay coincidencias). */
   textoVacio: string;
   paginacion?: PaginacionListaDetalle | undefined;
@@ -90,6 +100,12 @@ export interface PropsListaDetalle<T> {
   puedeAdministrar: boolean;
   alNuevo: () => void;
   textoNuevo: string;
+  /**
+   * Muestra el botón "Nuevo" del encabezado (además de `puedeAdministrar`). Para pantallas cuyo
+   * ALTA exige un permiso ADICIONAL al de administrar (p. ej. Órdenes/captura R3: "Nueva orden"
+   * abre el constructor de PEDIDO, que exige `pedidos.administrar`). Por defecto se muestra.
+   */
+  mostrarNuevo?: boolean | undefined;
   /**
    * Acciones EXTRA del encabezado de la pantalla (botones secundarios junto a
    * "Nuevo"): se pintan a la izquierda del botón "Nuevo", solo si
@@ -126,7 +142,6 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     testid,
     titulo,
     descripcion,
-    icono: Icono,
     registros,
     cargando,
     error,
@@ -141,12 +156,14 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     filtros,
     incluirInactivos,
     alAlternarInactivos,
+    ocultarToggleInactivos = false,
     textoVacio,
     paginacion,
     seleccionInicialId,
     puedeAdministrar,
     alNuevo,
     textoNuevo,
+    mostrarNuevo = true,
     accionesEncabezado,
     alEditar,
     alDesactivar,
@@ -215,27 +232,23 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
 
   return (
     <div className="flex h-full flex-col">
-      {/* Encabezado */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 lg:px-6">
+      {/* Encabezado (denso, R1). */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 lg:px-5">
         <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-          >
-            <Icono className="size-5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">{titulo}</h1>
-            <p className="text-sm text-muted-foreground">{descripcion}</p>
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">{titulo}</h1>
+            <p className="text-[12.5px] text-muted-foreground">{descripcion}</p>
           </div>
         </div>
         {puedeAdministrar ? (
           <div className="flex flex-wrap items-center gap-2">
             {accionesEncabezado}
-            <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
-              <PlusIcon aria-hidden />
-              {textoNuevo}
-            </Button>
+            {mostrarNuevo ? (
+              <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
+                <PlusIcon aria-hidden />
+                {textoNuevo}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -267,17 +280,19 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
               />
             </div>
             {filtros}
-            <Button
-              type="button"
-              variant={incluirInactivos ? 'secondary' : 'outline'}
-              size="sm"
-              className="w-full"
-              onClick={alAlternarInactivos}
-              aria-pressed={incluirInactivos}
-              data-testid="mostrar-desactivados"
-            >
-              {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
-            </Button>
+            {ocultarToggleInactivos ? null : (
+              <Button
+                type="button"
+                variant={incluirInactivos ? 'secondary' : 'outline'}
+                size="sm"
+                className="w-full"
+                onClick={alAlternarInactivos}
+                aria-pressed={incluirInactivos}
+                data-testid="mostrar-desactivados"
+              >
+                {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
+              </Button>
+            )}
           </div>
 
           {/* Renglones / estados */}
@@ -310,7 +325,8 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
                         aria-current={esActual ? 'true' : undefined}
                         onClick={() => seleccionar(registro)}
                         className={cn(
-                          'flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
+                          // Renglon denso (R1): ~30px por fila con el avatar sm.
+                          'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
                           esActual ? 'bg-primary-soft' : 'hover:bg-muted',
                         )}
                       >
@@ -338,8 +354,8 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
 
           {/* Paginacion (servidor) */}
           {paginacion && paginacion.total > 0 ? (
-            <div className="flex items-center justify-between gap-2 border-t p-3 text-xs">
-              <span className="text-muted-foreground" data-testid="resumen-paginacion">
+            <div className="flex items-center justify-between gap-2 border-t p-2.5 text-xs">
+              <span className="num text-muted-foreground" data-testid="resumen-paginacion">
                 {paginacion.total} · pág. {paginacion.pagina}/{paginacion.totalPaginas}
               </span>
               <div className="flex items-center gap-2">
@@ -442,13 +458,13 @@ function Detalle<T>({
         </Button>
       </div>
 
-      {/* Hero */}
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4 lg:p-6">
-        <div className="flex min-w-0 items-center gap-4">
+      {/* Hero (denso, R1). */}
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4 lg:p-5">
+        <div className="flex min-w-0 items-center gap-3.5">
           {renderAvatarDetalle(registro)}
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight break-words">{titulo}</h2>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight break-words">{titulo}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <EstadoBadge activo={activo} />
               {renderMeta ? renderMeta(registro) : null}
             </div>
@@ -496,7 +512,7 @@ function Detalle<T>({
       </div>
 
       {/* Cuerpo (secciones que arma la pantalla) */}
-      <div className="space-y-6 p-4 lg:p-6">{renderDetalle(registro)}</div>
+      <div className="space-y-5 p-4 lg:p-5">{renderDetalle(registro)}</div>
     </>
   );
 }
@@ -506,7 +522,7 @@ function ListaEsqueleto(): React.JSX.Element {
   return (
     <ul className="flex flex-col gap-1">
       {Array.from({ length: 6 }).map((_, i) => (
-        <li key={i} className="flex items-center gap-3 px-2.5 py-2">
+        <li key={i} className="flex items-center gap-2.5 px-2.5 py-1.5">
           <Skeleton className="size-8 shrink-0 rounded-lg" />
           <div className="flex-1 space-y-1.5">
             <Skeleton className="h-3.5 w-2/3" />

@@ -1,5 +1,6 @@
-import { Factory, Printer, ShoppingCart } from 'lucide-react';
-import { useState } from 'react';
+import { Printer, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { imprimirOc, useOrdenesCompra } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
@@ -14,6 +15,15 @@ import { EstatusOcBadge, descripcionMaterial, fechaCortaOc } from './piezas';
 /** Renglones por página de las OC ligadas. */
 const POR_PAGINA = 10;
 
+/** Lee `state.idOrden` del deep-link (mosaico "O.C." del centro de comando, R2). */
+function leerIdOrdenDeepLink(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
+    return null;
+  }
+  const id = state.idOrden;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
 /**
  * COMPRAS POR ORDEN DE PRODUCCIÓN (F4-E2): se elige una orden de producción y se listan las OC que
  * la tienen ligada (vía las líneas, R7). Reemplaza OrdCompraOrdenes/OrdCompraOrdsDet del sistema
@@ -22,10 +32,22 @@ const POR_PAGINA = 10;
  * (A1).
  */
 export function ComprasPorOrdenPagina(): React.JSX.Element {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [idOrden, setIdOrden] = useState<number | null>(null);
+  // Deep-link del centro de comando (R2): llega con la orden ya elegida.
+  const [idOrden, setIdOrden] = useState<number | null>(leerIdOrdenDeepLink(location.state));
   const [pagina, setPagina] = useState(1);
+
+  const idDeepLink = leerIdOrdenDeepLink(location.state);
+  useEffect(() => {
+    if (idDeepLink !== null) {
+      setIdOrden(idDeepLink);
+      // Consume el state para que un refresh/volver no lo re-aplique (patrón ModelosPagina).
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, location.pathname, navigate]);
 
   // Órdenes de producción no canceladas para elegir.
   const ordenes = useConsultaOrdenes({
@@ -60,17 +82,13 @@ export function ComprasPorOrdenPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <Factory className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Compras por orden</h1>
-          <p className="text-sm text-muted-foreground">
-            Órdenes de compra ligadas a una orden de producción.
+      <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Compras por orden
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Órdenes de compra ligadas a una orden de producción
           </p>
         </div>
       </div>

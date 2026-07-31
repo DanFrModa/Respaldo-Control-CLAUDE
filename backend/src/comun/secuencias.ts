@@ -76,6 +76,59 @@ export async function siguienteFolio(tx: Tx, idEmpresa: number, clave: string): 
 }
 
 /**
+ * Reserva un BLOQUE de `n` folios CONSECUTIVOS de la secuencia `clave` de la empresa, de forma
+ * ATÓMICA (A3), en una sola sentencia. Devuelve el ÚLTIMO folio del bloque; los folios reservados
+ * son `[ultimo − n + 1 … ultimo]`. Es la versión "en masa" de {@link siguienteFolio}: el mismo
+ * `INSERT … ON CONFLICT … DO UPDATE SET valor = valor + n RETURNING valor`, pero avanzando la
+ * secuencia de golpe. Como es una sola sentencia atómica a nivel de fila, N llamadas concurrentes
+ * SIEMPRE reciben bloques DISJUNTOS (el segundo espera el candado de la fila hasta el commit del
+ * primero). Pensada para el ETL de aperturas (F9-E6), que inserta muchos movimientos por
+ * `createMany` con su folio pre-asignado en un solo `INSERT` — sin N round-trips a la secuencia.
+ *
+ * Debe correr en la MISMA transacción que el `createMany` de los documentos que usan esos folios:
+ * así "bloque reservado" y "documentos creados" son un solo hecho atómico (si la tx aborta, la
+ * secuencia se revierte también → sin folios quemados; en un reintento se re-reserva el mismo bloque).
+ *
+ * @param tx        transacción activa (de `enTransaccion`).
+ * @param idEmpresa empresa dueña de la numeración (A9).
+ * @param clave     serie a incrementar (`"movimiento-tercero"`, …).
+ * @param n         cantidad de folios a reservar (entero ≥ 1).
+ * @returns el ÚLTIMO folio del bloque (los folios son `ultimo − n + 1 … ultimo`).
+ */
+export async function reservarBloqueFolios(
+  tx: Tx,
+  idEmpresa: number,
+  clave: string,
+  n: number,
+): Promise<bigint> {
+  if (!Number.isInteger(idEmpresa) || idEmpresa <= 0) {
+    throw new ErrorValidacion(`idEmpresa inválido para la secuencia: ${String(idEmpresa)}.`);
+  }
+  if (!PATRON_CLAVE_SECUENCIA.test(clave)) {
+    throw new ErrorValidacion(
+      `Clave de secuencia inválida: "${clave}". Usa minúsculas, dígitos y guiones (ej. "nota-salida").`,
+    );
+  }
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new ErrorValidacion(`Cantidad de folios inválida para el bloque: ${String(n)}.`);
+  }
+
+  const cantidad = BigInt(n);
+  const filas = await tx.$queryRaw<{ valor: bigint }[]>`
+    INSERT INTO "secuencias" ("id_empresa", "clave", "valor")
+    VALUES (${idEmpresa}, ${clave}, ${cantidad})
+    ON CONFLICT ("id_empresa", "clave")
+    DO UPDATE SET "valor" = "secuencias"."valor" + ${cantidad}
+    RETURNING "valor"
+  `;
+  const fila = filas[0];
+  if (fila === undefined) {
+    throw new Error(`La secuencia ${clave} (empresa ${String(idEmpresa)}) no devolvió valor.`);
+  }
+  return fila.valor;
+}
+
+/**
  * SIEMBRA el valor ACTUAL de una secuencia para que el SIGUIENTE folio sea `valorActual + 1`
  * (MIGRACIÓN — F2-E5). Tras migrar el histórico (que preserva los folios viejos con un valor
  * EXPLÍCITO, sin pasar por `siguienteFolio`), hay que dejar la secuencia "adelantada" al

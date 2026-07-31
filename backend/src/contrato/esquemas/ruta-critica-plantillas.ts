@@ -336,6 +336,52 @@ export const esquemaDuracionAplicacionSalida = z
 /** Forma de una duración por aplicación en la API. */
 export type DuracionAplicacionSalida = z.infer<typeof esquemaDuracionAplicacionSalida>;
 
+// ── Reglas de duración: rangos de DIFICULTAD por # de operaciones (R4, B7) ────
+
+const operaciones = z
+  .number({ error: 'El # de operaciones es obligatorio' })
+  .int({ error: 'El # de operaciones debe ser un entero' })
+  .min(1, { error: 'El # de operaciones debe ser al menos 1' })
+  .max(10000, { error: 'El # de operaciones es demasiado grande' });
+
+/** Alta de un rango de dificultad (rango de operaciones → nombre + días de costura). */
+export const esquemaRangoDificultadCrear = z.object({
+  opsDesde: operaciones.describe('Límite inferior del rango de operaciones (inclusive).'),
+  opsHasta: operaciones
+    .nullish()
+    .describe('Límite superior (inclusive), o null = abierto hacia arriba ("33+").'),
+  nombre,
+  diasCostura: dias.describe('Días de costura que aporta este rango (regla porDificultad).'),
+});
+/** Datos validados de alta de rango de dificultad. */
+export type DatosRangoDificultadCrear = z.infer<typeof esquemaRangoDificultadCrear>;
+
+/** Edición parcial de un rango de dificultad + `activo`. */
+export const esquemaRangoDificultadPatchCuerpo = z.object({
+  opsDesde: operaciones.optional(),
+  opsHasta: operaciones.nullish(),
+  nombre: nombre.optional(),
+  diasCostura: dias.optional(),
+  activo: z.boolean().optional(),
+});
+/** Datos validados de edición de rango de dificultad. */
+export type DatosRangoDificultadPatchCuerpo = z.infer<typeof esquemaRangoDificultadPatchCuerpo>;
+
+/** Salida de un rango de dificultad por # de operaciones. */
+export const esquemaRangoDificultadSalida = z
+  .object({
+    id: z.number().int(),
+    opsDesde: z.number().int().describe('Límite inferior (inclusive).'),
+    opsHasta: z.number().int().nullable().describe('Límite superior, o null = abierto ("33+").'),
+    nombre: z.string().describe('Nombre de la dificultad (p. ej. "Muy sencillo").'),
+    diasCostura: z.number().int().describe('Días de costura del rango.'),
+    activo: z.boolean(),
+    ...auditoriaSalida,
+  })
+  .describe('Rango de dificultad por # de operaciones (tabla configurable, R4/B7).');
+/** Forma de un rango de dificultad en la API. */
+export type RangoDificultadSalida = z.infer<typeof esquemaRangoDificultadSalida>;
+
 // ── Calendario laboral por empresa (decisión (a)) ─────────────────────────────
 
 /** Días hábiles de la semana de una empresa (set completo; reemplaza el actual). */

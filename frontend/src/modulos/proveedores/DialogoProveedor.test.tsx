@@ -124,7 +124,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Sin roles');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Sin roles');
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     // No se llama a crear y se muestra el error de captura de roles.
@@ -138,7 +138,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Factura sin RFC');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Factura sin RFC');
     // Elige un rol (para aislar la regla fiscal de la regla de roles).
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
@@ -164,7 +164,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={alCambiarAbierto} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Nuevo Prov');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Nuevo Prov');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-2'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
@@ -189,7 +189,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Taller');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Taller');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     // Expande "Datos de taller" y captura los tres campos.
     await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
@@ -328,7 +328,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Nuevo');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Nuevo');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 

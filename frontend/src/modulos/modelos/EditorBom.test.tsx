@@ -14,6 +14,7 @@ import { EditorBom } from './EditorBom';
  */
 const guardarBordadosMutate = vi.fn();
 const guardarTelasMutate = vi.fn();
+const marcarPrincipalMutate = vi.fn();
 const toastError = vi.fn();
 
 vi.mock('sonner', () => ({
@@ -30,6 +31,7 @@ vi.mock('@/api/modelos', () => ({
   useReemplazarAviosBom: () => ({ mutate: vi.fn(), isPending: false }),
   useReemplazarBordadosBom: () => ({ mutate: guardarBordadosMutate, isPending: false }),
   useCopiarBom: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarcarArtePrincipal: () => ({ mutate: marcarPrincipalMutate, isPending: false }),
   // useModelos lo usa el CopiarBomDialogo montado (cerrado).
   useModelos: () => ({
     data: { datos: [], total: 0, pagina: 1, porPagina: 20, totalPaginas: 1 },
@@ -57,6 +59,7 @@ function fichaConBordado(precio: number | null): ModeloFicha {
     id: 1,
     codigo: '501',
     descripcion: null,
+    composicion: null,
     maquilaBase: null,
     idTemporada: null,
     temporada: null,
@@ -66,8 +69,17 @@ function fichaConBordado(precio: number | null): ModeloFicha {
     genero: null,
     idTipoProducto: null,
     tipoProducto: null,
+    numOperaciones: null,
+    corteBase: null,
+    idMaquileroCotizado: null,
+    maquileroCotizado: null,
+    secuenciaEstampado: 'antes',
+    llevaArte: true,
     cantidadFotos: 0,
     urlFotoPrincipal: null,
+    telaPrincipal: null,
+    stockPt: null,
+    costoActual: null,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -100,7 +112,7 @@ describe('<EditorBom> — precio del bordado requerido (decisión #2)', () => {
     // Intentar guardar: no muta, avisa y marca el campo inválido.
     await usuario.click(screen.getByTestId('guardar-bom-bordados'));
     expect(guardarBordadosMutate).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('Captura el precio de cada bordado de la receta.');
+    expect(toastError).toHaveBeenCalledWith('Captura el precio de cada arte de la receta.');
     expect(screen.getByTestId('error-precio-bordado-5')).toBeInTheDocument();
     expect(precio).toHaveAttribute('aria-invalid', 'true');
   });
@@ -140,5 +152,127 @@ describe('<EditorBom> — precio del bordado requerido (decisión #2)', () => {
     );
     // El precio se pre-llenó con el del catálogo (30), editable.
     expect(renglon).toHaveValue(30);
+  });
+});
+
+/**
+ * ARTE PRINCIPAL del modelo (Daniel, 25-jul-2026): es el PRIMER renglón del BOM (el API lo
+ * devuelve ordenado). Lleva estrella + rótulo "Principal"; los demás, la acción para tomar su
+ * lugar (endpoint propio, no pasa por "Guardar receta").
+ */
+describe('<EditorBom> — arte principal', () => {
+  beforeEach(() => {
+    marcarPrincipalMutate.mockReset();
+    guardarBordadosMutate.mockReset();
+  });
+
+  /** Ficha con DOS artes en la receta, en el orden en que los devuelve el API. */
+  function fichaConDosArtes(): ModeloFicha {
+    const ficha = fichaConBordado(30);
+    ficha.bordados = [
+      { idBordado: 5, nombre: 'Logo', tipo: 'BORDADO', precio: 30 },
+      { idBordado: 6, nombre: 'Estampa', tipo: 'ESTAMPADO', precio: 12 },
+    ];
+    return ficha;
+  }
+
+  it('rotula el PRIMER arte como principal y solo ofrece la acción en los demás', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaConDosArtes()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('tab-bom-bordados'));
+
+    expect(screen.getByTestId('arte-principal-5')).toHaveTextContent('Principal');
+    expect(screen.queryByTestId('arte-principal-6')).not.toBeInTheDocument();
+    expect(screen.getByTestId('renglon-bom-bordado-5')).toHaveAttribute('data-principal', 'si');
+    expect(screen.queryByTestId('marcar-principal-bordado-5')).not.toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('marcar-principal-bordado-6'));
+    expect(marcarPrincipalMutate).toHaveBeenCalledTimes(1);
+    expect(marcarPrincipalMutate.mock.calls[0]?.[0]).toEqual({ id: 1, idBordado: 6 });
+    // Marcar principal NO guarda la receta (son operaciones distintas).
+    expect(guardarBordadosMutate).not.toHaveBeenCalled();
+  });
+
+  it('un arte recién agregado (aún sin guardar) no se puede marcar como principal', async () => {
+    const usuario = userEvent.setup();
+    const ficha = fichaConDosArtes();
+    // Deja solo el primero guardado; el 5 del catálogo se agregará sin guardar.
+    ficha.bordados = [{ idBordado: 6, nombre: 'Estampa', tipo: 'ESTAMPADO', precio: 12 }];
+    renderConProveedores(<EditorBom ficha={ficha} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('tab-bom-bordados'));
+    await usuario.selectOptions(screen.getByTestId('agregar-bordado-bom'), '5');
+
+    // El nuevo entra AL FINAL (no desbanca al principal) y todavía no ofrece la acción.
+    expect(screen.getByTestId('renglon-bom-bordado-5')).toHaveAttribute('data-principal', 'no');
+    expect(screen.queryByTestId('marcar-principal-bordado-5')).not.toBeInTheDocument();
+    expect(screen.getByTestId('arte-principal-6')).toBeInTheDocument();
+  });
+
+  // REGRESIÓN: marcar principal recarga la ficha y el editor vuelve a sembrar las TRES pestañas
+  // desde el servidor. Si se permitiera con captura pendiente, el usuario perdería lo tecleado
+  // creyendo que todo salió bien (el toast dice "éxito"). Se bloquea y se le avisa.
+  it('con captura SIN GUARDAR deshabilita "Marcar como principal" y avisa', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaConDosArtes()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('tab-bom-bordados'));
+    // Con la captura limpia la acción está disponible…
+    expect(screen.getByTestId('marcar-principal-bordado-6')).toBeEnabled();
+    expect(screen.queryByTestId('aviso-principal-sin-guardar')).not.toBeInTheDocument();
+
+    // …y en cuanto se toca un precio, se bloquea con su aviso.
+    await usuario.type(screen.getByTestId('precio-bordado-bom-6'), '5');
+    expect(screen.getByTestId('marcar-principal-bordado-6')).toBeDisabled();
+    expect(screen.getByTestId('aviso-principal-sin-guardar')).toHaveTextContent(
+      'Guarda la receta primero',
+    );
+
+    await usuario.click(screen.getByTestId('marcar-principal-bordado-6'));
+    expect(marcarPrincipalMutate).not.toHaveBeenCalled();
+  });
+
+  it('también se bloquea si la captura pendiente está en OTRA pestaña (telas/avíos)', async () => {
+    const usuario = userEvent.setup();
+    const ficha = fichaConDosArtes();
+    ficha.telas = [
+      {
+        idTela: 9,
+        nombre: 'Jersey',
+        consumoPorPrenda: 1,
+        paraPreCosto: true,
+        paraProduccion: true,
+        paraCosto: true,
+      },
+    ];
+    renderConProveedores(<EditorBom ficha={ficha} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    // Se edita el consumo en TELAS (sin guardar) y se cambia a la pestaña de Arte.
+    await usuario.clear(screen.getByTestId('consumo-bom-9'));
+    await usuario.type(screen.getByTestId('consumo-bom-9'), '3');
+    await usuario.click(screen.getByTestId('tab-bom-bordados'));
+
+    expect(screen.getByTestId('marcar-principal-bordado-6')).toBeDisabled();
+    expect(screen.getByTestId('aviso-principal-sin-guardar')).toBeInTheDocument();
+  });
+
+  it('en solo lectura se ve el rótulo pero no la acción', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaConDosArtes()} puedeAdministrar={false} />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('tab-bom-bordados'));
+    expect(screen.getByTestId('arte-principal-5')).toBeInTheDocument();
+    expect(screen.queryByTestId('marcar-principal-bordado-6')).not.toBeInTheDocument();
   });
 });

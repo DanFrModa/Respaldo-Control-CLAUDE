@@ -19,13 +19,55 @@
 |---|---|
 | `Modelo` | `IdModelos` viejo → `id` de `Modelo` en v2 |
 
-Consumido por: F2 (Pedidos), F4 (Producción), F9 (Finanzas).
+Consumido por: F2 (Pedidos), F3 (Producción), F4 (Compras/MRP), F7 (Costos), F8 (Desarrollo y Cotización) y F9 (Finanzas).
 
 ## Decisiones de diseño
 
 ### Temporadas — modelos sin temporada
 
 El CSV viejo `Temporadas.csv` estaba **vacío** (E6 lo verificó). Todos los registros de `Modelos.csv` tienen `IdTemporadas=0`. Decisión del dueño: **los modelos se cargan SIN temporada**. Se reporta como incidencia en el reporte de cuadre (no null silencioso, §7). Las temporadas podrán asignarse manualmente desde la UI una vez que se definan.
+
+### Composición textil — vive en el MODELO (Daniel, 24-jul-2026)
+
+`Modelo.composicion` (TEXT nullable, migración `20260724120000_modelo_composicion`) es la **fuente
+única** de la composición. Decisión textual de Daniel: _«La composición no sale de la OC del cliente.
+Sale de la información del desarrollo del modelo. De ahí la jala.»_
+
+- Toda **orden** de ese modelo **hereda** `Modelo.composicion` al nacer (`Orden.compForzada = false`).
+- En una orden puntual se puede **corregir a mano**: queda con **override** (`compForzada = true`) y
+  ya no se pisa. Vaciar el campo de la orden la devuelve a la del modelo.
+- La **re-derivación** ocurre solo donde la orden ya se está tocando (alta y guardado del encabezado)
+  y solo si NO tiene override — nunca hay recálculo masivo de órdenes históricas al editar el modelo.
+  El modelo de una OP no es editable, así que no hay caso de "cambió el modelo".
+- 🔒 **Heredar nunca destruye un dato:** si el modelo no tiene composición y la orden sí, se conserva
+  la de la orden (salvo que el usuario vacíe el campo a propósito). Sin ese guard, guardar el
+  encabezado de una OP histórica la habría vaciado en silencio, porque `modelos.composicion` nació
+  vacía. La migración de datos `20260724130000_ordenes_composicion_historica` marca además como
+  override todo lo que ya estaba capturado en `ordenes` (venía del ETL o del importador de PDF: nunca
+  derivó de una ficha de modelo).
+- La lógica está en `resolverComposicion` (`backend/src/dominio/produccion/ordenes.ts`); el
+  **importador de OC por PDF** ya no pisa la del modelo (solo la usa de respaldo si el modelo no tiene
+  ninguna, marcándola como override). Detalle completo en `docs/cambios-frontend-daniel.md` (2026-07-24).
+
+### ¿La prenda LLEVA arte? — `Modelo.llevaArte` (Daniel, 26-jul-2026)
+
+`Modelo.llevaArte` (BOOL NOT NULL **default `true`**, migración `20260726120000_modelo_lleva_arte`)
+dice si la prenda lleva bordado/estampado. Decisión textual de Daniel: _«por default sí lleva. A
+menos que la marques como que no lleva. Y de esa manera si no meten la información del arte, o no
+desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender ese tema.»_
+(`DECISIONES.md §Post-F9.4`).
+
+- Es el **requisito ARTE del estado automático de la orden**
+  (`backend/src/dominio/produccion/requisitos-orden.ts`): con `true`, las órdenes del modelo NO se
+  completan hasta que el BOM tenga su arte; con `false`, el arte no aplica.
+- **Default `true` también para los ~miles de modelos migrados**, a propósito: el tema se atiende
+  siempre. Efecto querido: muchas órdenes vivas quedan incompletas hasta capturar el arte o
+  desmarcar la casilla. El estado es **informativo** — no impide operar la orden.
+- **Desmarcarla recalcula** las órdenes de ese modelo en la misma transacción (`actualizarModelo` →
+  `recalcularEstadoOrdenesDeModelo`), y como todo recálculo por catálogo **solo puede completar**.
+- UI: casilla "Lleva arte (bordado o estampado)" en el alta/edición del modelo (sección Desarrollo)
+  y el estado del arte en la ficha del detalle (*Lleva arte* / *Lleva arte — falta capturarlo* /
+  *No lleva arte*).
 
 ### BOM — banderas `b*` → `para*`
 
@@ -50,6 +92,37 @@ El ETL busca en `ETL_FOTOS_MOD_DIR` un archivo cuyo nombre-base (sin extensión)
 ### Fotos — bordados (completadas en E7)
 
 El ETL de E6 cargó el CATÁLOGO de bordados pero NO las fotos (campo `Foto` de `Bordados.csv`). E7 completa las fotos usando `ETL_FOTOS_BOR_DIR`.
+
+### Foto principal y arte principal (Daniel, 25-jul-2026)
+
+El modelo tiene **una foto principal** ("la más importante") y **un arte principal**. La regla es:
+**principal = el PRIMERO**, y punto. No hay bandera `esPrincipal` en ninguna tabla — la única fuente
+de verdad es el orden (`ModeloFoto.orden`, que ya existía, y `ModeloBordado.orden`, agregado en la
+migración `20260725130000_modelo_bordado_orden`) — así es imposible que una bandera contradiga al
+orden de despliegue. Por default es la primera, sin que nadie tenga que marcar nada.
+
+- **Marcarla** = mover ese renglón al lugar 0 y reindexar los demás 0..N-1 conservando su orden
+  relativo, en UNA transacción con bitácora (`marcarFotoPrincipal` en `dominio/modelos/fotos-modelo.ts`
+  y `marcarBordadoPrincipal` en `bom-modelo.ts`; el cálculo puro y compartido vive en
+  `dominio/modelos/orden-principal.ts`). Es **idempotente**: repetirla no escribe nada.
+- **Permisos:** `modelos.administrar` (el mismo de editar el modelo/BOM; sin permisos nuevos).
+- **Endpoints:** `POST /api/modelos/:id/fotos/:idFoto/principal` y
+  `POST /api/modelos/:id/bom/bordados/:idBordado/principal` (ambos devuelven la lista ya reordenada).
+- **Lecturas ordenadas:** las fotos por `orden, id`; el arte del BOM por `orden, nombre, idBordado`
+  (el desempate por nombre deja el histórico —todo en `orden` 0— exactamente como se listaba antes).
+- **Concurrencia:** el reindexado es leer-calcular-escribir, así que ambas operaciones toman un
+  `pg_advisory_xact_lock(namespace, idModelo)` como primer paso de la transacción (namespaces 20 543
+  fotos / 20 544 arte). Sin él, dos marcados simultáneos del mismo modelo dejarían `orden` duplicado
+  y, con el desempate, la principal equivocada (lost update bajo READ COMMITTED).
+- **No se desbanca solo:** al guardar la receta, los artes nuevos entran con el `orden` siguiente al
+  máximo (nunca en 0) y entre ellos conservan el orden del cuerpo enviado; al copiar el BOM,
+  reemplazar conserva el orden del origen y fusionar deja lo copiado detrás de lo que el destino ya
+  tenía.
+- **Captura sin guardar:** en el frontend, "Marcar como principal" del arte recarga la ficha (y con
+  ella las tres pestañas del editor de receta), así que la acción se **deshabilita con aviso**
+  mientras haya cambios sin guardar — antes borraba la captura en curso con un toast de éxito.
+- **En el impreso de la orden** las dos principales encabezan su bloque y **nunca las recorta** el
+  tope (ver `docs/modulos/impreso-orden.md`).
 
 ### Funciones diferidas
 

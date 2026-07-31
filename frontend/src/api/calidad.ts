@@ -33,6 +33,8 @@ import type {
   PlanesAqlQuery,
   ResolverPlan,
   ResolverPlanQuery,
+  ResumenAuditorias,
+  ResumenAuditoriasQuery,
   TipoProducto,
   TipoProductoCrear,
   TipoProductoEditar,
@@ -282,16 +284,6 @@ async function listarPlanesAql(query: PlanesAqlQuery): Promise<PlanesAqlPagina> 
   return data;
 }
 
-async function obtenerPlanAql(id: number): Promise<PlanAql> {
-  const { data, error } = await api.GET('/api/calidad/planes-aql/{id}', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 async function crearPlanAql(cuerpo: PlanAqlCrear): Promise<PlanAql> {
   const { data, error } = await api.POST('/api/calidad/planes-aql', { body: cuerpo });
   if (!data) {
@@ -347,13 +339,6 @@ export function usePlanesAql(query: PlanesAqlQuery): UseQueryResult<PlanesAqlPag
     queryKey: [...CLAVE_PLANES_AQL, 'lista', query],
     queryFn: () => listarPlanesAql(query),
     placeholderData: keepPreviousData,
-  });
-}
-
-export function usePlanAql(id: number): UseQueryResult<PlanAql, ErrorDeApi> {
-  return useQuery({
-    queryKey: [...CLAVE_PLANES_AQL, 'detalle', id],
-    queryFn: () => obtenerPlanAql(id),
   });
 }
 
@@ -524,6 +509,14 @@ async function listarAuditorias(query: AuditoriasQuery): Promise<AuditoriasPagin
   return data;
 }
 
+async function resumenAuditorias(query: ResumenAuditoriasQuery): Promise<ResumenAuditorias> {
+  const { data, error } = await api.GET('/api/calidad/auditorias/resumen', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 async function obtenerHistorialMaquilero(
   idMaquilero: number,
   query: HistorialMaquileroQuery,
@@ -566,6 +559,17 @@ export function useAuditorias(
   return useQuery({
     queryKey: [...CLAVE_AUDITORIAS, 'lista', query],
     queryFn: () => listarAuditorias(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Resumen de cabecera de auditorías (defecto principal del conjunto filtrado) para el KPI. */
+export function useResumenAuditorias(
+  query: ResumenAuditoriasQuery,
+): UseQueryResult<ResumenAuditorias, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'resumen', query],
+    queryFn: () => resumenAuditorias(query),
     placeholderData: keepPreviousData,
   });
 }

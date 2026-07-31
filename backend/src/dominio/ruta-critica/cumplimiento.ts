@@ -71,8 +71,10 @@ async function exigirCapturaProceso(
 ): Promise<RenglonCaptura> {
   verificarPermiso(sesion, 'rc.capturar');
 
-  const fila = await tx.rutaOrden.findUnique({
-    where: { id: idRutaOrden },
+  // Scope por empresa activa (A9): un renglón de ruta de una orden de otra empresa "no existe" → 404
+  // (nunca se captura/revierte su avance). Se filtra por la empresa de la ORDEN dueña del renglón.
+  const fila = await tx.rutaOrden.findFirst({
+    where: { id: idRutaOrden, orden: { idEmpresa: sesion.idEmpresaActiva } },
     select: {
       id: true,
       idOrden: true,

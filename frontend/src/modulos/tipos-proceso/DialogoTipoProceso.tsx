@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -106,8 +112,11 @@ export function DialogoTipoProceso({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.codigo)}>
-              <FieldLabel htmlFor="tp-codigo">Código</FieldLabel>
+              <FieldLabel htmlFor="tp-codigo" required>
+                Código
+              </FieldLabel>
               <Input
                 id="tp-codigo"
                 autoFocus
@@ -120,7 +129,9 @@ export function DialogoTipoProceso({
             </Field>
 
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="tp-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="tp-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="tp-nombre"
                 aria-invalid={Boolean(errors.nombre)}
@@ -160,7 +171,12 @@ export function DialogoTipoProceso({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-tipo-proceso">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-tipo-proceso"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear tipo de proceso'}
             </Button>

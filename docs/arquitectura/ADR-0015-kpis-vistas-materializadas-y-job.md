@@ -62,7 +62,7 @@ botón **Refrescar** que encola el job y re-consulta.
   y la tendencia). `kpi_defecto_maquilero` NO lleva periodo → los defectos top honran empresa +
   maquilero, no periodo.
 - **Desempeño por responsable**: se usa `ruta_orden.capturado_por_id` (quien capturó), que SÍ está
-  poblado. El responsable "por ROL" (ProcesoDefRol/UsuarioRol) depende de F9 (usuarios reales aún no
+  poblado. El responsable "por ROL" (ProcesoDefRol/UsuarioRol) depende de F10 (usuarios reales aún no
   migrados) — se documenta y se difiere.
 - **La UI ROTULA la limitación**: las tarjetas ciegas al periodo (lead time, cuellos de botella,
   desempeño por responsable, defectos más frecuentes) llevan una leyenda teal
