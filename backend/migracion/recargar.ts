@@ -131,16 +131,21 @@ const PASO_REALINEAR: Paso = {
 function pasosF9(args: Argumentos): { etl: Paso[]; cuadre: Paso[] } {
   const etl: Paso[] = [];
   const cuadre: Paso[] = [];
+  // El CORTE de finanzas es la MISMA fecha de la ventana (`--desde`): los renglones de apertura
+  // sin fecha propia se fechan con él, y así quedan alineados con los demás saldos iniciales
+  // (kardex PT/telas y EsMa usan `fecha = corte`). Sin `--desde`, los scripts caen a su default
+  // (HOY) — que es lo correcto en una recarga COMPLETA sin ventana.
+  const corte = args.desde === null ? [] : [`--corte=${args.desde}`];
   if (args.saldosTerceros !== null) {
     etl.push({
       etiqueta: 'F9 · saldos iniciales de terceros (CxC/CxP)',
       script: 'migracion/etl-terceros-saldos.ts',
-      args: [`--archivo=${args.saldosTerceros}`],
+      args: [`--archivo=${args.saldosTerceros}`, ...corte],
     });
     cuadre.push({
       etiqueta: 'Cuadre F9 (corte vs aperturas cargadas)',
       script: 'migracion/cuadre-f9.ts',
-      args: [`--archivo=${args.saldosTerceros}`],
+      args: [`--archivo=${args.saldosTerceros}`, ...corte],
     });
   }
   if (args.cfdi !== null) {

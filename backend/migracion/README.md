@@ -193,6 +193,7 @@ Qué hace, en orden: **(0)** limpieza (si `--limpiar --confirmar`) → **(1)** e
 **F9 (Finanzas) es OPCIONAL y NO corre por defecto**: sus fuentes (corte de SINUBE / export del contador) **aún no existen** (D15c), así que meterlas al flujo tronaría por archivo faltante. Se activan con banderas explícitas, y el plan dice claramente cuándo se omiten y por qué:
 
 - `--saldos-terceros=<ruta.csv>` → agrega `etl-terceros-saldos -- --archivo=<ruta>` y, al final, `cuadre-f9 -- --archivo=<ruta>`.
+  **El corte de finanzas se alinea con la ventana**: si diste `--desde=YYYY-MM-DD`, ambos reciben además `--corte=YYYY-MM-DD`, así los renglones de apertura sin fecha propia quedan fechados en el corte y NO en HOY (que es el default de esos scripts) — coherente con los otros saldos iniciales (kardex PT/telas y EsMa usan `fecha = corte`). Sin `--desde` (recarga completa) se respeta su default.
 - `--cfdi=<carpeta>` → agrega `etl-cfdi-masivo -- --dir=<carpeta>`.
 
 Si la ventana (`--desde`) está activa y el corte de SINUBE trae terceros que el prescan de uso excluyó, el propio `etl-terceros-saldos` los LISTA como *"Apertura con tercero sin resolver (OMITIDA)"* — la red de seguridad de siempre: se ve en su reporte, nunca se pierde en silencio.
