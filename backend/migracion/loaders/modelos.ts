@@ -94,66 +94,114 @@ export async function cargarModelos(
   }
   if (pre !== null && fueraVentana > 0) {
     reporte.nota(
-      `Modelos fuera de ventana (sin uso: sin pedidos/órdenes/kardex/existencia/cíclico en la ` +
-        `ventana): ${String(fueraVentana)} NO migrados (ver sección en el reporte).`,
+      `Modelos fuera de ventana (SIN actividad en la ventana: sin pedidos/órdenes, sin kardex ` +
+        `PT ≥ corte y sin cíclico): ${String(fueraVentana)} NO migrados.`,
     );
   }
-  // Lista COMPLETA que pidió el dueño: modelos que migran por SOLO existencia (sin actividad
-  // en la ventana) — candidatos a depurar. El `Reporte` acota su volcado a 50 renglones, así
-  // que va a un archivo propio (gitignored como los reporte-etl-*) y al Reporte solo el conteo
-  // + la ruta.
-  if (pre !== null && pre.modelosSoloExistencia.size > 0) {
-    const ruta = escribirCandidatosDepurar(pre, filas);
+  // CONSTANCIA para Daniel (criterio del dueño: lo sin actividad NO entra aunque tenga saldo):
+  // deja por escrito QUÉ inventario se dejó de migrar. Va a un archivo propio porque el
+  // `Reporte` acota su volcado a 50 renglones; al Reporte solo el conteo + la ruta.
+  if (
+    pre !== null &&
+    (pre.modelosExcluidosConExistencia.size > 0 || pre.telasExcluidasConExistencia.size > 0)
+  ) {
+    const { ruta, totalModelos, existenciaModelos, totalTelas, existenciaTelas } =
+      escribirExcluidosSinActividad(pre, filas);
     reporte.nota(
-      `Modelos SIN actividad en la ventana pero CON existencia (migrados por saldo — candidatos ` +
-        `a depurar con Daniel): ${String(pre.modelosSoloExistencia.size)}. Lista COMPLETA en: ${ruta}`,
+      `Inventario NO migrado por falta de actividad en la ventana (decisión del dueño): ` +
+        `${String(totalModelos)} modelos (≈${existenciaModelos.toFixed(0)} pzas) y ` +
+        `${String(totalTelas)} telas (≈${existenciaTelas.toFixed(0)} u). Constancia COMPLETA en: ${ruta}`,
     );
   }
   return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
 
 /**
- * Escribe la lista COMPLETA de candidatos a depurar (código + descripción + existencia PT
- * estimada) en `candidatos-depurar-modelos-<timestamp>.txt` junto a los reportes del ETL.
- * Devuelve la ruta escrita.
+ * Escribe la CONSTANCIA del inventario que NO se migra: modelos y telas EXCLUIDOS por no tener
+ * actividad en la ventana pero que SÍ traían existencia pre-corte, con su existencia estimada.
+ * Archivo `excluidos-sin-actividad-<timestamp>.txt` junto a los reportes del ETL (gitignored).
+ * Devuelve la ruta + los totales para la nota del `Reporte`.
  */
-function escribirCandidatosDepurar(pre: PrescanUso, filas: Record<string, string>[]): string {
-  const renglones: string[] = [];
+function escribirExcluidosSinActividad(
+  pre: PrescanUso,
+  filas: Record<string, string>[],
+): {
+  ruta: string;
+  totalModelos: number;
+  existenciaModelos: number;
+  totalTelas: number;
+  existenciaTelas: number;
+} {
+  // ── Modelos ──
+  const renglonesModelos: string[] = [];
   const conFila = new Set<string>();
+  let existenciaModelos = 0;
+  const anotarModelo = (codigo: string, codigoNorm: string, descripcion: string): void => {
+    const existencia = pre.existenciaPtEstimadaPorCodigo.get(codigoNorm) ?? 0;
+    existenciaModelos += Math.abs(existencia);
+    renglonesModelos.push(`${codigo}\t${descripcion}\texistencia≈${String(existencia)}`);
+  };
   for (const fila of filas) {
     const codigo = (fila.Modelo ?? '').trim();
     const codigoNorm = codigo.toUpperCase();
     if (
       codigoNorm === '' ||
-      !pre.modelosSoloExistencia.has(codigoNorm) ||
+      !pre.modelosExcluidosConExistencia.has(codigoNorm) ||
       conFila.has(codigoNorm)
     ) {
       continue;
     }
     conFila.add(codigoNorm);
-    const existencia = pre.existenciaPtEstimadaPorCodigo.get(codigoNorm) ?? 0;
-    const descripcion = (fila.Descripcion ?? '').trim();
-    renglones.push(`${codigo}\t${descripcion}\texistencia≈${String(existencia)}`);
+    anotarModelo(codigo, codigoNorm, (fila.Descripcion ?? '').trim());
   }
-  // Códigos del kardex sin fila en Modelos.csv (no migran como catálogo; se listan igual).
-  for (const codigoNorm of pre.modelosSoloExistencia) {
+  // Códigos del kardex sin fila en Modelos.csv (se listan igual: es inventario que se pierde).
+  for (const codigoNorm of pre.modelosExcluidosConExistencia) {
     if (conFila.has(codigoNorm)) continue;
-    const existencia = pre.existenciaPtEstimadaPorCodigo.get(codigoNorm) ?? 0;
-    renglones.push(`${codigoNorm}\t(sin fila en Modelos.csv)\texistencia≈${String(existencia)}`);
+    anotarModelo(codigoNorm, codigoNorm, '(sin fila en Modelos.csv)');
   }
+
+  // ── Telas ──
+  const renglonesTelas: string[] = [];
+  let existenciaTelas = 0;
+  for (const idTelas of pre.telasExcluidasConExistencia) {
+    const existencia = pre.existenciaTelaEstimadaPorId.get(idTelas) ?? 0;
+    existenciaTelas += Math.abs(existencia);
+    renglonesTelas.push(`IdTelas=${idTelas}\texistencia≈${String(existencia)}`);
+  }
+
   const ruta = join(
     process.cwd(),
-    `candidatos-depurar-modelos-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
+    `excluidos-sin-actividad-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
   );
-  const encabezado =
-    'MODELOS SIN ACTIVIDAD EN LA VENTANA PERO CON EXISTENCIA (candidatos a depurar — para Daniel)\n' +
-    'Migran SOLO porque su saldo inicial de inventario PT los necesita (sin pedidos/órdenes/\n' +
-    'movimientos/cíclico dentro de la ventana). Columnas: codigo <TAB> descripcion <TAB> existencia estimada.\n' +
-    `Total: ${String(renglones.length)}\n` +
-    '─'.repeat(80) +
-    '\n';
-  writeFileSync(ruta, encabezado + renglones.join('\n') + '\n', { encoding: 'utf-8' });
-  return ruta;
+  const texto = [
+    'INVENTARIO QUE NO SE MIGRA — constancia para Daniel',
+    '',
+    'Criterio vigente (decisión del DUEÑO): a la recarga por ventana solo entra lo que tuvo',
+    'ACTIVIDAD dentro de la ventana. Lo de abajo quedó FUERA aunque traía existencia/saldo previo',
+    '("ya no me sirve"). Se deja por escrito para que quede registro de qué inventario se dejó de',
+    'migrar. NO es una incidencia ni un error: es la decisión aplicada.',
+    '',
+    `MODELOS excluidos con existencia PT: ${String(renglonesModelos.length)} ` +
+      `(≈${existenciaModelos.toFixed(0)} piezas en total)`,
+    'Columnas: codigo <TAB> descripcion <TAB> existencia estimada',
+    '─'.repeat(80),
+    ...renglonesModelos,
+    '',
+    `TELAS excluidas con existencia: ${String(renglonesTelas.length)} ` +
+      `(≈${existenciaTelas.toFixed(0)} unidades en total)`,
+    'Columnas: IdTelas (clave v1) <TAB> existencia estimada',
+    '─'.repeat(80),
+    ...renglonesTelas,
+    '',
+  ].join('\n');
+  writeFileSync(ruta, texto, { encoding: 'utf-8' });
+  return {
+    ruta,
+    totalModelos: renglonesModelos.length,
+    existenciaModelos,
+    totalTelas: renglonesTelas.length,
+    existenciaTelas,
+  };
 }
 
 async function procesarModelo(

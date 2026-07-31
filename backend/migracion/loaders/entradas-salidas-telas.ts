@@ -597,7 +597,7 @@ function construirLineasPorAlmacen(
     if (cantidad <= 0) continue; // renglón en ceros: no aporta movimiento (igual que el viejo)
     const col = ctx.coloresPorId.get(r.idTelasColores);
     if (col === undefined) {
-      ctx.reporte.agregar(
+      ctx.reporte.agregarMuestra(
         `${etiqueta}: renglón con IdTelasColores sin TelasColores (omitido)`,
         `doc=${doc.id} IdTelasColAlm=${r.idTelasColAlm} IdTelasColores=${r.idTelasColores}`,
       );
@@ -607,7 +607,9 @@ function construirLineasPorAlmacen(
     const idLote = ctx.loteIdPorColor.get(r.idTelasColores);
     const idAlmacen = ctx.mapaAlmacen.get(r.idAlmacenV1);
     if (idTela === undefined || idLote === undefined || idAlmacen === undefined) {
-      ctx.reporte.agregar(
+      // Muestra ACOTADA: con la ventana activa este descarte es MASIVO y esperado (telas fuera
+      // del set de USO), no una incidencia a revisar fila por fila. El total siempre se ve.
+      ctx.reporte.agregarMuestra(
         `${etiqueta}: renglón sin tela/lote/almacén mapeable (omitido)`,
         `doc=${doc.id} IdTelas=${col.idTelasV1} IdTelasColores=${r.idTelasColores} ` +
           `almacénV1=${r.idAlmacenV1} (tela=${String(idTela)} lote=${String(idLote)} alm=${String(idAlmacen)})`,

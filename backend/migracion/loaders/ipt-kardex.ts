@@ -632,7 +632,9 @@ async function procesarDetalle(ctx: ContextoIpt, f: Record<string, string>): Pro
   // Modelo: IdIPT_Modelos → NumMod (=código v2) → idModelo.
   const modeloV1 = ctx.modeloV1PorId.get(modAlm.idModeloV1);
   if (modeloV1 === undefined) {
-    ctx.reporte.agregar(
+    // Muestra ACOTADA: con la ventana activa este descarte es MASIVO y esperado (modelos fuera
+    // del set de USO), no una incidencia a revisar fila por fila. El total siempre se ve.
+    ctx.reporte.agregarMuestra(
       'IPT_Mod_Alm con IdIPT_Modelos sin IPT_Modelos (omitido)',
       `IdIPT_MovsDet=${idDet} IdIPT_Modelos=${modAlm.idModeloV1}`,
     );
@@ -640,7 +642,9 @@ async function procesarDetalle(ctx: ContextoIpt, f: Record<string, string>): Pro
   }
   const idModelo = ctx.idPorCodigoModelo.get(modeloV1.numMod);
   if (idModelo === undefined) {
-    ctx.reporte.agregar(
+    // Muestra ACOTADA: con la ventana activa son las decenas de miles de filas de kardex de los
+    // modelos SIN actividad que quedaron fuera del set de USO (decisión del dueño), no incidencias.
+    ctx.reporte.agregarMuestra(
       'Modelo de IPT sin match por código (NumMod) en v2 (omitido)',
       `IdIPT_MovsDet=${idDet} NumMod="${modeloV1.numMod}"`,
     );

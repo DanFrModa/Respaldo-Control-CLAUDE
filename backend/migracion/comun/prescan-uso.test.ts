@@ -165,28 +165,33 @@ function fuentes(): FuentesPrescanUso {
 }
 
 describe('calcularPrescanUso — modelos', () => {
-  it('usa documentos + kardex (neto pre-corte ≠ 0) + movimiento en ventana; excluye el resto', () => {
+  it('SOLO actividad en la ventana: documentos ∪ kardex ≥ corte ∪ cíclico (la existencia NO cuenta)', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    expect(p.modelosId).toEqual(new Set(['1', '2', '4', '5'])); // 3 (M-C) queda fuera
+    // 1 (M-A) por pedido en ventana; 4 (M-D) por movimiento ≥ corte. 2 (M-B) y 5 (M-E) tienen
+    // existencia pre-corte pero NINGUNA actividad → FUERA (criterio del dueño). 3 (M-C): nada.
+    expect(p.modelosId).toEqual(new Set(['1', '4']));
     expect(p.modelosCodigo.has('M-A')).toBe(true);
-    expect(p.modelosCodigo.has('M-B')).toBe(true);
     expect(p.modelosCodigo.has('M-D')).toBe(true);
-    expect(p.modelosCodigo.has('M-C')).toBe(false); // neto 0 y sin docs
+    expect(p.modelosCodigo.has('M-B')).toBe(false); // neto 6 pre-corte, pero sin actividad
+    expect(p.modelosCodigo.has('M-E')).toBe(false); // idem (neto 3 por tipo)
+    expect(p.modelosCodigo.has('M-C')).toBe(false);
   });
 
-  it('separa los "solo existencia" (sin actividad en ventana) para la lista de Daniel', () => {
+  it('deja CONSTANCIA del inventario excluido (con su existencia estimada)', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    // ni M-A (docs) ni M-D (kardex ≥ corte); M-E entra por el neto con signo por TIPO.
-    expect(p.modelosSoloExistencia).toEqual(new Set(['M-B', 'M-E']));
+    expect(p.modelosExcluidosConExistencia).toEqual(new Set(['M-B', 'M-E']));
     expect(p.existenciaPtEstimadaPorCodigo.get('M-B')).toBe(6);
     expect(p.existenciaPtEstimadaPorCodigo.get('M-E')).toBe(3);
+    // M-C tenía neto 0: ni entra ni figura como inventario perdido.
+    expect(p.modelosExcluidosConExistencia.has('M-C')).toBe(false);
   });
 
-  it('nota 4: con EnSa vacío el signo del neto PT lo decide el TIPO (misma regla que el ETL)', () => {
+  it('nota 4: el signo del neto PT (para la constancia) lo decide el TIPO, no el EnSa', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    // M-E solo tiene el movimiento m4 (tipo 1 = inventario-inicial, EnSa vacío): si el signo
-    // dependiera del EnSa, el neto sería 0 y M-E quedaría FUERA.
-    expect(p.modelosCodigo.has('M-E')).toBe(true);
+    // m4 es tipo 1 (inventario-inicial) con EnSa VACÍO: si el signo dependiera del EnSa el neto
+    // sería 0 y M-E no figuraría como inventario dejado fuera.
+    expect(p.existenciaPtEstimadaPorCodigo.get('M-E')).toBe(3);
+    expect(p.modelosExcluidosConExistencia.has('M-E')).toBe(true);
   });
 });
 
@@ -195,24 +200,42 @@ describe('calcularPrescanUso — cascada BOM y telas', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
     expect(p.telasIdTelasDis).toEqual(new Set(['71', '72'])); // BOM de usado + orden en ventana
     expect(p.aviosId).toEqual(new Set(['61']));
-    expect(p.bordadosId).toEqual(new Set(['51'])); // BOM del modelo con existencia
+    // El bordado 51 colgaba de M-B, que ahora queda FUERA → el BOM se encoge solo.
+    expect(p.bordadosId).toEqual(new Set([]));
   });
 
-  it('telas por movimiento ≥ corte, por existencia snapshot Y por NETO pre-corte calculado', () => {
+  it('telas SOLO por movimiento ≥ corte (existencia/neto pre-corte ya NO cuentan)', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
-    // 81 por movimiento ≥ corte; 82 por snapshot; 84 por NETO calculado (+7 sin snapshot —
-    // el caso del BLOQUEANTE); 83 queda fuera (neto 0: +5 −5, snapshot 0, pre-corte).
-    expect(p.telasIdTelas).toEqual(new Set(['81', '82', '84']));
+    // 81 por movimiento ≥ corte. 82 (snapshot) y 84 (neto +7) quedan FUERA: sin actividad.
+    expect(p.telasIdTelas).toEqual(new Set(['81']));
+  });
+
+  it('deja CONSTANCIA de las telas excluidas que traían existencia', () => {
+    const p = calcularPrescanUso(resolverVentana(), fuentes());
+    expect(p.telasExcluidasConExistencia).toEqual(new Set(['82', '84']));
+    expect(p.existenciaTelaEstimadaPorId.get('84')).toBe(7); // neto calculado
+    expect(p.telasExcluidasConExistencia.has('83')).toBe(false); // neto 0
   });
 });
 
 describe('calcularPrescanUso — proveedores', () => {
-  it('OC por fecha; maquilero/estampador/cortador por cascada de órdenes; EsMa grueso', () => {
+  it('OC por fecha; maquilero/estampador/cortador por cascada; EsMa SOLO con fecha ≥ corte', () => {
     const p = calcularPrescanUso(resolverVentana(), fuentes());
     expect(p.provIdProveedor).toEqual(new Set(['11']));
-    expect(p.provIdMaquileros).toEqual(new Set(['21', '22'])); // 23: orden fuera
+    // 21 por recibo de orden migrada; 22 tiene cuenta EsMa VIEJA (2010) → ya NO entra
+    // (criterio grueso retirado); 23: su orden quedó fuera.
+    expect(p.provIdMaquileros).toEqual(new Set(['21']));
     expect(p.provIdEstampadores).toEqual(new Set(['31']));
     expect(p.provIdCortadores).toEqual(new Set(['41'])); // 42: orden fuera
+  });
+
+  it('un maquilero con movimiento EsMa DENTRO de la ventana sí entra', () => {
+    const base = fuentes();
+    const p = calcularPrescanUso(resolverVentana(), {
+      ...base,
+      esMa: [...base.esMa, { IdEsMa: 'es2', IdMaquileros: '24', FechaEsMa: '10/03/2025 00:00:00' }],
+    });
+    expect(p.provIdMaquileros.has('24')).toBe(true);
   });
 
   it('proveedor TEXTO de telas/avíos usados entra por nombre normalizado', () => {

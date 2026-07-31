@@ -24,11 +24,30 @@ export interface SeccionReporte {
 export class Reporte {
   private readonly secciones = new Map<string, SeccionReporte>();
   private readonly notas: string[] = [];
+  /** Renglones NO guardados de las secciones acotadas (título → cuántos se omitieron). */
+  private readonly omitidosPorSeccion = new Map<string, number>();
 
   /** Agrega un renglón de detalle a una sección (la crea si no existe). */
   agregar(titulo: string, renglon: string): void {
     const seccion = this.secciones.get(titulo) ?? { titulo, renglones: [] };
     seccion.renglones.push(renglon);
+    this.secciones.set(titulo, seccion);
+  }
+
+  /**
+   * Igual que {@link agregar} pero ACOTADO: guarda como mucho `maxMuestra` renglones y del resto
+   * solo lleva el CONTEO. Para descartes MASIVOS y ESPERADOS (p. ej. con la ventana activa, las
+   * decenas de miles de filas de kardex de modelos/telas que quedaron fuera del set de USO): sin
+   * esto el reporte se llena de miles de renglones que no son incidencias que revisar, solo la
+   * consecuencia del filtro. El total SIEMPRE se ve.
+   */
+  agregarMuestra(titulo: string, renglon: string, maxMuestra = 20): void {
+    const seccion = this.secciones.get(titulo) ?? { titulo, renglones: [] };
+    if (seccion.renglones.length < maxMuestra) {
+      seccion.renglones.push(renglon);
+    } else {
+      this.omitidosPorSeccion.set(titulo, (this.omitidosPorSeccion.get(titulo) ?? 0) + 1);
+    }
     this.secciones.set(titulo, seccion);
   }
 
@@ -42,11 +61,11 @@ export class Reporte {
     return this.secciones.size > 0;
   }
 
-  /** Total de renglones de incidencia (todas las secciones). */
+  /** Total de renglones de incidencia (incluye los acotados que solo se contaron). */
   get totalIncidencias(): number {
     let total = 0;
     for (const s of this.secciones.values()) {
-      total += s.renglones.length;
+      total += s.renglones.length + (this.omitidosPorSeccion.get(s.titulo) ?? 0);
     }
     return total;
   }
@@ -80,15 +99,18 @@ export class Reporte {
       return partes.join('\n');
     }
     for (const s of this.secciones.values()) {
+      // El TOTAL de la sección incluye lo que `agregarMuestra` solo contó (sin guardar).
+      const soloContados = this.omitidosPorSeccion.get(s.titulo) ?? 0;
       partes.push('');
-      partes.push(`── ${s.titulo} (${String(s.renglones.length)}) ──`);
+      partes.push(`── ${s.titulo} (${String(s.renglones.length + soloContados)}) ──`);
       // Acota el volcado para no inundar la consola; el conteo total siempre sale completo.
       const MAX = 50;
       for (const r of s.renglones.slice(0, MAX)) {
         partes.push(`  - ${r}`);
       }
-      if (s.renglones.length > MAX) {
-        partes.push(`  … y ${String(s.renglones.length - MAX)} más.`);
+      const noListados = Math.max(0, s.renglones.length - MAX) + soloContados;
+      if (noListados > 0) {
+        partes.push(`  … y ${String(noListados)} más (no listados; muestra acotada).`);
       }
     }
     return partes.join('\n');

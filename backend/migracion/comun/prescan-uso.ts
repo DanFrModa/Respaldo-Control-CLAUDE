@@ -3,45 +3,51 @@
  * modelos y ya no me sirven" → con la ventana ACTIVA solo migran los catálogos GRANDES que
  * de verdad se USAN en la ventana; el resto se cuenta como `fueraVentana`, nada en silencio).
  *
+ * ⭐ CRITERIO VIGENTE (cambio dictado por el DUEÑO): **SOLO lo USADO en la ventana**. Una
+ * entidad SIN actividad dentro de la ventana NO entra **aunque tenga existencia o saldo
+ * viejo** — el dueño acepta explícitamente perder ese inventario ("ya no me sirve"). Los
+ * prongs de "existencia / neto pre-corte" quedaron RETIRADOS (retenían ~1,093 modelos y ~155
+ * telas por saldo histórico). Lo excluido que SÍ tenía existencia se deja por escrito en
+ * `excluidos-sin-actividad-<timestamp>.txt` (constancia para Daniel), nunca en silencio.
+ *
+ * ⚠️ Lo que SÍ se conserva: los **saldos iniciales de las entidades que SÍ migran** (un modelo
+ * usado en 2025 cuyo stock viene de 2024 conserva su existencia; si no, saldría negativo). La
+ * maquinaria de saldo inicial (kardex PT/telas, EsMa) sigue intacta: solo produce asientos de
+ * entidades dentro del set, porque los loaders descartan la fila ANTES de acumular cuando el
+ * modelo/tela no mapea (no quedan sintéticos huérfanos).
+ *
  * Extiende el patrón de `ventana-f2.ts` (clientes por uso) a modelos/telas/avíos/bordados/
  * proveedores. Lee los CSV del viejo (CP850, `leerCsv`) UNA vez y arma los sets de claves v1
  * "usadas". Definición de USADO (unión de fuentes):
  *
  *  • MODELO: referenciado por pedidos/órdenes DENTRO de la ventana (cascada de
- *    `ventana-f2.ts`) ∪ con movimiento de kardex PT con fecha ≥ corte ∪ con EXISTENCIA
- *    (neto de kardex pre-corte ≠ 0 por cadena IPT_Movs→IPT_MovsDet→IPT_Mod_Alm→IPT_Modelos
- *    →NumMod, con el signo de LA MISMA regla del ETL — dirección canónica del TIPO vía
- *    `signoMovimientoIpt`; EnSa solo decide en vacíos/discordantes — y además el snapshot
- *    `IPT_Mod_Alm.Existencia`≠0 — su saldo inicial lo va a necesitar) ∪ el cíclico (`Alm_InvCic`,
- *    por CÓDIGO `ModeloIC`) dentro de la ventana. OJO: el kardex/cíclico referencian por
- *    CÓDIGO y los documentos por `IdModelos` → los sets van en AMBOS espacios, cruzados vía
- *    `Modelos.csv`. Los que migran SOLO por existencia (sin actividad en ventana) se separan
- *    en `modelosSoloExistencia` (lista para Daniel: candidatos a depurar).
- *  • TELA: en el BOM de un modelo usado (`ModelosTela`→IdTelasDis) ∪ referenciada por una
- *    orden dentro de la ventana (`Ordenes.IdTelasDis`) ∪ con movimiento ≥ corte
- *    (`Entradas`/`Salidas`, espacio IdTelas) ∪ con EXISTENCIA: **neto pre-corte CALCULADO**
- *    desde `EntradasDet`/`SalidasDet` (cadena IdTelasColAlm→TelasColores→IdTelas, misma criba
- *    del ETL de F4 — es lo que el ETL condensa en saldos iniciales, D3) y además el snapshot
- *    `TelasColAlm.ExTela1/2` ≠ 0 (superset inofensivo). Las OC/notas legacy NO aportan telas
- *    (sus renglones son TEXTO LIBRE, sin FK a catálogo).
- *  • AVÍO: en el BOM de un modelo usado (`ModelosHab`→IdHabilitacion). (OC/notas: texto
- *    libre, no referencian avíos por id.)
- *  • BORDADO: en el BOM de un modelo usado (`ModelosBor`→IdBordados).
- *  • PROVEEDOR (4 espacios de id + nombres): OC dentro de ventana (IdProveedor) ∪ proveedor
+ *    `ventana-f2.ts`) ∪ con movimiento de kardex PT de **fecha ≥ corte** ∪ referenciado por el
+ *    cíclico (`Alm_InvCic`) dentro de la ventana. OJO: kardex/cíclico referencian por CÓDIGO y
+ *    los documentos por `IdModelos` → los sets van en AMBOS espacios, cruzados vía `Modelos.csv`.
+ *  • TELA: en el BOM de un modelo usado (`ModelosTela`→IdTelasDis) ∪ referenciada por una orden
+ *    dentro de la ventana (`Ordenes.IdTelasDis`) ∪ con movimiento **≥ corte** (`Entradas`/
+ *    `Salidas`: por la cabecera `IdTela` y por sus renglones vía IdTelasColAlm→TelasColores).
+ *    Las OC/notas legacy NO pueden aportar telas: sus renglones son TEXTO LIBRE sin FK a
+ *    catálogo (`OrdCompraDet.Descripcion`→`descripcionLibre`, `NotasDet.Descripcion`→
+ *    `descripcionLegacy`; verificado en sus loaders).
+ *  • AVÍO: BOM de un modelo usado (`ModelosHab`→IdHabilitacion) — se encoge solo con los
+ *    modelos. BORDADO: idem (`ModelosBor`→IdBordados).
+ *  • PROVEEDOR (4 espacios de id + nombres): OC dentro de la ventana (IdProveedor) ∪ proveedor
  *    TEXTO de tela/avío usado (match por `normalizarParaDedup`, igual que los loaders) ∪
- *    MAQUILERO con actividad de órdenes migradas (Ordenes/Entregas/Recibos/Notas/auditorías)
- *    o presente en EsMa (criterio GRUESO del saldo: el asiento inicial de EsMa lo necesita)
- *    ∪ ESTAMPADOR de EntregasEst/RecibosEst de órdenes migradas (la columna se llama
- *    IdMaquileros pero es espacio Estampadores) ∪ CORTADOR de `Corte` de órdenes migradas.
- *  • COLORES: NO se filtran (quedan COMPLETOS, decisión declarada): son chicos comparados
- *    con modelos y los referencian por texto libre múltiples fuentes (OrdenesDet, lotes de
- *    tela por color) — filtrarlos arriesga dejar fuera uno que un saldo inicial necesita.
+ *    terceros con actividad EN VENTANA: maquileros de órdenes migradas (`Ordenes`/`Entregas`/
+ *    `Recibos`/`CC_Auditorias` de esas órdenes) o de notas en ventana, o con **movimiento EsMa
+ *    de fecha ≥ corte**; estampadores de `EntregasEst`/`RecibosEst` de órdenes migradas (su
+ *    columna se llama IdMaquileros pero es espacio Estampadores); cortadores de `Corte` de
+ *    órdenes migradas. (RETIRADO el criterio grueso de "cualquiera con cuenta EsMa".)
+ *  • COLORES: NO se filtran (quedan COMPLETOS, decisión declarada): son chicos y los referencian
+ *    por texto libre múltiples fuentes (OrdenesDet, lotes de tela por color) — filtrarlos
+ *    arriesga romper un saldo inicial de las entidades que SÍ migran.
  *  • SIEMPRE completos: empresas, almacenes, géneros, temporadas, etiquetas de marca,
  *    tela-categorías, tallas/curvas (chicos/estructurales).
  *
  * RED DE SEGURIDAD: si este prescan dejara fuera algo que un ETL posterior sí necesita, ese
- * ETL ya REPORTA el mapeo faltante como incidencia (nunca silencioso) — el hueco se ve en el
- * reporte y se corrige re-corriendo sin ventana o afinando el criterio.
+ * ETL ya REPORTA el mapeo faltante (nunca silencioso) — y con la ventana activa esos descartes
+ * masivos van a BUCKETS AGREGADOS (conteo + muestra), no a incidencias por fila.
  *
  * Con la ventana INACTIVA devuelve `null` y todo migra completo (invariante: sin `ETL_DESDE`
  * nada cambia).
@@ -67,8 +73,14 @@ export interface PrescanUso {
   modelosId: Set<string>;
   /** Códigos de modelo usados, normalizados UPPER (kardex/cíclico ∪ traducción de ids). */
   modelosCodigo: Set<string>;
-  /** Códigos que migran SOLO por existencia PT (sin docs/kardex≥corte/cíclico) — lista para Daniel. */
-  modelosSoloExistencia: Set<string>;
+  /**
+   * CONSTANCIA (no altera el filtro): códigos de modelo EXCLUIDOS por no tener actividad en la
+   * ventana pero que SÍ traían existencia PT pre-corte → inventario que se deja de migrar por
+   * decisión del dueño. Se vuelca a `excluidos-sin-actividad-<timestamp>.txt`.
+   */
+  modelosExcluidosConExistencia: Set<string>;
+  /** Igual que el anterior, para telas: `IdTelas` excluidos que traían existencia pre-corte. */
+  telasExcluidasConExistencia: Set<string>;
   /** `IdTelas` usadas (movimientos/existencia). */
   telasIdTelas: Set<string>;
   /** `IdTelasDis` usadas (BOM ∪ órdenes en ventana). */
@@ -89,10 +101,12 @@ export interface PrescanUso {
   provNombres: Set<string>;
   /**
    * Existencia PT estimada por código de modelo (neto pre-corte CALCULADO; si el código solo
-   * apareció en el snapshot `IPT_Mod_Alm`, la suma del snapshot). Para la lista de
-   * "candidatos a depurar" que pidió el dueño.
+   * apareció en el snapshot `IPT_Mod_Alm`, la suma del snapshot). Solo para la CONSTANCIA de
+   * lo excluido — NO participa en el criterio de USADO.
    */
   existenciaPtEstimadaPorCodigo: Map<string, number>;
+  /** Existencia de tela estimada por `IdTelas` (neto pre-corte calculado / snapshot). Constancia. */
+  existenciaTelaEstimadaPorId: Map<string, number>;
 }
 
 /** Fuentes crudas (inyectables en el test; en real las lee {@link prescanUso} con `leerCsv`). */
@@ -184,7 +198,8 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (!idPorCodigo.has(codigo)) idPorCodigo.set(codigo, id);
   }
 
-  // ── 3) Kardex PT por código: movimiento ≥ corte, neto pre-corte y existencia snapshot ─────
+  // ── 3) Kardex PT por código: USADO = movimiento ≥ corte. El neto pre-corte y el snapshot YA
+  // NO deciden (criterio del dueño): se calculan SOLO como CONSTANCIA de lo que se deja fuera.
   const codigoPorIptModelo = new Map<string, string>(); // IdIPT_Modelos → NumMod
   for (const f of fuentes.iptModelos) {
     const id = limpio(f.IdIPT_Modelos);
@@ -254,31 +269,25 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (codigo !== '') ciclicoEnVentana.add(codigo);
   }
 
-  // ── 4) Unión de modelos en ambos espacios + "solo existencia" (lista para Daniel) ─────────
+  // ── 4) Unión de modelos en ambos espacios + CONSTANCIA de lo excluido con existencia ─────
   const codigosDocs = new Set<string>();
   for (const id of modelosId) {
     const codigo = codigoPorId.get(id);
     if (codigo !== undefined) codigosDocs.add(codigo);
   }
-  const modelosCodigo = new Set<string>([
-    ...codigosDocs,
-    ...kardexEnVentana,
-    ...kardexNeto,
-    ...kardexExistencia,
-    ...ciclicoEnVentana,
-  ]);
-  const modelosSoloExistencia = new Set<string>();
+  // CRITERIO DEL DUEÑO: SOLO actividad en la ventana. La existencia pre-corte NO entra.
+  const modelosCodigo = new Set<string>([...codigosDocs, ...kardexEnVentana, ...ciclicoEnVentana]);
+  // CONSTANCIA: excluidos que SÍ traían existencia (inventario que se deja de migrar).
+  const modelosExcluidosConExistencia = new Set<string>();
   for (const codigo of [...kardexNeto, ...kardexExistencia]) {
-    if (!codigosDocs.has(codigo) && !kardexEnVentana.has(codigo) && !ciclicoEnVentana.has(codigo)) {
-      modelosSoloExistencia.add(codigo);
-    }
+    if (!modelosCodigo.has(codigo)) modelosExcluidosConExistencia.add(codigo);
   }
   for (const codigo of modelosCodigo) {
     const id = idPorCodigo.get(codigo);
     if (id !== undefined) modelosId.add(id);
   }
-  // Existencia estimada por código (para la lista de candidatos a depurar): el neto CALCULADO
-  // manda; si el código solo apareció en el snapshot, la suma del snapshot.
+  // Existencia estimada por código (SOLO constancia de lo excluido): el neto CALCULADO manda;
+  // si el código solo apareció en el snapshot, la suma del snapshot.
   const existenciaPtEstimadaPorCodigo = new Map<string, number>();
   for (const [codigo, snapshot] of snapshotPorCodigo) {
     existenciaPtEstimadaPorCodigo.set(codigo, snapshot);
@@ -306,9 +315,9 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (esClave(idBordado)) bordadosId.add(idBordado);
   }
 
-  // ── 6) Telas por movimiento ≥ corte (Entradas/Salidas), NETO pre-corte CALCULADO desde los
-  // renglones (la MISMA base que el ETL de F4 condensa en saldos iniciales — D3: el snapshot
-  // `TelasColAlm` NO basta, difiere del neto real) y existencia snapshot (superset inofensivo).
+  // ── 6) Telas: USADO = movimiento ≥ corte (cabecera `Entradas`/`Salidas.IdTela` y renglones).
+  // El neto pre-corte y el snapshot `TelasColAlm` YA NO deciden (criterio del dueño): se calculan
+  // SOLO como CONSTANCIA del inventario de tela que se deja fuera.
   for (const f of [...fuentes.entradas, ...fuentes.salidas]) {
     if (!dentroVentana(parsearFechaSoloDia(f.Fecha), ventana)) continue;
     const idTela = limpio(f.IdTela);
@@ -321,13 +330,16 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (id !== '' && esClave(idTelas)) idTelasPorTelaColor.set(id, idTelas);
   }
   const idTelasPorColAlm = new Map<string, string>(); // IdTelasColAlm → IdTelas
+  const snapshotTelaPorId = new Map<string, number>(); // Σ TelasColAlm.ExTela1+2 por IdTelas
   for (const f of fuentes.telasColAlm) {
     const idColAlm = limpio(f.IdTelasColAlm);
     const idTelas = idTelasPorTelaColor.get(limpio(f.IdTelasColores));
     if (idColAlm !== '' && idTelas !== undefined) idTelasPorColAlm.set(idColAlm, idTelas);
+    // Snapshot: NO decide (ya no es criterio); solo alimenta la constancia de lo excluido.
     const ex = (parsearDinero(f.ExTela1) ?? 0) + (parsearDinero(f.ExTela2) ?? 0);
-    if (Math.abs(ex) <= TOLERANCIA_NETO) continue;
-    if (idTelas !== undefined) telasIdTelas.add(idTelas);
+    if (idTelas !== undefined && ex !== 0) {
+      snapshotTelaPorId.set(idTelas, (snapshotTelaPorId.get(idTelas) ?? 0) + ex);
+    }
   }
   // Neto pre-corte por tela desde EntradasDet/SalidasDet (cadena IdTelasColAlm→TelasColores→
   // IdTelas), con LA MISMA criba del ETL de telas: cantidad = cant1+cant2 > 0, cadena completa,
@@ -375,11 +387,18 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     1,
   );
   acumularNetoTela(fuentes.salidasDet, fechaSalidaPorDoc, 'IdSalidas', 'TelaSal1', 'TelaSal2', -1);
+  // CRITERIO DEL DUEÑO: el neto pre-corte NO mete la tela al set. Solo deja CONSTANCIA de la
+  // existencia de tela que se deja de migrar (se resuelve tras cerrar el set, más abajo).
+  const existenciaTelaEstimadaPorId = new Map<string, number>();
+  for (const [idTelas, snapshot] of snapshotTelaPorId) {
+    existenciaTelaEstimadaPorId.set(idTelas, snapshot);
+  }
   for (const [idTelas, neto] of netoTelaPre) {
-    if (Math.abs(neto) > TOLERANCIA_NETO) telasIdTelas.add(idTelas);
+    existenciaTelaEstimadaPorId.set(idTelas, neto);
   }
 
-  // ── 7) Proveedores: OC/notas por fecha; terceros por cascada de órdenes migradas; EsMa ────
+  // ── 7) Proveedores: OC/notas por fecha; terceros por cascada de órdenes migradas; EsMa
+  // SOLO con movimiento en ventana (el criterio grueso de "cuenta EsMa" quedó retirado) ───────
   for (const f of fuentes.ordCompra) {
     if (!dentroVentana(parsearFechaSoloDia(f.Fecha), ventana)) continue;
     const idProv = limpio(f.IdProveedor);
@@ -407,9 +426,11 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     const idCort = limpio(f.IdCortadores);
     if (esClave(idCort)) provIdCortadores.add(idCort);
   }
-  // EsMa: criterio GRUESO — cualquier maquilero con cuenta EsMa se conserva (su saldo inicial
-  // pre-corte lo va a necesitar; calcular el saldo exacto aquí duplicaría el ETL de F6).
+  // EsMa: SOLO movimientos DENTRO de la ventana (`FechaEsMa` ≥ corte). El criterio grueso
+  // anterior ("cualquiera con cuenta EsMa") quedó RETIRADO por decisión del dueño: retenía
+  // 334/496 maquileros por saldo viejo. Fecha nula = dentro (regla de `dentroVentana`).
   for (const f of fuentes.esMa) {
+    if (!dentroVentana(parsearFecha(f.FechaEsMa), ventana)) continue;
     const idMaq = limpio(f.IdMaquileros);
     if (esClave(idMaq)) provIdMaquileros.add(idMaq);
   }
@@ -432,11 +453,21 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (norm !== '') provNombres.add(norm);
   }
 
+  // CONSTANCIA final: telas excluidas que SÍ traían existencia pre-corte (inventario de tela
+  // que se deja de migrar). Se calcula con el set ya cerrado.
+  const telasExcluidasConExistencia = new Set<string>();
+  for (const [idTelas, existencia] of existenciaTelaEstimadaPorId) {
+    if (Math.abs(existencia) > TOLERANCIA_NETO && !telasIdTelas.has(idTelas)) {
+      telasExcluidasConExistencia.add(idTelas);
+    }
+  }
+
   return {
     f2,
     modelosId,
     modelosCodigo,
-    modelosSoloExistencia,
+    modelosExcluidosConExistencia,
+    telasExcluidasConExistencia,
     telasIdTelas,
     telasIdTelasDis,
     aviosId,
@@ -447,6 +478,7 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     provIdCortadores,
     provNombres,
     existenciaPtEstimadaPorCodigo,
+    existenciaTelaEstimadaPorId,
   };
 }
 
