@@ -20,6 +20,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { contarFilasCsv } from './comun/csv.js';
 import { calcularCuadre, type RenglonCuadre } from './cuadre.js';
 
@@ -143,7 +145,7 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url);
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const cuadre = await calcularCuadreFase(cliente);
     console.log(formatearCuadreFase(cuadre));

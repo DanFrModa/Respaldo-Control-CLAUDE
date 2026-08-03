@@ -9,8 +9,12 @@
  *
  * Todo es CONFIGURABLE POR ENTORNO para que Gabriel pueda subirlo sin recompilar:
  *
- *  • `ETL_CONCURRENCIA` (default **24**): tareas simultáneas de `enLotes`. Antes 8; con 0.43 s
- *    de round-trip, 24 en vuelo baja el tiempo ~3× (el límite real es el pool y la BD, no el CPU).
+ *  • `ETL_CONCURRENCIA` (default **12**, tope duro **64**): tareas simultáneas de `enLotes`.
+ *    Antes 8. El default es CONSERVADOR a propósito: (a) el pool del ETL convive con el de la
+ *    app desplegada y con pg-boss contra el `max_connections` de Railway, y un
+ *    `sorry, too many clients already` tumbaría la corrida; (b) en los loaders con folio, más
+ *    de ~12 en vuelo se serializan igual en la fila `Secuencia` (23 esperando de 24 no ayuda).
+ *    Si la corrida va holgada, Gabriel puede subirla; si truena por conexiones, bajarla.
  *  • `ETL_POOL_MAX` (default **`ETL_CONCURRENCIA` + 4**): conexiones del pool de `pg`. DEBE ser
  *    ≥ concurrencia o las tareas se serializan esperando conexión (el default lo garantiza).
  *  • `ETL_STATEMENT_TIMEOUT_MS` (default **120000**): corta una sentencia colgada del lado del
@@ -34,9 +38,12 @@ function enteroEnv(clave: string, porDefecto: number): number {
   return Number.isInteger(n) && n > 0 ? n : porDefecto;
 }
 
-/** Tareas simultáneas de `enLotes` en los loaders (env `ETL_CONCURRENCIA`, default 24). */
+/** Tope duro de concurrencia: un dedazo (`ETL_CONCURRENCIA=500`) no debe reventar el servidor. */
+const MAX_CONCURRENCIA = 64;
+
+/** Tareas simultáneas de `enLotes` en los loaders (env `ETL_CONCURRENCIA`, default 12, tope 64). */
 export function concurrenciaEtl(): number {
-  return enteroEnv('ETL_CONCURRENCIA', 24);
+  return Math.min(enteroEnv('ETL_CONCURRENCIA', 12), MAX_CONCURRENCIA);
 }
 
 /**

@@ -31,6 +31,16 @@ const PATRONES_TRANSITORIOS = [
   'socket hang up',
   'read econnreset',
   'connect etimedout',
+  // Saturación del servidor: el pool del ETL convive con el de la app y pg-boss contra el
+  // `max_connections` de Railway. Es TRANSITORIO (se libera una conexión y el reintento pasa).
+  'too many clients',
+  '53300',
+  // Contención entre tareas concurrentes: dos unidades tocando las mismas filas. También
+  // transitorio por definición (Postgres aborta una y la otra sigue).
+  'deadlock detected',
+  '40p01',
+  'could not serialize',
+  '40001',
 ] as const;
 
 /** Recolecta recursivamente los textos (message + code) de un error y sus causas anidadas. */

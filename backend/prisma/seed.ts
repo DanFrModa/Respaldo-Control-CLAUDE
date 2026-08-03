@@ -19,6 +19,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { concurrenciaEtl, opcionesClienteEtl } from '../migracion/comun/cliente-etl.js';
 import { sembrarCalidad } from './seed-calidad.js';
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
 import { sembrarRutaCriticaPlantillas } from './seed-ruta-critica-plantillas.js';
@@ -60,13 +61,45 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
   return empresa.id;
 }
 
+/**
+ * Corre `fn` sobre `items` con CONCURRENCIA ACOTADA y semántica ESTRICTA: a diferencia de
+ * `enLotes` del ETL (tolerante a fallos por fila), aquí el primer error se PROPAGA — el seed
+ * debe abortar si algo no se pudo sembrar.
+ *
+ * Solo se usa en bucles de filas INDEPENDIENTES (upserts por clave natural, sin orden entre
+ * sí). El seed sigue siendo idempotente y sus BLOQUES siguen en el mismo orden de dependencias
+ * (permisos → roles → …): esto solo paraleliza DENTRO de un bloque. Motivo: contra la BD remota
+ * cada upsert es un round-trip (~0.43 s medidos el 31-jul-2026) y el seed secuencial tardó 9m20s.
+ */
+async function enParaleloEstricto<T>(
+  items: readonly T[],
+  fn: (item: T) => Promise<void>,
+  concurrencia = concurrenciaEtl(),
+): Promise<void> {
+  const limite = Math.max(1, Math.min(concurrencia, items.length));
+  let siguiente = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const indice = siguiente;
+      siguiente += 1;
+      const item = items[indice];
+      if (indice >= items.length || item === undefined) return;
+      await fn(item); // si lanza, `Promise.all` propaga y el seed aborta (estricto)
+    }
+  };
+  await Promise.all(Array.from({ length: limite }, () => worker()));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. Permisos: la BD se sincroniza con el catálogo tipado de src/contrato
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, number>> {
   const idPorClave = new Map<ClavePermiso, number>();
-  for (const permiso of CATALOGO_PERMISOS) {
+  // Filas INDEPENDIENTES (upsert por `clave`): en paralelo acotado. El Map se llena desde el
+  // callback — en JS single-thread las escrituras entre awaits son atómicas, y cada clave la
+  // escribe UNA sola tarea, así que el resultado es idéntico al del bucle secuencial.
+  await enParaleloEstricto(CATALOGO_PERMISOS, async (permiso) => {
     const fila = await prisma.permiso.upsert({
       where: { clave: permiso.clave },
       update: { descripcion: permiso.descripcion, modulo: permiso.modulo },
@@ -77,7 +110,7 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
       },
     });
     idPorClave.set(permiso.clave, fila.id);
-  }
+  });
 
   // Un permiso en BD que ya no está en el catálogo es señal de catálogo desactualizado:
   // se avisa pero NO se borra (podría tener asignaciones; lo decide una migración expresa).
@@ -378,14 +411,16 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
 const ROLES_PROVEEDOR_OBSOLETOS: string[] = ['estampado-aplicacion'];
 
 async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
-  for (const rol of ROLES_PROVEEDOR_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(ROLES_PROVEEDOR_BASE, async (rol) => {
     await prisma.rolProveedor.upsert({
       where: { codigo: rol.codigo },
       // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
       update: {},
       create: { codigo: rol.codigo, nombre: rol.nombre },
     });
-  }
+  });
   // Desactiva los roles obsoletos si existen (idempotente; no falla si no están).
   await prisma.rolProveedor.updateMany({
     where: { codigo: { in: ROLES_PROVEEDOR_OBSOLETOS }, activo: true },
@@ -418,7 +453,9 @@ const TIPOS_PROCESO_BASE: { codigo: string; nombre: string; generaEntradaPt: boo
 ];
 
 async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
-  for (const tipo of TIPOS_PROCESO_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(TIPOS_PROCESO_BASE, async (tipo) => {
     await prisma.tipoProceso.upsert({
       where: { codigo: tipo.codigo },
       // No se pisa nombre/activo/generaEntradaPt si ya existe (pudo editarse en producción).
@@ -429,7 +466,7 @@ async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
         generaEntradaPt: tipo.generaEntradaPt,
       },
     });
-  }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,14 +492,16 @@ const GENEROS_BASE: string[] = [
 ];
 
 async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
-  for (const nombre of GENEROS_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(GENEROS_BASE, async (nombre) => {
     await prisma.genero.upsert({
       where: { nombre },
       // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción).
       update: {},
       create: { nombre },
     });
-  }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -701,14 +740,16 @@ const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[]
 ];
 
 async function sembrarReactivosFicha(prisma: PrismaClient): Promise<void> {
-  for (const reactivo of REACTIVOS_FICHA_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(REACTIVOS_FICHA_BASE, async (reactivo) => {
     await prisma.checklistFichaDef.upsert({
       where: { clave: reactivo.clave },
       // Idempotente: no pisa etiqueta/orden/activo si ya existe (pudieron editarse en producción).
       update: {},
       create: { clave: reactivo.clave, etiqueta: reactivo.etiqueta, orden: reactivo.orden },
     });
-  }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -737,7 +778,9 @@ const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fij
 ];
 
 async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
-  for (const concepto of CONCEPTOS_COSTO_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(CONCEPTOS_COSTO_BASE, async (concepto) => {
     await prisma.conceptoCosto.upsert({
       where: { codigo: concepto.codigo },
       update: {},
@@ -748,7 +791,7 @@ async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
         fijo: concepto.fijo,
       },
     });
-  }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -768,7 +811,9 @@ const ESTADOS_LISTA_BASE: { codigo: string; nombre: string; orden: number; esCie
 ];
 
 async function sembrarEstadosLista(prisma: PrismaClient): Promise<void> {
-  for (const estado of ESTADOS_LISTA_BASE) {
+  // Filas INDEPENDIENTES (upsert por clave natural) → paralelo acotado (ver
+  // `enParaleloEstricto`): mismo resultado e idempotencia, sin el round-trip en serie.
+  await enParaleloEstricto(ESTADOS_LISTA_BASE, async (estado) => {
     await prisma.estadoLista.upsert({
       where: { codigo: estado.codigo },
       update: {},
@@ -779,7 +824,7 @@ async function sembrarEstadosLista(prisma: PrismaClient): Promise<void> {
         esCierre: estado.esCierre,
       },
     });
-  }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -876,7 +921,10 @@ if (ejecutadoComoScript) {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const prisma = crearClientePrisma(url);
+  // Mismo afinado que los ETL (pool + timeouts + transacciones): el seed corre contra la BD
+  // REMOTA de `prueba` por el proxy público y sin `query_timeout` quedaba igual de expuesto al
+  // `SocketTimeout` que mató la corrida del 31-jul-2026 (midió 9m20s para ~1,300 renglones).
+  const prisma = crearClientePrisma(url, opcionesClienteEtl());
   try {
     await sembrar(prisma);
     console.log('Seed de fundación aplicado (idempotente).');

@@ -17,6 +17,8 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { signoDeOrigen } from '../src/dominio/terceros/origen-tercero.js';
 import type { TipoTercero } from '../src/datos/index.js';
 
@@ -229,7 +231,7 @@ async function main(): Promise<void> {
   const opciones: OpcionesParseo & { encoding?: string } = {};
   if (corteStr !== null) opciones.corte = new Date(`${corteStr}T00:00:00.000Z`);
   if (encoding !== null) opciones.encoding = encoding;
-  const cliente = crearClientePrisma(url);
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     console.log(formatearCuadreF9(await calcularCuadreF9(cliente, archivo, opciones)));
   } finally {

@@ -202,6 +202,22 @@ Si la ventana (`--desde`) está activa y el corte de SINUBE trae terceros que el
 
 **Al terminar (recordatorios que el propio comando repite):** reinicia el backend en Railway (invalida sesiones viejas y deja drenarse los jobs `pgboss` encolados antes de la limpieza — ese esquema NO se trunca; los handlers son resilientes y los absorben); el `admin` quedó con el password del seed — **cámbialo**; las fotos previas en R2 quedaron huérfanas (limitación conocida — deuda aparcada en `HOJA-DE-RUTA.md` §4); y cada ETL dejó su `reporte-etl-*.txt` en `backend/` para revisar con Daniel.
 
+### Rendimiento (BD remota: la carga es *latency-bound*)
+
+La corrida real del 31-jul-2026 (Mac → Railway por el proxy público) midió **~0.43 s por renglón**: el cuello es el **viaje redondo**, no el CPU. Todo el afinado es configurable por entorno — `recargar.ts` imprime en su banner cuál quedó activo:
+
+| Variable | Default | Para qué |
+|---|---|---|
+| `ETL_CONCURRENCIA` | **12** (tope duro 64) | Tareas simultáneas de `enLotes`. Default conservador: el pool del ETL convive con el de la app y pg-boss contra el `max_connections` de Railway, y arriba de ~12 los loaders con folio se serializan igual en la fila `Secuencia`. |
+| `ETL_POOL_MAX` | `ETL_CONCURRENCIA` + 4 | Conexiones del pool de `pg`. Debe ser ≥ concurrencia o las tareas esperan conexión. |
+| `ETL_QUERY_TIMEOUT_MS` | 120000 | Tope del lado cliente (`query_timeout`). **Es el que evita el `SocketTimeout`** que mató la corrida. |
+| `ETL_STATEMENT_TIMEOUT_MS` | 120000 | Tope del lado servidor (`statement_timeout`). |
+| `ETL_TX_TIMEOUT_MS` / `ETL_TX_MAXWAIT_MS` | 120000 / 20000 | Tiempos de `$transaction` (los defaults de Prisma dan `P2028` con esta latencia). |
+
+**Si truena por conexiones** (`sorry, too many clients already`): baja `ETL_CONCURRENCIA` (p. ej. 6) — aunque ese error ya está en la lista de transitorios y se reintenta. **Si va holgado**: súbela (24, 32). En PowerShell: `$env:ETL_CONCURRENCIA='6'`.
+
+El **seed** usa el mismo afinado y paraleliza sus bucles de catálogo independientes; `limpiar-datos.ts` va **sin** `statement_timeout` a propósito (un TRUNCATE largo no debe morir por el tope).
+
 ### Qué filtra la ventana (`--desde` / `ETL_DESDE`) y qué migra completo
 
 - **Filtrado por fecha propia** (documento anterior al corte → NO migra; fecha vacía = migra): pedidos (`FechaPedido`), pedidos reales (`FechaPedPR`), órdenes (`Fecha`), y los movimientos/documentos de F3–F7 que ya la respetaban (OC/notas por F4). **Cascada:** un hijo cuyo padre quedó fuera se excluye también (orden de pedido excluido, comentarios de orden excluida, renglones) — cada bucket se **cuenta** en el resumen/reporte del ETL (nada se descarta en silencio).

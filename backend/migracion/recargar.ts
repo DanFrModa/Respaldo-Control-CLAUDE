@@ -49,6 +49,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { crearClientePrisma } from '../src/datos/index.js';
 
+import { describirAjusteEtl } from './comun/cliente-etl.js';
 import { ejecutarLimpieza, hayDatosMigrados } from './limpiar-datos.js';
 import {
   describirVentana,
@@ -330,6 +331,8 @@ async function main(): Promise<void> {
       ? ' Recarga COMPLETA: sin --desde → SIN ventana temporal (migra todo el histórico).'
       : ` ${describirVentana(ventana)}`,
   );
+  // Qué ajuste de rendimiento quedó activo (visible para poder subirlo/bajarlo sin recompilar).
+  console.log(` ${describirAjusteEtl()}`);
 
   // Plan de pasos (la limpieza va aparte: no es subproceso, corre en este mismo proceso).
   // Orden: seed → ETL → F9 opcional → REALINEADO (obligatorio, cierra la carga) → cuadres

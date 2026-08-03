@@ -21,6 +21,8 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, Prisma, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { saldosDeTodosMaquileros } from '../src/dominio/esma/saldos-todos.js';
 import { conciliarEsMa } from '../src/dominio/esma/conciliacion.js';
 
@@ -566,7 +568,7 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url);
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const cuadre = await calcularCuadreF6(cliente);
     console.log(formatearCuadreF6(cuadre));

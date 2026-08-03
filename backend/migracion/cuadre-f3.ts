@@ -24,6 +24,8 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, DireccionMovimiento, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { ORIGEN } from '../src/comun/origenes.js';
 
 import { contarFilasCsv, leerCsv } from './comun/csv.js';
@@ -391,7 +393,7 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url);
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const cuadre = await calcularCuadreF3(cliente);
     console.log(formatearCuadreF3(cuadre));
