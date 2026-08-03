@@ -49,7 +49,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { crearClientePrisma } from '../src/datos/index.js';
 
-import { ejecutarLimpieza } from './limpiar-datos.js';
+import { ejecutarLimpieza, hayDatosMigrados } from './limpiar-datos.js';
 import {
   describirVentana,
   ErrorEtlDesdeInvalida,
@@ -207,12 +207,14 @@ interface Argumentos {
   saldosTerceros: string | null;
   /** F9 opcional: carpeta con los XML de CFDI históricos. */
   cfdi: string | null;
+  /** Autoriza truncar una BD que YA tiene datos migrados (anti-footgun de `--limpiar`). */
+  forzarLimpieza: boolean;
 }
 
 /** Uso del comando (se imprime ante una bandera desconocida). */
 const USO =
   '  npx tsx --env-file=.env migracion/recargar.ts [--desde=YYYY-MM-DD] [--limpiar] [--confirmar]\n' +
-  '      [--sin-cuadres] [--saldos-terceros=<ruta.csv>] [--cfdi=<carpeta>]';
+  '      [--sin-cuadres] [--saldos-terceros=<ruta.csv>] [--cfdi=<carpeta>] [--forzar-limpieza]';
 
 /** Parsea los argumentos; bandera desconocida → aborta (mejor que ignorarla en silencio). */
 function parsearArgumentos(argv: string[]): Argumentos {
@@ -223,6 +225,7 @@ function parsearArgumentos(argv: string[]): Argumentos {
     sinCuadres: false,
     saldosTerceros: null,
     cfdi: null,
+    forzarLimpieza: false,
   };
   for (const crudo of argv) {
     if (crudo.startsWith('--desde=')) args.desde = crudo.slice('--desde='.length);
@@ -232,6 +235,7 @@ function parsearArgumentos(argv: string[]): Argumentos {
     else if (crudo === '--limpiar') args.limpiar = true;
     else if (crudo === '--confirmar') args.confirmar = true;
     else if (crudo === '--sin-cuadres') args.sinCuadres = true;
+    else if (crudo === '--forzar-limpieza') args.forzarLimpieza = true;
     else {
       console.error(`Bandera desconocida: "${crudo}". Uso:\n${USO}`);
       process.exit(1);
@@ -347,6 +351,14 @@ async function main(): Promise<void> {
       const cliente = crearClientePrisma(url);
       try {
         await ejecutarLimpieza(cliente, { confirmar: false });
+        const { hay, detalle } = await hayDatosMigrados(cliente);
+        if (hay) {
+          console.warn(
+            `\n⚠️ OJO: la BD ya tiene datos migrados (${detalle.join(' ')}). Con --confirmar, ` +
+              '--limpiar ABORTARÁ (parece una reanudación): para reanudar corre SIN --limpiar; ' +
+              'para borrar de verdad agrega --forzar-limpieza.',
+          );
+        }
       } catch (error) {
         console.error(
           `(No se pudo conectar a la BD para contar filas: ${error instanceof Error ? error.message : String(error)})`,
@@ -367,6 +379,26 @@ async function main(): Promise<void> {
   if (args.limpiar) {
     const cliente = crearClientePrisma(url);
     try {
+      // ⛔ ANTI-FOOTGUN (incidente 31-jul-2026): tras un fallo lo natural es repetir el MISMO
+      // comando (flecha-arriba) — y con `--limpiar` eso volvía a truncar, tirando una hora de
+      // carga. Si la BD ya trae datos migrados esto parece una REANUDACIÓN: se aborta y se
+      // ofrecen las dos salidas. Solo `--forzar-limpieza` autoriza el borrado explícitamente.
+      const { hay, detalle } = await hayDatosMigrados(cliente);
+      if (hay && !args.forzarLimpieza) {
+        console.error(
+          '\n⛔ ABORTADO: pediste --limpiar pero la BD YA TIENE DATOS MIGRADOS ' +
+            `(${detalle.join(' ')}).\n` +
+            'Esto parece una REANUDACIÓN tras un fallo, y truncar tiraría todo lo ya cargado.\n' +
+            '\nQué hacer:\n' +
+            ' (a) REANUDAR (lo normal): re-corre SIN --limpiar; los ETL son idempotentes y\n' +
+            '     retoman donde quedaron:\n' +
+            comandoRecargar(args, { conLimpiar: false }) +
+            '\n (b) EMPEZAR DE CERO a propósito (borra TODO lo cargado, irreversible):\n' +
+            comandoRecargar(args, { conLimpiar: true }) +
+            ' --forzar-limpieza',
+        );
+        process.exit(1);
+      }
       banner(
         0,
         pasos.length,

@@ -20,6 +20,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import {
@@ -121,11 +123,7 @@ async function main(): Promise<void> {
   const encoding = flag('encoding') ?? undefined;
   const empresaRef = flag('empresa');
 
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: { keepAlive: true, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 30_000 },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   // Con `exactOptionalPropertyTypes`, las props opcionales solo se incluyen si vinieron.
   const opciones: OpcionesParseo & { encoding?: string; empresaRef?: string | null } = {
     empresaRef,

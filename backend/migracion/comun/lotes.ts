@@ -15,6 +15,8 @@
  * compartido orden-dependiente (p. ej. la fusión de terceros de proveedores: queda secuencial).
  */
 
+import { concurrenciaEtl } from './cliente-etl.js';
+
 /** Resultado por item: éxito con su valor, o fallo con el error capturado. */
 export type ResultadoItem<T> = { ok: true; valor: T } | { ok: false; error: unknown };
 
@@ -66,5 +68,14 @@ export async function enLotes<T, R>(
   return resultados;
 }
 
-/** Concurrencia por defecto del ETL contra BD remota (configurable por loader). */
-export const CONCURRENCIA_ETL = 8;
+/**
+ * Concurrencia por defecto del ETL contra BD remota. Se resuelve del ENTORNO
+ * (`ETL_CONCURRENCIA`, default 24) porque la carga es **latency-bound**, no CPU-bound: la
+ * corrida real del 31-jul-2026 midió ~0.43 s de round-trip por renglón contra Railway, así que
+ * lo que baja el tiempo es tener más tareas EN VUELO (ver `comun/cliente-etl.ts`). Se lee UNA
+ * vez al importar el módulo para que todos los loaders de una corrida usen el mismo valor.
+ *
+ * ⚠️ Solo aplica a filas INDEPENDIENTES (es el contrato de `enLotes`): no altera la atomicidad
+ * por unidad (A2) ni el orden de dependencias entre loaders.
+ */
+export const CONCURRENCIA_ETL = concurrenciaEtl();

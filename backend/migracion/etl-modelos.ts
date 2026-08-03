@@ -36,6 +36,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { calcularCuadreFase, formatearCuadreFase } from './cuadre-fase.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { prescanUso } from './comun/prescan-uso.js';
@@ -123,10 +125,7 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtlModelos(cliente);
 
@@ -155,10 +154,7 @@ async function mainFotosModelos(): Promise<void> {
     console.error('Falta DATABASE_URL');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 8,
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const sesion = sesionEtl();
     const reporte = new Reporte();
@@ -177,10 +173,7 @@ async function mainFotosBordados(): Promise<void> {
     console.error('Falta DATABASE_URL');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 8,
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const sesion = sesionEtl();
     const reporte = new Reporte();

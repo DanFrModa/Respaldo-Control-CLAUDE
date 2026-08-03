@@ -82,7 +82,9 @@ export async function cargarOrdenesEstadoRc(
   const resultados = await enLotes(
     candidatas,
     (f): Promise<Desenlace> =>
-      conReintentoTransitorio(() => procesarFila(sesion, bd, reporte, mapaOrden, ordenesNoMigradas, f)),
+      conReintentoTransitorio(() =>
+        procesarFila(sesion, bd, reporte, mapaOrden, ordenesNoMigradas, f),
+      ),
     CONCURRENCIA_ETL,
   );
 

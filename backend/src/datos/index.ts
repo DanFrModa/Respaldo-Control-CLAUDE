@@ -46,11 +46,17 @@ export interface OpcionesClientePrisma {
    *  • `keepAlive`: activa TCP keep-alive (evita que el proxy mate sockets ociosos).
    *  • `idleTimeoutMillis`: cuánto vive una conexión ociosa en el pool antes de cerrarse.
    *  • `connectionTimeoutMillis`: cuánto esperar a ABRIR una conexión nueva antes de fallar.
+   *  • `statementTimeoutMillis`: tope del lado del SERVIDOR (`statement_timeout`): corta la
+   *    sentencia colgada en vez de dejar que el proxy mate el socket.
+   *  • `queryTimeoutMillis`: tope del lado del CLIENTE (`query_timeout` de `pg`): es el que
+   *    evita el `SocketTimeout` seco del adaptador en una corrida larga contra Railway.
    */
   pool?: {
     keepAlive?: boolean;
     idleTimeoutMillis?: number;
     connectionTimeoutMillis?: number;
+    statementTimeoutMillis?: number;
+    queryTimeoutMillis?: number;
   };
 }
 
@@ -77,6 +83,12 @@ export function crearClientePrisma(
     ...(opciones?.pool?.connectionTimeoutMillis === undefined
       ? {}
       : { connectionTimeoutMillis: opciones.pool.connectionTimeoutMillis }),
+    ...(opciones?.pool?.statementTimeoutMillis === undefined
+      ? {}
+      : { statement_timeout: opciones.pool.statementTimeoutMillis }),
+    ...(opciones?.pool?.queryTimeoutMillis === undefined
+      ? {}
+      : { query_timeout: opciones.pool.queryTimeoutMillis }),
   });
   return new PrismaClient({
     adapter,

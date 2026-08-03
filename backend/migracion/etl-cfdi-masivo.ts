@@ -25,6 +25,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { servicioArchivos, type ServicioArchivos } from '../src/comun/archivos.js';
 import { ErrorConflicto, ErrorDominio } from '../src/comun/errores.js';
 import { importarCfdi } from '../src/dominio/terceros/cfdi/cfdi-proveedor.js';
@@ -252,11 +254,7 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: { keepAlive: true, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 30_000 },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const { reporte } = await ejecutarEtlCfdiMasivo(cliente, dir);
     const texto = reporte.aTexto();

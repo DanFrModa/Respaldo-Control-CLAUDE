@@ -25,8 +25,10 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { LIMITES, truncarYReportar } from '../comun/saneo.js';
+import { resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Desenlace de procesar un color (para agregar conteos tras los lotes). */
@@ -65,9 +67,22 @@ export async function cargarColores(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
-  const textos = [...recolectarTextosColor()];
+  // Ventana ACTIVA → solo los colores que USAN las entidades que migran (grid/lotes/saldos de
+  // telas usadas + matriz de órdenes en ventana). Es el mayor ahorro de la recarga remota: sin
+  // esto son 5,664 textos ≈ 40 min a 0.43 s de round-trip (donde tronó la corrida real).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  const todos = [...recolectarTextosColor()];
+  const textos = pre === null ? todos : todos.filter((t) => pre.coloresTexto.has(t));
+  const fueraVentana = todos.length - textos.length;
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Colores fuera de ventana: ${String(fueraVentana)} textos de color NO migrados ` +
+        `(sin uso en telas/órdenes migradas); ${String(textos.length)} sí.`,
+    );
+  }
 
   // canónico (lowercase) → idColor: cache COMPARTIDA entre tareas concurrentes (evita crear
   // dos veces el mismo color). En single-thread JS las escrituras del Map son atómicas entre
@@ -199,5 +214,5 @@ export async function cargarColores(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }

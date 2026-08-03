@@ -26,6 +26,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { CLAVE_SECUENCIA_PEDIDO } from '../src/dominio/pedidos/pedidos.js';
 import { CLAVE_SECUENCIA_ORDEN } from '../src/dominio/produccion/ordenes.js';
 import { sembrarSecuencia } from '../src/comun/secuencias.js';
@@ -154,15 +156,7 @@ async function main(): Promise<void> {
   // defaults de Prisma dan `P2028`); la concurrencia (lotes.ts) exige `poolMax`; y el proxy
   // corta conexiones ociosas, así que `keepAlive` + timeouts mantienen el pool sano durante toda
   // la corrida. Solo el ETL: la app no pasa estas opciones.
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: {
-      keepAlive: true,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 30_000,
-    },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtlPedidosOrdenes(cliente);
 

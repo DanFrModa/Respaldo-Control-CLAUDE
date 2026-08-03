@@ -19,7 +19,9 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import type { ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
+import { resolverVentana } from '../comun/ventana.js';
 import { parsearTallasAnchoFijo } from '../comun/tallas.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -68,9 +70,21 @@ export async function cargarTallas(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoTallas> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
-  const filas = leerCsv('Ordenes.csv');
+  // Ventana ACTIVA → tallas/curvas SOLO de las cadenas `Tallas` de las órdenes EN VENTANA
+  // (orden del dueño: ningún catálogo completo). Cierre inverso: la matriz color×talla que se
+  // migra sale de esas mismas órdenes, así que ninguna celda queda sin su talla.
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  const todas = leerCsv('Ordenes.csv');
+  const filas = pre === null ? todas : todas.filter((f) => pre.cadenasTalla.has(f.Tallas ?? ''));
+  if (pre !== null && todas.length - filas.length > 0) {
+    reporte.nota(
+      `Tallas/curvas: ${String(todas.length - filas.length)} órdenes fuera de ventana NO aportan ` +
+        `cadenas de talla al catálogo (solo las ${String(pre.cadenasTalla.size)} cadenas en uso).`,
+    );
+  }
 
   const cacheTalla = new Map<string, number>();
   const contTallas = { creados: 0, existentes: 0 };

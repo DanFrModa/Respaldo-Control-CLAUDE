@@ -163,6 +163,30 @@ export const ADVERTENCIAS_POST_LIMPIEZA =
   ' anteponiendo ETL_DESDE=YYYY-MM-DD si quieres la recarga limitada por fecha\n' +
   ' — o todo de una vez con:  npx tsx --env-file=.env migracion/recargar.ts …';
 
+/**
+ * ¿La BD tiene DATOS MIGRADOS (no está "recién vaciada")? Sirve de guarda anti-footgun: si
+ * `recargar.ts --limpiar` se repite tras un fallo (flecha-arriba), volver a truncar tiraría
+ * horas de carga. Criterio barato y directo: hay mapeos de migración o alguna tabla de negocio
+ * grande con filas. NO cuenta lo que siembra el seed (permisos/roles/empresa), porque una BD
+ * recién sembrada SÍ es un punto de partida válido para cargar.
+ */
+export async function hayDatosMigrados(
+  cliente: PrismaClient,
+): Promise<{ hay: boolean; detalle: string[] }> {
+  const detalle: string[] = [];
+  const conteos: [string, number][] = [
+    ['mapeo_migracion', await cliente.mapeoMigracion.count()],
+    ['modelos', await cliente.modelo.count()],
+    ['ordenes', await cliente.orden.count()],
+    ['pedidos', await cliente.pedido.count()],
+    ['movimientos', await cliente.movimiento.count()],
+  ];
+  for (const [tabla, n] of conteos) {
+    if (n > 0) detalle.push(`${tabla}=${String(n)}`);
+  }
+  return { hay: detalle.length > 0, detalle };
+}
+
 /** Punto de entrada del script. */
 async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;

@@ -28,6 +28,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { calcularCuadreF4, formatearCuadreF4 } from './cuadre-f4.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
@@ -101,15 +103,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   // Mismos tiempos HOLGADOS que el ETL de F3 (BD remota de `prueba`, proxy público).
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: {
-      keepAlive: true,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 30_000,
-    },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtlTelas(cliente);
 

@@ -39,11 +39,20 @@
  *    de fecha ≥ corte**; estampadores de `EntregasEst`/`RecibosEst` de órdenes migradas (su
  *    columna se llama IdMaquileros pero es espacio Estampadores); cortadores de `Corte` de
  *    órdenes migradas. (RETIRADO el criterio grueso de "cualquiera con cuenta EsMa".)
- *  • COLORES: NO se filtran (quedan COMPLETOS, decisión declarada): son chicos y los referencian
- *    por texto libre múltiples fuentes (OrdenesDet, lotes de tela por color) — filtrarlos
- *    arriesga romper un saldo inicial de las entidades que SÍ migran.
- *  • SIEMPRE completos: empresas, almacenes, géneros, temporadas, etiquetas de marca,
- *    tela-categorías, tallas/curvas (chicos/estructurales).
+ *  • COLORES: se filtran POR USO (`coloresTexto`, espacio del texto CRUDO). Antes quedaban
+ *    completos "porque son chicos"; con 0.43 s de round-trip los 5,664 textos eran ~40 min y
+ *    el punto donde la corrida real tronó. Entran los de `TelasColores` de telas USADAS (grid
+ *    + lote legacy + saldos iniciales de tela) y los de `OrdenesDet` de órdenes EN VENTANA
+ *    (matriz color×talla). El kardex PT usa el color SENTINELA y `Alm_InvCic` no tiene color,
+ *    así que no aportan. Ante la duda se incluye de más (nunca dejar un lote/saldo sin color).
+ *  • CATÁLOGOS CHICOS: TAMBIÉN filtrados por uso (orden del DUEÑO — "nada completo porque sea
+ *    chico": el histórico del viejo trae basura que abruma la operación). Etiquetas de marca
+ *    (órdenes en ventana ∪ IPT_Modelos de modelos migrados), géneros (IPT_Modelos de modelos
+ *    migrados), temporadas (modelos migrados), tela-categorías (telas migradas) y tallas/curvas
+ *    (cadenas `Ordenes.Tallas` de las órdenes en ventana).
+ *  • ÚNICAS EXCEPCIONES (estructurales): **empresas** y **almacenes** — son el continente de
+ *    los movimientos (empresa+almacén de cada asiento de kardex); quitar uno rompería un
+ *    kardex de algo que sí migra, y son ~8 y ~7 filas.
  *
  * RED DE SEGURIDAD: si este prescan dejara fuera algo que un ETL posterior sí necesita, ese
  * ETL ya REPORTA el mapeo faltante (nunca silencioso) — y con la ventana activa esos descartes
@@ -100,6 +109,23 @@ export interface PrescanUso {
   /** Nombres normalizados (`normalizarParaDedup`) del proveedor TEXTO de telas/avíos usados. */
   provNombres: Set<string>;
   /**
+   * Textos CRUDOS de color (tal como los indexa el mapeo `Color`: `fila.Color` con `trim`) que
+   * necesitan las entidades que SÍ migran: grid/lotes/saldos de las telas usadas y la matriz
+   * color×talla de las órdenes en ventana. Filtrarlos es el mayor ahorro de la recarga remota
+   * (5,664 textos ≈ 40 min a 0.43 s/renglón). Ante la duda se INCLUYE de más.
+   */
+  coloresTexto: Set<string>;
+  /** `IdEtiquetasM` usadas (órdenes en ventana ∪ IPT_Modelos de modelos migrados). */
+  etiquetasId: Set<string>;
+  /** `IdIPT_Generos` usados (IPT_Modelos de modelos migrados). */
+  generosId: Set<string>;
+  /** `IdTemporadas` usadas (modelos migrados; el viejo trae 0 en todos → normalmente vacío). */
+  temporadasId: Set<string>;
+  /** `IdTelasCategorias` usadas (categoría de las telas migradas). */
+  telaCategoriasId: Set<string>;
+  /** Cadenas CRUDAS de `Ordenes.Tallas` de las órdenes en ventana (fuente de tallas y curvas). */
+  cadenasTalla: Set<string>;
+  /**
    * Existencia PT estimada por código de modelo (neto pre-corte CALCULADO; si el código solo
    * apareció en el snapshot `IPT_Mod_Alm`, la suma del snapshot). Solo para la CONSTANCIA de
    * lo excluido — NO participa en el criterio de USADO.
@@ -114,6 +140,7 @@ export interface FuentesPrescanUso {
   pedidos: FilaCsv[];
   pedidosDet: FilaCsv[];
   ordenes: FilaCsv[];
+  ordenesDet: FilaCsv[];
   modelos: FilaCsv[];
   iptModelos: FilaCsv[];
   iptModAlm: FilaCsv[];
@@ -129,6 +156,7 @@ export interface FuentesPrescanUso {
   salidasDet: FilaCsv[];
   telasColAlm: FilaCsv[];
   telasColores: FilaCsv[];
+  telas: FilaCsv[];
   telasDis: FilaCsv[];
   habilitacion: FilaCsv[];
   ordCompra: FilaCsv[];
@@ -453,6 +481,71 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     if (norm !== '') provNombres.add(norm);
   }
 
+  // ── 9) COLORES por USO (cierre inverso: todo lo que migra debe tener su color) ────────────
+  // El color es TEXTO LIBRE y el mapeo se indexa por el texto CRUDO (`fila.Color` con trim),
+  // así que el set va en ese mismo espacio. Fuentes que exigen color en v2:
+  //  • `TelasColores` de una tela USADA → grid `TelaColor` + LOTE legacy por IdTelasColores +
+  //    los SALDOS INICIALES de tela (que cuelgan de ese lote). Se toman TODOS los renglones de
+  //    la tela usada (no solo los que tienen existencia): el lote nace de cualquiera de ellos.
+  //  • `OrdenesDet` de una orden DENTRO de la ventana → matriz color×talla (`OrdenLinea`).
+  // NO aportan color: el kardex PT (usa el color SENTINELA, no uno real) ni `Alm_InvCic` (su
+  // CSV no tiene columna de color). Si un color no se pudiera resolver, se prefiere incluirlo.
+  const coloresTexto = new Set<string>();
+  for (const f of fuentes.telasColores) {
+    const idTelas = limpio(f.IdTelas);
+    if (!telasIdTelas.has(idTelas)) continue;
+    const color = (f.Color ?? '').trim();
+    if (color !== '') coloresTexto.add(color);
+  }
+  for (const f of fuentes.ordenesDet) {
+    if (f2.ordenesFuera.has(limpio(f.IdOrdenes))) continue;
+    const color = (f.Color ?? '').trim();
+    if (color !== '') coloresTexto.add(color);
+  }
+
+  // ── 10) CATÁLOGOS CHICOS por USO (orden del dueño: NADA se migra completo "porque es chico";
+  // el histórico del viejo trae basura que abruma la operación). Cierre inverso: cada set sale
+  // de lo que las entidades YA migradas referencian, así ningún registro migrado queda huérfano.
+  // ÚNICAS excepciones (estructurales, en `etl-catalogos.ts`): EMPRESAS y ALMACENES — son el
+  // continente de los movimientos; quitar uno rompería un kardex.
+  const etiquetasId = new Set<string>();
+  const generosId = new Set<string>();
+  const temporadasId = new Set<string>();
+  const telaCategoriasId = new Set<string>();
+  const cadenasTalla = new Set<string>();
+
+  // Etiquetas de marca: por las órdenes EN VENTANA (`Ordenes.IdEtiquetasM`) y por la ficha de
+  // inventario de los modelos migrados (`IPT_Modelos.IdEtiquetasM`).
+  for (const f of fuentes.ordenes) {
+    if (f2.ordenesFuera.has(limpio(f.IdOrdenes))) continue;
+    const idEtiqueta = limpio(f.IdEtiquetasM);
+    if (esClave(idEtiqueta)) etiquetasId.add(idEtiqueta);
+    // Tallas: la cadena CRUDA de la orden es la fuente del catálogo de tallas y curvas.
+    const tallas = f.Tallas ?? '';
+    if (tallas.trim() !== '') cadenasTalla.add(tallas);
+  }
+  // `IPT_Modelos` aporta etiqueta y GÉNERO, pero solo de los modelos que migran (por código).
+  for (const f of fuentes.iptModelos) {
+    if (!modelosCodigo.has(limpio(f.NumMod).toUpperCase())) continue;
+    const idEtiqueta = limpio(f.IdEtiquetasM);
+    if (esClave(idEtiqueta)) etiquetasId.add(idEtiqueta);
+    const idGenero = limpio(f.IdIPT_Generos);
+    if (esClave(idGenero)) generosId.add(idGenero);
+  }
+  // Temporada del modelo migrado (en los datos reales `IdTemporadas` es 0 en TODAS las filas y
+  // `Temporadas.csv` está vacío → el set queda vacío; se calcula igual por corrección).
+  for (const f of fuentes.modelos) {
+    if (!modelosId.has(limpio(f.IdModelos))) continue;
+    const idTemporada = limpio(f.IdTemporadas);
+    if (esClave(idTemporada)) temporadasId.add(idTemporada);
+  }
+  // Categoría de las telas migradas (espacio `IdTelas`, que es el de `Telas.csv`).
+  for (const f of fuentes.telas) {
+    if (!telasIdTelas.has(limpio(f.IdTelas))) continue;
+    const idCategoria = limpio(f.IdTelasCategorias);
+    if (esClave(idCategoria)) telaCategoriasId.add(idCategoria);
+  }
+
   // CONSTANCIA final: telas excluidas que SÍ traían existencia pre-corte (inventario de tela
   // que se deja de migrar). Se calcula con el set ya cerrado.
   const telasExcluidasConExistencia = new Set<string>();
@@ -477,6 +570,12 @@ export function calcularPrescanUso(ventana: ConfigVentana, fuentes: FuentesPresc
     provIdEstampadores,
     provIdCortadores,
     provNombres,
+    coloresTexto,
+    etiquetasId,
+    generosId,
+    temporadasId,
+    telaCategoriasId,
+    cadenasTalla,
     existenciaPtEstimadaPorCodigo,
     existenciaTelaEstimadaPorId,
   };
@@ -493,6 +592,7 @@ export function prescanUso(ventana: ConfigVentana): PrescanUso | null {
     pedidos: leerCsv('Pedidos.csv'),
     pedidosDet: leerCsv('PedidosDet.csv'),
     ordenes: leerCsv('Ordenes.csv'),
+    ordenesDet: leerCsv('OrdenesDet.csv'),
     modelos: leerCsv('Modelos.csv'),
     iptModelos: leerCsv('IPT_Modelos.csv'),
     iptModAlm: leerCsv('IPT_Mod_Alm.csv'),
@@ -508,6 +608,7 @@ export function prescanUso(ventana: ConfigVentana): PrescanUso | null {
     salidasDet: leerCsv('SalidasDet.csv'),
     telasColAlm: leerCsv('TelasColAlm.csv'),
     telasColores: leerCsv('TelasColores.csv'),
+    telas: leerCsv('Telas.csv'),
     telasDis: leerCsv('TelasDis.csv'),
     habilitacion: leerCsv('Habilitacion.csv'),
     ordCompra: leerCsv('OrdCompra.csv'),

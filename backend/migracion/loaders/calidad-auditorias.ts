@@ -239,7 +239,11 @@ async function procesarAuditoria(
 ): Promise<ContribAud> {
   const idViejo = (f.IdCC_Auditorias ?? '').trim();
   const dets = ctx.detPorAud.get(idViejo) ?? [];
-  const base = (estado: ContribAud['estado'], detOmitidos = 0, detFueraVentana = 0): ContribAud => ({
+  const base = (
+    estado: ContribAud['estado'],
+    detOmitidos = 0,
+    detFueraVentana = 0,
+  ): ContribAud => ({
     estado,
     detCreados: 0,
     detMapeados: 0,

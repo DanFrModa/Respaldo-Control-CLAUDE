@@ -26,6 +26,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { calcularCuadreF3, formatearCuadreF3 } from './cuadre-f3.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
@@ -73,15 +75,7 @@ async function main(): Promise<void> {
   }
   // Mismos tiempos HOLGADOS que el ETL de F2 (BD remota de `prueba`, proxy público): subir
   // maxWait/timeout (defaults dan P2028), pool grande y keepAlive para no perder conexiones ociosas.
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: {
-      keepAlive: true,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 30_000,
-    },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtlIpt(cliente);
 

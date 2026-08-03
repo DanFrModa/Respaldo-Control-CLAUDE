@@ -14,7 +14,9 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
+import { resolverVentana } from '../comun/ventana.js';
 import { parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -22,6 +24,7 @@ export async function cargarTemporadas(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   let filas: Record<string, string>[];
@@ -29,6 +32,19 @@ export async function cargarTemporadas(
     filas = leerCsv('Temporadas.csv');
   } catch {
     filas = [];
+  }
+  // Ventana ACTIVA → solo las temporadas de los modelos migrados (orden del dueño). En los
+  // datos reales `Modelos.IdTemporadas` es 0 en TODAS las filas y este CSV viene vacío, así
+  // que en la práctica no cambia nada; se aplica por corrección del criterio.
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  if (pre !== null) {
+    const antes = filas.length;
+    filas = filas.filter((f) => pre.temporadasId.has((f.IdTemporadas ?? '').trim()));
+    if (antes - filas.length > 0) {
+      reporte.nota(
+        `Temporadas fuera de ventana (sin uso en los modelos migrados): ${String(antes - filas.length)} NO migradas.`,
+      );
+    }
   }
 
   if (filas.length === 0) {

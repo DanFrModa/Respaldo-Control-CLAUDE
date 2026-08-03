@@ -43,6 +43,11 @@ function fuentes(): FuentesPrescanUso {
       { IdPedidosDet: '100', IdPedidos: '10', IdModelos: '1' }, // modelo 1 usado por docs
       { IdPedidosDet: '110', IdPedidos: '11', IdModelos: '3' }, // pedido fuera → no aporta
     ],
+    ordenesDet: [
+      // Matriz de la orden 500 (DENTRO) → su color entra; la de 501 (fuera) no.
+      { IdOrdenesDet: 'od1', IdOrdenes: '500', Color: 'ROJO' },
+      { IdOrdenesDet: 'od2', IdOrdenes: '501', Color: 'MORADO VIEJO' },
+    ],
     ordenes: [
       // Orden dentro, huérfana: usa modelo 1, tela dis 72, maquilero 21.
       {
@@ -52,6 +57,8 @@ function fuentes(): FuentesPrescanUso {
         IdTelasDis: '72',
         IdMaquileros: '21',
         IdClientes: '1',
+        IdEtiquetasM: '700',
+        Tallas: 'CH  M   G',
         Fecha: '10/02/2025 00:00:00',
       },
       // Orden fuera (fecha vieja).
@@ -62,6 +69,8 @@ function fuentes(): FuentesPrescanUso {
         IdTelasDis: '73',
         IdMaquileros: '23',
         IdClientes: '1',
+        IdEtiquetasM: '701',
+        Tallas: 'XCH XG',
         Fecha: '01/01/2018 00:00:00',
       },
     ],
@@ -74,8 +83,8 @@ function fuentes(): FuentesPrescanUso {
     ],
     iptModelos: [
       { IdIPT_Modelos: '900', NumMod: 'M-B' },
-      { IdIPT_Modelos: '901', NumMod: 'M-C' },
-      { IdIPT_Modelos: '902', NumMod: 'M-D' },
+      { IdIPT_Modelos: '901', NumMod: 'M-C', IdEtiquetasM: '703', IdIPT_Generos: '801' },
+      { IdIPT_Modelos: '902', NumMod: 'M-D', IdEtiquetasM: '702', IdIPT_Generos: '800' },
       { IdIPT_Modelos: '903', NumMod: 'M-E' },
     ],
     iptModAlm: [
@@ -137,6 +146,10 @@ function fuentes(): FuentesPrescanUso {
       { IdTelasColores: 'tc1', IdTelas: '82', Color: 'ROJO' },
       { IdTelasColores: 'tc2', IdTelas: '83', Color: 'AZUL' },
       { IdTelasColores: 'tc3', IdTelas: '84', Color: 'VERDE' },
+    ],
+    telas: [
+      { IdTelas: '81', Nombre: 'FELPA USADA', IdTelasCategorias: '900' },
+      { IdTelas: '83', Nombre: 'VIEJA', IdTelasCategorias: '901' },
     ],
     telasDis: [
       { IdTelasDis: '71', TelaDis: 'FELPA X', Proveedor: 'Prov Tela SA' },
@@ -215,6 +228,44 @@ describe('calcularPrescanUso — cascada BOM y telas', () => {
     expect(p.telasExcluidasConExistencia).toEqual(new Set(['82', '84']));
     expect(p.existenciaTelaEstimadaPorId.get('84')).toBe(7); // neto calculado
     expect(p.telasExcluidasConExistencia.has('83')).toBe(false); // neto 0
+  });
+});
+
+describe('calcularPrescanUso — colores por uso', () => {
+  it('entran los de TelasColores de telas USADAS y los de OrdenesDet en ventana', () => {
+    const p = calcularPrescanUso(resolverVentana(), fuentes());
+    // 'ROJO' por la matriz de la orden 500 (en ventana). Las telas usadas (81) no tienen
+    // renglón en TelasColores en la fixture, y los colores de telas EXCLUIDAS no entran.
+    expect(p.coloresTexto.has('ROJO')).toBe(true);
+    expect(p.coloresTexto.has('MORADO VIEJO')).toBe(false); // orden fuera de ventana
+    expect(p.coloresTexto.has('AZUL')).toBe(false); // tela 83 excluida
+    expect(p.coloresTexto.has('VERDE')).toBe(false); // tela 84 excluida
+  });
+
+  it('cierre inverso: el color de una tela USADA sí entra (lote/saldo no queda sin color)', () => {
+    const base = fuentes();
+    const p = calcularPrescanUso(resolverVentana(), {
+      ...base,
+      // La tela 81 (usada por movimiento ≥ corte) ahora sí tiene su renglón de color.
+      telasColores: [
+        ...base.telasColores,
+        { IdTelasColores: 'tc4', IdTelas: '81', Color: 'BLANCO' },
+      ],
+    });
+    expect(p.coloresTexto.has('BLANCO')).toBe(true);
+  });
+});
+
+describe('calcularPrescanUso — catálogos chicos por uso', () => {
+  it('etiquetas/géneros/tela-categorías/tallas salen SOLO de lo que sí migra', () => {
+    const p = calcularPrescanUso(resolverVentana(), fuentes());
+    // 700: orden 500 (en ventana). 702: IPT_Modelos de M-D (modelo migrado).
+    // 701 (orden fuera) y 703 (M-C, no migrado) NO entran.
+    expect(p.etiquetasId).toEqual(new Set(['700', '702']));
+    expect(p.generosId).toEqual(new Set(['800'])); // 801 es de M-C (excluido)
+    expect(p.telaCategoriasId).toEqual(new Set(['900'])); // 901 es de la tela 83 (excluida)
+    expect(p.cadenasTalla).toEqual(new Set(['CH  M   G'])); // la de la orden fuera no
+    expect(p.temporadasId.size).toBe(0); // los modelos de la fixture no traen temporada
   });
 });
 

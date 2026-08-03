@@ -10,7 +10,9 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
+import { resolverVentana } from '../comun/ventana.js';
 import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
@@ -27,9 +29,22 @@ export async function cargarTelaCategorias(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
+  prescan?: PrescanUso | null,
 ): Promise<ResultadoLoader> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
-  const filas = leerCsv('TelasCategorias.csv');
+  const todas = leerCsv('TelasCategorias.csv');
+  // Ventana ACTIVA → solo lo USADO (orden del dueño: ningún catálogo completo).
+  const pre = prescan === undefined ? prescanUso(resolverVentana()) : prescan;
+  const filas =
+    pre === null
+      ? todas
+      : todas.filter((f) => pre.telaCategoriasId.has((f.IdTelasCategorias ?? '').trim()));
+  const fueraVentana = todas.length - filas.length;
+  if (fueraVentana > 0) {
+    reporte.nota(
+      `Tela-categorías fuera de ventana (sin uso en las telas migradas): ${String(fueraVentana)} NO migradas.`,
+    );
+  }
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
@@ -77,5 +92,5 @@ export async function cargarTelaCategorias(
     }
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }

@@ -33,6 +33,8 @@ import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
+
 import { calcularCuadre, formatearCuadre } from './cuadre.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { prescanUso } from './comun/prescan-uso.js';
@@ -79,9 +81,10 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   const prescan = prescanUso(ventana);
   if (prescan !== null) {
     const nota =
-      `${describirVentana(ventana)} Catálogos GRANDES filtrados por USO (proveedores/` +
-      `bordados/avíos/telas; clientes por su propio prescan). Colores y catálogos chicos ` +
-      `(empresas/almacenes/géneros/temporadas/etiquetas/tela-categorías/tallas) migran COMPLETOS.`;
+      `${describirVentana(ventana)} Catálogos GRANDES filtrados por USO (proveedores/bordados/` +
+      `avíos/telas/COLORES; clientes por su propio prescan) y TAMBIÉN los chicos (etiquetas/` +
+      `géneros/temporadas/tela-categorías/tallas+curvas). ÚNICAS excepciones estructurales: ` +
+      `EMPRESAS y ALMACENES (continente de los movimientos; quitar uno rompería un kardex).`;
     console.log(`  ${nota}`);
     reporte.nota(nota);
   }
@@ -91,10 +94,10 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   const idEmpresa = empresas.idFrModa ?? 1;
 
   log('Clientes', await cargarClientes(sesion, cliente, reporte));
-  log('Etiquetas de marca', await cargarEtiquetasMarca(sesion, cliente, reporte));
-  log('Géneros', await cargarGeneros(sesion, cliente, reporte));
-  log('Temporadas', await cargarTemporadas(sesion, cliente, reporte));
-  log('Tela-categorías', await cargarTelaCategorias(sesion, cliente, reporte));
+  log('Etiquetas de marca', await cargarEtiquetasMarca(sesion, cliente, reporte, prescan));
+  log('Géneros', await cargarGeneros(sesion, cliente, reporte, prescan));
+  log('Temporadas', await cargarTemporadas(sesion, cliente, reporte, prescan));
+  log('Tela-categorías', await cargarTelaCategorias(sesion, cliente, reporte, prescan));
 
   const prov = await cargarProveedores(sesion, cliente, reporte, prescan);
   log('Proveedores', prov);
@@ -103,11 +106,11 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   log('Almacenes', await cargarAlmacenes(sesion, cliente, reporte, idEmpresa));
   log('Bordados', await cargarBordados(sesion, cliente, reporte, prescan));
   log('Avíos', await cargarAvios(sesion, cliente, reporte, prescan));
-  log('Colores', await cargarColores(sesion, cliente, reporte));
+  log('Colores', await cargarColores(sesion, cliente, reporte, prescan));
   log('Telas', await cargarTelas(sesion, cliente, reporte, prescan));
   log('Telas-colores', await cargarTelasColores(sesion, cliente, reporte, prescan));
 
-  const tallas = await cargarTallas(sesion, cliente, reporte);
+  const tallas = await cargarTallas(sesion, cliente, reporte, prescan);
   log('Tallas', tallas.tallas);
   log('Curvas', tallas.curvas);
   console.log(`    (cadenas de talla raras reportadas: ${String(tallas.cadenasRaras)})`);
@@ -127,10 +130,7 @@ async function main(): Promise<void> {
   // `prueba` (Railway, proxy público); la latencia hace que los defaults de Prisma
   // (maxWait 2s / timeout 5s) den `P2028`, y la carga concurrente (lotes.ts) necesita que el
   // pool de `pg` sostenga ~8 tareas en vuelo (default 10 → 12 con holgura). Solo el ETL.
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtl(cliente);
 

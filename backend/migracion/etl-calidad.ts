@@ -25,6 +25,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+
+import { opcionesClienteEtl } from './comun/cliente-etl.js';
 import { CLAVE_SECUENCIA_AUDITORIA } from '../src/dominio/calidad/auditorias.js';
 import { sembrarSecuencia } from '../src/comun/secuencias.js';
 
@@ -146,15 +148,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   // Mismos tiempos HOLGADOS y pool ESTABLE que los otros ETL (BD remota de prueba en Railway).
-  const cliente = crearClientePrisma(url, {
-    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
-    pool: {
-      keepAlive: true,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 30_000,
-    },
-  });
+  const cliente = crearClientePrisma(url, opcionesClienteEtl());
   try {
     const reporte = await ejecutarEtlCalidad(cliente);
 
