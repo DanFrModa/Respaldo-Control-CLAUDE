@@ -29,6 +29,7 @@ import { conciliarEsMa } from '../src/dominio/esma/conciliacion.js';
 import { contarFilasCsv, leerCsv } from './comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO } from './comun/mapeo.js';
 import { parsearBandera, parsearDinero } from './comun/valores.js';
+import { prescanVentanaF2 } from './comun/ventana-f2.js';
 import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import {
@@ -62,16 +63,29 @@ async function calcularConteos(cliente: PrismaClient): Promise<RenglonCuadreF6[]
   const v1Descuentos = contarFilasCsv('EsMa_Desc.csv');
   const v1Pagos = contarFilasCsv('EsMa_Pagos.csv');
 
-  const [v2Defectos, v2Auditorias, v2AuditoriasDet, v2Cargos, v2Abonos, v2Descuentos, v2Pagos] =
-    await Promise.all([
-      cliente.defectoCatalogo.count(),
-      cliente.auditoria.count(),
-      cliente.auditoriaDefecto.count(),
-      cliente.esMaCargo.count(),
-      cliente.abonoMaquilero.count(),
-      cliente.descuentoMaquilero.count(),
-      cliente.pagoMaquilero.count(),
-    ]);
+  const [
+    v2Defectos,
+    v2Auditorias,
+    v2AuditoriasDet,
+    v2Cargos,
+    v2Abonos,
+    v2Descuentos,
+    v2Pagos,
+    v2AbonosSaldoInicial,
+  ] = await Promise.all([
+    cliente.defectoCatalogo.count(),
+    cliente.auditoria.count(),
+    cliente.auditoriaDefecto.count(),
+    cliente.esMaCargo.count(),
+    cliente.abonoMaquilero.count(),
+    cliente.descuentoMaquilero.count(),
+    cliente.pagoMaquilero.count(),
+    // Asientos SINTÉTICOS de saldo inicial (no vienen de `EsMa_Abonos.csv`): se cuentan aparte para
+    // que el v1-vs-v2 de abonos sea legible (si no, v2 parecería tener "de más" sin explicación).
+    cliente.mapeoMigracion.count({
+      where: { entidad: ENTIDAD_MAPEO.abonoMaquilero, claveVieja: { startsWith: 'saldo-inicial:' } },
+    }),
+  ]);
 
   return [
     {
@@ -101,9 +115,27 @@ async function calcularConteos(cliente: PrismaClient): Promise<RenglonCuadreF6[]
     {
       entidad: 'Abonos (EsMa_Abonos)',
       v1: v1Abonos,
-      v2: v2Abonos,
-      nota: 'v2 ≤ v1 por abonos con maquilero sin mapeo (empresas viejas, F10). Montos negativos ("saldo anterior") preservados.',
+      v2: v2Abonos - v2AbonosSaldoInicial,
+      nota:
+        'v2 ≤ v1 por abonos con maquilero sin mapeo (empresas viejas, F10) o fuera de ventana. Montos ' +
+        'negativos ("saldo anterior") preservados.' +
+        (v2AbonosSaldoInicial > 0
+          ? ` v2 mostrado EXCLUYE ${String(v2AbonosSaldoInicial)} asientos sintéticos de saldo inicial ` +
+            `(total en la tabla: ${String(v2Abonos)}) — ver renglón siguiente.`
+          : ''),
     },
+    // Renglón informativo SOLO cuando hay asientos sintéticos (con ventana inactiva no existe y el
+    // cuadre queda idéntico al de siempre).
+    ...(v2AbonosSaldoInicial > 0
+      ? [
+          {
+            entidad: '  └ de esos: saldo inicial (sintéticos)',
+            v1: 0,
+            v2: v2AbonosSaldoInicial,
+            nota: 'AbonoMaquilero "Saldo inicial de migración" (1 por maquilero, fecha = corte). NO vienen del CSV: condensan el neto pre-corte (D3), por eso v1 = 0.',
+          },
+        ]
+      : []),
     {
       entidad: 'Descuentos (EsMa_Desc)',
       v1: v1Descuentos,
@@ -142,9 +174,21 @@ export interface SaldosF6 {
   totalV2: number;
   /** Detalle de los descuadres (acotado). */
   detalle: string[];
-  /** Cargos de órdenes NO migradas excluidos del v1 comparable (# y monto) — causa sistemática. */
+  /**
+   * Cargos de órdenes NO migradas que v2 NO representa de ninguna forma (# y monto) — FUGA REAL.
+   * Con ventana ACTIVA excluye a propósito los de `ordenesFuera` (esos SÍ los representa el asiento
+   * de saldo inicial y se cuentan aparte en `cargosEnSaldoInicial`): así una fuga nueva SALTA a la
+   * vista en vez de quedar camuflada entre miles de exclusiones esperadas.
+   */
   cargosOrdenNoMigrada: number;
   montoCargosOrdenNoMigrada: number;
+  /**
+   * Cargos VALIDADOS de órdenes fuera de VENTANA (# y monto): NO migran como cargo, pero v2 SÍ los
+   * representa dentro del `AbonoMaquilero` sintético "Saldo inicial de migración" → por eso SÍ entran
+   * al v1 comparable. Informativo (0 con la ventana inactiva).
+   */
+  cargosEnSaldoInicial: number;
+  montoCargosEnSaldoInicial: number;
   /** Cargos `propuesto` (RevisionPendiente=1) excluidos (v2 solo suma validados). */
   cargosPropuestoExcluidos: number;
   /** Total del tablero de dominio (`saldosDeTodosMaquileros`) — cruce independiente. */
@@ -198,9 +242,19 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
 
   const v1 = new Map<number, SaldoAcumulado>();
 
-  // Cargos: solo VALIDADOS (RevisionPendiente=0) de órdenes MIGRADAS (comparable a v2).
+  // Ventana ACTIVA → prescan F2 para saber qué órdenes quedaron fuera POR LA VENTANA (≠ origen
+  // inválido). Los cargos validados de ESAS órdenes NO migran como cargo, pero v2 SÍ los representa
+  // dentro del `AbonoMaquilero` sintético de saldo inicial → deben ENTRAR al v1 comparable, o el
+  // cuadre reportaría un descuadre que no existe. Con ventana inactiva `prescan` es null y todo se
+  // comporta EXACTAMENTE como antes.
+  const ventana = resolverVentana();
+  const prescan = prescanVentanaF2(ventana);
+
+  // Cargos: solo VALIDADOS (RevisionPendiente=0); de órdenes MIGRADAS o representadas por el asiento.
   let cargosOrdenNoMigrada = 0;
   let montoCargosOrdenNoMigrada = 0;
+  let cargosEnSaldoInicial = 0;
+  let montoCargosEnSaldoInicial = 0;
   let cargosPropuestoExcluidos = 0;
   for (const r of leerCsv('EsMa_Recibos.csv')) {
     const prov = resolverProv((r.IdEsMa ?? '').trim());
@@ -210,10 +264,19 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
       cargosPropuestoExcluidos += 1;
       continue; // v2 solo suma cargos validados
     }
-    if (!mapaOrden.has((r.IdOrdenes ?? '').trim())) {
+    const idOrdenViejo = (r.IdOrdenes ?? '').trim();
+    if (!mapaOrden.has(idOrdenViejo)) {
+      // Fuera POR LA VENTANA → representado en el asiento de saldo inicial: SÍ suma al comparable.
+      if (prescan !== null && prescan.ordenesFuera.has(idOrdenViejo)) {
+        cargosEnSaldoInicial += 1;
+        montoCargosEnSaldoInicial += importe;
+        acumular(v1, prov, 'cargos', importe);
+        continue;
+      }
+      // Orden no migrada por ORIGEN INVÁLIDO: v2 no lo representa de ninguna forma → FUGA REAL.
       cargosOrdenNoMigrada += 1;
       montoCargosOrdenNoMigrada += importe;
-      continue; // v2 omite el cargo si su orden no se migró
+      continue;
     }
     acumular(v1, prov, 'cargos', importe);
   }
@@ -315,6 +378,8 @@ async function calcularSaldos(cliente: PrismaClient): Promise<SaldosF6> {
     detalle,
     cargosOrdenNoMigrada,
     montoCargosOrdenNoMigrada: redondear2(montoCargosOrdenNoMigrada),
+    cargosEnSaldoInicial,
+    montoCargosEnSaldoInicial: redondear2(montoCargosEnSaldoInicial),
     cargosPropuestoExcluidos,
     totalTableroDominio,
     filasTableroDominio,
@@ -495,23 +560,33 @@ export function formatearCuadreF6(c: CuadreF6): string {
   p.push(`  Saldo total v1        : ${s.totalV1.toFixed(2)}`);
   p.push(`  Saldo total v2        : ${s.totalV2.toFixed(2)}`);
   p.push(`  Diferencia (v2 − v1)  : ${(s.totalV2 - s.totalV1).toFixed(2)}`);
+  if (s.cargosEnSaldoInicial > 0) {
+    p.push(
+      `  Cargos fuera de VENTANA representados por el asiento de saldo inicial: ${String(s.cargosEnSaldoInicial)} ` +
+        `(monto ${s.montoCargosEnSaldoInicial.toFixed(2)}) — SÍ cuentan en el v1 comparable (v2 los lleva en el AbonoMaquilero sintético).`,
+    );
+  }
   p.push(
-    `  Cargos excluidos por ORDEN NO MIGRADA (causa sistemática): ${String(s.cargosOrdenNoMigrada)} (monto ${s.montoCargosOrdenNoMigrada.toFixed(2)})`,
+    `  Cargos excluidos por ORDEN NO MIGRADA que v2 NO representa (FUGA REAL, debería ser 0): ` +
+      `${String(s.cargosOrdenNoMigrada)} (monto ${s.montoCargosOrdenNoMigrada.toFixed(2)})`,
   );
   p.push(
     `  Cargos 'propuesto' excluidos (v2 solo validados): ${String(s.cargosPropuestoExcluidos)}`,
   );
   if (ventana.corte !== null) {
     p.push(
-      '  Ventana ACTIVA: el saldo v1 comparable de arriba suma TODO el histórico de abonos/pagos/',
+      '  Ventana ACTIVA: el v1 comparable suma TODO el histórico de abonos/pagos/descuentos + los',
     );
     p.push(
-      '  descuentos, mientras v2 lleva lo dentro de ventana + el asiento de saldo inicial; el residuo',
+      '  cargos validados fuera de ventana; v2 lleva lo dentro de ventana + el asiento de saldo',
     );
     p.push(
-      '  esperado del descuadre ≈ cargos excluidos por ORDEN NO MIGRADA (renglón de arriba). NO se',
+      '  inicial que condensa justo ese neto → lo ESPERADO es que TODOS cuadren y la diferencia sea',
     );
-    p.push('  re-balancea (§7): el desglose por maquilero está en el reporte del ETL.');
+    p.push(
+      '  0.00. Si NO cuadra, el descuadre es REAL: revisar la FUGA del renglón de arriba (cargos que',
+    );
+    p.push('  v2 no representa) y el desglose por maquilero del reporte del ETL. NO se re-balancea (§7).');
   }
   if (s.totalTableroDominio !== null) {
     p.push(

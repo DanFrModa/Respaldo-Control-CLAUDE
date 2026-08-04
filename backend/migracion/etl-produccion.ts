@@ -39,6 +39,7 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { resolverVentana } from './comun/ventana.js';
 import { cargarCortes } from './loaders/produccion-corte.js';
 import { cargarEnviosCostura, cargarEnviosEstampado } from './loaders/produccion-envios.js';
 import { cargarRecibosCostura, cargarRecibosEstampado } from './loaders/produccion-recibos.js';
@@ -119,8 +120,27 @@ export async function ejecutarEtlProduccion(
     )})`,
   );
 
+  // ⚠️ DEPENDENCIA EXPLÍCITA (ventana temporal): este ETL carga los cargos SIN acumulador de saldo
+  // inicial, A PROPÓSITO. El asiento "Saldo inicial de migración" (D3) necesita el neto COMPLETO
+  // (cargos + abonos − pagos − descuentos) y aquí solo se ven los CARGOS: crear el asiento desde
+  // aquí lo dejaría PARCIAL y, peor, su `MapeoMigracion` (`saldo-inicial:<idMaquilero>`) haría que
+  // `etl-esma` lo diera por hecho y NO lo corrigiera (solo reportaría discrepancia). Por eso el
+  // asiento lo crea SIEMPRE `etl-esma`, que ve los cuatro conceptos.
+  //
+  // Es SEGURO en el runbook: los cargos de órdenes fuera de ventana quedan sin mapeo aquí (se
+  // omiten sin registrar `MapeoMigracion`), así que cuando corre `etl-esma` los reevalúa y SÍ los
+  // acumula. Pero si alguien corriera este ETL SIN `etl-esma`, no existiría ningún asiento y los
+  // saldos de maquilero quedarían incompletos → se avisa fuerte (consola + reporte).
   const cargos = await cargarCargosEsMa(sesion, cliente, reporte);
   log('Cargos EsMa', cargos);
+  if (resolverVentana().corte !== null) {
+    const aviso =
+      'EsMa (ventana activa): este ETL NO crea el asiento de "Saldo inicial de migración" — lo crea ' +
+      '`etl-esma` (necesita cargos + abonos + pagos + descuentos). OBLIGATORIO correr después: ' +
+      'npx tsx --env-file=.env migracion/etl-esma.ts — si no, los saldos de maquilero quedan incompletos.';
+    console.warn(`  ⚠️  ${aviso}`);
+    reporte.nota(aviso);
+  }
 
   console.log('ETL de producción F3-E6 — sembrando secuencias');
   await sembrarSecuenciasF3(cliente);
