@@ -202,6 +202,21 @@ Si la ventana (`--desde`) está activa y el corte de SINUBE trae terceros que el
 
 **Al terminar (recordatorios que el propio comando repite):** reinicia el backend en Railway (invalida sesiones viejas y deja drenarse los jobs `pgboss` encolados antes de la limpieza — ese esquema NO se trunca; los handlers son resilientes y los absorben); el `admin` quedó con el password del seed — **cámbialo**; las fotos previas en R2 quedaron huérfanas (limitación conocida — deuda aparcada en `HOJA-DE-RUTA.md` §4); y cada ETL dejó su `reporte-etl-*.txt` en `backend/` para revisar con Daniel.
 
+### Reparar una corrida con el kardex PT vacío (bug del 31-jul-2026)
+
+**Síntoma:** `etl-ipt` termina "OK" en segundos con **cero movimientos** y el inventario PT queda vacío. **Causa:** el seed siembra los 3 almacenes PT como GLOBALES y el loader los buscaba solo dentro de FR Moda → el dominio rechazaba crearlos por nombre duplicado, el error se tragaba como `omitidosValidacion` y **el mapeo `Almacen:IPT` nunca se guardaba**; sin él, `etl-ipt` descarta todos sus renglones. Ya está corregido (el loader usa la misma visibilidad que el dominio y compara sin acentos) y hay guardarraíles que **abortan** en vez de terminar en verde.
+
+**Reparación SIN truncar** (los dos ETL son idempotentes; no se pierde nada de lo ya cargado):
+
+```bash
+npx tsx --env-file=.env migracion/etl-catalogos.ts   # persiste los mapeos de almacén que faltaban
+npx tsx --env-file=.env migracion/etl-ipt.ts         # ahora sí carga el kardex (idempotente por origenId)
+```
+
+En PowerShell es idéntico (recuerda `$env:ETL_DESDE='2025-01-01'` si vas con ventana). **No** uses `recargar.ts --limpiar`: no hay bandera para correr solo esos dos pasos, y `--limpiar` sobre una BD con datos ya aborta a propósito.
+
+Si el bug dejó un almacén PT **duplicado** ("Transito" de FR Moda + el global "Tránsito"), el loader ya lo resuelve solo: mapea al **global** y reporta el sobrante para que lo borres a mano desde Administración (no lo borra el ETL: borrar un almacén es decisión de negocio).
+
 ### Rendimiento (BD remota: la carga es *latency-bound*)
 
 La corrida real del 31-jul-2026 (Mac → Railway por el proxy público) midió **~0.43 s por renglón**: el cuello es el **viaje redondo**, no el CPU. Todo el afinado es configurable por entorno — `recargar.ts` imprime en su banner cuál quedó activo:

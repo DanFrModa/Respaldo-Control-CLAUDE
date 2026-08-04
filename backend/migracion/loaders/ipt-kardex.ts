@@ -245,6 +245,25 @@ export async function cargarIptKardex(
   // Mapeos de fases previas.
   const mapaEmpresa = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.empresa);
   const mapaAlmacen = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.almacenIpt);
+
+  // ⛔ GUARDARRAÍL (bug del 31-jul-2026: kardex PT VACÍO en silencio). Sin el mapeo
+  // `Almacen:IPT` este ETL descarta TODOS los renglones por "almacén sin mapeo" y termina "OK"
+  // sin cargar nada. Antes de tocar una sola fila se verifica que TODOS los almacenes del CSV
+  // estén mapeados; si falta uno, se ABORTA con la causa y el arreglo (correr `etl-catalogos`).
+  const almacenesCsv = leerCsv('IPT_Almacenes.csv')
+    .map((f) => (f.IdIPT_Almacenes ?? '').trim())
+    .filter((id) => id !== '');
+  const sinMapeo = almacenesCsv.filter((id) => !mapaAlmacen.has(id));
+  if (sinMapeo.length > 0) {
+    throw new Error(
+      `ETL IPT ABORTADO: faltan mapeos de almacén (Almacen:IPT) para IdIPT_Almacenes=` +
+        `${sinMapeo.join(',')} (mapeados ${String(mapaAlmacen.size)}/${String(almacenesCsv.length)}).\n` +
+        'Sin ellos TODOS los movimientos se descartarían por "almacén sin mapeo" y este ETL ' +
+        'terminaría en verde con CERO movimientos.\n' +
+        'Arreglo: vuelve a correr `npx tsx --env-file=.env migracion/etl-catalogos.ts` (persiste ' +
+        'los mapeos faltantes; es idempotente) y repite este ETL.',
+    );
+  }
   const mapaModelo = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.modelo);
 
   // Tipos de movimiento por código (id + dirección), de una sola query.
@@ -339,6 +358,7 @@ export async function cargarIptKardex(
     modAlmPorId,
     movPorId,
     yaMigrados,
+    sinAlmacen: { n: 0 },
   };
 
   const contribs = await enLotes(
@@ -346,6 +366,17 @@ export async function cargarIptKardex(
     (f): Promise<ContribDet> => conReintentoTransitorio(() => procesarDetalle(contexto, f)),
     CONCURRENCIA_ETL,
   );
+
+  // ⛔ GUARDARRAÍL DE CIERRE: si TODOS los renglones cayeron por "almacén sin mapeo", el ETL
+  // habría terminado "OK" sin cargar nada (el bug del 31-jul-2026). Es un fallo, no un cuadre.
+  if (detalles.length > 0 && contexto.sinAlmacen.n === detalles.length) {
+    throw new Error(
+      `ETL IPT ABORTADO: los ${String(detalles.length)} renglones de IPT_MovsDet se descartaron ` +
+        'por "almacén sin mapeo" — el kardex habría quedado VACÍO.\n' +
+        'Arreglo: corre `npx tsx --env-file=.env migracion/etl-catalogos.ts` (repara el mapeo ' +
+        'Almacen:IPT) y repite este ETL.',
+    );
+  }
 
   for (const res of contribs) {
     if (!res.ok) {
@@ -496,6 +527,8 @@ interface ContextoIpt {
   modAlmPorId: Map<string, { idModeloV1: string; idAlmacenV1: string }>;
   movPorId: Map<string, MovCrudo>;
   yaMigrados: Set<string>;
+  /** Contador de renglones caídos por "almacén sin mapeo" (guardarraíl del cierre). */
+  sinAlmacen: { n: number };
 }
 
 /** Contribución de UN renglón IPT_MovsDet a los conteos (`condensado` = pre-corte, va al saldo). */
@@ -668,6 +701,7 @@ async function procesarDetalle(ctx: ContextoIpt, f: Record<string, string>): Pro
       'IPT: almacén del movimiento sin mapeo (omitido)',
       `IdIPT_MovsDet=${idDet} IdIPT_Almacenes=${mov.idAlmacenV1}`,
     );
+    ctx.sinAlmacen.n += 1;
     return SIN('omitido');
   }
 

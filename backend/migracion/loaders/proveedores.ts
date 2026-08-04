@@ -45,6 +45,10 @@ import {
   type DatosMapeo,
   type EntidadMapeo,
 } from '../comun/mapeo.js';
+import {
+  escribirConstanciaTercerosConSaldo,
+  listarTercerosExcluidosConSaldo,
+} from '../comun/constancia-terceros.js';
 import { prescanUso, type PrescanUso } from '../comun/prescan-uso.js';
 import type { Reporte } from '../comun/reporte.js';
 import { LIMITES, truncarYReportar } from '../comun/saneo.js';
@@ -426,6 +430,15 @@ export async function cargarProveedores(
     reporte.nota(
       `Terceros fuera de ventana (sin OC/órdenes/EsMa/notas/auditorías en la ventana ni ` +
         `telas/avíos usados): ${String(fueraVentana)} NO migrados.`,
+    );
+  }
+  // CONSTANCIA (§7): de esos excluidos, los que traían SALDO EsMa ≠ 0 se dejan por escrito en un
+  // archivo propio (mismo patrón que `excluidos-sin-actividad-*.txt` del inventario). El criterio NO
+  // cambia: solo se documenta lo que la decisión del dueño deja fuera.
+  if (pre !== null) {
+    escribirConstanciaTercerosConSaldo(
+      listarTercerosExcluidosConSaldo((idViejo) => pre.provIdMaquileros.has(idViejo)),
+      reporte,
     );
   }
   return { creados, existentes, omitidos, omitidosValidacion, fusiones, fueraVentana };

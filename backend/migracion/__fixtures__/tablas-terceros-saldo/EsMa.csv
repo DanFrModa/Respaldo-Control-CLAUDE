@@ -1,0 +1,5 @@
+"IdEsMa","FechaEsMa","IdMaquileros","ObsEsMa"
+1,15/03/2024 00:00:00,7,"Cuenta del maquilero 7"
+2,20/06/2022 00:00:00,8,"Cuenta del maquilero 8"
+3,10/01/2021 00:00:00,9,"Cuenta del maquilero 9 (cierra en cero)"
+4,05/05/2023 00:00:00,0,"Cabecera sin maquilero (se ignora)"

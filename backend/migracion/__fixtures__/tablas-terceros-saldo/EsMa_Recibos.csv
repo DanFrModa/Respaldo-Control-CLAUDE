@@ -1,0 +1,6 @@
+"IdEsMa_Recibos","IdEsMa","IdOrdenes","CantRecEsMa","PrecioEsMa","ObsRecibos","RevisionPendiente","EsEstampado"
+1,1,100,100,"$10.00","Cargo validado maq7",0,0
+2,1,101,10,"$5.00","Cargo PENDIENTE (no cuenta)",1,0
+3,2,102,50,"$3.00","Cargo validado maq8",0,0
+4,3,103,20,"$5.00","Cargo validado maq9",0,0
+5,99,104,7,"$1.00","Cargo sin cabecera (se ignora)",0,0

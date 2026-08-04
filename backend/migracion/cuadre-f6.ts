@@ -6,10 +6,16 @@
  *      AuditoriaDefecto) + EsMa (EsMaCargo/AbonoMaquilero/DescuentoMaquilero/PagoMaquilero). Las
  *      tablas de Calidad se cuentan por Prisma directo (NO depende del código del ETL de Calidad).
  *  (2) SALDOS por maquilero: saldo v1 (fórmula `EsMa_SaldosMaq` con "ceronulo" sobre los CSV,
- *      calculada de forma COMPARABLE a v2 — solo cargos VALIDADOS de órdenes migradas) vs saldo v2
+ *      calculada de forma COMPARABLE a v2 — cargos VALIDADOS de órdenes migradas) vs saldo v2
  *      (mismo cálculo que `dominio/esma/saldos.ts`, D3). Lista los descuadres con su causa probable;
- *      la diferencia sistemática (cargos de órdenes NO migradas, cargos `propuesto`) se explica, NO
- *      se corrige. Cruce con el tablero de dominio (`saldosDeTodosMaquileros`).
+ *      la diferencia sistemática (cargos `propuesto`) se explica, NO se corrige. Cruce con el
+ *      tablero de dominio (`saldosDeTodosMaquileros`).
+ *      ⭐ Con VENTANA activa el comparable incluye ADEMÁS los cargos validados de órdenes fuera de
+ *      ventana, porque v2 SÍ los representa dentro del `AbonoMaquilero` sintético "Saldo inicial de
+ *      migración" (ver `loaders/esma-cargos.ts`): lo esperado es que TODOS cuadren y la diferencia
+ *      sea 0.00. Los cargos que v2 NO representa (orden no migrada por ORIGEN INVÁLIDO) se cuentan
+ *      APARTE como FUGA REAL, para que un hueco nuevo no quede camuflado entre las exclusiones
+ *      esperadas.
  *  (3) CONCILIACIÓN sobre el periodo histórico completo (`dominio/esma/conciliacion.ts`): recibido
  *      (F3) vs cargado (EsMa) — criterio de salida "EsMa cuadra contra los recibos del periodo".
  *  (+) INCONSISTENCIAS de origen LISTADAS (no se corrigen): cargos sin cabecera EsMa (los 12 con
@@ -83,7 +89,10 @@ async function calcularConteos(cliente: PrismaClient): Promise<RenglonCuadreF6[]
     // Asientos SINTÉTICOS de saldo inicial (no vienen de `EsMa_Abonos.csv`): se cuentan aparte para
     // que el v1-vs-v2 de abonos sea legible (si no, v2 parecería tener "de más" sin explicación).
     cliente.mapeoMigracion.count({
-      where: { entidad: ENTIDAD_MAPEO.abonoMaquilero, claveVieja: { startsWith: 'saldo-inicial:' } },
+      where: {
+        entidad: ENTIDAD_MAPEO.abonoMaquilero,
+        claveVieja: { startsWith: 'saldo-inicial:' },
+      },
     }),
   ]);
 
@@ -586,7 +595,9 @@ export function formatearCuadreF6(c: CuadreF6): string {
     p.push(
       '  0.00. Si NO cuadra, el descuadre es REAL: revisar la FUGA del renglón de arriba (cargos que',
     );
-    p.push('  v2 no representa) y el desglose por maquilero del reporte del ETL. NO se re-balancea (§7).');
+    p.push(
+      '  v2 no representa) y el desglose por maquilero del reporte del ETL. NO se re-balancea (§7).',
+    );
   }
   if (s.totalTableroDominio !== null) {
     p.push(

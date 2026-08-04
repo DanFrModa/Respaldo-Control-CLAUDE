@@ -206,6 +206,18 @@ export async function cargarTelasKardex(
   const mapaTela = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.telaPorIdTelas);
   const mapaColor = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.color);
   const mapaAlmacen = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.almacenTela);
+
+  // ⛔ GUARDARRAÍL (misma clase de bug que dejó el kardex PT vacío el 31-jul-2026): sin mapeos
+  // de almacén TELA, TODOS los renglones caerían por "sin tela/lote/almacén mapeable" y este
+  // ETL terminaría "OK" sin cargar nada. Aquí no se puede exigir el CSV completo (solo migran
+  // los almacenes ACTIVOS), pero CERO mapeos es inequívocamente un fallo, no un cuadre.
+  if (mapaAlmacen.size === 0) {
+    throw new Error(
+      'ETL de telas ABORTADO: no hay NINGÚN mapeo de almacén TELA (Almacen:Tela).\n' +
+        'Todos los movimientos se descartarían y el kardex de telas quedaría VACÍO.\n' +
+        'Arreglo: corre `npx tsx --env-file=.env migracion/etl-catalogos.ts` (es idempotente) y repite este ETL.',
+    );
+  }
   const mapaOrden = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.orden);
 
   // Empresa de cada orden (para las salidas ligadas a orden, A9): una sola query.
