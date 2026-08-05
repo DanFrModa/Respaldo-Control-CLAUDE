@@ -144,12 +144,16 @@ describe('pedidosPorMes (R3, B6)', () => {
     });
   });
 
+  // ⚠️ La ventana de entrega va en un año PASADO a propósito. El pedido sin ventana cae en el mes
+  // de su CAPTURA (hoy), así que si el mes consultado fuera el mes en curso se colaría en el
+  // resultado y la aserción exacta fallaría — un test que solo pasa 11 meses del año. Reventó de
+  // verdad el 5-ago-2026 contra `{ anio: 2026, mes: 8 }`: devolvió [22, 20] en vez de [20].
   it('filtra por MES de entrega (fechaHasta ?? fechaDe); sin ventana cae al mes de su captura', async () => {
-    await sembrarPedido({ folio: 20, fechaHasta: '2026-08-15' });
-    await sembrarPedido({ folio: 21, fechaHasta: '2026-09-10' });
+    await sembrarPedido({ folio: 20, fechaHasta: '2024-08-15' });
+    await sembrarPedido({ folio: 21, fechaHasta: '2024-09-10' });
     const sinVentana = await sembrarPedido({ folio: 22 }); // sin ventana de entrega
 
-    const agosto = await pedidosPorMes(sesion(), { anio: 2026, mes: 8 }, bd());
+    const agosto = await pedidosPorMes(sesion(), { anio: 2024, mes: 8 }, bd());
     expect(agosto.datos.map((p) => p.folio)).toEqual([20]);
 
     const todos = await pedidosPorMes(sesion(), {}, bd());
