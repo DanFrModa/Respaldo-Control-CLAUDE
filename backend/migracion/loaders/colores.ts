@@ -34,6 +34,12 @@ import type { ResultadoLoader } from './clientes.js';
 /** Desenlace de procesar un color (para agregar conteos tras los lotes). */
 type DesenlaceColor = 'creado' | 'existente' | 'omitidoValidacion';
 
+/** Resolución de un canónico: su id + si esta corrida lo INSERTÓ de verdad (conteo honesto). */
+interface ResolucionColor {
+  id: number;
+  insertado: boolean;
+}
+
 /** Detecta variantes A/B/C… de un mismo color base (p. ej. "NEGRO A"): nombre + letra suelta. */
 function baseDeVarianteAB(nombreCanonico: string): string | null {
   const m = /^(.+?)\s+([A-Z])$/.exec(nombreCanonico);
@@ -89,31 +95,40 @@ export async function cargarColores(
   // awaits; la carrera real (dos tareas crean el mismo color a la vez) la cubre el
   // ErrorConflicto + re-lectura de abajo. Una promesa por canónico serializa el primer create.
   const idPorCanonico = new Map<string, number>();
-  const creandoCanonico = new Map<string, Promise<number>>();
+  const creandoCanonico = new Map<string, Promise<ResolucionColor>>();
+  /**
+   * Canónicos que se INSERTARON de verdad en esta corrida. El conteo honesto (§7) sale de aquí:
+   * antes se contaba como "creado" todo canónico visto por primera vez, aunque `findFirst` lo
+   * hubiera hallado YA EXISTENTE en la BD → una re-corrida idempotente reportaba `creados=619`
+   * con 618 ya en base y disparaba una falsa alarma de duplicación (agosto-2026).
+   */
+  const insertadosDeVerdad = new Set<string>();
 
   /** Resuelve el idColor de un nombre canónico (cache → BD → create → carrera). */
-  async function resolverIdColor(canonico: string): Promise<number> {
+  async function resolverIdColor(canonico: string): Promise<ResolucionColor> {
     const clave = canonico.toLowerCase();
     const enCache = idPorCanonico.get(clave);
     if (enCache !== undefined) {
-      return enCache;
+      // Ya resuelto en esta corrida: no es un INSERT nuevo (lo fue, o no, la primera vez).
+      return { id: enCache, insertado: false };
     }
     // Si otra tarea ya está creando este canónico, espera su promesa (no lo dupliques).
     const enVuelo = creandoCanonico.get(clave);
     if (enVuelo !== undefined) {
-      return enVuelo;
+      const resuelto = await enVuelo;
+      return { id: resuelto.id, insertado: false }; // el INSERT lo cuenta quien lo hizo
     }
-    const promesa = (async (): Promise<number> => {
+    const promesa = (async (): Promise<ResolucionColor> => {
       const existe = await cliente.color.findFirst({
         where: { nombre: { equals: canonico, mode: 'insensitive' } },
         select: { id: true },
       });
       if (existe !== null) {
-        return existe.id;
+        return { id: existe.id, insertado: false }; // YA ESTABA en la BD
       }
       try {
         const creado = await crearColor(sesion, { nombre: canonico }, bd);
-        return creado.id;
+        return { id: creado.id, insertado: true }; // INSERT real
       } catch (error) {
         if (error instanceof ErrorConflicto) {
           // Carrera: lo creó otro; re-leer.
@@ -122,16 +137,17 @@ export async function cargarColores(
             select: { id: true },
           });
           if (reintento !== null) {
-            return reintento.id;
+            return { id: reintento.id, insertado: false };
           }
         }
         throw error;
       }
     })();
     creandoCanonico.set(clave, promesa);
-    const id = await promesa;
-    idPorCanonico.set(clave, id);
-    return id;
+    const resuelto = await promesa;
+    idPorCanonico.set(clave, resuelto.id);
+    if (resuelto.insertado) insertadosDeVerdad.add(clave);
+    return resuelto;
   }
 
   /** Procesa UN texto crudo de color: resuelve su idColor y guarda el mapeo texto→idColor. */
@@ -140,7 +156,7 @@ export async function cargarColores(
     if (canonicoCrudo === '') {
       return null; // texto vacío tras normalizar: no cuenta
     }
-    const yaEnCache = idPorCanonico.has(canonicoCrudo.toLowerCase());
+
     // El color es texto libre del viejo: trunca al máximo del esquema (80) + reporta.
     const canonico =
       truncarYReportar(
@@ -152,9 +168,9 @@ export async function cargarColores(
         LIMITES.color.nombre,
       ) ?? canonicoCrudo;
 
-    let idColor: number;
+    let resuelto: ResolucionColor;
     try {
-      idColor = await resolverIdColor(canonico);
+      resuelto = await resolverIdColor(canonico);
     } catch (error) {
       const detalle =
         error instanceof ErrorDominio ? `${error.codigo}: ${error.message}` : String(error);
@@ -163,9 +179,10 @@ export async function cargarColores(
     }
 
     // Mapeo texto ORIGINAL → idColor (varios crudos pueden ir al mismo idColor).
-    await guardarMapeo(cliente, ENTIDAD_MAPEO.color, textoCrudo, idColor, { canonico });
-    // "creado" solo el primero que materializó el canónico; los demás cuentan como existentes.
-    return yaEnCache ? 'existente' : 'creado';
+    await guardarMapeo(cliente, ENTIDAD_MAPEO.color, textoCrudo, resuelto.id, { canonico });
+    // "creado" = INSERT real en esta corrida; "existente" = ya estaba en la BD (o lo insertó
+    // otro texto crudo del mismo canónico). Así una re-corrida idempotente reporta creados=0.
+    return resuelto.insertado ? 'creado' : 'existente';
   }
 
   const resultados = await enLotes(textos, (t) => procesarColor(t), CONCURRENCIA_ETL);

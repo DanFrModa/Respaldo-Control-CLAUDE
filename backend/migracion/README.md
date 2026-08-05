@@ -217,6 +217,30 @@ En PowerShell es idéntico (recuerda `$env:ETL_DESDE='2025-01-01'` si vas con ve
 
 Si el bug dejó un almacén PT **duplicado** ("Transito" de FR Moda + el global "Tránsito"), el loader ya lo resuelve solo: mapea al **global** y reporta el sobrante para que lo borres a mano desde Administración (no lo borra el ETL: borrar un almacén es decisión de negocio).
 
+### Mantenimiento: limpiar residuos de la migración
+
+Tras una recarga pueden quedar dos cosas que **no se pueden resolver desde la UI**: almacenes **duplicados** por nombre equivalente (el global que siembra el seed vs. el que un ETL viejo creó por-empresa, p. ej. `"Tránsito"` vs `"Transito"`) y **clientes que la ventana no debía migrar** (residuo de una corrida sin ventana que se abortó). El script los localiza y borra **solo si son seguros**:
+
+```bash
+# 1) Reporte (no escribe nada). Pasa la MISMA ventana de la recarga para el chequeo de clientes:
+ETL_DESDE=2025-01-01 npx tsx --env-file=.env migracion/diagnostico-limpieza.ts
+
+# 2) Borrado de lo seguro:
+ETL_DESDE=2025-01-01 npx tsx --env-file=.env migracion/diagnostico-limpieza.ts --confirmar
+```
+
+```powershell
+# Windows (PowerShell):
+$env:ETL_DESDE = '2025-01-01'
+npx tsx --env-file=.env migracion/diagnostico-limpieza.ts
+npx tsx --env-file=.env migracion/diagnostico-limpieza.ts --confirmar
+```
+
+- **Solo borra lo que tiene CERO dependientes reales** (cualquier fila protegida por `onDelete: Restrict`: movimientos de kardex, pedidos, órdenes, notas, recepciones, inventarios cíclicos, listas, proyectos…). Lo que tenga datos colgando **no se toca**: se reporta qué lo retiene y se dice que requiere decisión humana.
+- Se consideran **cascadas triviales** (se van con el padre) solo las que el schema marca `onDelete: Cascade` y no cuelgan nada protegido: `ClienteCampo`, `ClienteDepartamento`, `ClienteFactores`, `ClienteModeloLiga`. Si un `ClienteCampo` tiene `OrdenReferencia` (Restrict), el cliente **no** es seguro y no se borra.
+- **Sin `ETL_DESDE` avisa y se salta el chequeo de clientes** (no hay criterio para decidir; nunca borra a ciegas). El de almacenes sí corre siempre.
+- Idempotente: correrlo dos veces no falla. Cada borrado va en su transacción y limpia también su fila de `MapeoMigracion` (que apunta al id por texto, no por FK).
+
 ### Rendimiento (BD remota: la carga es *latency-bound*)
 
 La corrida real del 31-jul-2026 (Mac → Railway por el proxy público) midió **~0.43 s por renglón**: el cuello es el **viaje redondo**, no el CPU. Todo el afinado es configurable por entorno — `recargar.ts` imprime en su banner cuál quedó activo:
@@ -293,6 +317,7 @@ npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts
 | Script | Qué hace |
 |---|---|
 | `migracion/recargar.ts` | ⭐ **RECARGA de punta a punta en un comando** (limpieza opcional + seed + 12 ETL + realineado de estado + 6 cuadres, secuencial con resumen; ver sección arriba) |
+| `migracion/diagnostico-limpieza.ts` | **Mantenimiento**: localiza y borra residuos de la migración (almacenes duplicados global-vs-empresa, clientes fuera de la ventana). Sin `--confirmar` solo reporta; borra únicamente lo que tiene cero dependientes |
 | `migracion/limpiar-datos.ts` | **VACÍA la BD** (TRUNCATE de todo `public` menos `_prisma_migrations`); sin `--confirmar` solo ensaya. Lo reusa `recargar.ts --limpiar` |
 | `migracion/realinear-estado-ordenes.ts` | ⚠️ **MANTENIMIENTO OBLIGATORIO al terminar cualquier carga/recarga**: realinea el estado `completa`/`capturada` con la regla automática (`requisitosOrden`). Idempotente, por lotes; `--empresa=<id>` `--lote=<n>` `--dry-run`. Lo corre `recargar.ts` como paso final |
 | `migracion/etl-catalogos.ts` | F1: catálogos, materiales, proveedores, mapeos |

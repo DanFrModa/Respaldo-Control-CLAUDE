@@ -95,6 +95,18 @@ export async function cargarTelasColores(
     porTela.set(idTela, grid);
   }
 
+  // Conteo HONESTO (§7, agosto-2026): antes se reportaba `creados = telas tocadas`, que en una
+  // re-corrida idempotente daba `creados=62` sin que la tabla creciera (hizo perder tiempo
+  // investigando una duplicación inexistente). Se leen los renglones que YA existen para poder
+  // decir cuántos son INSERT real y cuántos ya estaban — mismo criterio que `bom-modelos.ts`.
+  const yaPresentes = new Set<string>();
+  for (const r of await (bd.cliente as PrismaClient).telaColor.findMany({
+    where: { idTela: { in: [...porTela.keys()] } },
+    select: { idTela: true, idColor: true },
+  })) {
+    yaPresentes.add(`${String(r.idTela)}:${String(r.idColor)}`);
+  }
+
   // Aplicar el grid completo por tela (un actualizarTela por tela). Cada tela es INDEPENDIENTE
   // (renglones distintos) → carga concurrente acotada. Tolerante por tela: si una falla (data
   // sucia), se reporta y se sigue con las demás (el ETL no aborta).
@@ -113,13 +125,19 @@ export async function cargarTelasColores(
     CONCURRENCIA_ETL,
   );
 
-  let telasTocadas = 0;
+  let creados = 0;
+  let existentes = 0;
   let omitidosValidacion = 0;
-  for (const r of resultados) {
+  for (const [i, r] of resultados.entries()) {
     // `intentarCrear` ya captura errores de fila → devuelve null; `enLotes` solo fallaría por
     // algo inesperado fuera de `intentarCrear` (también se cuenta como omitido por validación).
-    if (r.ok && r.valor !== null) {
-      telasTocadas += 1;
+    const entrada = entradas[i];
+    if (r.ok && r.valor !== null && entrada !== undefined) {
+      const [idTela, grid] = entrada;
+      for (const idColor of grid.keys()) {
+        if (yaPresentes.has(`${String(idTela)}:${String(idColor)}`)) existentes += 1;
+        else creados += 1;
+      }
     } else {
       omitidosValidacion += 1;
     }
@@ -131,5 +149,5 @@ export async function cargarTelasColores(
         `(cascada tela → grid) — NO migrados.`,
     );
   }
-  return { creados: telasTocadas, existentes: 0, omitidos, omitidosValidacion, fueraVentana };
+  return { creados, existentes, omitidos, omitidosValidacion, fueraVentana };
 }
