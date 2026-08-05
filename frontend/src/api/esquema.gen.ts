@@ -8851,8 +8851,10 @@ export interface paths {
           pagina?: number;
           /** @description Renglones por página (máx 500). */
           porPagina?: number;
-          /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
+          /** @description Texto a buscar en el nombre de la tela O en el de sus colores (insensible a mayúsculas). */
           busqueda?: string;
+          /** @description Solo telas que tengan ESE color en su grid. */
+          idColor?: number;
           /** @description Filtra por id de categoría. */
           idCategoria?: number;
           /** @description Incluye las desactivadas ("true"/"false"). */
@@ -8887,8 +8889,11 @@ export interface paths {
                 idCategoria: number | null;
                 /** @description Nombre de la categoría, o null. */
                 categoria: string | null;
-                /** @description Unidad de medida (kg, m…), o null. */
-                unidadMedida: string | null;
+                /**
+                 * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
                 /**
                  * @description Rol típico de la tela en el lote (D5).
                  * @enum {string}
@@ -9038,6 +9043,8 @@ export interface paths {
              * @enum {string}
              */
             tipoComponente?: 'CUERPO' | 'CARDIGAN' | 'OTRO';
+            /** @enum {string} */
+            unidadMedida: 'KG' | 'M';
             /** @default false */
             favorito?: boolean;
             /** @default true */
@@ -9049,7 +9056,6 @@ export interface paths {
               precio?: number;
             }[];
             descripcion?: string;
-            unidadMedida?: string;
           };
         };
       };
@@ -9071,8 +9077,11 @@ export interface paths {
               idCategoria: number | null;
               /** @description Nombre de la categoría, o null. */
               categoria: string | null;
-              /** @description Unidad de medida (kg, m…), o null. */
-              unidadMedida: string | null;
+              /**
+               * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
+               * @enum {string}
+               */
+              unidadMedida: 'KG' | 'M';
               /**
                * @description Rol típico de la tela en el lote (D5).
                * @enum {string}
@@ -9237,8 +9246,11 @@ export interface paths {
               idCategoria: number | null;
               /** @description Nombre de la categoría, o null. */
               categoria: string | null;
-              /** @description Unidad de medida (kg, m…), o null. */
-              unidadMedida: string | null;
+              /**
+               * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
+               * @enum {string}
+               */
+              unidadMedida: 'KG' | 'M';
               /**
                * @description Rol típico de la tela en el lote (D5).
                * @enum {string}
@@ -9392,8 +9404,11 @@ export interface paths {
               idCategoria: number | null;
               /** @description Nombre de la categoría, o null. */
               categoria: string | null;
-              /** @description Unidad de medida (kg, m…), o null. */
-              unidadMedida: string | null;
+              /**
+               * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
+               * @enum {string}
+               */
+              unidadMedida: 'KG' | 'M';
               /**
                * @description Rol típico de la tela en el lote (D5).
                * @enum {string}
@@ -9535,6 +9550,8 @@ export interface paths {
             idCategoria?: number | null;
             /** @enum {string} */
             tipoComponente?: 'CUERPO' | 'CARDIGAN' | 'OTRO';
+            /** @enum {string} */
+            unidadMedida?: 'KG' | 'M';
             favorito?: boolean;
             paraProduccion?: boolean;
             precioSugerido?: number | null;
@@ -9544,7 +9561,6 @@ export interface paths {
             }[];
             activo?: boolean;
             descripcion?: string | null;
-            unidadMedida?: string | null;
           };
         };
       };
@@ -9566,8 +9582,11 @@ export interface paths {
               idCategoria: number | null;
               /** @description Nombre de la categoría, o null. */
               categoria: string | null;
-              /** @description Unidad de medida (kg, m…), o null. */
-              unidadMedida: string | null;
+              /**
+               * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
+               * @enum {string}
+               */
+              unidadMedida: 'KG' | 'M';
               /**
                * @description Rol típico de la tela en el lote (D5).
                * @enum {string}

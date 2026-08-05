@@ -15,6 +15,7 @@ import {
   type TelaCrear,
   type TelaEditar,
   type TipoComponenteTela,
+  type UnidadTela,
 } from '@/api/telas';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,8 +49,18 @@ const ETIQUETA_TIPO_COMPONENTE: Record<TipoComponenteTela, string> = {
   OTRO: 'Otro',
 };
 
-/** Unidades de medida sugeridas (lista de ayuda; el campo es texto libre). */
-const UNIDADES_SUGERIDAS = ['KILOGRAMO', 'METRO', 'YARDA', 'PIEZA', 'ROLLO', 'CONO'] as const;
+/**
+ * Unidades: SOLO kilos y metros (Daniel, 30-jul-2026: *"todo lo que se compra en kilos se consume
+ * en kilos y lo que se compra en metros se consume en metros… no hay otras medidas"*). Era un texto
+ * libre con lista sugerida (KILOGRAMO/YARDA/ROLLO/CONO…) y venía vacío en todas las telas; de esa
+ * unidad dependen el stock, el consumo y el costo por prenda, así que ahora es una ELECCIÓN
+ * obligatoria de dos, sin default: una tela de metros marcada en kilos ensucia todo en silencio.
+ */
+const UNIDADES: readonly UnidadTela[] = ['KG', 'M'];
+const ETIQUETA_UNIDAD: Record<UnidadTela, string> = {
+  KG: 'Kilos (kg)',
+  M: 'Metros (m)',
+};
 
 /** Valor "sin categoría" del `<select>` (texto vacío). */
 const SIN_CATEGORIA = '';
@@ -70,10 +81,13 @@ const esquemaTelaFormulario = z.object({
     .string()
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+  // El '' es el estado "todavía no elegida" del select; el `refine` lo rechaza. Sin default y sin
+  // opción preseleccionada, el alta OBLIGA a elegir: si arrancara en kilos, una popelina (metros)
+  // nacería mal marcada nada más por no tocar el combo — justo el fallo silencioso que esta regla
+  // existe para evitar (hallazgo del reviewer).
   unidadMedida: z
-    .string()
-    .trim()
-    .max(30, { error: 'La unidad de medida no puede tener más de 30 caracteres' }),
+    .union([z.literal('KG'), z.literal('M'), z.literal('')])
+    .refine((v) => v !== '', { error: 'Elige la unidad: kilos o metros' }),
   tipoComponente: z.enum(TIPOS_COMPONENTE),
   precioSugerido: z
     .string()
@@ -84,8 +98,15 @@ const esquemaTelaFormulario = z.object({
   paraProduccion: z.boolean(),
 });
 
-/** Datos del formulario de tela. */
-type DatosTelaFormulario = z.infer<typeof esquemaTelaFormulario>;
+/**
+ * Datos del formulario de tela. Se distinguen los DOS lados del esquema porque la unidad admite
+ * `''` mientras no se ha elegido (lo que el usuario teclea) pero nunca llega así al submit (lo que
+ * el esquema garantiza): sin esa distinción, el valor inicial vacío no compilaría.
+ */
+type DatosTelaFormulario = z.input<typeof esquemaTelaFormulario>;
+
+/** Los mismos datos ya validados (la unidad ya es KG o M). */
+type DatosTelaValidados = z.output<typeof esquemaTelaFormulario>;
 
 /** Valores por defecto de un alta. */
 const VALORES_INICIALES: DatosTelaFormulario = {
@@ -150,7 +171,7 @@ export function DialogoTela({
   // Diálogo de alta rápida de categoría.
   const [dialogoCategoria, setDialogoCategoria] = useState(false);
 
-  const formulario = useForm<DatosTelaFormulario>({
+  const formulario = useForm<DatosTelaFormulario, unknown, DatosTelaValidados>({
     resolver: zodResolver(esquemaTelaFormulario),
     defaultValues: VALORES_INICIALES,
   });
@@ -164,7 +185,7 @@ export function DialogoTela({
       formulario.reset({
         nombre: tela.nombre,
         descripcion: texto(tela.descripcion),
-        unidadMedida: texto(tela.unidadMedida),
+        unidadMedida: tela.unidadMedida,
         tipoComponente: tela.tipoComponente,
         precioSugerido: tela.precioSugerido === null ? '' : String(tela.precioSugerido),
         favorito: tela.favorito,
@@ -189,7 +210,7 @@ export function DialogoTela({
       const cuerpo: TelaEditar = {
         nombre: datos.nombre,
         descripcion: textoONull(datos.descripcion),
-        unidadMedida: textoONull(datos.unidadMedida),
+        unidadMedida: datos.unidadMedida,
         tipoComponente: datos.tipoComponente,
         favorito: datos.favorito,
         paraProduccion: datos.paraProduccion,
@@ -218,7 +239,7 @@ export function DialogoTela({
       paraProduccion: datos.paraProduccion,
       colores: coloresCuerpo,
       ...(datos.descripcion.trim() === '' ? {} : { descripcion: datos.descripcion.trim() }),
-      ...(datos.unidadMedida.trim() === '' ? {} : { unidadMedida: datos.unidadMedida.trim() }),
+      unidadMedida: datos.unidadMedida,
       ...(categoria === null ? {} : { idCategoria: categoria }),
       ...(precio === undefined ? {} : { precioSugerido: precio }),
     };
@@ -314,22 +335,28 @@ export function DialogoTela({
                   <FieldDescription>Agrupa las telas (Felpa, Jersey, Rib…).</FieldDescription>
                 </Field>
 
-                {/* Unidad de medida (texto libre con lista sugerida) */}
+                {/* Unidad: kilos o metros, obligatoria (de ella dependen stock, consumo y costo) */}
                 <Field data-invalid={Boolean(errors.unidadMedida)}>
-                  <FieldLabel htmlFor="tela-unidad">Unidad de medida</FieldLabel>
-                  <Input
+                  <FieldLabel htmlFor="tela-unidad" required>
+                    Unidad
+                  </FieldLabel>
+                  <SelectNativo
                     id="tela-unidad"
-                    list="unidades-sugeridas"
-                    placeholder="p. ej. KILOGRAMO"
                     aria-invalid={Boolean(errors.unidadMedida)}
                     disabled={guardando}
+                    data-testid="tela-unidad"
                     {...registrar('unidadMedida')}
-                  />
-                  <datalist id="unidades-sugeridas">
-                    {UNIDADES_SUGERIDAS.map((u) => (
-                      <option key={u} value={u} />
+                  >
+                    <option value="">Elige la unidad…</option>
+                    {UNIDADES.map((u) => (
+                      <option key={u} value={u}>
+                        {ETIQUETA_UNIDAD[u]}
+                      </option>
                     ))}
-                  </datalist>
+                  </SelectNativo>
+                  <FieldDescription>
+                    Como se compra y como se consume. No se puede dejar en blanco.
+                  </FieldDescription>
                   <FieldError errors={[errors.unidadMedida]} />
                 </Field>
 

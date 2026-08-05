@@ -35,6 +35,12 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await expect(dialogoAlta.getByRole('heading', { name: 'Nueva tela' })).toBeVisible();
     await dialogoAlta.getByLabel('Nombre').fill(nombre);
 
+    // La UNIDAD es obligatoria y arranca SIN elegir (30-jul-2026): sin esto el alta no guarda.
+    // Se elige METROS a propósito — es la unidad "no default", así que si algún día volviera a
+    // colarse un valor preseleccionado, esta prueba lo cazaría al verificar el detalle.
+    await expect(dialogoAlta.getByTestId('tela-unidad')).toHaveValue('');
+    await dialogoAlta.getByTestId('tela-unidad').selectOption('M');
+
     // Alta rápida de categoría: abre el sub-diálogo, la crea y queda seleccionada.
     await dialogoAlta.getByTestId('nueva-categoria-tela').click();
     const dialogoCategoria = page
@@ -62,12 +68,16 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
     await filaNueva.click();
     await expect(detalle.getByTestId('tela-colores-detalle')).toBeVisible();
+    // La unidad ELEGIDA se guardó y se lee (si se hubiera colado un default, aquí diría "kg").
+    await expect(detalle.getByTestId('tela-detalle-unidad')).toHaveText('m');
 
     // ── Editar (botón del detalle expandido) ───────────────────────────────────
     await page.getByTestId('editar-tela').click();
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByRole('heading', { name: 'Editar tela' })).toBeVisible();
     await expect(dialogoEdicion.getByLabel('Nombre')).toHaveValue(nombre);
+    // La edición pre-carga la unidad guardada (metros), no un default.
+    await expect(dialogoEdicion.getByTestId('tela-unidad')).toHaveValue('M');
     await dialogoEdicion.getByLabel('Nombre').fill(nombreEditado);
     await page.getByTestId('guardar-tela').click();
 
@@ -112,9 +122,10 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await page.goto('/catalogos/telas');
     await expect(page.getByRole('heading', { name: 'Telas' })).toBeVisible();
 
-    // Primera alta (sin colores ni categoría: ambos opcionales).
+    // Primera alta (sin colores ni categoría: ambos opcionales; la UNIDAD no lo es).
     await page.getByTestId('nuevo-tela').click();
     await page.getByRole('dialog').getByLabel('Nombre').fill(nombre);
+    await page.getByRole('dialog').getByTestId('tela-unidad').selectOption('KG');
     await page.getByTestId('guardar-tela').click();
     await expect(page.getByText(`Tela "${nombre}" creada.`)).toBeVisible();
 
@@ -123,6 +134,10 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await page.getByTestId('nuevo-tela').click();
     const dialogo = page.getByRole('dialog');
     await dialogo.getByLabel('Nombre').fill(nombre);
+    // La unidad también aquí, y no es un detalle: sin ella el FORMULARIO bloquearía antes de
+    // mandar nada, y esta prueba —que existe para verificar que el BACKEND rechaza el nombre
+    // duplicado (unicidad global, ADR-0007)— dejaría de probar eso en silencio.
+    await dialogo.getByTestId('tela-unidad').selectOption('KG');
     await page.getByTestId('guardar-tela').click();
     await expect(page.getByText(/Ya existe una tela llamada/)).toBeVisible();
     await expect(dialogo.getByRole('heading', { name: 'Nueva tela' })).toBeVisible();

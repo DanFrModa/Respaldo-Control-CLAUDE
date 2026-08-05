@@ -6,6 +6,8 @@ import type { TipoBordadoClave } from '../../src/contrato/esquemas/bordado.js';
 import type { TipoComponenteTelaClave } from '../../src/contrato/esquemas/tela.js';
 import type { TipoProveedorClave } from '../../src/contrato/esquemas/proveedor.js';
 
+import { parsearBandera } from './valores.js';
+
 /**
  * `Proveedores.TipoProv` (H/T/S, doc 03-Producción §Órdenes de Compra) → enum `TipoProveedor`.
  *  • H → AVIOS (habilitación)
@@ -92,6 +94,16 @@ export function mapearTipoBordado(borEst: string | undefined | null): TipoBordad
   }
   // Texto no numérico distinto de vacío: lo tratamos como estampado (señal de no-bordado).
   return 'ESTAMPADO';
+}
+
+/**
+ * `Telas.Medida` del Access → unidad de la tela (KG/M). El mapeo NO se adivinó: el formulario viejo
+ * `AgregarTelas` lo declara literal en su combo — `RowSource = "-1;\"Kilos\";0;\"Metros\""` — y el
+ * form `ExisTela` lo confirma en su barra de estado ("Si=Kilos, No=Metros"). En el volcado son 735
+ * telas en kilos y 142 en metros.
+ */
+export function mapearUnidadTela(medida: string | undefined): 'KG' | 'M' {
+  return parsearBandera(medida) ? 'KG' : 'M';
 }
 
 /**

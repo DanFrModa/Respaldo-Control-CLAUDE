@@ -13,11 +13,19 @@ import { useDebounce } from '@/lib/useDebounce';
  */
 export function SelectorTela({
   idSeleccionado,
+  etiquetaSeleccion,
   alSeleccionar,
   alLimpiar,
   testid = 'selector-tela',
 }: {
   idSeleccionado: number | undefined;
+  /**
+   * Nombre de la tela seleccionada, para cuando el padre la fija SIN pasar por este combobox (p. ej.
+   * el atajo de "telas al tono" del lote). La página del typeahead trae 8 telas de 877: sin esta
+   * etiqueta el campo se quedaría mostrando la tela ANTERIOR mientras por dentro ya hay otra
+   * elegida — y se capturaría un renglón distinto del que se lee (hallazgo del reviewer).
+   */
+  etiquetaSeleccion?: string | undefined;
   alSeleccionar: (tela: Tela) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
   alLimpiar?: () => void;
@@ -40,6 +48,7 @@ export function SelectorTela({
 
   return (
     <ComboboxBuscable
+      {...(etiquetaSeleccion === undefined ? {} : { etiquetaSeleccion })}
       opciones={telas}
       valor={idSeleccionado ?? null}
       onChange={(id) => {

@@ -70,7 +70,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
     it('sin permiso no se puede ni leer ni escribir', async () => {
       const sinPermisos = sesionDePrueba();
       await expect(
-        crearTela(sinPermisos, { nombre: 'X', colores: [] }, bd()),
+        crearTela(sinPermisos, { nombre: 'X', unidadMedida: 'KG', colores: [] }, bd()),
       ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarTelas(sinPermisos, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarTelasCategorias(sinPermisos, {}, bd())).rejects.toBeInstanceOf(
@@ -80,9 +80,9 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('con solo lectura no se puede escribir', async () => {
       const soloVer = sesionDePrueba({ permisos: ['telas.ver'] });
-      await expect(crearTela(soloVer, { nombre: 'X', colores: [] }, bd())).rejects.toBeInstanceOf(
-        ErrorPermiso,
-      );
+      await expect(
+        crearTela(soloVer, { nombre: 'X', unidadMedida: 'KG', colores: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarTelas(soloVer, {}, bd())).resolves.toBeTruthy();
     });
   });
@@ -94,9 +94,9 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
         sesion,
         {
           nombre: 'Felpa 100% algodón',
+          unidadMedida: 'KG',
           descripcion: 'Felpa pesada',
           idCategoria: categoriaFelpa,
-          unidadMedida: 'KILOGRAMO',
           tipoComponente: 'CUERPO',
           favorito: true,
           precioSugerido: 120.5,
@@ -108,8 +108,8 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
       expect(tela).toMatchObject({
         nombre: 'Felpa 100% algodón',
+        unidadMedida: 'KG',
         idCategoria: categoriaFelpa,
-        unidadMedida: 'KILOGRAMO',
         tipoComponente: 'CUERPO',
         favorito: true,
         paraProduccion: true,
@@ -135,7 +135,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
     });
 
     it('crea una tela SIN colores y SIN categoría (ambos opcionales)', async () => {
-      const tela = await crearTela(sesionAdmin(), { nombre: 'Muestra', colores: [] }, bd());
+      const tela = await crearTela(
+        sesionAdmin(),
+        { nombre: 'Muestra', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       expect(tela.idCategoria).toBeNull();
       expect(tela.colores).toHaveLength(0);
       // Defaults: OTRO / favorito false / paraProduccion true.
@@ -146,7 +150,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('rechaza un color inexistente → ErrorValidacion y NO crea la tela (atomicidad A2)', async () => {
       await expect(
-        crearTela(sesionAdmin(), { nombre: 'Con fantasma', colores: [{ idColor: 999999 }] }, bd()),
+        crearTela(
+          sesionAdmin(),
+          { nombre: 'Con fantasma', unidadMedida: 'KG', colores: [{ idColor: 999999 }] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
       expect(await cliente.tela.count({ where: { nombre: 'Con fantasma' } })).toBe(0);
       expect(await cliente.telaColor.count()).toBe(0);
@@ -157,7 +165,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       await expect(
         crearTela(
           sesionAdmin(),
-          { nombre: 'Con rojo apagado', colores: [{ idColor: colorRojo }] },
+          { nombre: 'Con rojo apagado', unidadMedida: 'KG', colores: [{ idColor: colorRojo }] },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -166,7 +174,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('rechaza una categoría inexistente → ErrorValidacion (y NO crea la tela)', async () => {
       await expect(
-        crearTela(sesionAdmin(), { nombre: 'Sin cat', idCategoria: 999999, colores: [] }, bd()),
+        crearTela(
+          sesionAdmin(),
+          { nombre: 'Sin cat', unidadMedida: 'KG', idCategoria: 999999, colores: [] },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
       expect(await cliente.tela.count({ where: { nombre: 'Sin cat' } })).toBe(0);
     });
@@ -179,16 +191,16 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       await expect(
         crearTela(
           sesionAdmin(),
-          { nombre: 'Cat apagada', idCategoria: categoriaFelpa, colores: [] },
+          { nombre: 'Cat apagada', unidadMedida: 'KG', idCategoria: categoriaFelpa, colores: [] },
           bd(),
         ),
       ).rejects.toBeInstanceOf(ErrorValidacion);
     });
 
     it('rechaza nombre duplicado, sin importar mayúsculas → ErrorConflicto', async () => {
-      await crearTela(sesionAdmin(), { nombre: 'Jersey', colores: [] }, bd());
+      await crearTela(sesionAdmin(), { nombre: 'Jersey', unidadMedida: 'KG', colores: [] }, bd());
       await expect(
-        crearTela(sesionAdmin(), { nombre: 'jersey', colores: [] }, bd()),
+        crearTela(sesionAdmin(), { nombre: 'jersey', unidadMedida: 'KG', colores: [] }, bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
     });
   });
@@ -200,6 +212,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
         sesion,
         {
           nombre: 'Tela',
+          unidadMedida: 'KG',
           colores: [
             { idColor: colorNegro, precio: 90 },
             { idColor: colorBlanco, precio: 80 },
@@ -237,7 +250,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const sesion = sesionAdmin();
       const tela = await crearTela(
         sesion,
-        { nombre: 'Tela', colores: [{ idColor: colorNegro }] },
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [{ idColor: colorNegro }] },
         bd(),
       );
       const actualizado = await actualizarTela(sesion, { id: tela.id, colores: [] }, bd());
@@ -249,7 +262,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const sesion = sesionAdmin();
       const tela = await crearTela(
         sesion,
-        { nombre: 'Tela', colores: [{ idColor: colorNegro }, { idColor: colorBlanco }] },
+        {
+          nombre: 'Tela',
+          unidadMedida: 'KG',
+          colores: [{ idColor: colorNegro }, { idColor: colorBlanco }],
+        },
         bd(),
       );
       await actualizarTela(sesion, { id: tela.id, descripcion: 'nota' }, bd());
@@ -258,26 +275,52 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('cambia datos generales con bitácora del detalle', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', favorito: false, colores: [] }, bd());
-      const actualizado = await actualizarTela(
+      const tela = await crearTela(
         sesion,
-        { id: tela.id, favorito: true, tipoComponente: 'CARDIGAN', precioSugerido: 42 },
+        { nombre: 'Tela', unidadMedida: 'KG', favorito: false, colores: [] },
         bd(),
       );
-      expect(actualizado).toMatchObject({ favorito: true, tipoComponente: 'CARDIGAN' });
+      const actualizado = await actualizarTela(
+        sesion,
+        {
+          id: tela.id,
+          favorito: true,
+          tipoComponente: 'CARDIGAN',
+          precioSugerido: 42,
+          // La UNIDAD se maneja con los demás enums desde el 30-jul-2026 (antes iba con los campos
+          // de texto). Si ese camino se rompiera, corregir un chifón de kilos a metros devolvería
+          // 200 y un toast de "actualizada" SIN escribir nada — el fallo silencioso de siempre.
+          unidadMedida: 'M',
+        },
+        bd(),
+      );
+      expect(actualizado).toMatchObject({
+        favorito: true,
+        tipoComponente: 'CARDIGAN',
+        unidadMedida: 'M',
+      });
       expect(actualizado.precioSugerido?.toNumber()).toBe(42);
 
       const bitacora = await cliente.bitacora.findFirstOrThrow({
         where: { entidad: 'Tela', idEntidad: String(tela.id), accion: 'MODIFICAR' },
       });
-      expect(bitacora.datos).toMatchObject({ favorito: { de: false, a: true } });
+      expect(bitacora.datos).toMatchObject({
+        favorito: { de: false, a: true },
+        unidadMedida: { de: 'KG', a: 'M' },
+      });
     });
 
     it('vaciar descripción (null) la BORRA; quitar categoría (null) la deja en null', async () => {
       const sesion = sesionAdmin();
       const tela = await crearTela(
         sesion,
-        { nombre: 'Tela', descripcion: 'algo', idCategoria: categoriaFelpa, colores: [] },
+        {
+          nombre: 'Tela',
+          unidadMedida: 'KG',
+          descripcion: 'algo',
+          idCategoria: categoriaFelpa,
+          colores: [],
+        },
         bd(),
       );
       const actualizado = await actualizarTela(
@@ -292,7 +335,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('una descripción que llega vacía ("") se normaliza a null (nunca se guarda "")', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', descripcion: 'x', colores: [] }, bd());
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', descripcion: 'x', colores: [] },
+        bd(),
+      );
       const actualizado = await actualizarTela(sesion, { id: tela.id, descripcion: '' }, bd());
       expect(actualizado.descripcion).toBeNull();
       const enBd = await cliente.tela.findUniqueOrThrow({ where: { id: tela.id } });
@@ -301,7 +348,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('cambiar a una categoría inexistente → ErrorValidacion', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', colores: [] }, bd());
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       await expect(
         actualizarTela(sesion, { id: tela.id, idCategoria: 999999 }, bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -309,8 +360,12 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('cambiar el nombre a uno ya usado → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
-      await crearTela(sesion, { nombre: 'Uno', colores: [] }, bd());
-      const segunda = await crearTela(sesion, { nombre: 'Dos', colores: [] }, bd());
+      await crearTela(sesion, { nombre: 'Uno', unidadMedida: 'KG', colores: [] }, bd());
+      const segunda = await crearTela(
+        sesion,
+        { nombre: 'Dos', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       await expect(
         actualizarTela(sesion, { id: segunda.id, nombre: 'uno' }, bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
@@ -318,7 +373,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('sin cambio real es idempotente: no escribe bitácora', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', colores: [] }, bd());
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       const antes = await cliente.bitacora.count();
       await actualizarTela(sesion, { id: tela.id, nombre: 'Tela' }, bd());
       expect(await cliente.bitacora.count()).toBe(antes);
@@ -336,7 +395,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const sesion = sesionAdmin();
       const tela = await crearTela(
         sesion,
-        { nombre: 'Tela', colores: [{ idColor: colorNegro }] },
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [{ idColor: colorNegro }] },
         bd(),
       );
       const desactivada = await desactivarTela(sesion, tela.id, bd());
@@ -351,14 +410,22 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('desactivar dos veces → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', colores: [] }, bd());
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       await desactivarTela(sesion, tela.id, bd());
       await expect(desactivarTela(sesion, tela.id, bd())).rejects.toBeInstanceOf(ErrorConflicto);
     });
 
     it('reactivar una tela desactivada funciona', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Tela', colores: [] }, bd());
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       await desactivarTela(sesion, tela.id, bd());
       const reactivada = await reactivarTela(sesion, tela.id, bd());
       expect(reactivada.activo).toBe(true);
@@ -366,11 +433,15 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('crear con el nombre de una tela desactivada choca (pide reactivarla) → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
-      const tela = await crearTela(sesion, { nombre: 'Repe', colores: [] }, bd());
-      await desactivarTela(sesion, tela.id, bd());
-      await expect(crearTela(sesion, { nombre: 'Repe', colores: [] }, bd())).rejects.toBeInstanceOf(
-        ErrorConflicto,
+      const tela = await crearTela(
+        sesion,
+        { nombre: 'Repe', unidadMedida: 'KG', colores: [] },
+        bd(),
       );
+      await desactivarTela(sesion, tela.id, bd());
+      await expect(
+        crearTela(sesion, { nombre: 'Repe', unidadMedida: 'KG', colores: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
     });
   });
 
@@ -381,6 +452,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
         sesion,
         {
           nombre: 'Tela',
+          unidadMedida: 'KG',
           idCategoria: categoriaFelpa,
           colores: [{ idColor: colorNegro, precio: 10 }],
         },
@@ -398,6 +470,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
         sesion,
         {
           nombre: 'Tela',
+          unidadMedida: 'KG',
           colores: [{ idColor: colorNegro, precio: 10 }, { idColor: colorBlanco }],
         },
         bd(),
@@ -423,11 +496,15 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const jersey = await cliente.telaCategoria.create({ data: { nombre: 'Jersey' } });
       await crearTela(
         sesion,
-        { nombre: 'Felpa A', idCategoria: categoriaFelpa, colores: [] },
+        { nombre: 'Felpa A', unidadMedida: 'KG', idCategoria: categoriaFelpa, colores: [] },
         bd(),
       );
-      await crearTela(sesion, { nombre: 'Jersey A', idCategoria: jersey.id, colores: [] }, bd());
-      await crearTela(sesion, { nombre: 'Sin cat', colores: [] }, bd());
+      await crearTela(
+        sesion,
+        { nombre: 'Jersey A', unidadMedida: 'KG', idCategoria: jersey.id, colores: [] },
+        bd(),
+      );
+      await crearTela(sesion, { nombre: 'Sin cat', unidadMedida: 'KG', colores: [] }, bd());
 
       expect((await listarTelas(sesion, { idCategoria: categoriaFelpa }, bd())).total).toBe(1);
       expect((await listarTelas(sesion, { idCategoria: jersey.id }, bd())).total).toBe(1);
@@ -438,10 +515,14 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const sesion = sesionAdmin();
       await crearTela(
         sesion,
-        { nombre: 'Felpa pesada', colores: [{ idColor: colorNegro }, { idColor: colorBlanco }] },
+        {
+          nombre: 'Felpa pesada',
+          unidadMedida: 'KG',
+          colores: [{ idColor: colorNegro }, { idColor: colorBlanco }],
+        },
         bd(),
       );
-      await crearTela(sesion, { nombre: 'Jersey liviano', colores: [] }, bd());
+      await crearTela(sesion, { nombre: 'Jersey liviano', unidadMedida: 'KG', colores: [] }, bd());
 
       const pagina = await listarTelas(sesion, { busqueda: 'FELPA' }, bd());
       expect(pagina.total).toBe(1);
@@ -449,10 +530,64 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       expect((await listarTelas(sesion, { busqueda: 'zzz' }, bd())).total).toBe(0);
     });
 
+    // Daniel (30-jul-2026): *"me gustaría poder buscar por color, por tipo de tela"* — en el
+    // almacén se busca "negro" mucho más seguido que el nombre exacto de la tela.
+    it('busca también por COLOR, y filtra por un color concreto', async () => {
+      const sesion = sesionAdmin();
+      await crearTela(
+        sesion,
+        { nombre: 'Felpa pesada', unidadMedida: 'KG', colores: [{ idColor: colorNegro }] },
+        bd(),
+      );
+      await crearTela(
+        sesion,
+        { nombre: 'Jersey liviano', unidadMedida: 'M', colores: [{ idColor: colorBlanco }] },
+        bd(),
+      );
+
+      // El texto pega con el nombre del COLOR aunque no diga nada del nombre de la tela.
+      const porColor = await listarTelas(sesion, { busqueda: 'negr' }, bd());
+      expect(porColor.total).toBe(1);
+      expect(porColor.datos[0]?.nombre).toBe('Felpa pesada');
+
+      // Y el filtro duro por id de color hace lo propio.
+      const filtrada = await listarTelas(sesion, { idColor: colorBlanco }, bd());
+      expect(filtrada.total).toBe(1);
+      expect(filtrada.datos[0]?.nombre).toBe('Jersey liviano');
+
+      // Sin coincidencia ni en tela ni en color: vacío (la búsqueda no se abrió de más).
+      expect((await listarTelas(sesion, { busqueda: 'zzz' }, bd())).total).toBe(0);
+    });
+
+    it('guarda la UNIDAD como se eligió (kilos o metros), y no acepta otra', async () => {
+      const sesion = sesionAdmin();
+      const enMetros = await crearTela(
+        sesion,
+        { nombre: 'Chifón', unidadMedida: 'M', colores: [] },
+        bd(),
+      );
+      expect(enMetros.unidadMedida).toBe('M');
+      const enKilos = await crearTela(
+        sesion,
+        { nombre: 'Felpa', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
+      expect(enKilos.unidadMedida).toBe('KG');
+
+      // Alta sin unidad → rechazada por el contrato (no cae a un default silencioso).
+      await expect(
+        crearTela(sesion, { nombre: 'Sin unidad', colores: [] } as never, bd()),
+      ).rejects.toThrow();
+    });
+
     it('excluye inactivas por defecto', async () => {
       const sesion = sesionAdmin();
-      await crearTela(sesion, { nombre: 'Activa', colores: [] }, bd());
-      const inactiva = await crearTela(sesion, { nombre: 'Inactiva', colores: [] }, bd());
+      await crearTela(sesion, { nombre: 'Activa', unidadMedida: 'KG', colores: [] }, bd());
+      const inactiva = await crearTela(
+        sesion,
+        { nombre: 'Inactiva', unidadMedida: 'KG', colores: [] },
+        bd(),
+      );
       await desactivarTela(sesion, inactiva.id, bd());
 
       expect((await listarTelas(sesion, {}, bd())).total).toBe(1);
@@ -462,7 +597,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
     it('pagina y respeta el orden por nombre', async () => {
       const sesion = sesionAdmin();
       for (const nombre of ['Ccc', 'Aaa', 'Bbb']) {
-        await crearTela(sesion, { nombre, colores: [] }, bd());
+        await crearTela(sesion, { unidadMedida: 'KG', nombre, colores: [] }, bd());
       }
       const p1 = await listarTelas(
         sesion,
@@ -488,7 +623,11 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
 
     it('NO se puede desactivar una categoría usada por una tela ACTIVA → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
-      await crearTela(sesion, { nombre: 'Tela', idCategoria: categoriaFelpa, colores: [] }, bd());
+      await crearTela(
+        sesion,
+        { nombre: 'Tela', unidadMedida: 'KG', idCategoria: categoriaFelpa, colores: [] },
+        bd(),
+      );
       await expect(desactivarTelaCategoria(sesion, categoriaFelpa, bd())).rejects.toBeInstanceOf(
         ErrorConflicto,
       );
@@ -498,7 +637,7 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       const sesion = sesionAdmin();
       const tela = await crearTela(
         sesion,
-        { nombre: 'Tela', idCategoria: categoriaFelpa, colores: [] },
+        { nombre: 'Tela', unidadMedida: 'KG', idCategoria: categoriaFelpa, colores: [] },
         bd(),
       );
       await desactivarTela(sesion, tela.id, bd());

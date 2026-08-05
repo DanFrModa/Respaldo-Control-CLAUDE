@@ -127,7 +127,20 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     expect(tras1.bordados).toBe(3); // incl. el duplicado de nombre desambiguado
     expect(tras1.avios).toBe(3);
     expect(tras1.colores).toBe(6); // Marino, Negro, Negro A, Negro B, Blanco, Rojo
-    expect(tras1.telas).toBe(3); // Alsatex100 (unificada), Jersey Liso, FelpaSuelta (TelaDis sin Tela)
+    // Alsatex100 (unificada), Jersey Liso, Chifon Liso, FelpaSuelta (TelaDis sin Tela)
+    expect(tras1.telas).toBe(4);
+
+    // La UNIDAD sale de `Telas.Medida` del Access (-1/1 = Kilos, 0 = Metros): el chifón es plano y
+    // se compra en metros. Sin esto, las 142 telas de metros del volcado real nacerían en kilos y
+    // el stock, el consumo y el costo por prenda quedarían mal sin que nadie lo note.
+    const porUnidad = await cliente.tela.findMany({
+      select: { nombre: true, unidadMedida: true },
+      orderBy: { nombre: 'asc' },
+    });
+    expect(porUnidad.find((t) => t.nombre === 'Chifon Liso')?.unidadMedida).toBe('M');
+    expect(porUnidad.find((t) => t.nombre === 'Alsatex100')?.unidadMedida).toBe('KG');
+    // La que solo existe en TelasDis no trae medida: queda en KG (y el loader lo reporta).
+    expect(porUnidad.find((t) => t.nombre === 'FelpaSuelta')?.unidadMedida).toBe('KG');
     expect(tras1.telaColor).toBe(5);
     expect(tras1.tallas).toBe(6); // XC, CH, M, G, XG, EX (la cadena rara no carga)
     expect(tras1.curvas).toBe(2);
@@ -136,6 +149,27 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     // 2ª corrida: nada se duplica.
     await ejecutarEtl(cliente);
     expect(await conteos()).toEqual(tras1);
+  }, 180_000);
+
+  // Las telas cargadas ANTES del 30-jul-2026 quedaron TODAS en KG (default de la migración
+  // `20260730120000_unidad_tela`, porque la unidad ni se migraba). Re-correr el ETL tiene que
+  // CORREGIRLAS: si solo las creara, las 142 telas de metros del volcado real se quedarían mal para
+  // siempre en una base ya cargada — y como todas dirían KG, nadie lo notaría (hallazgo del
+  // reviewer, que además era lo que la migración prometía por escrito).
+  it('al re-correrse CORRIGE la unidad de las telas ya migradas (no solo las crea)', async () => {
+    await ejecutarEtl(cliente);
+    const chifon = await cliente.tela.findFirstOrThrow({ where: { nombre: 'Chifon Liso' } });
+    expect(chifon.unidadMedida).toBe('M');
+
+    // Se simula el estado de una base cargada antes: la unidad quedó en KG.
+    await cliente.tela.update({ where: { id: chifon.id }, data: { unidadMedida: 'KG' } });
+
+    await ejecutarEtl(cliente);
+
+    const corregida = await cliente.tela.findUniqueOrThrow({ where: { id: chifon.id } });
+    expect(corregida.unidadMedida).toBe('M');
+    // Y no duplicó la tela al pasar por la rama de "ya existe".
+    expect(await cliente.tela.count({ where: { nombre: 'Chifon Liso' } })).toBe(1);
   }, 180_000);
 
   it('asigna el ROL de proveedor según TipoProv (T→vende-telas, H→vende-avios, S→otros)', async () => {

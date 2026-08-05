@@ -14,8 +14,9 @@ import { z } from 'zod';
  *
  * Reglas de captura (las repite el dominio, A1): `nombre` único global; un color NO se
  * repite dentro de la misma tela; `idCategoria` opcional (si viene, debe existir y estar
- * activa); `tipoComponente` ∈ {CUERPO, CARDIGAN, OTRO}; `unidadMedida` texto libre (la UI
- * sugiere una lista). Semántica del PATCH parcial (M1, igual que Proveedor): omitir un
+ * activa); `tipoComponente` ∈ {CUERPO, CARDIGAN, OTRO}; `unidadMedida` ∈ {KG, M} y es
+ * OBLIGATORIA en el alta (de ella dependen el stock, el consumo y el costo por prenda).
+ * Semántica del PATCH parcial (M1, igual que Proveedor): omitir un
  * campo (`undefined`) = no tocar; mandar `null`/`''` en un opcional de texto = vaciarlo
  * (se guarda `null`, nunca `''`). Decimales (`precioSugerido`, `precio` por color) entran
  * como `number` y salen como `number` (Prisma los guarda como `Decimal`).
@@ -25,6 +26,16 @@ import { z } from 'zod';
 
 /** Tipos de componente de una tela dentro del lote (D5). Alineado con `TipoComponenteTela` de src/datos. */
 export const TIPOS_COMPONENTE_TELA = ['CUERPO', 'CARDIGAN', 'OTRO'] as const;
+
+/**
+ * Unidades en las que se compra Y se consume una tela (Daniel, 30-jul-2026: *"solo kilos y metros,
+ * no hay otras medidas"*). El sistema viejo ya lo llevaba así (`Telas.Medida`: -1 = Kilos, 0 =
+ * Metros). Es OBLIGATORIA: sin ella el stock, el consumo y el costo por prenda no significan nada.
+ */
+export const UNIDADES_TELA = ['KG', 'M'] as const;
+
+/** Unidad de una tela. */
+export type UnidadTela = (typeof UNIDADES_TELA)[number];
 
 /** Clave de tipo de componente de tela. */
 export type TipoComponenteTelaClave = (typeof TIPOS_COMPONENTE_TELA)[number];
@@ -178,11 +189,6 @@ const camposOpcionalesTela = {
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
     .optional(),
-  unidadMedida: z
-    .string()
-    .trim()
-    .max(30, { error: 'La unidad de medida no puede tener más de 30 caracteres' })
-    .optional(),
 } as const;
 
 /**
@@ -191,7 +197,6 @@ const camposOpcionalesTela = {
  */
 const camposOpcionalesTelaEditar = {
   descripcion: camposOpcionalesTela.descripcion.nullable(),
-  unidadMedida: camposOpcionalesTela.unidadMedida.nullable(),
 } as const;
 
 /**
@@ -213,6 +218,13 @@ export const esquemaTelaCrear = z.object({
     .positive({ error: 'El id de la categoría debe ser positivo' })
     .optional(),
   tipoComponente: z.enum(TIPOS_COMPONENTE_TELA).default('OTRO'),
+  /**
+   * OBLIGATORIA en el alta, a propósito y sin default: si se dejara caer al default de la base
+   * (KG), una tela que se compra en metros nacería mal etiquetada EN SILENCIO y arrastraría el
+   * error al stock, al consumo y al costo por prenda. Quien da de alta la tela lo sabe; el sistema
+   * no lo adivina.
+   */
+  unidadMedida: z.enum(UNIDADES_TELA, { error: 'Elige la unidad: kilos (KG) o metros (M)' }),
   favorito: z.boolean().default(false),
   paraProduccion: z.boolean().default(true),
   /** Precio de referencia por unidad (informativo). Opcional, no negativo. */
@@ -253,6 +265,10 @@ export const esquemaTelaEditar = z
       .nullable()
       .optional(),
     tipoComponente: z.enum(TIPOS_COMPONENTE_TELA).optional(),
+    /** Omitir = no tocar. NO es nullable: una tela sin unidad no existe. */
+    unidadMedida: z
+      .enum(UNIDADES_TELA, { error: 'La unidad debe ser kilos (KG) o metros (M)' })
+      .optional(),
     favorito: z.boolean({ error: 'Favorito debe ser verdadero o falso' }).optional(),
     paraProduccion: z.boolean({ error: 'Para producción debe ser verdadero o falso' }).optional(),
     /** `null` quita el precio sugerido; un número lo fija; omitir = no tocar. */
@@ -290,7 +306,9 @@ export const esquemaTelaSalida = z
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     idCategoria: z.number().int().nullable().describe('Id de la categoría, o null.'),
     categoria: z.string().nullable().describe('Nombre de la categoría, o null.'),
-    unidadMedida: z.string().nullable().describe('Unidad de medida (kg, m…), o null.'),
+    unidadMedida: z
+      .enum(UNIDADES_TELA)
+      .describe('Unidad en que se compra y se consume: KG (kilos) o M (metros).'),
     tipoComponente: z
       .enum(TIPOS_COMPONENTE_TELA)
       .describe('Rol típico de la tela en el lote (D5).'),
@@ -329,7 +347,15 @@ export const esquemaListarTelas = z
       .trim()
       .max(150)
       .optional()
-      .describe('Texto a buscar en el nombre (insensible a mayúsculas).'),
+      .describe(
+        'Texto a buscar en el nombre de la tela O en el de sus colores (insensible a mayúsculas).',
+      ),
+    idColor: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Solo telas que tengan ESE color en su grid.'),
     idCategoria: z.coerce
       .number()
       .int()

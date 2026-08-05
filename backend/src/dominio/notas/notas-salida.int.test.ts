@@ -112,7 +112,7 @@ beforeEach(async () => {
   clienteNegocioId = clienteNegocio.id;
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'AVIO' } });
-  telaFelpa = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'm' } });
+  telaFelpa = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'M' } });
   avioBoton = await cliente.avio.create({
     data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
   });

@@ -336,6 +336,7 @@ type ColorEntrada = z.output<typeof esquemaTelaColores>[number];
 export const esquemaListarTelas = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(150).optional(),
   idCategoria: z.number().int().positive().optional(),
+  idColor: z.number().int().positive().optional(),
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['nombre', 'creadoEn']).default('nombre'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
@@ -360,7 +361,11 @@ const incluirCategoriaYColores = {
 } satisfies Prisma.TelaInclude;
 
 /** Campos de TEXTO opcionales editables (clave del payload === clave del modelo). */
-const CAMPOS_TEXTO_EDITABLES = ['descripcion', 'unidadMedida'] as const;
+// `unidadMedida` NO va aquí: es un enum NOT NULL desde el 30-jul-2026 y este loop convierte
+// ''/null en NULL — escribiría NULL en una columna que no lo admite (500). Se maneja abajo con
+// los demás enums. Hoy el Zod del contrato lo filtraría antes, pero eso es una defensa en OTRO
+// archivo: aflojar `esquemaTelaEditar` bastaría para reventarlo (hallazgo del reviewer).
+const CAMPOS_TEXTO_EDITABLES = ['descripcion'] as const;
 
 /**
  * Unicidad de negocio GLOBAL (ADR-0007): no puede haber dos telas con el mismo `nombre`,
@@ -577,6 +582,10 @@ function aplicarOpcionalesEditar(
   }
 
   // Enums/banderas: omitir = no tocar (el form las manda con valor).
+  if (datos.unidadMedida !== undefined && datos.unidadMedida !== actual.unidadMedida) {
+    cambios.unidadMedida = datos.unidadMedida;
+    detalle.unidadMedida = { de: actual.unidadMedida, a: datos.unidadMedida };
+  }
   if (datos.tipoComponente !== undefined && datos.tipoComponente !== actual.tipoComponente) {
     cambios.tipoComponente = datos.tipoComponente;
     detalle.tipoComponente = { de: actual.tipoComponente, a: datos.tipoComponente };
@@ -604,7 +613,7 @@ function aplicarOpcionalesEditar(
  *
  * @example
  * const t = await crearTela(sesion, {
- *   nombre: "Felpa 100% algodón", idCategoria: idFelpa, unidadMedida: "KILOGRAMO",
+ *   nombre: "Felpa 100% algodón", idCategoria: idFelpa, unidadMedida: "KG",
  *   colores: [{ idColor: idNegro, precio: 95 }, { idColor: idBlanco }],
  * });
  */
@@ -866,12 +875,25 @@ export async function listarTelas(
   verificarPermiso(sesion, 'telas.ver');
   const filtros = validarEntrada(esquemaListarTelas, parametros);
 
+  // La búsqueda mira el nombre de la tela Y EL DE SUS COLORES (petición de Daniel, 30-jul-2026:
+  // *"me gustaría poder buscar por color, por tipo de tela"*): en el almacén se busca "negro" mucho
+  // más seguido que el nombre exacto de la tela, y cada tela trae sus colores adentro.
   const where: Prisma.TelaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.idCategoria === undefined ? {} : { idCategoria: filtros.idCategoria }),
+    ...(filtros.idColor === undefined ? {} : { colores: { some: { idColor: filtros.idColor } } }),
     ...(filtros.busqueda === undefined || filtros.busqueda === ''
       ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+      : {
+          OR: [
+            { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
+            {
+              colores: {
+                some: { color: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } },
+              },
+            },
+          ],
+        }),
   };
 
   const cliente = clienteLectura(bd);

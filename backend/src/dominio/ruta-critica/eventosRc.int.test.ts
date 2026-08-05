@@ -87,7 +87,7 @@ beforeEach(async () => {
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   tallaCH = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
   proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor / Maquila SA' } });
-  tela = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'm' } });
+  tela = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'M' } });
   avio = await cliente.avio.create({
     data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
   });

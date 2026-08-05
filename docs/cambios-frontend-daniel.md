@@ -1279,3 +1279,100 @@ pero se despliega con el mismo deploy: backend y frontend van juntos.
   maquilero asignado el campo queda vacío, la lista filtrada con su pendiente, que el que ya devolvió
   todo no se ofrece, y el enlace de tela con su permiso) · `SalidaTelaOrdenPagina.test.tsx` (el
   deep-link llega con la orden puesta y sin deep-link no se pide nada al servidor).
+
+---
+
+## 2026-07-30 — Telas: unidad en kilos o metros, búsqueda por color y el cardigan al tono
+
+Primera tanda del trabajo de **consumos de tela e inventarios** que pidió Daniel. Antes de
+construir nada se revisó qué existía ya, y resultó que **lo más difícil ya estaba resuelto**.
+
+### Lo que ya existía (y Daniel no sabía que sí)
+
+> *"No sé si tienes definido poder hacerlo por lotes… la felpa lleva su cardigan y es importante que
+> esté junto el registro, porque puede haber dos partidas de negro y cada una lleva su cardigan al
+> tono."*
+
+Eso ya está desde el arranque: un **lote** es una partida de **un color**, con su proveedor, su
+factura y su fecha, y **adentro trae varias telas**. Dos partidas de negro son **dos lotes**, cada
+uno con su cardigan del mismo teñido, y el inventario se lleva por **tela × lote × almacén** — nunca
+se revuelven. También estaban el **precio por color** y el **precio por proveedor y por color** (el
+cardigan es otra tela, así que lleva su propio precio).
+
+### A) La unidad: kilos o metros, y ya
+
+Daniel: *"todo lo que se compra en kilos se consume en kilos y lo que se compra en metros se consume
+en metros… solo kilos y metros, no hay otras medidas"*.
+
+La unidad **era un texto libre** con una lista de sugerencias (KILOGRAMO, YARDA, ROLLO, CONO…) y
+—peor— **estaba vacía en todas las telas**. Sin unidad, el stock no se puede leer, el consumo no se
+puede comparar y el costo por prenda no significa nada.
+
+- Ahora es **una elección de dos: Kilos o Metros**, y es **obligatoria al dar de alta la tela**, sin
+  valor por default. Es a propósito: una tela de metros que naciera marcada en kilos ensuciaría el
+  inventario **sin que nadie lo note**. Quien la da de alta lo sabe; el sistema no lo adivina.
+- En la edición se puede **cambiar** de una a otra, pero **no dejarla en blanco**.
+- **El dato viejo no se inventó.** El Access sí lo guardaba: la columna `Medida` de la tabla de
+  telas, y el propio formulario viejo declara qué significa (**-1 = Kilos, 0 = Metros**). Son **735
+  telas en kilos y 142 en metros**, y así las va a cargar el ETL. Las telas que ya están cargadas
+  en `prueba` pasan a kilos con la migración, y **el ETL las corrige al re-correrse**: compara la
+  unidad de cada tela ya migrada contra el dato del Access y la ajusta si difiere, reportando cada
+  corrección. No hace falta borrar la base.
+
+### B) Buscar el catálogo por color
+
+En el almacén se busca *"negro"* mucho más seguido que el nombre exacto de la tela. El buscador del
+catálogo ahora mira **el nombre de la tela y el de sus colores**.
+
+### C) Al descargar, el cardigan al tono se ofrece junto
+
+Daniel: *"normalmente se descargan las telas al mismo tiempo cuando están relacionadas"*.
+
+Al elegir un lote en la salida de tela, aparece un aviso con **las otras telas de esa misma
+partida** (con lo que hay disponible de cada una) y un atajo para capturarlas seguidas, sin volver a
+buscar el lote. Y respetando su otra regla —*"nada se estima, ni es un porcentaje… todo lleva una
+cantidad tecleada"*—: **se ofrecen, no se descuentan solas**. Cada una lleva su cantidad. La que ya
+se capturó deja de ofrecerse.
+
+### D) El botón "Consumo tela" de la OP
+
+Abría la pantalla en blanco y había que volver a buscar la orden. Ahora **llega con esa orden
+puesta**, como el enlace del avance de producción.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración**, automática: `20260730120000_unidad_tela`. Convierte la unidad a kilos/metros
+   respetando lo que estuviera capturado a mano y dejando el resto en **kilos**.
+2. **NO hay permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. Al desplegar, **todas** las telas van a aparecer en **kilos**. Para corregir las que van en
+   metros hay que **re-correr el ETL de catálogos** (no hace falta borrar la base): desde `backend/`,
+   `npx tsx --env-file=.env migracion/etl-catalogos.ts`. El reporte lista cada tela corregida bajo
+   *"Telas con la unidad corregida (kilos/metros del Access)"*. Mientras no se corra, Daniel verá
+   142 telas de metros marcadas en kilos — y conviene avisarle, porque **todas** dirán kg y el error
+   no se nota solo.
+
+### Lo que sigue (y no entró aquí)
+
+**Entrada de tela por factura o remisión** sin orden de compra (con el PDF adjunto), la **pantalla
+de stocks** por proveedor / tipo / color —el API ya acepta un filtro por color (`idColor`) que esa
+pantalla va a usar; está puesto de antemano a propósito, para que quien la construya no lo
+reinvente—, y el **packing list de rollos** —que queda al final y como
+dato informativo del lote, porque *"los rollos solo podrían ser informativos"*—. El **consumo por
+prenda** se mostrará junto al estimado, pero **no se empuja solo al costeo**: eso toca el módulo de
+Costos y se hace aparte.
+
+### Archivos tocados
+
+- **Backend:** `prisma/schema.prisma` + migración `20260730120000_unidad_tela` (enum `UnidadTela`) ·
+  `src/contrato/esquemas/tela.ts` (obligatoria en el alta, no vaciable en la edición, filtro
+  `idColor`) · `src/dominio/catalogos/telas.ts` (la búsqueda mira los colores) ·
+  `migracion/comun/mapeos-enum.ts` + `migracion/loaders/telas.ts` (la unidad real del Access) ·
+  `openapi.json`.
+- **Frontend:** `src/modulos/telas/DialogoTela.tsx` (la unidad como elección obligatoria) ·
+  `src/modulos/inventarios/CapturaRenglonesTela.tsx` (telas al tono del lote) ·
+  `src/modulos/ordenes/CentroOrdenesPagina.tsx` (el mosaico lleva la orden) · `src/api/telas.ts` ·
+  `openapi.json` + `esquema.gen.ts` regenerados.
+- **Pruebas:** `mapeos-enum.test.ts` (el mapeo -1/0 del Access) · `tela.test.ts` (alta sin unidad
+  rechazada; no se puede vaciar) · `telas.int.test.ts` (**CI**: búsqueda por color, filtro por color,
+  y la unidad como se eligió) · `CapturaRenglonesTela.test.tsx` (**nuevo**: el aviso de telas al
+  tono, el atajo que conserva el lote, y que la ya capturada deja de ofrecerse).

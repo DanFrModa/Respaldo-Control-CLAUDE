@@ -17,25 +17,40 @@ import {
  */
 
 describe('esquemaTelaCrear', () => {
-  it('acepta un alta mínima (solo nombre) y aplica defaults', () => {
-    const datos = esquemaTelaCrear.parse({ nombre: '  Felpa  ' });
+  it('acepta un alta mínima (nombre + unidad) y aplica defaults', () => {
+    const datos = esquemaTelaCrear.parse({ nombre: '  Felpa  ', unidadMedida: 'KG' });
     expect(datos.nombre).toBe('Felpa');
+    expect(datos.unidadMedida).toBe('KG');
     expect(datos.tipoComponente).toBe('OTRO');
     expect(datos.favorito).toBe(false);
     expect(datos.paraProduccion).toBe(true);
     expect(datos.colores).toEqual([]);
   });
 
+  // La unidad NO tiene default a propósito: una tela de metros que naciera en kilos ensuciaría el
+  // stock, el consumo y el costo por prenda sin que nadie lo note (Daniel, 30-jul-2026).
+  it('RECHAZA un alta sin unidad, y solo acepta kilos o metros', () => {
+    expect(esquemaTelaCrear.safeParse({ nombre: 'Felpa' }).success).toBe(false);
+    expect(esquemaTelaCrear.safeParse({ nombre: 'Felpa', unidadMedida: 'YARDA' }).success).toBe(
+      false,
+    );
+    expect(esquemaTelaCrear.safeParse({ nombre: 'Felpa', unidadMedida: 'M' }).success).toBe(true);
+  });
+
   it('acepta un grid de colores con y sin precio', () => {
     const datos = esquemaTelaCrear.parse({
       nombre: 'Jersey',
+      unidadMedida: 'KG',
       colores: [{ idColor: 1, precio: 95.5 }, { idColor: 2 }],
     });
     expect(datos.colores).toEqual([{ idColor: 1, precio: 95.5 }, { idColor: 2 }]);
   });
 
   it('permite un grid de colores VACÍO (una tela sin colores es válida)', () => {
-    expect(esquemaTelaCrear.safeParse({ nombre: 'Sin colores', colores: [] }).success).toBe(true);
+    expect(
+      esquemaTelaCrear.safeParse({ nombre: 'Sin colores', unidadMedida: 'KG', colores: [] })
+        .success,
+    ).toBe(true);
   });
 
   it('rechaza colores repetidos dentro de la misma tela', () => {
@@ -94,18 +109,23 @@ describe('esquemaTelaEditar (semántica del PATCH parcial, M1)', () => {
     expect(datos.descripcion).toBeUndefined();
   });
 
-  it('acepta null para vaciar descripcion/unidadMedida y para quitar categoría/precio', () => {
+  it('acepta null para vaciar descripcion y para quitar categoría/precio', () => {
     const datos = esquemaTelaEditar.parse({
       id: 1,
       descripcion: null,
-      unidadMedida: null,
       idCategoria: null,
       precioSugerido: null,
     });
     expect(datos.descripcion).toBeNull();
-    expect(datos.unidadMedida).toBeNull();
     expect(datos.idCategoria).toBeNull();
     expect(datos.precioSugerido).toBeNull();
+  });
+
+  it('la unidad NO se puede vaciar en la edición (una tela sin unidad no existe)', () => {
+    expect(esquemaTelaEditar.safeParse({ id: 1, unidadMedida: null }).success).toBe(false);
+    // Omitirla sí se vale: "no tocar".
+    expect(esquemaTelaEditar.safeParse({ id: 1 }).success).toBe(true);
+    expect(esquemaTelaEditar.safeParse({ id: 1, unidadMedida: 'M' }).success).toBe(true);
   });
 
   it('NO permite null en el nombre (clave obligatoria)', () => {

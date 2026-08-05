@@ -36,6 +36,9 @@ export type Tela = TelasPagina['datos'][number];
 export type TelaColor = Tela['colores'][number];
 /** Tipo de componente de la tela (CUERPO/CARDIGAN/OTRO). */
 export type TipoComponenteTela = Tela['tipoComponente'];
+
+/** Unidad en que se compra y se consume una tela: `KG` (kilos) o `M` (metros). */
+export type UnidadTela = Tela['unidadMedida'];
 /** Parametros de consulta del listado de telas (querystring; incluye `idCategoria`). */
 export type TelasQuery = NonNullable<paths['/api/telas']['get']['parameters']['query']>;
 /** Cuerpo de alta de tela (`POST /api/telas`). */

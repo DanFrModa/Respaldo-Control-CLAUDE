@@ -1270,7 +1270,12 @@ function DetalleCentroOrden({
           <Mosaico
             icono={Calculator}
             etiqueta="Consumo tela"
-            onClick={() => void navigate('/inventarios/telas/salida-orden')}
+            // Se lleva la ORDEN puesta (reporte de Daniel, 30-jul-2026: *"cuando le doy click ahí
+            // quiero que me mande a descargar la tela de esa orden en particular"*). Antes abría la
+            // pantalla en blanco y había que volver a buscar la orden a mano.
+            onClick={() =>
+              void navigate('/inventarios/telas/salida-orden', { state: { idOrden: orden.id } })
+            }
             testid="mosaico-tela"
           />
           <Mosaico

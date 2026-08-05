@@ -30,7 +30,7 @@ const sesionSinPermisos = () => sesionDePrueba();
 describe('dominio Telas — permisos (deny-by-default, §9.2)', () => {
   it('crear tela sin permiso administrar → ErrorPermiso (no toca la base)', async () => {
     await expect(
-      crearTela(sesionSoloVer(), { nombre: 'Felpa', colores: [] }, {}),
+      crearTela(sesionSoloVer(), { nombre: 'Felpa', unidadMedida: 'KG', colores: [] }, {}),
     ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
@@ -56,9 +56,9 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
   // `validarEntrada` corre ANTES de abrir transacción: estas entradas inválidas lanzan
   // ErrorValidacion sin que el `bd` (ausente) se use jamás.
   it('crear tela con nombre vacío → ErrorValidacion', async () => {
-    await expect(crearTela(sesionAdmin(), { nombre: '   ' }, {})).rejects.toBeInstanceOf(
-      ErrorValidacion,
-    );
+    await expect(
+      crearTela(sesionAdmin(), { unidadMedida: 'KG', nombre: '   ' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
   it('crear tela con un color repetido en el grid → ErrorValidacion (Zod refine)', async () => {
@@ -67,6 +67,7 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
         sesionAdmin(),
         {
           nombre: 'Repe',
+          unidadMedida: 'KG',
           colores: [
             { idColor: 4, precio: 1 },
             { idColor: 4, precio: 2 },
@@ -79,7 +80,11 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
 
   it('crear tela con precio de color negativo → ErrorValidacion', async () => {
     await expect(
-      crearTela(sesionAdmin(), { nombre: 'X', colores: [{ idColor: 1, precio: -5 }] }, {}),
+      crearTela(
+        sesionAdmin(),
+        { nombre: 'X', unidadMedida: 'KG', colores: [{ idColor: 1, precio: -5 }] },
+        {},
+      ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
@@ -122,7 +127,11 @@ describe('dominio Telas — colores inexistentes/inactivos (tx stub, sin Postgre
     await expect(
       crearTela(
         sesionAdmin(),
-        { nombre: 'Con color fantasma', colores: [{ idColor: 1 }, { idColor: 999 }] },
+        {
+          nombre: 'Con color fantasma',
+          unidadMedida: 'KG',
+          colores: [{ idColor: 1 }, { idColor: 999 }],
+        },
         bd,
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -134,7 +143,11 @@ describe('dominio Telas — colores inexistentes/inactivos (tx stub, sin Postgre
   it('rechaza un color DESACTIVADO → ErrorValidacion', async () => {
     const { bd } = bdParaAlta([{ id: 1, nombre: 'Negro', activo: false }]);
     await expect(
-      crearTela(sesionAdmin(), { nombre: 'Con color inactivo', colores: [{ idColor: 1 }] }, bd),
+      crearTela(
+        sesionAdmin(),
+        { nombre: 'Con color inactivo', unidadMedida: 'KG', colores: [{ idColor: 1 }] },
+        bd,
+      ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });

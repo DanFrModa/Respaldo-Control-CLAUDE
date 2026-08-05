@@ -12,6 +12,7 @@ import {
   type TelaColor,
   type TelasQuery,
   type TipoComponenteTela,
+  type UnidadTela,
 } from '@/api/telas';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -40,6 +41,16 @@ const POR_PAGINA = 10;
 
 /** Valor del filtro de categoría que significa "todas" (sin filtrar). */
 const CATEGORIA_TODAS = 'TODAS';
+
+/**
+ * La unidad se pinta con su etiqueta legible, NUNCA con el valor crudo del enum: el diálogo dice
+ * "Kilos (kg)" y la tabla decía "KG" — dos vocabularios para el mismo dato en la misma pantalla
+ * (hallazgo del reviewer). Aquí va la forma CORTA, que es la que cabe en un renglón denso.
+ */
+const ETIQUETA_UNIDAD: Record<UnidadTela, string> = {
+  KG: 'kg',
+  M: 'm',
+};
 
 /** Etiqueta legible del tipo de componente del lote (D5). */
 const ETIQUETA_TIPO_COMPONENTE: Record<TipoComponenteTela, string> = {
@@ -227,7 +238,7 @@ export function TelasPagina(): React.JSX.Element {
             <Input
               type="search"
               className="h-8 pl-8 text-sm"
-              placeholder="Buscar tela…"
+              placeholder="Buscar tela o color…"
               value={textoBusqueda}
               onChange={(e) => {
                 setTextoBusqueda(e.target.value);
@@ -484,9 +495,7 @@ function RenglonTela({
                 ) : null}
                 {tela.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
               </div>
-              {hayTexto(tela.unidadMedida) ? (
-                <div className="text-xs text-faint">{tela.unidadMedida}</div>
-              ) : null}
+              <div className="text-xs text-faint">{ETIQUETA_UNIDAD[tela.unidadMedida]}</div>
             </div>
           </div>
         </TablaDensaCelda>
@@ -522,8 +531,10 @@ function RenglonTela({
                 </h4>
                 <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
                   <Dato etiqueta="Categoría">{tela.categoria ?? '—'}</Dato>
-                  <Dato etiqueta="Unidad de medida">
-                    {hayTexto(tela.unidadMedida) ? tela.unidadMedida : '—'}
+                  <Dato etiqueta="Unidad">
+                    <span data-testid="tela-detalle-unidad">
+                      {ETIQUETA_UNIDAD[tela.unidadMedida]}
+                    </span>
                   </Dato>
                   <Dato etiqueta="Tipo de componente">
                     {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
