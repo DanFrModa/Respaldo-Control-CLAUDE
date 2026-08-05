@@ -1156,6 +1156,16 @@ model ClienteCampo {
 // F1-E1B (Proveedor↔RolProveedor) y F1-E2 (Maquilero↔TipoProceso).
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Unidad en que se compra Y se consume una tela (Daniel, 30-jul-2026: *"todo lo que se compra en
+/// kilos se consume en kilos y lo que se compra en metros se consume en metros"*). Son las DOS que
+/// existen — el sistema viejo ya lo llevaba así (`Telas.Medida`: -1 = Kilos, 0 = Metros).
+enum UnidadTela {
+  KG
+  M
+
+  @@map("unidad_tela")
+}
+
 /// Tipo de componente de una tela dentro del lote (D5 — doc 04-Inventarios §B.1:
 /// telas de dos componentes, p. ej. felpa + cardigan del mismo lote). `OTRO` cubre
 /// acompañantes y telas de un solo componente. Sustituye la dualidad fija
@@ -1212,8 +1222,10 @@ model Tela {
   /// no se borra físico → se desactiva.
   idCategoria    Int?               @map("id_categoria")
   categoria      TelaCategoria?     @relation(fields: [idCategoria], references: [id], onDelete: Restrict)
-  /// Unidad de medida de uso/compra (kg, m…). Texto libre (la UI sugiere una lista).
-  unidadMedida   String?            @map("unidad_medida")
+  /// Unidad en que se compra y se consume (kg o m). OBLIGATORIA: de ella depende que el stock, el
+  /// consumo y el costo por prenda signifiquen algo. Era texto libre y venía NULL en todas las
+  /// telas — se cerró a enum el 30-jul-2026 (ver {@link UnidadTela}).
+  unidadMedida   UnidadTela         @default(KG) @map("unidad_medida")
   /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
   tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
   /// Tela de uso frecuente (preselección en la UI de captura).

@@ -164,8 +164,8 @@ describe('Listado de modelos — telaPrincipal (R9)', () => {
     expect((await filaListado()).telaPrincipal).toBeNull();
 
     // Dos telas: por nombre asc, "Algodón" va ANTES que "Popelina" (aunque se capture después).
-    const popelina = await cliente.tela.create({ data: { nombre: 'Popelina', unidadMedida: 'm' } });
-    const algodon = await cliente.tela.create({ data: { nombre: 'Algodón', unidadMedida: 'kg' } });
+    const popelina = await cliente.tela.create({ data: { nombre: 'Popelina', unidadMedida: 'M' } });
+    const algodon = await cliente.tela.create({ data: { nombre: 'Algodón', unidadMedida: 'KG' } });
     await cliente.modeloTela.createMany({
       data: [
         { idModelo: modelo.id, idTela: popelina.id, consumoPorPrenda: 0.5 },

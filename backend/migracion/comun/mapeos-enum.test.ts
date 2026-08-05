@@ -4,6 +4,7 @@ import {
   mapearRolProveedorComercial,
   mapearTipoBordado,
   mapearTipoComponente,
+  mapearUnidadTela,
   mapearTipoProveedor,
   rolesDeMaquilero,
 } from './mapeos-enum.js';
@@ -82,5 +83,20 @@ describe('migración · mapeos de enum (puros)', () => {
       expect(mapearTipoComponente('algo raro', 'otra cosa')).toBe('OTRO');
       expect(mapearTipoComponente(null, null)).toBe('OTRO');
     });
+  });
+});
+
+describe('mapearUnidadTela', () => {
+  // El mapeo NO se adivinó: el combo del formulario viejo `AgregarTelas` lo declara literal
+  // (`-1;"Kilos";0;"Metros"`) y `ExisTela` lo confirma ("Si=Kilos, No=Metros").
+  it('la bandera de Access: verdadero = kilos, falso = metros', () => {
+    expect(mapearUnidadTela('1')).toBe('KG');
+    expect(mapearUnidadTela('-1')).toBe('KG');
+    expect(mapearUnidadTela('0')).toBe('M');
+  });
+
+  it('sin dato cae en metros (es el valor "falso" del Access, no un default inventado)', () => {
+    expect(mapearUnidadTela('')).toBe('M');
+    expect(mapearUnidadTela(undefined)).toBe('M');
   });
 });

@@ -69,7 +69,7 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     descripcion: null,
     idCategoria: 7,
     categoria: 'Felpa',
-    unidadMedida: 'KILOGRAMO',
+    unidadMedida: 'KG',
     tipoComponente: 'CUERPO',
     favorito: false,
     precioSugerido: null,

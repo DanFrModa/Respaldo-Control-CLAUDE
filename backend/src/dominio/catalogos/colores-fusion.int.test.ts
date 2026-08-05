@@ -101,7 +101,12 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       // Una tela usa SOLO el color origen.
       const tela = await crearTela(
         sesionTelas(),
-        { nombre: 'Felpa lisa', idCategoria, colores: [{ idColor: origen.id, precio: 50 }] },
+        {
+          nombre: 'Felpa lisa',
+          unidadMedida: 'KG',
+          idCategoria,
+          colores: [{ idColor: origen.id, precio: 50 }],
+        },
         bd(),
       );
 
@@ -135,6 +140,7 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
         sesionTelas(),
         {
           nombre: 'Felpa colisión',
+          unidadMedida: 'KG',
           idCategoria,
           colores: [{ idColor: destino.id }, { idColor: origen.id, precio: 77 }],
         },
@@ -161,6 +167,7 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
         sesionTelas(),
         {
           nombre: 'Felpa ambos precios',
+          unidadMedida: 'KG',
           idCategoria,
           colores: [
             { idColor: destino.id, precio: 100 },
@@ -185,12 +192,12 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
 
       const telaA = await crearTela(
         sesionTelas(),
-        { nombre: 'Tela A', idCategoria, colores: [{ idColor: a.id }] },
+        { nombre: 'Tela A', unidadMedida: 'KG', idCategoria, colores: [{ idColor: a.id }] },
         bd(),
       );
       const telaB = await crearTela(
         sesionTelas(),
-        { nombre: 'Tela B', idCategoria, colores: [{ idColor: b.id }] },
+        { nombre: 'Tela B', unidadMedida: 'KG', idCategoria, colores: [{ idColor: b.id }] },
         bd(),
       );
 
@@ -233,7 +240,7 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const origen = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
       await crearTela(
         sesionTelas(),
-        { nombre: 'Tela', idCategoria, colores: [{ idColor: origen.id }] },
+        { nombre: 'Tela', unidadMedida: 'KG', idCategoria, colores: [{ idColor: origen.id }] },
         bd(),
       );
 

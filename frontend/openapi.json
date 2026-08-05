@@ -19420,7 +19420,18 @@
             "in": "query",
             "name": "busqueda",
             "required": false,
-            "description": "Texto a buscar en el nombre (insensible a mayúsculas)."
+            "description": "Texto a buscar en el nombre de la tela O en el de sus colores (insensible a mayúsculas)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idColor",
+            "required": false,
+            "description": "Solo telas que tengan ESE color en su grid."
           },
           {
             "schema": {
@@ -19535,15 +19546,12 @@
                             "description": "Nombre de la categoría, o null."
                           },
                           "unidadMedida": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": "string",
+                            "enum": [
+                              "KG",
+                              "M"
                             ],
-                            "description": "Unidad de medida (kg, m…), o null."
+                            "description": "Unidad en que se compra y se consume: KG (kilos) o M (metros)."
                           },
                           "tipoComponente": {
                             "type": "string",
@@ -19888,6 +19896,13 @@
                       "OTRO"
                     ]
                   },
+                  "unidadMedida": {
+                    "type": "string",
+                    "enum": [
+                      "KG",
+                      "M"
+                    ]
+                  },
                   "favorito": {
                     "default": false,
                     "type": "boolean"
@@ -19925,14 +19940,11 @@
                   "descripcion": {
                     "type": "string",
                     "maxLength": 500
-                  },
-                  "unidadMedida": {
-                    "type": "string",
-                    "maxLength": 30
                   }
                 },
                 "required": [
-                  "nombre"
+                  "nombre",
+                  "unidadMedida"
                 ]
               }
             }
@@ -19997,15 +20009,12 @@
                       "description": "Nombre de la categoría, o null."
                     },
                     "unidadMedida": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": "string",
+                      "enum": [
+                        "KG",
+                        "M"
                       ],
-                      "description": "Unidad de medida (kg, m…), o null."
+                      "description": "Unidad en que se compra y se consume: KG (kilos) o M (metros)."
                     },
                     "tipoComponente": {
                       "type": "string",
@@ -20361,15 +20370,12 @@
                       "description": "Nombre de la categoría, o null."
                     },
                     "unidadMedida": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": "string",
+                      "enum": [
+                        "KG",
+                        "M"
                       ],
-                      "description": "Unidad de medida (kg, m…), o null."
+                      "description": "Unidad en que se compra y se consume: KG (kilos) o M (metros)."
                     },
                     "tipoComponente": {
                       "type": "string",
@@ -20683,6 +20689,13 @@
                       "OTRO"
                     ]
                   },
+                  "unidadMedida": {
+                    "type": "string",
+                    "enum": [
+                      "KG",
+                      "M"
+                    ]
+                  },
                   "favorito": {
                     "type": "boolean"
                   },
@@ -20729,17 +20742,6 @@
                       {
                         "type": "string",
                         "maxLength": 500
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "unidadMedida": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 30
                       },
                       {
                         "type": "null"
@@ -20823,15 +20825,12 @@
                       "description": "Nombre de la categoría, o null."
                     },
                     "unidadMedida": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": "string",
+                      "enum": [
+                        "KG",
+                        "M"
                       ],
-                      "description": "Unidad de medida (kg, m…), o null."
+                      "description": "Unidad en que se compra y se consume: KG (kilos) o M (metros)."
                     },
                     "tipoComponente": {
                       "type": "string",
@@ -21185,15 +21184,12 @@
                       "description": "Nombre de la categoría, o null."
                     },
                     "unidadMedida": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": "string",
+                      "enum": [
+                        "KG",
+                        "M"
                       ],
-                      "description": "Unidad de medida (kg, m…), o null."
+                      "description": "Unidad en que se compra y se consume: KG (kilos) o M (metros)."
                     },
                     "tipoComponente": {
                       "type": "string",

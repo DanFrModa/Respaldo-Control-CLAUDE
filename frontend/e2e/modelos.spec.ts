@@ -22,6 +22,8 @@ async function crearTela(page: Page, nombre: string): Promise<void> {
   await page.getByTestId('nuevo-tela').click();
   const dialogo = page.getByRole('dialog');
   await dialogo.getByLabel('Nombre').fill(nombre);
+  // La unidad es obligatoria y arranca sin elegir (30-jul-2026).
+  await dialogo.getByTestId('tela-unidad').selectOption('KG');
   await page.getByTestId('guardar-tela').click();
   await expect(page.getByText(`Tela "${nombre}" creada.`)).toBeVisible();
 }

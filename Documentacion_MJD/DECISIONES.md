@@ -714,3 +714,31 @@ Daniel: *"A la hora de cortar, es necesario descargar la tela de los inventarios
 - **NO se hizo automático a propósito:** el corte registra PIEZAS por color×talla y la salida de tela descuenta **metros/kilos por tela y lote**, que no se derivan del corte (dependen del tendido real, de la tela dispuesta y del lote del que se jaló). Inventarlo sería descuadrar el inventario con un número que nadie capturó. El enlace deja la decisión —y la captura— en manos de quien sabe.
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Frontend-only: SIN migración, SIN permisos nuevos, SIN seed.
 - **Fecha:** 2026-07-28.
+
+#### (Post-F9.9) — Inventario de telas: unidad cerrada a kilos/metros, búsqueda por color y telas al tono (DANIEL, 30-jul-2026)
+
+Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
+
+1. *"Los rollos solo podrían ser informativos. Todos los inventarios se llevan en kilos o metros (depende de cómo se compren las telas). Los consumos se llevan en la misma medida de cómo se da de alta la tela."*
+2. *"Todo lo que se compra en kilos se consume en kilos y lo que se compra en metros se consume en metros. La conversión podríamos ver más adelante si la ponemos solo como referencia."* Y: *"solo kilos y metros… no hay otras medidas."*
+3. *"Se captura el consumo real… de ahí sale el consumo por prenda que deriva en el costo. Me gusta que al lado pongas el consumo estimado."*
+4. *"Todo se descarga con captura de cantidad. Nada se estima, ni es un porcentaje… todo lleva una cantidad tecleada."*
+5. *"Normalmente se descargan las telas al mismo tiempo cuando están relacionadas"* (la felpa y su cardigan al tono).
+6. Sobrantes: *"solo damos salida de lo que se corta, no lo que viene en la partida. Bajo esa manera de trabajar no veo la necesidad de volver a meterlo al almacén."* → **NO hay devoluciones de tela al almacén**; nunca sale más de lo que se consumió.
+7. Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión sin OC), con **una cabecera por documento y N partidas** (cada una con su color y sus telas al tono).
+
+**Lo que YA estaba y no había que construir:** el **lote** es una partida de UN color con **N telas dentro** (`Lote` + `LoteComponente`, decisión **D5**) — dos partidas de negro son dos lotes, cada uno con su cardigan al tono, y el inventario se lleva por **tela × lote × almacén**. También el **precio por color** (`TelaColor`) y el **precio por proveedor y por color** (`TelaProveedor`/`TelaProveedorColor`, F8-E1).
+
+**Lo que se decidió y cambió (etapa A):**
+
+- **`Tela.unidadMedida` deja de ser texto libre y pasa a enum `UnidadTela` = {KG, M}, NOT NULL.** Era `text` nullable, con una lista sugerida de seis valores (KILOGRAMO/YARDA/ROLLO/CONO…), y **venía vacía en TODAS las telas** (el ETL nunca la llenaba) — sin unidad, el stock, el consumo y el costo por prenda no significan nada. En el **alta es obligatoria y SIN default**: una tela de metros que naciera marcada en kilos ensuciaría todo en silencio; quien la da de alta lo sabe, el sistema no lo adivina. En la **edición** se puede cambiar de una a otra, pero **no vaciar**.
+- **El ETL la carga del dato REAL del Access, no de una suposición:** `Telas.Medida` es la bandera de la unidad, y el mapeo está declarado literal en el formulario viejo `AgregarTelas` (`RowSource = "-1;\"Kilos\";0;\"Metros\""`), confirmado por `ExisTela` (*"Si=Kilos, No=Metros"*). En el volcado son **735 telas en kilos y 142 en metros**. Las telas que solo existen en `TelasDis` (no en `Telas`) no traen medida → quedan en KG y se reportan.
+- **Migración de lo existente:** se respeta lo que estuviera capturado a mano (kg/kilo/m/metro…) y **todo lo demás** —NULL y cualquier texto no reconocido, p. ej. los `YARDA`/`ROLLO`/`CONO` del datalist viejo— queda en **KG**, sin dejar rastro (deliberado: Daniel confirmó que solo existen kilos y metros). Para corregir las 142 de metros **basta re-correr el ETL de catálogos**: el loader **reconcilia** la unidad de las telas ya migradas contra `Telas.Medida` y reporta cada corrección — no hay que borrar la base. *(Sin esa reconciliación el loader se salta las telas ya mapeadas y las dejaría mal para siempre; lo cazó el reviewer.)*
+- **La búsqueda del catálogo de telas mira también el nombre de los COLORES** (y hay filtro duro `idColor`): en el almacén se busca "negro" más seguido que el nombre exacto de la tela.
+- **Al descargar, el lote ofrece sus telas al tono:** elegido un lote, la pantalla muestra las OTRAS telas de esa partida con su disponible y un atajo para capturarlas seguidas, conservando el lote. **Se ofrecen, no se descuentan**: cada cantidad se teclea (regla 4). Las ya capturadas dejan de ofrecerse.
+- **El botón "Consumo tela" de la OP** ahora abre la salida de tela **con esa orden puesta** (antes abría la pantalla en blanco).
+
+**Lo que NO se hizo y por qué:** el **packing list de rollos** queda para el final y como **dato informativo del lote** (regla 1: la existencia se sigue llevando por lote, no por rollo). El **consumo por prenda** se mostrará en pantalla, pero **no se empuja solo al costeo** — eso toca el módulo de Costos y se hace aparte, con Daniel viéndolo. La **conversión kg↔m** no se construye (regla 2: "más adelante, solo como referencia").
+
+- **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-07-30.

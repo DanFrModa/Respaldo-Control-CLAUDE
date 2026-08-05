@@ -125,7 +125,7 @@ beforeEach(async () => {
 
   // Catálogo: tela y avíos con precio de CATÁLOGO deliberadamente distinto del de compra.
   const tela = await cliente.tela.create({
-    data: { nombre: 'Felpa', unidadMedida: 'm', precioSugerido: 20 },
+    data: { nombre: 'Felpa', unidadMedida: 'M', precioSugerido: 20 },
   });
   idTela = tela.id;
   const avio = await cliente.avio.create({

@@ -54,7 +54,7 @@ function telaEjemplo(sobre: Partial<Tela> = {}): Tela {
     descripcion: null,
     idCategoria: null,
     categoria: null,
-    unidadMedida: null,
+    unidadMedida: 'KG',
     tipoComponente: 'OTRO',
     favorito: false,
     precioSugerido: null,
@@ -99,6 +99,7 @@ describe('<DialogoTela>', () => {
     );
 
     await usuario.type(screen.getByLabelText(/^Nombre/), 'Jersey nuevo');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
     await usuario.click(screen.getByTestId('guardar-tela'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -106,7 +107,8 @@ describe('<DialogoTela>', () => {
     expect(cuerpo.nombre).toBe('Jersey nuevo');
     // Omitidos (no presentes), NO null.
     expect('descripcion' in cuerpo).toBe(false);
-    expect('unidadMedida' in cuerpo).toBe(false);
+    // La unidad NO es opcional: se eligió y viaja.
+    expect(cuerpo.unidadMedida).toBe('KG');
     expect('idCategoria' in cuerpo).toBe(false);
     expect('precioSugerido' in cuerpo).toBe(false);
     // Banderas y colores siempre viajan.
@@ -114,6 +116,28 @@ describe('<DialogoTela>', () => {
     expect(cuerpo.paraProduccion).toBe(true);
     expect(cuerpo.colores).toEqual([]);
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
+  });
+
+  // Sin default a propósito: si el combo arrancara en kilos, una popelina (metros) nacería mal
+  // marcada nada más por no tocarlo — el fallo silencioso que la regla existe para evitar.
+  it('el ALTA no se guarda sin elegir la unidad (no hay valor preseleccionado)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    expect(screen.getByTestId('tela-unidad')).toHaveValue('');
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Popelina');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    // No se manda nada y se explica por qué.
+    await screen.findByText('Elige la unidad: kilos o metros');
+    expect(crearMutate).not.toHaveBeenCalled();
+
+    // Elegida, ya guarda.
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'M');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect((crearMutate.mock.calls[0]?.[0] as { unidadMedida?: string }).unidadMedida).toBe('M');
   });
 
   it('en alta, elegir una categoría la incluye en el cuerpo como id numérico', async () => {
@@ -126,6 +150,7 @@ describe('<DialogoTela>', () => {
     renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
 
     await usuario.type(screen.getByLabelText(/^Nombre/), 'Con categoría');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'M');
     await usuario.selectOptions(screen.getByTestId('tela-categoria'), '7');
     await usuario.click(screen.getByTestId('guardar-tela'));
 
@@ -139,36 +164,32 @@ describe('<DialogoTela>', () => {
       <DialogoTela
         abierto
         alCambiarAbierto={vi.fn()}
-        tela={telaEjemplo({ nombre: 'Felpa', unidadMedida: 'KILOGRAMO', favorito: true })}
+        tela={telaEjemplo({ nombre: 'Felpa', unidadMedida: 'KG', favorito: true })}
       />,
     );
     expect(screen.getByRole('heading', { name: 'Editar tela' })).toBeInTheDocument();
     expect(screen.getByLabelText(/^Nombre/)).toHaveValue('Felpa');
-    expect(screen.getByLabelText('Unidad de medida')).toHaveValue('KILOGRAMO');
+    expect(screen.getByTestId('tela-unidad')).toHaveValue('KG');
     expect(screen.getByTestId('tela-favorito')).toBeChecked();
   });
 
-  // M1: en edición, vaciar un campo opcional ya capturado debe mandar `null` (borrar).
-  it('en edición, vaciar la unidad de medida manda null para borrarla', async () => {
+  // La unidad ya NO se puede vaciar (Daniel, 30-jul-2026: solo kilos o metros, y de ella dependen
+  // el stock, el consumo y el costo por prenda): en edición se CAMBIA de una a la otra.
+  it('en edición, la unidad se cambia de kilos a metros (no se puede vaciar)', async () => {
     const usuario = userEvent.setup();
     actualizarMutate.mockImplementation((_args, opciones?: { onSuccess?: (r: Tela) => void }) => {
       opciones?.onSuccess?.(telaEjemplo());
     });
     renderConProveedores(
-      <DialogoTela
-        abierto
-        alCambiarAbierto={vi.fn()}
-        tela={telaEjemplo({ unidadMedida: 'KILOGRAMO' })}
-      />,
+      <DialogoTela abierto alCambiarAbierto={vi.fn()} tela={telaEjemplo({ unidadMedida: 'KG' })} />,
     );
 
-    await usuario.clear(screen.getByLabelText('Unidad de medida'));
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'M');
     await usuario.click(screen.getByTestId('guardar-tela'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
     const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: TelaEditar };
-    // Vacío -> null (borrar), no se omite ni se manda ''.
-    expect(args.cuerpo.unidadMedida).toBeNull();
+    expect(args.cuerpo.unidadMedida).toBe('M');
     // Y los colores siempre viajan en edición (reemplaza el grid).
     expect(args.cuerpo.colores).toEqual([]);
   });

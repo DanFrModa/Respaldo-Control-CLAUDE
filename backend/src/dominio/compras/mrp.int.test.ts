@@ -113,7 +113,7 @@ beforeEach(async () => {
   provBarato = await cliente.proveedor.create({ data: { nombre: 'Avíos Baratos' } });
   provCaro = await cliente.proveedor.create({ data: { nombre: 'Avíos Caros' } });
 
-  telaFelpa = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'm' } });
+  telaFelpa = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'M' } });
   avioBoton = await cliente.avio.create({
     data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
   });
