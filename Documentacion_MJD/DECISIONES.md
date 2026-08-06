@@ -764,3 +764,42 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Alcance:** OP + `EtapaMovimientoDet` (corte/envío/recibo) + importador de PDF + matrices de captura. **NO** toca el kardex de PT.
 - **Secuencia (Daniel):** *"Me parece bien terminar con las telas y luego retomas esto."* Va **después** de la reestructura de telas, como etapa propia.
 - **Fecha:** 2026-08-06.
+
+#### (Post-F9.11) — Reestructura de TELAS: tela padre + complemento, colores con pantone, y migración desde cero (DANIEL, 6-ago-2026)
+
+Conversación completa con Daniel sobre consumos de tela e inventarios. Cierra el diseño de la reestructura (etapas A1 catálogo / A2 inventario).
+
+**1. Identidad de la tela.** Hoy el nombre mezcla todo ("FelpaAlsa100"). Se parte en cuatro datos:
+
+| Dato | Ejemplo | De dónde |
+| --- | --- | --- |
+| Tipo de tela | "Felpa" | La **categoría** que YA existe (se renombra a "Tipo de tela" en la UI; no se inventa campo nuevo) |
+| Composición | "50% Algodón, 50% Poliéster" | **Catálogo nuevo** (petición textual: *"de un catálogo de composiciones para mantener misma congruencia"*) |
+| Proveedor | Alsatex | El proveedor **dueño** del artículo |
+| Nombre del proveedor | "Felpa Suiza" | Cómo le llama él |
+
+Se lee de corrido: **Felpa · Alsatex · Felpa Suiza**. **Consecuencia:** la tela pasa a ser DE UN PROVEEDOR (la felpa de Alsatex y la de otro son telas distintas — correcto: no son el mismo rollo y no deben revolverse en el inventario). Eso deja casi de sobra el N:N `TelaProveedor` de F8; **NO se retira** (tocaría cotizaciones y listas de precios sin necesidad) — queda anotado para simplificar después. Proveedor **obligatorio en telas nuevas**, opcional en las 877 migradas (el viejo no lo traía como campo).
+
+**2. El COMPLEMENTO es parte de la misma tela.** *"Es como parte de la misma tela para el manejo de todo. Es el mismo color, con el mismo pantone, parte de la misma tela padre… Hay que darle prioridad a que conviva como parte de la misma tela."*
+- Una tela = **un cuerpo + un complemento OPCIONAL**, nombrados desde el alta ("Felpa" / "Cardigan"). Nunca más de uno.
+- **Entradas y salidas siempre juntas**: un renglón, dos cantidades. (El sistema viejo ya lo hacía: `TelasColAlm.ExTela1/ExTela2` y `SalidasDet.TelaSal1/TelaSal2`.)
+- **Comprar solo complemento** (pasa cuando se acaba el cardigan y se compra más, *"posiblemente de otro proveedor"*): es una entrada de esa MISMA tela y color con la cantidad del cuerpo en **0**, y su propia partida con su proveedor y factura. **No hace falta "ligar" nada.**
+- ⚠️ **Por eso el consumo empareja por TELA+COLOR, no por partida:** el cuerpo puede salir de una partida y el complemento de otra. Cuando eso pase, la pantalla **avisa** (riesgo de tono) sin bloquear.
+
+**3. Colores: hijos de la tela, no catálogo global.** Nombre libre + **pantone**, con **dos precios** (cuerpo y complemento — *"el cardigan es otro precio que la tela"*). El pantone va en el color de la tela; dos partidas pueden traer tonos distintos del mismo pantone. Para no fragmentar, el campo sugiere los colores que **esa tela** ya tiene. **El catálogo global de `Color` NO se toca**: es el color de la PRENDA y lo exigen la matriz de la OP y todo el WIP (ver §Post-F9.10).
+
+**4. Partidas.** Se identifican con **folio propio consecutivo** del sistema (secuencia atómica, A3) + el **número de lote/teñido del proveedor** como campo aparte, opcional y buscable (ese SÍ puede repetirse entre proveedores). Hoy la `clave` es texto único global y el auto-generado es ilegible (`LOTE-1-20260806-m1x2p3-a7f2`) — se corrige en A2. Daniel eligió explícitamente la opción de **partidas por lote** (con proveedor y factura) sobre la de "crear colores Negro/Negro 2".
+
+**5. MIGRACIÓN — inventario desde cero.** *"Lo ideal va a ser partir de un inventario físico desde cero… hay muchos errores en el inventario."*
+- **Existencias: CERO.** No se migra ni un movimiento de tela. El arranque es el **conteo físico** que capture FR Moda; el conteo YA trae el consumo adentro (lo que queda en el anaquel es lo que queda).
+- **Catálogo: SE CONSERVA, sucio y depurable.** Borrarlo dejaría sin receta de telas al BOM de los modelos migrados y mudo al histórico de compras/notas. Las telas viejas se desactivan conforme dejen de usarse; las nuevas se dan de alta bien hechas.
+- **Consumos históricos: SÍ se cargan** (2025-2026, ~400 órdenes), como **dato de la orden**: sin crear partidas y **sin tocar existencias** (mismo patrón anti-doble-conteo del histórico de producción de F3-E6). Las telas viejas quedan "solo para leer consumos viejos"; lo nuevo usa el catálogo nuevo.
+- **Costo del consumo histórico: APROXIMADO y marcado como tal.** `Salidas`/`SalidasDet` del viejo traen la orden, la tela, el color y las dos cantidades — pero **no el precio**. Las cantidades son exactas; el costo se valúa con el precio del catálogo y la pantalla dice que es aproximado. *"El aproximado está perfecto."*
+- **Por qué importa el consumo, más allá del costo** (Daniel): *"También por referencia cuando quiero hacer un nuevo modelo. Me sirve consultar cuánto se llevó alguna orden en particular."* → el consumo por orden tiene que quedar **consultable**, no solo alimentar el costeo.
+
+**6. ⚠️ CORRECCIÓN A LO YA CONSTRUIDO — el costo de TELA sale del CONSUMO, no de la OC.** Daniel (6-ago): *"El costo por prenda de tela sí sale del consumo, no la de OC. De la OC salen los costos de los avíos pero no de las telas. Aparte es muy complicado sacar los costos de las OCs porque en una OC normalmente compro telas para varias OP. Sería imposible definir cuánto costó cada OP sin el consumo real."*
+- Esto **refina §Post-F9.5** (26-jul, "manda lo comprado: la OC autorizada"), que hoy vale para **avíos** pero NO para telas.
+- `dominio/costos/costo-real-compras.ts` valúa hoy la tela desde las líneas de OC, prorrateando entre órdenes por el consumo **teórico** de la receta. Para telas debe pasar a **consumo REAL**.
+- **PENDIENTE, etapa propia del módulo de costos** — no se mezcla con la reestructura de telas.
+
+**Secuencia acordada:** A1 (catálogo) → A2 (inventario) → entrada por factura/remisión → pantalla de stocks → packing list. El **pack** (§Post-F9.10) y la **corrección del costo de tela** van después.
