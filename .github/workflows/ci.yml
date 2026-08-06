@@ -77,8 +77,12 @@ jobs:
       - name: Instalar dependencias (lockfile)
         run: npm ci
 
+      # El lint con tipos crece con el proyecto: con el heap por defecto de Node
+      # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
       - name: Lint (eslint)
         run: npm run lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
