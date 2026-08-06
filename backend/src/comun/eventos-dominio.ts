@@ -122,8 +122,9 @@ export type EventoAuditoriaCalidad = {
 export const VERSION_EVENTO_ETAPA_RC = 1;
 
 /**
- * Un material recibido en un renglón de recepción. `tipo`: `'tela'` (con `idLote` del lote creado),
- * `'avio'` (sin lote) o `'libre'` (línea no catalogada — informativa, no inventaría).
+ * Un material recibido en un renglón de recepción. `tipo`: `'tela'` (con la `idPartida` creada —
+ * desde B1 el inventario de telas entra por COLOR/PARTIDA, ya no por lote), `'avio'` (sin lote ni
+ * partida) o `'libre'` (línea no catalogada — informativa, no inventaría).
  *
  * NOTA (M3 — reviewer F4-E3): el evento NO lleva la cantidad recibida. Mezclar unidades heterogéneas
  * (metros de tela + piezas de avío) en un escalar es engañoso y nadie lo usaría para cálculo; el
@@ -133,8 +134,11 @@ export type MaterialRecibido = {
   tipo: 'tela' | 'avio' | 'libre';
   /** Id del material de catálogo (tela/avío) o null para líneas libres. */
   id: number | null;
-  /** Lote creado para la tela (D5) o null. */
+  /** LEGADO: lote creado para la tela (D5) o null. Desde B1 las telas ya no crean lote. */
   idLote: number | null;
+  /** Partida creada para la tela (B1 — la unidad de entrada por color) o null. Opcional: los
+   * eventos escritos ANTES de B1 no la traen (contrato retro-compatible, sin bump de versión). */
+  idPartida?: number | null;
   /** Renglón de OC contra el que se recibió (R7). */
   idOrdenCompraLinea: number;
   /** Orden de PRODUCCIÓN ligada al renglón de OC (R7), o null. */

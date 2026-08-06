@@ -570,10 +570,10 @@ export type RecepcionLinea = Recepcion['lineas'][number];
 /** Cuerpo de alta de una recepción (`POST /api/ordenes-compra/{idOrdenCompra}/recepciones`). */
 export type RecepcionCrear =
   paths['/api/ordenes-compra/{idOrdenCompra}/recepciones']['post']['requestBody']['content']['application/json'];
-/** Un renglón de captura de la recepción (renglón de OC + cantidad + lote opcional). */
+/** Un renglón de captura de la recepción (renglón de OC + cantidad + color de tela). */
 export type RecepcionLineaEntrada = NonNullable<RecepcionCrear['lineas']>[number];
-/** Lote a capturar en una línea de tela de la recepción (color + componentes, D5). */
-export type RecepcionLoteEntrada = NonNullable<RecepcionLineaEntrada['lote']>;
+/** Bloque por COLOR de una línea de tela de la recepción (B1: color + complemento + lote prov.). */
+export type RecepcionTelaColorEntrada = NonNullable<RecepcionLineaEntrada['telaColor']>;
 /** Cuerpo del reverso de una recepción (`POST /api/recepciones-compra/{id}/reversar`). */
 export type RecepcionReversar =
   paths['/api/recepciones-compra/{id}/reversar']['post']['requestBody']['content']['application/json'];

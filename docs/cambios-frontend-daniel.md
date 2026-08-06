@@ -1542,3 +1542,47 @@ visibles en el detalle cuando tienen valor.
   `dominio/catalogos/telas.ts` · dominio de proveedores · OpenAPI regenerado.
 - **Frontend:** `modulos/telas/{DialogoTela,EditorColoresTela,TelasPagina}.tsx` ·
   `modulos/proveedores/DialogoProveedor.tsx` (+ detalle) · cliente regenerado.
+
+## 2026-08-06 — Entrada de tela por factura o remisión (etapa B1)
+
+La otra mitad del inventario nuevo: ya se puede **meter tela al almacén** por las dos vías que pidió
+Daniel — con orden de compra y sin ella.
+
+### A) Entrada por factura o remisión (sin orden de compra)
+
+`Inventarios → Telas → Entradas de tela`: se captura **una cabecera por documento** (factura o
+remisión, número del proveedor, proveedor, fecha y almacén) y **N partidas** debajo. Cada renglón es
+una partida: su tela y color, la cantidad de cuerpo y la de cardigan, el número de lote del
+proveedor y el precio. Dos lotes del mismo color en la misma factura = dos renglones = dos partidas.
+
+Se puede **adjuntar el PDF de la factura**. El documento nace como **borrador** (no toca el
+inventario), y hasta que se **confirma** se crean las partidas y entra la tela. Cancelar una entrada
+confirmada no borra nada: registra el movimiento contrario, con su motivo.
+
+Si capturas un número de factura que ya existe de ese mismo proveedor, la pantalla **te avisa** —
+pero te deja seguir, por si el proveedor de verdad repitió el número.
+
+### B) La compra con orden de compra ya entra al inventario nuevo
+
+Al recibir una OC de tela ahora se elige el **color** (el sistema no lo adivina: si falta, no deja
+recibir) y la tela entra por color con su partida y su costo, igual que la entrada por factura.
+Antes seguía cayendo en el inventario viejo por lote, que con el arranque desde cero habría quedado
+muerto. Los avíos no cambian en nada.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260806150000_b1_entrada_tela`): las tablas del documento, sus
+   adjuntos y la columna del costo del cardigan en el kardex. Aditiva, sin borrados.
+2. **Cero permisos nuevos** (reúsa `inventario-telas.ver`/`.mover`) → **no** hace falta
+   `SEED_ON_START`.
+3. **Nada que correr a mano.**
+
+### Dos cosas que conviene saber
+
+- **Cancelar una entrada vieja puede dejar el color en negativo** si esa tela ya se consumió. Es a
+  propósito (anular es una corrección contable, no se editan movimientos), pero a partir de ahí ese
+  color no deja dar salidas hasta que se ajuste por conteo. Si la tela ya se usó, lo correcto es
+  ajustar, no cancelar.
+- La entrada **por factura no mueve la Ruta Crítica** (el hito de compra de tela): esa entrada nace
+  de una factura y no está ligada a una orden de producción. La tela que debe empujar la RC entra
+  por la vía con orden de compra.

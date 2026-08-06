@@ -30,6 +30,10 @@ export interface RenglonTelaColor {
   cantidadComplemento: number;
   /** Número de lote del PROVEEDOR (solo entradas — dato de la partida). */
   loteProveedor?: string;
+  /** Precio por unidad del CUERPO (solo con `conPrecios`; viaja al kardex como costo, D1). */
+  precioUnit?: number;
+  /** Precio por unidad del COMPLEMENTO (solo con `conPrecios`; vive en el documento). */
+  precioUnitComplemento?: number;
 }
 
 /**
@@ -38,24 +42,31 @@ export interface RenglonTelaColor {
  * cantidades — cuerpo y complemento — que viajan JUNTAS en el mismo renglón (Daniel: el
  * complemento es parte de la misma tela; comprar solo cardigan = cuerpo en 0). Con
  * `conLoteProveedor` (ajustes de ENTRADA) se captura además el número de lote del proveedor de la
- * partida. Presentación pura (A1): el backend valida no-negativo de ambos componentes bajo lock.
+ * partida, y con `conPrecios` (documento de entrada por factura/remisión, B1) los DOS precios
+ * unitarios — prellenados con los del catálogo del color como SUGERENCIA (la fuente de verdad del
+ * costo es lo que se captura aquí, D1). Presentación pura (A1): el backend valida.
  */
 export function CapturaRenglonesTelaColor({
   renglones,
   onChange,
   soloLectura = false,
   conLoteProveedor = false,
+  conPrecios = false,
 }: {
   renglones: RenglonTelaColor[];
   onChange: (renglones: RenglonTelaColor[]) => void;
   soloLectura?: boolean;
   conLoteProveedor?: boolean;
+  /** Muestra y captura los precios unitarios de cuerpo y complemento (B1). */
+  conPrecios?: boolean;
 }): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
   const [idTelaColor, setIdTelaColor] = useState<string>('');
   const [cantidad, setCantidad] = useState<string>('');
   const [cantidadComplemento, setCantidadComplemento] = useState<string>('');
   const [loteProveedor, setLoteProveedor] = useState<string>('');
+  const [precioUnit, setPrecioUnit] = useState<string>('');
+  const [precioComplemento, setPrecioComplemento] = useState<string>('');
 
   const llevaComplemento = tela !== undefined && tela.nombreComplemento !== null;
   const colorElegido = tela?.colores.find((c) => String(c.id) === idTelaColor);
@@ -72,10 +83,26 @@ export function CapturaRenglonesTelaColor({
     setTela(t);
     setIdTelaColor('');
     setCantidadComplemento('');
+    setPrecioUnit('');
+    setPrecioComplemento('');
+  }
+
+  /**
+   * Al elegir el color, PRE-LLENA los precios con los del catálogo (sugerencia editable): el precio
+   * real de la factura manda y es el que se guarda (el catálogo no es la fuente de verdad, D1).
+   */
+  function elegirColor(valor: string): void {
+    setIdTelaColor(valor);
+    if (!conPrecios) return;
+    const color = tela?.colores.find((c) => String(c.id) === valor);
+    setPrecioUnit(color?.precio == null ? '' : String(color.precio));
+    setPrecioComplemento(color?.precioComplemento == null ? '' : String(color.precioComplemento));
   }
 
   function agregar(): void {
     if (tela === undefined || colorElegido === undefined || !cantidadesValidas) return;
+    const precioCuerpoNum = precioUnit === '' ? undefined : Number(precioUnit);
+    const precioComplNum = precioComplemento === '' ? undefined : Number(precioComplemento);
     const nuevo: RenglonTelaColor = {
       idTelaColor: colorElegido.id,
       tela: tela.nombre,
@@ -85,6 +112,15 @@ export function CapturaRenglonesTelaColor({
       cantidadComplemento: llevaComplemento ? complementoNum : 0,
       ...(conLoteProveedor && loteProveedor.trim().length > 0
         ? { loteProveedor: loteProveedor.trim() }
+        : {}),
+      ...(conPrecios && precioCuerpoNum !== undefined && Number.isFinite(precioCuerpoNum)
+        ? { precioUnit: precioCuerpoNum }
+        : {}),
+      ...(conPrecios &&
+      llevaComplemento &&
+      precioComplNum !== undefined &&
+      Number.isFinite(precioComplNum)
+        ? { precioUnitComplemento: precioComplNum }
         : {}),
     };
     if (conLoteProveedor) {
@@ -111,6 +147,8 @@ export function CapturaRenglonesTelaColor({
     setCantidad('');
     setCantidadComplemento('');
     setLoteProveedor('');
+    setPrecioUnit('');
+    setPrecioComplemento('');
   }
 
   function quitar(indice: number): void {
@@ -136,7 +174,7 @@ export function CapturaRenglonesTelaColor({
               <SelectNativo
                 id="captura-color-color"
                 value={idTelaColor}
-                onChange={(e) => setIdTelaColor(e.target.value)}
+                onChange={(e) => elegirColor(e.target.value)}
                 disabled={soloLectura}
                 data-testid="captura-color-color"
               >
@@ -196,6 +234,42 @@ export function CapturaRenglonesTelaColor({
                 />
               </Field>
             ) : null}
+            {conPrecios ? (
+              <Field>
+                <FieldLabel htmlFor="captura-color-precio">
+                  Precio {(tela.nombreCuerpo ?? 'cuerpo').toLowerCase()}
+                </FieldLabel>
+                <Input
+                  id="captura-color-precio"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={precioUnit}
+                  onChange={(e) => setPrecioUnit(e.target.value)}
+                  placeholder="Del catálogo"
+                  disabled={soloLectura}
+                  data-testid="captura-color-precio"
+                />
+              </Field>
+            ) : null}
+            {conPrecios && llevaComplemento ? (
+              <Field>
+                <FieldLabel htmlFor="captura-color-precio-compl">
+                  Precio {(tela.nombreComplemento ?? '').toLowerCase()}
+                </FieldLabel>
+                <Input
+                  id="captura-color-precio-compl"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={precioComplemento}
+                  onChange={(e) => setPrecioComplemento(e.target.value)}
+                  placeholder="Del catálogo"
+                  disabled={soloLectura}
+                  data-testid="captura-color-precio-compl"
+                />
+              </Field>
+            ) : null}
           </div>
         ) : null}
         {tela !== undefined && llevaComplemento ? (
@@ -231,6 +305,7 @@ export function CapturaRenglonesTelaColor({
                   <TableHead className="text-right">Complemento</TableHead>
                 ) : null}
                 {conLoteProveedor ? <TableHead>Lote prov.</TableHead> : null}
+                {conPrecios ? <TableHead className="text-right">Precio</TableHead> : null}
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -254,6 +329,14 @@ export function CapturaRenglonesTelaColor({
                   {conLoteProveedor ? (
                     <TableCell className="text-xs text-muted-foreground">
                       {r.loteProveedor ?? '—'}
+                    </TableCell>
+                  ) : null}
+                  {conPrecios ? (
+                    <TableCell className="text-right text-xs tabular-nums">
+                      {r.precioUnit === undefined ? '—' : r.precioUnit.toLocaleString('es-MX')}
+                      {r.precioUnitComplemento === undefined
+                        ? ''
+                        : ` / ${r.precioUnitComplemento.toLocaleString('es-MX')}`}
                     </TableCell>
                   ) : null}
                   <TableCell className="text-right">

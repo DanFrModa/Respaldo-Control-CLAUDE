@@ -616,6 +616,16 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             subVista: true,
           },
           {
+            clave: 'inventario-telas-entradas',
+            titulo: 'Entradas de tela por factura',
+            descripcion:
+              'Entrada SIN orden de compra: factura o remisión del proveedor con N partidas y su PDF',
+            ruta: '/inventarios/telas/entradas',
+            icono: 'paquete',
+            permisos: ['inventario-telas.ver'],
+            subVista: true,
+          },
+          {
             clave: 'inventario-telas-ajuste',
             titulo: 'Ajuste de telas por color',
             descripcion:
@@ -1428,13 +1438,15 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         // Telas es PADRE desplegable (pedido de Daniel, 6-ago-2026): como hoja colapsada el
         // «Catálogo de telas» quedaba invisible (solo ⌘K/URL, y en el celular ni eso). Hijos
         // CURADOS para no saturar: la nueva Existencias por color (principal), el catálogo, la
-        // salida a orden y el ajuste; el resto (traspaso, kardex, vistas por lote legadas) sigue
-        // vivo como sub-vista por ⌘K.
+        // ENTRADA por factura (B1 — es la puerta diaria del inventario junto con la recepción de
+        // compra: sin riel sólo se alcanzaría por ⌘K), la salida a orden y el ajuste; el resto
+        // (traspaso, kardex, vistas por lote legadas) sigue vivo como sub-vista por ⌘K.
         tipo: 'padre',
         clave: 'telas',
         hijos: [
           'inventario-telas-existencias',
           'catalogo-telas',
+          'inventario-telas-entradas',
           'inventario-telas-salida-orden',
           'inventario-telas-ajuste',
         ],

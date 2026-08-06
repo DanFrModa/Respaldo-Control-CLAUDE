@@ -60,6 +60,8 @@ import { ExistenciasTelasPagina } from '@/modulos/inventarios/ExistenciasTelasPa
 import { ExistenciasTelasColorPagina } from '@/modulos/inventarios/ExistenciasTelasColorPagina';
 import { AjusteTelaColorPagina } from '@/modulos/inventarios/AjusteTelaColorPagina';
 import { TraspasoTelaColorPagina } from '@/modulos/inventarios/TraspasoTelaColorPagina';
+import { EntradasTelaPagina } from '@/modulos/inventarios/EntradasTelaPagina';
+import { CapturaEntradaTelaPagina } from '@/modulos/inventarios/CapturaEntradaTelaPagina';
 import { SalidaTelaColorOrdenPagina } from '@/modulos/inventarios/SalidaTelaColorOrdenPagina';
 import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
@@ -223,6 +225,11 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/ajuste', element: <AjusteTelaColorPagina /> },
           { path: 'inventarios/telas/traspaso', element: <TraspasoTelaColorPagina /> },
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaColorOrdenPagina /> },
+          // Entrada de tela por FACTURA/REMISIÓN sin orden de compra (B1). Las rutas ESTÁTICAS
+          // ('nueva') van ANTES de las que llevan :param, si no 'nueva' caería en el detalle.
+          { path: 'inventarios/telas/entradas', element: <EntradasTelaPagina /> },
+          { path: 'inventarios/telas/entradas/nueva', element: <CapturaEntradaTelaPagina /> },
+          { path: 'inventarios/telas/entradas/:id/editar', element: <CapturaEntradaTelaPagina /> },
           // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4). Las vistas de telas por LOTE
           // quedan como LEGADO consultable (…-lote); con el arranque desde cero ya no operan.
           { path: 'inventarios/telas/existencias-lote', element: <ExistenciasTelasPagina /> },

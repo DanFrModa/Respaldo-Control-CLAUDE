@@ -650,14 +650,14 @@ export {
 
 // ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
 export {
-  esquemaRecepcionLoteEntrada,
+  esquemaRecepcionTelaColorEntrada,
   esquemaRecepcionLineaEntrada,
   esquemaRecepcionCrear,
   esquemaRecepcionReversarCuerpo,
   esquemaRecepcionLineaSalida,
   esquemaRecepcionSalida,
   esquemaRecepcionesLista,
-  type DatosRecepcionLoteEntrada,
+  type DatosRecepcionTelaColorEntrada,
   type DatosRecepcionLineaEntrada,
   type DatosRecepcionCrear,
   type DatosRecepcionReversar,
@@ -1096,6 +1096,39 @@ export {
   type KardexAvioRenglon,
   type KardexAvioLista,
 } from './esquemas/inventario-material.js';
+
+// ── Entrada de tela por FACTURA/REMISIÓN sin OC (B1; DECISIONES §Post-F9.9 p.7) ──
+export {
+  esquemaTipoDocumentoEntradaTela,
+  esquemaEstatusEntradaTela,
+  esquemaEntradaTelaLineaEntrada,
+  esquemaEntradaTelaCrear,
+  esquemaEntradaTelaActualizar,
+  esquemaEntradaTelaCancelarCuerpo,
+  esquemaEntradaTelaLineaSalida,
+  esquemaEntradaTelaSalida,
+  esquemaEntradasTelaQuery,
+  esquemaEntradasTelaPagina,
+  esquemaParamIdEntradaTela,
+  esquemaEntradaTelaAdjuntoCrear,
+  esquemaEntradaTelaAdjuntoSubida,
+  esquemaEntradaTelaAdjuntoSalida,
+  esquemaEntradaTelaAdjuntosLista,
+  type TipoDocumentoEntradaTela,
+  type EstatusEntradaTela,
+  type DatosEntradaTelaLineaEntrada,
+  type DatosEntradaTelaCrear,
+  type DatosEntradaTelaActualizar,
+  type DatosEntradaTelaCancelar,
+  type EntradaTelaLineaSalida,
+  type EntradaTelaSalida,
+  type EntradasTelaQuery,
+  type EntradasTelaPagina,
+  type DatosEntradaTelaAdjuntoCrear,
+  type EntradaTelaAdjuntoSubida,
+  type EntradaTelaAdjuntoSalida,
+  type EntradaTelaAdjuntosLista,
+} from './esquemas/entrada-tela.js';
 
 // ── Etapas de producción: corte + envío a maquila (F3-E2; doc 03-Produccion) ──
 export {

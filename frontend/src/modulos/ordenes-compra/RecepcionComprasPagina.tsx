@@ -1,12 +1,11 @@
-import { Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useColores } from '@/api/colores';
 import { useOrdenesCompra } from '@/api/ordenes-compra';
 import { useRecepcionesDeOc, useRecibir, useReversarRecepcion } from '@/api/recepciones';
-import { useTelas } from '@/api/telas';
+import { useTela } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -30,33 +29,178 @@ function tipoLinea(linea: OrdenCompraLinea): 'tela' | 'avio' | 'libre' {
   return 'libre';
 }
 
-/** Un componente del lote en captura (tela + cantidad). */
-interface ComponenteCaptura {
-  idTela: number;
-  cantidad: string;
-}
-
 /** Estado de captura de UN renglón de OC en la recepción. */
 interface CapturaRenglon {
   /** ¿Se incluye este renglón en la recepción? */
   incluir: boolean;
-  /** Cantidad a recibir (en la presentación de la OC). */
+  /** Cantidad de CUERPO a recibir (en la presentación de la OC). */
   cantidad: string;
-  /** Color del lote (solo telas, D5). */
-  idColor: string;
-  /** Clave del lote (opcional; el backend la autogenera). */
-  claveLote: string;
-  /** Componentes del lote (solo telas; arranca con la tela de la OC). */
-  componentes: ComponenteCaptura[];
+  /** COLOR de la tela que llegó (B1: obligatorio en telas — la OC no lo define). */
+  idTelaColor: string;
+  /** Cantidad del COMPLEMENTO (cardigan) que llegó junto (solo telas que lo llevan). */
+  cantidadComplemento: string;
+  /** Número de lote del PROVEEDOR de la partida (opcional). */
+  loteProveedor: string;
+  /** Precio unitario del COMPLEMENTO (el cardigan tiene su propio precio; la OC trae uno solo). */
+  precioComplemento: string;
 }
 
 /**
- * RECEPCIÓN de compras (F4-E3, R7). Selecciona una OC AUTORIZADA (o recibida parcial) y recibe su
- * material (parcial o total): captura factura, almacén destino y la cantidad por renglón; para los
- * renglones de TELA, captura el lote (color + 1..N componentes del mismo lote, D5 — arranca con 1
- * componente = la tela comprada, con un botón "+ componente"). El backend convierte a unidad de
- * consumo (R1), crea el lote, mueve el kardex y recalcula el estatus de la OC. El historial de
- * recepciones de la OC se muestra abajo (con su reverso auditado, D3). `compras.recibir` gobierna.
+ * Captura POR COLOR de una línea de TELA de la recepción (B1). Lee la tela EXACTA de la línea de OC
+ * por su id (`GET /telas/:id`, que ya trae sus colores hijos) — NO por búsqueda paginada: con
+ * cientos de telas la página podía no traer la buscada y el select de color se quedaba vacío
+ * mintiendo con "esta tela no tiene colores". Pide:
+ *  • el COLOR que llegó — OBLIGATORIO: la OC se pide por tela y no lo determina (regla explícita
+ *    de B1, el backend la re-exige);
+ *  • la cantidad del COMPLEMENTO (cardigan), sólo si la tela lo lleva (viaja JUNTO al cuerpo);
+ *  • su PRECIO unitario (la OC trae un solo precio por línea, que es el del cuerpo) — opcional,
+ *    prellenado con el del catálogo del color como sugerencia; viaja al kardex como
+ *    `costoUnitComplemento`;
+ *  • el número de lote del PROVEEDOR de la partida que se creará (opcional, buscable después).
+ * Presentación pura (A1): valida el backend.
+ */
+function CapturaTelaPorColor({
+  idLinea,
+  idTela,
+  idTelaColor,
+  cantidadComplemento,
+  precioComplemento,
+  loteProveedor,
+  soloLectura,
+  alCambiar,
+}: {
+  idLinea: number;
+  idTela: number;
+  idTelaColor: string;
+  cantidadComplemento: string;
+  precioComplemento: string;
+  loteProveedor: string;
+  soloLectura: boolean;
+  alCambiar: (cambios: Partial<CapturaRenglon>) => void;
+}): React.JSX.Element {
+  // La tela EXACTA de la línea de OC, con sus colores hijos (endpoint por id, sin búsquedas).
+  const consulta = useTela(idTela);
+  const tela = consulta.data;
+  const colores = tela?.colores ?? [];
+  const llevaComplemento = tela?.nombreComplemento != null;
+
+  /** Al elegir el color, sugiere el precio del complemento del catálogo (editable). */
+  function elegirColor(valor: string): void {
+    const color = colores.find((c) => String(c.id) === valor);
+    alCambiar({
+      idTelaColor: valor,
+      precioComplemento: color?.precioComplemento == null ? '' : String(color.precioComplemento),
+    });
+  }
+
+  return (
+    <>
+      <Field>
+        <FieldLabel htmlFor={`rec-color-${idLinea}`}>Color que llegó</FieldLabel>
+        <SelectNativo
+          id={`rec-color-${idLinea}`}
+          value={idTelaColor}
+          onChange={(e) => elegirColor(e.target.value)}
+          disabled={soloLectura || consulta.isError}
+          data-testid={`rec-color-${idLinea}`}
+        >
+          {/* El estado de ERROR se distingue del de "sin colores": si la lectura de la tela falló
+              (403/500/red), decirle al usuario que no hay colores sería MENTIRLE. */}
+          <option value="">
+            {consulta.isPending
+              ? 'Cargando colores…'
+              : consulta.isError
+                ? 'No se pudo cargar la tela'
+                : colores.length === 0
+                  ? 'Esta tela no tiene colores capturados'
+                  : 'Elige el color…'}
+          </option>
+          {colores.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.nombre}
+              {c.pantone != null ? ` · ${c.pantone}` : ''}
+            </option>
+          ))}
+        </SelectNativo>
+        {consulta.isError ? (
+          <div
+            className="flex flex-wrap items-center gap-2 text-xs text-destructive"
+            role="alert"
+            data-testid={`rec-color-error-${idLinea}`}
+          >
+            <span>No se pudieron cargar los colores de la tela: {consulta.error.message}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void consulta.refetch()}
+              data-testid={`rec-color-reintentar-${idLinea}`}
+            >
+              Reintentar
+            </Button>
+          </div>
+        ) : null}
+      </Field>
+      {llevaComplemento ? (
+        <Field>
+          <FieldLabel htmlFor={`rec-compl-${idLinea}`}>
+            {tela?.nombreComplemento} recibido
+          </FieldLabel>
+          <Input
+            id={`rec-compl-${idLinea}`}
+            type="number"
+            min="0"
+            step="any"
+            value={cantidadComplemento}
+            onChange={(e) => alCambiar({ cantidadComplemento: e.target.value })}
+            placeholder="0"
+            disabled={soloLectura}
+            data-testid={`rec-compl-${idLinea}`}
+          />
+        </Field>
+      ) : null}
+      {llevaComplemento ? (
+        <Field>
+          <FieldLabel htmlFor={`rec-precio-compl-${idLinea}`}>
+            Precio {(tela?.nombreComplemento ?? '').toLowerCase()}
+          </FieldLabel>
+          <Input
+            id={`rec-precio-compl-${idLinea}`}
+            type="number"
+            min="0"
+            step="any"
+            value={precioComplemento}
+            onChange={(e) => alCambiar({ precioComplemento: e.target.value })}
+            placeholder="Del catálogo"
+            disabled={soloLectura}
+            data-testid={`rec-precio-compl-${idLinea}`}
+          />
+        </Field>
+      ) : null}
+      <Field>
+        <FieldLabel htmlFor={`rec-lote-prov-${idLinea}`}>Lote del proveedor</FieldLabel>
+        <Input
+          id={`rec-lote-prov-${idLinea}`}
+          value={loteProveedor}
+          onChange={(e) => alCambiar({ loteProveedor: e.target.value })}
+          placeholder="Opcional"
+          disabled={soloLectura}
+          data-testid={`rec-lote-prov-${idLinea}`}
+        />
+      </Field>
+    </>
+  );
+}
+
+/**
+ * RECEPCIÓN de compras (F4-E3, R7; reescrita en B1). Selecciona una OC AUTORIZADA (o recibida
+ * parcial) y recibe su material (parcial o total): captura factura, almacén destino y la cantidad
+ * por renglón. Para los renglones de TELA la captura es POR COLOR (el inventario de telas opera por
+ * tela+color desde A2): se EXIGE el color que llegó — la OC se pide por tela y no lo define —, se
+ * captura junto el COMPLEMENTO (cardigan) si la tela lo lleva y, opcionalmente, el lote del
+ * proveedor; el backend crea la PARTIDA, convierte a unidad de consumo (R1), mueve el kardex por
+ * color y recalcula el estatus de la OC. El historial de recepciones se muestra abajo (con su
+ * reverso auditado, D3). `compras.recibir` gobierna.
  */
 export function RecepcionComprasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -97,16 +241,6 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
-  });
-  // Catálogo de telas para elegir los componentes ACOMPAÑANTES del lote (D5, M1): cualquier tela,
-  // no solo la comprada en la línea.
-  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre', direccion: 'asc' });
   const recepciones = useRecepcionesDeOc(ocSeleccionada?.id);
   const recibir = useRecibir();
   const reversar = useReversarRecepcion();
@@ -122,10 +256,10 @@ export function RecepcionComprasPagina(): React.JSX.Element {
       inicial[linea.id] = {
         incluir: false,
         cantidad: String(linea.cantidad),
-        idColor: '',
-        claveLote: '',
-        componentes:
-          linea.idTela !== null ? [{ idTela: linea.idTela, cantidad: String(linea.cantidad) }] : [],
+        idTelaColor: '',
+        cantidadComplemento: '',
+        precioComplemento: '',
+        loteProveedor: '',
       };
     }
     setCaptura(inicial);
@@ -136,46 +270,6 @@ export function RecepcionComprasPagina(): React.JSX.Element {
       const r = prev[idLinea];
       if (r === undefined) return prev;
       return { ...prev, [idLinea]: { ...r, ...cambios } };
-    });
-  }
-
-  function agregarComponente(idLinea: number): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: { ...r, componentes: [...r.componentes, { idTela: 0, cantidad: '' }] },
-      };
-    });
-  }
-
-  function quitarComponente(idLinea: number, indice: number): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: { ...r, componentes: r.componentes.filter((_, i) => i !== indice) },
-      };
-    });
-  }
-
-  function actualizarComponente(
-    idLinea: number,
-    indice: number,
-    cambios: Partial<ComponenteCaptura>,
-  ): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: {
-          ...r,
-          componentes: r.componentes.map((c, i) => (i === indice ? { ...c, ...cambios } : c)),
-        },
-      };
     });
   }
 
@@ -195,26 +289,26 @@ export function RecepcionComprasPagina(): React.JSX.Element {
         return;
       }
       if (tipoLinea(linea) === 'tela') {
-        if (r.idColor === '') {
-          toast.error(`Elige el color del lote de "${descripcionMaterial(linea)}".`);
+        // B1: el color es OBLIGATORIO (el backend lo re-exige; aquí sólo evitamos el viaje).
+        if (r.idTelaColor === '') {
+          toast.error(`Elige el color que llegó de "${descripcionMaterial(linea)}".`);
           return;
         }
-        const componentes = r.componentes
-          .filter((c) => c.idTela > 0 && Number(c.cantidad) > 0)
-          .map((c) => ({ idTela: c.idTela, cantidad: Number(c.cantidad) }));
-        if (componentes.length === 0) {
-          toast.error(
-            `El lote de "${descripcionMaterial(linea)}" necesita al menos un componente.`,
-          );
-          return;
-        }
+        const complemento = Number(r.cantidadComplemento);
+        const precioComplemento = Number(r.precioComplemento);
         lineas.push({
           idOrdenCompraLinea: linea.id,
           cantidad,
-          lote: {
-            idColor: Number(r.idColor),
-            ...(r.claveLote.trim().length > 0 ? { clave: r.claveLote.trim() } : {}),
-            componentes,
+          telaColor: {
+            idTelaColor: Number(r.idTelaColor),
+            ...(r.cantidadComplemento.trim().length > 0 && Number.isFinite(complemento)
+              ? { cantidadComplemento: complemento }
+              : {}),
+            // El precio del cardigan (la OC sólo trae el del cuerpo): opcional, va al kardex.
+            ...(r.precioComplemento.trim().length > 0 && Number.isFinite(precioComplemento)
+              ? { precioUnitComplemento: precioComplemento }
+              : {}),
+            ...(r.loteProveedor.trim().length > 0 ? { loteProveedor: r.loteProveedor.trim() } : {}),
           },
         });
       } else {
@@ -446,102 +540,18 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                                 />
                               </Field>
                               {tipo === 'tela' ? (
-                                <Field>
-                                  <FieldLabel htmlFor={`rec-color-${linea.id}`}>
-                                    Color del lote
-                                  </FieldLabel>
-                                  <SelectNativo
-                                    id={`rec-color-${linea.id}`}
-                                    value={r.idColor}
-                                    onChange={(e) =>
-                                      actualizar(linea.id, { idColor: e.target.value })
-                                    }
-                                    disabled={!puedeRecibir}
-                                    data-testid={`rec-color-${linea.id}`}
-                                  >
-                                    <option value="">Elige el color…</option>
-                                    {(colores.data?.datos ?? []).map((c) => (
-                                      <option key={c.id} value={String(c.id)}>
-                                        {c.nombre}
-                                      </option>
-                                    ))}
-                                  </SelectNativo>
-                                </Field>
+                                <CapturaTelaPorColor
+                                  idLinea={linea.id}
+                                  idTela={linea.idTela as number}
+                                  idTelaColor={r.idTelaColor}
+                                  cantidadComplemento={r.cantidadComplemento}
+                                  precioComplemento={r.precioComplemento}
+                                  loteProveedor={r.loteProveedor}
+                                  soloLectura={!puedeRecibir}
+                                  alCambiar={(cambios) => actualizar(linea.id, cambios)}
+                                />
                               ) : null}
                             </div>
-
-                            {tipo === 'tela' ? (
-                              <div className="rounded-md bg-muted/40 p-3">
-                                <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-xs font-medium text-muted-foreground">
-                                    Componentes del lote (mismo lote/color)
-                                  </span>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => agregarComponente(linea.id)}
-                                    disabled={!puedeRecibir}
-                                    data-testid={`rec-add-comp-${linea.id}`}
-                                  >
-                                    <Plus className="size-4" aria-hidden /> componente
-                                  </Button>
-                                </div>
-                                <div className="space-y-2">
-                                  {r.componentes.map((comp, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                      <SelectNativo
-                                        aria-label="Tela del componente"
-                                        value={comp.idTela > 0 ? String(comp.idTela) : ''}
-                                        onChange={(e) =>
-                                          actualizarComponente(linea.id, i, {
-                                            idTela: Number(e.target.value),
-                                          })
-                                        }
-                                        disabled={!puedeRecibir}
-                                        className="flex-1"
-                                      >
-                                        <option value="">Elige la tela…</option>
-                                        {/* Catálogo completo (M1): el primer componente arranca con
-                                            la tela comprada, pero los acompañantes (D5) eligen
-                                            cualquier tela (felpa + cardigan, etc.). */}
-                                        {(telas.data?.datos ?? []).map((t) => (
-                                          <option key={t.id} value={String(t.id)}>
-                                            {t.nombre}
-                                          </option>
-                                        ))}
-                                      </SelectNativo>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        aria-label="Cantidad del componente"
-                                        value={comp.cantidad}
-                                        onChange={(e) =>
-                                          actualizarComponente(linea.id, i, {
-                                            cantidad: e.target.value,
-                                          })
-                                        }
-                                        disabled={!puedeRecibir}
-                                        className="w-32"
-                                      />
-                                      {r.componentes.length > 1 ? (
-                                        <Button
-                                          type="button"
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => quitarComponente(linea.id, i)}
-                                          disabled={!puedeRecibir}
-                                          aria-label="Quitar componente"
-                                        >
-                                          <Trash2 className="size-4" aria-hidden />
-                                        </Button>
-                                      ) : null}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
                           </div>
                         ) : null}
                       </li>

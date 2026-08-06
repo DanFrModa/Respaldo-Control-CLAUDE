@@ -1,19 +1,27 @@
 import { z } from 'zod';
 
-import { esquemaLoteComponenteEntrada } from './inventario-material.js';
-
 /**
  * Esquemas Zod de la RECEPCIÓN de compras (F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
  * R7). UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). La recepción recibe
- * (parcial o total) el material de una OC AUTORIZADA, crea el lote de la tela (D5) y registra la
- * ENTRADA al kardex con cantidad/costo YA convertidos a unidad de consumo (R1, motor
- * `comun/conversion.ts`). DECISIÓN (b): SOLO se recibe contra una OC `autorizada`/`recibida_parcial`
- * (lo refuerza el dominio, server-side, A4).
+ * (parcial o total) el material de una OC AUTORIZADA y registra la ENTRADA al kardex con
+ * cantidad/costo YA convertidos a unidad de consumo (R1, motor `comun/conversion.ts`). DECISIÓN
+ * (b): SOLO se recibe contra una OC `autorizada`/`recibida_parcial` (lo refuerza el dominio,
+ * server-side, A4).
+ *
+ * ⚠️ CAMBIO DE B1 — las TELAS entran por COLOR/PARTIDA, no por lote. El inventario de telas opera
+ * por TELA+COLOR desde la etapa A2 (§Post-F9.11) y arranca desde cero: recibir contra una OC por el
+ * flujo viejo de `Lote` alimentaría un inventario muerto. Ahora cada renglón de TELA trae su bloque
+ * `telaColor` (color + complemento + lote del proveedor) y el dominio crea SU PARTIDA. El bloque
+ * `lote` (D5) queda SÓLO para consultar las recepciones históricas: ya no se acepta en la captura.
+ * REGLA EXPLÍCITA del color: la línea de OC NO determina el color (la OC se pide por tela), así que
+ * el color se EXIGE en la pantalla de recepción — el dominio rechaza la línea de tela sin
+ * `telaColor` en vez de adivinar.
  *
  * Captura por LÍNEA DE OC: cada renglón de recepción referencia un `idOrdenCompraLinea` y la
  * `cantidadRecibida` en la PRESENTACIÓN de compra (la misma unidad de la OC). El dominio:
  *  • Convierte cantidad/costo a unidad de consumo con el factor del avío/proveedor (R1).
- *  • Para TELAS, exige el `lote` (clave + 1..N componentes mismo color, D5) que crea en la misma tx.
+ *  • Para TELAS, exige `telaColor` y crea la PARTIDA en la misma tx (cuerpo = `cantidad` de la
+ *    línea; el COMPLEMENTO viaja junto en `telaColor.cantidadComplemento`).
  *  • Para AVÍOS, no hay lote (el lote del avío es opcional y no entra en la dimensión, R4).
  *  • Para líneas LIBRES (la OC no tiene tela/avío), registra la cantidad pero NO mueve kardex.
  */
@@ -24,43 +32,51 @@ const idPositivo = (campo: string) =>
     .int({ error: `El id de ${campo} debe ser entero` })
     .positive({ error: `El id de ${campo} debe ser positivo` });
 
-// ── Lote de la recepción (para líneas de TELA) ───────────────────────────────────────────────────
+// ── Bloque de TELA por COLOR de la recepción (B1) ────────────────────────────────────────────────
 
 /**
- * Lote a CREAR en la recepción de una línea de TELA (D5). Define el color (teñido) y trae 1..N
- * componentes del mismo lote/color. La clave se autogenera en el dominio si no se manda. El
- * `idProveedor`/`factura`/`fecha` los puede heredar el dominio de la OC/recepción si no vienen.
+ * Datos POR COLOR de una línea de TELA de la recepción (B1): el color que llegó, el complemento
+ * (cardigan) que viaja junto y el lote del proveedor de la partida que se creará. El CUERPO va en
+ * la `cantidad` de la línea (la que se compara contra lo pedido en la OC, R7); el complemento NO
+ * cuenta contra la cantidad pedida (es el acompañante del mismo renglón).
  */
-export const esquemaRecepcionLoteEntrada = z
+export const esquemaRecepcionTelaColorEntrada = z
   .object({
-    clave: z
+    idTelaColor: idPositivo('el color de tela').describe(
+      'Color (hijo de la tela) que llegó. Se EXIGE: la OC no determina el color.',
+    ),
+    cantidadComplemento: z
+      .number()
+      .nonnegative({ error: 'La cantidad de complemento no puede ser negativa' })
+      .optional()
+      .describe('Cantidad del COMPLEMENTO (sólo telas que lo llevan).'),
+    precioUnitComplemento: z
+      .number()
+      .nonnegative({ error: 'El precio del complemento no puede ser negativo' })
+      .optional()
+      .describe(
+        'Precio por unidad del COMPLEMENTO (el cardigan tiene su propio precio y la OC sólo trae ' +
+          'uno por línea). Viaja al kardex como `costoUnitComplemento`; si no se captura, NULL.',
+      ),
+    loteProveedor: z
       .string()
       .trim()
-      .min(1)
       .max(100)
       .optional()
-      .describe('Clave del lote (autogenerada si falta).'),
-    idColor: idPositivo('el color'),
-    idProveedor: idPositivo('el proveedor').optional(),
-    factura: z.string().trim().max(100).optional(),
-    fecha: z.iso.date({ error: 'La fecha del lote debe ser YYYY-MM-DD' }).optional(),
-    observaciones: z.string().trim().max(1000).optional(),
-    componentes: z
-      .array(esquemaLoteComponenteEntrada)
-      .min(1, { error: 'El lote necesita al menos un componente (tela)' }),
+      .describe('Número de lote del proveedor de la partida (opcional).'),
   })
-  .describe('Lote de tela a crear en la recepción con sus componentes (D5).');
+  .describe('Color, complemento y lote del proveedor de una línea de tela recibida (B1).');
 
-/** Datos de un lote a crear en la recepción. */
-export type DatosRecepcionLoteEntrada = z.infer<typeof esquemaRecepcionLoteEntrada>;
+/** Datos validados del bloque por color de una línea de tela recibida. */
+export type DatosRecepcionTelaColorEntrada = z.infer<typeof esquemaRecepcionTelaColorEntrada>;
 
 // ── Renglón de la recepción ──────────────────────────────────────────────────────────────────────
 
 /**
  * Un renglón de recepción: cuánto se recibe contra un renglón de OC. `cantidad` va en la
  * PRESENTACIÓN de compra (misma unidad de la OC); el dominio la convierte a unidad de consumo (R1).
- * `lote` es obligatorio para líneas de TELA (lo valida el dominio según el renglón de OC); en
- * avío/libre va ausente.
+ * `telaColor` es OBLIGATORIO en las líneas de TELA (B1: el inventario de telas opera por color y
+ * cada recepción crea su PARTIDA); en avío/libre va ausente.
  */
 export const esquemaRecepcionLineaEntrada = z
   .object({
@@ -68,10 +84,15 @@ export const esquemaRecepcionLineaEntrada = z
     cantidad: z
       .number({ error: 'La cantidad recibida es obligatoria' })
       .positive({ error: 'La cantidad recibida debe ser mayor que 0' })
-      .describe('Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1).'),
-    lote: esquemaRecepcionLoteEntrada
+      .describe(
+        'Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es ' +
+          'el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento ' +
+          '(se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de ' +
+          'entrada por factura/remisión (B1), que sí admite cuerpo 0.',
+      ),
+    telaColor: esquemaRecepcionTelaColorEntrada
       .optional()
-      .describe('Lote a crear (OBLIGATORIO en líneas de tela, D5).'),
+      .describe('Color + complemento + lote del proveedor (OBLIGATORIO en líneas de tela, B1).'),
   })
   .describe('Renglón de recepción: cuánto se recibe contra un renglón de OC.');
 
@@ -139,13 +160,26 @@ export const esquemaRecepcionLineaSalida = z
     descripcionLibre: z.string().nullable().describe('Descripción libre (líneas libres), o null.'),
     cantidadRecibida: z
       .number()
-      .describe('Cantidad recibida en unidad de consumo (ya convertida, R1).'),
+      .describe('Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO.'),
+    cantidadComplemento: z
+      .number()
+      .nullable()
+      .describe('Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null.'),
     costoUnit: z
       .number()
       .nullable()
       .describe('Costo por unidad de consumo (precio ÷ factor), o null.'),
-    idLote: z.number().int().nullable().describe('Lote creado (telas), o null.'),
-    loteClave: z.string().nullable().describe('Clave del lote, o null.'),
+    idTelaColor: z.number().int().nullable().describe('Color de tela recibido (B1), o null.'),
+    telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    idPartida: z.number().int().nullable().describe('Partida creada (telas, B1), o null.'),
+    partidaFolio: z.number().int().nullable().describe('Folio de la partida, o null.'),
+    loteProveedor: z.string().nullable().describe('Lote del proveedor de la partida, o null.'),
+    idLote: z
+      .number()
+      .int()
+      .nullable()
+      .describe('LEGADO: lote creado (recepciones viejas), o null.'),
+    loteClave: z.string().nullable().describe('LEGADO: clave del lote, o null.'),
     idMovimiento: z.number().int().nullable().describe('Movimiento de kardex generado, o null.'),
     folioMovimiento: z
       .number()

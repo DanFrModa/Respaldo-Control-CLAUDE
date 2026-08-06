@@ -26612,13 +26612,25 @@ export interface paths {
                   avio: string | null;
                   /** @description Descripción libre (líneas libres), o null. */
                   descripcionLibre: string | null;
-                  /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                  /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
                   cantidadRecibida: number;
+                  /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
+                  cantidadComplemento: number | null;
                   /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
                   costoUnit: number | null;
-                  /** @description Lote creado (telas), o null. */
+                  /** @description Color de tela recibido (B1), o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela, o null. */
+                  telaColor: string | null;
+                  /** @description Partida creada (telas, B1), o null. */
+                  idPartida: number | null;
+                  /** @description Folio de la partida, o null. */
+                  partidaFolio: number | null;
+                  /** @description Lote del proveedor de la partida, o null. */
+                  loteProveedor: string | null;
+                  /** @description LEGADO: lote creado (recepciones viejas), o null. */
                   idLote: number | null;
-                  /** @description Clave del lote, o null. */
+                  /** @description LEGADO: clave del lote, o null. */
                   loteClave: string | null;
                   /** @description Movimiento de kardex generado, o null. */
                   idMovimiento: number | null;
@@ -26744,23 +26756,18 @@ export interface paths {
             /** @description Renglones de OC que se reciben (parcial o total). */
             lineas: {
               idOrdenCompraLinea: number;
-              /** @description Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). */
+              /** @description Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). En TELA es el CUERPO y debe ser > 0: por esta vía NO se recibe una entrega de SOLO complemento (se recibe contra lo pedido en la OC, que es cuerpo) — ese caso va por el documento de entrada por factura/remisión (B1), que sí admite cuerpo 0. */
               cantidad: number;
-              /** @description Lote a crear (OBLIGATORIO en líneas de tela, D5). */
-              lote?: {
-                /** @description Clave del lote (autogenerada si falta). */
-                clave?: string;
-                idColor: number;
-                idProveedor?: number;
-                factura?: string;
-                /** Format: date */
-                fecha?: string;
-                observaciones?: string;
-                componentes: {
-                  idTela: number;
-                  cantidad: number;
-                  peso?: number;
-                }[];
+              /** @description Color + complemento + lote del proveedor (OBLIGATORIO en líneas de tela, B1). */
+              telaColor?: {
+                /** @description Color (hijo de la tela) que llegó. Se EXIGE: la OC no determina el color. */
+                idTelaColor: number;
+                /** @description Cantidad del COMPLEMENTO (sólo telas que lo llevan). */
+                cantidadComplemento?: number;
+                /** @description Precio por unidad del COMPLEMENTO (el cardigan tiene su propio precio y la OC sólo trae uno por línea). Viaja al kardex como `costoUnitComplemento`; si no se captura, NULL. */
+                precioUnitComplemento?: number;
+                /** @description Número de lote del proveedor de la partida (opcional). */
+                loteProveedor?: string;
               };
             }[];
           };
@@ -26826,13 +26833,25 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
                 cantidadRecibida: number;
+                /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
+                cantidadComplemento: number | null;
                 /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
                 costoUnit: number | null;
-                /** @description Lote creado (telas), o null. */
+                /** @description Color de tela recibido (B1), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Partida creada (telas, B1), o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+                /** @description Lote del proveedor de la partida, o null. */
+                loteProveedor: string | null;
+                /** @description LEGADO: lote creado (recepciones viejas), o null. */
                 idLote: number | null;
-                /** @description Clave del lote, o null. */
+                /** @description LEGADO: clave del lote, o null. */
                 loteClave: string | null;
                 /** @description Movimiento de kardex generado, o null. */
                 idMovimiento: number | null;
@@ -27016,13 +27035,25 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
                 cantidadRecibida: number;
+                /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
+                cantidadComplemento: number | null;
                 /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
                 costoUnit: number | null;
-                /** @description Lote creado (telas), o null. */
+                /** @description Color de tela recibido (B1), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Partida creada (telas, B1), o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+                /** @description Lote del proveedor de la partida, o null. */
+                loteProveedor: string | null;
+                /** @description LEGADO: lote creado (recepciones viejas), o null. */
                 idLote: number | null;
-                /** @description Clave del lote, o null. */
+                /** @description LEGADO: clave del lote, o null. */
                 loteClave: string | null;
                 /** @description Movimiento de kardex generado, o null. */
                 idMovimiento: number | null;
@@ -27217,13 +27248,25 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
                 cantidadRecibida: number;
+                /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
+                cantidadComplemento: number | null;
                 /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
                 costoUnit: number | null;
-                /** @description Lote creado (telas), o null. */
+                /** @description Color de tela recibido (B1), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Partida creada (telas, B1), o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+                /** @description Lote del proveedor de la partida, o null. */
+                loteProveedor: string | null;
+                /** @description LEGADO: lote creado (recepciones viejas), o null. */
                 idLote: number | null;
-                /** @description Clave del lote, o null. */
+                /** @description LEGADO: clave del lote, o null. */
                 loteClave: string | null;
                 /** @description Movimiento de kardex generado, o null. */
                 idMovimiento: number | null;
@@ -32752,9 +32795,11 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad de COMPLEMENTO o null (la tela no lleva). */
                 cantidadComplemento: number | null;
-                /** @description Costo unitario o null (sin permiso de importes). */
+                /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                 costoUnit: number | null;
-                /** @description Importe (cuerpo × costoUnit) o null. */
+                /** @description Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio). */
+                costoUnitComplemento: number | null;
+                /** @description Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento. */
                 importe: number | null;
               }[];
               /** @description Suma de las cantidades de cuerpo (derivada). */
@@ -32936,9 +32981,11 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad de COMPLEMENTO o null (la tela no lleva). */
                 cantidadComplemento: number | null;
-                /** @description Costo unitario o null (sin permiso de importes). */
+                /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                 costoUnit: number | null;
-                /** @description Importe (cuerpo × costoUnit) o null. */
+                /** @description Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio). */
+                costoUnitComplemento: number | null;
+                /** @description Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento. */
                 importe: number | null;
               }[];
               /** @description Suma de las cantidades de cuerpo (derivada). */
@@ -33121,9 +33168,11 @@ export interface paths {
                   cantidad: number;
                   /** @description Cantidad de COMPLEMENTO o null (la tela no lleva). */
                   cantidadComplemento: number | null;
-                  /** @description Costo unitario o null (sin permiso de importes). */
+                  /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                   costoUnit: number | null;
-                  /** @description Importe (cuerpo × costoUnit) o null. */
+                  /** @description Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio). */
+                  costoUnitComplemento: number | null;
+                  /** @description Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento. */
                   importe: number | null;
                 }[];
                 /** @description Suma de las cantidades de cuerpo (derivada). */
@@ -33174,9 +33223,11 @@ export interface paths {
                   cantidad: number;
                   /** @description Cantidad de COMPLEMENTO o null (la tela no lleva). */
                   cantidadComplemento: number | null;
-                  /** @description Costo unitario o null (sin permiso de importes). */
+                  /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                   costoUnit: number | null;
-                  /** @description Importe (cuerpo × costoUnit) o null. */
+                  /** @description Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio). */
+                  costoUnitComplemento: number | null;
+                  /** @description Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento. */
                   importe: number | null;
                 }[];
                 /** @description Suma de las cantidades de cuerpo (derivada). */
@@ -33352,9 +33403,11 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad de COMPLEMENTO o null (la tela no lleva). */
                 cantidadComplemento: number | null;
-                /** @description Costo unitario o null (sin permiso de importes). */
+                /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                 costoUnit: number | null;
-                /** @description Importe (cuerpo × costoUnit) o null. */
+                /** @description Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio). */
+                costoUnitComplemento: number | null;
+                /** @description Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento. */
                 importe: number | null;
               }[];
               /** @description Suma de las cantidades de cuerpo (derivada). */
@@ -33704,9 +33757,11 @@ export interface paths {
                 salidaComplemento: number;
                 /** @description Saldo corrido del complemento (por color×almacén). */
                 saldoComplemento: number;
-                /** @description Costo unitario o null (sin permiso de importes). */
+                /** @description Costo unitario del CUERPO o null (sin permiso de importes / sin precio). */
                 costoUnit: number | null;
-                /** @description Importe del renglón o null. */
+                /** @description Costo unitario del COMPLEMENTO (B1) o null. */
+                costoUnitComplemento: number | null;
+                /** @description Importe del renglón (ambos componentes con su propio costo) o null. */
                 importe: number | null;
                 origenTipo: string | null;
                 origenId: string | null;
@@ -34060,6 +34115,1635 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar las entradas de tela por factura/remisión (sin orden de compra) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Busca por folio, número de documento o nombre del proveedor. */
+          busqueda?: string;
+          /** @description Filtra por estado del documento. */
+          estatus?: 'borrador' | 'confirmada' | 'cancelada';
+          /** @description Filtra por factura/remisión. */
+          tipoDocumento?: 'factura' | 'remision';
+          /** @description Filtra por proveedor. */
+          idProveedor?: number;
+          /** @description Filtra por almacén destino. */
+          idAlmacen?: number;
+          /** @description Filtra por fecha ≥ (YYYY-MM-DD). */
+          fechaDesde?: string;
+          /** @description Filtra por fecha ≤ (YYYY-MM-DD). */
+          fechaHasta?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'fecha' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de entradas de tela por factura/remisión. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Entradas de la página. */
+              datos: {
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                idEmpresa: number;
+                /**
+                 * @description Documento del proveedor: factura o remisión.
+                 * @enum {string}
+                 */
+                tipoDocumento: 'factura' | 'remision';
+                numeroDocumento: string;
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                proveedor: string;
+                /** @description Fecha del documento (YYYY-MM-DD). */
+                fecha: string;
+                idAlmacen: number;
+                almacen: string;
+                observaciones: string | null;
+                /**
+                 * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+                 * @enum {string}
+                 */
+                estatus: 'borrador' | 'confirmada' | 'cancelada';
+                /** @description Movimiento de kardex generado, o null. */
+                idMovimiento: number | null;
+                /** @description Folio del movimiento, o null. */
+                folioMovimiento: number | null;
+                confirmadaEn: string | null;
+                confirmadaPorId: string | null;
+                canceladaEn: string | null;
+                canceladaPorId: string | null;
+                motivoCancelacion: string | null;
+                lineas: {
+                  id: number;
+                  idTela: number;
+                  /** @description Nombre de la tela. */
+                  tela: string;
+                  idTelaColor: number;
+                  /** @description Nombre del color de la tela. */
+                  telaColor: string;
+                  pantone: string | null;
+                  /**
+                   * @description Unidad de compra/consumo de la tela.
+                   * @enum {string}
+                   */
+                  unidadMedida: 'KG' | 'M';
+                  /** @description Nombre del componente cuerpo o null. */
+                  nombreCuerpo: string | null;
+                  /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                  nombreComplemento: string | null;
+                  /** @description Cantidad del CUERPO. */
+                  cantidad: number;
+                  /** @description Cantidad del COMPLEMENTO o null. */
+                  cantidadComplemento: number | null;
+                  /** @description Precio por unidad del cuerpo o null. */
+                  precioUnit: number | null;
+                  /** @description Precio del complemento o null. */
+                  precioUnitComplemento: number | null;
+                  /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                  importe: number | null;
+                  loteProveedor: string | null;
+                  /** @description Partida creada al confirmar, o null. */
+                  idPartida: number | null;
+                  /** @description Folio de la partida, o null. */
+                  partidaFolio: number | null;
+                }[];
+                /** @description Σ de las cantidades de cuerpo (derivada). */
+                totalCuerpo: number;
+                /** @description Σ de las cantidades de complemento (derivada). */
+                totalComplemento: number;
+                /** @description Σ de los importes de los renglones, o null. */
+                totalImporte: number | null;
+                /** @description Cuántos archivos trae adjuntos el documento. */
+                numeroAdjuntos: number;
+                /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+                avisos: string[];
+                /** Format: date-time */
+                creadoEn: string;
+                creadoPorId: string | null;
+              }[];
+              /** @description Total de entradas que cumplen el filtro. */
+              total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Capturar una entrada de tela por factura/remisión (queda en borrador) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Alta de una entrada de tela por factura/remisión (sin orden de compra). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Documento del proveedor: factura o remisión.
+             * @enum {string}
+             */
+            tipoDocumento: 'factura' | 'remision';
+            /** @description Número del documento tal como lo trae el proveedor. */
+            numeroDocumento: string;
+            idProveedor: number;
+            /** Format: date */
+            fecha: string;
+            idAlmacen: number;
+            observaciones?: string;
+            lineas: {
+              idTelaColor: number;
+              /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
+              cantidad: number;
+              /** @description Cantidad del COMPLEMENTO (sólo telas que lo llevan). */
+              cantidadComplemento?: number;
+              /** @description Precio por unidad del CUERPO (viaja al kardex como costo, D1). */
+              precioUnit?: number;
+              /** @description Precio por unidad del COMPLEMENTO (vive en el documento). */
+              precioUnitComplemento?: number;
+              /** @description Número de lote del proveedor de esta partida (opcional). */
+              loteProveedor?: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Documento de entrada de tela por factura/remisión con sus partidas. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              /**
+               * @description Documento del proveedor: factura o remisión.
+               * @enum {string}
+               */
+              tipoDocumento: 'factura' | 'remision';
+              numeroDocumento: string;
+              idProveedor: number;
+              /** @description Nombre del proveedor. */
+              proveedor: string;
+              /** @description Fecha del documento (YYYY-MM-DD). */
+              fecha: string;
+              idAlmacen: number;
+              almacen: string;
+              observaciones: string | null;
+              /**
+               * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Movimiento de kardex generado, o null. */
+              idMovimiento: number | null;
+              /** @description Folio del movimiento, o null. */
+              folioMovimiento: number | null;
+              confirmadaEn: string | null;
+              confirmadaPorId: string | null;
+              canceladaEn: string | null;
+              canceladaPorId: string | null;
+              motivoCancelacion: string | null;
+              lineas: {
+                id: number;
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                idTelaColor: number;
+                /** @description Nombre del color de la tela. */
+                telaColor: string;
+                pantone: string | null;
+                /**
+                 * @description Unidad de compra/consumo de la tela.
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
+                /** @description Nombre del componente cuerpo o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Cantidad del CUERPO. */
+                cantidad: number;
+                /** @description Cantidad del COMPLEMENTO o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio por unidad del cuerpo o null. */
+                precioUnit: number | null;
+                /** @description Precio del complemento o null. */
+                precioUnitComplemento: number | null;
+                /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                importe: number | null;
+                loteProveedor: string | null;
+                /** @description Partida creada al confirmar, o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+              }[];
+              /** @description Σ de las cantidades de cuerpo (derivada). */
+              totalCuerpo: number;
+              /** @description Σ de las cantidades de complemento (derivada). */
+              totalComplemento: number;
+              /** @description Σ de los importes de los renglones, o null. */
+              totalImporte: number | null;
+              /** @description Cuántos archivos trae adjuntos el documento. */
+              numeroAdjuntos: number;
+              /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+              avisos: string[];
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una entrada de tela con sus partidas */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Documento de entrada de tela por factura/remisión con sus partidas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              /**
+               * @description Documento del proveedor: factura o remisión.
+               * @enum {string}
+               */
+              tipoDocumento: 'factura' | 'remision';
+              numeroDocumento: string;
+              idProveedor: number;
+              /** @description Nombre del proveedor. */
+              proveedor: string;
+              /** @description Fecha del documento (YYYY-MM-DD). */
+              fecha: string;
+              idAlmacen: number;
+              almacen: string;
+              observaciones: string | null;
+              /**
+               * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Movimiento de kardex generado, o null. */
+              idMovimiento: number | null;
+              /** @description Folio del movimiento, o null. */
+              folioMovimiento: number | null;
+              confirmadaEn: string | null;
+              confirmadaPorId: string | null;
+              canceladaEn: string | null;
+              canceladaPorId: string | null;
+              motivoCancelacion: string | null;
+              lineas: {
+                id: number;
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                idTelaColor: number;
+                /** @description Nombre del color de la tela. */
+                telaColor: string;
+                pantone: string | null;
+                /**
+                 * @description Unidad de compra/consumo de la tela.
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
+                /** @description Nombre del componente cuerpo o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Cantidad del CUERPO. */
+                cantidad: number;
+                /** @description Cantidad del COMPLEMENTO o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio por unidad del cuerpo o null. */
+                precioUnit: number | null;
+                /** @description Precio del complemento o null. */
+                precioUnitComplemento: number | null;
+                /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                importe: number | null;
+                loteProveedor: string | null;
+                /** @description Partida creada al confirmar, o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+              }[];
+              /** @description Σ de las cantidades de cuerpo (derivada). */
+              totalCuerpo: number;
+              /** @description Σ de las cantidades de complemento (derivada). */
+              totalComplemento: number;
+              /** @description Σ de los importes de los renglones, o null. */
+              totalImporte: number | null;
+              /** @description Cuántos archivos trae adjuntos el documento. */
+              numeroAdjuntos: number;
+              /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+              avisos: string[];
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Editar una entrada de tela en borrador (reemplaza cabecera y renglones) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición de una entrada de tela en borrador (reemplaza cabecera y renglones). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Documento del proveedor: factura o remisión.
+             * @enum {string}
+             */
+            tipoDocumento: 'factura' | 'remision';
+            /** @description Número del documento tal como lo trae el proveedor. */
+            numeroDocumento: string;
+            idProveedor: number;
+            /** Format: date */
+            fecha: string;
+            idAlmacen: number;
+            observaciones?: string;
+            lineas: {
+              idTelaColor: number;
+              /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
+              cantidad: number;
+              /** @description Cantidad del COMPLEMENTO (sólo telas que lo llevan). */
+              cantidadComplemento?: number;
+              /** @description Precio por unidad del CUERPO (viaja al kardex como costo, D1). */
+              precioUnit?: number;
+              /** @description Precio por unidad del COMPLEMENTO (vive en el documento). */
+              precioUnitComplemento?: number;
+              /** @description Número de lote del proveedor de esta partida (opcional). */
+              loteProveedor?: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Documento de entrada de tela por factura/remisión con sus partidas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              /**
+               * @description Documento del proveedor: factura o remisión.
+               * @enum {string}
+               */
+              tipoDocumento: 'factura' | 'remision';
+              numeroDocumento: string;
+              idProveedor: number;
+              /** @description Nombre del proveedor. */
+              proveedor: string;
+              /** @description Fecha del documento (YYYY-MM-DD). */
+              fecha: string;
+              idAlmacen: number;
+              almacen: string;
+              observaciones: string | null;
+              /**
+               * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Movimiento de kardex generado, o null. */
+              idMovimiento: number | null;
+              /** @description Folio del movimiento, o null. */
+              folioMovimiento: number | null;
+              confirmadaEn: string | null;
+              confirmadaPorId: string | null;
+              canceladaEn: string | null;
+              canceladaPorId: string | null;
+              motivoCancelacion: string | null;
+              lineas: {
+                id: number;
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                idTelaColor: number;
+                /** @description Nombre del color de la tela. */
+                telaColor: string;
+                pantone: string | null;
+                /**
+                 * @description Unidad de compra/consumo de la tela.
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
+                /** @description Nombre del componente cuerpo o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Cantidad del CUERPO. */
+                cantidad: number;
+                /** @description Cantidad del COMPLEMENTO o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio por unidad del cuerpo o null. */
+                precioUnit: number | null;
+                /** @description Precio del complemento o null. */
+                precioUnitComplemento: number | null;
+                /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                importe: number | null;
+                loteProveedor: string | null;
+                /** @description Partida creada al confirmar, o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+              }[];
+              /** @description Σ de las cantidades de cuerpo (derivada). */
+              totalCuerpo: number;
+              /** @description Σ de las cantidades de complemento (derivada). */
+              totalComplemento: number;
+              /** @description Σ de los importes de los renglones, o null. */
+              totalImporte: number | null;
+              /** @description Cuántos archivos trae adjuntos el documento. */
+              numeroAdjuntos: number;
+              /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+              avisos: string[];
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas/{id}/confirmar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirmar la entrada de tela (crea las partidas y da la entrada al inventario) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Documento de entrada de tela por factura/remisión con sus partidas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              /**
+               * @description Documento del proveedor: factura o remisión.
+               * @enum {string}
+               */
+              tipoDocumento: 'factura' | 'remision';
+              numeroDocumento: string;
+              idProveedor: number;
+              /** @description Nombre del proveedor. */
+              proveedor: string;
+              /** @description Fecha del documento (YYYY-MM-DD). */
+              fecha: string;
+              idAlmacen: number;
+              almacen: string;
+              observaciones: string | null;
+              /**
+               * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Movimiento de kardex generado, o null. */
+              idMovimiento: number | null;
+              /** @description Folio del movimiento, o null. */
+              folioMovimiento: number | null;
+              confirmadaEn: string | null;
+              confirmadaPorId: string | null;
+              canceladaEn: string | null;
+              canceladaPorId: string | null;
+              motivoCancelacion: string | null;
+              lineas: {
+                id: number;
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                idTelaColor: number;
+                /** @description Nombre del color de la tela. */
+                telaColor: string;
+                pantone: string | null;
+                /**
+                 * @description Unidad de compra/consumo de la tela.
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
+                /** @description Nombre del componente cuerpo o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Cantidad del CUERPO. */
+                cantidad: number;
+                /** @description Cantidad del COMPLEMENTO o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio por unidad del cuerpo o null. */
+                precioUnit: number | null;
+                /** @description Precio del complemento o null. */
+                precioUnitComplemento: number | null;
+                /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                importe: number | null;
+                loteProveedor: string | null;
+                /** @description Partida creada al confirmar, o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+              }[];
+              /** @description Σ de las cantidades de cuerpo (derivada). */
+              totalCuerpo: number;
+              /** @description Σ de las cantidades de complemento (derivada). */
+              totalComplemento: number;
+              /** @description Σ de los importes de los renglones, o null. */
+              totalImporte: number | null;
+              /** @description Cuántos archivos trae adjuntos el documento. */
+              numeroAdjuntos: number;
+              /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+              avisos: string[];
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar una entrada de tela (si estaba confirmada genera el movimiento inverso; no edita ni borra) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación de la entrada de tela. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Documento de entrada de tela por factura/remisión con sus partidas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              /**
+               * @description Documento del proveedor: factura o remisión.
+               * @enum {string}
+               */
+              tipoDocumento: 'factura' | 'remision';
+              numeroDocumento: string;
+              idProveedor: number;
+              /** @description Nombre del proveedor. */
+              proveedor: string;
+              /** @description Fecha del documento (YYYY-MM-DD). */
+              fecha: string;
+              idAlmacen: number;
+              almacen: string;
+              observaciones: string | null;
+              /**
+               * @description Estado del documento: borrador (no toca inventario), confirmada o cancelada.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Movimiento de kardex generado, o null. */
+              idMovimiento: number | null;
+              /** @description Folio del movimiento, o null. */
+              folioMovimiento: number | null;
+              confirmadaEn: string | null;
+              confirmadaPorId: string | null;
+              canceladaEn: string | null;
+              canceladaPorId: string | null;
+              motivoCancelacion: string | null;
+              lineas: {
+                id: number;
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                idTelaColor: number;
+                /** @description Nombre del color de la tela. */
+                telaColor: string;
+                pantone: string | null;
+                /**
+                 * @description Unidad de compra/consumo de la tela.
+                 * @enum {string}
+                 */
+                unidadMedida: 'KG' | 'M';
+                /** @description Nombre del componente cuerpo o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del complemento; null = la tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Cantidad del CUERPO. */
+                cantidad: number;
+                /** @description Cantidad del COMPLEMENTO o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio por unidad del cuerpo o null. */
+                precioUnit: number | null;
+                /** @description Precio del complemento o null. */
+                precioUnitComplemento: number | null;
+                /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
+                importe: number | null;
+                loteProveedor: string | null;
+                /** @description Partida creada al confirmar, o null. */
+                idPartida: number | null;
+                /** @description Folio de la partida, o null. */
+                partidaFolio: number | null;
+              }[];
+              /** @description Σ de las cantidades de cuerpo (derivada). */
+              totalCuerpo: number;
+              /** @description Σ de las cantidades de complemento (derivada). */
+              totalComplemento: number;
+              /** @description Σ de los importes de los renglones, o null. */
+              totalImporte: number | null;
+              /** @description Cuántos archivos trae adjuntos el documento. */
+              numeroAdjuntos: number;
+              /** @description Avisos SUAVES para revisión (no bloquean): hoy, que ya exista otro documento vivo del MISMO proveedor con el MISMO número (posible factura capturada dos veces). */
+              avisos: string[];
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas/{id}/adjuntos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los adjuntos de una entrada de tela */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Adjuntos de una entrada de tela. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                idArchivo: string;
+                nombreOriginal: string;
+                tipoMime: string;
+                tamanoBytes: number;
+                /** @description URL GET prefirmada para ver/descargar el archivo. */
+                urlDescarga: string;
+                subidoPorId: string | null;
+                /** Format: date-time */
+                creadoEn: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Preparar la subida de un adjunto de la entrada (el PDF de la factura) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para preparar la subida de un adjunto de una entrada de tela. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre del archivo tal como lo llama el usuario. */
+            nombreOriginal: string;
+            /** @description Tipo MIME del archivo (ej. application/pdf). */
+            tipoMime: string;
+            /** @description Tamaño exacto en bytes (la URL prefirmada sólo acepta este tamaño). */
+            tamanoBytes: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de preparar la subida de un adjunto de entrada de tela. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo creado. */
+              idArchivo: string;
+              nombreOriginal: string;
+              /** @description URL PUT prefirmada: el navegador sube directo a R2. */
+              urlSubida: string;
+              /** @description Vigencia de la URL de subida (segundos). */
+              expiraEnSegundos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/entradas/{id}/adjuntos/{idArchivo}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Quitar un adjunto de la entrada de tela */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del documento de entrada de tela. */
+          id: number;
+          /** @description Id del adjunto. */
+          idArchivo: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
