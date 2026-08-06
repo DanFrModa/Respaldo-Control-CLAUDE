@@ -271,4 +271,45 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
       await cliente.mapeoMigracion.count({ where: { entidad: ENTIDAD_MAPEO.telaPorIdTelas } }),
     ).toBeGreaterThan(0);
   });
+  // R2-1 (lección del PR #153, §Post-F9.11): re-correr el ETL NO borra la depuración manual
+  // del grid de colores — conserva casing corregido, pantone, liga legacy y colores
+  // agregados a mano; SOLO refresca el precio que el CSV sí trae.
+  it('al re-correrse CONSERVA la depuración manual de los colores de tela', async () => {
+    await ejecutarEtl(cliente);
+
+    // La tela unificada trae sus colores del CSV, ligados al catálogo de prenda.
+    const alsatex = await cliente.tela.findFirstOrThrow({
+      where: { nombre: { equals: 'Alsatex100', mode: 'insensitive' } },
+      select: { id: true },
+    });
+    const marino = await cliente.telaColor.findFirstOrThrow({
+      where: { idTela: alsatex.id, nombre: 'Marino' },
+    });
+    expect(marino.idColor).not.toBeNull(); // la liga legacy quedó puesta
+
+    // DEPURACIÓN manual: casing corregido, pantone capturado, precio movido a mano (para
+    // comprobar que el CSV lo re-impone) y un color NUEVO que el CSV no conoce.
+    await cliente.telaColor.update({
+      where: { id: marino.id },
+      data: { nombre: 'MARINO', pantone: '19-4024 TCX', precio: 999 },
+    });
+    await cliente.telaColor.create({
+      data: { idTela: alsatex.id, nombre: 'Agregado a mano', precio: 10 },
+    });
+    const totalAntes = await cliente.telaColor.count();
+
+    // 2ª corrida.
+    await ejecutarEtl(cliente);
+
+    const tras = await cliente.telaColor.findUniqueOrThrow({ where: { id: marino.id } });
+    expect(tras.nombre).toBe('MARINO'); // el casing corregido NO se pisa con el crudo del CSV
+    expect(tras.pantone).toBe('19-4024 TCX'); // el pantone capturado a mano sobrevive
+    expect(tras.idColor).toBe(marino.idColor); // la liga legacy sobrevive
+    expect(tras.precio?.toNumber()).toBe(57); // el precio del CSV SÍ se re-impone (Marino=57)
+    // El color agregado a mano NO se borró; no se duplicó nada.
+    expect(
+      await cliente.telaColor.count({ where: { idTela: alsatex.id, nombre: 'Agregado a mano' } }),
+    ).toBe(1);
+    expect(await cliente.telaColor.count()).toBe(totalAntes);
+  }, 180_000);
 });

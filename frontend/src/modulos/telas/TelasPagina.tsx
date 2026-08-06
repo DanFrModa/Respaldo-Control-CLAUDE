@@ -76,6 +76,15 @@ function hayTexto(valor: string | null): valor is string {
 }
 
 /**
+ * La IDENTIDAD de la tela se lee de corrido "Felpa 280 · Alsatex · Felpa Suiza"
+ * (§Post-F9.11): nombre propio · proveedor dueño · nombre que le da el proveedor. Las
+ * migradas sin proveedor solo muestran su nombre (los puntos no se pintan vacíos).
+ */
+function identidadTela(tela: Tela): string {
+  return [tela.nombre, tela.proveedor, tela.nombreProveedor].filter(hayTexto).join(' · ');
+}
+
+/**
  * TELAS — catálogo unificado (BOM + inventario, F1-E3) re-vestido R9 a TABLA-FIRST fiel al proto
  * `vTelas`: page-head + toolbar (filtro por categoría, búsqueda, inactivos) + TABLA DENSA con filas
  * EXPANDIBLES (chevron) + barra de totales al pie. El renglón colapsado muestra la categoría, el tipo
@@ -193,8 +202,8 @@ export function TelasPagina(): React.JSX.Element {
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Telas</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Catálogo unificado (BOM e inventario) · colores con precio · proveedores con precio por
-            color (R17)
+            Catálogo unificado (BOM e inventario) · tipo, composición y proveedor dueño · colores
+            con pantone y precios
           </p>
         </div>
         {puedeAdministrar ? (
@@ -218,11 +227,11 @@ export function TelasPagina(): React.JSX.Element {
               setCategoriaFiltro(e.target.value);
               reiniciar();
             }}
-            aria-label="Filtrar telas por categoría"
+            aria-label="Filtrar telas por tipo de tela"
             data-testid="filtro-categoria-tela"
             disabled={categoriasCatalogo.isPending || categoriasCatalogo.isError}
           >
-            <option value={CATEGORIA_TODAS}>Todas las categorías</option>
+            <option value={CATEGORIA_TODAS}>Todos los tipos de tela</option>
             {(categoriasCatalogo.data?.datos ?? []).map((cat: TelaCategoria) => (
               <option key={cat.id} value={String(cat.id)}>
                 {cat.nombre}
@@ -238,7 +247,7 @@ export function TelasPagina(): React.JSX.Element {
             <Input
               type="search"
               className="h-8 pl-8 text-sm"
-              placeholder="Buscar tela o color…"
+              placeholder="Buscar tela, proveedor, color o pantone…"
               value={textoBusqueda}
               onChange={(e) => {
                 setTextoBusqueda(e.target.value);
@@ -301,14 +310,16 @@ export function TelasPagina(): React.JSX.Element {
                           </Avatar>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="font-medium">{tela.nombre}</span>
+                              <span className="font-medium">{identidadTela(tela)}</span>
                               {tela.categoria !== null ? (
                                 <TipoBadge tono="telas">{tela.categoria}</TipoBadge>
                               ) : null}
                               {tela.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
                             </div>
                             <div className="text-xs text-faint">
-                              {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
+                              {hayTexto(tela.composicion)
+                                ? tela.composicion
+                                : ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
                             </div>
                           </div>
                         </div>
@@ -489,13 +500,19 @@ function RenglonTela({
             </Avatar>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-medium">{tela.nombre}</span>
+                {/* Identidad §Post-F9.11: "nombre · proveedor · nombre del proveedor". */}
+                <span className="font-medium" data-testid="identidad-tela">
+                  {identidadTela(tela)}
+                </span>
                 {tela.categoria !== null ? (
                   <TipoBadge tono="telas">{tela.categoria}</TipoBadge>
                 ) : null}
                 {tela.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
               </div>
-              <div className="text-xs text-faint">{ETIQUETA_UNIDAD[tela.unidadMedida]}</div>
+              <div className="truncate text-xs text-faint">
+                {ETIQUETA_UNIDAD[tela.unidadMedida]}
+                {hayTexto(tela.composicion) ? ` · ${tela.composicion}` : ''}
+              </div>
             </div>
           </div>
         </TablaDensaCelda>
@@ -530,11 +547,26 @@ function RenglonTela({
                   Datos de la tela
                 </h4>
                 <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
-                  <Dato etiqueta="Categoría">{tela.categoria ?? '—'}</Dato>
+                  <Dato etiqueta="Tipo de tela">{tela.categoria ?? '—'}</Dato>
+                  <Dato etiqueta="Composición">{tela.composicion ?? '—'}</Dato>
+                  <Dato etiqueta="Proveedor">
+                    <span data-testid="tela-detalle-proveedor">{tela.proveedor ?? '—'}</span>
+                  </Dato>
+                  <Dato etiqueta="Nombre del proveedor">{tela.nombreProveedor ?? '—'}</Dato>
                   <Dato etiqueta="Unidad">
                     <span data-testid="tela-detalle-unidad">
                       {ETIQUETA_UNIDAD[tela.unidadMedida]}
                     </span>
+                  </Dato>
+                  <Dato etiqueta="Complemento">
+                    {tela.nombreComplemento === null ? (
+                      'No lleva'
+                    ) : (
+                      <span data-testid="tela-detalle-complemento">
+                        {hayTexto(tela.nombreCuerpo) ? `${tela.nombreCuerpo} + ` : ''}
+                        {tela.nombreComplemento}
+                      </span>
+                    )}
                   </Dato>
                   <Dato etiqueta="Tipo de componente">
                     {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
@@ -564,12 +596,34 @@ function RenglonTela({
                   <ul className="flex max-w-xl flex-col gap-1.5" data-testid="tela-colores-detalle">
                     {tela.colores.map((color: TelaColor) => (
                       <li
-                        key={color.idColor}
+                        key={color.id}
                         className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-1.5"
                       >
-                        <span className="text-sm font-medium">{color.nombre}</span>
-                        <span className="num shrink-0 text-sm text-muted-foreground">
-                          {color.precio === null ? 'Sin precio' : formatearPrecio(color.precio)}
+                        <span className="flex min-w-0 flex-col">
+                          <span className="text-sm font-medium">{color.nombre}</span>
+                          {hayTexto(color.pantone) ? (
+                            <span
+                              className="text-[11px] text-muted-foreground"
+                              data-testid="pantone-detalle"
+                            >
+                              PANTONE {color.pantone}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="num flex shrink-0 flex-col items-end text-sm text-muted-foreground">
+                          <span>
+                            {color.precio === null ? 'Sin precio' : formatearPrecio(color.precio)}
+                          </span>
+                          {/* El precio del COMPLEMENTO solo existe si la tela lo lleva
+                              (§Post-F9.11), con su nombre: "Precio Cardigan". */}
+                          {tela.nombreComplemento !== null ? (
+                            <span className="text-[11px]" data-testid="precio-complemento-detalle">
+                              Precio {tela.nombreComplemento}:{' '}
+                              {color.precioComplemento === null
+                                ? '—'
+                                : formatearPrecio(color.precioComplemento)}
+                            </span>
+                          ) : null}
                         </span>
                       </li>
                     ))}
@@ -577,17 +631,26 @@ function RenglonTela({
                 )}
               </section>
 
-              {/* Precios por proveedor (R17): a quién se le compra la tela y a qué precio (por color). */}
+              {/* Precios por proveedor (R17): a quién se le puede COMPRAR la tela y a qué precio
+                  (cotizaciones/listas de precios de F8, por color de PRENDA). NO confundir con el
+                  "Proveedor" de arriba: ese es el DUEÑO del artículo (§Post-F9.11, la identidad de
+                  la tela); este bloque es el N:N de compra que quedó anotado para simplificar. El
+                  grid por color usa la liga LEGACY al catálogo de prenda (solo colores migrados). */}
               <section>
                 <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Precios por proveedor
                 </h4>
+                <p className="mb-1.5 text-xs text-muted-foreground">
+                  A quién se le puede comprar y a qué precio (R17, cotizaciones). El dueño del
+                  artículo es el Proveedor de los datos de la tela.
+                </p>
                 <EditorProveedoresTela
                   idTela={tela.id}
-                  colores={tela.colores.map((color) => ({
-                    idColor: color.idColor,
-                    nombre: color.nombre,
-                  }))}
+                  colores={tela.colores.flatMap((color) =>
+                    color.idColor === null
+                      ? []
+                      : [{ idColor: color.idColor, nombre: color.nombre }],
+                  )}
                   deshabilitado={!puedeAdministrar || !tela.activo}
                   puedeVerImportes={puedeVerImportes}
                 />

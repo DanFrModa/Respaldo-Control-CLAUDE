@@ -1376,3 +1376,72 @@ Costos y se hace aparte.
   rechazada; no se puede vaciar) · `telas.int.test.ts` (**CI**: búsqueda por color, filtro por color,
   y la unidad como se eligió) · `CapturaRenglonesTela.test.tsx` (**nuevo**: el aviso de telas al
   tono, el atajo que conserva el lote, y que la ya capturada deja de ofrecerse).
+
+---
+
+## 2026-08-06 — El catálogo de telas, reestructurado (etapa A1 de la conversación de telas)
+
+Primera etapa construida de la conversación del 6 de agosto (las reglas completas, en
+`DECISIONES.md §Post-F9.11`). Esto es SOLO el catálogo; el inventario con partidas (A2), la entrada
+por factura y la pantalla de stocks vienen después, sobre esta base.
+
+### A) La identidad de una tela ahora son cuatro datos
+
+Daniel: *"Me gustaría tener más información: nombre de la tela genérica, composición (de un catálogo
+para mantener congruencia), nombre del proveedor, y nombre de la tela como le llama el proveedor."*
+
+- **Tipo de tela** ("Felpa"): es la categoría que ya existía, re-etiquetada.
+- **Composición** ("50% Algodón, 50% Poliéster"): catálogo NUEVO, administrable desde el propio
+  diálogo de la tela (alta rápida, igual que las categorías).
+- **Proveedor** (Alsatex): el dueño del artículo. **Obligatorio en telas nuevas**; las 877 migradas
+  quedan sin él y se van llenando al depurar (decisión explícita).
+- **Nombre del proveedor** ("Felpa Suiza"): como le llama él.
+
+El renglón del catálogo se lee de corrido: **Felpa · Alsatex · Felpa Suiza**, y el buscador
+encuentra por cualquiera de los cuatro (y por color y pantone).
+
+### B) El complemento (cardigan) es parte de la misma tela
+
+Daniel: *"Es como parte de la misma tela para el manejo de todo… mismo color, mismo pantone, parte
+de la misma tela padre."* Desde el alta se declara si la tela lleva complemento y cómo se llama
+("Felpa" / "Cardigan"). Cada color lleva **dos precios** — el del cuerpo y el del complemento — y
+la columna del complemento solo aparece si la tela lo lleva. Si se desmarca el complemento, sus
+precios se limpian en todos los colores (regla del servidor, no de la pantalla).
+
+### C) Los colores de la tela ya NO salen del catálogo de colores de prenda
+
+Daniel: *"No debería de haber un catálogo de colores. Debería ser un campo abierto. Chance estaría
+bien tener un nombre genérico del color, y un campo adicional con el pantone."* (registrado en
+`DECISIONES.md §Post-F9.11` punto 3). Ahora cada tela tiene SUS colores: se teclean libres, con su pantone,
+y "Negro" puede existir en veinte telas sin estorbarse. El catálogo global de colores queda SOLO
+para el color de la prenda (la matriz de la OP y todo el WIP), que es donde debe ser una lista
+controlada. Las telas migradas conservan una liga al color viejo para que el histórico siga
+cuadrando (MRP incluido).
+
+### D) Alta de color de PRENDA al vuelo en la orden
+
+La contraparte del punto C: al capturar la matriz de la OP, un color que no existe ("Indigo con
+Amarillo") **se crea ahí mismo**, sin salirse a Catálogos → Colores. Busca en el servidor (no solo
+en los primeros 100), sugiere los existentes y solo ofrece "crear" cuando de verdad no está. Solo
+lo ve quien tiene permiso de administrar colores.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración**, automática (`20260806120000_tela_identidad_complemento`): catálogo de
+   composiciones + los campos nuevos + la reestructura de `telas_colores` (los nombres se copian de
+   la liga vieja; nada se pierde).
+2. **Cero permisos nuevos** (composiciones reúsa `telas.ver`/`telas.administrar`) → **no** hace
+   falta `SEED_ON_START`.
+3. **Nada que correr a mano.** Y si el ETL de catálogos se re-corre, **respeta la depuración
+   manual**: conserva los pantones, los precios de cardigán, los colores agregados a mano y las
+   correcciones de nombre — solo actualiza el precio del cuerpo si el CSV trae otro.
+
+### Archivos principales
+
+- **Backend:** `prisma/schema.prisma` + la migración · `dominio/catalogos/telas.ts` (composiciones
+  CRUD, identidad, complemento con su invariante, colores por nombre) · `dominio/catalogos/colores.ts`
+  (la fusión conserva pantone/precios) · `dominio/costos/resolucion-precios.ts` (helper del orden de
+  resolución, listo para A2) · `api/telas/telas.rutas.ts` · contrato + `openapi.json`.
+- **Frontend:** `modulos/telas/{TelasPagina,DialogoTela,EditorColoresTela}.tsx` ·
+  `modulos/ordenes/{AgregarColorMatriz,PanelMatriz}.tsx` · `componentes/matriz-color-talla` (prop
+  `slotAgregarColor`) · `api/telas.ts` + cliente regenerado.

@@ -256,23 +256,23 @@ export async function reactivarColor(
 
 /**
  * Reasigna TODAS las referencias del color `idOrigen` al color `idDestino`, dentro de
- * la transacción `tx`. Hoy la ÚNICA tabla que referencia a `Color` es `TelaColor`
- * (puente Tela↔Color con PK compuesta `[idTela, idColor]`).
+ * la transacción `tx`. Hoy la ÚNICA tabla que referencia a `Color` es `TelaColor` — y
+ * desde §Post-F9.11 esa referencia es la LIGA LEGACY `idColor` (nullable) de las filas
+ * MIGRADAS: los colores de tela nuevos nacen sin liga y esta fusión no los toca.
  *
  * PUNTO CENTRAL DE EXTENSIÓN: cuando en el futuro otras tablas referencien a `Color`
  * (p. ej. colores de avíos, de modelos, de pedidos), agrega aquí su reasignación —
  * todas dentro de la MISMA transacción para que la fusión siga siendo todo-o-nada (A2).
- * Cada referencia con unicidad por color necesita resolver su propia colisión de PK,
- * igual que se hace abajo con `TelaColor`.
  *
- * REGLA DE COLISIÓN DE PK (TelaColor): no se puede mover ciegamente un `TelaColor` de
- * origen a destino si el destino YA tiene un renglón para la misma tela (violaría la
- * PK `[idTela, idColor]`). Para esas telas en colisión:
- *   - GANA EL DESTINO (es el canónico), PERO si el destino tiene `precio` nulo y el
- *     origen trae precio, se rellena el del origen (no perder un dato que solo existía
- *     en el duplicado). Si ambos tienen precio, se conserva el del destino.
+ * REGLA DE COLISIÓN (TelaColor): si el destino YA tiene una fila ligada en la MISMA
+ * tela, no se mueve ciegamente (la tela quedaría con dos filas ligadas al mismo color
+ * de prenda — el duplicado que la fusión existe para eliminar). Para esas telas:
+ *   - GANA EL DESTINO (es el canónico), PERO cada dato que el destino tenga NULO y el
+ *     origen SÍ traiga se RELLENA — `precio`, `pantone` y `precioComplemento` por igual
+ *     (§Post-F9.11: no perder un dato que solo existía en el duplicado).
  *   - El renglón duplicado del origen se ELIMINA (ya no aporta nada).
- * Las telas SIN colisión simplemente se mueven (`update` de `idColor`).
+ * Las telas SIN colisión simplemente re-ligan (`update` de `idColor`), conservando su
+ * nombre propio.
  *
  * @returns cuántas referencias `TelaColor` se reasignaron o consolidaron (para bitácora).
  */
@@ -286,35 +286,38 @@ async function reasignarReferenciasColor(
     return 0;
   }
 
-  // Telas que el destino YA tiene (para detectar colisiones de PK).
+  // Telas donde el destino YA tiene fila ligada (para detectar colisiones).
   const referenciasDestino = await tx.telaColor.findMany({
     where: { idColor: idDestino },
-    select: { idTela: true, precio: true },
+    select: { id: true, idTela: true, precio: true, pantone: true, precioComplemento: true },
   });
-  const destinoPorTela = new Map(referenciasDestino.map((r) => [r.idTela, r.precio]));
+  const destinoPorTela = new Map(referenciasDestino.map((r) => [r.idTela, r]));
 
   for (const ref of referenciasOrigen) {
-    if (!destinoPorTela.has(ref.idTela)) {
-      // Sin colisión: la tela solo existía con el color origen → se mueve al destino.
-      await tx.telaColor.update({
-        where: { idTela_idColor: { idTela: ref.idTela, idColor: idOrigen } },
-        data: { idColor: idDestino },
-      });
+    const destino = destinoPorTela.get(ref.idTela);
+    if (destino === undefined) {
+      // Sin colisión: la tela solo estaba ligada al origen → se re-liga al destino.
+      await tx.telaColor.update({ where: { id: ref.id }, data: { idColor: idDestino } });
       continue;
     }
 
-    // Colisión: el destino ya tiene esta tela. Gana el destino; solo rellena su precio
-    // si estaba nulo y el origen sí lo traía. Luego elimina el duplicado del origen.
-    const precioDestino = destinoPorTela.get(ref.idTela) ?? null;
-    if (precioDestino === null && ref.precio !== null) {
-      await tx.telaColor.update({
-        where: { idTela_idColor: { idTela: ref.idTela, idColor: idDestino } },
-        data: { precio: ref.precio },
-      });
+    // Colisión: el destino ya tiene fila en esta tela. Gana el destino; se rellena TODO
+    // dato que tuviera nulo y el origen sí traiga (precio, pantone y precioComplemento).
+    const relleno: {
+      precio?: Prisma.Decimal;
+      pantone?: string;
+      precioComplemento?: Prisma.Decimal;
+    } = {
+      ...(destino.precio === null && ref.precio !== null ? { precio: ref.precio } : {}),
+      ...(destino.pantone === null && ref.pantone !== null ? { pantone: ref.pantone } : {}),
+      ...(destino.precioComplemento === null && ref.precioComplemento !== null
+        ? { precioComplemento: ref.precioComplemento }
+        : {}),
+    };
+    if (Object.keys(relleno).length > 0) {
+      await tx.telaColor.update({ where: { id: destino.id }, data: relleno });
     }
-    await tx.telaColor.delete({
-      where: { idTela_idColor: { idTela: ref.idTela, idColor: idOrigen } },
-    });
+    await tx.telaColor.delete({ where: { id: ref.id } });
   }
 
   return referenciasOrigen.length;

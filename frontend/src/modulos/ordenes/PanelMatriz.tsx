@@ -15,7 +15,9 @@ import {
   type MatrizTalla,
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { Button } from '@/components/ui/button';
+import { useSesion } from '@/sesion/useSesion';
 
+import { AgregarColorMatriz } from './AgregarColorMatriz';
 import { useReinicioBloqueado, useSeccionGuardable, type EjecutorGuardado } from './guardado-orden';
 
 /**
@@ -140,6 +142,10 @@ export function PanelMatriz({
   alCopiarMatriz: () => void;
 }): React.JSX.Element {
   const soloLectura = orden.estado === 'cancelada' || !puedeAdministrar;
+  // Alta de color AL VUELO (§Post-F9.11): solo se ofrece con el permiso que exige el
+  // endpoint de crear color (`colores.administrar`); el backend re-valida (A1).
+  const { tienePermiso } = useSesion();
+  const puedeCrearColor = tienePermiso('colores.administrar');
 
   const ficha = useFichaModelo(orden.idModelo);
   const curva = useCurva(ficha.data?.idCurvaTalla ?? null);
@@ -181,6 +187,26 @@ export function PanelMatriz({
     () => (colores.data?.datos ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
     [colores.data],
   );
+  // Los colores que YA están en la matriz (el combobox del alta al vuelo no los ofrece).
+  const idsColoresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
+
+  // R2-9: contador de AGREGADOS para remontar el combobox del alta al vuelo. Un contador
+  // propio y no `lineas.length`: quitar una fila también cambia el length y remontaría el
+  // combobox sin necesidad (perdiendo lo tecleado a media búsqueda).
+  const [vecesAgregado, setVecesAgregado] = useState(0);
+
+  /** Agrega la fila de un color (elegido del catálogo o recién creado al vuelo). */
+  const agregarColorFila = useCallback(
+    (idColor: number, nombre: string): void => {
+      setLineas((previas) =>
+        previas.some((l) => l.idColor === idColor)
+          ? previas
+          : [...previas, { idColor, color: nombre, cantidades: {} }],
+      );
+      setVecesAgregado((n) => n + 1);
+    },
+    [setLineas],
+  );
   const tallasDisponibles = useMemo(
     () => (tallas.data?.datos ?? []).map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta })),
     [tallas.data],
@@ -216,6 +242,20 @@ export function PanelMatriz({
         onTallasChange={setColumnas}
         soloLectura={soloLectura}
         testid="matriz-orden"
+        // Combobox con alta de color AL VUELO (§Post-F9.11): busca los existentes EN EL
+        // SERVIDOR y, con permiso `colores.administrar`, crea el color aquí mismo y agrega
+        // su fila. El `key` (contador de AGREGADOS, R2-9) lo REMONTA tras cada alta: así el
+        // texto tecleado no queda pegado después de agregar.
+        slotAgregarColor={
+          soloLectura ? undefined : (
+            <AgregarColorMatriz
+              key={vecesAgregado}
+              idsUsados={idsColoresUsados}
+              alAgregar={agregarColorFila}
+              puedeCrear={puedeCrearColor}
+            />
+          )
+        }
       />
 
       {!soloLectura ? (

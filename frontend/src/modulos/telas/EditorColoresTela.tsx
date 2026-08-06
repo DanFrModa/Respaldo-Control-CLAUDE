@@ -1,127 +1,134 @@
 import { PlusIcon, Trash2Icon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { useColores } from '@/api/colores';
-import type { Color } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 
-import type { RenglonColor } from './colores-tela';
+import { claveNombreColor, type RenglonColor } from './colores-tela';
 
 /**
- * Editor del GRID DE COLORES de una tela (F1-E3): cada renglon es un color del catalogo
- * (`GET /api/colores`) con su PRECIO opcional. El estado vive en el dialogo padre
- * (`colores` + `alCambiar`), que lo envia INLINE en el cuerpo del API (alta/edicion, misma
- * transaccion A2). El backend valida (color existe/activo, sin repetir) y es la autoridad
- * (A1); aqui solo se ayuda a la captura (no se puede agregar dos veces el mismo color).
+ * Editor del GRID DE COLORES de una tela (F1-E3; reestructura A1 §Post-F9.11): los colores
+ * son HIJOS de la tela — NOMBRE LIBRE ("Marino Alsa 3040") + PANTONE (texto buscable) +
+ * precio del cuerpo y — solo si la tela LLEVA COMPLEMENTO — precio del complemento
+ * (Daniel: *"el cardigan es otro precio que la tela"*; la columna se esconde si no lleva y
+ * su etiqueta usa el nombre capturado, p. ej. "Precio Cardigan"). El catálogo global
+ * `Color` es SOLO el color de la PRENDA: aquí NO participa (dar de alta un color de tela
+ * no lo mete a ese catálogo). El estado vive en el diálogo padre (`colores` + `alCambiar`),
+ * que lo envía INLINE en el cuerpo del API (alta/edición, misma transacción A2).
  *
- * A diferencia del selector de tipos del maquilero (checkboxes ≥1), aqui el grid PUEDE ir
- * vacio y cada item lleva un dato extra (el precio). El precio se captura como texto en un
- * `<input type="number">` y la conversion a numero la hace el dialogo al armar el cuerpo.
- * Los helpers puros (`aRenglones`/`aColoresCuerpo`) y el tipo `RenglonColor` viven en
- * `./colores-tela` (regla fast-refresh: este archivo solo exporta un componente).
+ * El nombre es la IDENTIDAD del color dentro de la tela: no se puede agregar dos veces el
+ * mismo (insensible a mayúsculas); el backend re-valida y es la autoridad (A1). El grid
+ * PUEDE ir vacío. Los precios se capturan como texto en un `<input type="number">` y la
+ * conversión a número la hace el diálogo al armar el cuerpo. Los helpers puros
+ * (`aRenglones`/`aColoresCuerpo`) y el tipo `RenglonColor` viven en `./colores-tela`
+ * (regla fast-refresh: este archivo solo exporta un componente).
  */
 export function EditorColoresTela({
   colores,
   alCambiar,
   deshabilitado = false,
+  llevaComplemento = false,
+  nombreComplemento = '',
 }: {
   colores: RenglonColor[];
   alCambiar: (colores: RenglonColor[]) => void;
   deshabilitado?: boolean;
+  /** Si la tela lleva complemento, cada color muestra también el precio del complemento. */
+  llevaComplemento?: boolean;
+  /** Nombre del complemento ("Cardigan") para etiquetar su precio; vacío = "complemento". */
+  nombreComplemento?: string;
 }): React.JSX.Element {
-  // Catalogo de colores activos para el selector de "agregar". Una pagina amplia basta
-  // (el catalogo de colores es corto); el backend re-valida de todos modos.
-  const consulta = useColores({ porPagina: 100, ordenarPor: 'nombre', direccion: 'asc' });
-  const datosColores = consulta.data?.datos;
-  // Memoizado para estabilizar las dependencias de los useMemo de abajo.
-  const catalogo = useMemo<readonly Color[]>(() => datosColores ?? [], [datosColores]);
+  // Nombre tecleado del color a agregar (texto libre, §Post-F9.11).
+  const [aAgregar, setAAgregar] = useState('');
+  const [errorAgregar, setErrorAgregar] = useState<string | null>(null);
 
-  // Color elegido en el selector de "agregar" (id como texto del `<select>`).
-  const [aAgregar, setAAgregar] = useState<string>('');
-
-  // Colores ya en el grid (para no ofrecerlos de nuevo y para pintar su nombre).
-  const idsEnGrid = useMemo(() => new Set(colores.map((c) => c.idColor)), [colores]);
-  const nombrePorId = useMemo(() => {
-    const mapa = new Map<number, string>();
-    for (const color of catalogo) {
-      mapa.set(color.id, color.nombre);
-    }
-    return mapa;
-  }, [catalogo]);
-
-  // Solo los colores que aun NO estan en el grid (evita duplicados en captura).
-  const disponibles = catalogo.filter((color) => !idsEnGrid.has(color.id));
+  const etiquetaComplemento =
+    nombreComplemento.trim() === '' ? 'complemento' : nombreComplemento.trim();
 
   function agregar(): void {
-    if (aAgregar === '') {
+    const nombre = aAgregar.trim();
+    if (nombre === '') {
       return;
     }
-    const id = Number(aAgregar);
-    if (idsEnGrid.has(id)) {
+    if (colores.some((c) => claveNombreColor(c.nombre) === claveNombreColor(nombre))) {
+      setErrorAgregar(`Esta tela ya tiene el color "${nombre}".`);
       return;
     }
-    alCambiar([...colores, { idColor: id, precioTexto: '' }]);
+    setErrorAgregar(null);
+    alCambiar([
+      ...colores,
+      { nombre, precioTexto: '', precioComplementoTexto: '', pantoneTexto: '' },
+    ]);
     setAAgregar('');
   }
 
-  function quitar(idColor: number): void {
-    alCambiar(colores.filter((c) => c.idColor !== idColor));
+  function quitar(indice: number): void {
+    alCambiar(colores.filter((_, i) => i !== indice));
   }
 
-  function cambiarPrecio(idColor: number, precioTexto: string): void {
-    alCambiar(colores.map((c) => (c.idColor === idColor ? { ...c, precioTexto } : c)));
+  function cambiar(indice: number, cambios: Partial<RenglonColor>): void {
+    alCambiar(colores.map((c, i) => (i === indice ? { ...c, ...cambios } : c)));
   }
 
-  const errorCatalogo = consulta.isError ? consulta.error.message : null;
+  // Nombres repetidos EN VIVO (p. ej. al renombrar en sitio): se avisa aquí; el contrato
+  // del backend lo re-valida al guardar (A1).
+  const clavesVistas = new Map<string, number>();
+  for (const c of colores) {
+    const clave = claveNombreColor(c.nombre);
+    clavesVistas.set(clave, (clavesVistas.get(clave) ?? 0) + 1);
+  }
+  const hayRepetidos = [...clavesVistas.values()].some((n) => n > 1);
 
   return (
     <Field role="group" aria-labelledby="editor-colores-titulo">
       <FieldLabel id="editor-colores-titulo" asChild>
-        <span>Colores con precio</span>
+        <span>Colores de la tela</span>
       </FieldLabel>
       <FieldDescription>
-        Colores disponibles de esta tela y su precio por unidad (opcional). Puede no tener ninguno.
+        Colores PROPIOS de esta tela (nombre libre, como los llama su proveedor), con su pantone y
+        su precio por unidad (opcionales). Puede no tener ninguno; no son los colores de prenda.
       </FieldDescription>
 
-      {/* Agregar color */}
+      {/* Agregar color por nombre (texto libre) */}
       <div className="flex items-center gap-2">
-        <SelectNativo
+        <Input
+          type="text"
           value={aAgregar}
-          onChange={(e) => setAAgregar(e.target.value)}
-          aria-label="Elegir un color para agregar a la tela"
-          data-testid="selector-agregar-color"
-          disabled={deshabilitado || consulta.isPending || disponibles.length === 0}
-        >
-          <option value="">
-            {consulta.isPending
-              ? 'Cargando colores…'
-              : disponibles.length === 0
-                ? 'No hay más colores'
-                : 'Elige un color…'}
-          </option>
-          {disponibles.map((color) => (
-            <option key={color.id} value={String(color.id)}>
-              {color.nombre}
-            </option>
-          ))}
-        </SelectNativo>
+          maxLength={80}
+          placeholder="Ej. Marino Alsa 3040"
+          aria-label="Nombre del color a agregar a la tela"
+          data-testid="nombre-agregar-color"
+          disabled={deshabilitado}
+          onChange={(e) => {
+            setAAgregar(e.target.value);
+            setErrorAgregar(null);
+          }}
+          onKeyDown={(e) => {
+            // Enter agrega el color, sin disparar el submit del diálogo.
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              agregar();
+            }
+          }}
+        />
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={agregar}
-          disabled={deshabilitado || aAgregar === ''}
+          disabled={deshabilitado || aAgregar.trim() === ''}
           data-testid="agregar-color"
         >
           <PlusIcon aria-hidden />
           Agregar
         </Button>
       </div>
-
-      {errorCatalogo !== null ? <p className="text-sm text-destructive">{errorCatalogo}</p> : null}
+      {errorAgregar !== null ? (
+        <p className="text-sm text-destructive" role="alert" data-testid="error-agregar-color">
+          {errorAgregar}
+        </p>
+      ) : null}
 
       {/* Grid de colores agregados */}
       {colores.length === 0 ? (
@@ -129,43 +136,95 @@ export function EditorColoresTela({
           Esta tela no tiene colores. Agrega los que apliquen.
         </p>
       ) : (
-        <ul className="mt-1 space-y-2" data-testid="grid-colores-tela">
-          {colores.map((renglon) => (
-            <li
-              key={renglon.idColor}
-              data-testid="renglon-color"
-              className="flex items-center gap-2 rounded-lg border p-2"
-            >
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {nombrePorId.get(renglon.idColor) ?? `Color #${String(renglon.idColor)}`}
-              </span>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                inputMode="decimal"
-                className="w-28"
-                placeholder="Precio"
-                aria-label={`Precio del color ${nombrePorId.get(renglon.idColor) ?? String(renglon.idColor)}`}
-                value={renglon.precioTexto}
-                disabled={deshabilitado}
-                onChange={(e) => cambiarPrecio(renglon.idColor, e.target.value)}
-                data-testid={`precio-color-${renglon.idColor}`}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => quitar(renglon.idColor)}
-                disabled={deshabilitado}
-                aria-label={`Quitar el color ${nombrePorId.get(renglon.idColor) ?? String(renglon.idColor)}`}
-                data-testid={`quitar-color-${renglon.idColor}`}
+        <>
+          <ul className="mt-1 space-y-2" data-testid="grid-colores-tela">
+            {/* Claves y testids por ÍNDICE (R2-8): el nombre es texto libre del usuario y
+                además EDITABLE en sitio (R2-7) — corregir "NEGRRO" ya no obliga a quitar y
+                recapturar (y en casing, el dominio actualiza en sitio conservando la liga). */}
+            {colores.map((renglon, indice) => (
+              <li
+                key={indice}
+                data-testid="renglon-color"
+                className="space-y-1.5 rounded-lg border p-2"
               >
-                <Trash2Icon className="text-destructive" aria-hidden />
-              </Button>
-            </li>
-          ))}
-        </ul>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    className="min-w-0 flex-1 font-medium"
+                    maxLength={80}
+                    aria-label={`Nombre del color ${String(indice + 1)}`}
+                    aria-invalid={renglon.nombre.trim() === ''}
+                    value={renglon.nombre}
+                    disabled={deshabilitado}
+                    onChange={(e) => cambiar(indice, { nombre: e.target.value })}
+                    data-testid={`nombre-color-${indice}`}
+                  />
+                  <Input
+                    type="text"
+                    className="w-32"
+                    placeholder="PANTONE"
+                    maxLength={50}
+                    aria-label={`Pantone del color ${renglon.nombre}`}
+                    value={renglon.pantoneTexto}
+                    disabled={deshabilitado}
+                    onChange={(e) => cambiar(indice, { pantoneTexto: e.target.value })}
+                    data-testid={`pantone-color-${indice}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => quitar(indice)}
+                    disabled={deshabilitado}
+                    aria-label={`Quitar el color ${renglon.nombre}`}
+                    data-testid={`quitar-color-${indice}`}
+                  >
+                    <Trash2Icon className="text-destructive" aria-hidden />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    className="w-28"
+                    placeholder="Precio"
+                    aria-label={`Precio del color ${renglon.nombre}`}
+                    value={renglon.precioTexto}
+                    disabled={deshabilitado}
+                    onChange={(e) => cambiar(indice, { precioTexto: e.target.value })}
+                    data-testid={`precio-color-${indice}`}
+                  />
+                  {llevaComplemento ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      className="w-36"
+                      placeholder={`Precio ${etiquetaComplemento}`}
+                      aria-label={`Precio del ${etiquetaComplemento} en el color ${renglon.nombre}`}
+                      value={renglon.precioComplementoTexto}
+                      disabled={deshabilitado}
+                      onChange={(e) => cambiar(indice, { precioComplementoTexto: e.target.value })}
+                      data-testid={`precio-complemento-color-${indice}`}
+                    />
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {hayRepetidos ? (
+            <p
+              className="text-sm text-destructive"
+              role="alert"
+              data-testid="error-colores-repetidos"
+            >
+              Hay colores con el mismo nombre en esta tela; corrígelos antes de guardar.
+            </p>
+          ) : null}
+        </>
       )}
 
       <FieldError errors={[]} />

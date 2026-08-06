@@ -161,6 +161,11 @@ export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox
   testidInput?: string;
   /** Etiqueta accesible del input. */
   etiqueta?: string;
+  /**
+   * `id` del `<input>` (para que un `<label htmlFor>` externo lo enfoque de verdad).
+   * Opcional: los usos sin label externo no lo necesitan.
+   */
+  idInput?: string | undefined;
 }
 
 /**
@@ -188,6 +193,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   testid = 'combobox',
   testidInput,
   etiqueta,
+  idInput,
 }: PropsComboboxBuscable<O>): React.JSX.Element {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -376,6 +382,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
       ) : null}
       <Input
         ref={inputRef}
+        id={idInput}
         type="text"
         role="combobox"
         autoFocus={autoFocus}

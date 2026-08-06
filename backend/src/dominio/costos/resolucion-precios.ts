@@ -13,7 +13,10 @@
  *   1. amarre CON color   — `TelaProveedorColor.precio` del proveedor amarrado, si maneja precio por
  *                           color Y hay color en contexto Y ese color tiene precio.
  *   2. amarre             — `TelaProveedor.precio` del proveedor amarrado por Desarrollo.
- *   3. referencia color   — `TelaColor.precio` (ya existente, SIN proveedor) del color en contexto.
+ *   3. referencia color   — `TelaColor.precio` (SIN proveedor) del color en contexto. Desde
+ *                           §Post-F9.11 los colores de tela son HIJOS de la tela: el pegue con el
+ *                           color de PRENDA va primero por la liga legacy `idColor` (migradas) y
+ *                           luego por NOMBRE — ver {@link resolverPrecioColorReferencia}.
  *   4. sugerido           — `Tela.precioSugerido` (genérico, el de F7). Sin nada ⇒ `null`.
  *
  * CASCADA DEL AVÍO (3 pasos; el precio de compra se NORMALIZA a unidad de consumo dividiendo por el
@@ -73,6 +76,48 @@ export interface PrecioResuelto {
 /** ¿Es un precio utilizable? (número finito ≥ 0; los `null`/negativos/NaN se saltan). */
 function precioUsable(valor: number | null | undefined): valor is number {
   return typeof valor === 'number' && Number.isFinite(valor) && valor >= 0;
+}
+
+/** Un color de TELA (hijo de la tela, §Post-F9.11) para resolver la referencia por color. */
+export interface ColorTelaReferencia {
+  /** `TelaColor.nombre` (nombre libre del color de esa tela). */
+  nombre: string;
+  /** `TelaColor.precio` (del cuerpo). */
+  precio: number | null;
+  /** LEGACY: `TelaColor.idColor` — liga al color de PRENDA de las filas migradas; null en las nuevas. */
+  idColor: number | null;
+}
+
+/**
+ * Resuelve el `precioColorReferencia` (paso 3 de la cascada de la tela) desde los colores
+ * HIJOS de la tela, dado el color de PRENDA en contexto. Desde §Post-F9.11 `TelaColor` ya no
+ * cuelga del catálogo de prenda, así que el pegue va en DOS pasos:
+ *
+ *   1. por la LIGA LEGACY `idColor` (filas migradas de F1-E6) — el comportamiento de siempre;
+ *   2. si no pega, por NOMBRE (insensible a mayúsculas): el color de tela cuyo nombre coincide
+ *      con el del color de prenda en contexto;
+ *   3. si tampoco, `null` — y la cascada de {@link resolverPrecioTela} cae al escalón que sigue
+ *      (`precioSugerido`), como siempre.
+ *
+ * Función PURA (el llamador ya leyó los colores de la tela); alimenta el campo
+ * `precioColorReferencia` de {@link EntradaPrecioTela} SIN cambiar ninguna firma existente.
+ */
+export function resolverPrecioColorReferencia(
+  coloresTela: readonly ColorTelaReferencia[],
+  contexto: { idColor: number; nombre: string },
+): number | null {
+  // 1. Liga legacy al catálogo de prenda (lo migrado sigue resolviendo como siempre).
+  const porLiga = coloresTela.find((c) => c.idColor !== null && c.idColor === contexto.idColor);
+  if (porLiga !== undefined && precioUsable(porLiga.precio)) {
+    return porLiga.precio;
+  }
+  // 2. Por nombre (insensible): "Negro" de la tela pega con el color de prenda "NEGRO".
+  const clave = contexto.nombre.trim().toLowerCase();
+  const porNombre = coloresTela.find((c) => c.nombre.trim().toLowerCase() === clave);
+  if (porNombre !== undefined && precioUsable(porNombre.precio)) {
+    return porNombre.precio;
+  }
+  return null;
 }
 
 /**

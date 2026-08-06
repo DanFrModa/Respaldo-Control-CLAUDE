@@ -175,4 +175,30 @@ describe('<EditorProveedoresTela>', () => {
     // Viaja el grid completo: el color con precio lo lleva; el sin precio va sin `precio`.
     expect(args.cuerpo.colores).toEqual([{ idColor: 1, precio: 42 }, { idColor: 2 }]);
   });
+
+  // R2-2 (§Post-F9.11): las telas NUEVAS no tienen colores LIGADOS al catálogo de prenda →
+  // el modo por-color de R17 no aplica y la pantalla lo dice tal cual (no miente con un
+  // grid vacío ni con "captura sus colores primero").
+  it('SIN colores ligados, deshabilita el modo por-color y dice la verdad', async () => {
+    const usuario = userEvent.setup();
+    useTelaProveedores.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={[]} puedeVerImportes />);
+
+    await usuario.click(screen.getByTestId('nuevo-proveedor-tela'));
+    const dialogo = await screen.findByRole('dialog');
+
+    // El checkbox está deshabilitado (no se puede activar el modo por-color)…
+    expect(within(dialogo).getByTestId('maneja-precio-por-color')).toBeDisabled();
+    // …y el aviso honesto explica el porqué.
+    expect(within(dialogo).getByTestId('aviso-por-color-solo-migradas')).toHaveTextContent(
+      'El precio por color solo aplica a telas migradas del sistema viejo. En telas nuevas, ' +
+        'usa el precio base del proveedor.',
+    );
+    expect(within(dialogo).queryByTestId('grid-precio-por-color')).not.toBeInTheDocument();
+  });
 });

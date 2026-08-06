@@ -230,6 +230,7 @@ export {
 export {
   TIPOS_COMPONENTE_TELA,
   esquemaTelaCrear,
+  // (esquemaTelaCrearMigracion NO se reexporta: es SOLO del ETL; el dominio lo importa directo)
   esquemaTelaEditar,
   esquemaTelaSalida,
   esquemaListarTelas,
@@ -241,6 +242,11 @@ export {
   esquemaTelaCategoriaSalida,
   esquemaTelasCategoriasQuery,
   esquemaTelasCategoriasPagina,
+  esquemaComposicionTelaCrear,
+  esquemaComposicionTelaEditar,
+  esquemaComposicionTelaSalida,
+  esquemaComposicionesTelaQuery,
+  esquemaComposicionesTelaPagina,
   type TipoComponenteTelaClave,
   type DatosTelaCrear,
   type DatosTelaEditar,
@@ -254,6 +260,11 @@ export {
   type TelaCategoriaSalida,
   type TelasCategoriasQuery,
   type TelasCategoriasPagina,
+  type DatosComposicionTelaCrear,
+  type DatosComposicionTelaEditar,
+  type ComposicionTelaSalida,
+  type ComposicionesTelaQuery,
+  type ComposicionesTelaPagina,
 } from './esquemas/tela.js';
 
 export {

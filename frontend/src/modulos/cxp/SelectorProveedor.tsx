@@ -17,6 +17,7 @@ export function SelectorProveedor({
   alSeleccionar,
   alLimpiar,
   testid = 'selector-proveedor',
+  idInput,
 }: {
   idSeleccionado: number | undefined;
   /**
@@ -28,6 +29,8 @@ export function SelectorProveedor({
   /** Si viene, el combobox muestra ✕ para limpiar la selección. */
   alLimpiar?: () => void;
   testid?: string;
+  /** `id` del input (para que el `<label htmlFor>` del formulario lo enfoque). */
+  idInput?: string | undefined;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
   const busqueda = useDebounce(texto.trim(), 300);
@@ -71,6 +74,7 @@ export function SelectorProveedor({
       textoVacio="No hay proveedores que coincidan."
       testid={testid}
       testidInput={`${testid}-busqueda`}
+      idInput={idInput}
     />
   );
 }

@@ -16,7 +16,7 @@
  * desambiguan duplicados con sufijo y se reportan. `Activa` → desactivar tras crear si toca.
  * Los COLORES se cargan en `telas-colores.ts` (necesita el mapeo de telas y de colores).
  */
-import { actualizarTela, crearTela } from '../../src/dominio/catalogos/telas.js';
+import { actualizarTela, crearTelaMigracion } from '../../src/dominio/catalogos/telas.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
@@ -203,7 +203,10 @@ async function procesarTelaBase(
       nombreOriginal,
       (base) => nombreTelaLibre(cliente, base),
       (nombre) =>
-        crearTela(
+        // Variante de MIGRACIÓN (§Post-F9.11): el viejo NO traía el proveedor dueño como
+        // campo (lo embebía en el nombre, "FelpaAlsa") — estas telas nacen sin proveedor y
+        // se depuran a mano. Un alta normal (`crearTela`) SÍ lo exige.
+        crearTelaMigracion(
           sesion,
           {
             nombre,
@@ -299,7 +302,8 @@ async function procesarTelaDisSinTela(
       nombreOriginal,
       (base) => nombreTelaLibre(cliente, base),
       (nombre) =>
-        crearTela(
+        // Variante de migración: sin proveedor dueño (ver arriba).
+        crearTelaMigracion(
           sesion,
           {
             nombre,

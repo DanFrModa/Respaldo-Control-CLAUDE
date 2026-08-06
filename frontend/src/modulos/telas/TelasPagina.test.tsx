@@ -69,6 +69,13 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     descripcion: null,
     idCategoria: 7,
     categoria: 'Felpa',
+    idComposicion: null,
+    composicion: null,
+    idProveedor: null,
+    proveedor: null,
+    nombreProveedor: null,
+    nombreCuerpo: null,
+    nombreComplemento: null,
     unidadMedida: 'KG',
     tipoComponente: 'CUERPO',
     favorito: false,
@@ -166,8 +173,22 @@ describe('<TelasPagina>', () => {
   it('muestra los colores de la tela con su precio al expandir el renglón', () => {
     const conColores = tela(3, 'Felpa C', {
       colores: [
-        { idColor: 1, nombre: 'Negro', precio: 95 },
-        { idColor: 2, nombre: 'Blanco', precio: null },
+        {
+          id: 1,
+          nombre: 'Negro',
+          precio: 95,
+          precioComplemento: null,
+          pantone: null,
+          idColor: null,
+        },
+        {
+          id: 2,
+          nombre: 'Blanco',
+          precio: null,
+          precioComplemento: null,
+          pantone: null,
+          idColor: null,
+        },
       ],
     });
     useTelas.mockReturnValue(consultaConDatos([conColores]));
@@ -179,6 +200,78 @@ describe('<TelasPagina>', () => {
     expect(within(detalle).getByText('Blanco')).toBeInTheDocument();
     // El precio capturado se muestra; el color sin precio dice "Sin precio".
     expect(within(detalle).getByText('Sin precio')).toBeInTheDocument();
+  });
+
+  it('el renglón lee la identidad "nombre · proveedor · nombre del proveedor" (§Post-F9.11)', () => {
+    const conDueno = tela(11, 'Felpa 280', {
+      proveedor: 'Alsatex',
+      nombreProveedor: 'Felpa Suiza',
+      composicion: '50% Algodón, 50% Poliéster',
+    });
+    useTelas.mockReturnValue(consultaConDatos([conDueno]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+
+    const fila = within(screen.getByTestId('tela-tabla')).getByTestId('fila-tela');
+    expect(within(fila).getByTestId('identidad-tela')).toHaveTextContent(
+      'Felpa 280 · Alsatex · Felpa Suiza',
+    );
+    // La composición acompaña a la unidad en la línea secundaria.
+    expect(within(fila).getByText(/50% Algodón, 50% Poliéster/)).toBeInTheDocument();
+  });
+
+  it('una MIGRADA sin proveedor muestra solo su nombre (sin puntos vacíos)', () => {
+    useTelas.mockReturnValue(consultaConDatos([tela(12, 'FelpaAlsa100')]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+    const fila = within(screen.getByTestId('tela-tabla')).getByTestId('fila-tela');
+    expect(within(fila).getByTestId('identidad-tela')).toHaveTextContent(/^FelpaAlsa100$/);
+  });
+
+  it('el detalle muestra el pantone y el precio del COMPLEMENTO solo si la tela lo lleva', () => {
+    const conComplemento = tela(13, 'Felpa C', {
+      nombreCuerpo: 'Felpa',
+      nombreComplemento: 'Cardigan',
+      colores: [
+        {
+          id: 1,
+          nombre: 'Negro',
+          precio: 95,
+          precioComplemento: 60,
+          pantone: '19-4005 TCX',
+          idColor: null,
+        },
+      ],
+    });
+    useTelas.mockReturnValue(consultaConDatos([conComplemento]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+
+    fireEvent.click(screen.getByTestId('fila-tela'));
+    const detalle = screen.getByTestId('tela-colores-detalle');
+    expect(within(detalle).getByTestId('pantone-detalle')).toHaveTextContent('PANTONE 19-4005 TCX');
+    // El precio del complemento sale CON SU NOMBRE ("Precio Cardigan"), no genérico.
+    expect(within(detalle).getByTestId('precio-complemento-detalle')).toHaveTextContent(
+      /^Precio Cardigan:/,
+    );
+    // Y el resumen del detalle dice "Felpa + Cardigan".
+    expect(screen.getByTestId('tela-detalle-complemento')).toHaveTextContent('Felpa + Cardigan');
+  });
+
+  it('una tela SIN complemento no muestra el renglón de precio del complemento', () => {
+    const sinComplemento = tela(14, 'Lisa', {
+      colores: [
+        {
+          id: 1,
+          nombre: 'Negro',
+          precio: 95,
+          precioComplemento: null,
+          pantone: null,
+          idColor: null,
+        },
+      ],
+    });
+    useTelas.mockReturnValue(consultaConDatos([sinComplemento]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+    fireEvent.click(screen.getByTestId('fila-tela'));
+    expect(screen.queryByTestId('precio-complemento-detalle')).not.toBeInTheDocument();
   });
 
   it('una tela sin colores muestra el aviso correspondiente al expandir el renglón', () => {
