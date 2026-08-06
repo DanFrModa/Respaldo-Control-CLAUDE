@@ -58,10 +58,11 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 101 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
-    // (101 hojas + 15 padres, +Reportes fiscales F9-E5). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(101);
+    // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
+    // de existencias y salida a orden). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(105);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -88,6 +89,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     expect(primerHijo('g-rc-config')).toBe('rc-procesos-responsables');
     expect(primerHijo('calidad')).toBe('calidad-consulta-auditorias');
     expect(primerHijo('inventarios')).toBe('inventario-existencias');
+    expect(primerHijo('telas')).toBe('inventario-telas-existencias');
     expect(primerHijo('catalogos')).toBe('colores');
   });
 
@@ -171,7 +173,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     const inventarios = MODULOS_MENU.filter(
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
-    expect(inventarios).toHaveLength(10);
+    // +4 en A2: ajuste/traspaso de telas por color y las vistas legadas por lote (existencias y
+    // salida a orden).
+    expect(inventarios).toHaveLength(14);
   });
 
   it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
@@ -230,7 +234,19 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       titulo: 'Inventarios',
       entradas: [
         { clave: 'inventarios', padre: false },
-        { clave: 'telas', padre: false },
+        {
+          // A2 (Daniel, 6-ago-2026): Telas pasó a DESPLEGABLE para que el catálogo de telas se
+          // vea en el menú. Hijos curados: existencias por color (principal) + catálogo +
+          // salida a orden + ajuste; el resto sigue por ⌘K.
+          clave: 'telas',
+          padre: true,
+          hijos: [
+            'inventario-telas-existencias',
+            'catalogo-telas',
+            'inventario-telas-salida-orden',
+            'inventario-telas-ajuste',
+          ],
+        },
         { clave: 'avios', padre: false },
         { clave: 'compras', padre: false },
       ],
@@ -302,12 +318,13 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     });
   });
 
-  it('el riel tiene 5 padres y marca SOLO la Ruta Crítica como destacada', () => {
+  it('el riel tiene 6 padres y marca SOLO la Ruta Crítica como destacada', () => {
     const padres = RIEL_GRUPOS.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres.map((p) => p.clave)).toEqual([
       'g-desarrollo',
       'produccion',
       'calidad',
+      'telas', // A2: desplegable (el catálogo de telas tenía que verse en el menú)
       'clientes',
       'catalogos',
     ]);
@@ -324,7 +341,7 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     };
     const casos: ReadonlyArray<[string, string, readonly ClavePermiso[]]> = [
       ['inventarios', '/inventarios/existencias', ['inventario-pt.ver']],
-      ['telas', '/inventarios/telas/existencias', ['inventario-telas.ver']],
+      // «telas» ya NO es hoja colapsada: pasó a padre desplegable en A2 (ver el test del riel).
       ['avios', '/inventarios/avios/existencias', ['inventario-avios.ver']],
       ['compras', '/compras/ordenes', ['compras.ver']],
       ['costos', '/costos', ['costos.ver', 'precostos.consultar']],
@@ -405,7 +422,8 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       'etiquetas-marca',
       'calidad-defectos',
       'inventario-movimientos',
-      'catalogo-telas',
+      // 'catalogo-telas' ya NO está aquí: en A2 entró al riel como hijo del padre «Telas»
+      // (pedido de Daniel, 6-ago-2026 — el catálogo tenía que verse en el menú).
       'ordenes-compra',
       'costos-margenes',
       'edr-por-anio',
@@ -423,8 +441,12 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     // FINANZAS: sin permisos, el grupo entero desaparece — CxC (gate `cxc.ver`, F9-E4), CxP (gate
     // `cxp.ver`, F9-E2) y EsMa (gate) están todos gateados; no queda ninguna hoja "autenticado".
     expect(porClave.get('finanzas')).toBeUndefined();
-    // INVENTARIOS: las 4 hojas colapsadas tienen gate → sin permisos, el grupo entero desaparece.
-    expect(porClave.get('inventarios')).toBeUndefined();
+    // INVENTARIOS: las 3 hojas colapsadas tienen gate y desaparecen; el padre «Telas» (A2)
+    // SOBREVIVE con su único hijo "autenticado" — el Catálogo de telas (pedido de Daniel: que
+    // siempre se vea en el menú, como los demás catálogos de uso general).
+    const inventarios = porClave.get('inventarios');
+    expect(inventarios?.entradas.map((e) => e.clave)).toEqual(['telas']);
+    expect(inventarios?.entradas[0]?.hijos?.map((h) => h.clave)).toEqual(['catalogo-telas']);
     // OPERACIÓN: sin permisos ya no sobrevive nada — Auditores ahora exige `calidad.ver` (antes era
     // "autenticado" y mantenía viva a Calidad/Operación); las dos hojas de Calidad quedan gateadas.
     expect(porClave.get('operacion')).toBeUndefined();

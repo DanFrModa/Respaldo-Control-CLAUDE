@@ -1445,3 +1445,60 @@ lo ve quien tiene permiso de administrar colores.
 - **Frontend:** `modulos/telas/{TelasPagina,DialogoTela,EditorColoresTela}.tsx` ·
   `modulos/ordenes/{AgregarColorMatriz,PanelMatriz}.tsx` · `componentes/matriz-color-talla` (prop
   `slotAgregarColor`) · `api/telas.ts` + cliente regenerado.
+
+## 2026-08-06 — El inventario de telas nuevo: partidas y stocks por color (etapa A2)
+
+La vista que Daniel pidió: **telas padre desplegables → colores con sus stocks, con la tela base y
+su complemento (cardigan) JUNTOS**. Sustituye en operación al inventario por lote de F4 (que queda
+como "legado", consultable pero en cuarentena — los movimientos nuevos no lo ensucian ni al revés).
+
+### A) Existencias por tela y color
+
+`Inventarios → Telas → Existencias de telas`: cada tela padre se despliega y muestra sus colores
+con DOS columnas de existencia — el cuerpo y el complemento, con los nombres reales ("Felpa" /
+"Cardigan") como encabezados; pantone y unidad (kg/m) a la vista; filtros por tipo, proveedor,
+almacén y búsqueda. **Doble clic (o el botón) en un color** abre su kardex: todos sus movimientos
+con saldo corrido de ambos componentes, filtrable por partida, y con cancelación (que registra el
+movimiento inverso — nunca borra, D3).
+
+### B) Partidas con folio propio
+
+Cada ENTRADA crea una **partida** con folio consecutivo propio (ya no la clave ilegible
+`LOTE-...-...`): un renglón = una partida, con su número de lote del proveedor (opcional, buscable),
+factura y fecha. Una factura con dos lotes del mismo color = dos renglones = dos partidas. Las
+SALIDAS no piden partida: el consumo empareja por **tela + color** (como pidió Daniel), y la
+pantalla avisa el **riesgo de tono** sin bloquear.
+
+### C) Capturas nuevas
+
+Ajuste/conteo físico por color (la puerta del **arranque desde cero**), traspaso entre almacenes por
+color, y **salida de tela a orden por color** — esta última hereda el enlace "Descargar tela" desde
+el avance de producción. Todas capturan las dos cantidades juntas (cuerpo puede ir en 0 si solo
+entra cardigan).
+
+### D) El menú de Telas, destapado
+
+El grupo `Inventarios → Telas` ahora SÍ se despliega en el riel (antes iba directo a existencias y
+escondía todo): Existencias, **Catálogo de telas** (el que Daniel no encontraba), Salida a orden y
+Ajuste. Lo demás (kardex, traspaso, pantallas de lote legado) sigue por ⌘K.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260806130000_a2_partidas_telas`): tabla `partidas_tela`, 3
+   columnas nuevas en el detalle del kardex, la vista nueva `existencia_tela_color` y el reemplazo
+   de la vista vieja con su filtro de cuarentena. Aditiva; nada se pierde.
+2. **Cero permisos y cero tipos de movimiento nuevos** (reúsa `inventario-telas.ver/.mover`) →
+   **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.** La secuencia del folio de partida se crea sola en el primer uso.
+
+### Archivos principales
+
+- **Backend:** `prisma/schema.prisma` + la migración · `comun/kardex.ts` (línea de tela con
+  color/partida/complemento, lock por color, inverso completo, cuarentena del legado) ·
+  `dominio/inventarios/partidas-telas.ts` (dominio nuevo completo) · `dominio/inventarios/telas.ts`
+  (kardex legado filtrado) · contrato + `api/inventarios/telas.rutas.ts` (7 endpoints
+  `/inventarios/telas/color/*` + partidas).
+- **Frontend:** `modulos/inventarios/{ExistenciasTelasColorPagina,CapturaRenglonesTelaColor,`
+  `AjusteTelaColorPagina,TraspasoTelaColorPagina,SalidaTelaColorOrdenPagina,DialogoCancelarMaterial}.tsx`
+  · `modulos/catalogo.ts` (Telas como nodo padre) · `api/inventario-materiales.ts` + cliente
+  regenerado.

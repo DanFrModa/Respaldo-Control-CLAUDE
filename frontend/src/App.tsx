@@ -57,6 +57,10 @@ import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPa
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
 import { ExistenciasTelasPagina } from '@/modulos/inventarios/ExistenciasTelasPagina';
+import { ExistenciasTelasColorPagina } from '@/modulos/inventarios/ExistenciasTelasColorPagina';
+import { AjusteTelaColorPagina } from '@/modulos/inventarios/AjusteTelaColorPagina';
+import { TraspasoTelaColorPagina } from '@/modulos/inventarios/TraspasoTelaColorPagina';
+import { SalidaTelaColorOrdenPagina } from '@/modulos/inventarios/SalidaTelaColorOrdenPagina';
 import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
@@ -214,11 +218,17 @@ const router = createBrowserRouter([
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
           { path: 'inventarios/kardex', element: <KardexPtPagina /> },
-          // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4).
-          { path: 'inventarios/telas/existencias', element: <ExistenciasTelasPagina /> },
+          // Inventario de telas NUEVO por COLOR (etapa A2: partidas + tela×color + kardex).
+          { path: 'inventarios/telas/existencias', element: <ExistenciasTelasColorPagina /> },
+          { path: 'inventarios/telas/ajuste', element: <AjusteTelaColorPagina /> },
+          { path: 'inventarios/telas/traspaso', element: <TraspasoTelaColorPagina /> },
+          { path: 'inventarios/telas/salida-orden', element: <SalidaTelaColorOrdenPagina /> },
+          // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4). Las vistas de telas por LOTE
+          // quedan como LEGADO consultable (…-lote); con el arranque desde cero ya no operan.
+          { path: 'inventarios/telas/existencias-lote', element: <ExistenciasTelasPagina /> },
+          { path: 'inventarios/telas/salida-orden-lote', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/avios/existencias', element: <ExistenciasAviosPagina /> },
           { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
-          { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la

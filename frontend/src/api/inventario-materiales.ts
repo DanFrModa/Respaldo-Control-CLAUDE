@@ -11,22 +11,33 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   AjusteAvioCrear,
+  AjusteTelaColorCrear,
   AjusteTelaCrear,
   ExistenciasAvio,
   ExistenciasAvioQuery,
   ExistenciasTela,
+  ExistenciasTelaColor,
+  ExistenciasTelaColorQuery,
   ExistenciasTelaQuery,
   KardexAvio,
   KardexAvioQuery,
   KardexTela,
+  KardexTelaColor,
+  KardexTelaColorQuery,
   KardexTelaQuery,
   MovimientoAvio,
   MovimientoMaterialCancelar,
   MovimientoTela,
+  MovimientoTelaColor,
+  PartidasTela,
+  PartidasTelaQuery,
+  SalidaTelaColorCrear,
   SalidaTelaCrear,
   TraspasoAvio,
   TraspasoAvioCrear,
   TraspasoTela,
+  TraspasoTelaColor,
+  TraspasoTelaColorCrear,
   TraspasoTelaCrear,
 } from './tipos';
 
@@ -84,6 +95,66 @@ async function listarExistenciasTela(query: ExistenciasTelaQuery): Promise<Exist
 
 async function obtenerKardexTela(query: KardexTelaQuery): Promise<KardexTela> {
   const { data, error } = await api.GET('/api/inventarios/telas/kardex', { params: { query } });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+// ── Llamadas: TELAS por COLOR (inventario NUEVO, etapa A2) ─────────────────────
+
+async function ajustarTelaColor(cuerpo: AjusteTelaColorCrear): Promise<MovimientoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/ajustes', { body: cuerpo });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function salidaTelaColorAOrden(cuerpo: SalidaTelaColorCrear): Promise<MovimientoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-orden', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function traspasarTelaColor(cuerpo: TraspasoTelaColorCrear): Promise<TraspasoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/traspasos', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function cancelarTelaColor(
+  id: number,
+  cuerpo: MovimientoMaterialCancelar,
+): Promise<MovimientoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/movimientos/{id}/cancelar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function listarExistenciasTelaColor(
+  query: ExistenciasTelaColorQuery,
+): Promise<ExistenciasTelaColor> {
+  const { data, error } = await api.GET('/api/inventarios/telas/color/existencias', {
+    params: { query },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function obtenerKardexTelaColor(query: KardexTelaColorQuery): Promise<KardexTelaColor> {
+  const { data, error } = await api.GET('/api/inventarios/telas/color/kardex', {
+    params: { query },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function listarPartidasTela(query: PartidasTelaQuery): Promise<PartidasTela> {
+  const { data, error } = await api.GET('/api/inventarios/telas/partidas', { params: { query } });
   if (!data) throw new ErrorDeApi(error);
   return data;
 }
@@ -165,6 +236,44 @@ export function useKardexTela(
   });
 }
 
+// ── Hooks de consulta: TELAS por COLOR (inventario NUEVO, etapa A2) ────────────
+
+/** Existencias agrupadas TELA PADRE → colores (cuerpo y complemento juntos). */
+export function useExistenciasTelaColor(
+  query: ExistenciasTelaColorQuery,
+): UseQueryResult<ExistenciasTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'existencias', query],
+    queryFn: () => listarExistenciasTelaColor(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Kardex de un color de tela (saldo corrido de ambos componentes). Apagada sin `idTelaColor`. */
+export function useKardexTelaColor(
+  query: KardexTelaColorQuery | undefined,
+): UseQueryResult<KardexTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'kardex', query],
+    queryFn: () => obtenerKardexTelaColor(query as KardexTelaColorQuery),
+    enabled: query !== undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Búsqueda de partidas (folio / lote del proveedor / factura). */
+export function usePartidasTela(
+  query: PartidasTelaQuery,
+  opciones?: { habilitado?: boolean },
+): UseQueryResult<PartidasTela, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'partidas', query],
+    queryFn: () => listarPartidasTela(query),
+    enabled: opciones?.habilitado ?? true,
+    placeholderData: keepPreviousData,
+  });
+}
+
 // ── Hooks de consulta: AVÍOS ───────────────────────────────────────────────────
 
 /** Existencias de avío por avío×almacén (multi-almacén, R4). `habilitado:false` la apaga (p. ej.
@@ -241,6 +350,60 @@ export function useCancelarTela(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarMaterial) => cancelarTela(id, cuerpo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+// ── Hooks de mutación: TELAS por COLOR (inventario NUEVO, etapa A2) ────────────
+
+/** Registra un ajuste por color (entrada crea partidas) e invalida existencias/kardex. */
+export function useAjustarTelaColor(): UseMutationResult<
+  MovimientoTelaColor,
+  ErrorDeApi,
+  AjusteTelaColorCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ajustarTelaColor,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** Registra una salida por color a orden e invalida existencias/kardex. */
+export function useSalidaTelaColorAOrden(): UseMutationResult<
+  MovimientoTelaColor,
+  ErrorDeApi,
+  SalidaTelaColorCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salidaTelaColorAOrden,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** Registra un traspaso por color e invalida existencias/kardex. */
+export function useTraspasarTelaColor(): UseMutationResult<
+  TraspasoTelaColor,
+  ErrorDeApi,
+  TraspasoTelaColorCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: traspasarTelaColor,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** Cancela un movimiento por color (inverso auditado) e invalida existencias/kardex. */
+export function useCancelarTelaColor(): UseMutationResult<
+  MovimientoTelaColor,
+  ErrorDeApi,
+  ArgsCancelarMaterial
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCancelarMaterial) => cancelarTelaColor(id, cuerpo),
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
   });
 }

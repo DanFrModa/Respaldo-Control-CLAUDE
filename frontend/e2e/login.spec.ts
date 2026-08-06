@@ -71,10 +71,12 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
 
-    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 5 padres desplegables
-    // (Desarrollo, Producción, Calidad, Clientes, Catálogos base), ni uno más.
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 6 padres desplegables
+    // (Desarrollo, Producción, Calidad, Telas, Clientes, Catálogos base), ni uno más.
+    // «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel, 6-ago-2026: el catálogo de
+    // telas tenía que verse en el menú).
     const padres = navegacion.getByRole('button');
-    expect(await padres.count()).toBe(5);
+    expect(await padres.count()).toBe(6);
     // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
     // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
     // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
@@ -88,6 +90,22 @@ test.describe('Inicio de sesión', () => {
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
+    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 4 hijos curados — la nueva
+    // Existencias por color (principal), el Catálogo de telas (el pedido de Daniel), la salida a
+    // orden y el ajuste por color. El resto (traspaso/kardex/vistas por lote) va por ⌘K.
+    await expect(navegacion.getByRole('link', { name: 'Existencias de telas' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Telas' }).click();
+    for (const hijoTelas of [
+      'Existencias de telas',
+      'Catálogo de telas',
+      'Salida de tela a orden',
+      'Ajuste de telas por color',
+    ]) {
+      await expect(navegacion.getByRole('link', { name: hijoTelas, exact: true })).toBeVisible();
+    }
+    await expect(navegacion.getByRole('link', { name: 'Traspaso de telas por color' })).toHaveCount(
+      0,
+    );
     // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
     await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
     // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su

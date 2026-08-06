@@ -1,9 +1,10 @@
+import { TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useSalidaTelaAOrden } from '@/api/inventario-materiales';
+import { useSalidaTelaColorAOrden } from '@/api/inventario-materiales';
 import { useOrden } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
 
-import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
+import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
@@ -31,24 +32,22 @@ function leerIdOrdenDeepLink(state: unknown): number | null {
 }
 
 /**
- * SALIDA DE TELA A UNA ORDEN (F4-E1, doc 04-Inventarios §"Cómo conecta"). Es LA única vía que
- * descuenta tela hacia una orden de producción (conserva la traza orden↔salida); la nota de salida
- * de E5 la referenciará SIN generar otro movimiento. Captura PC: orden + almacén + renglones
- * tela×lote. El servidor valida que no deje existencia negativa (D3, bajo lock). `inventario-telas.mover`
- * gobierna la captura.
- *
- * ⚠️ VISTA LEGADA (etapa A2): la salida OPERATIVA es ahora POR TELA+COLOR
- * (`SalidaTelaColorOrdenPagina`, en `/inventarios/telas/salida-orden` — a donde apuntan el menú y
- * los deep-links). Esta pantalla por LOTE queda viva SOLO para el flujo viejo
- * (`/inventarios/telas/salida-orden-lote`).
+ * SALIDA DE TELA A UNA ORDEN por TELA+COLOR (inventario NUEVO, etapa A2 — Daniel §Post-F9.9): el
+ * consumo EMPAREJA por color, NO por partida (las salidas no obligan a escoger partida), y el
+ * cuerpo y el complemento viajan JUNTOS en el mismo renglón. Como puede haber PARTIDAS con tonos
+ * distintos del mismo color, la pantalla AVISA el riesgo de tono SIN bloquear (DECISIONES
+ * §Post-F9.11 punto 2). Conserva el deep-link `state.idOrden` de "Descargar tela" (avance de
+ * producción / centro de órdenes). El servidor valida no-negativo de AMBOS componentes bajo lock
+ * (D3). La salida vieja por lote sigue como "Salida a orden por lote (legado)".
+ * `inventario-telas.mover` gobierna la captura.
  */
-export function SalidaTelaOrdenPagina(): React.JSX.Element {
+export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-telas.mover');
 
-  // DEEP-LINK desde el avance de producción (petición de Daniel, 28-jul-2026: al cortar hay que
-  // descargar la tela, y el enlace debe traer la orden ya puesta). Se consume el `state` en cuanto
-  // llega para que un refresh o un "atrás" no lo vuelvan a aplicar (patrón de NotasPorOrdenPagina).
+  // DEEP-LINK desde el avance de producción / centro de órdenes (Daniel, 28-jul-2026): el enlace
+  // trae la orden ya puesta. Se consume el `state` en cuanto llega para que un refresh o un
+  // "atrás" no lo vuelvan a aplicar (patrón de la pantalla por lote que esta sustituye).
   const location = useLocation();
   const navigate = useNavigate();
   const [idDeepLink] = useState<number | null>(() => leerIdOrdenDeepLink(location.state));
@@ -58,7 +57,7 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [fecha, setFecha] = useState(hoy());
   const [observaciones, setObservaciones] = useState('');
-  const [renglones, setRenglones] = useState<RenglonTela[]>([]);
+  const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
 
   const almacenes = useAlmacenes({
     pagina: 1,
@@ -66,7 +65,7 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const crear = useSalidaTelaAOrden();
+  const crear = useSalidaTelaColorAOrden();
 
   // La orden del deep-link se fija SOLO una vez y solo si el usuario no eligió otra a mano.
   const ordenDeepLinkData = ordenDeepLink.data;
@@ -83,7 +82,8 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
     }
   }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate]);
 
-  const total = renglones.reduce((s, r) => s + r.cantidad, 0);
+  const totalCuerpo = renglones.reduce((s, r) => s + r.cantidad, 0);
+  const totalComplemento = renglones.reduce((s, r) => s + r.cantidadComplemento, 0);
   const puedeGuardar =
     puedeMover &&
     orden !== undefined &&
@@ -100,9 +100,9 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
         fecha,
         ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
         lineas: renglones.map((r) => ({
-          idTela: r.idTela,
-          idLote: r.idLote,
+          idTelaColor: r.idTelaColor,
           cantidad: r.cantidad,
+          ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
         })),
       },
       {
@@ -122,11 +122,11 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            Salida a orden por lote (legado)
+            Salida de tela a orden
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Vista LEGADA del flujo viejo por lote · la salida operativa es por tela y color en
-            «Salida de tela a orden»
+            Descuenta tela por color (cuerpo y complemento juntos) ligándola a una orden de
+            producción
           </p>
         </div>
       </header>
@@ -160,16 +160,13 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="salida-almacen">Almacén de origen</FieldLabel>
+                    <FieldLabel htmlFor="salida-color-almacen">Almacén de origen</FieldLabel>
                     <SelectNativo
-                      id="salida-almacen"
+                      id="salida-color-almacen"
                       value={idAlmacen}
-                      onChange={(e) => {
-                        setIdAlmacen(e.target.value);
-                        setRenglones([]); // los lotes dependen del almacén
-                      }}
+                      onChange={(e) => setIdAlmacen(e.target.value)}
                       disabled={!puedeMover}
-                      data-testid="salida-almacen"
+                      data-testid="salida-color-almacen"
                     >
                       <option value="">Elige el almacén…</option>
                       {(almacenes.data?.datos ?? []).map((a) => (
@@ -180,22 +177,22 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
                     </SelectNativo>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="salida-fecha">Fecha</FieldLabel>
+                    <FieldLabel htmlFor="salida-color-fecha">Fecha</FieldLabel>
                     <Input
-                      id="salida-fecha"
+                      id="salida-color-fecha"
                       type="date"
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
                       disabled={!puedeMover}
-                      data-testid="salida-fecha"
+                      data-testid="salida-color-fecha"
                     />
                   </Field>
                 </div>
 
                 <Field>
-                  <FieldLabel htmlFor="salida-obs">Observaciones</FieldLabel>
+                  <FieldLabel htmlFor="salida-color-obs">Observaciones</FieldLabel>
                   <Input
-                    id="salida-obs"
+                    id="salida-color-obs"
                     value={observaciones}
                     onChange={(e) => setObservaciones(e.target.value)}
                     placeholder="Opcional"
@@ -204,20 +201,48 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
                 </Field>
 
                 <div>
-                  <h3 className="mb-2 text-sm font-medium">Telas a sacar (por lote)</h3>
-                  <CapturaRenglonesTela
-                    idAlmacen={idAlmacen === '' ? undefined : Number(idAlmacen)}
+                  <h3 className="mb-2 text-sm font-medium">Telas a sacar (por color)</h3>
+                  <CapturaRenglonesTelaColor
                     renglones={renglones}
                     onChange={setRenglones}
                     soloLectura={!puedeMover}
                   />
                 </div>
 
+                {/* AVISO DE RIESGO DE TONO (Daniel, DECISIONES §Post-F9.11 punto 2): el consumo
+                    empareja por COLOR, no por partida — dos partidas del mismo color pueden traer
+                    TONOS distintos del mismo pantone. La pantalla AVISA, nunca bloquea. */}
+                {renglones.length > 0 ? (
+                  <div
+                    className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400"
+                    role="note"
+                    data-testid="salida-color-aviso-tono"
+                  >
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                    <span>
+                      <strong>Riesgo de tono:</strong> la salida empareja por tela y color, no por
+                      partida. Si hay varias partidas de este color, verifica físicamente que el
+                      tono del rollo que sacas case con el resto de la orden. Este aviso no bloquea
+                      la salida.
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">
-                    Total a sacar: <strong>{total.toLocaleString('es-MX')}</strong>
+                    Total a sacar: <strong>{totalCuerpo.toLocaleString('es-MX')}</strong>
+                    {totalComplemento > 0 ? (
+                      <>
+                        {' '}
+                        · complemento: <strong>{totalComplemento.toLocaleString('es-MX')}</strong>
+                      </>
+                    ) : null}
                   </span>
-                  <Button onClick={guardar} disabled={!puedeGuardar} data-testid="salida-guardar">
+                  <Button
+                    onClick={guardar}
+                    disabled={!puedeGuardar}
+                    data-testid="salida-color-guardar"
+                  >
                     {crear.isPending ? 'Guardando…' : 'Registrar salida'}
                   </Button>
                 </div>
