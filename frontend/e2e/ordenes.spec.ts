@@ -91,7 +91,9 @@ async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: stri
   const fila = page
     .getByTestId('centro-fila')
     .filter({ hasText: codigoModelo })
-    .filter({ has: page.getByTestId('centro-folio').filter({ hasText: new RegExp(`^${folio}$`) }) });
+    .filter({
+      has: page.getByTestId('centro-folio').filter({ hasText: new RegExp(`^${folio}$`) }),
+    });
   await fila.first().click();
   // El panel persistente (escritorio) hospeda los mosaicos; se espera a que cargue la orden.
   const panel = page.getByTestId('centro-panel');
