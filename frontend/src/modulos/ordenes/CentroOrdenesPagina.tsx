@@ -768,7 +768,10 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                             <TablaDensaCelda className="text-xs text-muted-foreground">
                               {identificadorEmpresa.get(fila.idEmpresa) ?? fila.empresa}
                             </TablaDensaCelda>
-                            <TablaDensaCelda className="font-semibold text-primary">
+                            <TablaDensaCelda
+                              className="font-semibold text-primary"
+                              data-testid="centro-folio"
+                            >
                               {fila.folio}
                             </TablaDensaCelda>
                             <TablaDensaCelda className="num">{fila.codigoModelo}</TablaDensaCelda>
