@@ -81,13 +81,15 @@ const COD_SALIDA_A_ORDEN = 'salida-a-orden';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
 
-/** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
-function aDateColumna(valor: string): Date {
+/** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. (Compartido con el
+ * inventario NUEVO por color de `partidas-telas.ts` — etapa A2.) */
+export function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
 }
 
-/** Resuelve un tipo de movimiento por su `codigo`, exigiéndolo activo. Lanza si no existe/inactivo. */
-async function tipoPorCodigo(
+/** Resuelve un tipo de movimiento por su `codigo`, exigiéndolo activo. Lanza si no existe/inactivo.
+ * (Compartido con `partidas-telas.ts`.) */
+export async function tipoPorCodigo(
   tx: Tx,
   codigo: string,
 ): Promise<{ id: number; nombre: string; direccion: DireccionMovimiento }> {
@@ -106,8 +108,9 @@ async function tipoPorCodigo(
   return { id: tipo.id, nombre: tipo.nombre, direccion: tipo.direccion };
 }
 
-/** Resuelve un tipo de movimiento por su id (PK), exigiéndolo activo. */
-async function tipoPorId(
+/** Resuelve un tipo de movimiento por su id (PK), exigiéndolo activo. (Compartido con
+ * `partidas-telas.ts`.) */
+export async function tipoPorId(
   tx: Tx,
   idTipoMov: number,
 ): Promise<{ id: number; nombre: string; direccion: DireccionMovimiento }> {
@@ -124,8 +127,8 @@ async function tipoPorId(
   return { id: tipo.id, nombre: tipo.nombre, direccion: tipo.direccion };
 }
 
-/** Convierte un Decimal de Prisma (o null) a number (o null). */
-function aNumero(valor: Prisma.Decimal | null): number | null {
+/** Convierte un Decimal de Prisma (o null) a number (o null). (Compartido con `partidas-telas.ts`.) */
+export function aNumero(valor: Prisma.Decimal | null): number | null {
   return valor === null ? null : Number(valor);
 }
 
@@ -742,6 +745,10 @@ export async function kardexTela(
     where: {
       idTela: filtros.idTela,
       ...(filtros.idLote === undefined ? {} : { idLote: filtros.idLote }),
+      // SOLO el flujo LEGADO por lote: los renglones del inventario NUEVO por color (etapa A2,
+      // `idTelaColor` poblado) tienen su propio kardex (`kardexTelaColor`) — sin este filtro se
+      // colaban aquí como "(sin lote)" y descuadraban el saldo corrido (reviewer A2 #1).
+      idTelaColor: null,
       movimiento: {
         idEmpresa,
         ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),

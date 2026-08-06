@@ -88,6 +88,8 @@ model Empresa {
   etapasMovimiento       EtapaMovimiento[]
   /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
   movimientos            Movimiento[]
+  /// Partidas de tela (entradas del inventario nuevo por color, A2 §Post-F9.11; folio por empresa). Restrict.
+  partidasTela           PartidaTela[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
   cargosEsMa             EsMaCargo[]
   /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
@@ -1355,6 +1357,11 @@ model TelaColor {
 
   tela Tela @relation(fields: [idTela], references: [id], onDelete: Cascade)
 
+  /// Partidas (entradas) de esta tela+color al inventario nuevo (A2 §Post-F9.9 opción B). Restrict.
+  partidas           PartidaTela[]
+  /// Renglones de kardex de TELA del inventario NUEVO por color (cuerpo+complemento juntos). Restrict.
+  movimientosDetTela MovimientoDetTela[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -1363,6 +1370,49 @@ model TelaColor {
   @@unique([idTela, nombre])
   @@index([idColor])
   @@map("telas_colores")
+}
+
+/// PARTIDA de tela (etapa A2 del inventario nuevo — Daniel §Post-F9.9 opción B, §Post-F9.11):
+/// la UNIDAD DE ENTRADA del inventario de telas por COLOR. Cada entrada (compra/ajuste inicial)
+/// crea una partida con FOLIO PROPIO consecutivo POR EMPRESA (A3, secuencia `partida-tela`) y,
+/// opcional, el número de LOTE del proveedor (texto buscable). La partida cuelga de `TelaColor`
+/// (resuelve la dualidad vieja `Lote.idColor` vs `TelaColor` anotada en HOJA-DE-RUTA §4): el
+/// color de la partida ES el color-hijo de la tela, no el catálogo de prenda. El CONSUMO empareja
+/// por TELA+COLOR (las salidas NO obligan a escoger partida — `MovimientoDetTela.idPartida` va
+/// NULL en salidas); la partida queda como traza de entrada y para búsquedas. La EXISTENCIA NO
+/// vive aquí (D3): es Σ de `MovimientoDetTela` por tela×color×almacén. Auditoría A7. El
+/// inventario viejo por `Lote` NO se toca (queda como legado consultable).
+model PartidaTela {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia `partida-tela`, jamás Max()+1).
+  folio     BigInt
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Color de tela (hijo de la tela) que entró en esta partida. Restrict.
+  idTelaColor Int       @map("id_tela_color")
+  telaColor   TelaColor @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+
+  /// Número de lote del PROVEEDOR (texto libre, opcional y buscable — opción B de Daniel).
+  loteProveedor String? @map("lote_proveedor")
+  /// Factura/remisión de la entrada (texto del proveedor; opcional).
+  factura       String?
+  /// Fecha de la entrada de la partida (solo fecha; opcional).
+  fecha         DateTime? @db.Date
+  observaciones String?   @db.Text
+
+  /// Renglones de kardex de ENTRADA que trajeron esta partida (en salidas idPartida va NULL).
+  movimientosDetTela MovimientoDetTela[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idTelaColor])
+  @@index([loteProveedor])
+  @@map("partidas_tela")
 }
 
 /// LOTE de tela (F4-E1, D5 — doc 04-Inventarios §B.1/§B.3). Un lote es una compra/teñido
@@ -2962,8 +3012,26 @@ model MovimientoDetTela {
   idLote       Int?       @map("id_lote")
   lote         Lote?      @relation(fields: [idLote], references: [id], onDelete: Restrict)
 
+  // ── INVENTARIO NUEVO por COLOR (etapa A2 — Daniel §Post-F9.9/§Post-F9.11). Columnas ADITIVAS:
+  // las filas viejas (flujo por Lote) quedan con las 3 en NULL; las filas NUEVAS llevan SIEMPRE
+  // `idTelaColor` (la dimensión de existencia pasa a tela×color×almacén, vista
+  // `existencia_tela_color`). `idPartida` SOLO en entradas (el consumo empareja por color, no por
+  // partida: en salidas va NULL). `cantidad` = CUERPO (puede ser 0 si la entrada es solo
+  // complemento); `cantidadComplemento` NULL cuando la tela no lleva complemento. ──
+
+  /// Color de tela (hijo de la tela) del renglón NUEVO. NULL = fila del flujo viejo por Lote. Restrict.
+  idTelaColor Int?       @map("id_tela_color")
+  telaColor   TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+  /// Partida de la ENTRADA (traza; NULL en salidas — el consumo empareja por tela+color). Restrict.
+  idPartida   Int?         @map("id_partida")
+  partida     PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
+
   /// Cantidad de tela (positiva; el signo lo da la dirección del tipo de movimiento). Decimal.
+  /// En el flujo NUEVO por color es el CUERPO y admite 0 (entrada de solo complemento).
   cantidad  Decimal  @db.Decimal(14, 4)
+  /// Cantidad del COMPLEMENTO (cardigan) que viaja JUNTA en el mismo renglón (Daniel: el
+  /// complemento es parte de la misma tela). NULL si la tela no lleva complemento o fila vieja.
+  cantidadComplemento Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
   /// Costo unitario. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
   costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
 
@@ -2974,6 +3042,8 @@ model MovimientoDetTela {
 
   @@index([idMovimiento])
   @@index([idTela, idLote])
+  @@index([idTelaColor])
+  @@index([idPartida])
   @@map("movimiento_det_tela")
 }
 

@@ -580,23 +580,76 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
       {
         clave: 'telas',
         titulo: 'Telas',
-        descripcion: 'Inventario de telas por lote (D5) y su catálogo',
+        descripcion: 'Inventario de telas por color (partidas, A2) y su catálogo',
         icono: 'capas',
         hijos: [
+          // Los 4 hijos APROBADOS del riel van PRIMERO (existencias por color = la principal;
+          // pedido de Daniel 6-ago-2026: que el catálogo de telas se VEA en el menú).
           {
             clave: 'inventario-telas-existencias',
             titulo: 'Existencias de telas',
-            descripcion: 'Existencia por tela, lote y almacén con los componentes del lote (D5)',
+            descripcion:
+              'Existencia por tela y color (cuerpo y complemento juntos) con kardex por color',
             ruta: '/inventarios/telas/existencias',
             icono: 'almacen',
             permisos: ['inventario-telas.ver'],
             subVista: true,
           },
+          // El catálogo de telas (antes bajo el hub Catálogos) conserva su gate "autenticado".
+          {
+            clave: 'catalogo-telas',
+            titulo: 'Catálogo de telas',
+            descripcion: 'Catálogo de telas con su composición y proveedores',
+            ruta: '/catalogos/telas',
+            icono: 'capas',
+            permisos: 'autenticado',
+            subVista: true,
+          },
           {
             clave: 'inventario-telas-salida-orden',
             titulo: 'Salida de tela a orden',
-            descripcion: 'Descuenta tela del inventario ligándola a una orden de producción',
+            descripcion:
+              'Descuenta tela POR COLOR ligándola a una orden (avisa el riesgo de tono, sin bloquear)',
             ruta: '/inventarios/telas/salida-orden',
+            icono: 'paquete',
+            permisos: ['inventario-telas.mover'],
+            subVista: true,
+          },
+          {
+            clave: 'inventario-telas-ajuste',
+            titulo: 'Ajuste de telas por color',
+            descripcion:
+              'Conteo físico / arranque desde cero por color: la entrada crea la partida',
+            ruta: '/inventarios/telas/ajuste',
+            icono: 'paquete',
+            permisos: ['inventario-telas.mover'],
+            subVista: true,
+          },
+          // Sub-vistas fuera del riel (⌘K / URL directa).
+          {
+            clave: 'inventario-telas-traspaso',
+            titulo: 'Traspaso de telas por color',
+            descripcion: 'Mueve tela por color entre almacenes (cuerpo y complemento juntos)',
+            ruta: '/inventarios/telas/traspaso',
+            icono: 'paquete',
+            permisos: ['inventario-telas.mover'],
+            subVista: true,
+          },
+          {
+            clave: 'inventario-telas-existencias-lote',
+            titulo: 'Existencias por lote (legado)',
+            descripcion: 'Vista LEGADA del flujo viejo por lote (solo consulta)',
+            ruta: '/inventarios/telas/existencias-lote',
+            icono: 'almacen',
+            permisos: ['inventario-telas.ver'],
+            subVista: true,
+          },
+          {
+            clave: 'inventario-telas-salida-orden-lote',
+            titulo: 'Salida a orden por lote (legado)',
+            descripcion:
+              'Captura LEGADA de la salida a orden por lote (el flujo nuevo va por color)',
+            ruta: '/inventarios/telas/salida-orden-lote',
             icono: 'paquete',
             permisos: ['inventario-telas.mover'],
             subVista: true,
@@ -628,16 +681,6 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             ruta: '/inventarios/materiales/ajustes',
             icono: 'paquete',
             permisos: ['inventario-telas.mover', 'inventario-avios.mover'],
-            subVista: true,
-          },
-          // El catálogo de telas (antes bajo el hub Catálogos) conserva su gate "autenticado".
-          {
-            clave: 'catalogo-telas',
-            titulo: 'Catálogo de telas',
-            descripcion: 'Catálogo de telas con su composición y proveedores',
-            ruta: '/catalogos/telas',
-            icono: 'capas',
-            permisos: 'autenticado',
             subVista: true,
           },
         ],
@@ -1382,10 +1425,19 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         permisos: ['inventario-pt.ver'],
       },
       {
-        tipo: 'colapsar',
+        // Telas es PADRE desplegable (pedido de Daniel, 6-ago-2026): como hoja colapsada el
+        // «Catálogo de telas» quedaba invisible (solo ⌘K/URL, y en el celular ni eso). Hijos
+        // CURADOS para no saturar: la nueva Existencias por color (principal), el catálogo, la
+        // salida a orden y el ajuste; el resto (traspaso, kardex, vistas por lote legadas) sigue
+        // vivo como sub-vista por ⌘K.
+        tipo: 'padre',
         clave: 'telas',
-        ruta: '/inventarios/telas/existencias',
-        permisos: ['inventario-telas.ver'],
+        hijos: [
+          'inventario-telas-existencias',
+          'catalogo-telas',
+          'inventario-telas-salida-orden',
+          'inventario-telas-ajuste',
+        ],
       },
       {
         tipo: 'colapsar',

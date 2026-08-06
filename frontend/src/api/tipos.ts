@@ -1027,6 +1027,53 @@ export type KardexTelaQuery = NonNullable<
   paths['/api/inventarios/telas/kardex']['get']['parameters']['query']
 >;
 
+// ── Inventario de TELAS NUEVO por COLOR (etapa A2: partidas + tela×color) ─────
+
+/** Un movimiento de tela por COLOR tal como lo devuelve el API. */
+export type MovimientoTelaColor =
+  paths['/api/inventarios/telas/color/ajustes']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de un ajuste de tela por color (`POST /api/inventarios/telas/color/ajustes`). */
+export type AjusteTelaColorCrear =
+  paths['/api/inventarios/telas/color/ajustes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de una salida de tela por color a orden. */
+export type SalidaTelaColorCrear =
+  paths['/api/inventarios/telas/color/salidas-orden']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de un traspaso de tela por color. */
+export type TraspasoTelaColorCrear =
+  paths['/api/inventarios/telas/color/traspasos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un traspaso de tela por color: las dos patas. */
+export type TraspasoTelaColor =
+  paths['/api/inventarios/telas/color/traspasos']['post']['responses']['201']['content']['application/json'];
+/** Existencias por color agrupadas TELA PADRE → colores. */
+export type ExistenciasTelaColor =
+  paths['/api/inventarios/telas/color/existencias']['get']['responses']['200']['content']['application/json'];
+/** Una tela agrupada con sus colores hijos. */
+export type ExistenciaTelaAgrupada = ExistenciasTelaColor['telas'][number];
+/** Un color hijo con existencia de cuerpo y complemento. */
+export type ExistenciaTelaColorHijo = ExistenciaTelaAgrupada['colores'][number];
+/** Parámetros de existencias por color (querystring). */
+export type ExistenciasTelaColorQuery = NonNullable<
+  paths['/api/inventarios/telas/color/existencias']['get']['parameters']['query']
+>;
+/** Kardex de un color de tela (dos componentes con saldo corrido). */
+export type KardexTelaColor =
+  paths['/api/inventarios/telas/color/kardex']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del kardex por color. */
+export type KardexTelaColorRenglon = KardexTelaColor['renglones'][number];
+/** Parámetros del kardex por color (querystring). */
+export type KardexTelaColorQuery = NonNullable<
+  paths['/api/inventarios/telas/color/kardex']['get']['parameters']['query']
+>;
+/** Partidas de tela (búsqueda por folio / lote del proveedor / factura). */
+export type PartidasTela =
+  paths['/api/inventarios/telas/partidas']['get']['responses']['200']['content']['application/json'];
+/** Una partida de tela. */
+export type PartidaTela = PartidasTela['datos'][number];
+/** Parámetros de la búsqueda de partidas (querystring). */
+export type PartidasTelaQuery = NonNullable<
+  paths['/api/inventarios/telas/partidas']['get']['parameters']['query']
+>;
+
 // ── Inventario de AVÍOS por kardex (Módulo 4, F4-E1; multi-almacén, R4) ───────
 
 /** Un movimiento de inventario de avío tal como lo devuelve el API. */

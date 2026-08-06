@@ -42,6 +42,10 @@ function claveFila(f: ExistenciaTelaFila): string {
  * reportado: valorizar telas necesita costo por lote y umbrales de mínimo en el catálogo).
  *
  * `inventario-telas.ver` gobierna el acceso.
+ *
+ * ⚠️ VISTA LEGADA (etapa A2): el inventario NUEVO opera por TELA+COLOR con partidas
+ * (`ExistenciasTelasColorPagina`, la entrada principal del menú). Esta vista por LOTE queda viva
+ * SOLO para consultar el flujo viejo (ruta `/inventarios/telas/existencias-lote`).
  */
 export function ExistenciasTelasPagina(): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
@@ -104,11 +108,11 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
       <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            Inventario de telas
+            Existencias por lote (legado)
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Existencia por tela, lote y almacén (suma de movimientos) · expande para ver los
-            componentes del lote (D5)
+            Vista LEGADA del flujo viejo por lote · el inventario nuevo opera por tela y color en
+            «Existencias de telas»
           </p>
         </div>
         <Button asChild variant="outline" size="sm" data-testid="telas-imprimir">

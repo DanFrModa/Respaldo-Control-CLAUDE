@@ -1,11 +1,58 @@
-# Módulo — Inventario de Telas y Avíos (F4)
+# Módulo — Inventario de Telas y Avíos (F4 + A2)
 
 > Cómo quedó construido el inventario de **telas (D5) y avíos (R4)** en CONTROL v2. No duplica el
 > funcional (ADR-0002): para el QUÉ, ver `Documentacion_MJD/04-Inventarios.md` §B y
-> `REQUISITOS-NUEVOS.md` §R4/R1, `DECISIONES.md` §D5/D3. Aquí va el CÓMO de v2.
+> `REQUISITOS-NUEVOS.md` §R4/R1, `DECISIONES.md` §D5/D3 y §Post-F9.9/.11 (reestructura de telas).
+> Aquí va el CÓMO de v2.
 
 Construido en F4 (E1 = motor + pantallas; E6 = ETL del histórico + cuadre). Es el cimiento sobre el
 que escriben la recepción y las notas de [`compras-mrp.md`](compras-mrp.md).
+
+> ⚠️ **Desde A2 (6-ago-2026) el inventario de TELAS opera por PARTIDAS y COLOR** (sección A2 abajo).
+> El flujo por `Lote` de F4 quedó como **LEGADO en cuarentena**: sus pantallas siguen vivas
+> retituladas "(legado)", sus vistas/kardex **excluyen** los movimientos nuevos, y ningún flujo nuevo
+> escribe `Lote`. Los avíos NO cambian.
+
+## A2 — Inventario de telas por PARTIDAS y COLOR (2026-08-06)
+
+La unidad de inventario ya no es el `Lote` global sino el **color de la tela** (`TelaColor`, hijo del
+catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el mismo renglón:
+
+- **`PartidaTela`** = la unidad de ENTRADA (decisión B de Daniel): `folio` propio por secuencia
+  atómica `partida-tela` por empresa (A3, `@@unique([idEmpresa, folio])`), `loteProveedor` (texto
+  opcional buscable), `factura`, `fecha`, FK Restrict a `TelaColor`. **Una entrada crea UNA partida
+  POR RENGLÓN** — una factura con dos lotes del mismo color se captura en un documento con dos
+  renglones → dos partidas con folios consecutivos.
+- **`MovimientoDetTela`** ganó 3 columnas nullable: `idTelaColor`, `idPartida` (solo entradas) y
+  `cantidadComplemento` (NULL = la tela no lleva; con complemento se guarda 0 explícito; `cantidad` =
+  cuerpo y admite 0 → compra de solo cardigan). Las filas del flujo Lote quedan con las 3 en NULL.
+- **Las SALIDAS no escogen partida**: el consumo empareja por **TELA+COLOR** (decisión de Daniel);
+  la pantalla de salida a orden avisa **"riesgo de tono" SIN bloquear** (§Post-F9.11 punto 2).
+  `registrarSalidaTelaColorAOrden` es la vía nueva del consumo (traza `origenId=idOrden`); el
+  contrato de salida/traspaso **no acepta** `loteProveedor` (solo la entrada lo lleva).
+- **Vistas**: `existencia_tela_color` (Σ de AMBOS componentes con signo por tela×color×almacén,
+  solo filas con `id_tela_color IS NOT NULL`); la vieja `existencia_tela` fue REEMPLAZADA con el
+  filtro espejo `id_tela_color IS NULL` para que el flujo nuevo **no contamine** el legado (misma
+  cuarentena en `kardexTela` y en la suma bajo lock `existenciaTelaBloqueada`). Vistas = solo
+  consulta (D3): el no-negativo se valida por suma directa de ambos componentes bajo
+  `pg_advisory_xact_lock` por color (`bloquearTelaColor`/`existenciaTelaColorBloqueada`).
+- **Dominio** `backend/src/dominio/inventarios/partidas-telas.ts`: `ajustarInventarioTelaColor`
+  (puerta del **arranque desde cero** — conteo físico; la entrada crea las partidas en la misma tx,
+  folio de partida SIEMPRE antes del de movimiento), `registrarSalidaTelaColorAOrden`,
+  `traspasarTelaColor`, `cancelarMovimientoTelaColor` (inverso auditado que copia las 3 dimensiones
+  nuevas), `consultarExistenciasTelaColor` (agrupado TELA PADRE→colores→almacenes),
+  `kardexTelaColor` (saldo corrido doble, filtro por partida), `listarPartidasTela`.
+  Permisos REUSADOS `inventario-telas.ver/.mover` (cero seed).
+- **Pantallas**: Existencias de telas (padre desplegable → colores con columnas cuerpo/complemento,
+  pantone, unidad; **doble clic o botón** en el color → cajón con su kardex, cancelar-inverso y
+  filtro por partida), Ajuste por color, Traspaso por color, **Salida a orden por color** (hereda el
+  deep-link "Descargar tela" de producción). Las de lote viven como "(legado)":
+  `/inventarios/telas/existencias-lote` y `/inventarios/telas/salida-orden-lote` (⌘K). El riel:
+  `Telas` es ahora nodo PADRE con 4 hijos visibles (existencias, **catálogo**, salida a orden,
+  ajuste).
+- **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
+  existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
+  como datos de orden SIN tocar existencias (etapa posterior del track).
 
 ## Motor (D3 — existencia = suma de movimientos)
 

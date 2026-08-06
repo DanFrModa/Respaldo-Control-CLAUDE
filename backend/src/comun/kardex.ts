@@ -445,10 +445,23 @@ export async function cancelarMovimientoPt(
  */
 export interface LineaMovimientoTela {
   idTela: number;
-  /** Lote de la tela (D5). Opcional a nivel motor; el dominio de telas lo requiere. */
+  /** Lote de la tela (D5, flujo VIEJO). Opcional a nivel motor; el dominio de lotes lo requiere. */
   idLote?: number | null;
-  /** Cantidad de tela, POSITIVA (> 0). El signo lo aplica el kardex por la dirección. */
+  /**
+   * Color de tela (hijo de la tela) del flujo NUEVO por color (etapa A2). Si viene, el renglón es
+   * del inventario nuevo: `cantidad` = CUERPO (admite 0) y `cantidadComplemento` viaja junta.
+   */
+  idTelaColor?: number | null;
+  /** Partida de la ENTRADA (traza, flujo nuevo). NULL en salidas: el consumo empareja por color. */
+  idPartida?: number | null;
+  /**
+   * Cantidad de tela, POSITIVA. El signo lo aplica el kardex por la dirección. En el flujo NUEVO
+   * por color es el CUERPO y admite 0 (entrada de solo complemento) siempre que
+   * `cantidadComplemento` sea > 0.
+   */
   cantidad: number;
+  /** Cantidad del COMPLEMENTO (cardigan) del flujo nuevo. NULL si la tela no lleva complemento. */
+  cantidadComplemento?: number | null;
   /** Costo unitario (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
   costoUnit?: number | null;
 }
@@ -465,15 +478,41 @@ export interface EntradaMovimientoTela {
   observaciones?: string;
 }
 
-/** Valida líneas de tela: al menos una, cantidades finitas y positivas. */
+/**
+ * Valida líneas de tela: al menos una y cantidades finitas. El flujo VIEJO por lote conserva su
+ * regla (`cantidad > 0`); el flujo NUEVO por color (`idTelaColor` presente) acepta cuerpo 0 o
+ * complemento 0, pero exige que AL MENOS UNO sea > 0 y que ninguno sea negativo (Daniel: cuerpo y
+ * complemento viajan JUNTOS en el mismo renglón; comprar solo complemento = cuerpo en 0).
+ */
 function validarLineasTela(lineas: LineaMovimientoTela[]): void {
   if (lineas.length === 0) {
     throw new ErrorValidacion('Un movimiento de inventario de tela necesita al menos un renglón.');
   }
   for (const linea of lineas) {
-    if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+    const esFlujoColor = linea.idTelaColor !== undefined && linea.idTelaColor !== null;
+    if (!esFlujoColor) {
+      if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+        throw new ErrorValidacion(
+          `La cantidad de un renglón de kardex de tela debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+        );
+      }
+      continue;
+    }
+    const cuerpo = linea.cantidad;
+    const complemento = linea.cantidadComplemento ?? 0;
+    if (!Number.isFinite(cuerpo) || cuerpo < 0) {
       throw new ErrorValidacion(
-        `La cantidad de un renglón de kardex de tela debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+        `La cantidad de cuerpo de un renglón por color debe ser un número ≥ 0 (recibido: ${String(cuerpo)}).`,
+      );
+    }
+    if (!Number.isFinite(complemento) || complemento < 0) {
+      throw new ErrorValidacion(
+        `La cantidad de complemento de un renglón por color debe ser un número ≥ 0 (recibido: ${String(linea.cantidadComplemento)}).`,
+      );
+    }
+    if (cuerpo === 0 && complemento === 0) {
+      throw new ErrorValidacion(
+        'Un renglón por color necesita cantidad de cuerpo o de complemento mayor que 0.',
       );
     }
   }
@@ -498,10 +537,80 @@ export async function bloquearTela(
 }
 
 /**
+ * Bloqueo por COLOR de tela × almacén DENTRO de la transacción (flujo NUEVO, etapa A2): dos
+ * salidas/traspasos del MISMO tela-color no corren en paralelo y dejan existencia negativa
+ * (ADR-0010 §3). La clave2 se deriva del `idTelaColor` con un multiplicador distinto al del flujo
+ * por lote para no colisionar sistemáticamente con {@link bloquearTela} (una colisión solo
+ * serializa de más, nunca afecta la correctitud).
+ */
+export async function bloquearTelaColor(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTelaColor: number,
+): Promise<void> {
+  const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
+  const clave2 = (idTelaColor * 1_000_033 + 7) | 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/** Existencia (cuerpo + complemento) de un color de tela en un almacén, por suma DIRECTA. */
+export interface ExistenciaTelaColor {
+  /** Existencia del CUERPO (Σ de `cantidad` con signo). */
+  cuerpo: number;
+  /** Existencia del COMPLEMENTO (Σ de `cantidad_complemento` con signo; 0 si nunca hubo). */
+  complemento: number;
+}
+
+/**
+ * Existencia ACTUAL de un tela-color en un almacén — AMBOS componentes (cuerpo y complemento) —
+ * sumando `movimiento_det_tela` DIRECTO (NUNCA la vista `existencia_tela_color` — ADR-0010 §3).
+ * Tómala SIEMPRE tras {@link bloquearTelaColor}: es la base de la validación de no-negativo de
+ * los DOS componentes en salidas/traspasos del flujo nuevo (D3).
+ */
+export async function existenciaTelaColorBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTelaColor: number,
+): Promise<ExistenciaTelaColor> {
+  const filas = await tx.$queryRaw<
+    { cuerpo: Prisma.Decimal | null; complemento: Prisma.Decimal | null }[]
+  >`
+    SELECT
+      COALESCE(SUM(
+        d."cantidad" * CASE t."direccion"
+          WHEN 'entrada' THEN 1
+          WHEN 'salida'  THEN -1
+          ELSE 0
+        END
+      ), 0) AS cuerpo,
+      COALESCE(SUM(
+        COALESCE(d."cantidad_complemento", 0) * CASE t."direccion"
+          WHEN 'entrada' THEN 1
+          WHEN 'salida'  THEN -1
+          ELSE 0
+        END
+      ), 0) AS complemento
+    FROM "movimiento_det_tela" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_tela_color" = ${idTelaColor}
+  `;
+  return {
+    cuerpo: Number(filas[0]?.cuerpo ?? 0),
+    complemento: Number(filas[0]?.complemento ?? 0),
+  };
+}
+
+/**
  * Existencia ACTUAL de una tela/lote en un almacén, sumando `movimiento_det_tela` DIRECTO (NUNCA la
  * vista — ADR-0010 §3). Decimal: se devuelve `number`. Tómala SIEMPRE tras {@link bloquearTela}.
  * El `idLote` NULL se compara con `IS NOT DISTINCT FROM` para que el ajuste sin lote case consigo
- * mismo.
+ * mismo. EXCLUYE los renglones del flujo NUEVO por color (etapa A2, `id_tela_color` poblado):
+ * también traen `id_lote` NULL y sin el filtro contaminarían la suma del flujo legado.
  */
 export async function existenciaTelaBloqueada(
   tx: Tx,
@@ -525,6 +634,7 @@ export async function existenciaTelaBloqueada(
       AND m."id_almacen" = ${idAlmacen}
       AND d."id_tela" = ${idTela}
       AND d."id_lote" IS NOT DISTINCT FROM ${idLote}
+      AND d."id_tela_color" IS NULL
   `;
   return Number(filas[0]?.existencia ?? 0);
 }
@@ -565,7 +675,10 @@ export async function registrarMovimientoTela(
           create: entrada.lineas.map((linea) => ({
             idTela: linea.idTela,
             idLote: linea.idLote ?? null,
+            idTelaColor: linea.idTelaColor ?? null,
+            idPartida: linea.idPartida ?? null,
             cantidad: linea.cantidad,
+            cantidadComplemento: linea.cantidadComplemento ?? null,
             costoUnit: linea.costoUnit ?? null,
           })),
         },
@@ -1008,10 +1121,16 @@ export async function cancelarMovimientoMaterial(
         ...(esTela
           ? {
               detallesTela: {
+                // El inverso copia TAMBIÉN las dimensiones del flujo nuevo por color (A2):
+                // sin `idTelaColor`/`cantidadComplemento` el par original+inverso NO se
+                // neutralizaría en la vista/suma por color y el saldo quedaría descuadrado.
                 create: original.detallesTela.map((det) => ({
                   idTela: det.idTela,
                   idLote: det.idLote,
+                  idTelaColor: det.idTelaColor,
+                  idPartida: det.idPartida,
                   cantidad: det.cantidad,
+                  cantidadComplemento: det.cantidadComplemento,
                   costoUnit: det.costoUnit,
                 })),
               },
