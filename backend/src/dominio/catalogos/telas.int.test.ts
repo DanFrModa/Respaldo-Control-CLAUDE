@@ -1308,13 +1308,15 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
       });
 
       // Renombre REAL (la clave normalizada CAMBIA): sin el `id` esto sería quitar+crear y
-      // la liga se perdería en silencio — el hallazgo R3-1.
+      // la liga se perdería en silencio — el hallazgo R3-1. El pantone viaja en el payload
+      // porque el grid es reemplazo completo (así lo manda la UI real vía `aColoresCuerpo`);
+      // lo que R3-1 garantiza conservar es la FILA (id/liga/auditoría), no campos omitidos.
       const editada = await actualizarTela(
         sesion,
         {
           id: tela.id,
           colores: [
-            { id: fila.id, nombre: 'Marino Alsa 3040', precio: 60 },
+            { id: fila.id, nombre: 'Marino Alsa 3040', precio: 60, pantone: '19-4024 TCX' },
             { id: blanco.id, nombre: 'Blanco' },
           ],
         },
@@ -1324,7 +1326,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
       const tras = await cliente.telaColor.findUniqueOrThrow({ where: { id: fila.id } });
       expect(tras.nombre).toBe('Marino Alsa 3040'); // el nombre nuevo entró
       expect(tras.idColor).toBe(colorPrendaBlanco); // la liga legacy SOBREVIVE
-      expect(tras.pantone).toBe('19-4024 TCX'); // pantone del renglón intacto (mismo registro)
+      expect(tras.pantone).toBe('19-4024 TCX'); // el pantone del payload (reemplazo completo)
       expect(tras.precio?.toNumber()).toBe(60);
       // No hubo quitar+crear: siguen siendo las MISMAS dos filas.
       expect(editada.colores.map((c) => c.id).sort()).toEqual([fila.id, blanco.id].sort());
