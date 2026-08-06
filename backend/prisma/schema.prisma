@@ -549,6 +549,9 @@ model Proveedor {
   id          Int           @id @default(autoincrement())
   /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
   nombre      String        @unique
+  /// Nombre CORTO de uso diario ("Bloom" para BLOOM TEXTIL), para armar el nombre compuesto
+  /// de la tela (A1.1, Daniel 6-ago-2026). Solo display: SIN unicidad, opcional.
+  nombreCorto String?       @map("nombre_corto")
   razonSocial String?       @map("razon_social")
   /// Clasificación rápida (telas/avíos/servicios); por defecto sin clasificar.
   /// F1-E1B: SE CONSERVA junto a los roles multi-valor (acta Gabriel 13-jun-2026).
@@ -1280,12 +1283,20 @@ model Tela {
   /// esa es la bandera: se define desde el alta, como pidió Daniel.
   nombreComplemento String? @map("nombre_complemento")
   /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
+  /// LEGADO desde A1.1 (Daniel, 6-ago-2026): redundante con nombreCuerpo/nombreComplemento;
+  /// la UI ya no lo captura ni lo muestra. La columna se conserva (sin migración de borrado).
   tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
+  /// Peso de la tela en gramos por metro cuadrado (A1.1, Daniel 6-ago-2026). Informativo, opcional.
+  peso           Decimal?           @db.Decimal(8, 2)
+  /// Ancho de la tela en metros (A1.1). Informativo, opcional.
+  ancho          Decimal?           @db.Decimal(8, 2)
   /// Tela de uso frecuente (preselección en la UI de captura).
   favorito       Boolean            @default(false)
   /// Precio de referencia por unidad (informativo; el costo real va por lote/orden).
   precioSugerido Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
   /// ¿Es tela de producción (vs. muestra/insumo no productivo)? Default true.
+  /// LEGADO desde A1.1 (Daniel, 6-ago-2026): la casilla salió de la UI (ya no se captura ni
+  /// se muestra); el dato se conserva con su default server-side. La columna NO se borra.
   paraProduccion Boolean            @default(true) @map("para_produccion")
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo         Boolean            @default(true)

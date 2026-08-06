@@ -73,6 +73,7 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     composicion: null,
     idProveedor: null,
     proveedor: null,
+    proveedorCorto: null,
     nombreProveedor: null,
     nombreCuerpo: null,
     nombreComplemento: null,
@@ -80,6 +81,8 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     tipoComponente: 'CUERPO',
     favorito: false,
     precioSugerido: null,
+    peso: null,
+    ancho: null,
     paraProduccion: true,
     colores: [],
     activo: true,
@@ -272,6 +275,27 @@ describe('<TelasPagina>', () => {
     renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
     fireEvent.click(screen.getByTestId('fila-tela'));
     expect(screen.queryByTestId('precio-complemento-detalle')).not.toBeInTheDocument();
+  });
+
+  // A1.1: peso (gr/m²) y ancho (m) salen en el detalle SOLO si hay valores; el tipo de
+  // componente y "¿Para producción?" salieron de la UI (puntos 4 y 5).
+  it('el detalle muestra peso y ancho con su unidad solo si hay valores (A1.1)', () => {
+    useTelas.mockReturnValue(consultaConDatos([tela(15, 'Con ficha', { peso: 280, ancho: 1.8 })]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+    fireEvent.click(screen.getByTestId('fila-tela'));
+    expect(screen.getByTestId('tela-detalle-peso')).toHaveTextContent('280 gr/m²');
+    expect(screen.getByTestId('tela-detalle-ancho')).toHaveTextContent('1.8 m');
+    // Lo retirado de la UI (A1.1 puntos 4-5) ya no se pinta en el detalle.
+    expect(screen.queryByText('¿Para producción?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tipo de componente')).not.toBeInTheDocument();
+  });
+
+  it('sin peso ni ancho capturados, el detalle no pinta esos datos (A1.1)', () => {
+    useTelas.mockReturnValue(consultaConDatos([tela(16, 'Sin ficha')]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+    fireEvent.click(screen.getByTestId('fila-tela'));
+    expect(screen.queryByTestId('tela-detalle-peso')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tela-detalle-ancho')).not.toBeInTheDocument();
   });
 
   it('una tela sin colores muestra el aviso correspondiente al expandir el renglón', () => {

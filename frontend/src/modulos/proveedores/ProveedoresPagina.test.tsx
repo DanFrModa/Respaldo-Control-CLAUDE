@@ -71,6 +71,7 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
   return {
     id,
     nombre,
+    nombreCorto: null,
     razonSocial: null,
     tipo: 'TELAS',
     telefono: null,

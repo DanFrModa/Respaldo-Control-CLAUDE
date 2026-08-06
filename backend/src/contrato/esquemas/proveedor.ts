@@ -203,6 +203,12 @@ export const esquemaProveedorCrear = z
       .trim()
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    /** Nombre CORTO de uso diario ("Bloom" para BLOOM TEXTIL). Display, SIN unicidad (A1.1). */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El nombre corto no puede tener más de 50 caracteres' })
+      .optional(),
     razonSocial: z
       .string()
       .trim()
@@ -268,6 +274,13 @@ const baseProveedorEditar = z
       .optional(),
     // Opcionales nullable (M1): omitir = no tocar; `null` = borrar. `nombre` NO es
     // nullable (clave de negocio obligatoria) y `tipo` tampoco (siempre tiene valor).
+    /** Nombre corto de uso diario ("Bloom"): `null`/'' lo borra; omitir = no tocar (A1.1). */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El nombre corto no puede tener más de 50 caracteres' })
+      .optional()
+      .nullable(),
     razonSocial: z
       .string()
       .trim()
@@ -361,6 +374,10 @@ export const esquemaProveedorSalida = z
   .object({
     id: z.number().int().describe('Id del proveedor.'),
     nombre: z.string().describe('Nombre del proveedor.'),
+    nombreCorto: z
+      .string()
+      .nullable()
+      .describe('Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1).'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
     tipo: z
       .enum(TIPOS_PROVEEDOR)

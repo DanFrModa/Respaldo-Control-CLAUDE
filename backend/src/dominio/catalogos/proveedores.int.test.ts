@@ -184,6 +184,33 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(bitacora.idUsuario).toBe(sesion.id);
     });
 
+    // A1.1 (Daniel, 6-ago-2026): nombre corto de uso diario ("Bloom" para BLOOM TEXTIL).
+    it('guarda el nombre corto (A1.1) en alta, lo edita, lo vacía y NO exige unicidad', async () => {
+      const sesion = sesionAdmin();
+      const bloom = await crearProveedor(
+        sesion,
+        { nombre: 'BLOOM TEXTIL', roles: [rolMaquila], nombreCorto: 'Bloom' },
+        bd(),
+      );
+      expect(bloom.nombreCorto).toBe('Bloom');
+
+      // SIN unicidad (es display): otro proveedor puede repetir el mismo nombre corto.
+      const otro = await crearProveedor(
+        sesion,
+        { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'Bloom' },
+        bd(),
+      );
+      expect(otro.nombreCorto).toBe('Bloom');
+
+      // Editar lo cambia; `null` lo borra (M1); omitirlo no lo toca.
+      const editado = await actualizarProveedor(sesion, { id: bloom.id, nombreCorto: 'Blm' }, bd());
+      expect(editado.nombreCorto).toBe('Blm');
+      const sinTocar = await actualizarProveedor(sesion, { id: bloom.id, notas: 'x' }, bd());
+      expect(sinTocar.nombreCorto).toBe('Blm');
+      const vaciado = await actualizarProveedor(sesion, { id: bloom.id, nombreCorto: null }, bd());
+      expect(vaciado.nombreCorto).toBeNull();
+    });
+
     it('exige al menos un rol (R15): alta sin roles → ErrorValidacion', async () => {
       await expect(
         crearProveedor(sesionAdmin(), { nombre: 'Sin rol', tipo: 'TELAS' }, bd()),

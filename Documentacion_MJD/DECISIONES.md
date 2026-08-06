@@ -803,3 +803,13 @@ Se lee de corrido: **Felpa · Alsatex · Felpa Suiza**. **Consecuencia:** la tel
 - **PENDIENTE, etapa propia del módulo de costos** — no se mezcla con la reestructura de telas.
 
 **Secuencia acordada:** A1 (catálogo) → A2 (inventario) → entrada por factura/remisión → pantalla de stocks → packing list. El **pack** (§Post-F9.10) y la **corrección del costo de tela** van después.
+
+**7. Remates del catálogo tras probarlo (DANIEL, 6-ago-2026, feedback textual sobre A1 en `prueba` — construidos como A1.1):**
+- **Peso y ancho** de la tela: dos campos nuevos opcionales (*"Me faltó incluir un campo de peso y otro de ancho"*) — peso en gr/m², ancho en metros.
+- **Favorita marcada por default** al dar de alta una tela nueva (solo el alta; editar no cambia).
+- El ejemplo del alta de color es **"Negro"** (no "Marino Alsa 3040").
+- **"¿Es tela de producción?" se OCULTA de la pantalla** (*"no entiendo la casilla"*): el dato queda en BD con su default `true` como legado del viejo; si algún día hace falta, se destapa.
+- **"Tipo de componente" se RETIRA de la pantalla** (*"no sé si está siendo redundante"* — lo es): quedó superado por los nombres de cuerpo/complemento de la propia tela. Columna/enum quedan en BD como legado.
+- **Nombre del complemento consistente**: al marcar "lleva complemento" se pre-llena **"Cardigan"** (editable — Daniel: el 99 % de las veces es cárdigan; mejor default que catálogo). Y el **nombre del cuerpo se propone desde el tipo de tela** (tipo "Felpa 50/50" → propone "Felpa"), sin pisar lo tecleado.
+- **`Proveedor.nombreCorto`** (nuevo, opcional): BLOOM TEXTIL → "Bloom". Se usa para el nombre compuesto.
+- **El nombre de la tela se ARMA solo** (*"me está sobrando el nombre… chance el nombre que aparezca debe de ser el compuesto"*): `nombre corto del proveedor + nombre del proveedor de la tela` → **"Bloom Felpa España"**. Editable (teclearlo lo protege; vaciarlo re-suelta el armado); sigue único global.

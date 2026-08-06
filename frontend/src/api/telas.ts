@@ -34,8 +34,6 @@ export type TelasPagina =
 export type Tela = TelasPagina['datos'][number];
 /** Un renglon de color de una tela (color + precio). */
 export type TelaColor = Tela['colores'][number];
-/** Tipo de componente de la tela (CUERPO/CARDIGAN/OTRO). */
-export type TipoComponenteTela = Tela['tipoComponente'];
 
 /** Unidad en que se compra y se consume una tela: `KG` (kilos) o `M` (metros). */
 export type UnidadTela = Tela['unidadMedida'];

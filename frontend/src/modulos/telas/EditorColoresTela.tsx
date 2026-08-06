@@ -96,7 +96,7 @@ export function EditorColoresTela({
           type="text"
           value={aAgregar}
           maxLength={80}
-          placeholder="Ej. Marino Alsa 3040"
+          placeholder="Ej. Negro"
           aria-label="Nombre del color a agregar a la tela"
           data-testid="nombre-agregar-color"
           disabled={deshabilitado}

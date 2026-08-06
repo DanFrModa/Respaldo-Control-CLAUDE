@@ -417,6 +417,22 @@ export const esquemaTelaCrear = z.object({
     .number({ error: 'El precio sugerido debe ser un número' })
     .nonnegative({ error: 'El precio sugerido no puede ser negativo' })
     .optional(),
+  /**
+   * Peso de la tela en gr/m² (A1.1). Informativo, opcional, no negativo. El tope respeta el
+   * DECIMAL(8,2) de la base (como las puntadas del bordado): sin él, un valor de 1,000,000
+   * desbordaría la columna y daría un 500 opaco en vez de un 400 legible.
+   */
+  peso: z
+    .number({ error: 'El peso debe ser un número' })
+    .nonnegative({ error: 'El peso no puede ser negativo' })
+    .max(99999.99, { error: 'El peso no puede ser más de 99,999.99 gr/m²' })
+    .optional(),
+  /** Ancho de la tela en metros (A1.1). Informativo, opcional, no negativo. Mismo tope que el peso. */
+  ancho: z
+    .number({ error: 'El ancho debe ser un número' })
+    .nonnegative({ error: 'El ancho no puede ser negativo' })
+    .max(99999.99, { error: 'El ancho no puede ser más de 99,999.99 m' })
+    .optional(),
   /** Grid de colores (cada uno con precio opcional). Puede ir vacío. */
   colores: esquemaTelaColores.default([]),
   ...camposOpcionalesTela,
@@ -498,6 +514,20 @@ export const esquemaTelaEditar = z
       .nonnegative({ error: 'El precio sugerido no puede ser negativo' })
       .nullable()
       .optional(),
+    /** `null` quita el peso (gr/m²); un número lo fija; omitir = no tocar (A1.1). Tope del DECIMAL(8,2). */
+    peso: z
+      .number({ error: 'El peso debe ser un número' })
+      .nonnegative({ error: 'El peso no puede ser negativo' })
+      .max(99999.99, { error: 'El peso no puede ser más de 99,999.99 gr/m²' })
+      .nullable()
+      .optional(),
+    /** `null` quita el ancho (m); un número lo fija; omitir = no tocar (A1.1). Tope del DECIMAL(8,2). */
+    ancho: z
+      .number({ error: 'El ancho debe ser un número' })
+      .nonnegative({ error: 'El ancho no puede ser negativo' })
+      .max(99999.99, { error: 'El ancho no puede ser más de 99,999.99 m' })
+      .nullable()
+      .optional(),
     /** Reemplaza el grid de colores si viene (incluso vacío); omitir = no tocar. */
     colores: esquemaTelaColores.optional(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
@@ -542,6 +572,10 @@ export const esquemaTelaSalida = z
       .nullable()
       .describe('Id del proveedor DUEÑO del artículo (null solo en telas migradas).'),
     proveedor: z.string().nullable().describe('Nombre del proveedor dueño, o null.'),
+    proveedorCorto: z
+      .string()
+      .nullable()
+      .describe('Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto).'),
     nombreProveedor: z
       .string()
       .nullable()
@@ -559,6 +593,8 @@ export const esquemaTelaSalida = z
       .describe('Rol típico de la tela en el lote (D5).'),
     favorito: z.boolean().describe('¿Tela de uso frecuente?'),
     precioSugerido: z.number().nullable().describe('Precio de referencia por unidad, o null.'),
+    peso: z.number().nullable().describe('Peso de la tela en gr/m² (A1.1), o null.'),
+    ancho: z.number().nullable().describe('Ancho de la tela en metros (A1.1), o null.'),
     paraProduccion: z.boolean().describe('¿Es tela de producción (vs. muestra/insumo)?'),
     colores: z
       .array(esquemaTelaColorSalida)

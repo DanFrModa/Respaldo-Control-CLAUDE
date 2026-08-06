@@ -22,7 +22,8 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
   await page.getByTestId('nuevo-proveedor').click();
   const dialogo = page.getByRole('dialog');
-  await dialogo.getByLabel('Nombre').fill(nombre);
+  // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+  await dialogo.locator('#proveedor-nombre').fill(nombre);
   // Crear exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
   await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
   await page.getByTestId('guardar-proveedor').click();
@@ -64,6 +65,9 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
 
     // El PROVEEDOR dueño es OBLIGATORIO en el alta (§Post-F9.11): se elige del combobox.
     await elegirProveedor(page, proveedor);
+    // A1.1 punto 8: el nombre ya tecleado a mano quedó "tocado" — elegir proveedor NO debe
+    // pisarlo con el auto-armado (corto/nombre del proveedor).
+    await expect(dialogoAlta.locator('#tela-nombre')).toHaveValue(nombre);
 
     // La UNIDAD es obligatoria y arranca SIN elegir (30-jul-2026): sin esto el alta no guarda.
     // Se elige METROS a propósito — es la unidad "no default", así que si algún día volviera a

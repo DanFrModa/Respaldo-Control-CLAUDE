@@ -52,7 +52,8 @@ test.describe('Importar CFDI de proveedor (F9-E3)', () => {
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
     await page.getByTestId('nuevo-proveedor').click();
     const dialogo = page.getByRole('dialog');
-    await dialogo.getByLabel('Nombre').fill(proveedor);
+    // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+    await dialogo.locator('#proveedor-nombre').fill(proveedor);
     await dialogo.getByLabel('Tipo').selectOption('AVIOS');
     await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
     await page.getByTestId('guardar-proveedor').click();

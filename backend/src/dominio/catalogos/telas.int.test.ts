@@ -165,6 +165,101 @@ describe('Catálogo Telas (F1-E3, telas unificadas — global ADR-0007)', () => 
       expect(tela.paraProduccion).toBe(true);
     });
 
+    // REGRESIÓN A1.1 (puntos 4-5): `tipoComponente` y `paraProduccion` son LEGADO — la UI ya
+    // no los manda. Un PATCH SIN esos campos NO debe resetearlos a su default: si algún día
+    // el contrato de EDICIÓN les pusiera un `.default()` (la trampa que el CI cazó en F1-E1),
+    // este test truena antes de que una tela vieja pierda sus valores en silencio.
+    it('editar sin mandar tipoComponente/paraProduccion NO resetea los valores legado', async () => {
+      const sesion = sesionAdmin();
+      const vieja = await crearTela(
+        sesion,
+        {
+          nombre: 'Vieja con legado',
+          unidadMedida: 'KG',
+          idProveedor: proveedorAlsatex,
+          tipoComponente: 'CUERPO',
+          paraProduccion: false,
+          colores: [],
+        },
+        bd(),
+      );
+      expect(vieja.tipoComponente).toBe('CUERPO');
+      expect(vieja.paraProduccion).toBe(false);
+
+      // PATCH como el que hoy arma la UI: toca otros campos, OMITE los legado.
+      const editada = await actualizarTela(
+        sesion,
+        { id: vieja.id, descripcion: 'depurada', favorito: true },
+        bd(),
+      );
+      expect(editada.descripcion).toBe('depurada');
+      expect(editada.tipoComponente).toBe('CUERPO');
+      expect(editada.paraProduccion).toBe(false);
+
+      // Verificación directa en BD (no solo la proyección devuelta).
+      const enBd = await cliente.tela.findUniqueOrThrow({ where: { id: vieja.id } });
+      expect(enBd.tipoComponente).toBe('CUERPO');
+      expect(enBd.paraProduccion).toBe(false);
+    });
+
+    // A1.1 (Daniel, 6-ago-2026): peso (gr/m²) y ancho (m) de la tela — informativos, opcionales.
+    it('guarda peso y ancho (A1.1) en el alta, los edita con bitácora y los vacía (M1)', async () => {
+      const sesion = sesionAdmin();
+      const tela = await crearTela(
+        sesion,
+        {
+          nombre: 'Felpa 280',
+          unidadMedida: 'KG',
+          idProveedor: proveedorAlsatex,
+          peso: 280,
+          ancho: 1.8,
+          colores: [],
+        },
+        bd(),
+      );
+      expect(tela.peso?.toNumber()).toBe(280);
+      expect(tela.ancho?.toNumber()).toBe(1.8);
+
+      // Editar los cambia y la bitácora registra el detalle (A7).
+      const editada = await actualizarTela(sesion, { id: tela.id, peso: 300.5, ancho: 1.6 }, bd());
+      expect(editada.peso?.toNumber()).toBe(300.5);
+      expect(editada.ancho?.toNumber()).toBe(1.6);
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Tela', idEntidad: String(tela.id), accion: 'MODIFICAR' },
+      });
+      expect(bitacora.datos).toMatchObject({
+        peso: { de: 280, a: 300.5 },
+        ancho: { de: 1.8, a: 1.6 },
+      });
+
+      // `null` los borra; omitirlos NO los toca (M1).
+      const vaciada = await actualizarTela(sesion, { id: tela.id, peso: null }, bd());
+      expect(vaciada.peso).toBeNull();
+      expect(vaciada.ancho?.toNumber()).toBe(1.6);
+
+      // Un alta SIN peso/ancho los deja en null (opcionales); negativos se rechazan.
+      const sinFicha = await crearTela(
+        sesion,
+        { nombre: 'Sin ficha', unidadMedida: 'M', idProveedor: proveedorAlsatex, colores: [] },
+        bd(),
+      );
+      expect(sinFicha.peso).toBeNull();
+      expect(sinFicha.ancho).toBeNull();
+      await expect(
+        crearTela(
+          sesion,
+          {
+            nombre: 'Peso negativo',
+            unidadMedida: 'KG',
+            idProveedor: proveedorAlsatex,
+            peso: -1,
+            colores: [],
+          },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
     // §Post-F9.11: los colores son HIJOS de la tela — nombre libre, NO catálogo global.
     it('rechaza nombres de color repetidos en la misma tela, sin importar mayúsculas', async () => {
       await expect(

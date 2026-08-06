@@ -24,7 +24,8 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
   await page.getByTestId('nuevo-proveedor').click();
   const dialogo = page.getByRole('dialog');
-  await dialogo.getByLabel('Nombre').fill(nombre);
+  // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+  await dialogo.locator('#proveedor-nombre').fill(nombre);
   await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
   await page.getByTestId('guardar-proveedor').click();
   await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();

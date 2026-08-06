@@ -1502,3 +1502,43 @@ Ajuste. Lo demás (kardex, traspaso, pantallas de lote legado) sigue por ⌘K.
   `AjusteTelaColorPagina,TraspasoTelaColorPagina,SalidaTelaColorOrdenPagina,DialogoCancelarMaterial}.tsx`
   · `modulos/catalogo.ts` (Telas como nodo padre) · `api/inventario-materiales.ts` + cliente
   regenerado.
+
+## 2026-08-06 — Remates del catálogo de telas (etapa A1.1, feedback de Daniel)
+
+Daniel probó el catálogo nuevo en `prueba` y pidió 8 ajustes; todos entraron:
+
+### A) Dos datos nuevos: peso y ancho
+
+La tela ahora lleva **peso (gr/m²)** y **ancho (m)**, opcionales, capturables en el diálogo y
+visibles en el detalle cuando tienen valor.
+
+### B) Menos fricción y menos ruido al capturar
+
+- **"Favorita" viene marcada por default** al dar de alta (se puede desmarcar).
+- El ejemplo del alta de color ahora dice **"Negro"**.
+- Se **ocultaron** las dos casillas que confundían: "¿Es tela de producción?" (queda por dentro con
+  su default) y "Tipo de componente" (redundante con los nombres de cuerpo/complemento — quedó
+  superada y se retiró de la pantalla; el dato viejo no se pierde).
+
+### C) Nombres consistentes sin teclear de más
+
+- Marcar "lleva complemento" **pre-llena "Cardigan"** (editable, para que siempre se escriba igual).
+- Elegir el tipo de tela **propone el nombre del cuerpo** ("Felpa 50/50" → "Felpa") — aplica cuando
+  la tela lleva complemento, que es donde ese campo existe.
+- El proveedor ganó un **"Nombre corto"** (BLOOM TEXTIL → "Bloom") y el **nombre de la tela se arma
+  solo**: nombre corto + nombre del proveedor de la tela → **"Bloom Felpa España"**. Si lo tecleas a
+  mano, lo tuyo manda; si lo vacías, se vuelve a armar.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260806140000_tela_peso_ancho_proveedor_nombre_corto`): 3
+   columnas nuevas opcionales (peso/ancho en telas, nombre corto en proveedores). Aditiva.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.**
+
+### Archivos principales
+
+- **Backend:** `prisma/schema.prisma` + la migración · `contrato/esquemas/tela.ts` y `proveedor` ·
+  `dominio/catalogos/telas.ts` · dominio de proveedores · OpenAPI regenerado.
+- **Frontend:** `modulos/telas/{DialogoTela,EditorColoresTela,TelasPagina}.tsx` ·
+  `modulos/proveedores/DialogoProveedor.tsx` (+ detalle) · cliente regenerado.

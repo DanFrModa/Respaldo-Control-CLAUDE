@@ -262,6 +262,11 @@ export const esquemaProveedorFormulario = z
       .trim()
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    /** Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL). Display, sin unicidad (A1.1). */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El nombre corto no puede tener más de 50 caracteres' }),
     razonSocial: z
       .string()
       .trim()

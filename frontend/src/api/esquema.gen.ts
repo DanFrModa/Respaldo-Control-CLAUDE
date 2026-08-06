@@ -1281,6 +1281,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre del proveedor. */
                 nombre: string;
+                /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+                nombreCorto: string | null;
                 /** @description Razón social, o null. */
                 razonSocial: string | null;
                 /**
@@ -1472,6 +1474,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre: string;
+            nombreCorto?: string;
             razonSocial?: string;
             /**
              * @default SIN_CLASIFICAR
@@ -1523,6 +1526,8 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
+              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
               /**
@@ -1729,6 +1734,8 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
+              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
               /**
@@ -1924,6 +1931,8 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
+              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
               /**
@@ -2110,6 +2119,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre?: string;
+            nombreCorto?: string | null;
             razonSocial?: string | null;
             /** @enum {string} */
             tipo?: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
@@ -2155,6 +2165,8 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
+              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
               /**
@@ -9456,6 +9468,8 @@ export interface paths {
                 idProveedor: number | null;
                 /** @description Nombre del proveedor dueño, o null. */
                 proveedor: string | null;
+                /** @description Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto). */
+                proveedorCorto: string | null;
                 /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
                 nombreProveedor: string | null;
                 /** @description Nombre del componente CUERPO, o null. */
@@ -9476,6 +9490,10 @@ export interface paths {
                 favorito: boolean;
                 /** @description Precio de referencia por unidad, o null. */
                 precioSugerido: number | null;
+                /** @description Peso de la tela en gr/m² (A1.1), o null. */
+                peso: number | null;
+                /** @description Ancho de la tela en metros (A1.1), o null. */
+                ancho: number | null;
                 /** @description ¿Es tela de producción (vs. muestra/insumo)? */
                 paraProduccion: boolean;
                 /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
@@ -9631,6 +9649,8 @@ export interface paths {
             /** @default true */
             paraProduccion?: boolean;
             precioSugerido?: number;
+            peso?: number;
+            ancho?: number;
             /** @default [] */
             colores?: {
               /** @description Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas. */
@@ -9673,6 +9693,8 @@ export interface paths {
               idProveedor: number | null;
               /** @description Nombre del proveedor dueño, o null. */
               proveedor: string | null;
+              /** @description Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto). */
+              proveedorCorto: string | null;
               /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
               nombreProveedor: string | null;
               /** @description Nombre del componente CUERPO, o null. */
@@ -9693,6 +9715,10 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Peso de la tela en gr/m² (A1.1), o null. */
+              peso: number | null;
+              /** @description Ancho de la tela en metros (A1.1), o null. */
+              ancho: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
               /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
@@ -9862,6 +9888,8 @@ export interface paths {
               idProveedor: number | null;
               /** @description Nombre del proveedor dueño, o null. */
               proveedor: string | null;
+              /** @description Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto). */
+              proveedorCorto: string | null;
               /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
               nombreProveedor: string | null;
               /** @description Nombre del componente CUERPO, o null. */
@@ -9882,6 +9910,10 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Peso de la tela en gr/m² (A1.1), o null. */
+              peso: number | null;
+              /** @description Ancho de la tela en metros (A1.1), o null. */
+              ancho: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
               /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
@@ -10040,6 +10072,8 @@ export interface paths {
               idProveedor: number | null;
               /** @description Nombre del proveedor dueño, o null. */
               proveedor: string | null;
+              /** @description Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto). */
+              proveedorCorto: string | null;
               /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
               nombreProveedor: string | null;
               /** @description Nombre del componente CUERPO, o null. */
@@ -10060,6 +10094,10 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Peso de la tela en gr/m² (A1.1), o null. */
+              peso: number | null;
+              /** @description Ancho de la tela en metros (A1.1), o null. */
+              ancho: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
               /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
@@ -10205,6 +10243,8 @@ export interface paths {
             favorito?: boolean;
             paraProduccion?: boolean;
             precioSugerido?: number | null;
+            peso?: number | null;
+            ancho?: number | null;
             colores?: {
               /** @description Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas. */
               id?: number;
@@ -10247,6 +10287,8 @@ export interface paths {
               idProveedor: number | null;
               /** @description Nombre del proveedor dueño, o null. */
               proveedor: string | null;
+              /** @description Nombre CORTO del proveedor dueño ("Bloom"), o null (A1.1: nombre compuesto). */
+              proveedorCorto: string | null;
               /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
               nombreProveedor: string | null;
               /** @description Nombre del componente CUERPO, o null. */
@@ -10267,6 +10309,10 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Peso de la tela en gr/m² (A1.1), o null. */
+              peso: number | null;
+              /** @description Ancho de la tela en metros (A1.1), o null. */
+              ancho: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
               /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */

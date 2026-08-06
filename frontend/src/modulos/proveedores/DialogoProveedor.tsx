@@ -56,6 +56,7 @@ import { SelectorRolesProveedor } from './SelectorRolesProveedor';
 const VALORES_INICIALES: DatosProveedorFormulario = {
   // General
   nombre: '',
+  nombreCorto: '',
   razonSocial: '',
   tipo: 'SIN_CLASIFICAR',
   // Fiscal
@@ -133,6 +134,7 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
 
   // ── Textos opcionales (se omiten si vacios) ─────────────────────────────────
   const textos: Array<[keyof ProveedorCrear, string]> = [
+    ['nombreCorto', datos.nombreCorto],
     ['razonSocial', datos.razonSocial],
     ['rfc', datos.rfc],
     ['regimenFiscalSat', datos.regimenFiscalSat],
@@ -210,6 +212,7 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     nombre: datos.nombre,
     tipo: datos.tipo,
     // Textos opcionales: vacio -> null (borrar).
+    nombreCorto: textoONull(datos.nombreCorto),
     razonSocial: textoONull(datos.razonSocial),
     rfc: textoONull(datos.rfc),
     regimenFiscalSat: textoONull(datos.regimenFiscalSat),
@@ -298,6 +301,7 @@ export function DialogoProveedor({
       formulario.reset({
         // General
         nombre: proveedor.nombre,
+        nombreCorto: texto(proveedor.nombreCorto),
         razonSocial: texto(proveedor.razonSocial),
         tipo: proveedor.tipo,
         // Fiscal
@@ -417,6 +421,23 @@ export function DialogoProveedor({
                         {...registrar('nombre')}
                       />
                       <FieldError errors={[errors.nombre]} />
+                    </Field>
+
+                    {/* Nombre corto (A1.1): display para el nombre compuesto de la tela. */}
+                    <Field data-invalid={Boolean(errors.nombreCorto)}>
+                      <FieldLabel htmlFor="proveedor-nombre-corto">Nombre corto</FieldLabel>
+                      <Input
+                        id="proveedor-nombre-corto"
+                        placeholder="Ej. Bloom"
+                        aria-invalid={Boolean(errors.nombreCorto)}
+                        disabled={guardando}
+                        data-testid="proveedor-nombre-corto"
+                        {...registrar('nombreCorto')}
+                      />
+                      <FieldDescription>
+                        De uso diario, p. ej. Bloom para BLOOM TEXTIL. Arma el nombre de sus telas.
+                      </FieldDescription>
+                      <FieldError errors={[errors.nombreCorto]} />
                     </Field>
 
                     <Field data-invalid={Boolean(errors.tipo)}>

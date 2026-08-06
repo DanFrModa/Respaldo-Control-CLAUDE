@@ -203,6 +203,8 @@ function datosEnriquecidosCrear(
   datos: z.output<typeof esquemaProveedorCrear>,
 ): Partial<Prisma.ProveedorCreateInput> {
   const data: Partial<Prisma.ProveedorCreateInput> = {};
+  // Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL; A1.1). Display, sin unicidad.
+  if (datos.nombreCorto !== undefined) data.nombreCorto = datos.nombreCorto;
   if (datos.razonSocial !== undefined) data.razonSocial = datos.razonSocial;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.contacto !== undefined) data.contacto = datos.contacto;
@@ -239,6 +241,7 @@ function datosEnriquecidosCrear(
 
 /** Campos de TEXTO editables (clave del payload === clave del modelo). */
 const CAMPOS_TEXTO_EDITABLES = [
+  'nombreCorto',
   'razonSocial',
   'telefono',
   'contacto',

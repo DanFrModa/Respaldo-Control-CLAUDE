@@ -4,6 +4,7 @@ import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
+  actualizarTela,
   crearTela,
   crearTelaCategoria,
   crearTelaMigracion,
@@ -115,6 +116,42 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
         { nombre: 'Sin dueño', unidadMedida: 'KG', colores: [] } as never,
         {},
       ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  // A1.1 (ronda de corrección): sin tope, un peso/ancho ≥ 1,000,000 desbordaría el
+  // DECIMAL(8,2) de la base y daría un 500 opaco; el contrato lo corta con un 400 cuyo
+  // `detalles.fieldErrors` trae el mensaje LEGIBLE por campo (formato de `validarEntrada`).
+  it('crear tela con peso o ancho que desbordan el DECIMAL(8,2) → ErrorValidacion legible', async () => {
+    const errorPeso: unknown = await crearTela(
+      sesionAdmin(),
+      { nombre: 'Pesada', unidadMedida: 'KG', idProveedor: 1, peso: 1_000_000 },
+      {},
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(errorPeso).toBeInstanceOf(ErrorValidacion);
+    expect((errorPeso as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { peso: ['El peso no puede ser más de 99,999.99 gr/m²'] },
+    });
+
+    const errorAncho: unknown = await crearTela(
+      sesionAdmin(),
+      { nombre: 'Ancha', unidadMedida: 'KG', idProveedor: 1, ancho: 100_000 },
+      {},
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(errorAncho).toBeInstanceOf(ErrorValidacion);
+    expect((errorAncho as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { ancho: ['El ancho no puede ser más de 99,999.99 m'] },
+    });
+
+    // Y en EDICIÓN el mismo tope aplica (el PATCH valida antes de tocar la base).
+    await expect(
+      actualizarTela(sesionAdmin(), { id: 1, peso: 1_000_000 }, {}),
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
