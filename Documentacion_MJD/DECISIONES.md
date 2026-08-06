@@ -742,3 +742,25 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
+
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ REGISTRADA, NO CONSTRUIDA
+
+**El problema.** C&A pide varios **tendidos** en una misma OP: el pack A con corrida 1-2-2-1 (CH-M-G-EG), el pack B con 1-1-1-2, etc. Daniel lo resuelve hoy metiendo el pack **dentro del nombre del color**: "Negro A", "Negro B". Y **v2 lo copió**: el importador de OC por PDF crea un renglón por pack con el color `{Base} {LETRA}` (`BLANCO A`/`B`/`C`) — a petición suya cuando se construyó (§Post-F9.2).
+
+**Por qué hay que cambiarlo.** Daniel (6-ago-2026): *"Me gusta que exista un solo Negro y no esté fragmentado en miles de colores escritos de diferente manera."* Con el pack embebido en el color, cada OC de C&A **fabrica colores nuevos** ("NEGRO A", "NEGRO B", "NEGRO C"), y el inventario de producto terminado y los reportes dejan de poder sumar "todo lo negro". La prenda es la misma: un CH negro del pack A y uno del pack B son idénticos; lo que cambia es la corrida del tendido y cómo se empacan.
+
+**Hasta dónde viaja el pack** (respuesta textual de Daniel): *"Creo que sí es importante que viaje el pack al menos en el corte, entrega a maquila… y que sea opcional al recibir. Lo ideal sería que sí entregue separado, pero en caso de que lo junten, poder recibirlo así también. Para el inventario ya deja de ser importante el pack. Hasta ahí queda, después ya no."*
+
+| Etapa | El pack… |
+| --- | --- |
+| Matriz de la OP | **obligatorio** cuando la orden trae packs (renglón = color × pack) |
+| Corte | **obligatorio** (cada tendido es de un pack) |
+| Entrega a maquila | **obligatorio** |
+| Recibo de maquila | **OPCIONAL** — se recibe por pack si el maquilero los separó, o sin pack si los juntó |
+| Arte, entrega a cliente, inventario PT | **no aplica** — ahí ya es solo color |
+
+- **Consecuencia de diseño a resolver al construir:** con el recibo opcional, el saldo "recibido ≤ enviado" no puede llevarse solo por pack. Un recibo SIN pack consume del saldo **agregado de todos los packs** de esa orden y proceso; uno CON pack, del suyo. Hay que definir (y probar) que las dos formas convivan sin permitir recibir de más en total.
+- **Migración:** los colores ya creados con la convención vieja ("NEGRO A") hay que partirlos en color *NEGRO* + pack *A*, en la OP y en las etapas de corte/envío que ya existan. El importador de PDF deja de componer el color con la letra.
+- **Alcance:** OP + `EtapaMovimientoDet` (corte/envío/recibo) + importador de PDF + matrices de captura. **NO** toca el kardex de PT.
+- **Secuencia (Daniel):** *"Me parece bien terminar con las telas y luego retomas esto."* Va **después** de la reestructura de telas, como etapa propia.
+- **Fecha:** 2026-08-06.
