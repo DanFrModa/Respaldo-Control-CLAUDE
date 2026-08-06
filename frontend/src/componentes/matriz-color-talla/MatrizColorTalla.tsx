@@ -68,6 +68,13 @@ export interface PropsMatrizColorTalla {
    * simplemente omiten esta prop y no ven nada nuevo.
    */
   onPantoneChange?: (idColor: number, pantone: string) => void;
+  /**
+   * Selector de "agregar color" PROPIO del flujo, que REEMPLAZA al `<select>` nativo de la
+   * matriz (p. ej. el combobox con alta de color al vuelo de la OP, §Post-F9.11). El padre es
+   * dueño de agregar la fila vía `onLineasChange`; la matriz solo lo posiciona en su toolbar.
+   * Los flujos que no lo pasan conservan el select de siempre.
+   */
+  slotAgregarColor?: React.ReactNode;
   /** Solo lectura (orden cancelada / sin permiso): oculta toda edición y deja la matriz visible. */
   soloLectura?: boolean;
   /** Base de los `data-testid` (por defecto "matriz"). */
@@ -117,6 +124,7 @@ function MatrizColorTallaBase({
   onLineasChange,
   onTallasChange,
   onPantoneChange,
+  slotAgregarColor,
   soloLectura = false,
   testid = 'matriz',
 }: PropsMatrizColorTalla): React.JSX.Element {
@@ -254,25 +262,27 @@ function MatrizColorTallaBase({
     <div className="space-y-3" data-testid={testid}>
       {!soloLectura ? (
         <div className="flex flex-wrap items-center gap-2">
-          <SelectNativo
-            className="w-auto"
-            aria-label="Agregar color"
-            value=""
-            disabled={coloresParaAgregar.length === 0}
-            onChange={(e) => {
-              if (e.target.value !== '') {
-                agregarColor(Number(e.target.value));
-              }
-            }}
-            data-testid={`${testid}-agregar-color`}
-          >
-            <option value="">Agregar color…</option>
-            {coloresParaAgregar.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {slotAgregarColor ?? (
+            <SelectNativo
+              className="w-auto"
+              aria-label="Agregar color"
+              value=""
+              disabled={coloresParaAgregar.length === 0}
+              onChange={(e) => {
+                if (e.target.value !== '') {
+                  agregarColor(Number(e.target.value));
+                }
+              }}
+              data-testid={`${testid}-agregar-color`}
+            >
+              <option value="">Agregar color…</option>
+              {coloresParaAgregar.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </option>
+              ))}
+            </SelectNativo>
+          )}
 
           <SelectNativo
             className="w-auto"

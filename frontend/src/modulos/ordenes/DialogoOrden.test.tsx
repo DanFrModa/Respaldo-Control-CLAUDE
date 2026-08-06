@@ -44,6 +44,8 @@ vi.mock('@/api/modelos', () => ({
 }));
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [] }, isPending: false }),
+  // El alta de color al vuelo de la matriz (§Post-F9.11) usa este hook; aquí no se ejercita.
+  useCrearColor: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/api/tallas', () => ({
   useTallasActivas: () => ({ data: { datos: [] }, isPending: false }),

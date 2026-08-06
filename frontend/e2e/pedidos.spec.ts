@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 
 import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
@@ -139,25 +139,46 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(panelCentro.getByTestId('traza-oc')).toContainText(ocCliente);
     await expect(panelCentro.getByTestId('traza-desarrollo')).toBeEnabled();
 
-    // ── La RC se programó SOLA (outbox → consumidor, B5): poll sobre el PANEL (R4) ─
+    // ── La RC se programó SOLA (outbox → consumidor, B5): poll por API + panel UNA vez ─
     // R4 cambió el mosaico "Ruta crítica": ya NO navega a /ruta-critica/ordenes/:id — abre el
     // PANEL deslizante "Ruta de la orden" aquí mismo. El consumidor corre en el backend del
-    // compose (outbox + pg-boss): se reintenta CERRANDO (Esc) y REABRIENDO el panel — cada
-    // apertura re-consulta la ruta — hasta que la ruta exista y liste sus procesos. `toPass`
-    // reintenta el callback COMPLETO aunque una aserción interna lance.
-    await expect(async () => {
-      await panelCentro.getByTestId('mosaico-rc').click();
-      try {
-        await expect(
-          page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
-        ).toBeVisible();
-        await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible({ timeout: 2_000 });
-      } finally {
-        // Cierra el panel (modal) para que el siguiente intento — o el siguiente paso — pueda
-        // interactuar con la página aunque este intento haya fallado.
-        await page.keyboard.press('Escape');
-      }
-    }).toPass({ timeout: 90_000, intervals: [3_000] });
+    // compose (outbox + pg-boss) y puede tardar. Antes se reintentaba ABRIENDO y CERRANDO el
+    // panel hasta 90 s, pero cada vuelta paga clic + animación + aserciones — en el CI del A1
+    // (PR #154) ese churn ayudó a comerse el presupuesto del test (timeout de 180 s alcanzado
+    // pasos después). Ahora la espera se ancla al ESTADO: se sondea la ruta por API con la
+    // cookie de la sesión (patrón de `ruta-critica-motor.spec`) — cada intento cuesta
+    // milisegundos y termina EN CUANTO el consumidor acaba — y el panel se abre UNA sola vez,
+    // ya con la ruta lista, para verificar la UI.
+    const idOrden = await idOrdenPorFolio(page.request, folioOrden, codigoModelo);
+    await expect
+      .poll(
+        async () => {
+          const respuesta = await page.request.get(
+            `/api/ruta-critica/ordenes/${String(idOrden)}/ruta`,
+          );
+          if (!respuesta.ok()) {
+            return `http-${String(respuesta.status())}`;
+          }
+          const ruta = (await respuesta.json()) as {
+            estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta';
+            procesos: unknown[];
+          };
+          // Lo mismo que exigía el panel: que la ruta exista Y liste procesos.
+          return ruta.estadoRecalculo !== 'sin-ruta' && ruta.procesos.length > 0
+            ? 'con-procesos'
+            : ruta.estadoRecalculo;
+        },
+        { timeout: 90_000, intervals: [1_000] },
+      )
+      .toBe('con-procesos');
+
+    await panelCentro.getByTestId('mosaico-rc').click();
+    await expect(
+      page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
+    ).toBeVisible();
+    await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible();
+    // Cierra el panel (modal) para que el siguiente paso pueda interactuar con la página.
+    await page.keyboard.press('Escape');
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');
@@ -181,6 +202,31 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     ).toBeVisible();
   });
 });
+
+/**
+ * Resuelve el id interno de una orden por su folio vía el buscador global (`GET
+ * /api/ordenes/buscar`), reusando la cookie de sesión del admin. El folio se repite entre
+ * empresas y `q` busca por substring, así que el hit se acota al folio EXACTO y al modelo
+ * único de la corrida.
+ */
+async function idOrdenPorFolio(
+  request: APIRequestContext,
+  folio: string,
+  codigoModelo: string,
+): Promise<number> {
+  const respuesta = await request.get(`/api/ordenes/buscar?q=${folio}`);
+  if (!respuesta.ok()) {
+    throw new Error(`El buscador de órdenes respondió ${String(respuesta.status())}.`);
+  }
+  const { datos } = (await respuesta.json()) as {
+    datos: { id: number; folio: number; codigoModelo: string }[];
+  };
+  const hit = datos.find((d) => d.folio === Number(folio) && d.codigoModelo === codigoModelo);
+  if (hit === undefined) {
+    throw new Error(`El buscador no encontró la OP ${folio} del modelo ${codigoModelo}.`);
+  }
+  return hit.id;
+}
 
 /** Fecha date-only `YYYY-MM-DD` a `dias` de HOY (hora local), para la fecha de entrega. */
 function fechaRelativa(dias: number): string {

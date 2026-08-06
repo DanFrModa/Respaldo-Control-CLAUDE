@@ -6,7 +6,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { resolverPrecioAvio, resolverPrecioTela } from './resolucion-precios.js';
+import {
+  resolverPrecioAvio,
+  resolverPrecioColorReferencia,
+  resolverPrecioTela,
+} from './resolucion-precios.js';
 
 describe('resolverPrecioTela (cascada de 4 pasos, R17)', () => {
   it('1) amarre CON color: usa TelaProveedorColor cuando el proveedor amarrado maneja color', () => {
@@ -143,5 +147,50 @@ describe('resolverPrecioAvio (cascada de 3 pasos + normalización por factor, R1
     });
     expect(r.precio).toBeCloseTo(7.5, 6);
     expect(r.origen).toBe('mas-barato');
+  });
+});
+
+describe('resolverPrecioColorReferencia (colores HIJOS de la tela, §Post-F9.11)', () => {
+  const colores = [
+    { nombre: 'Negro', precio: 90, idColor: 7 }, // migrada: liga legacy al color de prenda 7
+    { nombre: 'Blanco', precio: 80, idColor: null }, // nueva: sin liga, pega por nombre
+    { nombre: 'Rojo', precio: null, idColor: 9 }, // ligada pero sin precio
+  ];
+
+  it('1) resuelve PRIMERO por la liga legacy idColor (lo migrado sigue igual)', () => {
+    // El nombre del contexto NI coincide ("NEGRO AZABACHE"): la liga manda.
+    expect(resolverPrecioColorReferencia(colores, { idColor: 7, nombre: 'NEGRO AZABACHE' })).toBe(
+      90,
+    );
+  });
+
+  it('2) sin liga que pegue, resuelve por NOMBRE insensible a mayúsculas', () => {
+    expect(resolverPrecioColorReferencia(colores, { idColor: 999, nombre: ' BLANCO ' })).toBe(80);
+  });
+
+  // Caso DISCRIMINANTE del orden (R2-4): la liga Y el nombre pegan a la vez pero en filas
+  // DISTINTAS con precios distintos — la LIGA legacy (90) manda sobre el nombre (80). Si
+  // alguien invirtiera los bloques, esta prueba daría 80 y moriría.
+  it('cuando liga y nombre pegan en filas distintas, GANA la liga legacy', () => {
+    expect(resolverPrecioColorReferencia(colores, { idColor: 7, nombre: 'Blanco' })).toBe(90);
+  });
+
+  it('liga que pega pero SIN precio usable cae al pegue por nombre (y luego a null)', () => {
+    // idColor 9 pega (Rojo) pero su precio es null → por nombre también es Rojo → null.
+    expect(resolverPrecioColorReferencia(colores, { idColor: 9, nombre: 'Rojo' })).toBeNull();
+  });
+
+  it('3) sin liga NI nombre que peguen devuelve null (la cascada cae al sugerido)', () => {
+    expect(resolverPrecioColorReferencia(colores, { idColor: 999, nombre: 'Verde' })).toBeNull();
+    // Y enchufado a la cascada completa: cae al precioSugerido.
+    expect(
+      resolverPrecioTela({
+        precioSugerido: 42,
+        precioColorReferencia: resolverPrecioColorReferencia(colores, {
+          idColor: 999,
+          nombre: 'Verde',
+        }),
+      }),
+    ).toEqual({ precio: 42, origen: 'sugerido' });
   });
 });

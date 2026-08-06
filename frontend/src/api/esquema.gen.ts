@@ -8836,6 +8836,565 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/composiciones-tela': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar composiciones de tela */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
+          busqueda?: string;
+          /** @description Incluye las desactivadas ("true"/"false"). */
+          incluirInactivos?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'nombre' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de composiciones de tela. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Composiciones de la página. */
+              datos: {
+                /** @description Id de la composición. */
+                id: number;
+                /** @description Nombre de la composición (único global). */
+                nombre: string;
+                /** @description Falso si está desactivada (borrado suave). */
+                activo: boolean;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que la creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que la modificó. */
+                modificadoPorId: string | null;
+              }[];
+              /** @description Total de composiciones que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear una composición de tela */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Composición de tela del catálogo (global). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la composición. */
+              id: number;
+              /** @description Nombre de la composición (único global). */
+              nombre: string;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/composiciones-tela/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Desactivar una composición de tela (borrado suave) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la composición de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Composición de tela del catálogo (global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la composición. */
+              id: number;
+              /** @description Nombre de la composición (único global). */
+              nombre: string;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Actualizar una composición de tela */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la composición de tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre?: string;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Composición de tela del catálogo (global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la composición. */
+              id: number;
+              /** @description Nombre de la composición (único global). */
+              nombre: string;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/telas': {
     parameters: {
       query?: never;
@@ -8851,9 +9410,9 @@ export interface paths {
           pagina?: number;
           /** @description Renglones por página (máx 500). */
           porPagina?: number;
-          /** @description Texto a buscar en el nombre de la tela O en el de sus colores (insensible a mayúsculas). */
+          /** @description Texto a buscar en el nombre de la tela, el nombre que le da su proveedor, el nombre del PROVEEDOR dueño, el nombre de sus colores o su PANTONE (insensible a mayúsculas). */
           busqueda?: string;
-          /** @description Solo telas que tengan ESE color en su grid. */
+          /** @description LEGACY (§Post-F9.11): solo telas con un color MIGRADO ligado a ese color de PRENDA. Los colores de tela nuevos no cuelgan del catálogo de prenda y no participan. */
           idColor?: number;
           /** @description Filtra por id de categoría. */
           idCategoria?: number;
@@ -8885,10 +9444,24 @@ export interface paths {
                 nombre: string;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
-                /** @description Id de la categoría, o null. */
+                /** @description Id de la categoría ("Tipo de tela"), o null. */
                 idCategoria: number | null;
-                /** @description Nombre de la categoría, o null. */
+                /** @description Nombre de la categoría ("Tipo de tela"), o null. */
                 categoria: string | null;
+                /** @description Id de la composición, o null. */
+                idComposicion: number | null;
+                /** @description Nombre de la composición ("50% Algodón, 50% Poliéster"), o null. */
+                composicion: string | null;
+                /** @description Id del proveedor DUEÑO del artículo (null solo en telas migradas). */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor dueño, o null. */
+                proveedor: string | null;
+                /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
+                nombreProveedor: string | null;
+                /** @description Nombre del componente CUERPO, o null. */
+                nombreCuerpo: string | null;
+                /** @description Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento. */
+                nombreComplemento: string | null;
                 /**
                  * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
                  * @enum {string}
@@ -8905,14 +9478,20 @@ export interface paths {
                 precioSugerido: number | null;
                 /** @description ¿Es tela de producción (vs. muestra/insumo)? */
                 paraProduccion: boolean;
-                /** @description Colores de la tela con su precio (N:N). */
+                /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
                 colores: {
-                  /** @description Id del color. */
-                  idColor: number;
-                  /** @description Nombre del color. */
+                  /** @description Id del color de tela (hijo de la tela). */
+                  id: number;
+                  /** @description Nombre libre del color de esta tela (único por tela). */
                   nombre: string;
-                  /** @description Precio de la tela en este color, o null. */
+                  /** @description Precio del CUERPO en este color, o null. */
                   precio: number | null;
+                  /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                  precioComplemento: number | null;
+                  /** @description Código PANTONE del color de esta tela, o null. */
+                  pantone: string | null;
+                  /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                  idColor: number | null;
                 }[];
                 /** @description Falso si está desactivada (borrado suave). */
                 activo: boolean;
@@ -9038,6 +9617,8 @@ export interface paths {
           'application/json': {
             nombre: string;
             idCategoria?: number;
+            idComposicion?: number;
+            idProveedor: number;
             /**
              * @default OTRO
              * @enum {string}
@@ -9052,10 +9633,17 @@ export interface paths {
             precioSugerido?: number;
             /** @default [] */
             colores?: {
-              idColor: number;
+              /** @description Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas. */
+              id?: number;
+              nombre: string;
               precio?: number;
+              precioComplemento?: number;
+              pantone?: string;
             }[];
             descripcion?: string;
+            nombreProveedor?: string;
+            nombreCuerpo?: string;
+            nombreComplemento?: string;
           };
         };
       };
@@ -9073,10 +9661,24 @@ export interface paths {
               nombre: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
-              /** @description Id de la categoría, o null. */
+              /** @description Id de la categoría ("Tipo de tela"), o null. */
               idCategoria: number | null;
-              /** @description Nombre de la categoría, o null. */
+              /** @description Nombre de la categoría ("Tipo de tela"), o null. */
               categoria: string | null;
+              /** @description Id de la composición, o null. */
+              idComposicion: number | null;
+              /** @description Nombre de la composición ("50% Algodón, 50% Poliéster"), o null. */
+              composicion: string | null;
+              /** @description Id del proveedor DUEÑO del artículo (null solo en telas migradas). */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor dueño, o null. */
+              proveedor: string | null;
+              /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
+              nombreProveedor: string | null;
+              /** @description Nombre del componente CUERPO, o null. */
+              nombreCuerpo: string | null;
+              /** @description Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento. */
+              nombreComplemento: string | null;
               /**
                * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
                * @enum {string}
@@ -9093,14 +9695,20 @@ export interface paths {
               precioSugerido: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
-              /** @description Colores de la tela con su precio (N:N). */
+              /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
               colores: {
-                /** @description Id del color. */
-                idColor: number;
-                /** @description Nombre del color. */
+                /** @description Id del color de tela (hijo de la tela). */
+                id: number;
+                /** @description Nombre libre del color de esta tela (único por tela). */
                 nombre: string;
-                /** @description Precio de la tela en este color, o null. */
+                /** @description Precio del CUERPO en este color, o null. */
                 precio: number | null;
+                /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                precioComplemento: number | null;
+                /** @description Código PANTONE del color de esta tela, o null. */
+                pantone: string | null;
+                /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                idColor: number | null;
               }[];
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
@@ -9242,10 +9850,24 @@ export interface paths {
               nombre: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
-              /** @description Id de la categoría, o null. */
+              /** @description Id de la categoría ("Tipo de tela"), o null. */
               idCategoria: number | null;
-              /** @description Nombre de la categoría, o null. */
+              /** @description Nombre de la categoría ("Tipo de tela"), o null. */
               categoria: string | null;
+              /** @description Id de la composición, o null. */
+              idComposicion: number | null;
+              /** @description Nombre de la composición ("50% Algodón, 50% Poliéster"), o null. */
+              composicion: string | null;
+              /** @description Id del proveedor DUEÑO del artículo (null solo en telas migradas). */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor dueño, o null. */
+              proveedor: string | null;
+              /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
+              nombreProveedor: string | null;
+              /** @description Nombre del componente CUERPO, o null. */
+              nombreCuerpo: string | null;
+              /** @description Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento. */
+              nombreComplemento: string | null;
               /**
                * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
                * @enum {string}
@@ -9262,14 +9884,20 @@ export interface paths {
               precioSugerido: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
-              /** @description Colores de la tela con su precio (N:N). */
+              /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
               colores: {
-                /** @description Id del color. */
-                idColor: number;
-                /** @description Nombre del color. */
+                /** @description Id del color de tela (hijo de la tela). */
+                id: number;
+                /** @description Nombre libre del color de esta tela (único por tela). */
                 nombre: string;
-                /** @description Precio de la tela en este color, o null. */
+                /** @description Precio del CUERPO en este color, o null. */
                 precio: number | null;
+                /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                precioComplemento: number | null;
+                /** @description Código PANTONE del color de esta tela, o null. */
+                pantone: string | null;
+                /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                idColor: number | null;
               }[];
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
@@ -9400,10 +10028,24 @@ export interface paths {
               nombre: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
-              /** @description Id de la categoría, o null. */
+              /** @description Id de la categoría ("Tipo de tela"), o null. */
               idCategoria: number | null;
-              /** @description Nombre de la categoría, o null. */
+              /** @description Nombre de la categoría ("Tipo de tela"), o null. */
               categoria: string | null;
+              /** @description Id de la composición, o null. */
+              idComposicion: number | null;
+              /** @description Nombre de la composición ("50% Algodón, 50% Poliéster"), o null. */
+              composicion: string | null;
+              /** @description Id del proveedor DUEÑO del artículo (null solo en telas migradas). */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor dueño, o null. */
+              proveedor: string | null;
+              /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
+              nombreProveedor: string | null;
+              /** @description Nombre del componente CUERPO, o null. */
+              nombreCuerpo: string | null;
+              /** @description Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento. */
+              nombreComplemento: string | null;
               /**
                * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
                * @enum {string}
@@ -9420,14 +10062,20 @@ export interface paths {
               precioSugerido: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
-              /** @description Colores de la tela con su precio (N:N). */
+              /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
               colores: {
-                /** @description Id del color. */
-                idColor: number;
-                /** @description Nombre del color. */
+                /** @description Id del color de tela (hijo de la tela). */
+                id: number;
+                /** @description Nombre libre del color de esta tela (único por tela). */
                 nombre: string;
-                /** @description Precio de la tela en este color, o null. */
+                /** @description Precio del CUERPO en este color, o null. */
                 precio: number | null;
+                /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                precioComplemento: number | null;
+                /** @description Código PANTONE del color de esta tela, o null. */
+                pantone: string | null;
+                /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                idColor: number | null;
               }[];
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
@@ -9548,6 +10196,8 @@ export interface paths {
           'application/json': {
             nombre?: string;
             idCategoria?: number | null;
+            idComposicion?: number | null;
+            idProveedor?: number;
             /** @enum {string} */
             tipoComponente?: 'CUERPO' | 'CARDIGAN' | 'OTRO';
             /** @enum {string} */
@@ -9556,11 +10206,18 @@ export interface paths {
             paraProduccion?: boolean;
             precioSugerido?: number | null;
             colores?: {
-              idColor: number;
+              /** @description Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas. */
+              id?: number;
+              nombre: string;
               precio?: number;
+              precioComplemento?: number;
+              pantone?: string;
             }[];
             activo?: boolean;
             descripcion?: string | null;
+            nombreProveedor?: string | null;
+            nombreCuerpo?: string | null;
+            nombreComplemento?: string | null;
           };
         };
       };
@@ -9578,10 +10235,24 @@ export interface paths {
               nombre: string;
               /** @description Descripción, o null. */
               descripcion: string | null;
-              /** @description Id de la categoría, o null. */
+              /** @description Id de la categoría ("Tipo de tela"), o null. */
               idCategoria: number | null;
-              /** @description Nombre de la categoría, o null. */
+              /** @description Nombre de la categoría ("Tipo de tela"), o null. */
               categoria: string | null;
+              /** @description Id de la composición, o null. */
+              idComposicion: number | null;
+              /** @description Nombre de la composición ("50% Algodón, 50% Poliéster"), o null. */
+              composicion: string | null;
+              /** @description Id del proveedor DUEÑO del artículo (null solo en telas migradas). */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor dueño, o null. */
+              proveedor: string | null;
+              /** @description Cómo le llama el proveedor a esta tela ("Felpa Suiza"), o null. */
+              nombreProveedor: string | null;
+              /** @description Nombre del componente CUERPO, o null. */
+              nombreCuerpo: string | null;
+              /** @description Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento. */
+              nombreComplemento: string | null;
               /**
                * @description Unidad en que se compra y se consume: KG (kilos) o M (metros).
                * @enum {string}
@@ -9598,14 +10269,20 @@ export interface paths {
               precioSugerido: number | null;
               /** @description ¿Es tela de producción (vs. muestra/insumo)? */
               paraProduccion: boolean;
-              /** @description Colores de la tela con su precio (N:N). */
+              /** @description Colores HIJOS de la tela (nombre libre + pantone + precios). */
               colores: {
-                /** @description Id del color. */
-                idColor: number;
-                /** @description Nombre del color. */
+                /** @description Id del color de tela (hijo de la tela). */
+                id: number;
+                /** @description Nombre libre del color de esta tela (único por tela). */
                 nombre: string;
-                /** @description Precio de la tela en este color, o null. */
+                /** @description Precio del CUERPO en este color, o null. */
                 precio: number | null;
+                /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                precioComplemento: number | null;
+                /** @description Código PANTONE del color de esta tela, o null. */
+                pantone: string | null;
+                /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                idColor: number | null;
               }[];
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
@@ -9730,7 +10407,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Colores de una tela (N:N a Color). */
+        /** @description Colores de una tela (hijos de la tela, §Post-F9.11). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -9739,12 +10416,18 @@ export interface paths {
             'application/json': {
               /** @description Colores de la tela con su precio. */
               datos: {
-                /** @description Id del color. */
-                idColor: number;
-                /** @description Nombre del color. */
+                /** @description Id del color de tela (hijo de la tela). */
+                id: number;
+                /** @description Nombre libre del color de esta tela (único por tela). */
                 nombre: string;
-                /** @description Precio de la tela en este color, o null. */
+                /** @description Precio del CUERPO en este color, o null. */
                 precio: number | null;
+                /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+                precioComplemento: number | null;
+                /** @description Código PANTONE del color de esta tela, o null. */
+                pantone: string | null;
+                /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+                idColor: number | null;
               }[];
             };
           };

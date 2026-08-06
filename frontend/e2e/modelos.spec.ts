@@ -15,13 +15,32 @@ import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
  * ruta `/modelos` en App.tsx; de lo contrario estas pruebas se omiten en CI hasta el cierre.
  */
 
+/**
+ * Crea un PROVEEDOR por la UI (el seed no siembra ninguno): el alta de tela ahora exige el
+ * proveedor DUEÑO del artículo (§Post-F9.11). Calca los pasos de `proveedores.spec.ts`.
+ */
+async function crearProveedor(page: Page, nombre: string): Promise<void> {
+  await page.goto('/catalogos/proveedores');
+  await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
+  await page.getByTestId('nuevo-proveedor').click();
+  const dialogo = page.getByRole('dialog');
+  await dialogo.getByLabel('Nombre').fill(nombre);
+  await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+  await page.getByTestId('guardar-proveedor').click();
+  await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
+}
+
 /** Crea un componente simple desde su catálogo (tela/avío/bordado) y vuelve a Inicio. */
-async function crearTela(page: Page, nombre: string): Promise<void> {
+async function crearTela(page: Page, nombre: string, proveedor: string): Promise<void> {
   await page.goto('/catalogos/telas');
   await expect(page.getByRole('heading', { name: 'Telas' })).toBeVisible();
   await page.getByTestId('nuevo-tela').click();
   const dialogo = page.getByRole('dialog');
-  await dialogo.getByLabel('Nombre').fill(nombre);
+  // El label "Nombre" ya no es único en el diálogo de tela (§Post-F9.11): por id.
+  await dialogo.locator('#tela-nombre').fill(nombre);
+  // El proveedor dueño es obligatorio en el alta (§Post-F9.11).
+  await page.getByTestId('tela-proveedor-busqueda').fill(proveedor);
+  await page.getByTestId('tela-proveedor-opcion').filter({ hasText: proveedor }).first().click();
   // La unidad es obligatoria y arranca sin elegir (30-jul-2026).
   await dialogo.getByTestId('tela-unidad').selectOption('KG');
   await page.getByTestId('guardar-tela').click();
@@ -62,11 +81,13 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     const tela = `Tela Mod ${sufijo}`;
     const avio = `BTN-${sufijo}`;
     const bordado = `Bordado Mod ${sufijo}`;
+    const proveedor = `Prov Mod ${sufijo}`;
 
     await entrarComoAdmin(page);
 
     // ── Componentes del BOM (catálogos existentes) ──────────────────────────────
-    await crearTela(page, tela);
+    await crearProveedor(page, proveedor);
+    await crearTela(page, tela, proveedor);
     await crearAvio(page, avio);
     await crearBordado(page, bordado);
 

@@ -530,12 +530,23 @@ function DialogoProveedorTela({
                 </Field>
               </div>
 
+              {/* R2-2 (§Post-F9.11): el precio POR COLOR de R17 cuelga del catálogo de color
+                  de PRENDA vía la liga LEGACY de los colores migrados. Las telas NUEVAS no
+                  tienen colores ligados → el modo por-color NO aplica y la UI lo dice tal
+                  cual (checkbox deshabilitado), en vez de ofrecer un grid vacío que miente.
+                  DEUDA: con el proveedor dueño, R17 va camino a simplificarse/retirarse —
+                  registrada en HOJA-DE-RUTA §4 (decisión del lead, ronda 2 opción b). */}
               <Field orientation="horizontal">
                 <input
                   id="tp-por-color"
                   type="checkbox"
                   className="size-4 rounded border-input accent-primary"
-                  disabled={guardando}
+                  disabled={guardando || colores.length === 0}
+                  title={
+                    colores.length === 0
+                      ? 'El precio por color solo aplica a telas migradas del sistema viejo.'
+                      : undefined
+                  }
                   checked={manejaPrecioPorColor}
                   onChange={(e) => setManejaPrecioPorColor(e.target.checked)}
                   data-testid="maneja-precio-por-color"
@@ -544,6 +555,15 @@ function DialogoProveedorTela({
                   ¿El precio cambia por color?
                 </FieldLabel>
               </Field>
+              {colores.length === 0 ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="aviso-por-color-solo-migradas"
+                >
+                  El precio por color solo aplica a telas migradas del sistema viejo. En telas
+                  nuevas, usa el precio base del proveedor.
+                </p>
+              ) : null}
 
               {/* Grid color × precio (solo si maneja precio por color). */}
               {manejaPrecioPorColor ? (
@@ -552,8 +572,8 @@ function DialogoProveedorTela({
                     className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground"
                     data-testid="grid-color-sin-colores"
                   >
-                    La tela no tiene colores. Captura sus colores primero para fijar precio por
-                    color.
+                    Esta tela no tiene colores ligados al catálogo de prenda: el precio por color no
+                    aplica aquí.
                   </p>
                 ) : (
                   <ul className="space-y-2" data-testid="grid-precio-por-color">

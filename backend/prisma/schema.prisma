@@ -663,6 +663,9 @@ model Proveedor {
   /// Movimientos de cuenta corriente (CxP/EsMa) de este proveedor (F9-E1). Restrict.
   movimientosTerceros     MovimientoTercero[]
 
+  /// Telas de las que este proveedor es el DUEÑO del artículo (§Post-F9.11). Restrict.
+  telasComoDueno Tela[] @relation("TelaProveedorDueno")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -813,7 +816,8 @@ model Color {
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
-  /// Telas que tienen este color con su precio (F1-E3, N:N vía `TelaColor`).
+  /// LEGACY §Post-F9.11: colores de tela MIGRADOS que conservan su liga a este color de prenda
+  /// (`TelaColor.idColor` nullable). Los colores de tela nuevos ya NO cuelgan de aquí.
   telas                  TelaColor[]
   /// Renglones de matriz de órdenes en este color (F2-E2, Restrict).
   ordenLineas            OrdenLinea[]
@@ -1187,9 +1191,29 @@ enum TipoBordado {
   @@map("tipo_bordado")
 }
 
-/// Categoría de tela (catálogo global, F1-E3). Equivale a `TelasCategorias` del viejo
-/// (doc 04-Inventarios §B.2): agrupa las telas (Felpa, Jersey, Rib…). Sin permiso
-/// propio: se gobierna con `telas.administrar` (ADR-0009). Borrado suave + auditoría A7.
+/// Composición de una tela ("50% Algodón, 50% Poliéster") como CATÁLOGO, no texto libre
+/// (Daniel, 6-ago-2026 §Post-F9.11: *"de un catálogo de composiciones para mantener misma
+/// congruencia"*). Única global (ADR-0007); borrado suave (una composición en uso no se borra).
+model ComposicionTela {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  /// Telas con esta composición. Restrict: en uso no se borra físico.
+  telas Tela[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("composiciones_tela")
+}
+
+/// Categoría de tela (catálogo global, F1-E3; en la UI se lee "Tipo de tela", §Post-F9.11).
+/// Equivale a `TelasCategorias` del viejo (doc 04-Inventarios §B.2): agrupa las telas (Felpa,
+/// Jersey, Rib…). Sin permiso propio: se gobierna con `telas.administrar` (ADR-0009). Borrado
+/// suave + auditoría A7.
 model TelaCategoria {
   id     Int     @id @default(autoincrement())
   /// Nombre de la categoría. Único global (ADR-0007).
@@ -1226,6 +1250,33 @@ model Tela {
   /// consumo y el costo por prenda signifiquen algo. Era texto libre y venía NULL en todas las
   /// telas — se cerró a enum el 30-jul-2026 (ver {@link UnidadTela}).
   unidadMedida   UnidadTela         @default(KG) @map("unidad_medida")
+
+  // ── Identidad en 4 datos (Daniel, 6-ago-2026 §Post-F9.11): tipo (= la categoría de arriba) ·
+  // composición · proveedor dueño · nombre del proveedor. Se lee "Felpa · Alsatex · Felpa Suiza". ──
+
+  /// Composición ("50% Algodón, 50% Poliéster"), del catálogo. Opcional en las 877 migradas
+  /// (el viejo no la traía); la UI la pide en telas nuevas. Restrict.
+  idComposicion Int?             @map("id_composicion")
+  composicion   ComposicionTela? @relation(fields: [idComposicion], references: [id], onDelete: Restrict)
+  /// Proveedor DUEÑO del artículo: la felpa de Alsatex y la de otro proveedor son telas DISTINTAS
+  /// (no son el mismo rollo y no se revuelven en inventario). OBLIGATORIO en telas nuevas (lo exige
+  /// el contrato, no la base): en las migradas viene NULL porque el viejo lo embebía en el nombre
+  /// ("FelpaAlsa") y se va llenando al depurar. Restrict.
+  idProveedor Int?       @map("id_proveedor")
+  proveedor   Proveedor? @relation("TelaProveedorDueno", fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Cómo le llama el proveedor a esta tela ("Felpa Suiza"). Buscable.
+  nombreProveedor String? @map("nombre_proveedor")
+
+  // ── El COMPLEMENTO es PARTE de la misma tela (Daniel: *"es como parte de la misma tela para el
+  // manejo de todo… mismo color, mismo pantone"*). Una tela = cuerpo + complemento OPCIONAL, nunca
+  // más de uno; entradas y salidas van SIEMPRE juntas (un renglón, dos cantidades — el viejo ya lo
+  // hacía: ExTela1/ExTela2). Comprar solo complemento = entrada con el cuerpo en 0. ──
+
+  /// Nombre del componente CUERPO ("Felpa", "Terry"; viejo: `Texto1`). Null = sin nombre especial.
+  nombreCuerpo String? @map("nombre_cuerpo")
+  /// Nombre del COMPLEMENTO ("Cardigan"; viejo: `Texto2`). NULL = esta tela NO lleva complemento —
+  /// esa es la bandera: se define desde el alta, como pidió Daniel.
+  nombreComplemento String? @map("nombre_complemento")
   /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
   tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
   /// Tela de uso frecuente (preselección en la UI de captura).
@@ -1276,21 +1327,40 @@ model Tela {
 ///  • Restrict hacia `Color`: un color usado por alguna tela no se borra físico (se
 ///    desactiva con `activo`, con mensaje claro), para no dejar el par colgando.
 /// Auditoría COMPLETA: `precio` es editable (A7).
+/// COLOR DE TELA — HIJO de la tela, NO catálogo global (Daniel, 6-ago-2026 §Post-F9.11 punto 3:
+/// nombre LIBRE + pantone + dos precios; *"para no fragmentar, el campo sugiere los colores que
+/// ESA tela ya tiene"*). El catálogo global `Color` es SOLO el color de la PRENDA (matriz de la
+/// OP / WIP) y NO se toca: dar de alta "Marino Alsa 3040" en una tela NO debe meterlo al
+/// catálogo de prenda. Unicidad del nombre POR TELA (el dominio la valida insensible a
+/// mayúsculas; el unique exacto respalda la carrera, mismo patrón que `Color.nombre`).
 model TelaColor {
-  idTela  Int      @map("id_tela")
-  idColor Int      @map("id_color")
-  /// Precio del metro/kg de esta tela en este color (informativo; el costo real va por lote).
-  precio  Decimal? @db.Decimal(12, 2)
+  id     Int @id @default(autoincrement())
+  idTela Int @map("id_tela")
+  /// Nombre LIBRE del color de ESTA tela ("Marino Alsa 3040"). Único por tela.
+  nombre String
+  /// Pantone del color de ESTA tela (Daniel: va ligado al color de cada tela; dos partidas pueden
+  /// traer tonos distintos del MISMO pantone). Opcional y buscable.
+  pantone String?
+  /// Precio del metro/kg del CUERPO en este color (informativo; el costo real va por lote).
+  precio Decimal? @db.Decimal(12, 2)
+  /// Precio del COMPLEMENTO en este color (Daniel: *"el cardigan es otro precio que la tela"*).
+  /// Solo tiene sentido si la tela lleva complemento; el dominio lo rechaza si no.
+  precioComplemento Decimal? @map("precio_complemento") @db.Decimal(12, 2)
+  /// LEGACY (solo filas migradas de F1-E6): liga al catálogo global de color de PRENDA que el
+  /// N:N viejo usaba. Se conserva para que el MRP/precosto sigan resolviendo precio por esa liga
+  /// en lo migrado y para la fusión de colores duplicados. Las filas NUEVAS nacen con NULL: el
+  /// color de tela ya NO cuelga del catálogo de prenda (§Post-F9.11).
+  idColor Int?   @map("id_color")
+  color   Color? @relation(fields: [idColor], references: [id], onDelete: Restrict)
 
-  tela  Tela  @relation(fields: [idTela], references: [id], onDelete: Cascade)
-  color Color @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  tela Tela @relation(fields: [idTela], references: [id], onDelete: Cascade)
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@id([idTela, idColor])
+  @@unique([idTela, nombre])
   @@index([idColor])
   @@map("telas_colores")
 }

@@ -82,14 +82,18 @@ async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: stri
   await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
   // La búsqueda del centro filtra en SERVIDOR con debounce: si se clickea al instante, la lista
   // aún trae TODAS las órdenes y `hasText: folio` (substring de un número corto) caza una celda de
-  // OTRA fila (cantidades/fechas) — el run cazó "OP 5" por "OP 4". Se acota la fila al MODELO de la
-  // corrida (texto único) y al folio EXACTO de su celda (no substring), así no importa si el filtro
-  // del servidor ya aplicó.
+  // OTRA fila (cantidades/fechas) — el run cazó "OP 5" por "OP 4". Y el texto EXACTO tampoco basta:
+  // cualquier celda cuyo texto completo sea el folio también matchea — en el CI del A1 (PR #154)
+  // el folio era "5" y la fila de la OTRA OP del mismo modelo (la de 5 pzas) matcheó por su celda
+  // de cantidad. Se ancla al MODELO de la corrida (texto único) y a la CELDA DEL FOLIO
+  // (`centro-folio`), que no puede confundirse con cantidades ni fechas.
   await page.getByTestId('centro-busqueda').fill(folio);
   const fila = page
     .getByTestId('centro-fila')
     .filter({ hasText: codigoModelo })
-    .filter({ has: page.getByText(folio, { exact: true }) });
+    .filter({
+      has: page.getByTestId('centro-folio').filter({ hasText: new RegExp(`^${folio}$`) }),
+    });
   await fila.first().click();
   // El panel persistente (escritorio) hospeda los mosaicos; se espera a que cargue la orden.
   const panel = page.getByTestId('centro-panel');
@@ -198,6 +202,13 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await dialogoCopiar.getByTestId('copiar-matriz-opcion').first().click();
     await page.getByTestId('confirmar-copiar-matriz').click();
     await expect(page.getByText('Matriz copiada.')).toBeVisible();
+    // El copiado invalida el detalle de la orden: cuando el refetch llega, las secciones se
+    // RE-INICIALIZAN con lo del servidor (PanelMatriz/PanelReferencias) y PISAN lo capturado
+    // después de este punto. Antes de teclear la referencia se espera a que el refetch YA esté
+    // aplicado (la matriz enseña la cantidad copiada); si no, el reset borra lo tecleado, la
+    // sección deja de estar "sucia" y `guardar-orden` queda deshabilitado para siempre (race
+    // real del CI del A1, PR #154: 278 reintentos de click sobre el botón deshabilitado).
+    await expect(matriz.getByTestId('matriz-orden-celda').first()).toHaveValue('25');
 
     // ── Referencia D7 (misma vía: el botón único del pie) ───────────────────────
     const campoRef = detalle.getByLabel(campoReferencia);

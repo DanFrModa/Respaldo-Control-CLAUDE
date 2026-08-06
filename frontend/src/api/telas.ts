@@ -49,6 +49,19 @@ export type TelaEditar =
 /** Un renglon del grid de colores en el cuerpo de crear/editar (idColor + precio?). */
 export type TelaColorEntrada = NonNullable<TelaCrear['colores']>[number];
 
+/** Pagina de composiciones de tela (`GET /api/composiciones-tela`, §Post-F9.11). */
+export type ComposicionesTelaPagina =
+  paths['/api/composiciones-tela']['get']['responses']['200']['content']['application/json'];
+/** Una composicion de tela ("50% Algodon, 50% Poliester") tal como la devuelve el API. */
+export type ComposicionTela = ComposicionesTelaPagina['datos'][number];
+/** Parametros de consulta del listado de composiciones de tela (querystring). */
+export type ComposicionesTelaQuery = NonNullable<
+  paths['/api/composiciones-tela']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de composicion de tela (`POST /api/composiciones-tela`). */
+export type ComposicionTelaCrear =
+  paths['/api/composiciones-tela']['post']['requestBody']['content']['application/json'];
+
 /** Pagina de categorias de tela (`GET /api/telas-categorias`). */
 export type TelasCategoriasPagina =
   paths['/api/telas-categorias']['get']['responses']['200']['content']['application/json'];
@@ -231,5 +244,64 @@ export function useCrearTelaCategoria(): UseMutationResult<
   return useMutation({
     mutationFn: crearCategoria,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_TELAS_CATEGORIAS }),
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+//  Composiciones de tela (§Post-F9.11; selector + alta rapida, bajo telas.*)
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** Clave raiz de la cache de composiciones de tela. */
+export const CLAVE_COMPOSICIONES_TELA = ['composiciones-tela'] as const;
+
+/** Clave de cache de una pagina concreta del listado de composiciones. */
+function claveListaComposiciones(query: ComposicionesTelaQuery): readonly unknown[] {
+  return [...CLAVE_COMPOSICIONES_TELA, 'lista', query];
+}
+
+/** Pide una pagina del listado de composiciones de tela. */
+async function listarComposiciones(
+  query: ComposicionesTelaQuery,
+): Promise<ComposicionesTelaPagina> {
+  const { data, error } = await api.GET('/api/composiciones-tela', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Crea una composicion de tela (`POST /api/composiciones-tela`). */
+async function crearComposicion(cuerpo: ComposicionTelaCrear): Promise<ComposicionTela> {
+  const { data, error } = await api.POST('/api/composiciones-tela', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lista las composiciones de tela (paginadas). Por defecto la primera pagina de activas,
+ * que alimenta el selector del formulario de tela (mismo trato que las categorias).
+ */
+export function useComposicionesTela(
+  query: ComposicionesTelaQuery = {},
+): UseQueryResult<ComposicionesTelaPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveListaComposiciones(query),
+    queryFn: () => listarComposiciones(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Crea una composicion de tela e invalida su lista. */
+export function useCrearComposicionTela(): UseMutationResult<
+  ComposicionTela,
+  ErrorDeApi,
+  ComposicionTelaCrear
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: crearComposicion,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_COMPOSICIONES_TELA }),
   });
 }

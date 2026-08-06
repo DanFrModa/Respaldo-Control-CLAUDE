@@ -17,7 +17,8 @@
 | Bordado | `bordados`, `archivos` | `Bordados.csv` (fotos: E7) | F1-E3 |
 | Avio (habilitación) | `avios`, `avio_proveedor` | `Habilitacion.csv` | F1-E3 |
 | Color | `colores` | texto libre normalizado de `TelasColores.csv` | F1-E6 |
-| Tela | `telas`, `tela_color` | `Telas.csv`+`TelasDis.csv` (unificadas, D5) | F1-E3/E6 |
+| Tela | `telas`, `telas_colores` | `Telas.csv`+`TelasDis.csv` (unificadas, D5) | F1-E3/E6 · reestructura A1 (§Post-F9.11) |
+| ComposicionTela | `composiciones_tela` | — (catálogo NUEVO, sin ETL: se captura a mano) | Telas A1 (6-ago-2026) |
 | Talla / CurvaTalla | `tallas`, `curvas_talla` | derivadas de `Ordenes.Tallas` | F1-E2 |
 
 ## Decisiones de diseño (ver también `DECISIONES.md`)

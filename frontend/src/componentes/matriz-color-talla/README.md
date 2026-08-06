@@ -20,6 +20,8 @@ El componente es **controlado en dos ejes independientes**: el padre es dueño d
 | `onTallasChange`     | `(tallas) => void`                              | Emite el nuevo set de columnas (agregar/quitar talla).                      |
 | `soloLectura?`       | `boolean`                                       | Oculta toda edición (orden cancelada / sin permiso); la matriz sigue visible.|
 | `testid?`            | `string` (def. `"matriz"`)                      | Base de los `data-testid`.                                                   |
+| `slotAgregarColor?`  | `ReactNode`                                     | Reemplaza el `<select>` de "agregar color" (p. ej. el combobox con alta al vuelo de la OP). Los demás flujos, sin la prop, conservan el select. |
+| `onPantoneChange?`   | ver código                                      | Callback del pantone por fila (importador de OC C&A).                        |
 
 ### Comportamiento
 

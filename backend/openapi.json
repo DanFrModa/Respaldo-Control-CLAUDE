@@ -19381,6 +19381,1107 @@
         }
       }
     },
+    "/api/composiciones-tela": {
+      "get": {
+        "summary": "Listar composiciones de tela",
+        "tags": [
+          "telas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 150
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar en el nombre (insensible a mayúsculas)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye las desactivadas (\"true\"/\"false\")."
+          },
+          {
+            "schema": {
+              "default": "nombre",
+              "type": "string",
+              "enum": [
+                "nombre",
+                "creadoEn"
+              ]
+            },
+            "in": "query",
+            "name": "ordenarPor",
+            "required": false,
+            "description": "Columna de orden."
+          },
+          {
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección del orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de composiciones de tela.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la composición."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la composición (único global)."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está desactivada (borrado suave)."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha de alta (ISO 8601)."
+                          },
+                          "creadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del usuario que la creó."
+                          },
+                          "modificadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha de la última modificación (ISO 8601)."
+                          },
+                          "modificadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del último usuario que la modificó."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "activo",
+                          "creadoEn",
+                          "creadoPorId",
+                          "modificadoEn",
+                          "modificadoPorId"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Composición de tela del catálogo (global)."
+                      },
+                      "description": "Composiciones de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de composiciones que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de composiciones de tela."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear una composición de tela",
+        "tags": [
+          "telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  }
+                },
+                "required": [
+                  "nombre"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Composición de tela del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la composición."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la composición (único global)."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está desactivada (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nombre",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Composición de tela del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/composiciones-tela/{id}": {
+      "patch": {
+        "summary": "Actualizar una composición de tela",
+        "tags": [
+          "telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la composición de tela."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Composición de tela del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la composición."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la composición (único global)."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está desactivada (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nombre",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Composición de tela del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Desactivar una composición de tela (borrado suave)",
+        "tags": [
+          "telas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la composición de tela."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Composición de tela del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la composición."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la composición (único global)."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está desactivada (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nombre",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Composición de tela del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/telas": {
       "get": {
         "summary": "Listar telas",
@@ -19420,7 +20521,7 @@
             "in": "query",
             "name": "busqueda",
             "required": false,
-            "description": "Texto a buscar en el nombre de la tela O en el de sus colores (insensible a mayúsculas)."
+            "description": "Texto a buscar en el nombre de la tela, el nombre que le da su proveedor, el nombre del PROVEEDOR dueño, el nombre de sus colores o su PANTONE (insensible a mayúsculas)."
           },
           {
             "schema": {
@@ -19431,7 +20532,7 @@
             "in": "query",
             "name": "idColor",
             "required": false,
-            "description": "Solo telas que tengan ESE color en su grid."
+            "description": "LEGACY (§Post-F9.11): solo telas con un color MIGRADO ligado a ese color de PRENDA. Los colores de tela nuevos no cuelgan del catálogo de prenda y no participan."
           },
           {
             "schema": {
@@ -19532,7 +20633,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Id de la categoría, o null."
+                            "description": "Id de la categoría (\"Tipo de tela\"), o null."
                           },
                           "categoria": {
                             "anyOf": [
@@ -19543,7 +20644,88 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nombre de la categoría, o null."
+                            "description": "Nombre de la categoría (\"Tipo de tela\"), o null."
+                          },
+                          "idComposicion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la composición, o null."
+                          },
+                          "composicion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de la composición (\"50% Algodón, 50% Poliéster\"), o null."
+                          },
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del proveedor DUEÑO del artículo (null solo en telas migradas)."
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor dueño, o null."
+                          },
+                          "nombreProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo le llama el proveedor a esta tela (\"Felpa Suiza\"), o null."
+                          },
+                          "nombreCuerpo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del componente CUERPO, o null."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento."
                           },
                           "unidadMedida": {
                             "type": "string",
@@ -19586,15 +20768,15 @@
                             "items": {
                               "type": "object",
                               "properties": {
-                                "idColor": {
+                                "id": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Id del color."
+                                  "description": "Id del color de tela (hijo de la tela)."
                                 },
                                 "nombre": {
                                   "type": "string",
-                                  "description": "Nombre del color."
+                                  "description": "Nombre libre del color de esta tela (único por tela)."
                                 },
                                 "precio": {
                                   "anyOf": [
@@ -19605,18 +20787,56 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Precio de la tela en este color, o null."
+                                  "description": "Precio del CUERPO en este color, o null."
+                                },
+                                "precioComplemento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                                },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Código PANTONE del color de esta tela, o null."
+                                },
+                                "idColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                                 }
                               },
                               "required": [
-                                "idColor",
+                                "id",
                                 "nombre",
-                                "precio"
+                                "precio",
+                                "precioComplemento",
+                                "pantone",
+                                "idColor"
                               ],
                               "additionalProperties": false,
-                              "description": "Renglón de color de una tela (con su precio)."
+                              "description": "Renglón de color de una tela (con sus precios y pantone)."
                             },
-                            "description": "Colores de la tela con su precio (N:N)."
+                            "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
                           },
                           "activo": {
                             "type": "boolean",
@@ -19663,6 +20883,13 @@
                           "descripcion",
                           "idCategoria",
                           "categoria",
+                          "idComposicion",
+                          "composicion",
+                          "idProveedor",
+                          "proveedor",
+                          "nombreProveedor",
+                          "nombreCuerpo",
+                          "nombreComplemento",
                           "unidadMedida",
                           "tipoComponente",
                           "favorito",
@@ -19887,6 +21114,16 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "idComposicion": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idProveedor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "tipoComponente": {
                     "default": "OTRO",
                     "type": "string",
@@ -19922,28 +21159,55 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "idColor": {
+                        "id": {
+                          "description": "Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas.",
                           "type": "integer",
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "nombre": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
                         "precio": {
                           "type": "number",
                           "minimum": 0
+                        },
+                        "precioComplemento": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "pantone": {
+                          "type": "string",
+                          "maxLength": 50
                         }
                       },
                       "required": [
-                        "idColor"
+                        "nombre"
                       ]
                     }
                   },
                   "descripcion": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "nombreProveedor": {
+                    "type": "string",
+                    "maxLength": 150
+                  },
+                  "nombreCuerpo": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "nombreComplemento": {
+                    "type": "string",
+                    "maxLength": 100
                   }
                 },
                 "required": [
                   "nombre",
+                  "idProveedor",
                   "unidadMedida"
                 ]
               }
@@ -19995,7 +21259,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Id de la categoría, o null."
+                      "description": "Id de la categoría (\"Tipo de tela\"), o null."
                     },
                     "categoria": {
                       "anyOf": [
@@ -20006,7 +21270,88 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre de la categoría, o null."
+                      "description": "Nombre de la categoría (\"Tipo de tela\"), o null."
+                    },
+                    "idComposicion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la composición, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la composición (\"50% Algodón, 50% Poliéster\"), o null."
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del proveedor DUEÑO del artículo (null solo en telas migradas)."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proveedor dueño, o null."
+                    },
+                    "nombreProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo le llama el proveedor a esta tela (\"Felpa Suiza\"), o null."
+                    },
+                    "nombreCuerpo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del componente CUERPO, o null."
+                    },
+                    "nombreComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento."
                     },
                     "unidadMedida": {
                       "type": "string",
@@ -20049,15 +21394,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "idColor": {
+                          "id": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del color."
+                            "description": "Id del color de tela (hijo de la tela)."
                           },
                           "nombre": {
                             "type": "string",
-                            "description": "Nombre del color."
+                            "description": "Nombre libre del color de esta tela (único por tela)."
                           },
                           "precio": {
                             "anyOf": [
@@ -20068,18 +21413,56 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de la tela en este color, o null."
+                            "description": "Precio del CUERPO en este color, o null."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE del color de esta tela, o null."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                           }
                         },
                         "required": [
-                          "idColor",
+                          "id",
                           "nombre",
-                          "precio"
+                          "precio",
+                          "precioComplemento",
+                          "pantone",
+                          "idColor"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de color de una tela (con su precio)."
+                        "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
-                      "description": "Colores de la tela con su precio (N:N)."
+                      "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
                     },
                     "activo": {
                       "type": "boolean",
@@ -20126,6 +21509,13 @@
                     "descripcion",
                     "idCategoria",
                     "categoria",
+                    "idComposicion",
+                    "composicion",
+                    "idProveedor",
+                    "proveedor",
+                    "nombreProveedor",
+                    "nombreCuerpo",
+                    "nombreComplemento",
                     "unidadMedida",
                     "tipoComponente",
                     "favorito",
@@ -20356,7 +21746,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Id de la categoría, o null."
+                      "description": "Id de la categoría (\"Tipo de tela\"), o null."
                     },
                     "categoria": {
                       "anyOf": [
@@ -20367,7 +21757,88 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre de la categoría, o null."
+                      "description": "Nombre de la categoría (\"Tipo de tela\"), o null."
+                    },
+                    "idComposicion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la composición, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la composición (\"50% Algodón, 50% Poliéster\"), o null."
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del proveedor DUEÑO del artículo (null solo en telas migradas)."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proveedor dueño, o null."
+                    },
+                    "nombreProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo le llama el proveedor a esta tela (\"Felpa Suiza\"), o null."
+                    },
+                    "nombreCuerpo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del componente CUERPO, o null."
+                    },
+                    "nombreComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento."
                     },
                     "unidadMedida": {
                       "type": "string",
@@ -20410,15 +21881,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "idColor": {
+                          "id": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del color."
+                            "description": "Id del color de tela (hijo de la tela)."
                           },
                           "nombre": {
                             "type": "string",
-                            "description": "Nombre del color."
+                            "description": "Nombre libre del color de esta tela (único por tela)."
                           },
                           "precio": {
                             "anyOf": [
@@ -20429,18 +21900,56 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de la tela en este color, o null."
+                            "description": "Precio del CUERPO en este color, o null."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE del color de esta tela, o null."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                           }
                         },
                         "required": [
-                          "idColor",
+                          "id",
                           "nombre",
-                          "precio"
+                          "precio",
+                          "precioComplemento",
+                          "pantone",
+                          "idColor"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de color de una tela (con su precio)."
+                        "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
-                      "description": "Colores de la tela con su precio (N:N)."
+                      "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
                     },
                     "activo": {
                       "type": "boolean",
@@ -20487,6 +21996,13 @@
                     "descripcion",
                     "idCategoria",
                     "categoria",
+                    "idComposicion",
+                    "composicion",
+                    "idProveedor",
+                    "proveedor",
+                    "nombreProveedor",
+                    "nombreCuerpo",
+                    "nombreComplemento",
                     "unidadMedida",
                     "tipoComponente",
                     "favorito",
@@ -20681,6 +22197,23 @@
                       }
                     ]
                   },
+                  "idComposicion": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idProveedor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "tipoComponente": {
                     "type": "string",
                     "enum": [
@@ -20719,18 +22252,32 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "idColor": {
+                        "id": {
+                          "description": "Id de la fila existente (renombrar sin destruirla); omitir en filas nuevas.",
                           "type": "integer",
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "nombre": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
                         "precio": {
                           "type": "number",
                           "minimum": 0
+                        },
+                        "precioComplemento": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "pantone": {
+                          "type": "string",
+                          "maxLength": 50
                         }
                       },
                       "required": [
-                        "idColor"
+                        "nombre"
                       ]
                     }
                   },
@@ -20742,6 +22289,39 @@
                       {
                         "type": "string",
                         "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nombreProveedor": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 150
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nombreCuerpo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nombreComplemento": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
                       },
                       {
                         "type": "null"
@@ -20811,7 +22391,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Id de la categoría, o null."
+                      "description": "Id de la categoría (\"Tipo de tela\"), o null."
                     },
                     "categoria": {
                       "anyOf": [
@@ -20822,7 +22402,88 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre de la categoría, o null."
+                      "description": "Nombre de la categoría (\"Tipo de tela\"), o null."
+                    },
+                    "idComposicion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la composición, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la composición (\"50% Algodón, 50% Poliéster\"), o null."
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del proveedor DUEÑO del artículo (null solo en telas migradas)."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proveedor dueño, o null."
+                    },
+                    "nombreProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo le llama el proveedor a esta tela (\"Felpa Suiza\"), o null."
+                    },
+                    "nombreCuerpo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del componente CUERPO, o null."
+                    },
+                    "nombreComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento."
                     },
                     "unidadMedida": {
                       "type": "string",
@@ -20865,15 +22526,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "idColor": {
+                          "id": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del color."
+                            "description": "Id del color de tela (hijo de la tela)."
                           },
                           "nombre": {
                             "type": "string",
-                            "description": "Nombre del color."
+                            "description": "Nombre libre del color de esta tela (único por tela)."
                           },
                           "precio": {
                             "anyOf": [
@@ -20884,18 +22545,56 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de la tela en este color, o null."
+                            "description": "Precio del CUERPO en este color, o null."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE del color de esta tela, o null."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                           }
                         },
                         "required": [
-                          "idColor",
+                          "id",
                           "nombre",
-                          "precio"
+                          "precio",
+                          "precioComplemento",
+                          "pantone",
+                          "idColor"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de color de una tela (con su precio)."
+                        "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
-                      "description": "Colores de la tela con su precio (N:N)."
+                      "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
                     },
                     "activo": {
                       "type": "boolean",
@@ -20942,6 +22641,13 @@
                     "descripcion",
                     "idCategoria",
                     "categoria",
+                    "idComposicion",
+                    "composicion",
+                    "idProveedor",
+                    "proveedor",
+                    "nombreProveedor",
+                    "nombreCuerpo",
+                    "nombreComplemento",
                     "unidadMedida",
                     "tipoComponente",
                     "favorito",
@@ -21170,7 +22876,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Id de la categoría, o null."
+                      "description": "Id de la categoría (\"Tipo de tela\"), o null."
                     },
                     "categoria": {
                       "anyOf": [
@@ -21181,7 +22887,88 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre de la categoría, o null."
+                      "description": "Nombre de la categoría (\"Tipo de tela\"), o null."
+                    },
+                    "idComposicion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la composición, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la composición (\"50% Algodón, 50% Poliéster\"), o null."
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del proveedor DUEÑO del artículo (null solo en telas migradas)."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proveedor dueño, o null."
+                    },
+                    "nombreProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cómo le llama el proveedor a esta tela (\"Felpa Suiza\"), o null."
+                    },
+                    "nombreCuerpo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del componente CUERPO, o null."
+                    },
+                    "nombreComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del COMPLEMENTO (cardigan). Null = esta tela NO lleva complemento."
                     },
                     "unidadMedida": {
                       "type": "string",
@@ -21224,15 +23011,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "idColor": {
+                          "id": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del color."
+                            "description": "Id del color de tela (hijo de la tela)."
                           },
                           "nombre": {
                             "type": "string",
-                            "description": "Nombre del color."
+                            "description": "Nombre libre del color de esta tela (único por tela)."
                           },
                           "precio": {
                             "anyOf": [
@@ -21243,18 +23030,56 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de la tela en este color, o null."
+                            "description": "Precio del CUERPO en este color, o null."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE del color de esta tela, o null."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                           }
                         },
                         "required": [
-                          "idColor",
+                          "id",
                           "nombre",
-                          "precio"
+                          "precio",
+                          "precioComplemento",
+                          "pantone",
+                          "idColor"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de color de una tela (con su precio)."
+                        "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
-                      "description": "Colores de la tela con su precio (N:N)."
+                      "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
                     },
                     "activo": {
                       "type": "boolean",
@@ -21301,6 +23126,13 @@
                     "descripcion",
                     "idCategoria",
                     "categoria",
+                    "idComposicion",
+                    "composicion",
+                    "idProveedor",
+                    "proveedor",
+                    "nombreProveedor",
+                    "nombreCuerpo",
+                    "nombreComplemento",
                     "unidadMedida",
                     "tipoComponente",
                     "favorito",
@@ -21493,7 +23325,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Colores de una tela (N:N a Color).",
+            "description": "Colores de una tela (hijos de la tela, §Post-F9.11).",
             "content": {
               "application/json": {
                 "schema": {
@@ -21504,15 +23336,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "idColor": {
+                          "id": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Id del color."
+                            "description": "Id del color de tela (hijo de la tela)."
                           },
                           "nombre": {
                             "type": "string",
-                            "description": "Nombre del color."
+                            "description": "Nombre libre del color de esta tela (único por tela)."
                           },
                           "precio": {
                             "anyOf": [
@@ -21523,16 +23355,54 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de la tela en este color, o null."
+                            "description": "Precio del CUERPO en este color, o null."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                          },
+                          "pantone": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código PANTONE del color de esta tela, o null."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
                           }
                         },
                         "required": [
-                          "idColor",
+                          "id",
                           "nombre",
-                          "precio"
+                          "precio",
+                          "precioComplemento",
+                          "pantone",
+                          "idColor"
                         ],
                         "additionalProperties": false,
-                        "description": "Renglón de color de una tela (con su precio)."
+                        "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
                       "description": "Colores de la tela con su precio."
                     }
@@ -21541,7 +23411,7 @@
                     "datos"
                   ],
                   "additionalProperties": false,
-                  "description": "Colores de una tela (N:N a Color)."
+                  "description": "Colores de una tela (hijos de la tela, §Post-F9.11)."
                 }
               }
             }
