@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import {
   useActualizarTela,
   useComposicionesTela,
@@ -514,6 +515,9 @@ export function DialogoTela({
                   </FieldLabel>
                   <SelectorProveedor
                     idInput="tela-proveedor"
+                    // Solo proveedores de TELA (decisión P.2, Daniel 7-ago-2026): el dueño de una
+                    // tela es quien la vende, nunca un maquilero ni un prestador de servicio.
+                    rol={COD_ROL_PROVEEDOR.vendeTelas}
                     idSeleccionado={idProveedor ?? undefined}
                     nombreSeleccionado={nombreProveedorDueno}
                     alSeleccionar={(proveedor) => {

@@ -74,7 +74,13 @@ vi.mock('@/api/cfdi', () => ({
 
 // El selector de proveedor consulta el catálogo; lo mockeamos vacío (el candidato se pre-selecciona).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [] }, isPending: false, isError: false, error: null }),
+  // CxP NO acota por rol: una cuenta por pagar puede ser de cualquier tercero.
+  useProveedoresPorRol: () => ({
+    data: { datos: [] },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 const ADMIN: ClavePermiso[] = ['cxp.administrar', 'cxp.ver', 'consultas.ver-importes'];

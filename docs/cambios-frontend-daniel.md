@@ -1586,3 +1586,75 @@ muerto. Los avíos no cambian en nada.
 - La entrada **por factura no mueve la Ruta Crítica** (el hito de compra de tela): esa entrada nace
   de una factura y no está ligada a una orden de producción. La tela que debe empujar la RC entra
   por la vía con orden de compra.
+
+---
+
+## 2026-08-07 — "Que solo salgan los proveedores de telas"
+
+Daniel: *"Necesitamos definir en los atributos de proveedores los diferentes tipo (creo que ya
+estaba contemplado)… y en los inventarios de telas, solo debe de mostrar los proveedores de telas
+para poder dar de alta una nueva tela"*, y luego: *"En control estaba definido así… los proveedores
+de tela son importantes para futuras consultas"*.
+
+### Lo primero ya estaba: el proveedor trae DOS clasificaciones
+
+En su ficha, cada proveedor tiene:
+
+- **Tipo** (una sola opción): *Telas · Avíos · Servicios · Sin clasificar*. Es el heredero directo
+  del campo `TipoProv` (H/T/S) de CONTROL viejo.
+- **Roles / servicios** (casillas, varias a la vez): *Vende telas · Vende avíos · Maquila (costura) ·
+  Corte · Estampado · Bordado · Lavado · Aplicación · Otros servicios*.
+
+Las dos se pueden **consultar**: la lista de proveedores tiene un filtro por tipo y otro por rol, y
+ambas se ven en la ficha del proveedor. La migración llenó las dos de forma pareja (los proveedores
+que en el viejo eran "T" quedaron con tipo *Telas* **y** con el rol *Vende telas*), así que las
+consultas históricas de "proveedores de tela" funcionan por cualquiera de los dos caminos.
+
+**Lo que faltaba** no era el dato, sino usarlo: las pantallas de telas seguían listando a **todos**
+los proveedores, maquileros incluidos.
+
+### Ahora las pantallas de tela solo ofrecen proveedores de tela
+
+Se acotan al rol **«Vende telas»**:
+
+- **Alta y edición de una tela del catálogo** — el "proveedor dueño" de la tela. Es el *dar de alta
+  una nueva tela* de la petición: la tela es DE quien la vende, nunca de un maquilero.
+- **Entrada de tela por factura o remisión** — quien surte la partida.
+- **Ajuste / inventario físico del flujo viejo por lote**, mientras siga vivo.
+
+Se eligió el **rol** y no el *tipo* porque el rol admite varias casillas: un proveedor que vende
+telas **y** avíos aparece en las dos pantallas, cosa que el tipo (de un solo valor) no permite. Es
+además el mismo criterio que Producción ya usaba: *Corte* solo lista cortadores y *Envío a maquila*
+solo maquileros.
+
+### En las órdenes de compra la lista sigue a los renglones
+
+Una OC se le hace a **un** proveedor, pero el proveedor se captura **antes** que los renglones y una
+misma OC puede llevar telas y avíos. Por eso ahí el filtro es en vivo:
+
+| Renglones de la OC | Proveedores que se listan |
+|---|---|
+| solo telas | los de rol *Vende telas* |
+| solo avíos | los de rol *Vende avíos* |
+| telas **y** avíos, o solo líneas libres | **todos** (no se acota) |
+
+Una compra mixta es legítima y el filtro no debe estorbarla.
+
+### El proveedor ya capturado nunca se pierde
+
+Si un documento viejo (o uno migrado) tiene un proveedor que **no** trae el rol, ese proveedor
+**sigue apareciendo** en el selector en vez de desaparecer y borrarse en silencio. El filtro es una
+ayuda para capturar, no un candado hacia atrás.
+
+### Dos cosas que conviene saber
+
+- **Si un proveedor de telas "desapareció" de la lista**, es que le falta la casilla *Vende telas* en
+  su ficha: se le marca en *Catálogos › Proveedores* y vuelve a salir.
+- **Cuentas por pagar NO se acotó**: ahí se sigue viendo a todos los terceros, porque una CxP puede
+  ser de cualquiera (un maquilero, la papelería), no solo de quien vende material.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Sin migración** — no se agregó ni una columna: el dato ya existía.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.** Es un cambio de pantallas (el API ya sabía filtrar por rol desde F1).

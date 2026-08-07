@@ -72,6 +72,12 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
   cardigan en el mismo renglón; avíos igual que antes), explosión (con
   "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil), captura/consulta de
   notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
+  - **Proveedor de la OC acotado por sus renglones (§Post-F9.12, 7-ago-2026):** el selector del
+    encabezado se filtra en vivo por el rol (R15) que piden los renglones capturados — solo telas →
+    `vende-telas`, solo avíos → `vende-avios`, **mixta o solo líneas libres → sin acotar** (una OC
+    mixta es legítima y el filtro no debe estorbar una compra real). El proveedor **ya capturado se
+    conserva** como opción aunque no cumpla el rol vigente (OCs viejas o migradas), para no perder
+    el dato en silencio.
 
 ## Enganche con Desarrollo (F8-E6)
 

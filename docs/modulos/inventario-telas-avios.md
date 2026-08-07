@@ -53,6 +53,12 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
   existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
   como datos de orden SIN tocar existencias (etapa posterior del track).
+- **Quién puede surtir tela: solo el rol `vende-telas`** (§Post-F9.12, 7-ago-2026). El selector de
+  proveedor se acota **en servidor** (`GET /api/proveedores?rol=`) vía el hook compartido
+  `useProveedoresPorRol` en: alta/edición de tela del catálogo (el proveedor DUEÑO de A1), entrada
+  por factura/remisión (B1) y el ajuste del flujo legado por lote. Mismo criterio que Producción
+  (Corte → `corte`). **El proveedor ya capturado se conserva** como opción aunque no traiga el rol
+  (documentos viejos/migrados): el filtro es ayuda de captura, no candado retroactivo.
 
 ## Motor (D3 — existencia = suma de movimientos)
 

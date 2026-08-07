@@ -1,12 +1,12 @@
 import { Loader2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
 import { useColores } from '@/api/colores';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import { useProveedores } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTelas } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraCrear, OrdenCompraEditar } from '@/api/tipos';
@@ -25,6 +25,37 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { capturaDesdeOc, renglonApi, renglonVacio, type RenglonOcCaptura } from './captura';
 import { EditorLineasOc } from './EditorLineasOc';
+
+/**
+ * Rol de proveedor (R15) que exigen los renglones capturados, o `undefined` si no hay que acotar.
+ *
+ * Una OC es de UN proveedor pero sus renglones pueden mezclar telas, avíos y líneas libres, y el
+ * proveedor se captura ANTES que los renglones. Por eso la regla es por MAYORÍA de tipo, no por
+ * bloqueo (decisión de Daniel, 07-ago-2026):
+ *  • solo renglones de tela → proveedores con rol «Vende telas»;
+ *  • solo renglones de avío → proveedores con rol «Vende avíos»;
+ *  • mezclada, o solo líneas libres → NO se acota (mostrar todos: nunca estorbar una compra real).
+ *
+ * Cuenta el `tipo` del renglón aunque todavía no se haya elegido el material: el usuario ya declaró
+ * qué va a comprar en esa línea.
+ */
+function rolSegunRenglones(renglones: readonly RenglonOcCaptura[]): string | undefined {
+  const hayTela = renglones.some((renglon) => renglon.tipo === 'tela');
+  const hayAvio = renglones.some((renglon) => renglon.tipo === 'avio');
+  if (hayTela && !hayAvio) {
+    return COD_ROL_PROVEEDOR.vendeTelas;
+  }
+  if (hayAvio && !hayTela) {
+    return COD_ROL_PROVEEDOR.vendeAvios;
+  }
+  return undefined;
+}
+
+/** Texto de ayuda bajo el selector, según el rol al que quedó acotada la lista. */
+const AYUDA_POR_ROL: Record<string, string> = {
+  [COD_ROL_PROVEEDOR.vendeTelas]: 'La OC es de telas: solo proveedores con el rol «Vende telas».',
+  [COD_ROL_PROVEEDOR.vendeAvios]: 'La OC es de avíos: solo proveedores con el rol «Vende avíos».',
+};
 
 /**
  * Diálogo de CAPTURA / EDICIÓN de una orden de compra (F4-E2). Si recibe `oc`, edita; si no, da de
@@ -55,7 +86,6 @@ export function DialogoEditarOc({
   const esEdicion = oc !== undefined;
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const avios = useAvios({ pagina: 1, porPagina: 100 });
   const colores = useColores({
@@ -76,6 +106,21 @@ export function DialogoEditarOc({
   const [observaciones, setObservaciones] = useState('');
   const [correspondeA, setCorrespondeA] = useState('');
   const [renglones, setRenglones] = useState<RenglonOcCaptura[]>([]);
+  /**
+   * Nombre del proveedor elegido. Se guarda aparte porque la lista se acota en vivo: si el
+   * proveedor ya capturado no trae el rol que piden los renglones (típico al EDITAR una OC vieja
+   * o migrada), desaparecería del `<select>` y el valor se perdería en silencio. Con el nombre a
+   * la mano se puede seguir mostrando como opción y respetar lo capturado.
+   */
+  const [nombreProveedor, setNombreProveedor] = useState('');
+
+  // Rol al que se acota la lista, recalculado con cada cambio de renglones.
+  const rolProveedor = useMemo(() => rolSegunRenglones(renglones), [renglones]);
+  const proveedores = useProveedoresPorRol(rolProveedor);
+  const listaProveedores = proveedores.data?.datos ?? [];
+  // El proveedor capturado no cumple el rol vigente → se conserva como opción extra.
+  const seleccionadoFueraDelFiltro =
+    idProveedor !== null && !listaProveedores.some((p) => p.id === idProveedor);
 
   // Al abrir, carga los datos de la OC (edición) o limpia (alta).
   useEffect(() => {
@@ -84,6 +129,7 @@ export function DialogoEditarOc({
     }
     if (oc !== undefined) {
       setIdProveedor(oc.idProveedor);
+      setNombreProveedor(oc.proveedor);
       setFecha(oc.fecha ?? '');
       setFechaEntrega(oc.fechaEntrega ?? '');
       setEntregaEn(oc.entregaEn ?? '');
@@ -92,6 +138,7 @@ export function DialogoEditarOc({
       setRenglones(capturaDesdeOc(oc));
     } else {
       setIdProveedor(null);
+      setNombreProveedor('');
       setFecha('');
       setFechaEntrega('');
       setEntregaEn('');
@@ -169,18 +216,32 @@ export function DialogoEditarOc({
                 id="oc-proveedor"
                 disabled={soloLectura || proveedores.isPending}
                 value={idProveedor === null ? '' : String(idProveedor)}
-                onChange={(e) =>
-                  setIdProveedor(e.target.value === '' ? null : Number(e.target.value))
-                }
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  const id = valor === '' ? null : Number(valor);
+                  setIdProveedor(id);
+                  setNombreProveedor(listaProveedores.find((p) => p.id === id)?.nombre ?? '');
+                }}
                 data-testid="oc-proveedor"
               >
                 <option value="">Elige un proveedor…</option>
-                {(proveedores.data?.datos ?? []).map((p) => (
+                {/* El proveedor ya capturado que no cumple el rol vigente sigue disponible. */}
+                {seleccionadoFueraDelFiltro && idProveedor !== null ? (
+                  <option value={String(idProveedor)}>
+                    {nombreProveedor === '' ? 'Proveedor actual' : nombreProveedor}
+                  </option>
+                ) : null}
+                {listaProveedores.map((p) => (
                   <option key={p.id} value={String(p.id)}>
                     {p.nombre}
                   </option>
                 ))}
               </SelectNativo>
+              {rolProveedor !== undefined ? (
+                <p className="text-xs text-muted-foreground" data-testid="oc-proveedor-ayuda">
+                  {AYUDA_POR_ROL[rolProveedor]}
+                </p>
+              ) : null}
             </Field>
             <Field>
               <FieldLabel htmlFor="oc-fecha">Fecha de emisión</FieldLabel>

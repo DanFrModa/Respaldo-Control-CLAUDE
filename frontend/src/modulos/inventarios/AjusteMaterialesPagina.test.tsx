@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -34,7 +34,16 @@ vi.mock('@/api/inventarios', () => ({
 }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
-vi.mock('@/api/proveedores', () => ({ useProveedores: () => ({ data: { datos: [] } }) }));
+// Espía del código de rol con el que la pantalla pide los proveedores del lote.
+const { espiaRolProveedor } = vi.hoisted(() => ({ espiaRolProveedor: vi.fn() }));
+vi.mock('@/api/proveedores', () => ({
+  COD_ROL_PROVEEDOR: { vendeTelas: 'vende-telas', vendeAvios: 'vende-avios' },
+  useProveedoresPorRol: (codigo: string | undefined) => {
+    espiaRolProveedor(codigo);
+    // El backend ya filtró: solo llegan proveedores con ese rol.
+    return { data: { datos: [{ id: 7, nombre: 'Telas del Norte' }] }, isPending: false };
+  },
+}));
 vi.mock('./CapturaRenglonesTela', () => ({
   CapturaRenglonesTela: () => <div data-testid="captura-renglones-tela" />,
 }));
@@ -56,6 +65,16 @@ describe('AjusteMaterialesPagina (F4-E1)', () => {
     expect(screen.getByTestId('ajuste-motivo')).toBeInTheDocument();
     // Sin almacén/color/componentes/motivo, guardar deshabilitado.
     expect(screen.getByTestId('ajuste-guardar')).toBeDisabled();
+  });
+
+  it('en TELA-ENTRADA solo ofrece proveedores con el rol «Vende telas»', () => {
+    renderConProveedores(<AjusteMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+    });
+    // La lista se pide ACOTADA al rol (el filtro lo aplica el servidor, no la pantalla).
+    expect(espiaRolProveedor).toHaveBeenCalledWith('vende-telas');
+    const selector = screen.getByTestId('ajuste-proveedor');
+    expect(within(selector).getByRole('option', { name: 'Telas del Norte' })).toBeInTheDocument();
   });
 
   it('en TELA-SALIDA cambia a la captura de renglones sobre lo existente', () => {
