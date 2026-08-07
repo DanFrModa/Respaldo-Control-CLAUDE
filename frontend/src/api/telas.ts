@@ -34,8 +34,6 @@ export type TelasPagina =
 export type Tela = TelasPagina['datos'][number];
 /** Un renglon de color de una tela (color + precio). */
 export type TelaColor = Tela['colores'][number];
-/** Tipo de componente de la tela (CUERPO/CARDIGAN/OTRO). */
-export type TipoComponenteTela = Tela['tipoComponente'];
 
 /** Unidad en que se compra y se consume una tela: `KG` (kilos) o `M` (metros). */
 export type UnidadTela = Tela['unidadMedida'];
@@ -136,6 +134,30 @@ async function reactivarTela(id: number): Promise<Tela> {
     throw new ErrorDeApi(error);
   }
   return data;
+}
+
+/** Obtiene UNA tela por id (con su categoria y sus colores hijos). */
+async function obtenerTela(id: number): Promise<Tela> {
+  const { data, error } = await api.GET('/api/telas/{id}', { params: { path: { id } } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Una tela CONCRETA por id (`GET /api/telas/{id}`) con sus colores. Es lo que deben usar las
+ * pantallas que ya SABEN de qué tela hablan (p. ej. la recepción de compra: la línea de OC trae
+ * `idTela`) — buscar por nombre en el listado paginado NO sirve ahí: con cientos de telas, la
+ * página de resultados puede no traer la buscada y el selector de color se quedaría vacío.
+ * Apagada mientras no haya id.
+ */
+export function useTela(id: number | undefined): UseQueryResult<Tela, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_TELAS, 'detalle', id],
+    queryFn: () => obtenerTela(id as number),
+    enabled: id !== undefined,
+  });
 }
 
 /** Lista telas con los filtros dados (mantiene la pagina previa al paginar/buscar). */

@@ -90,6 +90,8 @@ model Empresa {
   movimientos            Movimiento[]
   /// Partidas de tela (entradas del inventario nuevo por color, A2 §Post-F9.11; folio por empresa). Restrict.
   partidasTela           PartidaTela[]
+  /// Documentos de ENTRADA de tela por factura/remisión SIN orden de compra (B1; folio por empresa). Restrict.
+  entradasTela           EntradaTela[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
   cargosEsMa             EsMaCargo[]
   /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
@@ -406,6 +408,9 @@ model Almacen {
   /// Recepciones de compra cuyo material entra a este almacén destino (F4-E3). Restrict.
   recepcionesCompra RecepcionCompra[]
 
+  /// Documentos de entrada de tela por factura/remisión cuyo material entra a este almacén (B1). Restrict.
+  entradasTela EntradaTela[]
+
   /// Notas de salida cuyos avíos salen de este almacén origen (F4-E5, decisión (g)). Restrict.
   notasSalida NotaSalida[]
 
@@ -500,6 +505,9 @@ model Archivo {
   /// Movimientos de terceros cuyo CFDI (XML/PDF) es este archivo (F9-E1), si los hay. Inversa de
   /// `MovimientoTercero.archivoCfdi`; Restrict — no se borra el XML de un movimiento vivo.
   movimientosTerceroCfdi MovimientoTercero[]
+  /// Adjunto de una entrada de tela (el PDF de la factura/remisión, B1), si lo hay. Inversa de
+  /// `EntradaTelaArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA entrada — Cascade en ambos).
+  entradaTelaArchivo     EntradaTelaArchivo?
 
   @@map("archivos")
 }
@@ -549,6 +557,9 @@ model Proveedor {
   id          Int           @id @default(autoincrement())
   /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
   nombre      String        @unique
+  /// Nombre CORTO de uso diario ("Bloom" para BLOOM TEXTIL), para armar el nombre compuesto
+  /// de la tela (A1.1, Daniel 6-ago-2026). Solo display: SIN unicidad, opcional.
+  nombreCorto String?       @map("nombre_corto")
   razonSocial String?       @map("razon_social")
   /// Clasificación rápida (telas/avíos/servicios); por defecto sin clasificar.
   /// F1-E1B: SE CONSERVA junto a los roles multi-valor (acta Gabriel 13-jun-2026).
@@ -650,6 +661,8 @@ model Proveedor {
   lotes                   Lote[]
   /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
   ordenesCompra           OrdenCompra[]
+  /// Entradas de tela por factura/remisión SIN OC surtidas por este proveedor (B1). Restrict.
+  entradasTela            EntradaTela[]
   /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
   requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
   /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
@@ -1280,12 +1293,20 @@ model Tela {
   /// esa es la bandera: se define desde el alta, como pidió Daniel.
   nombreComplemento String? @map("nombre_complemento")
   /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
+  /// LEGADO desde A1.1 (Daniel, 6-ago-2026): redundante con nombreCuerpo/nombreComplemento;
+  /// la UI ya no lo captura ni lo muestra. La columna se conserva (sin migración de borrado).
   tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
+  /// Peso de la tela en gramos por metro cuadrado (A1.1, Daniel 6-ago-2026). Informativo, opcional.
+  peso           Decimal?           @db.Decimal(8, 2)
+  /// Ancho de la tela en metros (A1.1). Informativo, opcional.
+  ancho          Decimal?           @db.Decimal(8, 2)
   /// Tela de uso frecuente (preselección en la UI de captura).
   favorito       Boolean            @default(false)
   /// Precio de referencia por unidad (informativo; el costo real va por lote/orden).
   precioSugerido Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
   /// ¿Es tela de producción (vs. muestra/insumo no productivo)? Default true.
+  /// LEGADO desde A1.1 (Daniel, 6-ago-2026): la casilla salió de la UI (ya no se captura ni
+  /// se muestra); el dato se conserva con su default server-side. La columna NO se borra.
   paraProduccion Boolean            @default(true) @map("para_produccion")
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo         Boolean            @default(true)
@@ -1361,6 +1382,8 @@ model TelaColor {
   partidas           PartidaTela[]
   /// Renglones de kardex de TELA del inventario NUEVO por color (cuerpo+complemento juntos). Restrict.
   movimientosDetTela MovimientoDetTela[]
+  /// Renglones de documentos de ENTRADA de tela por factura/remisión (B1). Restrict.
+  entradaTelaLineas  EntradaTelaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1403,6 +1426,10 @@ model PartidaTela {
 
   /// Renglones de kardex de ENTRADA que trajeron esta partida (en salidas idPartida va NULL).
   movimientosDetTela MovimientoDetTela[]
+  /// Renglón del documento de ENTRADA de tela (B1) que creó esta partida al confirmarse. Inversa.
+  entradaTelaLineas  EntradaTelaLinea[]
+  /// Renglones de RECEPCIÓN de compra (con OC) que crearon esta partida al recibirse (B1). Inversa.
+  recepcionLineas    RecepcionCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1413,6 +1440,161 @@ model PartidaTela {
   @@index([idTelaColor])
   @@index([loteProveedor])
   @@map("partidas_tela")
+}
+
+/// Tipo del DOCUMENTO del proveedor que ampara una entrada de tela sin orden de compra (B1 —
+/// Daniel §Post-F9.9 punto 7: *"permitir las dos vías (con orden de compra y por factura/remisión
+/// sin OC)"*).
+enum TipoDocumentoEntradaTela {
+  factura
+  remision
+
+  @@map("tipo_documento_entrada_tela")
+}
+
+/// Estado del documento de entrada de tela (B1). `borrador` = capturado, todavía NO tocó el
+/// inventario (se puede editar y se le puede adjuntar el PDF); `confirmada` = ya creó sus
+/// partidas y su movimiento de kardex (inmutable, D3); `cancelada` = anulada (si estaba
+/// confirmada, con su movimiento INVERSO auditado — nunca se edita ni se borra).
+enum EstatusEntradaTela {
+  borrador
+  confirmada
+  cancelada
+
+  @@map("estatus_entrada_tela")
+}
+
+/// DOCUMENTO DE ENTRADA de tela por FACTURA/REMISIÓN, SIN orden de compra (etapa B1 — Daniel
+/// §Post-F9.9 punto 7 y §Post-F9.11). Es la segunda vía de entrada al inventario de telas por
+/// COLOR: una CABECERA por documento del proveedor (factura o remisión, con su número) y N
+/// PARTIDAS (`EntradaTelaLinea`), cada una con su color y sus cantidades de cuerpo/complemento.
+/// La vía con OC sigue siendo `RecepcionCompra` (que desde B1 también entra por color/partida).
+///
+/// Reglas: folio propio consecutivo POR EMPRESA (A3, secuencia `entrada-tela`); scope por empresa
+/// (A9); auditoría uniforme (A7). Al CONFIRMAR, en UNA transacción (A2), cada renglón crea SU
+/// `PartidaTela` y el documento genera UN movimiento de kardex de entrada (`entrada-recepcion`,
+/// origen `entrada-tela`) — la existencia sigue siendo Σ de movimientos (D3). Cancelar una entrada
+/// confirmada genera el movimiento INVERSO auditado (NUNCA edita ni borra).
+model EntradaTela {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia `entrada-tela`, jamás Max()+1).
+  folio     BigInt
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Factura o remisión (el documento con que el proveedor ampara la entrega).
+  tipoDocumento   TipoDocumentoEntradaTela @map("tipo_documento")
+  /// Número del documento TAL COMO lo trae el proveedor (texto, buscable).
+  numeroDocumento String                   @map("numero_documento")
+  /// Proveedor que surtió la tela. Restrict.
+  idProveedor     Int                      @map("id_proveedor")
+  proveedor       Proveedor                @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Fecha del documento (solo fecha) — es también la fecha del movimiento de kardex.
+  fecha           DateTime                 @db.Date
+  /// Almacén DESTINO al que entra la tela. Restrict.
+  idAlmacen       Int                      @map("id_almacen")
+  almacen         Almacen                  @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+  observaciones   String?                  @db.Text
+
+  estatus EstatusEntradaTela @default(borrador)
+
+  /// Movimiento de kardex de ENTRADA generado al CONFIRMAR (uno por documento). NULL mientras
+  /// está en borrador. SetNull defensivo: los movimientos jamás se borran (D3).
+  idMovimiento    Int?        @unique @map("id_movimiento")
+  movimiento      Movimiento? @relation(fields: [idMovimiento], references: [id], onDelete: SetNull)
+  confirmadaEn    DateTime?   @map("confirmada_en")
+  confirmadaPorId String?     @map("confirmada_por_id")
+
+  /// Cancelación SUAVE (D3/A7): cuándo, quién y por qué. Si estaba confirmada, el kardex se
+  /// neutraliza con el movimiento INVERSO (el original NO se toca).
+  canceladaEn       DateTime? @map("cancelada_en")
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Renglones/partidas del documento (cada uno crea SU partida al confirmar).
+  lineas   EntradaTelaLinea[]
+  /// Adjuntos del documento (el PDF de la factura/remisión), en R2.
+  archivos EntradaTelaArchivo[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idProveedor])
+  @@index([idAlmacen])
+  @@index([estatus])
+  @@index([numeroDocumento])
+  @@map("entradas_tela")
+}
+
+/// Un RENGLÓN (= una PARTIDA) del documento de entrada de tela (B1). Cada renglón es una partida:
+/// una factura con dos lotes del MISMO tela+color son DOS renglones = DOS partidas (regla ya
+/// establecida en A2, DECISIONES §Post-F9.11 punto 4) — por eso NO hay unicidad por color.
+/// `cantidad` es el CUERPO (admite 0: compra de solo complemento) y `cantidadComplemento` viaja
+/// SIEMPRE junta (NULL = la tela no lleva complemento).
+///
+/// PRECIOS (D1): `precioUnit` es el precio por unidad del CUERPO y es el que viaja al kardex como
+/// `costoUnit` del renglón de `MovimientoDetTela` (el kardex valúa `costoUnit × cuerpo`);
+/// `precioUnitComplemento` es el precio del complemento (Daniel: *"el cardigan es otro precio que
+/// la tela"*) y vive AQUÍ, en el documento, porque el renglón de kardex sólo tiene una columna de
+/// costo. En un renglón de SOLO complemento (cuerpo 0) el kardex va sin costo y el dinero queda
+/// en el documento.
+model EntradaTelaLinea {
+  id            Int         @id @default(autoincrement())
+  idEntradaTela Int         @map("id_entrada_tela")
+  entradaTela   EntradaTela @relation(fields: [idEntradaTela], references: [id], onDelete: Cascade)
+
+  /// Color de tela (hijo de la tela) que entra en este renglón. Restrict.
+  idTelaColor Int       @map("id_tela_color")
+  telaColor   TelaColor @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+
+  /// Cantidad del CUERPO (≥ 0; 0 = el renglón es de solo complemento).
+  cantidad              Decimal  @db.Decimal(14, 4)
+  /// Cantidad del COMPLEMENTO (cardigan). NULL = la tela no lleva complemento.
+  cantidadComplemento   Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
+  /// Precio unitario del CUERPO (viaja al kardex como `costoUnit`, D1). Opcional.
+  precioUnit            Decimal? @map("precio_unit") @db.Decimal(12, 4)
+  /// Precio unitario del COMPLEMENTO (vive en el documento; el kardex no lo valúa hoy). Opcional.
+  precioUnitComplemento Decimal? @map("precio_unit_complemento") @db.Decimal(12, 4)
+  /// Número de lote del PROVEEDOR de esta partida (texto libre, opcional y buscable).
+  loteProveedor         String?  @map("lote_proveedor")
+
+  /// Partida creada al CONFIRMAR el documento (traza renglón ↔ partida). NULL en borrador. Restrict.
+  idPartida Int?         @map("id_partida")
+  partida   PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEntradaTela])
+  @@index([idTelaColor])
+  @@index([idPartida])
+  @@map("entrada_tela_linea")
+}
+
+/// Adjunto de un documento de entrada de tela (B1): el PDF de la FACTURA/remisión del proveedor
+/// (o cualquier soporte) en Cloudflare R2. Espejo de `OrdenArchivo`/`PedidoArchivo`. `onDelete`:
+///  • Cascade hacia `EntradaTela`: los adjuntos son del documento.
+///  • Cascade hacia `Archivo`: al quitar el adjunto se borra también su `Archivo` (el objeto
+///    físico en R2 lo borra el dominio best-effort — ver `comun/archivos.ts`).
+model EntradaTelaArchivo {
+  id            Int    @id @default(autoincrement())
+  idEntradaTela Int    @map("id_entrada_tela")
+  idArchivo     String @map("id_archivo")
+
+  entradaTela EntradaTela @relation(fields: [idEntradaTela], references: [id], onDelete: Cascade)
+  archivo     Archivo     @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idEntradaTela])
+  @@map("entrada_tela_archivo")
 }
 
 /// LOTE de tela (F4-E1, D5 — doc 04-Inventarios §B.1/§B.3). Un lote es una compra/teñido
@@ -2934,6 +3116,9 @@ model Movimiento {
   notaLineasAvio       NotaSalidaLinea[]      @relation("NotaLineaAvio")
   /// Renglones de inventario cíclico cuyo AJUSTE generó este movimiento (F7-E5). Inversa informativa.
   ajustesCiclico       InventarioCiclicoDet[]
+  /// Documento de ENTRADA de tela por factura/remisión (B1) que generó este movimiento al
+  /// CONFIRMARSE. 0 o 1 (la liga es 1:1 — `EntradaTela.idMovimiento` es único). Inversa.
+  entradaTela          EntradaTela?
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3032,8 +3217,14 @@ model MovimientoDetTela {
   /// Cantidad del COMPLEMENTO (cardigan) que viaja JUNTA en el mismo renglón (Daniel: el
   /// complemento es parte de la misma tela). NULL si la tela no lleva complemento o fila vieja.
   cantidadComplemento Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
-  /// Costo unitario. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
+  /// Costo unitario del CUERPO. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
   costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
+  /// Costo unitario del COMPLEMENTO (cardigan) — B1. El complemento tiene SU propio precio
+  /// (Daniel: *"el cardigan es otro precio que la tela"*), así que el renglón valúa por separado
+  /// cada componente: `costoUnit × cantidad` + `costoUnitComplemento × cantidadComplemento`. Lo
+  /// pueblan las DOS puertas de entrada (documento por factura B1 y recepción de compra); NULL
+  /// cuando la tela no lleva complemento, cuando no se capturó precio, o en filas del flujo viejo.
+  costoUnitComplemento Decimal? @map("costo_unit_complemento") @db.Decimal(12, 4)
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3724,9 +3915,20 @@ model RecepcionCompraLinea {
   /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
   costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
 
-  /// Lote creado/usado para esta línea de TELA (D5). NULL en avío/libre. Restrict.
+  /// Cantidad del COMPLEMENTO (cardigan) recibida en esta línea de TELA (flujo NUEVO por color,
+  /// B1). NULL en avío/libre y en telas sin complemento. El CUERPO va en `cantidadRecibida`.
+  cantidadComplemento Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
+
+  /// LEGADO (F4-E3): lote creado para esta línea de TELA por el flujo viejo (D5). Desde B1 las
+  /// recepciones de tela entran por COLOR y crean una PARTIDA (`idPartida`), no un lote: en las
+  /// recepciones NUEVAS esta columna va NULL. Se conserva para las filas históricas. Restrict.
   idLote Int?  @map("id_lote")
   lote   Lote? @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// PARTIDA creada para esta línea de TELA (flujo NUEVO por color, B1 — la unidad de entrada del
+  /// inventario de telas). NULL en avío/libre y en las recepciones históricas por lote. Restrict.
+  idPartida Int?         @map("id_partida")
+  partida   PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
 
   /// Movimiento de kardex de ENTRADA que generó esta línea (tela/avío). NULL en líneas libres y
   /// tras un reverso conceptual (el movimiento sigue existiendo; aquí se conserva la traza).
@@ -3742,6 +3944,7 @@ model RecepcionCompraLinea {
   @@index([idRecepcionCompra])
   @@index([idOrdenCompraLinea])
   @@index([idLote])
+  @@index([idPartida])
   @@index([idMovimiento])
   @@map("recepcion_compra_linea")
 }

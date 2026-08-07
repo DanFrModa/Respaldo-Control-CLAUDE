@@ -1502,3 +1502,87 @@ Ajuste. Lo demás (kardex, traspaso, pantallas de lote legado) sigue por ⌘K.
   `AjusteTelaColorPagina,TraspasoTelaColorPagina,SalidaTelaColorOrdenPagina,DialogoCancelarMaterial}.tsx`
   · `modulos/catalogo.ts` (Telas como nodo padre) · `api/inventario-materiales.ts` + cliente
   regenerado.
+
+## 2026-08-06 — Remates del catálogo de telas (etapa A1.1, feedback de Daniel)
+
+Daniel probó el catálogo nuevo en `prueba` y pidió 8 ajustes; todos entraron:
+
+### A) Dos datos nuevos: peso y ancho
+
+La tela ahora lleva **peso (gr/m²)** y **ancho (m)**, opcionales, capturables en el diálogo y
+visibles en el detalle cuando tienen valor.
+
+### B) Menos fricción y menos ruido al capturar
+
+- **"Favorita" viene marcada por default** al dar de alta (se puede desmarcar).
+- El ejemplo del alta de color ahora dice **"Negro"**.
+- Se **ocultaron** las dos casillas que confundían: "¿Es tela de producción?" (queda por dentro con
+  su default) y "Tipo de componente" (redundante con los nombres de cuerpo/complemento — quedó
+  superada y se retiró de la pantalla; el dato viejo no se pierde).
+
+### C) Nombres consistentes sin teclear de más
+
+- Marcar "lleva complemento" **pre-llena "Cardigan"** (editable, para que siempre se escriba igual).
+- Elegir el tipo de tela **propone el nombre del cuerpo** ("Felpa 50/50" → "Felpa") — aplica cuando
+  la tela lleva complemento, que es donde ese campo existe.
+- El proveedor ganó un **"Nombre corto"** (BLOOM TEXTIL → "Bloom") y el **nombre de la tela se arma
+  solo**: nombre corto + nombre del proveedor de la tela → **"Bloom Felpa España"**. Si lo tecleas a
+  mano, lo tuyo manda; si lo vacías, se vuelve a armar.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260806140000_tela_peso_ancho_proveedor_nombre_corto`): 3
+   columnas nuevas opcionales (peso/ancho en telas, nombre corto en proveedores). Aditiva.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.**
+
+### Archivos principales
+
+- **Backend:** `prisma/schema.prisma` + la migración · `contrato/esquemas/tela.ts` y `proveedor` ·
+  `dominio/catalogos/telas.ts` · dominio de proveedores · OpenAPI regenerado.
+- **Frontend:** `modulos/telas/{DialogoTela,EditorColoresTela,TelasPagina}.tsx` ·
+  `modulos/proveedores/DialogoProveedor.tsx` (+ detalle) · cliente regenerado.
+
+## 2026-08-06 — Entrada de tela por factura o remisión (etapa B1)
+
+La otra mitad del inventario nuevo: ya se puede **meter tela al almacén** por las dos vías que pidió
+Daniel — con orden de compra y sin ella.
+
+### A) Entrada por factura o remisión (sin orden de compra)
+
+`Inventarios → Telas → Entradas de tela`: se captura **una cabecera por documento** (factura o
+remisión, número del proveedor, proveedor, fecha y almacén) y **N partidas** debajo. Cada renglón es
+una partida: su tela y color, la cantidad de cuerpo y la de cardigan, el número de lote del
+proveedor y el precio. Dos lotes del mismo color en la misma factura = dos renglones = dos partidas.
+
+Se puede **adjuntar el PDF de la factura**. El documento nace como **borrador** (no toca el
+inventario), y hasta que se **confirma** se crean las partidas y entra la tela. Cancelar una entrada
+confirmada no borra nada: registra el movimiento contrario, con su motivo.
+
+Si capturas un número de factura que ya existe de ese mismo proveedor, la pantalla **te avisa** —
+pero te deja seguir, por si el proveedor de verdad repitió el número.
+
+### B) La compra con orden de compra ya entra al inventario nuevo
+
+Al recibir una OC de tela ahora se elige el **color** (el sistema no lo adivina: si falta, no deja
+recibir) y la tela entra por color con su partida y su costo, igual que la entrada por factura.
+Antes seguía cayendo en el inventario viejo por lote, que con el arranque desde cero habría quedado
+muerto. Los avíos no cambian en nada.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260806150000_b1_entrada_tela`): las tablas del documento, sus
+   adjuntos y la columna del costo del cardigan en el kardex. Aditiva, sin borrados.
+2. **Cero permisos nuevos** (reúsa `inventario-telas.ver`/`.mover`) → **no** hace falta
+   `SEED_ON_START`.
+3. **Nada que correr a mano.**
+
+### Dos cosas que conviene saber
+
+- **Cancelar una entrada vieja puede dejar el color en negativo** si esa tela ya se consumió. Es a
+  propósito (anular es una corrección contable, no se editan movimientos), pero a partir de ahí ese
+  color no deja dar salidas hasta que se ajuste por conteo. Si la tela ya se usó, lo correcto es
+  ajustar, no cancelar.
+- La entrada **por factura no mueve la Ruta Crítica** (el hito de compra de tela): esa entrada nace
+  de una factura y no está ligada a una orden de producción. La tela que debe empujar la RC entra
+  por la vía con orden de compra.

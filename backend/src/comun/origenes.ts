@@ -31,6 +31,11 @@ export const ORIGEN = {
   salidaTelaOrden: 'salida-tela-orden',
   /** Entrada de tela/avío por recepción de compra (F4-E3 — el `origenId` es la recepción/OC). */
   recepcionCompra: 'recepcion-compra',
+  /**
+   * Entrada de TELA por FACTURA/REMISIÓN del proveedor, SIN orden de compra (B1 — la segunda vía de
+   * entrada que pidió Daniel, §Post-F9.9 punto 7). El `origenId` es el id del documento `EntradaTela`.
+   */
+  entradaTela: 'entrada-tela',
   /** Salida de avío por una nota de salida a maquilero (F4-E5 — el `origenId` es la nota). */
   notaSalida: 'nota-salida',
   /** Carga del ETL histórico de inventario (F3-E6 — IPT_Movs; F4-E6 — telas/avíos). */

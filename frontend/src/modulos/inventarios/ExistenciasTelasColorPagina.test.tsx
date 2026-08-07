@@ -97,6 +97,7 @@ const kardex: KardexTelaColor = {
       salidaComplemento: 0,
       saldoComplemento: 40,
       costoUnit: null,
+      costoUnitComplemento: null,
       importe: null,
       origenTipo: 'movimiento-manual',
       origenId: null,

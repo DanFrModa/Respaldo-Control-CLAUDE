@@ -14,11 +14,20 @@ const actualizarMutate = vi.fn();
 const crearCategoriaMutate = vi.fn();
 const crearComposicionMutate = vi.fn();
 
-/** Categorias de ejemplo del selector. */
+/** Categorias de ejemplo del selector (la 2ª, multi-palabra, prueba el pre-llenado A1.1). */
 const CATEGORIAS: TelaCategoria[] = [
   {
     id: 7,
     nombre: 'Felpa',
+    activo: true,
+    creadoEn: '',
+    creadoPorId: null,
+    modificadoEn: '',
+    modificadoPorId: null,
+  },
+  {
+    id: 8,
+    nombre: 'Felpa 50/50',
     activo: true,
     creadoEn: '',
     creadoPorId: null,
@@ -60,23 +69,33 @@ vi.mock('@/api/telas', () => ({
 }));
 
 // El selector de proveedor se aisla (usa busqueda server-side de `useProveedores`): el stub
-// expone un boton que "elige" al proveedor 5 — suficiente para probar el flujo del dialogo.
+// expone dos botones que "eligen" un proveedor CON nombre corto (Alsatex/Alsa) y uno SIN
+// (Bloom Textil) — suficiente para probar el flujo del dialogo y el nombre compuesto (A1.1).
 vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
   SelectorProveedor: ({
     idSeleccionado,
     alSeleccionar,
   }: {
     idSeleccionado: number | undefined;
-    alSeleccionar: (proveedor: { id: number; nombre: string }) => void;
+    alSeleccionar: (proveedor: { id: number; nombre: string; nombreCorto: string | null }) => void;
   }) => (
-    <button
-      type="button"
-      data-testid="selector-proveedor-stub"
-      data-seleccionado={idSeleccionado ?? ''}
-      onClick={() => alSeleccionar({ id: 5, nombre: 'Alsatex' })}
-    >
-      {idSeleccionado === undefined ? 'Elegir proveedor' : `Proveedor ${idSeleccionado}`}
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid="selector-proveedor-stub"
+        data-seleccionado={idSeleccionado ?? ''}
+        onClick={() => alSeleccionar({ id: 5, nombre: 'Alsatex', nombreCorto: 'Alsa' })}
+      >
+        {idSeleccionado === undefined ? 'Elegir proveedor' : `Proveedor ${idSeleccionado}`}
+      </button>
+      <button
+        type="button"
+        data-testid="selector-proveedor-stub-sin-corto"
+        onClick={() => alSeleccionar({ id: 6, nombre: 'Bloom Textil', nombreCorto: null })}
+      >
+        Elegir proveedor sin corto
+      </button>
+    </>
   ),
 }));
 
@@ -112,6 +131,7 @@ function telaEjemplo(sobre: Partial<Tela> = {}): Tela {
     composicion: null,
     idProveedor: 5,
     proveedor: 'Alsatex',
+    proveedorCorto: null,
     nombreProveedor: null,
     nombreCuerpo: null,
     nombreComplemento: null,
@@ -119,6 +139,8 @@ function telaEjemplo(sobre: Partial<Tela> = {}): Tela {
     tipoComponente: 'OTRO',
     favorito: false,
     precioSugerido: null,
+    peso: null,
+    ancho: null,
     paraProduccion: true,
     colores: [],
     activo: true,
@@ -180,11 +202,104 @@ describe('<DialogoTela>', () => {
     expect(cuerpo.unidadMedida).toBe('KG');
     expect('idCategoria' in cuerpo).toBe(false);
     expect('precioSugerido' in cuerpo).toBe(false);
-    // Banderas y colores siempre viajan.
-    expect(cuerpo.favorito).toBe(false);
-    expect(cuerpo.paraProduccion).toBe(true);
+    // Peso y ancho vacíos también se omiten (A1.1 punto 1).
+    expect('peso' in cuerpo).toBe(false);
+    expect('ancho' in cuerpo).toBe(false);
+    // `tipoComponente` y `paraProduccion` ya NO viajan (A1.1 puntos 4-5): caen al default
+    // del contrato (OTRO / true) en el servidor.
+    expect('tipoComponente' in cuerpo).toBe(false);
+    expect('paraProduccion' in cuerpo).toBe(false);
+    // La bandera de favorita y los colores siempre viajan; en el ALTA arranca MARCADA
+    // (A1.1 punto 2 — solo la UI; el default del modelo no cambió).
+    expect(cuerpo.favorito).toBe(true);
     expect(cuerpo.colores).toEqual([]);
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
+  });
+
+  // A1.1 punto 2: la casilla "favorita" arranca MARCADA en el alta (y se puede desmarcar).
+  it('en ALTA la casilla de favorita viene marcada por default y se puede desmarcar', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
+        opciones?.onSuccess?.(telaEjemplo());
+      },
+    );
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    expect(screen.getByTestId('tela-favorito')).toBeChecked();
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'No favorita');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.click(screen.getByTestId('tela-favorito'));
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect((crearMutate.mock.calls[0]?.[0] as { favorito?: boolean }).favorito).toBe(false);
+  });
+
+  // A1.1 punto 1: peso (gr/m²) y ancho (m) viajan como número cuando se capturan.
+  it('en ALTA, el peso y el ancho capturados viajan como número', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
+        opciones?.onSuccess?.(telaEjemplo());
+      },
+    );
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Con ficha');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.type(screen.getByTestId('tela-peso'), '280');
+    await usuario.type(screen.getByTestId('tela-ancho'), '1.8');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as { peso?: number; ancho?: number };
+    expect(cuerpo.peso).toBe(280);
+    expect(cuerpo.ancho).toBe(1.8);
+  });
+
+  // Ronda de corrección A1.1 (hallazgo 2): el tope del DECIMAL(8,2) se espeja en captura —
+  // un peso de 1,000,000 se rechaza aquí con mensaje legible, no con un 400/500 del API.
+  it('un peso fuera del tope (>99,999.99) se rechaza en captura y no viaja', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Desborde');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.type(screen.getByTestId('tela-peso'), '1000000');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await screen.findByText('El peso debe ser un número entre 0 y 99,999.99');
+    expect(crearMutate).not.toHaveBeenCalled();
+  });
+
+  it('en EDICIÓN, vaciar el peso lo manda como null (borrar) y pre-carga los valores', async () => {
+    const usuario = userEvent.setup();
+    actualizarMutate.mockImplementation((_args, opciones?: { onSuccess?: (r: Tela) => void }) => {
+      opciones?.onSuccess?.(telaEjemplo());
+    });
+    renderConProveedores(
+      <DialogoTela
+        abierto
+        alCambiarAbierto={vi.fn()}
+        tela={telaEjemplo({ peso: 280, ancho: 1.8 })}
+      />,
+    );
+
+    expect(screen.getByTestId('tela-peso')).toHaveValue(280);
+    expect(screen.getByTestId('tela-ancho')).toHaveValue(1.8);
+
+    await usuario.clear(screen.getByTestId('tela-peso'));
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: TelaEditar };
+    expect(args.cuerpo.peso).toBeNull();
+    expect(args.cuerpo.ancho).toBe(1.8);
   });
 
   // Sin default a propósito: si el combo arrancara en kilos, una popelina (metros) nacería mal
@@ -296,7 +411,7 @@ describe('<DialogoTela>', () => {
     expect((crearMutate.mock.calls[0]?.[0] as { idProveedor?: number }).idProveedor).toBe(5);
   });
 
-  it('marcar "lleva complemento" pide su nombre, lo manda y condiciona el editor de colores', async () => {
+  it('marcar "lleva complemento" PRE-LLENA "Cardigan" (editable) y condiciona el editor', async () => {
     const usuario = userEvent.setup();
     crearMutate.mockImplementation(
       (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
@@ -317,27 +432,193 @@ describe('<DialogoTela>', () => {
     await usuario.click(screen.getByTestId('selector-proveedor-stub'));
     await usuario.click(screen.getByTestId('tela-lleva-complemento'));
 
-    // Marcado, el editor condiciona la columna y el form exige el nombre del complemento.
+    // Marcado: el editor condiciona la columna y el nombre del complemento se PRE-LLENA
+    // con "Cardigan" (A1.1 punto 6), editable.
     expect(screen.getByTestId('editor-colores-mock')).toHaveAttribute(
       'data-lleva-complemento',
       'si',
     );
+    expect(screen.getByTestId('tela-nombre-complemento')).toHaveValue('Cardigan');
+    expect(screen.getByTestId('editor-colores-mock')).toHaveAttribute(
+      'data-nombre-complemento',
+      'Cardigan',
+    );
+
+    // Si el usuario lo VACÍA, el form sigue exigiendo el nombre del complemento.
+    await usuario.clear(screen.getByTestId('tela-nombre-complemento'));
     await usuario.click(screen.getByTestId('guardar-tela'));
     await screen.findByText('Ponle nombre al complemento (p. ej. Cardigán)');
     expect(crearMutate).not.toHaveBeenCalled();
 
     await usuario.type(screen.getByTestId('tela-nombre-cuerpo'), 'Felpa');
     await usuario.type(screen.getByTestId('tela-nombre-complemento'), 'Cardigán');
-    expect(screen.getByTestId('editor-colores-mock')).toHaveAttribute(
-      'data-nombre-complemento',
-      'Cardigán',
-    );
     await usuario.click(screen.getByTestId('guardar-tela'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
     const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(cuerpo.nombreCuerpo).toBe('Felpa');
     expect(cuerpo.nombreComplemento).toBe('Cardigán');
+  });
+
+  // A1.1 punto 6: al elegir el tipo de tela se propone la PRIMERA PALABRA de su nombre
+  // como nombre del cuerpo ("Felpa 50/50" → "Felpa"), sin pisar lo ya tecleado. Ronda de
+  // corrección: el prefill SOLO corre con "lleva complemento" — al marcar la casilla
+  // después del tipo, la casilla propone entonces (este test cubre ese flujo).
+  it('elegir el tipo de tela propone la primera palabra como nombre del cuerpo (alta)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.selectOptions(screen.getByTestId('tela-categoria'), '8'); // "Felpa 50/50"
+    await usuario.click(screen.getByTestId('tela-lleva-complemento'));
+    expect(screen.getByTestId('tela-nombre-cuerpo')).toHaveValue('Felpa');
+  });
+
+  it('y en el flujo inverso (marcar primero, elegir tipo después) también propone', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.click(screen.getByTestId('tela-lleva-complemento'));
+    expect(screen.getByTestId('tela-nombre-cuerpo')).toHaveValue('');
+    await usuario.selectOptions(screen.getByTestId('tela-categoria'), '8');
+    expect(screen.getByTestId('tela-nombre-cuerpo')).toHaveValue('Felpa');
+  });
+
+  // Ronda de corrección A1.1 (hallazgo 4): SIN complemento el campo del cuerpo ni se ve —
+  // el prefill NO debe correr, o un alta "sin complemento" persistiría un nombreCuerpo
+  // invisible que aflora después en inventario.
+  it('SIN complemento, elegir el tipo NO pre-llena el cuerpo (ni viaja en el alta)', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
+        opciones?.onSuccess?.(telaEjemplo());
+      },
+    );
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin complemento');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.selectOptions(screen.getByTestId('tela-categoria'), '8'); // "Felpa 50/50"
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect('nombreCuerpo' in cuerpo).toBe(false);
+  });
+
+  it('el pre-llenado del cuerpo NO pisa lo que el usuario ya tecleó', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.click(screen.getByTestId('tela-lleva-complemento'));
+    const campoCuerpo = screen.getByTestId('tela-nombre-cuerpo');
+    await usuario.type(campoCuerpo, 'Terry');
+    await usuario.selectOptions(screen.getByTestId('tela-categoria'), '8');
+    expect(campoCuerpo).toHaveValue('Terry');
+  });
+
+  it('en EDICIÓN elegir el tipo de tela NO re-llena el nombre del cuerpo', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoTela
+        abierto
+        alCambiarAbierto={vi.fn()}
+        tela={telaEjemplo({ nombreComplemento: 'Cardigan' })}
+      />,
+    );
+
+    await usuario.selectOptions(screen.getByTestId('tela-categoria'), '8');
+    expect(screen.getByTestId('tela-nombre-cuerpo')).toHaveValue('');
+  });
+
+  // ── Nombre COMPUESTO (A1.1 punto 8): corto del proveedor + nombre del proveedor ──
+
+  it('el nombre se AUTO-ARMA con el corto del proveedor + el nombre que él le da', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
+        opciones?.onSuccess?.(telaEjemplo());
+      },
+    );
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    // Elegir proveedor (Alsatex, corto "Alsa") y teclear el nombre del proveedor.
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.type(screen.getByTestId('tela-nombre-proveedor'), 'Felpa España');
+    expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('Alsa Felpa España');
+
+    // Sigue siendo editable y viaja tal cual al guardar.
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect((crearMutate.mock.calls[0]?.[0] as { nombre?: string }).nombre).toBe(
+      'Alsa Felpa España',
+    );
+  });
+
+  it('sin nombre corto, el compuesto usa el NOMBRE del proveedor', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.click(screen.getByTestId('selector-proveedor-stub-sin-corto'));
+    await usuario.type(screen.getByTestId('tela-nombre-proveedor'), 'Felpa');
+    expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('Bloom Textil Felpa');
+  });
+
+  it('el auto-armado NO pisa un nombre tecleado a mano', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    const campoNombre = screen.getByLabelText(/^Nombre\* \(obligatorio\)$/);
+    await usuario.type(campoNombre, 'Mi tela especial');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    await usuario.type(screen.getByTestId('tela-nombre-proveedor'), 'Felpa España');
+    expect(campoNombre).toHaveValue('Mi tela especial');
+  });
+
+  it('en EDICIÓN el nombre NO se re-arma solo; solo si el usuario lo VACÍA (y usa el CORTO)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoTela
+        abierto
+        alCambiarAbierto={vi.fn()}
+        tela={telaEjemplo({
+          nombre: 'Nombre histórico',
+          nombreProveedor: 'Felpa España',
+          // Ronda de corrección (hallazgo 3): la salida de la tela YA trae el corto del
+          // dueño — el re-armado debe usar "Alsa", no el nombre largo "Alsatex".
+          proveedorCorto: 'Alsa',
+        })}
+      />,
+    );
+
+    const campoNombre = screen.getByLabelText(/^Nombre\* \(obligatorio\)$/);
+    // Cambiar el nombre del proveedor NO re-arma el nombre guardado…
+    await usuario.type(screen.getByTestId('tela-nombre-proveedor'), ' 2');
+    expect(campoNombre).toHaveValue('Nombre histórico');
+
+    // …pero VACIARLO vuelve a soltar el armado, con el nombre CORTO del dueño.
+    await usuario.clear(campoNombre);
+    await waitFor(() => expect(campoNombre).toHaveValue('Alsa Felpa España 2'));
+  });
+
+  it('en EDICIÓN sin corto del dueño, el re-armado cae a su nombre completo', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoTela
+        abierto
+        alCambiarAbierto={vi.fn()}
+        tela={telaEjemplo({
+          nombre: 'Nombre histórico',
+          nombreProveedor: 'Felpa España',
+          proveedorCorto: null,
+        })}
+      />,
+    );
+
+    const campoNombre = screen.getByLabelText(/^Nombre\* \(obligatorio\)$/);
+    await usuario.clear(campoNombre);
+    await waitFor(() => expect(campoNombre).toHaveValue('Alsatex Felpa España'));
   });
 
   it('en alta, elegir una composición la incluye como id numérico (y "Nueva" abre su alta rápida)', async () => {

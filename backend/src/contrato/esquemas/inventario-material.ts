@@ -485,8 +485,18 @@ const esquemaMovTelaColorRenglonSalida = z.object({
     .number()
     .nullable()
     .describe('Cantidad de COMPLEMENTO o null (la tela no lleva).'),
-  costoUnit: z.number().nullable().describe('Costo unitario o null (sin permiso de importes).'),
-  importe: z.number().nullable().describe('Importe (cuerpo × costoUnit) o null.'),
+  costoUnit: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del CUERPO o null (sin permiso de importes / sin precio).'),
+  costoUnitComplemento: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio).'),
+  importe: z
+    .number()
+    .nullable()
+    .describe('Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento.'),
 });
 
 /** Salida de un movimiento de tela POR COLOR: encabezado + renglones. */
@@ -647,8 +657,18 @@ const esquemaKardexTelaColorRenglon = z.object({
   entradaComplemento: z.number().describe('Complemento que entra (0 si es salida).'),
   salidaComplemento: z.number().describe('Complemento que sale (0 si es entrada).'),
   saldoComplemento: z.number().describe('Saldo corrido del complemento (por color×almacén).'),
-  costoUnit: z.number().nullable().describe('Costo unitario o null (sin permiso de importes).'),
-  importe: z.number().nullable().describe('Importe del renglón o null.'),
+  costoUnit: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del CUERPO o null (sin permiso de importes / sin precio).'),
+  costoUnitComplemento: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del COMPLEMENTO (B1) o null.'),
+  importe: z
+    .number()
+    .nullable()
+    .describe('Importe del renglón (ambos componentes con su propio costo) o null.'),
   origenTipo: z.string().nullable(),
   origenId: z.string().nullable(),
   cancelado: z.boolean(),

@@ -637,7 +637,8 @@ export type ParametrosListarTelas = z.input<typeof esquemaListarTelas>;
 export type TelaConColores = Tela & {
   categoria: Pick<TelaCategoria, 'nombre'> | null;
   composicion: Pick<ComposicionTela, 'nombre'> | null;
-  proveedor: { nombre: string } | null;
+  /** Dueño del artículo: nombre + nombre CORTO (A1.1: la UI arma el nombre compuesto con él). */
+  proveedor: { nombre: string; nombreCorto: string | null } | null;
   colores: {
     id: number;
     nombre: string;
@@ -657,7 +658,9 @@ export type TelaConColores = Tela & {
 const incluirCategoriaYColores = {
   categoria: { select: { nombre: true } },
   composicion: { select: { nombre: true } },
-  proveedor: { select: { nombre: true } },
+  // El nombre CORTO viaja junto al nombre (A1.1): la edición del diálogo arma el nombre
+  // compuesto con el corto del proveedor dueño, no con su nombre largo.
+  proveedor: { select: { nombre: true, nombreCorto: true } },
   colores: {
     select: {
       id: true,
@@ -943,6 +946,9 @@ function datosOpcionalesCrear(
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
   if (datos.unidadMedida !== undefined) data.unidadMedida = datos.unidadMedida;
   if (datos.precioSugerido !== undefined) data.precioSugerido = datos.precioSugerido;
+  // Peso (gr/m²) y ancho (m) de la tela (A1.1): informativos, opcionales.
+  if (datos.peso !== undefined) data.peso = datos.peso;
+  if (datos.ancho !== undefined) data.ancho = datos.ancho;
   if (datos.idCategoria !== undefined) data.idCategoria = datos.idCategoria;
   // Identidad en 4 datos (§Post-F9.11). Los textos '' se normalizan a omitir (nunca se guarda '').
   if (datos.idComposicion !== undefined) data.idComposicion = datos.idComposicion;
@@ -1030,6 +1036,18 @@ function aplicarOpcionalesEditar(
       de: actual.precioSugerido === null ? null : actual.precioSugerido.toNumber(),
       a: nuevo,
     };
+  }
+
+  // peso / ancho (A1.1, decimales nullable): misma semántica que precioSugerido.
+  if (cambiaDecimal(datos.peso, actual.peso)) {
+    const nuevo = datos.peso ?? null;
+    cambios.peso = nuevo;
+    detalle.peso = { de: actual.peso === null ? null : actual.peso.toNumber(), a: nuevo };
+  }
+  if (cambiaDecimal(datos.ancho, actual.ancho)) {
+    const nuevo = datos.ancho ?? null;
+    cambios.ancho = nuevo;
+    detalle.ancho = { de: actual.ancho === null ? null : actual.ancho.toNumber(), a: nuevo };
   }
 
   // Enums/banderas: omitir = no tocar (el form las manda con valor).

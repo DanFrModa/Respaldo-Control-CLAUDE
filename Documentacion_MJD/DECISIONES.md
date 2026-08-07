@@ -803,3 +803,20 @@ Se lee de corrido: **Felpa · Alsatex · Felpa Suiza**. **Consecuencia:** la tel
 - **PENDIENTE, etapa propia del módulo de costos** — no se mezcla con la reestructura de telas.
 
 **Secuencia acordada:** A1 (catálogo) → A2 (inventario) → entrada por factura/remisión → pantalla de stocks → packing list. El **pack** (§Post-F9.10) y la **corrección del costo de tela** van después.
+
+**8. Decisiones que salieron al construir la ENTRADA de tela (etapa B1, 6-ago-2026 — derivadas de §Post-F9.9 punto 7; las tomó el lead dentro del margen de lo que Daniel ya decidió, se le confirman cuando pruebe):**
+- **El COLOR es obligatorio al recibir una orden de compra de tela.** La línea de la OC no lo determina (se compra "felpa negra" pero el sistema necesita saber cuál color hijo). Antes de inventarlo, el sistema **lo exige** en la pantalla de recepción y el dominio rechaza la recepción sin él. Nunca se adivina un color.
+- **El complemento NO cuenta contra lo pedido en la orden de compra.** El cardigan es el acompañante del mismo renglón; lo pedido se sigue midiendo por el cuerpo (si no, el MRP y la Ruta Crítica leerían mal el avance de la compra). Por la vía de OC **no** se recibe una entrega de solo complemento: ese caso entra por factura/remisión.
+- **El documento de entrada tiene borrador.** Se captura, se le adjunta el PDF de la factura y se revisa **sin tocar el inventario**; hasta confirmarlo se crean las partidas y el movimiento. Cancelar una entrada ya confirmada **no borra nada**: registra el movimiento inverso (D3).
+- **Factura repetida: avisa, no bloquea.** Si ya existe un documento vivo del mismo proveedor con el mismo número, la pantalla lo advierte y deja seguir (el número lo pone el proveedor y puede repetirse legítimamente). Importa porque el inventario arranca desde cero por conteo físico, justo por los errores del inventario viejo.
+- **El precio del cardigan también se guarda en el kardex** (`costoUnitComplemento`), por las dos vías de entrada. Sin eso el complemento quedaba sin costo y la corrección del punto 6 (costo de tela por consumo) nacería incompleta.
+
+**7. Remates del catálogo tras probarlo (DANIEL, 6-ago-2026, feedback textual sobre A1 en `prueba` — construidos como A1.1):**
+- **Peso y ancho** de la tela: dos campos nuevos opcionales (*"Me faltó incluir un campo de peso y otro de ancho"*) — peso en gr/m², ancho en metros.
+- **Favorita marcada por default** al dar de alta una tela nueva (solo el alta; editar no cambia).
+- El ejemplo del alta de color es **"Negro"** (no "Marino Alsa 3040").
+- **"¿Es tela de producción?" se OCULTA de la pantalla** (*"no entiendo la casilla"*): el dato queda en BD con su default `true` como legado del viejo; si algún día hace falta, se destapa.
+- **"Tipo de componente" se RETIRA de la pantalla** (*"no sé si está siendo redundante"* — lo es): quedó superado por los nombres de cuerpo/complemento de la propia tela. Columna/enum quedan en BD como legado.
+- **Nombre del complemento consistente**: al marcar "lleva complemento" se pre-llena **"Cardigan"** (editable — Daniel: el 99 % de las veces es cárdigan; mejor default que catálogo). Y el **nombre del cuerpo se propone desde el tipo de tela** (tipo "Felpa 50/50" → propone "Felpa"), sin pisar lo tecleado.
+- **`Proveedor.nombreCorto`** (nuevo, opcional): BLOOM TEXTIL → "Bloom". Se usa para el nombre compuesto.
+- **El nombre de la tela se ARMA solo** (*"me está sobrando el nombre… chance el nombre que aparezca debe de ser el compuesto"*): `nombre corto del proveedor + nombre del proveedor de la tela` → **"Bloom Felpa España"**. Editable (teclearlo lo protege; vaciarlo re-suelta el armado); sigue único global.

@@ -58,11 +58,12 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 106 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
-    // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
-    // de existencias y salida a orden). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(105);
+    // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
+    // de existencias y salida a orden; +1 en B1: entradas de tela por factura). Lo que cambia es
+    // SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(106);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -174,8 +175,8 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
     // +4 en A2: ajuste/traspaso de telas por color y las vistas legadas por lote (existencias y
-    // salida a orden).
-    expect(inventarios).toHaveLength(14);
+    // salida a orden); +1 en B1: entradas de tela por factura/remisión.
+    expect(inventarios).toHaveLength(15);
   });
 
   it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
@@ -243,6 +244,8 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           hijos: [
             'inventario-telas-existencias',
             'catalogo-telas',
+            // +1 en B1: la entrada por factura/remisión (la otra puerta del inventario de telas).
+            'inventario-telas-entradas',
             'inventario-telas-salida-orden',
             'inventario-telas-ajuste',
           ],

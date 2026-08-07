@@ -90,14 +90,16 @@ test.describe('Inicio de sesión', () => {
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
-    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 4 hijos curados — la nueva
-    // Existencias por color (principal), el Catálogo de telas (el pedido de Daniel), la salida a
-    // orden y el ajuste por color. El resto (traspaso/kardex/vistas por lote) va por ⌘K.
+    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 5 hijos curados — la nueva
+    // Existencias por color (principal), el Catálogo de telas (el pedido de Daniel), las entradas
+    // por factura (B1), la salida a orden y el ajuste por color. El resto (traspaso/kardex/vistas
+    // por lote) va por ⌘K.
     await expect(navegacion.getByRole('link', { name: 'Existencias de telas' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Telas' }).click();
     for (const hijoTelas of [
       'Existencias de telas',
       'Catálogo de telas',
+      'Entradas de tela por factura',
       'Salida de tela a orden',
       'Ajuste de telas por color',
     ]) {

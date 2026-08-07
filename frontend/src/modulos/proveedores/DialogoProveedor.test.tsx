@@ -38,6 +38,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
   return {
     id: 10,
     nombre: 'Textiles Prueba',
+    nombreCorto: null,
     razonSocial: null,
     tipo: 'TELAS',
     telefono: null,
@@ -124,7 +125,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText(/^Nombre/), 'Sin roles');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin roles');
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     // No se llama a crear y se muestra el error de captura de roles.
@@ -138,7 +139,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText(/^Nombre/), 'Factura sin RFC');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Factura sin RFC');
     // Elige un rol (para aislar la regla fiscal de la regla de roles).
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
@@ -164,7 +165,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={alCambiarAbierto} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText(/^Nombre/), 'Nuevo Prov');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo Prov');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-2'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
@@ -175,6 +176,57 @@ describe('<DialogoProveedor>', () => {
     expect(cuerpo.roles).toEqual([1, 2]);
     // Tras el exito cierra el dialogo.
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
+  });
+
+  // A1.1: el nombre corto de uso diario ("Bloom" para BLOOM TEXTIL) viaja en el alta y,
+  // vacío en edición, se manda null para borrarlo (M1).
+  it('captura el nombre corto en el alta y lo borra con null en edición', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'BLOOM TEXTIL' }));
+      },
+    );
+    const { unmount } = renderConProveedores(
+      <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+    );
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'BLOOM TEXTIL');
+    await usuario.type(screen.getByTestId('proveedor-nombre-corto'), 'Bloom');
+    await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect((crearMutate.mock.calls[0]?.[0] as ProveedorCrear).nombreCorto).toBe('Bloom');
+    unmount();
+
+    // EDICIÓN: pre-carga el nombre corto y, si se vacía, viaja como null (borrar).
+    actualizarMutate.mockImplementation(
+      (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo());
+      },
+    );
+    renderConProveedores(
+      <DialogoProveedor
+        abierto
+        alCambiarAbierto={vi.fn()}
+        proveedor={proveedorEjemplo({
+          nombreCorto: 'Bloom',
+          roles: [{ id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' }],
+        })}
+      />,
+    );
+
+    const campoCorto = screen.getByTestId('proveedor-nombre-corto');
+    expect(campoCorto).toHaveValue('Bloom');
+    await usuario.clear(campoCorto);
+    await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { nombreCorto?: string | null };
+    };
+    expect(args.cuerpo.nombreCorto).toBeNull();
   });
 
   // Fusión de terceros (D12/R15): la UI captura los datos de taller del proveedor.
@@ -189,7 +241,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText(/^Nombre/), 'Taller');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Taller');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     // Expande "Datos de taller" y captura los tres campos.
     await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
@@ -328,7 +380,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText(/^Nombre/), 'Nuevo');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 

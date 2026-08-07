@@ -66,7 +66,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { aDateColumna, aNumero, tipoPorCodigo, tipoPorId } from './telas.js';
 
 /** Clave de la secuencia de folios de partida (A3 — consecutivo por empresa, jamás Max()+1). */
-const CLAVE_SECUENCIA_PARTIDA = 'partida-tela';
+export const CLAVE_SECUENCIA_PARTIDA = 'partida-tela';
 
 /** Tipo inverso para CANCELAR una entrada (dirección `salida`). */
 const COD_AJUSTE_SALIDA = 'ajuste-salida';
@@ -81,7 +81,7 @@ const COD_SALIDA_A_ORDEN = 'salida-a-orden';
 // ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
 
 /** Un color de tela con los datos de su tela padre que las reglas necesitan. */
-interface ColorConTela {
+export interface ColorConTela {
   idTelaColor: number;
   nombreColor: string;
   idTela: number;
@@ -92,7 +92,7 @@ interface ColorConTela {
 
 /** La forma MÍNIMA de un renglón por color que las reglas necesitan (sin `loteProveedor` — las
  * líneas de salida/traspaso ya no traen ese campo en el contrato, reviewer A2 #4). */
-interface LineaColorBase {
+export interface LineaColorBase {
   idTelaColor: number;
   cantidad: number;
   cantidadComplemento?: number | undefined;
@@ -106,7 +106,7 @@ interface LineaColorBase {
  * DOS lotes del MISMO tela+color en un documento — cada renglón crea SU partida, DECISIONES
  * §Post-F9.11 punto 4).
  */
-async function resolverColores(
+export async function resolverColores(
   tx: Tx,
   lineas: readonly LineaColorBase[],
   opciones?: { permitirRepetidos?: boolean },
@@ -156,7 +156,7 @@ async function resolverColores(
  * `idPartidaPorLinea` va POR ÍNDICE (no por color): en una entrada el mismo color puede aparecer
  * en varios renglones y cada uno lleva SU propia partida.
  */
-function aLineasMotor(
+export function aLineasMotor(
   lineas: readonly LineaColorBase[],
   colores: Map<number, ColorConTela>,
   idPartidaPorLinea?: readonly (number | null)[],
@@ -175,6 +175,58 @@ function aLineasMotor(
       cantidadComplemento: llevaComplemento ? (l.cantidadComplemento ?? 0) : null,
     };
   });
+}
+
+/** Datos de la PARTIDA que se crea al dar una entrada de tela por color. */
+export interface DatosPartidaTela {
+  idEmpresa: number;
+  idTelaColor: number;
+  /** Número de lote del proveedor (texto libre, opcional). */
+  loteProveedor?: string | null | undefined;
+  /** Factura/remisión que ampara la entrada (opcional). */
+  factura?: string | null | undefined;
+  /** Fecha de la entrada (`YYYY-MM-DD`). */
+  fecha: string;
+}
+
+/**
+ * Crea UNA partida de tela (la unidad de ENTRADA del inventario por color) con su folio atómico
+ * por empresa (A3, secuencia `partida-tela`) y su bitácora (A7), DENTRO de la transacción del
+ * llamador (A2). Es el único lugar donde nace una `PartidaTela`: lo usan el ajuste de entrada por
+ * color (A2), el documento de entrada por factura/remisión y la recepción de compra (B1).
+ *
+ * ⚠️ Orden de folios: si la transacción también pide el folio del MOVIMIENTO, la partida va
+ * PRIMERO (mismo orden en todos los llamadores para no interbloquear — ver `comun/secuencias.ts`).
+ */
+export async function crearPartidaTela(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: DatosPartidaTela,
+): Promise<{ id: number; folio: bigint }> {
+  const folio = await siguienteFolio(tx, datos.idEmpresa, CLAVE_SECUENCIA_PARTIDA);
+  const partida = await tx.partidaTela.create({
+    data: {
+      folio,
+      idEmpresa: datos.idEmpresa,
+      idTelaColor: datos.idTelaColor,
+      loteProveedor: datos.loteProveedor?.trim() || null,
+      factura: datos.factura?.trim() || null,
+      fecha: aDateColumna(datos.fecha),
+      creadoPorId: sesion.id,
+      modificadoPorId: sesion.id,
+    },
+  });
+  await registrarBitacora(tx, sesion, {
+    entidad: 'PartidaTela',
+    idEntidad: partida.id,
+    accion: 'CREAR',
+    datos: {
+      folio: folio.toString(),
+      idTelaColor: datos.idTelaColor,
+      ...(partida.loteProveedor === null ? {} : { loteProveedor: partida.loteProveedor }),
+    },
+  });
+  return { id: partida.id, folio };
 }
 
 /**
@@ -257,7 +309,12 @@ function aMovimientoTelaColorSalida(
       totalCuerpo += cantidad;
       totalComplemento += cantidadComplemento ?? 0;
       const costoUnit = verImportes ? aNumero(d.costoUnit) : null;
-      const importe = costoUnit === null ? null : costoUnit * cantidad;
+      const costoUnitComplemento = verImportes ? aNumero(d.costoUnitComplemento) : null;
+      // B1: el renglón valúa CADA componente con SU costo (el cardigan tiene su propio precio).
+      const importe =
+        costoUnit === null && costoUnitComplemento === null
+          ? null
+          : (costoUnit ?? 0) * cantidad + (costoUnitComplemento ?? 0) * (cantidadComplemento ?? 0);
       if (importe !== null) {
         totalImporte += importe;
         hayImporte = true;
@@ -275,6 +332,7 @@ function aMovimientoTelaColorSalida(
         cantidad,
         cantidadComplemento,
         costoUnit,
+        costoUnitComplemento,
         importe,
       };
     });
@@ -367,30 +425,14 @@ export async function ajustarInventarioTelaColor(
       // índice, porque un color repetido lleva partidas distintas.
       idPartidaPorLinea = [];
       for (const linea of datos.lineas) {
-        const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_PARTIDA);
-        const partida = await tx.partidaTela.create({
-          data: {
-            folio,
-            idEmpresa,
-            idTelaColor: linea.idTelaColor,
-            loteProveedor: linea.loteProveedor?.trim() || null,
-            factura: datos.factura?.trim() || null,
-            fecha: aDateColumna(datos.fecha),
-            creadoPorId: sesion.id,
-            modificadoPorId: sesion.id,
-          },
+        const partida = await crearPartidaTela(tx, sesion, {
+          idEmpresa,
+          idTelaColor: linea.idTelaColor,
+          loteProveedor: linea.loteProveedor,
+          factura: datos.factura,
+          fecha: datos.fecha,
         });
         idPartidaPorLinea.push(partida.id);
-        await registrarBitacora(tx, sesion, {
-          entidad: 'PartidaTela',
-          idEntidad: partida.id,
-          accion: 'CREAR',
-          datos: {
-            folio: folio.toString(),
-            idTelaColor: linea.idTelaColor,
-            ...(partida.loteProveedor === null ? {} : { loteProveedor: partida.loteProveedor }),
-          },
-        });
       }
     } else {
       // SALIDA de ajuste: sin partida (el consumo empareja por color) y sin lote del proveedor.
@@ -789,6 +831,7 @@ export async function kardexTelaColor(
       cantidad: true,
       cantidadComplemento: true,
       costoUnit: true,
+      costoUnitComplemento: true,
       idPartida: true,
       partida: { select: { folio: true, loteProveedor: true } },
       movimiento: {
@@ -831,6 +874,7 @@ export async function kardexTelaColor(
     saldoComplementoPorAlmacen.set(m.idAlmacen, saldoComplemento);
 
     const costoUnit = verImportes ? aNumero(d.costoUnit) : null;
+    const costoUnitComplemento = verImportes ? aNumero(d.costoUnitComplemento) : null;
     return {
       idMovimiento: m.id,
       folio: Number(m.folio),
@@ -850,7 +894,12 @@ export async function kardexTelaColor(
       salidaComplemento,
       saldoComplemento,
       costoUnit,
-      importe: costoUnit === null ? null : costoUnit * cuerpo,
+      costoUnitComplemento,
+      // B1: cada componente con SU costo (el complemento ya no queda fuera de la valuación).
+      importe:
+        costoUnit === null && costoUnitComplemento === null
+          ? null
+          : (costoUnit ?? 0) * cuerpo + (costoUnitComplemento ?? 0) * complemento,
       origenTipo: m.origenTipo,
       origenId: m.origenId,
       cancelado: m.anuladoPor.length > 0,

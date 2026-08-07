@@ -58,6 +58,7 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
   return {
     id: proveedor.id,
     nombre: proveedor.nombre,
+    nombreCorto: proveedor.nombreCorto,
     razonSocial: proveedor.razonSocial,
     tipo: proveedor.tipo,
     telefono: proveedor.telefono,

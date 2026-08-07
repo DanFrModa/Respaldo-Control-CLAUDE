@@ -9,8 +9,7 @@ import { RecepcionComprasPagina } from './RecepcionComprasPagina';
 
 const useOrdenesCompraMock = vi.fn();
 const useAlmacenesMock = vi.fn();
-const useColoresMock = vi.fn();
-const useTelasMock = vi.fn();
+const useTelaMock = vi.fn();
 const useRecepcionesDeOcMock = vi.fn();
 const recibirMutate = vi.fn();
 const reversarMutate = vi.fn();
@@ -22,11 +21,8 @@ vi.mock('@/api/ordenes-compra', () => ({
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => useAlmacenesMock() as unknown,
 }));
-vi.mock('@/api/colores', () => ({
-  useColores: () => useColoresMock() as unknown,
-}));
 vi.mock('@/api/telas', () => ({
-  useTelas: () => useTelasMock() as unknown,
+  useTela: (id: unknown) => useTelaMock(id) as unknown,
 }));
 vi.mock('@/api/recepciones', () => ({
   useRecepcionesDeOc: (id: unknown) => useRecepcionesDeOcMock(id) as unknown,
@@ -45,8 +41,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
   beforeEach(() => {
     useOrdenesCompraMock.mockReset();
     useAlmacenesMock.mockReset();
-    useColoresMock.mockReset();
-    useTelasMock.mockReset();
+    useTelaMock.mockReset();
     useRecepcionesDeOcMock.mockReset();
     recibirMutate.mockReset();
     reversarMutate.mockReset();
@@ -57,15 +52,23 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
       q.estatus === 'autorizada' ? lista([ocAutorizada]) : lista([]),
     );
     useAlmacenesMock.mockReturnValue(lista([{ id: 1, nombre: 'Bodega' }]));
-    useColoresMock.mockReturnValue(lista([{ id: 9, nombre: 'Rojo' }]));
-    // Catálogo de telas para los componentes del lote (M1): incluye la tela comprada (id 3) + una
-    // acompañante (id 4) para poder armar un lote felpa+cardigan desde la UI.
-    useTelasMock.mockReturnValue(
-      lista([
-        { id: 3, nombre: 'Felpa francesa' },
-        { id: 4, nombre: 'Cardigan' },
-      ]),
-    );
+    // B1: la captura de tela es POR COLOR — la tela comprada se lee por su ID EXACTO (no por
+    // búsqueda paginada) y trae sus colores hijos, su complemento ("Cardigan") y los precios del
+    // catálogo que se sugieren en la captura.
+    useTelaMock.mockReturnValue({
+      data: {
+        id: 3,
+        nombre: 'Felpa francesa',
+        nombreCuerpo: 'Felpa',
+        nombreComplemento: 'Cardigan',
+        colores: [
+          { id: 91, nombre: 'Rojo', pantone: '18-1664', precio: 95, precioComplemento: 130 },
+          { id: 92, nombre: 'Marino', pantone: null, precio: null, precioComplemento: null },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
     useRecepcionesDeOcMock.mockReturnValue({
       data: { recepciones: [] },
       isPending: false,
@@ -82,7 +85,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     expect(screen.getByRole('option', { name: /OC 1007/ })).toBeInTheDocument();
   });
 
-  it('al recibir una línea de tela arma el lote (color + componente) y llama a recibir', async () => {
+  it('B1: la línea de tela se captura POR COLOR (color + complemento + su precio + lote del proveedor)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<RecepcionComprasPagina />, {
       sesion: estadoSesionDePrueba(['compras.recibir']),
@@ -92,9 +95,13 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
     await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
 
-    // Marca el renglón de tela (id 10) y elige el color del lote.
+    // Marca el renglón de tela (id 10) y captura color + complemento + lote del proveedor.
     await usuario.click(screen.getByTestId('rec-incluir-10'));
-    await usuario.selectOptions(screen.getByTestId('rec-color-10'), '9');
+    await usuario.selectOptions(screen.getByTestId('rec-color-10'), '91');
+    await usuario.type(screen.getByTestId('rec-compl-10'), '25');
+    // El precio del complemento se PRE-LLENA del catálogo del color (sugerencia editable).
+    expect(screen.getByTestId('rec-precio-compl-10')).toHaveValue(130);
+    await usuario.type(screen.getByTestId('rec-lote-prov-10'), 'L-88');
 
     // Registra la recepción.
     await usuario.click(screen.getByTestId('rec-guardar'));
@@ -109,11 +116,40 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     expect(args.cuerpo.lineas[0]).toMatchObject({
       idOrdenCompraLinea: 10,
       cantidad: 100,
-      lote: { idColor: 9, componentes: [{ idTela: 3, cantidad: 100 }] },
+      telaColor: {
+        idTelaColor: 91,
+        cantidadComplemento: 25,
+        precioUnitComplemento: 130,
+        loteProveedor: 'L-88',
+      },
     });
   });
 
-  it('M1: "+ componente" agrega una tela ACOMPAÑANTE distinta del catálogo (lote felpa+cardigan)', async () => {
+  it('B1: si la tela no se pudo leer, lo DICE (no miente con "no tiene colores") y ofrece reintentar', async () => {
+    const usuario = userEvent.setup();
+    const refetch = vi.fn();
+    useTelaMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: { message: 'No tienes permiso para ver telas.' },
+      refetch,
+    });
+    renderConProveedores(<RecepcionComprasPagina />, {
+      sesion: estadoSesionDePrueba(['compras.recibir']),
+    });
+    await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
+    await usuario.click(screen.getByTestId('rec-incluir-10'));
+
+    expect(screen.getByTestId('rec-color-error-10')).toHaveTextContent(
+      'No tienes permiso para ver telas.',
+    );
+    expect(screen.getByTestId('rec-color-10')).toBeDisabled();
+    await usuario.click(screen.getByTestId('rec-color-reintentar-10'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('B1: sin COLOR no se manda la recepción (el backend lo exige; la UI evita el viaje)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<RecepcionComprasPagina />, {
       sesion: estadoSesionDePrueba(['compras.recibir']),
@@ -122,28 +158,10 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
     await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
     await usuario.click(screen.getByTestId('rec-incluir-10'));
-    await usuario.selectOptions(screen.getByTestId('rec-color-10'), '9');
-
-    // Agrega un segundo componente y elige el CARDIGAN (id 4), distinto de la tela comprada (id 3).
-    await usuario.click(screen.getByTestId('rec-add-comp-10'));
-    const [, selectorComp2] = screen.getAllByLabelText('Tela del componente');
-    const [, cantidadComp2] = screen.getAllByLabelText('Cantidad del componente');
-    expect(selectorComp2).toBeDefined();
-    await usuario.selectOptions(selectorComp2 as HTMLElement, '4');
-    await usuario.clear(cantidadComp2 as HTMLElement);
-    await usuario.type(cantidadComp2 as HTMLElement, '60');
-
+    // NO se elige color.
     await usuario.click(screen.getByTestId('rec-guardar'));
 
-    expect(recibirMutate).toHaveBeenCalledTimes(1);
-    const [args] = recibirMutate.mock.calls[0] as [
-      { cuerpo: { lineas: { lote: { componentes: { idTela: number; cantidad: number }[] } }[] } },
-    ];
-    const [primeraLinea] = args.cuerpo.lineas;
-    expect(primeraLinea?.lote.componentes).toEqual([
-      { idTela: 3, cantidad: 100 }, // tela comprada (default)
-      { idTela: 4, cantidad: 60 }, // acompañante elegido del catálogo (M1)
-    ]);
+    expect(recibirMutate).not.toHaveBeenCalled();
   });
 
   it('sin compras.recibir el selector queda deshabilitado', () => {

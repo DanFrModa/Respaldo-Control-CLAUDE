@@ -47,6 +47,7 @@ import { rutasClienteDepartamentos } from './api/clientes/cliente-departamentos.
 import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
 import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
 import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
+import { rutasEntradasTela } from './api/inventarios/entradas-tela.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
 import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
@@ -257,6 +258,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // inverso (D3), existencias (vistas) y kardex. Importes de telas ocultos sin telas.ver-totales
   // (ex-acceso #7). RBAC inventario-telas/.avios ver/.mover.
   await app.register(rutasInventarioTelas, { prefix: '/api' });
+  // ENTRADA de tela por FACTURA/REMISIÓN sin orden de compra (B1, DECISIONES §Post-F9.9 p.7): la
+  // segunda vía de entrada del inventario por color — documento con cabecera + N partidas, PDF de
+  // la factura adjunto en R2, confirmación que crea partidas + kardex y cancelación por inverso.
+  await app.register(rutasEntradasTela, { prefix: '/api' });
   await app.register(rutasInventarioAvios, { prefix: '/api' });
   // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),
   // cancelación suave, pendientes derivados por orden, corte semanal por cortador y los 2 PDFs

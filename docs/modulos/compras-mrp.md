@@ -25,8 +25,13 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     almacena: es derivado de las líneas.
   - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`. `recibirCompra` es **UNA transacción
     (A2)**: valida OC `autorizada`/`recibida_parcial` (decisión **(b)**, deny-by-default A4) y el
-    almacén destino (`comun/almacenes.ts`), folio A3, crea `RecepcionCompra`/`Linea` + `Lote`+
-    componentes (**D5**), registra la entrada al kardex (`entrada-recepcion`) **convirtiendo cantidad
+    almacén destino (`comun/almacenes.ts`), folio A3, crea `RecepcionCompra`/`Linea` y —desde **B1**
+    (6-ago-2026)— para TELA **exige el COLOR** (`idTelaColor`, nunca lo adivina) y crea su
+    **`PartidaTela`** en vez del `Lote` de D5 (que quedó como legado en cuarentena; ver
+    [`inventario-telas-avios.md`](inventario-telas-avios.md) §A2). El complemento (cardigan) viaja en
+    el mismo renglón con su propio costo y **NO cuenta contra lo pedido** (`cantidadRecibida` sigue
+    midiéndose por el cuerpo, que es lo que leen MRP y el auto-avance de RC). Avíos y libres, sin
+    cambio. Registra la entrada al kardex (`entrada-recepcion`) **convirtiendo cantidad
     ×factor y costo ÷factor** (invariante de valuación `cantidad×costoUnit = cantidadOC×precioOC`,
     D1/D3), recalcula el estatus de la OC **bajo `pg_advisory_xact_lock` por OC** (namespace `bigint`
     `0x4f43`, anti-carrera R7) y **publica `material-recibido` vía OUTBOX transaccional** (el evento
@@ -63,7 +68,8 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
   server-side en cada una; OpenAPI regenerado + cliente del frontend sincronizado. Permisos:
   `compras.ver/.administrar/.cancelar/.autorizar/.recibir`, `notas.ver/.administrar/.cancelar`.
 - **Frontend** `frontend/src/modulos/{compras,notas-salida}/` — listado/captura de OC, bandeja de
-  autorización (móvil), compras por orden, recepción con lote multi-componente, explosión (con
+  autorización (móvil), compras por orden, recepción de tela **por color** (con su partida y el
+  cardigan en el mismo renglón; avíos igual que antes), explosión (con
   "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil), captura/consulta de
   notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
 

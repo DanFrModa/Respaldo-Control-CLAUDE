@@ -251,7 +251,8 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
     await page.getByTestId('nuevo-proveedor').click();
     const dialogoProveedor = page.getByRole('dialog');
-    await dialogoProveedor.getByLabel('Nombre').fill(cortador);
+    // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+    await dialogoProveedor.locator('#proveedor-nombre').fill(cortador);
     await dialogoProveedor
       .getByTestId('selector-roles-proveedor')
       .getByRole('checkbox', { name: 'Corte', exact: true })

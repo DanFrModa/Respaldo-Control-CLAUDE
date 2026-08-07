@@ -11,7 +11,6 @@ import {
   type TelaCategoria,
   type TelaColor,
   type TelasQuery,
-  type TipoComponenteTela,
   type UnidadTela,
 } from '@/api/telas';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
@@ -50,13 +49,6 @@ const CATEGORIA_TODAS = 'TODAS';
 const ETIQUETA_UNIDAD: Record<UnidadTela, string> = {
   KG: 'kg',
   M: 'm',
-};
-
-/** Etiqueta legible del tipo de componente del lote (D5). */
-const ETIQUETA_TIPO_COMPONENTE: Record<TipoComponenteTela, string> = {
-  CUERPO: 'Cuerpo',
-  CARDIGAN: 'Cardigán',
-  OTRO: 'Otro',
 };
 
 /** Formatea un precio (number | null) como moneda es-MX, o "—". */
@@ -316,10 +308,13 @@ export function TelasPagina(): React.JSX.Element {
                               ) : null}
                               {tela.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
                             </div>
+                            {/* `tipoComponente` salió de la UI (A1.1 punto 5): el subtítulo
+                                es "unidad · composición", el MISMO formato que el renglón
+                                de escritorio (sin composición, la unidad no queda pelada
+                                con otro formato). */}
                             <div className="text-xs text-faint">
-                              {hayTexto(tela.composicion)
-                                ? tela.composicion
-                                : ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
+                              {ETIQUETA_UNIDAD[tela.unidadMedida]}
+                              {hayTexto(tela.composicion) ? ` · ${tela.composicion}` : ''}
                             </div>
                           </div>
                         </div>
@@ -345,10 +340,10 @@ export function TelasPagina(): React.JSX.Element {
               <div className="hidden lg:block" data-testid="tela-tabla">
                 <TablaDensa>
                   <TablaDensaEncabezado>
+                    {/* La columna "Componente" (tipoComponente) salió de la UI (A1.1 punto 5). */}
                     <TablaDensaFila>
                       <TablaDensaHead className="w-8" />
                       <TablaDensaHead>Tela</TablaDensaHead>
-                      <TablaDensaHead>Componente</TablaDensaHead>
                       <TablaDensaHead>Colores</TablaDensaHead>
                       <TablaDensaHead numerica>Precio sug.</TablaDensaHead>
                       <TablaDensaHead>Estado</TablaDensaHead>
@@ -438,7 +433,7 @@ export function TelasPagina(): React.JSX.Element {
 
 /**
  * Un renglón del catálogo de telas + su fila EXPANDIBLE (datos + colores con precio + proveedores +
- * acciones). El renglón colapsado muestra la categoría, el tipo de componente del lote (D5), la cuenta
+ * acciones). El renglón colapsado muestra la categoría, la cuenta
  * de colores, el precio sugerido y el estado (activo/inactivo). Clic en el renglón (o el chevron) lo
  * expande.
  */
@@ -517,11 +512,6 @@ function RenglonTela({
           </div>
         </TablaDensaCelda>
         <TablaDensaCelda>
-          <span className="text-xs text-muted-foreground">
-            {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
-          </span>
-        </TablaDensaCelda>
-        <TablaDensaCelda>
           {numColores > 0 ? (
             <ChipEstado tono="info">
               {numColores} color{numColores > 1 ? 'es' : ''}
@@ -539,7 +529,7 @@ function RenglonTela({
       {abierta ? (
         <TablaDensaFila className="bg-muted/20 hover:bg-muted/20">
           <TablaDensaCelda />
-          <TablaDensaCelda colSpan={5} className="py-3">
+          <TablaDensaCelda colSpan={4} className="py-3">
             <div className="space-y-4" data-testid="detalle-tela">
               {/* Datos generales de la tela. */}
               <section>
@@ -568,12 +558,20 @@ function RenglonTela({
                       </span>
                     )}
                   </Dato>
-                  <Dato etiqueta="Tipo de componente">
-                    {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
-                  </Dato>
+                  {/* `tipoComponente` y `paraProduccion` salieron de la UI (A1.1 puntos 4-5). */}
+                  {/* Peso y ancho (A1.1 punto 1): solo si hay valores, con su unidad. */}
+                  {tela.peso !== null ? (
+                    <Dato etiqueta="Peso">
+                      <span data-testid="tela-detalle-peso">{`${String(tela.peso)} gr/m²`}</span>
+                    </Dato>
+                  ) : null}
+                  {tela.ancho !== null ? (
+                    <Dato etiqueta="Ancho">
+                      <span data-testid="tela-detalle-ancho">{`${String(tela.ancho)} m`}</span>
+                    </Dato>
+                  ) : null}
                   <Dato etiqueta="Precio sugerido">{formatearPrecio(tela.precioSugerido)}</Dato>
                   <Dato etiqueta="¿Favorita?">{tela.favorito ? 'Sí' : 'No'}</Dato>
-                  <Dato etiqueta="¿Para producción?">{tela.paraProduccion ? 'Sí' : 'No'}</Dato>
                   {hayTexto(tela.descripcion) ? (
                     <div className="col-span-2 min-w-0 sm:col-span-3">
                       <dt className="text-[11px] text-faint uppercase">Descripción</dt>

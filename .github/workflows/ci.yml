@@ -50,7 +50,9 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30: la suite de integración creció (2,700+ tests con testcontainers); la corrida sana ya
+    # tarda ~19 min y con runners degradados el tope de 20 la cancelaba a media suite (6-ago-2026).
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -75,8 +77,12 @@ jobs:
       - name: Instalar dependencias (lockfile)
         run: npm ci
 
+      # El lint con tipos crece con el proyecto: con el heap por defecto de Node
+      # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
       - name: Lint (eslint)
         run: npm run lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck

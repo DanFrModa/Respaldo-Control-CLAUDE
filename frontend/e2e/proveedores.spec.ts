@@ -36,7 +36,7 @@ test.describe('CRUD de Proveedores', () => {
     await page.getByTestId('nuevo-proveedor').click();
     const dialogoAlta = page.getByRole('dialog');
     await expect(dialogoAlta.getByRole('heading', { name: 'Nuevo proveedor' })).toBeVisible();
-    await dialogoAlta.getByLabel('Nombre').fill(nombre);
+    await dialogoAlta.locator('#proveedor-nombre').fill(nombre);
     await dialogoAlta.getByLabel('Tipo').selectOption('AVIOS');
     // Crear ahora exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
     await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
@@ -58,8 +58,9 @@ test.describe('CRUD de Proveedores', () => {
     await page.getByTestId('editar-proveedor').click();
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByRole('heading', { name: 'Editar proveedor' })).toBeVisible();
-    await expect(dialogoEdicion.getByLabel('Nombre')).toHaveValue(nombre);
-    await dialogoEdicion.getByLabel('Nombre').fill(nombreEditado);
+    // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+    await expect(dialogoEdicion.locator('#proveedor-nombre')).toHaveValue(nombre);
+    await dialogoEdicion.locator('#proveedor-nombre').fill(nombreEditado);
     await page.getByTestId('guardar-proveedor').click();
 
     await expect(page.getByText(`Proveedor "${nombreEditado}" actualizado.`)).toBeVisible();
@@ -152,7 +153,7 @@ test.describe('Proveedor enriquecido (R15)', () => {
     await page.getByTestId('nuevo-proveedor').click();
     const dialogo = page.getByRole('dialog');
     await expect(dialogo.getByRole('heading', { name: 'Nuevo proveedor' })).toBeVisible();
-    await dialogo.getByLabel('Nombre').fill(nombre);
+    await dialogo.locator('#proveedor-nombre').fill(nombre);
 
     // La sección de roles está abierta por defecto: marca los DOS primeros roles.
     const selectorRoles = dialogo.getByTestId('selector-roles-proveedor');
@@ -206,7 +207,7 @@ test.describe('Proveedor enriquecido (R15)', () => {
     // Crea un proveedor mínimo (con un rol) para poder adjuntar en edición.
     await page.getByTestId('nuevo-proveedor').click();
     const dialogoAlta = page.getByRole('dialog');
-    await dialogoAlta.getByLabel('Nombre').fill(nombre);
+    await dialogoAlta.locator('#proveedor-nombre').fill(nombre);
     await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();

@@ -76,6 +76,7 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
     composicion: tela.composicion?.nombre ?? null,
     idProveedor: tela.idProveedor,
     proveedor: tela.proveedor?.nombre ?? null,
+    proveedorCorto: tela.proveedor?.nombreCorto ?? null,
     nombreProveedor: tela.nombreProveedor,
     nombreCuerpo: tela.nombreCuerpo,
     nombreComplemento: tela.nombreComplemento,
@@ -83,6 +84,8 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
     tipoComponente: tela.tipoComponente,
     favorito: tela.favorito,
     precioSugerido: tela.precioSugerido === null ? null : tela.precioSugerido.toNumber(),
+    peso: tela.peso === null ? null : tela.peso.toNumber(),
+    ancho: tela.ancho === null ? null : tela.ancho.toNumber(),
     paraProduccion: tela.paraProduccion,
     colores: tela.colores.map((c) => ({
       id: c.id,

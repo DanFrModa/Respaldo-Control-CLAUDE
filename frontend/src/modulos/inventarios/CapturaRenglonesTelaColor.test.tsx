@@ -24,8 +24,8 @@ vi.mock('./SelectorTela', () => ({
             nombreCuerpo: 'Felpa',
             nombreComplemento: 'Cardigan',
             colores: [
-              { id: 11, nombre: 'Marino', pantone: '19-3920' },
-              { id: 12, nombre: 'Blanco', pantone: null },
+              { id: 11, nombre: 'Marino', pantone: '19-3920', precio: 95, precioComplemento: 130 },
+              { id: 12, nombre: 'Blanco', pantone: null, precio: null, precioComplemento: null },
             ],
           })
         }
@@ -191,5 +191,41 @@ describe('<CapturaRenglonesTelaColor> · cuerpo y complemento juntos (A2)', () =
     expect(onChange).toHaveBeenCalledWith([
       expect.objectContaining({ idTelaColor: 11, cantidad: 25, cantidadComplemento: 5 }),
     ]);
+  });
+  it('B1 · con `conPrecios` pre-llena los precios del catálogo y los manda en el renglón', async () => {
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor renglones={[]} onChange={onChange} conLoteProveedor conPrecios />,
+    );
+    await usuario.click(screen.getByTestId('sel-felpa'));
+    await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
+
+    // Pre-llenado (SUGERENCIA del catálogo del color; editable — la factura manda, D1).
+    expect(screen.getByTestId('captura-color-precio')).toHaveValue(95);
+    expect(screen.getByTestId('captura-color-precio-compl')).toHaveValue(130);
+
+    // Se corrige el precio del cuerpo con el REAL de la factura y se agrega.
+    await usuario.clear(screen.getByTestId('captura-color-precio'));
+    await usuario.type(screen.getByTestId('captura-color-precio'), '99.5');
+    await usuario.type(screen.getByTestId('captura-color-cantidad'), '20');
+    await usuario.click(screen.getByTestId('captura-color-agregar'));
+
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        idTelaColor: 11,
+        cantidad: 20,
+        precioUnit: 99.5,
+        precioUnitComplemento: 130,
+      }),
+    ]);
+  });
+
+  it('B1 · sin `conPrecios` no se piden precios (ajustes/traspasos siguen igual)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
+    await usuario.click(screen.getByTestId('sel-felpa'));
+    await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    expect(screen.queryByTestId('captura-color-precio')).not.toBeInTheDocument();
   });
 });

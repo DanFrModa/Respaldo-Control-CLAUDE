@@ -462,8 +462,15 @@ export interface LineaMovimientoTela {
   cantidad: number;
   /** Cantidad del COMPLEMENTO (cardigan) del flujo nuevo. NULL si la tela no lleva complemento. */
   cantidadComplemento?: number | null;
-  /** Costo unitario (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
+  /** Costo unitario del CUERPO (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
   costoUnit?: number | null;
+  /**
+   * Costo unitario del COMPLEMENTO (cardigan) al momento del movimiento (B1). El complemento tiene
+   * SU propio precio, así que el renglón valúa cada componente por separado
+   * (`costoUnit × cantidad` + `costoUnitComplemento × cantidadComplemento`). NULL si la tela no
+   * lleva complemento o no se capturó precio.
+   */
+  costoUnitComplemento?: number | null;
 }
 
 /** Datos para registrar UN movimiento de TELA (encabezado + detalle). Análogo a {@link EntradaMovimientoPt}. */
@@ -680,6 +687,7 @@ export async function registrarMovimientoTela(
             cantidad: linea.cantidad,
             cantidadComplemento: linea.cantidadComplemento ?? null,
             costoUnit: linea.costoUnit ?? null,
+            costoUnitComplemento: linea.costoUnitComplemento ?? null,
           })),
         },
         creadoPorId: sesion.id,
@@ -1132,6 +1140,7 @@ export async function cancelarMovimientoMaterial(
                   cantidad: det.cantidad,
                   cantidadComplemento: det.cantidadComplemento,
                   costoUnit: det.costoUnit,
+                  costoUnitComplemento: det.costoUnitComplemento,
                 })),
               },
             }

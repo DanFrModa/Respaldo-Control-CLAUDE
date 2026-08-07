@@ -577,6 +577,8 @@ function DetalleProveedor({
           <CampoDetalle icono={Tag} etiqueta="Tipo">
             <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</TipoBadge>
           </CampoDetalle>
+          {/* Nombre corto de uso diario (A1.1): arma el nombre compuesto de sus telas. */}
+          <CampoTextoSiHay icono={Tag} etiqueta="Nombre corto" valor={p.nombreCorto} />
           <CampoTextoSiHay icono={ClipboardList} etiqueta="Razón social" valor={p.razonSocial} />
           <CampoTextoSiHay icono={Mail} etiqueta="Contacto" valor={p.contacto} />
           <CampoTextoSiHay icono={Phone} etiqueta="Teléfono" valor={p.telefono} />

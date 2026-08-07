@@ -1,28 +1,42 @@
 /**
  * RECEPCIÓN de compras (Módulo COMPRAS, F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
  * REQUISITOS-NUEVOS.md §R7). La recepción es el HECHO que conecta la orden de compra con el kardex
- * de materiales: recibe (parcial o total) el material de una OC AUTORIZADA, crea el lote de la tela
- * (D5), registra la ENTRADA al kardex (`entrada-recepcion`) con cantidad y costo YA convertidos a
- * unidad de consumo (R1, motor `comun/conversion.ts`), y recalcula el estatus de la OC
- * (parcial/total, R7). Toda la lógica vive AQUÍ (A1); las rutas REST solo validan permiso + Zod y
- * delegan. Esta capa ORQUESTA el motor de kardex (`comun/kardex.ts`) — el ÚNICO que escribe
- * `Movimiento`/`MovimientoDet*`.
+ * de materiales: recibe (parcial o total) el material de una OC AUTORIZADA, registra la ENTRADA al
+ * kardex (`entrada-recepcion`) con cantidad y costo YA convertidos a unidad de consumo (R1, motor
+ * `comun/conversion.ts`), y recalcula el estatus de la OC (parcial/total, R7). Toda la lógica vive
+ * AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan. Esta capa ORQUESTA el motor de
+ * kardex (`comun/kardex.ts`) — el ÚNICO que escribe `Movimiento`/`MovimientoDet*`.
+ *
+ * ⚠️ CAMBIO DE B1 — LAS TELAS ENTRAN POR COLOR/PARTIDA. Hasta A2 esta recepción creaba un `Lote`
+ * (D5) y movía el kardex por tela×lote. Con el inventario de telas reestructurado por TELA+COLOR
+ * (§Post-F9.11) y arrancando DESDE CERO, seguir por lote alimentaba un inventario muerto: ahora
+ * cada línea de TELA exige su `telaColor` (color + complemento + lote del proveedor), crea SU
+ * `PartidaTela` (motor compartido `dominio/inventarios/partidas-telas`) y registra la entrada por
+ * color con su costo. El flujo de AVÍOS NO cambia. El `Lote` queda en cuarentena (legado).
+ *
+ * REGLA DEL COLOR (decidida en B1, explícita y sin adivinar): la línea de OC NO determina el color
+ * (la OC se pide por TELA, sin color), así que el color se EXIGE en la pantalla de recepción; si la
+ * línea de tela llega sin `telaColor`, el dominio la RECHAZA con un mensaje que lo dice.
  *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo de dominio; las rutas son delgadas.
- *  • A2 — TODO en UNA transacción: carga OC, folio, crea recepción + renglones, crea lote(s),
+ *  • A2 — TODO en UNA transacción: carga OC, folio, crea recepción + renglones, crea partida(s),
  *    mueve kardex, recalcula estatus de la OC, escribe bitácora e inserta el evento outbox. O todo
- *    o nada (si falla la creación del lote/movimiento NO queda recepción ni movimiento — rollback).
- *  • A3 — folio de recepción por secuencia atómica (`siguienteFolio`, clave "recepcion-compra").
+ *    o nada (si falla la partida/movimiento NO queda recepción ni movimiento — rollback).
+ *  • A3 — folio de recepción por secuencia atómica (`siguienteFolio`, clave "recepcion-compra") y
+ *    folio de partida por la secuencia `partida-tela`.
  *  • A4 — `compras.recibir` re-verificado aquí (defensa en profundidad, deny-by-default).
  *  • A7 — auditoría (`creadoPorId`/…) + `Bitacora` en la misma tx.
  *  • A9 — todo se filtra/sella por la empresa ACTIVA de la sesión.
  *  • D1 — el costo entra como costo por unidad de consumo (precio ÷ factor); la valuación cuadra
  *    (cantidadConsumo × costoUnit == cantidadPresentación × precio — invariante de
- *    `comun/conversion.ts`).
+ *    `comun/conversion.ts`). Ese costo valúa el CUERPO; el COMPLEMENTO tiene SU propio precio (la
+ *    OC trae uno solo por línea), así que se captura en la recepción (`telaColor.precioUnitComplemento`,
+ *    opcional) y viaja al kardex en su propia columna `costoUnitComplemento` (B1). Si no se
+ *    captura queda NULL: el complemento entra sin valuar, pero el hueco es visible en el kardex.
  *  • D3 — la existencia es Σ de movimientos; el reverso NO edita/borra — genera el movimiento
- *    INVERSO auditado (`cancelarMovimientoMaterial`).
- *  • D5 — un lote define el color/teñido y agrupa 1..N telas acompañantes (mismo color).
+ *    INVERSO auditado (`cancelarMovimientoMaterial`, que copia `idTelaColor`/`idPartida`/
+ *    `cantidadComplemento` para que el par se neutralice en la suma por color).
  *
  * DECISIÓN (b), DECISIONES.md: SOLO se recibe contra una OC en estatus `autorizada` o
  * `recibida_parcial`. Cualquier otro estatus → `ErrorConflicto` (server-side, A4).
@@ -36,7 +50,6 @@
 import {
   esquemaRecepcionCrear,
   esquemaRecepcionReversarCuerpo,
-  type DatosRecepcionLoteEntrada,
   type RecepcionLineaSalida,
   type RecepcionSalida,
   type RecepcionesLista,
@@ -75,6 +88,11 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  crearPartidaTela,
+  resolverColores,
+  type LineaColorBase,
+} from '../inventarios/partidas-telas.js';
 
 /** Clave de la secuencia de folios de recepciones de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_RECEPCION = 'recepcion-compra';
@@ -144,17 +162,6 @@ async function bloquearOrdenCompra(tx: Tx, idOrdenCompra: number): Promise<void>
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave}::bigint)`;
 }
 
-/**
- * Genera una clave de lote legible cuando la recepción no la trae. Lleva el sello de tiempo + un
- * sufijo aleatorio corto para que dos recepciones en el MISMO milisegundo no colisionen en la clave
- * única `Lote.clave` (mismo criterio que `crearLoteAjuste` de F4-E1). No es un folio de negocio.
- */
-function claveLoteAuto(idEmpresa: number, fecha: string): string {
-  const sello = Date.now().toString(36);
-  const sufijo = Math.random().toString(36).slice(2, 6);
-  return `REC-${idEmpresa}-${fecha.replaceAll('-', '')}-${sello}-${sufijo}`;
-}
-
 // ── Tipos de la OC cargada para recibir ──────────────────────────────────────────────────────────
 
 type OCLineaParaRecepcion = {
@@ -201,85 +208,6 @@ async function factorAvioLinea(
   };
 }
 
-/**
- * Crea el LOTE de una recepción de TELA (D5) y devuelve la línea de kardex por componente (todas con
- * el mismo idLote). El lote define el color; los componentes son las telas que llegaron.
- *
- * VALUACIÓN (M2 — reviewer F4-E3): el `costoUnit` (precio÷factor de la tela COMPRADA en la línea de
- * OC, D1) se asigna SOLO al componente de esa tela; los ACOMPAÑANTES (`idTela ≠ idTelaComprada`)
- * entran con `costoUnit = NULL`. Así la valuación del lote = el total de la línea de OC (no se infla
- * cobrando el acompañante como si se hubiera pagado). Decisión PROVISIONAL registrada en
- * `DECISIONES.md` §F4, a confirmar con Daniel antes de que F7 valúe inventario. Hereda
- * proveedor/factura de la recepción si el lote no los trae.
- */
-async function crearLoteRecepcion(
-  tx: Tx,
-  sesion: SesionUsuario,
-  idEmpresa: number,
-  fechaRecepcion: string,
-  facturaRecepcion: string | null,
-  idProveedorOC: number,
-  lote: DatosRecepcionLoteEntrada,
-  idTelaComprada: number,
-  costoUnit: number,
-): Promise<{ idLote: number; lineas: LineaMovimientoTela[] }> {
-  const clave = lote.clave?.trim() || claveLoteAuto(idEmpresa, fechaRecepcion);
-  const idsTela = lote.componentes.map((c) => c.idTela);
-  if (new Set(idsTela).size !== idsTela.length) {
-    throw new ErrorValidacion('Una tela no puede aparecer dos veces en los componentes del lote.');
-  }
-  const existe = await tx.lote.findUnique({ where: { clave }, select: { id: true } });
-  if (existe !== null) {
-    throw new ErrorConflicto(`Ya existe un lote con la clave "${clave}".`);
-  }
-  const creado = await tx.lote.create({
-    data: {
-      clave,
-      idColor: lote.idColor,
-      idProveedor: lote.idProveedor ?? idProveedorOC,
-      ...(lote.factura !== undefined
-        ? { factura: lote.factura }
-        : facturaRecepcion === null
-          ? {}
-          : { factura: facturaRecepcion }),
-      ...(lote.fecha === undefined
-        ? { fecha: aDateColumna(fechaRecepcion) }
-        : { fecha: aDateColumna(lote.fecha) }),
-      ...(lote.observaciones === undefined ? {} : { observaciones: lote.observaciones }),
-      componentes: {
-        create: lote.componentes.map((c) => ({
-          idTela: c.idTela,
-          cantidad: c.cantidad,
-          ...(c.peso === undefined ? {} : { peso: c.peso }),
-        })),
-      },
-      ...datosCreacion(sesion),
-    },
-  });
-  await registrarBitacora(tx, sesion, {
-    entidad: 'Lote',
-    idEntidad: creado.id,
-    accion: 'CREAR',
-    datos: {
-      clave,
-      idColor: lote.idColor,
-      componentes: lote.componentes.length,
-      origen: 'recepcion',
-    },
-  });
-  return {
-    idLote: creado.id,
-    lineas: lote.componentes.map((c) => ({
-      idTela: c.idTela,
-      idLote: creado.id,
-      cantidad: c.cantidad,
-      // Solo la tela comprada lleva el costo de la línea de OC; los acompañantes entran sin costo
-      // (NULL) para no inflar la valuación del lote (M2 — decisión provisional, DECISIONES.md §F4).
-      costoUnit: c.idTela === idTelaComprada ? costoUnit : null,
-    })),
-  };
-}
-
 // ── Proyección a la salida ───────────────────────────────────────────────────────────────────────
 
 const incluirRecepcion = {
@@ -298,6 +226,14 @@ const incluirRecepcion = {
         },
       },
       lote: { select: { clave: true } },
+      partida: {
+        select: {
+          folio: true,
+          loteProveedor: true,
+          idTelaColor: true,
+          telaColor: { select: { nombre: true } },
+        },
+      },
       movimiento: { select: { folio: true } },
     },
   },
@@ -321,7 +257,15 @@ function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
       avio: ocl.avio === null ? null : `${ocl.avio.clave} — ${ocl.avio.descripcion}`,
       descripcionLibre: ocl.descripcionLibre,
       cantidadRecibida: Number(l.cantidadRecibida),
+      cantidadComplemento: aNumero(l.cantidadComplemento),
       costoUnit: aNumero(l.costoUnit),
+      // Flujo NUEVO por color (B1): la traza de la tela es la PARTIDA (color + lote del proveedor).
+      idTelaColor: l.partida?.idTelaColor ?? null,
+      telaColor: l.partida?.telaColor.nombre ?? null,
+      idPartida: l.idPartida,
+      partidaFolio: l.partida === null ? null : Number(l.partida.folio),
+      loteProveedor: l.partida?.loteProveedor ?? null,
+      // LEGADO: sólo lo traen las recepciones de tela anteriores a B1.
       idLote: l.idLote,
       loteClave: l.lote?.clave ?? null,
       idMovimiento: l.idMovimiento,
@@ -459,9 +403,10 @@ async function recalcularEstatusOC(
  *     (decisión b) o rechaza.
  *  2. Folio de recepción (A3) y alta de `RecepcionCompra`.
  *  3. Por cada renglón recibido: valida que el renglón sea de la OC; convierte cantidad/costo a
- *     unidad de consumo (R1); para TELA crea el lote (D5) y registra la entrada al kardex de tela;
- *     para AVÍO registra la entrada al kardex de avío; para LIBRE solo registra el renglón (no
- *     inventaría). Persiste `RecepcionCompraLinea` con la traza (lote/movimiento, costo).
+ *     unidad de consumo (R1); para TELA exige el COLOR (B1), crea su PARTIDA y registra la entrada
+ *     al kardex POR COLOR (cuerpo + complemento juntos, cada uno con su costo); para AVÍO registra
+ *     la entrada al kardex de avío; para LIBRE solo registra el renglón (no inventaría). Persiste
+ *     `RecepcionCompraLinea` con la traza (partida/movimiento, costo).
  *  4. Recalcula el estatus de la OC (parcial/total, R7).
  *  5. Bitácora (A7) + inserta el evento `material-recibido` en el OUTBOX (misma tx, ADR-0011).
  *  6. Tras el commit, dispara el relay (publish best-effort).
@@ -555,30 +500,63 @@ export async function recibirCompra(
       const precio = Number(ocl.precio);
 
       if (ocl.idTela !== null) {
-        // ── TELA: factor 1 (la tela se compra en su unidad de consumo, no hay presentación).
-        if (lineaEntrada.lote === undefined) {
+        // ── TELA (flujo NUEVO por COLOR, B1): factor 1 (la tela se compra en su unidad de
+        // consumo, no hay presentación). El color se EXIGE — la línea de OC no lo determina.
+        const porColor = lineaEntrada.telaColor;
+        if (porColor === undefined) {
           throw new ErrorValidacion(
-            `El renglón de tela ${ocl.id} necesita el lote (color + componentes) para recibirse (D5).`,
+            `El renglón de tela ${ocl.id} necesita el COLOR que llegó para recibirse: el inventario ` +
+              `de telas opera por tela+color y la orden de compra no lo define. Elígelo en la ` +
+              `pantalla de recepción.`,
           );
         }
-        // La tela del renglón de OC DEBE estar entre los componentes del lote (coherencia).
-        if (!lineaEntrada.lote.componentes.some((c) => c.idTela === ocl.idTela)) {
+        // El color capturado DEBE ser un color de la tela comprada (no de otra tela).
+        const lineaColor: LineaColorBase = {
+          idTelaColor: porColor.idTelaColor,
+          cantidad: lineaEntrada.cantidad,
+          ...(porColor.cantidadComplemento === undefined
+            ? {}
+            : { cantidadComplemento: porColor.cantidadComplemento }),
+        };
+        // `resolverColores` valida que el color exista y aplica las reglas del complemento
+        // (una tela sin complemento rechaza cantidad de complemento).
+        const colores = await resolverColores(tx, [lineaColor]);
+        const color = colores.get(porColor.idTelaColor);
+        if (color === undefined || color.idTela !== ocl.idTela) {
           throw new ErrorValidacion(
-            `El lote del renglón ${ocl.id} debe incluir la tela comprada (idTela ${String(ocl.idTela)}).`,
+            `El color elegido para el renglón ${ocl.id} no pertenece a la tela comprada ` +
+              `(idTela ${String(ocl.idTela)}).`,
           );
         }
         const convertida = convertirLineaCompra(lineaEntrada.cantidad, precio); // factor 1 (tela)
-        const { idLote, lineas } = await crearLoteRecepcion(
-          tx,
-          sesion,
+        // Una PARTIDA por línea de tela recibida (la unidad de entrada del inventario por color):
+        // el folio de la partida se toma ANTES que el del movimiento (orden fijo, A3).
+        const partida = await crearPartidaTela(tx, sesion, {
           idEmpresa,
-          datos.fecha,
-          datos.factura ?? null,
-          oc.idProveedor,
-          lineaEntrada.lote,
-          ocl.idTela, // tela comprada: solo ella lleva el costo (M2)
-          convertida.costoUnitConsumo,
-        );
+          idTelaColor: porColor.idTelaColor,
+          loteProveedor: porColor.loteProveedor,
+          factura: datos.factura,
+          fecha: datos.fecha,
+        });
+        const llevaComplemento = color.nombreComplemento !== null;
+        const lineas: LineaMovimientoTela[] = [
+          {
+            idTela: ocl.idTela,
+            idTelaColor: porColor.idTelaColor,
+            idPartida: partida.id,
+            cantidad: convertida.cantidadConsumo,
+            // NULL distingue "la tela no lleva complemento" de "llegó 0" (igual que en A2).
+            cantidadComplemento: llevaComplemento ? (porColor.cantidadComplemento ?? 0) : null,
+            // D1: el costo por unidad de consumo valúa el CUERPO (precio de la línea de OC ÷ factor).
+            costoUnit: convertida.costoUnitConsumo,
+            // El COMPLEMENTO tiene su propio precio y la OC sólo trae uno por línea: se captura en
+            // la recepción (opcional) y viaja al kardex en su propia columna (B1). Sin captura, NULL
+            // — el complemento entra sin valuar, pero el hueco es visible en el kardex.
+            costoUnitComplemento: llevaComplemento
+              ? (porColor.precioUnitComplemento ?? null)
+              : null,
+          },
+        ];
         const movimiento = await registrarMovimientoTela(
           sesion,
           {
@@ -598,8 +576,9 @@ export async function recibirCompra(
             idRecepcionCompra: recepcion.id,
             idOrdenCompraLinea: ocl.id,
             cantidadRecibida: convertida.cantidadConsumo,
+            cantidadComplemento: llevaComplemento ? (porColor.cantidadComplemento ?? 0) : null,
             costoUnit: convertida.costoUnitConsumo,
-            idLote,
+            idPartida: partida.id,
             idMovimiento: movimiento.id,
             ...datosCreacion(sesion),
           },
@@ -607,11 +586,20 @@ export async function recibirCompra(
         materialesEvento.push({
           tipo: 'tela',
           id: ocl.idTela,
-          idLote,
+          // El flujo por color ya no crea lotes: la traza de la entrada es la PARTIDA.
+          idLote: null,
+          idPartida: partida.id,
           idOrdenCompraLinea: ocl.id,
           idOrden: ocl.idOrden,
         });
       } else if (ocl.idAvio !== null) {
+        // El bloque por color es EXCLUSIVO de las líneas de tela: mandarlo en un avío significa que
+        // el capturador se equivocó de renglón — se RECHAZA en vez de ignorarlo en silencio.
+        if (lineaEntrada.telaColor !== undefined) {
+          throw new ErrorValidacion(
+            `El renglón ${ocl.id} es de AVÍO: no lleva color de tela (el bloque "telaColor" sólo aplica a telas).`,
+          );
+        }
         // ── AVÍO: factor por AvioProveedor → Avio → 1 (R1).
         const { factorProveedor, factorAvio } = await factorAvioLinea(
           tx,
@@ -663,6 +651,13 @@ export async function recibirCompra(
           idOrden: ocl.idOrden,
         });
       } else {
+        // Igual que en avío: una línea LIBRE no inventaría, así que un color capturado ahí es un
+        // error de captura, no un dato que se pueda descartar callando.
+        if (lineaEntrada.telaColor !== undefined) {
+          throw new ErrorValidacion(
+            `El renglón ${ocl.id} es una línea LIBRE (no es material de catálogo): no lleva color de tela.`,
+          );
+        }
         // ── LIBRE: no es material de catálogo → NO mueve kardex. Solo se registra la cantidad.
         await tx.recepcionCompraLinea.create({
           data: {
