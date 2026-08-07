@@ -820,3 +820,29 @@ Se lee de corrido: **Felpa · Alsatex · Felpa Suiza**. **Consecuencia:** la tel
 - **Nombre del complemento consistente**: al marcar "lleva complemento" se pre-llena **"Cardigan"** (editable — Daniel: el 99 % de las veces es cárdigan; mejor default que catálogo). Y el **nombre del cuerpo se propone desde el tipo de tela** (tipo "Felpa 50/50" → propone "Felpa"), sin pisar lo tecleado.
 - **`Proveedor.nombreCorto`** (nuevo, opcional): BLOOM TEXTIL → "Bloom". Se usa para el nombre compuesto.
 - **El nombre de la tela se ARMA solo** (*"me está sobrando el nombre… chance el nombre que aparezca debe de ser el compuesto"*): `nombre corto del proveedor + nombre del proveedor de la tela` → **"Bloom Felpa España"**. Editable (teclearlo lo protege; vaciarlo re-suelta el armado); sigue único global.
+
+#### (Post-F9.12) — Los selectores de proveedor se acotan por ROL: "solo los proveedores de telas" (DANIEL, 7-ago-2026)
+
+Daniel: *"Necesitamos definir en los atributos de proveedores los diferentes tipo (creo que ya estaba contemplado)… y en los inventarios de telas, solo debe de mostrar los proveedores de telas para poder dar de alta una nueva tela"*, y después: *"En control estaba definido así… los proveedores de tela son importantes para futuras consultas"* (en CONTROL viejo era el campo `Proveedores.TipoProv` = H/T/S).
+
+**1. La clasificación YA existía — no se agrega nada al modelo.** Un proveedor trae **dos** clasificaciones, ambas capturables en su ficha y **ambas consultables** en la lista (hay filtro por tipo y filtro por rol):
+- **Tipo** (una sola opción, el clasificador rápido heredado de `TipoProv`): `Telas` / `Avíos` / `Servicios` / `Sin clasificar`.
+- **Roles / servicios** (multi-valor, R15 §4.1): `Vende telas`, `Vende avíos`, `Maquila (costura)`, `Corte`, `Estampado`, `Bordado`, `Lavado`, `Aplicación`, `Otros servicios`.
+
+El ETL de terceros llena **las dos** de forma consistente (`TipoProv` T → tipo `TELAS` + rol `vende-telas`; H → `AVIOS` + `vende-avios`; S/vacío → `SERVICIOS` + `otros-servicios`), así que las **consultas históricas** por "proveedor de tela" funcionan por cualquiera de los dos caminos. Lo que faltaba no era el dato: era **usarlo para acotar los selectores**.
+
+**2. El criterio para acotar es el ROL, no el tipo (decisión de Daniel).** Razones: el rol es **multi-valor** —un tercero que vende telas *y* avíos aparece en las dos pantallas, cosa que un `tipo` de un solo valor no permite— y es el **mismo criterio que ya usaba Producción** (Corte lista los de rol `corte`, Envío a maquila los de `maquila-costura`). El `tipo` se conserva como clasificador rápido y como filtro de consulta.
+
+**3. Dónde se acota a `vende-telas`:**
+- **Alta/edición de una tela del catálogo** (el "proveedor DUEÑO" que §Post-F9.11 volvió obligatorio) — es el "dar de alta una nueva tela" de la petición. La tela es DE quien la vende: nunca de un maquilero.
+- **Entrada de tela por factura/remisión** (`CapturaEntradaTelaPagina`, etapa B1) — quien surte la partida.
+- **Ajuste/inventario físico del flujo LEGADO por lote** (`AjusteMaterialesPagina`), por consistencia mientras siga vivo.
+
+**4. En órdenes de compra el filtro va por lo que lleva la OC, y NUNCA bloquea.** Una OC tiene **un** proveedor en el encabezado, se captura **antes** que los renglones y sus renglones pueden mezclar telas, avíos y líneas libres. Decisión de Daniel: acotar **según los renglones capturados**, en vivo — solo telas → `vende-telas`; solo avíos → `vende-avios`; **mezclada o solo líneas libres → sin acotar** (una OC mixta es legítima y el filtro no debe estorbar una compra real).
+
+**5. Regla dura de captura: el proveedor ya capturado se RESPETA siempre.** Si no cumple el rol vigente (típico al editar una OC vieja/migrada, o un documento cuyo proveedor no trae la casilla), **sigue apareciendo como opción** del selector en vez de desaparecer y perder el dato en silencio. El filtro es una ayuda de captura, no un candado retroactivo.
+
+- **Lo que NO se acota:** los selectores de **CxP** (estado de cuenta e importación de CFDI) siguen mostrando a todos — una cuenta por pagar puede ser de cualquier tercero, no solo de quien vende material.
+- **Efecto lateral a cuidar:** un proveedor de telas al que le falte la casilla `Vende telas` deja de aparecer en esas pantallas. Es el comportamiento pedido; se corrige marcándole el rol en su ficha.
+- **Aplica en:** solo **frontend**. El API ya soportaba `GET /api/proveedores?rol=<id>` desde F1-E1B; hook nuevo `useProveedoresPorRol` (`frontend/src/api/proveedores.ts`) que centraliza el patrón. **SIN migración, SIN permisos nuevos, SIN seed.**
+- **Fecha:** 2026-08-07.

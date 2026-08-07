@@ -184,6 +184,59 @@ export function useRolesProveedor(): UseQueryResult<RolProveedor[], ErrorDeApi> 
   });
 }
 
+/**
+ * CODIGOS de rol de `RolProveedor` que la UI usa para acotar selectores. Son las claves estables
+ * sembradas por el seed (`backend/prisma/seed.ts`, ROLES_PROVEEDOR_BASE) y las mismas que asigna el
+ * ETL de terceros; el `nombre` del rol puede editarse desde la UI, el `codigo` no. Centralizarlas
+ * evita literales sueltos por pantalla.
+ */
+export const COD_ROL_PROVEEDOR = {
+  vendeTelas: 'vende-telas',
+  vendeAvios: 'vende-avios',
+  corte: 'corte',
+  maquilaCostura: 'maquila-costura',
+  estampado: 'estampado',
+} as const;
+
+/**
+ * Lista los proveedores que prestan UN rol/servicio (por su `codigo`, p. ej. "vende-telas"),
+ * filtrando en SERVIDOR (`?rol=`). Envuelve el patron que ya usaban las pantallas de Produccion
+ * (resolver el rol → pasar su id → `enabled`) para no repetirlo en cada captura.
+ *
+ * Dos cuidados que lo hacen seguro como selector:
+ *  - Mientras el catalogo de roles carga, la consulta queda DESHABILITADA: una query sin `rol`
+ *    significa "todos los proveedores", justo lo que la pantalla quiere evitar (se veria un
+ *    parpadeo con la lista completa).
+ *  - `codigo === undefined` = no acotar (devuelve todos): permite que una pantalla decida en vivo
+ *    si filtra o no, sin romper el orden de los hooks.
+ *
+ * El catalogo de roles va por `useRolesProveedor` (cacheado): una pantalla que quiera reintentarlo
+ * o pintar su error lo llama tambien, sin costo extra de red.
+ */
+export function useProveedoresPorRol(
+  codigo: string | undefined,
+  filtros: Omit<ProveedoresQuery, 'rol'> = {},
+): UseQueryResult<ProveedoresPagina, ErrorDeApi> {
+  const roles = useRolesProveedor();
+  const idRol =
+    codigo === undefined ? undefined : roles.data?.find((rol) => rol.codigo === codigo)?.id;
+  // Solo se consulta cuando NO hay que acotar, o cuando ya se conoce el id del rol.
+  const listo = codigo === undefined || idRol !== undefined;
+
+  return useProveedores(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      direccion: 'asc',
+      incluirInactivos: 'false',
+      ...filtros,
+      ...(idRol === undefined ? {} : { rol: idRol }),
+    },
+    { enabled: listo },
+  );
+}
+
 // ── Adjuntos de proveedor (F1-E1B, archivos PDF en R2 via presigned) ──────────
 
 /** Clave de cache de los adjuntos de UN proveedor. */

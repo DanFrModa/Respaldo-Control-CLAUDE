@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type * as ReactRouter from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,12 +29,19 @@ vi.mock('@/api/almacenes', () => ({
     isError: false,
   }),
 }));
+// Espía del código de rol con el que la captura pide los proveedores (debe ser "vende-telas").
+const { espiaRolProveedor } = vi.hoisted(() => ({ espiaRolProveedor: vi.fn() }));
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({
-    data: { datos: [{ id: 3, nombre: 'Textiles del Norte' }], total: 1 },
-    isPending: false,
-    isError: false,
-  }),
+  COD_ROL_PROVEEDOR: { vendeTelas: 'vende-telas', vendeAvios: 'vende-avios' },
+  useProveedoresPorRol: (codigo: string | undefined) => {
+    espiaRolProveedor(codigo);
+    // El backend ya filtró por rol: solo llegan proveedores de telas.
+    return {
+      data: { datos: [{ id: 3, nombre: 'Textiles del Norte' }], total: 1 },
+      isPending: false,
+      isError: false,
+    };
+  },
 }));
 vi.mock('react-router-dom', async () => {
   const real = await vi.importActual<typeof ReactRouter>('react-router-dom');
@@ -182,5 +189,46 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     });
     expect(screen.getByTestId('entrada-numero')).toBeDisabled();
     expect(screen.getByTestId('entrada-guardar')).toBeDisabled();
+  });
+
+  it('solo ofrece proveedores con el rol «Vende telas» (decisión P.2)', () => {
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    // La lista se pide ACOTADA al rol: el filtro lo aplica el servidor, no la pantalla.
+    expect(espiaRolProveedor).toHaveBeenCalledWith('vende-telas');
+    const selector = screen.getByTestId('entrada-proveedor');
+    expect(
+      within(selector).getByRole('option', { name: 'Textiles del Norte' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('entrada-proveedor-ayuda')).toHaveTextContent('«Vende telas»');
+  });
+
+  it('al EDITAR conserva el proveedor capturado aunque no traiga el rol', () => {
+    // Documento viejo cuyo proveedor (id 99) no aparece en la lista acotada.
+    useEntradaTelaMock.mockReturnValue({
+      data: {
+        id: 5,
+        folio: 12,
+        estatus: 'borrador',
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A-1001',
+        idProveedor: 99,
+        proveedor: 'Taller Montaño',
+        fecha: '2026-08-06',
+        idAlmacen: 2,
+        observaciones: null,
+        avisos: [],
+        lineas: [],
+      },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    const selector = screen.getByTestId('entrada-proveedor');
+    expect(selector).toHaveValue('99');
+    expect(within(selector).getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
   });
 });

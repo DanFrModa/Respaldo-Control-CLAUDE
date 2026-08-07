@@ -26,7 +26,10 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   const dialogo = page.getByRole('dialog');
   // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
   await dialogo.locator('#proveedor-nombre').fill(nombre);
-  await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+  // Crear exige >=1 rol (R15). Marca "Vende telas" EN CONCRETO: desde el 7-ago-2026 el selector
+  // de proveedor del alta de tela se acota a ese rol (decisión P.2), así que un proveedor con
+  // cualquier otro rol no aparecería en el combobox.
+  await dialogo.getByRole('checkbox', { name: 'Vende telas' }).check();
   await page.getByTestId('guardar-proveedor').click();
   await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
 }

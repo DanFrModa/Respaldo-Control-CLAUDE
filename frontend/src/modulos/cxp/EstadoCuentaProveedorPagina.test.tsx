@@ -18,7 +18,8 @@ vi.mock('@/api/cxp', () => ({
 
 // El selector de proveedor consulta el catálogo; en el test no toca la red.
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({
+  // CxP NO acota por rol: una cuenta por pagar puede ser de cualquier tercero.
+  useProveedoresPorRol: () => ({
     data: { datos: [] },
     isPending: false,
     isError: false,

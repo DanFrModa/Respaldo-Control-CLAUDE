@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useProveedores } from '@/api/proveedores';
+import { useProveedoresPorRol } from '@/api/proveedores';
 import type { Proveedor } from '@/api/tipos';
 import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { useDebounce } from '@/lib/useDebounce';
@@ -16,6 +16,7 @@ export function SelectorProveedor({
   nombreSeleccionado,
   alSeleccionar,
   alLimpiar,
+  rol,
   testid = 'selector-proveedor',
   idInput,
 }: {
@@ -28,13 +29,19 @@ export function SelectorProveedor({
   alSeleccionar: (proveedor: Proveedor) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección. */
   alLimpiar?: () => void;
+  /**
+   * CÓDIGO de rol (`COD_ROL_PROVEEDOR`) al que se ACOTA la búsqueda — p. ej. `vende-telas` en el alta
+   * de tela (decisión P.2, 7-ago-2026). Omitirlo = sin acotar, que es lo que necesita CxP: una CxP
+   * puede ser de cualquier tercero, no solo de quien vende material.
+   */
+  rol?: string | undefined;
   testid?: string;
   /** `id` del input (para que el `<label htmlFor>` del formulario lo enfoque). */
   idInput?: string | undefined;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
   const busqueda = useDebounce(texto.trim(), 300);
-  const consulta = useProveedores({
+  const consulta = useProveedoresPorRol(rol, {
     pagina: 1,
     porPagina: 10,
     ordenarPor: 'nombre',

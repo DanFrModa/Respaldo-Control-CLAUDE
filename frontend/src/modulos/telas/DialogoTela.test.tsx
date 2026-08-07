@@ -75,14 +75,18 @@ vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
   SelectorProveedor: ({
     idSeleccionado,
     alSeleccionar,
+    rol,
   }: {
     idSeleccionado: number | undefined;
     alSeleccionar: (proveedor: { id: number; nombre: string; nombreCorto: string | null }) => void;
+    /** Código de rol al que el diálogo acota la búsqueda (debe ser "vende-telas"). */
+    rol?: string | undefined;
   }) => (
     <>
       <button
         type="button"
         data-testid="selector-proveedor-stub"
+        data-rol={rol ?? ''}
         data-seleccionado={idSeleccionado ?? ''}
         onClick={() => alSeleccionar({ id: 5, nombre: 'Alsatex', nombreCorto: 'Alsa' })}
       >
@@ -168,6 +172,16 @@ describe('<DialogoTela>', () => {
     expect(within(dialogo).getByLabelText(/^Nombre\* \(obligatorio\)$/)).toBeInTheDocument();
     expect(within(dialogo).getByTestId('tela-categoria')).toBeInTheDocument();
     expect(screen.getByTestId('editor-colores-mock')).toBeInTheDocument();
+  });
+
+  it('acota el proveedor dueño al rol «Vende telas» (decisión P.2)', () => {
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    // La tela es DE quien la vende: el combobox nunca debe ofrecer maquileros ni servicios.
+    expect(screen.getByTestId('selector-proveedor-stub')).toHaveAttribute(
+      'data-rol',
+      'vende-telas',
+    );
   });
 
   it('en ALTA, los campos opcionales vacíos se OMITEN (no viajan como null) y manda colores', async () => {

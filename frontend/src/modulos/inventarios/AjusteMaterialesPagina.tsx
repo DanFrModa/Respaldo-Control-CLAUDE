@@ -6,7 +6,7 @@ import { useAlmacenes } from '@/api/almacenes';
 import { useColores } from '@/api/colores';
 import { useTiposMovimiento } from '@/api/inventarios';
 import { useAjustarAvio, useAjustarTela } from '@/api/inventario-materiales';
-import { useProveedores } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import type { Tela } from '@/api/telas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,12 +90,9 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
     direccion: 'asc',
     incluirInactivos: 'false',
   });
-  const proveedores = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
+  // Proveedor del lote: SOLO los que venden telas (decisión P.2, 7-ago-2026), igual que la captura
+  // de entrada del flujo nuevo por color.
+  const proveedores = useProveedoresPorRol(COD_ROL_PROVEEDOR.vendeTelas);
   const tiposMov = useTiposMovimiento();
   const ajustarTela = useAjustarTela();
   const ajustarAvio = useAjustarAvio();
@@ -330,7 +327,7 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
                   </SelectNativo>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="ajuste-proveedor">Proveedor (opcional)</FieldLabel>
+                  <FieldLabel htmlFor="ajuste-proveedor">Proveedor de telas (opcional)</FieldLabel>
                   <SelectNativo
                     id="ajuste-proveedor"
                     value={idProveedor}
@@ -345,6 +342,9 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
                       </option>
                     ))}
                   </SelectNativo>
+                  <p className="text-xs text-muted-foreground">
+                    Solo proveedores con el rol «Vende telas».
+                  </p>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="ajuste-factura">Factura (opcional)</FieldLabel>

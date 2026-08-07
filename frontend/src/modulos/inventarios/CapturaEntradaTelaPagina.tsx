@@ -10,7 +10,7 @@ import {
   useEntradaTela,
   type EntradaTelaCrear,
 } from '@/api/entradas-tela';
-import { useProveedores } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -59,13 +59,10 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const proveedores = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
-  });
+  // Quien surte la tela: SOLO proveedores con el rol "vende-telas" (petición de Daniel, 7-ago-2026;
+  // decisión P.2). Mismo criterio que Producción (Corte lista los de rol "corte"). El filtro lo
+  // aplica el SERVIDOR (`?rol=`); mientras el rol no se resuelve, la consulta queda apagada.
+  const proveedores = useProveedoresPorRol(COD_ROL_PROVEEDOR.vendeTelas);
   const existente = useEntradaTela(idEditar);
   const crear = useCrearEntradaTela();
   const actualizar = useActualizarEntradaTela();
@@ -105,6 +102,17 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       ? existente.data.estatus
       : null;
   const editable = puedeMover && noEditable === null;
+
+  // El proveedor ya capturado se RESPETA aunque no traiga el rol "vende-telas" (documento viejo o
+  // proveedor al que le falta la casilla): se conserva como opción en vez de desaparecer del
+  // selector y perder el dato en silencio.
+  const listaProveedores = proveedores.data?.datos ?? [];
+  const proveedorFueraDelFiltro =
+    idProveedor !== '' && !listaProveedores.some((p) => String(p.id) === idProveedor);
+  const nombreProveedorCargado =
+    existente.data !== undefined && String(existente.data.idProveedor) === idProveedor
+      ? existente.data.proveedor
+      : 'Proveedor actual';
 
   const guardando = crear.isPending || actualizar.isPending;
   const puedeGuardar =
@@ -238,7 +246,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="entrada-proveedor">Proveedor</FieldLabel>
+              <FieldLabel htmlFor="entrada-proveedor">Proveedor de telas</FieldLabel>
               <SelectNativo
                 id="entrada-proveedor"
                 value={idProveedor}
@@ -247,12 +255,18 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 data-testid="entrada-proveedor"
               >
                 <option value="">Elige el proveedor…</option>
-                {(proveedores.data?.datos ?? []).map((p) => (
+                {proveedorFueraDelFiltro ? (
+                  <option value={idProveedor}>{nombreProveedorCargado}</option>
+                ) : null}
+                {listaProveedores.map((p) => (
                   <option key={p.id} value={String(p.id)}>
                     {p.nombre}
                   </option>
                 ))}
               </SelectNativo>
+              <p className="text-xs text-muted-foreground" data-testid="entrada-proveedor-ayuda">
+                Solo proveedores con el rol «Vende telas».
+              </p>
             </Field>
             <Field>
               <FieldLabel htmlFor="entrada-fecha">Fecha</FieldLabel>
