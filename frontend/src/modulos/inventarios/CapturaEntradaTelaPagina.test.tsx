@@ -22,6 +22,33 @@ vi.mock('@/api/entradas-tela', () => ({
   useActualizarEntradaTela: () => ({ mutate: actualizarMutate, isPending: false }),
   useEntradaTela: (id: unknown) => useEntradaTelaMock(id) as unknown,
 }));
+const espiaLineasOc = vi.fn();
+vi.mock('@/api/compras-lineas-tela', () => ({
+  useLineasTelaPendientes: (idProveedor: number | undefined) => {
+    espiaLineasOc(idProveedor);
+    return {
+      data:
+        idProveedor === undefined
+          ? undefined
+          : [
+              {
+                idOrdenCompraLinea: 55,
+                idOrdenCompra: 7,
+                numCompra: 1007,
+                idTela: 3,
+                tela: 'Felpa Suiza',
+                unidad: 'kg',
+                cantidad: 100,
+                recibido: 0,
+                pendiente: 100,
+                precio: 12,
+              },
+            ],
+      isPending: false,
+      isError: false,
+    };
+  },
+}));
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => ({
     data: { datos: [{ id: 2, nombre: 'Bodega Telas' }], total: 1 },
@@ -230,5 +257,18 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     const selector = screen.getByTestId('entrada-proveedor');
     expect(selector).toHaveValue('99');
     expect(within(selector).getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
+  });
+
+  it('§Post-F9.14: los renglones de OC pendientes se piden por el PROVEEDOR elegido', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    // Sin proveedor elegido no hay universo que consultar (la consulta queda apagada).
+    expect(espiaLineasOc).toHaveBeenCalledWith(undefined);
+
+    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    expect(espiaLineasOc).toHaveBeenCalledWith(3);
   });
 });

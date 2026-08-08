@@ -10,6 +10,7 @@ import {
   useEntradaTela,
   type EntradaTelaCrear,
 } from '@/api/entradas-tela';
+import { useLineasTelaPendientes } from '@/api/compras-lineas-tela';
 import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,6 +64,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   // decisión P.2). Mismo criterio que Producción (Corte lista los de rol "corte"). El filtro lo
   // aplica el SERVIDOR (`?rol=`); mientras el rol no se resuelve, la consulta queda apagada.
   const proveedores = useProveedoresPorRol(COD_ROL_PROVEEDOR.vendeTelas);
+  // §Post-F9.14 — renglones de OC pendientes de ESTE proveedor, para amarrar cada renglón de la
+  // factura a su orden de compra. Sin proveedor elegido todavía no hay nada que ofrecer.
+  const lineasOc = useLineasTelaPendientes(idProveedor === '' ? undefined : Number(idProveedor));
   const existente = useEntradaTela(idEditar);
   const crear = useCrearEntradaTela();
   const actualizar = useActualizarEntradaTela();
@@ -86,6 +90,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
         cantidad: l.cantidad,
         cantidadComplemento: l.cantidadComplemento ?? 0,
         ...(l.loteProveedor === null ? {} : { loteProveedor: l.loteProveedor }),
+        ...(l.idOrdenCompraLinea === null ? {} : { idOrdenCompraLinea: l.idOrdenCompraLinea }),
         ...(l.precioUnit === null ? {} : { precioUnit: l.precioUnit }),
         ...(l.precioUnitComplemento === null
           ? {}
@@ -137,6 +142,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
         cantidad: r.cantidad,
         ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
         ...(r.loteProveedor === undefined ? {} : { loteProveedor: r.loteProveedor }),
+        ...(r.idOrdenCompraLinea === undefined ? {} : { idOrdenCompraLinea: r.idOrdenCompraLinea }),
         ...(r.precioUnit === undefined ? {} : { precioUnit: r.precioUnit }),
         ...(r.precioUnitComplemento === undefined
           ? {}
@@ -315,6 +321,10 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             soloLectura={!puedeMover}
             conLoteProveedor
             conPrecios
+            // §Post-F9.14: el selector "Renglón de OC" aparece en cuanto hay proveedor elegido.
+            // Un arreglo vacío igual lo enciende (dice "Sin orden de compra"), que es lo correcto:
+            // significa "este proveedor no tiene OCs abiertas de tela", no "no se puede ligar".
+            {...(idProveedor === '' ? {} : { lineasOc: lineasOc.data ?? [] })}
           />
 
           <div className="flex items-center justify-end gap-3">

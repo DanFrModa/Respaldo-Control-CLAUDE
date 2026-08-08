@@ -870,3 +870,26 @@ El mismo puente de descarga se agregó a *Producción › Captura de corte* (la 
 - **Defecto propio encontrado y cerrado en la misma ronda:** la primera versión del efecto que resuelve el deep-link dependía de la lista de almacenes y llamaba a `navigate` dentro; con una identidad de datos nueva por render eso era un **bucle infinito** (lo cazó la prueba nueva del traspaso, que se colgó). Se cerró con un candado por `ref` en ambas pantallas.
 - **Aplica en:** migración aditiva `20260807120000_almacen_cortador` (columna nullable + índice único + FK Restrict). **SIN permisos nuevos → no requiere `SEED_ON_START`.**
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.14) — La entrada de tela por factura, ligada a su ORDEN DE COMPRA (DANIEL, 7-ago-2026)
+
+Daniel: *"También es muy importante que al dar entrada de tela de una factura, la relacionemos con la OC de esa tela. De esa manera amarramos que sea visible el recibo de la OC de la tela y se marca con estatus de recibido."*
+
+Cierra la deuda (ii) que B1 dejó declarada: la entrada por factura no tocaba la orden de compra.
+
+**1. UNA sola puerta para recibir tela (decisión de Daniel).** Había dos caminos —recepción desde la OC (F4) y entrada por factura (B1)— y hacerlos convivir permitía recibir la misma tela **dos veces**, una por cada uno, inflando el inventario sin que nada lo impidiera. Se eligió que la **factura sea la puerta**: `recibirCompra` **rechaza** los renglones de tela con un mensaje que dice a dónde ir; los **avíos y las líneas libres siguen recibiéndose desde la OC**, sin cambio.
+
+**2. La liga es POR RENGLÓN, no por documento (decisión de Daniel).** `EntradaTelaLinea.idOrdenCompraLinea` (nullable). Así una misma factura puede amparar tela de **dos OCs distintas** y, en el mismo documento, tela **suelta** sin orden de compra — que es como facturan los proveedores. `NULL` sigue siendo un caso válido y frecuente.
+
+**3. Confirmar la factura ES la recepción.** Al confirmar, los renglones con OC generan una `RecepcionCompra` **por cada OC surtida** (`recepciones_compra.id_entrada_tela` guarda de qué documento nació) con la MISMA contabilidad de F4: renglones contra `OrdenCompraLinea`, recálculo del estatus (R7 → `recibida_parcial`/`recibida_total`) y evento `material-recibido` al outbox, que es lo que hace avanzar la Ruta Crítica. **No mueve inventario otra vez**: reusa la partida y el movimiento de kardex que la entrada ya creó. Por eso la tela entra una vez al kardex y suma una vez a lo recibido.
+
+**4. Cancelar la factura devuelve la OC a pendiente.** Las recepciones que generó se marcan **reversadas** (suave, D3 — nada se borra) y el estatus de cada OC se recalcula hacia atrás. El kardex lo neutraliza el inverso que ya hacía la cancelación; aquí no se toca dos veces.
+
+**5. Validaciones al confirmar** (server-side, A1/A4), cada una con mensaje que dice qué revisar: el renglón de OC debe ser de **tela**; el **color** que llegó debe ser de la tela comprada; la OC debe ser del **mismo proveedor** que la factura; y debe estar en `autorizada`/`recibida_parcial` (decisión (b), igual que la otra puerta). Si algo falla, la transacción entera se revierte: no queda ni partida ni existencia.
+
+**6. Ayuda de captura:** endpoint nuevo `GET /api/compras/lineas-tela-pendientes?idProveedor=` — los renglones de tela con pendiente de las OCs abiertas de ese proveedor (pendiente = pedido − recibido en recepciones activas, mismo criterio que el estatus). El selector de la captura solo ofrece los renglones **de la misma tela** del renglón que se está capturando, así que ligar felpa contra una OC de otra tela no se puede ni intentar.
+
+- **Orden de locks (anti-interbloqueo):** el `pg_advisory_xact_lock` de cada OC se toma **al principio** de la transacción de confirmar/cancelar y en **orden ascendente de id** — el mismo orden que usa `recibirCompra` (primero la OC, después el inventario). Sin eso, las dos puertas podían tomarse los recursos en orden inverso y trabarse entre sí.
+- **Efecto operativo a cuidar:** una OC de tela ya no se puede terminar de recibir desde *Compras › Recepción*. El renglón sigue **visible** ahí (para ver qué falta) pero deshabilitado, con la nota de a dónde ir.
+- **Aplica en:** migración aditiva `20260807160000_entrada_tela_orden_compra` (dos columnas nullable + índices + FKs). **SIN permisos nuevos → no requiere `SEED_ON_START`.**
+- **Fecha:** 2026-08-07.

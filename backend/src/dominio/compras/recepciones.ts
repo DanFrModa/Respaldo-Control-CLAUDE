@@ -42,10 +42,13 @@
  * `recibida_parcial`. Cualquier otro estatus → `ErrorConflicto` (server-side, A4).
  *
  * FACTOR de conversión (R1): el factor "fino" por proveedor vive en `AvioProveedor.factorConversion`
- * (fallback `Avio.factorConversion`, fallback 1). Para TELAS NO existe campo de factor presentación→
- * consumo (la tela se compra en su unidad de uso): el factor es SIEMPRE 1 (la cantidad/precio de la
- * OC ya están en la unidad de consumo). Por eso `convertirLineaCompra` se llama sin factores para
- * tela → identidad.
+ * (fallback `Avio.factorConversion`, fallback 1).
+ *
+ * §Post-F9.14 (decisión de Daniel, 7-ago-2026) — **la TELA ya no se recibe por aquí**: se recibe
+ * capturando la FACTURA/REMISIÓN del proveedor (`dominio/inventarios/entradas-tela.ts`) con cada
+ * renglón ligado a su renglón de OC; esa entrada crea la partida, mueve el kardex y llama a
+ * {@link registrarRecepcionesDesdeEntradaTela} para escribir ESTA misma contabilidad. Una sola
+ * puerta = la tela no se puede recibir dos veces. Los AVÍOS y las líneas libres siguen aquí.
  */
 import {
   esquemaRecepcionCrear,
@@ -74,9 +77,7 @@ import {
 import {
   cancelarMovimientoMaterial,
   registrarMovimientoAvio,
-  registrarMovimientoTela,
   type LineaMovimientoAvio,
-  type LineaMovimientoTela,
 } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -88,12 +89,6 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import {
-  crearPartidaTela,
-  resolverColores,
-  type LineaColorBase,
-} from '../inventarios/partidas-telas.js';
-
 /** Clave de la secuencia de folios de recepciones de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_RECEPCION = 'recepcion-compra';
 
@@ -157,7 +152,7 @@ const NS_LOCK_ORDEN_COMPRA = 0x4f43n; // "OC" en hex, como discriminador del nam
  * Clave `bigint` = (namespace << 32) | idOrdenCompra: única por OC y en un espacio de locks que no
  * comparte con los del kardex (que usan la forma de dos enteros).
  */
-async function bloquearOrdenCompra(tx: Tx, idOrdenCompra: number): Promise<void> {
+export async function bloquearOrdenCompra(tx: Tx, idOrdenCompra: number): Promise<void> {
   const clave = (NS_LOCK_ORDEN_COMPRA << 32n) | BigInt(idOrdenCompra);
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave}::bigint)`;
 }
@@ -500,98 +495,17 @@ export async function recibirCompra(
       const precio = Number(ocl.precio);
 
       if (ocl.idTela !== null) {
-        // ── TELA (flujo NUEVO por COLOR, B1): factor 1 (la tela se compra en su unidad de
-        // consumo, no hay presentación). El color se EXIGE — la línea de OC no lo determina.
-        const porColor = lineaEntrada.telaColor;
-        if (porColor === undefined) {
-          throw new ErrorValidacion(
-            `El renglón de tela ${ocl.id} necesita el COLOR que llegó para recibirse: el inventario ` +
-              `de telas opera por tela+color y la orden de compra no lo define. Elígelo en la ` +
-              `pantalla de recepción.`,
-          );
-        }
-        // El color capturado DEBE ser un color de la tela comprada (no de otra tela).
-        const lineaColor: LineaColorBase = {
-          idTelaColor: porColor.idTelaColor,
-          cantidad: lineaEntrada.cantidad,
-          ...(porColor.cantidadComplemento === undefined
-            ? {}
-            : { cantidadComplemento: porColor.cantidadComplemento }),
-        };
-        // `resolverColores` valida que el color exista y aplica las reglas del complemento
-        // (una tela sin complemento rechaza cantidad de complemento).
-        const colores = await resolverColores(tx, [lineaColor]);
-        const color = colores.get(porColor.idTelaColor);
-        if (color === undefined || color.idTela !== ocl.idTela) {
-          throw new ErrorValidacion(
-            `El color elegido para el renglón ${ocl.id} no pertenece a la tela comprada ` +
-              `(idTela ${String(ocl.idTela)}).`,
-          );
-        }
-        const convertida = convertirLineaCompra(lineaEntrada.cantidad, precio); // factor 1 (tela)
-        // Una PARTIDA por línea de tela recibida (la unidad de entrada del inventario por color):
-        // el folio de la partida se toma ANTES que el del movimiento (orden fijo, A3).
-        const partida = await crearPartidaTela(tx, sesion, {
-          idEmpresa,
-          idTelaColor: porColor.idTelaColor,
-          loteProveedor: porColor.loteProveedor,
-          factura: datos.factura,
-          fecha: datos.fecha,
-        });
-        const llevaComplemento = color.nombreComplemento !== null;
-        const lineas: LineaMovimientoTela[] = [
-          {
-            idTela: ocl.idTela,
-            idTelaColor: porColor.idTelaColor,
-            idPartida: partida.id,
-            cantidad: convertida.cantidadConsumo,
-            // NULL distingue "la tela no lleva complemento" de "llegó 0" (igual que en A2).
-            cantidadComplemento: llevaComplemento ? (porColor.cantidadComplemento ?? 0) : null,
-            // D1: el costo por unidad de consumo valúa el CUERPO (precio de la línea de OC ÷ factor).
-            costoUnit: convertida.costoUnitConsumo,
-            // El COMPLEMENTO tiene su propio precio y la OC sólo trae uno por línea: se captura en
-            // la recepción (opcional) y viaja al kardex en su propia columna (B1). Sin captura, NULL
-            // — el complemento entra sin valuar, pero el hueco es visible en el kardex.
-            costoUnitComplemento: llevaComplemento
-              ? (porColor.precioUnitComplemento ?? null)
-              : null,
-          },
-        ];
-        const movimiento = await registrarMovimientoTela(
-          sesion,
-          {
-            idEmpresa,
-            idTipoMov: tipoEntrada.id,
-            idAlmacen: datos.idAlmacen,
-            fecha: aDateColumna(datos.fecha),
-            origenTipo: ORIGEN.recepcionCompra,
-            origenId: String(recepcion.id),
-            lineas,
-            observaciones: `Recepción ${Number(folio)} (OC ${Number(oc.numCompra)})`,
-          },
-          { tx },
+        // §Post-F9.14 (decisión de Daniel, 7-ago-2026): la TELA ya NO se recibe desde aquí. Se
+        // recibe capturando la FACTURA o REMISIÓN del proveedor y ligando cada renglón a su renglón
+        // de OC — esa entrada es la que crea la partida, mueve el kardex y marca la orden como
+        // recibida. Dejar viva esta puerta permitiría recibir la misma tela dos veces (una por cada
+        // camino) e inflar el inventario sin que nada lo impidiera.
+        throw new ErrorConflicto(
+          `El renglón ${ocl.id} es de TELA y la tela ya no se recibe desde la orden de compra: ` +
+            `captura la factura o remisión del proveedor en Inventarios › Telas › Entradas y liga ` +
+            `ese renglón a esta orden. Al confirmarla, la orden queda marcada como recibida. Los ` +
+            `avíos sí se siguen recibiendo desde aquí.`,
         );
-        await tx.recepcionCompraLinea.create({
-          data: {
-            idRecepcionCompra: recepcion.id,
-            idOrdenCompraLinea: ocl.id,
-            cantidadRecibida: convertida.cantidadConsumo,
-            cantidadComplemento: llevaComplemento ? (porColor.cantidadComplemento ?? 0) : null,
-            costoUnit: convertida.costoUnitConsumo,
-            idPartida: partida.id,
-            idMovimiento: movimiento.id,
-            ...datosCreacion(sesion),
-          },
-        });
-        materialesEvento.push({
-          tipo: 'tela',
-          id: ocl.idTela,
-          // El flujo por color ya no crea lotes: la traza de la entrada es la PARTIDA.
-          idLote: null,
-          idPartida: partida.id,
-          idOrdenCompraLinea: ocl.id,
-          idOrden: ocl.idOrden,
-        });
       } else if (ocl.idAvio !== null) {
         // El bloque por color es EXCLUSIVO de las líneas de tela: mandarlo en un avío significa que
         // el capturador se equivocó de renglón — se RECHAZA en vez de ignorarlo en silencio.
@@ -730,7 +644,303 @@ export async function recibirCompra(
   return obtenerRecepcion(idRecepcion, idEmpresa, bd);
 }
 
-// ── Operación: REVERSAR ──────────────────────────────────────────────────────────────────────────
+// ── Recepción generada por una ENTRADA DE TELA por factura (§Post-F9.14) ─────────────────────────
+
+/**
+ * Un renglón de la factura de tela que SURTE un renglón de OC, ya resuelto por el llamador
+ * (`confirmarEntradaTela`): la partida y el movimiento de kardex YA existen — esta función no mueve
+ * inventario, solo escribe la contabilidad de la recepción.
+ */
+export interface RenglonEntradaTelaRecibido {
+  /** Renglón de OC que surte (validado aquí contra la tela y el proveedor). */
+  idOrdenCompraLinea: number;
+  /** Color que llegó (para verificar que es de la tela comprada). */
+  idTelaColor: number;
+  /** Tela del color (la resuelve el llamador, que ya cargó los colores). */
+  idTela: number;
+  /** Cantidad del CUERPO, en unidad de consumo (la tela no tiene factor de presentación: R1 = 1). */
+  cantidad: number;
+  /** Cantidad del COMPLEMENTO, o null si la tela no lleva. */
+  cantidadComplemento: number | null;
+  /** Precio unitario del cuerpo capturado en la factura (D1), o null. */
+  costoUnit: number | null;
+  /** Partida creada por la entrada para este renglón. */
+  idPartida: number;
+}
+
+/** Cabecera del documento de entrada que genera las recepciones. */
+export interface CabeceraEntradaTelaRecibida {
+  idEmpresa: number;
+  idEntradaTela: number;
+  folioEntrada: number;
+  idAlmacen: number;
+  /** Proveedor de la FACTURA: debe coincidir con el de cada OC surtida. */
+  idProveedor: number;
+  /** Número del documento del proveedor (queda como `factura` de la recepción). */
+  factura: string;
+  /** Fecha del documento en YYYY-MM-DD. */
+  fecha: string;
+  /** Movimiento de kardex único que creó la entrada (traza en cada renglón de recepción). */
+  idMovimiento: number;
+}
+
+/**
+ * Toma los advisory locks de las OCs que va a tocar una entrada de tela, en orden ASCENDENTE de id.
+ *
+ * DEBE llamarse al PRINCIPIO de la transacción de `confirmarEntradaTela`, ANTES de crear partidas y
+ * de mover el kardex: así las dos puertas que escriben recepciones (esta y `recibirCompra`) toman
+ * los recursos en el MISMO orden —primero la OC, después el inventario— y no pueden interbloquearse
+ * entre sí. El orden ascendente evita además el interbloqueo entre dos facturas que surten las
+ * mismas dos OCs en orden distinto.
+ */
+export async function bloquearOrdenesDeRenglones(
+  tx: Tx,
+  idsOrdenCompraLinea: readonly number[],
+): Promise<void> {
+  if (idsOrdenCompraLinea.length === 0) {
+    return;
+  }
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: { id: { in: [...new Set(idsOrdenCompraLinea)] } },
+    select: { idOrdenCompra: true },
+  });
+  const ids = [...new Set(lineas.map((l) => l.idOrdenCompra))].sort((a, b) => a - b);
+  for (const id of ids) {
+    await bloquearOrdenCompra(tx, id);
+  }
+}
+
+/**
+ * Escribe la RECEPCIÓN de una entrada de tela por factura contra sus órdenes de compra
+ * (§Post-F9.14, petición de Daniel: *"al dar entrada de tela de una factura, la relacionemos con la
+ * OC de esa tela… se marca con estatus de recibido"*).
+ *
+ * Es la MISMA contabilidad que `recibirCompra` —una `RecepcionCompra` por OC surtida, con sus
+ * renglones, el recálculo de estatus (R7) y el evento `material-recibido` del outbox—, pero SIN
+ * mover inventario: la entrada ya creó las partidas y el movimiento de kardex. Por eso la tela no
+ * puede contarse dos veces: hay una sola escritura al kardex y una sola suma a `cantidadRecibida`.
+ *
+ * Una factura puede surtir VARIAS OCs (decisión de Daniel: la liga es por renglón) → se agrupa por
+ * OC y se emite una recepción y un evento por cada una. Valida, por renglón:
+ *  • que el renglón de OC exista, sea de esta empresa y sea de TELA;
+ *  • que el color que llegó sea de la tela comprada;
+ *  • que la OC sea del MISMO proveedor que la factura (una factura de X no surte una OC de Y);
+ *  • que la OC esté en `autorizada` o `recibida_parcial` (decisión (b), igual que la otra puerta).
+ *
+ * DEBE correr dentro de la transacción de `confirmarEntradaTela` y bajo los locks de
+ * {@link bloquearOrdenesDeRenglones}.
+ */
+export async function registrarRecepcionesDesdeEntradaTela(
+  tx: Tx,
+  sesion: SesionUsuario,
+  cabecera: CabeceraEntradaTelaRecibida,
+  renglones: readonly RenglonEntradaTelaRecibido[],
+): Promise<void> {
+  if (renglones.length === 0) {
+    return;
+  }
+
+  const lineasOC = await tx.ordenCompraLinea.findMany({
+    where: { id: { in: [...new Set(renglones.map((r) => r.idOrdenCompraLinea))] } },
+    select: {
+      id: true,
+      idTela: true,
+      idOrden: true,
+      idOrdenCompra: true,
+      ordenCompra: {
+        select: {
+          id: true,
+          numCompra: true,
+          idEmpresa: true,
+          idProveedor: true,
+          estatus: true,
+          lineas: { select: { id: true, cantidad: true } },
+        },
+      },
+    },
+  });
+  const porId = new Map(lineasOC.map((l) => [l.id, l]));
+
+  // Agrupa por OC conservando el orden de captura dentro de cada una.
+  const porOrdenCompra = new Map<
+    number,
+    { linea: (typeof lineasOC)[number]; renglon: RenglonEntradaTelaRecibido }[]
+  >();
+  for (const renglon of renglones) {
+    const linea = porId.get(renglon.idOrdenCompraLinea);
+    if (linea === undefined || linea.ordenCompra.idEmpresa !== cabecera.idEmpresa) {
+      throw new ErrorNoEncontrado('OrdenCompraLinea', renglon.idOrdenCompraLinea);
+    }
+    const oc = linea.ordenCompra;
+    if (linea.idTela === null) {
+      throw new ErrorValidacion(
+        `El renglón elegido de la orden de compra ${Number(oc.numCompra)} no es de TELA: una ` +
+          `factura de tela solo puede surtir renglones de tela (los avíos se reciben desde la OC).`,
+      );
+    }
+    if (linea.idTela !== renglon.idTela) {
+      throw new ErrorValidacion(
+        `El color que llegó no es de la tela que pide la orden de compra ${Number(oc.numCompra)}: ` +
+          `revisa a qué renglón de la OC lo estás ligando.`,
+      );
+    }
+    if (oc.idProveedor !== cabecera.idProveedor) {
+      throw new ErrorValidacion(
+        `La orden de compra ${Number(oc.numCompra)} es de otro proveedor: una factura solo puede ` +
+          `surtir órdenes del proveedor que la emitió.`,
+      );
+    }
+    if (!ESTATUS_RECIBIBLES.includes(oc.estatus)) {
+      throw new ErrorConflicto(
+        `No se puede recibir contra la orden de compra ${Number(oc.numCompra)} en estatus ` +
+          `"${oc.estatus}": solo se recibe en "autorizada" o "recibida_parcial".`,
+      );
+    }
+    const grupo = porOrdenCompra.get(oc.id) ?? [];
+    grupo.push({ linea, renglon });
+    porOrdenCompra.set(oc.id, grupo);
+  }
+
+  // Una recepción por OC surtida, en orden ascendente (mismo orden que los locks).
+  for (const idOrdenCompra of [...porOrdenCompra.keys()].sort((a, b) => a - b)) {
+    const grupo = porOrdenCompra.get(idOrdenCompra) ?? [];
+    const oc = grupo[0]?.linea.ordenCompra;
+    if (oc === undefined) {
+      continue;
+    }
+
+    const folio = await siguienteFolio(tx, cabecera.idEmpresa, CLAVE_SECUENCIA_RECEPCION);
+    const recepcion = await tx.recepcionCompra.create({
+      data: {
+        folio,
+        idEmpresa: cabecera.idEmpresa,
+        idOrdenCompra,
+        idEntradaTela: cabecera.idEntradaTela,
+        idAlmacen: cabecera.idAlmacen,
+        factura: cabecera.factura,
+        fecha: new Date(`${cabecera.fecha}T00:00:00.000Z`),
+        observaciones: `Entrada de tela ${String(cabecera.folioEntrada)} · ${cabecera.factura}`,
+        ...datosCreacion(sesion),
+      },
+      select: { id: true },
+    });
+
+    const materialesEvento: EventoMaterialRecibido['materiales'] = [];
+    for (const { linea, renglon } of grupo) {
+      await tx.recepcionCompraLinea.create({
+        data: {
+          idRecepcionCompra: recepcion.id,
+          idOrdenCompraLinea: linea.id,
+          cantidadRecibida: renglon.cantidad,
+          cantidadComplemento: renglon.cantidadComplemento,
+          costoUnit: renglon.costoUnit,
+          idPartida: renglon.idPartida,
+          idMovimiento: cabecera.idMovimiento,
+          ...datosCreacion(sesion),
+        },
+      });
+      materialesEvento.push({
+        tipo: 'tela',
+        id: renglon.idTela,
+        idLote: null,
+        idPartida: renglon.idPartida,
+        idOrdenCompraLinea: linea.id,
+        idOrden: linea.idOrden,
+      });
+    }
+
+    await recalcularEstatusOC(tx, sesion, {
+      id: oc.id,
+      estatus: oc.estatus,
+      lineas: oc.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'RecepcionCompra',
+      idEntidad: recepcion.id,
+      accion: 'CREAR',
+      datos: {
+        folio: Number(folio),
+        idOrdenCompra,
+        idEntradaTela: cabecera.idEntradaTela,
+        renglones: grupo.length,
+      },
+    });
+
+    const principal = materialesEvento[0];
+    if (principal !== undefined) {
+      const evento: EventoMaterialRecibido = {
+        idEmpresa: cabecera.idEmpresa,
+        idOrdenCompra,
+        idRecepcion: recepcion.id,
+        folioRecepcion: Number(folio),
+        material: principal,
+        materiales: materialesEvento,
+        idAlmacen: cabecera.idAlmacen,
+        fecha: cabecera.fecha,
+      };
+      await registrarEventoOutbox(
+        tx,
+        EVENTOS_OUTBOX.materialRecibido,
+        VERSION_MATERIAL_RECIBIDO,
+        cabecera.idEmpresa,
+        evento,
+      );
+    }
+  }
+}
+
+/**
+ * REVERSA (suave) las recepciones que generó una entrada de tela, al cancelarla (§Post-F9.14). NO
+ * toca el kardex: el inverso lo hace `cancelarEntradaTela` con su propio movimiento (D3). Aquí solo
+ * se marca la recepción como reversada y se recalcula el estatus de la OC hacia atrás (R7), que es
+ * lo que devuelve la orden a "autorizada"/"recibida_parcial" cuando la factura se anula.
+ *
+ * DEBE correr dentro de la transacción de la cancelación y bajo el lock de cada OC.
+ */
+export async function reversarRecepcionesDeEntradaTela(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idEntradaTela: number,
+  motivo: string,
+): Promise<void> {
+  const recepciones = await tx.recepcionCompra.findMany({
+    where: { idEntradaTela, reversadaEn: null },
+    select: {
+      id: true,
+      ordenCompra: {
+        select: { id: true, estatus: true, lineas: { select: { id: true, cantidad: true } } },
+      },
+    },
+    orderBy: { id: 'asc' },
+  });
+
+  for (const recepcion of recepciones) {
+    await tx.recepcionCompra.update({
+      where: { id: recepcion.id },
+      data: {
+        reversadaEn: new Date(),
+        reversadaPorId: sesion.id,
+        motivoReverso: motivo,
+        ...datosModificacion(sesion),
+      },
+    });
+    // Se recalcula DESPUÉS de marcar el reverso: el groupBy suma solo recepciones activas.
+    await recalcularEstatusOC(tx, sesion, {
+      id: recepcion.ordenCompra.id,
+      estatus: recepcion.ordenCompra.estatus,
+      lineas: recepcion.ordenCompra.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'RecepcionCompra',
+      idEntidad: recepcion.id,
+      accion: 'OTRO',
+      datos: { reversada: true, porCancelacionDeEntradaTela: idEntradaTela, motivo },
+    });
+  }
+}
+
+// ── Operación: REVERSAR ─────────────────────────────────────────────────────────────────────────
 
 /** Cuerpo del reverso (forma del contrato). */
 export type CuerpoReversarRecepcion = z.input<typeof esquemaRecepcionReversarCuerpo>;
@@ -887,4 +1097,93 @@ export async function obtenerRecepcionCompra(
 ): Promise<RecepcionSalida> {
   verificarPermiso(sesion, 'compras.ver');
   return obtenerRecepcion(idRecepcion, sesion.idEmpresaActiva, bd);
+}
+
+/**
+ * Renglones de TELA todavía PENDIENTES de recibir, de las OCs abiertas de un proveedor
+ * (§Post-F9.14). Es lo que alimenta el selector "¿qué renglón de OC surte este renglón?" de la
+ * captura de la factura: sin esta lista, ligar una factura a su orden obligaría a abrir la OC en
+ * otra pantalla y copiar ids a mano.
+ *
+ * Pendiente = cantidad pedida − Σ recibido en recepciones ACTIVAS (mismo criterio que el estatus,
+ * R7). Se devuelven SOLO las líneas con pendiente > 0, de OCs `autorizada`/`recibida_parcial` de la
+ * empresa activa (A9). Lectura pura: no toma locks (es una ayuda de captura; quien manda es la
+ * validación del confirmar).
+ */
+export async function lineasTelaPendientesDeProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  bd?: ContextoBd,
+): Promise<
+  {
+    idOrdenCompraLinea: number;
+    idOrdenCompra: number;
+    numCompra: number;
+    idTela: number;
+    tela: string;
+    unidad: string | null;
+    cantidad: number;
+    recibido: number;
+    pendiente: number;
+    precio: number;
+  }[]
+> {
+  verificarPermiso(sesion, 'compras.ver');
+  const cliente = clienteLectura(bd);
+
+  const lineas = await cliente.ordenCompraLinea.findMany({
+    where: {
+      idTela: { not: null },
+      ordenCompra: {
+        idEmpresa: sesion.idEmpresaActiva,
+        idProveedor,
+        estatus: { in: [EstatusOrdenCompra.autorizada, EstatusOrdenCompra.recibida_parcial] },
+      },
+    },
+    select: {
+      id: true,
+      idOrdenCompra: true,
+      idTela: true,
+      cantidad: true,
+      precio: true,
+      unidad: true,
+      tela: { select: { nombre: true } },
+      ordenCompra: { select: { numCompra: true } },
+    },
+    orderBy: [{ idOrdenCompra: 'asc' }, { id: 'asc' }],
+  });
+  if (lineas.length === 0) {
+    return [];
+  }
+
+  const sumas = await cliente.recepcionCompraLinea.groupBy({
+    by: ['idOrdenCompraLinea'],
+    where: {
+      idOrdenCompraLinea: { in: lineas.map((l) => l.id) },
+      recepcionCompra: { reversadaEn: null },
+    },
+    _sum: { cantidadRecibida: true },
+  });
+  const recibidoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0)]),
+  );
+
+  return lineas
+    .map((l) => {
+      const cantidad = Number(l.cantidad);
+      const recibido = recibidoPorLinea.get(l.id) ?? 0;
+      return {
+        idOrdenCompraLinea: l.id,
+        idOrdenCompra: l.idOrdenCompra,
+        numCompra: Number(l.ordenCompra.numCompra),
+        idTela: l.idTela as number,
+        tela: l.tela?.nombre ?? '(tela)',
+        unidad: l.unidad,
+        cantidad,
+        recibido,
+        pendiente: cantidad - recibido,
+        precio: Number(l.precio),
+      };
+    })
+    .filter((l) => l.pendiente > TOLERANCIA_RECEPCION);
 }

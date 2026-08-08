@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useAlmacenes } from '@/api/almacenes';
 import { useOrdenesCompra } from '@/api/ordenes-compra';
 import { useRecepcionesDeOc, useRecibir, useReversarRecepcion } from '@/api/recepciones';
-import { useTela } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -43,153 +42,6 @@ interface CapturaRenglon {
   loteProveedor: string;
   /** Precio unitario del COMPLEMENTO (el cardigan tiene su propio precio; la OC trae uno solo). */
   precioComplemento: string;
-}
-
-/**
- * Captura POR COLOR de una línea de TELA de la recepción (B1). Lee la tela EXACTA de la línea de OC
- * por su id (`GET /telas/:id`, que ya trae sus colores hijos) — NO por búsqueda paginada: con
- * cientos de telas la página podía no traer la buscada y el select de color se quedaba vacío
- * mintiendo con "esta tela no tiene colores". Pide:
- *  • el COLOR que llegó — OBLIGATORIO: la OC se pide por tela y no lo determina (regla explícita
- *    de B1, el backend la re-exige);
- *  • la cantidad del COMPLEMENTO (cardigan), sólo si la tela lo lleva (viaja JUNTO al cuerpo);
- *  • su PRECIO unitario (la OC trae un solo precio por línea, que es el del cuerpo) — opcional,
- *    prellenado con el del catálogo del color como sugerencia; viaja al kardex como
- *    `costoUnitComplemento`;
- *  • el número de lote del PROVEEDOR de la partida que se creará (opcional, buscable después).
- * Presentación pura (A1): valida el backend.
- */
-function CapturaTelaPorColor({
-  idLinea,
-  idTela,
-  idTelaColor,
-  cantidadComplemento,
-  precioComplemento,
-  loteProveedor,
-  soloLectura,
-  alCambiar,
-}: {
-  idLinea: number;
-  idTela: number;
-  idTelaColor: string;
-  cantidadComplemento: string;
-  precioComplemento: string;
-  loteProveedor: string;
-  soloLectura: boolean;
-  alCambiar: (cambios: Partial<CapturaRenglon>) => void;
-}): React.JSX.Element {
-  // La tela EXACTA de la línea de OC, con sus colores hijos (endpoint por id, sin búsquedas).
-  const consulta = useTela(idTela);
-  const tela = consulta.data;
-  const colores = tela?.colores ?? [];
-  const llevaComplemento = tela?.nombreComplemento != null;
-
-  /** Al elegir el color, sugiere el precio del complemento del catálogo (editable). */
-  function elegirColor(valor: string): void {
-    const color = colores.find((c) => String(c.id) === valor);
-    alCambiar({
-      idTelaColor: valor,
-      precioComplemento: color?.precioComplemento == null ? '' : String(color.precioComplemento),
-    });
-  }
-
-  return (
-    <>
-      <Field>
-        <FieldLabel htmlFor={`rec-color-${idLinea}`}>Color que llegó</FieldLabel>
-        <SelectNativo
-          id={`rec-color-${idLinea}`}
-          value={idTelaColor}
-          onChange={(e) => elegirColor(e.target.value)}
-          disabled={soloLectura || consulta.isError}
-          data-testid={`rec-color-${idLinea}`}
-        >
-          {/* El estado de ERROR se distingue del de "sin colores": si la lectura de la tela falló
-              (403/500/red), decirle al usuario que no hay colores sería MENTIRLE. */}
-          <option value="">
-            {consulta.isPending
-              ? 'Cargando colores…'
-              : consulta.isError
-                ? 'No se pudo cargar la tela'
-                : colores.length === 0
-                  ? 'Esta tela no tiene colores capturados'
-                  : 'Elige el color…'}
-          </option>
-          {colores.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.nombre}
-              {c.pantone != null ? ` · ${c.pantone}` : ''}
-            </option>
-          ))}
-        </SelectNativo>
-        {consulta.isError ? (
-          <div
-            className="flex flex-wrap items-center gap-2 text-xs text-destructive"
-            role="alert"
-            data-testid={`rec-color-error-${idLinea}`}
-          >
-            <span>No se pudieron cargar los colores de la tela: {consulta.error.message}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void consulta.refetch()}
-              data-testid={`rec-color-reintentar-${idLinea}`}
-            >
-              Reintentar
-            </Button>
-          </div>
-        ) : null}
-      </Field>
-      {llevaComplemento ? (
-        <Field>
-          <FieldLabel htmlFor={`rec-compl-${idLinea}`}>
-            {tela?.nombreComplemento} recibido
-          </FieldLabel>
-          <Input
-            id={`rec-compl-${idLinea}`}
-            type="number"
-            min="0"
-            step="any"
-            value={cantidadComplemento}
-            onChange={(e) => alCambiar({ cantidadComplemento: e.target.value })}
-            placeholder="0"
-            disabled={soloLectura}
-            data-testid={`rec-compl-${idLinea}`}
-          />
-        </Field>
-      ) : null}
-      {llevaComplemento ? (
-        <Field>
-          <FieldLabel htmlFor={`rec-precio-compl-${idLinea}`}>
-            Precio {(tela?.nombreComplemento ?? '').toLowerCase()}
-          </FieldLabel>
-          <Input
-            id={`rec-precio-compl-${idLinea}`}
-            type="number"
-            min="0"
-            step="any"
-            value={precioComplemento}
-            onChange={(e) => alCambiar({ precioComplemento: e.target.value })}
-            placeholder="Del catálogo"
-            disabled={soloLectura}
-            data-testid={`rec-precio-compl-${idLinea}`}
-          />
-        </Field>
-      ) : null}
-      <Field>
-        <FieldLabel htmlFor={`rec-lote-prov-${idLinea}`}>Lote del proveedor</FieldLabel>
-        <Input
-          id={`rec-lote-prov-${idLinea}`}
-          value={loteProveedor}
-          onChange={(e) => alCambiar({ loteProveedor: e.target.value })}
-          placeholder="Opcional"
-          disabled={soloLectura}
-          data-testid={`rec-lote-prov-${idLinea}`}
-        />
-      </Field>
-    </>
-  );
 }
 
 /**
@@ -497,6 +349,11 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                     const r = captura[linea.id];
                     if (r === undefined) return null;
                     const tipo = tipoLinea(linea);
+                    // §Post-F9.14 (Daniel, 7-ago-2026): la TELA ya no se recibe desde la orden
+                    // de compra — se recibe capturando la factura del proveedor y ligando cada
+                    // renglón a su renglón de OC. El renglón se muestra (para ver qué falta) pero
+                    // NO se puede marcar, y se dice a dónde ir. El servidor lo rechaza igual (A1).
+                    const esTela = tipo === 'tela';
                     return (
                       <li key={linea.id} className="rounded-lg border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -505,7 +362,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                               type="checkbox"
                               checked={r.incluir}
                               onChange={(e) => actualizar(linea.id, { incluir: e.target.checked })}
-                              disabled={!puedeRecibir}
+                              disabled={!puedeRecibir || esTela}
                               data-testid={`rec-incluir-${linea.id}`}
                             />
                             {descripcionMaterial(linea)}
@@ -518,6 +375,17 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                             {linea.unidad ?? ''}
                           </span>
                         </div>
+                        {esTela ? (
+                          <p
+                            className="mt-2 text-xs text-muted-foreground"
+                            data-testid={`rec-tela-por-factura-${linea.id}`}
+                          >
+                            La tela se recibe capturando la <strong>factura o remisión</strong> del
+                            proveedor en <em>Inventarios › Telas › Entradas</em> y ligando ahí este
+                            renglón a la orden. Al confirmarla, la orden queda marcada como
+                            recibida.
+                          </p>
+                        ) : null}
 
                         {r.incluir ? (
                           <div className="mt-3 space-y-3">
@@ -539,18 +407,6 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                                   data-testid={`rec-cant-${linea.id}`}
                                 />
                               </Field>
-                              {tipo === 'tela' ? (
-                                <CapturaTelaPorColor
-                                  idLinea={linea.id}
-                                  idTela={linea.idTela as number}
-                                  idTelaColor={r.idTelaColor}
-                                  cantidadComplemento={r.cantidadComplemento}
-                                  precioComplemento={r.precioComplemento}
-                                  loteProveedor={r.loteProveedor}
-                                  soloLectura={!puedeRecibir}
-                                  alCambiar={(cambios) => actualizar(linea.id, cambios)}
-                                />
-                              ) : null}
                             </div>
                           </div>
                         ) : null}

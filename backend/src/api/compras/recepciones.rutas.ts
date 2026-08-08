@@ -34,6 +34,7 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  lineasTelaPendientesDeProveedor,
   listarRecepcionesDeOC,
   obtenerRecepcionCompra,
   recibirCompra,
@@ -101,6 +102,52 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
         idOrdenCompra: request.params.idOrdenCompra,
       });
       return reply.code(201).send(recepcion);
+    },
+  });
+
+  // Renglones de TELA pendientes de recibir de las OCs abiertas de un proveedor (§Post-F9.14):
+  // alimenta el selector "¿qué renglón de OC surte este renglón?" de la captura de la factura.
+  app.route({
+    method: 'GET',
+    url: '/compras/lineas-tela-pendientes',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Renglones de tela pendientes de recibir, por proveedor',
+      security: SEGURIDAD_SESION,
+      querystring: z.object({
+        idProveedor: z.coerce
+          .number({ error: 'El proveedor debe ser un número' })
+          .int()
+          .positive()
+          .describe('Proveedor cuyas órdenes de compra abiertas se consultan.'),
+      }),
+      response: {
+        200: z
+          .object({
+            datos: z.array(
+              z.object({
+                idOrdenCompraLinea: z.number().int(),
+                idOrdenCompra: z.number().int(),
+                numCompra: z.number().int().describe('Folio de la orden de compra.'),
+                idTela: z.number().int(),
+                tela: z.string(),
+                unidad: z.string().nullable(),
+                cantidad: z.number().describe('Cantidad pedida en la OC.'),
+                recibido: z.number().describe('Ya recibido (recepciones activas).'),
+                pendiente: z.number().describe('Lo que falta por recibir.'),
+                precio: z.number().describe('Precio unitario de la OC.'),
+              }),
+            ),
+          })
+          .describe('Renglones de tela con pendiente por recibir.'),
+        ...respuestasError,
+      },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await lineasTelaPendientesDeProveedor(sesion, request.query.idProveedor);
+      return { datos };
     },
   });
 

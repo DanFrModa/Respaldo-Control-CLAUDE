@@ -1731,3 +1731,64 @@ igual.
    almacenes, su índice único y la llave foránea. Aditiva, sin borrados.
 2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
 3. **Nada que correr a mano.**
+
+---
+
+## 2026-08-07 — La factura de tela ahora marca la orden de compra como recibida
+
+Daniel: *"Es muy importante que al dar entrada de tela de una factura, la relacionemos con la OC de
+esa tela. De esa manera amarramos que sea visible el recibo de la OC de la tela y se marca con
+estatus de recibido."*
+
+### Ahora hay UNA sola forma de recibir tela
+
+Antes había dos caminos y ninguno sabía del otro: recibir desde la orden de compra, o capturar la
+factura. Se podía recibir la misma tela **dos veces** —una por cada camino— y el inventario quedaba
+inflado sin que nada lo impidiera.
+
+Desde hoy, la **tela se recibe capturando su factura o remisión**. En *Compras › Recepción* el
+renglón de tela **sigue viéndose** (para saber qué falta de la orden), pero ya no se puede marcar:
+la pantalla dice a dónde ir. **Los avíos no cambian**: se siguen recibiendo desde la orden de
+compra, igual que siempre.
+
+### Cómo se liga
+
+En *Inventarios › Telas › Entradas*, al capturar la factura, cada renglón tiene un campo nuevo
+**Renglón de OC**. Ahí se elige la orden que ese renglón está surtiendo:
+
+- Solo aparecen las órdenes **abiertas de ese proveedor**, y de cada una solo los renglones **de la
+  misma tela** que estás capturando (así no se puede ligar una felpa contra una orden de otra tela).
+- Cada opción dice cuánto falta: *"OC 1007 · faltan 60 kg"*.
+- Se puede dejar en **"Sin orden de compra"**: la tela suelta sigue siendo un caso válido.
+- Como la liga es **por renglón**, una misma factura puede surtir **dos órdenes distintas** y traer
+  además tela suelta — que es como facturan los proveedores.
+
+### Qué pasa al confirmar la factura
+
+1. La tela entra al inventario (como ya lo hacía).
+2. Se genera el **recibo de cada orden** que la factura surtió, y queda visible desde la orden.
+3. La orden pasa sola a **recibida parcial** o **recibida total**, según lo que falte.
+4. La **Ruta Crítica se entera** y avanza sola, igual que con la recepción de siempre.
+
+Y si te equivocaste: al **cancelar** la factura, esos recibos se anulan y la orden vuelve a quedar
+pendiente de recibir. Nada se borra — queda el rastro de lo que pasó.
+
+### Lo que el sistema no te va a dejar hacer
+
+Cada una de estas te lo dice con un mensaje que explica qué revisar:
+
+- Ligar un renglón a una orden **de otro proveedor**.
+- Ligar un **color que no es de la tela** que pide esa orden.
+- Ligar a una orden que **todavía no está autorizada**.
+
+Si algo de eso pasa al confirmar, **no se guarda nada**: ni la entrada al inventario ni el recibo.
+Se corrige y se vuelve a confirmar.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260807160000_entrada_tela_orden_compra`): dos columnas
+   opcionales con sus índices y llaves. Aditiva, sin borrados.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.**
+4. ⚠️ Si en `prueba` hay órdenes de compra de tela a medio recibir, de aquí en adelante se terminan
+   de recibir por la factura, no desde la orden.

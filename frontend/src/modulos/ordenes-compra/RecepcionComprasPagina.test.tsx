@@ -85,83 +85,18 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
     expect(screen.getByRole('option', { name: /OC 1007/ })).toBeInTheDocument();
   });
 
-  it('B1: la línea de tela se captura POR COLOR (color + complemento + su precio + lote del proveedor)', async () => {
-    const usuario = userEvent.setup();
+  it('§Post-F9.14: la tela NO se recibe aquí — el renglón se ve pero no se puede marcar', async () => {
     renderConProveedores(<RecepcionComprasPagina />, {
       sesion: estadoSesionDePrueba(['compras.recibir']),
     });
-
-    // Elige la OC y el almacén.
-    await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
-    await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
-
-    // Marca el renglón de tela (id 10) y captura color + complemento + lote del proveedor.
-    await usuario.click(screen.getByTestId('rec-incluir-10'));
-    await usuario.selectOptions(screen.getByTestId('rec-color-10'), '91');
-    await usuario.type(screen.getByTestId('rec-compl-10'), '25');
-    // El precio del complemento se PRE-LLENA del catálogo del color (sugerencia editable).
-    expect(screen.getByTestId('rec-precio-compl-10')).toHaveValue(130);
-    await usuario.type(screen.getByTestId('rec-lote-prov-10'), 'L-88');
-
-    // Registra la recepción.
-    await usuario.click(screen.getByTestId('rec-guardar'));
-
-    expect(recibirMutate).toHaveBeenCalledTimes(1);
-    const [args] = recibirMutate.mock.calls[0] as [
-      { idOrdenCompra: number; cuerpo: { idAlmacen: number; lineas: unknown[] } },
-    ];
-    expect(args.idOrdenCompra).toBe(7);
-    expect(args.cuerpo.idAlmacen).toBe(1);
-    expect(args.cuerpo.lineas).toHaveLength(1);
-    expect(args.cuerpo.lineas[0]).toMatchObject({
-      idOrdenCompraLinea: 10,
-      cantidad: 100,
-      telaColor: {
-        idTelaColor: 91,
-        cantidadComplemento: 25,
-        precioUnitComplemento: 130,
-        loteProveedor: 'L-88',
-      },
-    });
-  });
-
-  it('B1: si la tela no se pudo leer, lo DICE (no miente con "no tiene colores") y ofrece reintentar', async () => {
     const usuario = userEvent.setup();
-    const refetch = vi.fn();
-    useTelaMock.mockReturnValue({
-      data: undefined,
-      isPending: false,
-      isError: true,
-      error: { message: 'No tienes permiso para ver telas.' },
-      refetch,
-    });
-    renderConProveedores(<RecepcionComprasPagina />, {
-      sesion: estadoSesionDePrueba(['compras.recibir']),
-    });
     await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
-    await usuario.click(screen.getByTestId('rec-incluir-10'));
 
-    expect(screen.getByTestId('rec-color-error-10')).toHaveTextContent(
-      'No tienes permiso para ver telas.',
-    );
-    expect(screen.getByTestId('rec-color-10')).toBeDisabled();
-    await usuario.click(screen.getByTestId('rec-color-reintentar-10'));
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('B1: sin COLOR no se manda la recepción (el backend lo exige; la UI evita el viaje)', async () => {
-    const usuario = userEvent.setup();
-    renderConProveedores(<RecepcionComprasPagina />, {
-      sesion: estadoSesionDePrueba(['compras.recibir']),
-    });
-
-    await usuario.selectOptions(screen.getByTestId('rec-oc'), '7');
-    await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
-    await usuario.click(screen.getByTestId('rec-incluir-10'));
-    // NO se elige color.
-    await usuario.click(screen.getByTestId('rec-guardar'));
-
-    expect(recibirMutate).not.toHaveBeenCalled();
+    // El renglón de tela sigue VISIBLE (para ver qué falta de la orden)…
+    expect(screen.getByTestId('rec-incluir-10')).toBeInTheDocument();
+    // …pero no se puede marcar, y la pantalla dice a dónde ir a recibirlo.
+    expect(screen.getByTestId('rec-incluir-10')).toBeDisabled();
+    expect(screen.getByTestId('rec-tela-por-factura-10')).toHaveTextContent('factura o remisión');
   });
 
   it('sin compras.recibir el selector queda deshabilitado', () => {

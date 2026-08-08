@@ -1077,28 +1077,28 @@ model Cliente {
 /// cada columna, su índice + encabezado + rol. Restrict hacia Cliente (una plantilla no se borra al
 /// borrar el cliente — igual que proyectos/listas). Auditoría uniforme (A7).
 model PlantillaImportacion {
-  id        Int     @id @default(autoincrement())
-  idCliente Int     @map("id_cliente")
-  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  id                  Int     @id @default(autoincrement())
+  idCliente           Int     @map("id_cliente")
+  cliente             Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
   /// Nombre descriptivo del formato (p. ej. "OC C&A — hoja Estilos").
-  nombre    String
+  nombre              String
   /// Nº de versión (1, 2, …) DENTRO del cliente. Guardar cambios = versión nueva; la vieja se conserva.
-  version   Int
+  version             Int
   /// La versión que se aplica hoy. A lo más UNA `true` por cliente (lo garantiza el dominio en tx).
-  vigente   Boolean @default(true)
+  vigente             Boolean @default(true)
   /// FORMATO del archivo del cliente (importador de OC, petición Daniel): `excel` = OC en Excel con
   /// mapeo de columnas (R8, el histórico); `pdf-cya` = OC en PDF de C&A, parseada por un extractor EN
   /// CÓDIGO (por anclas de etiqueta) — ahí `mapeo` va vacío y la config viva vive en `camposVariables`.
   /// Default `excel` (las plantillas R8 existentes lo son). Nuevos formatos por cliente = nuevo valor
   /// aquí + su extractor, sin migración.
-  formato   String  @default("excel")
+  formato             String  @default("excel")
   /// Mapeo de columnas: `[{ indice, columna, rol }]` — `rol` ∈ modeloCliente|color|talla|cantidad|precio|ignorar.
   /// Sólo para `formato='excel'`; en `pdf-cya` es `[]` (el extractor es por-cliente en código).
-  mapeo     Json
+  mapeo               Json
   /// CAMPOS VARIABLES por cliente (Daniel: "poder poner más variables por cliente" sin migración):
   /// `[{ campo, etiqueta }]` — qué campo del PDF (p. ej. `subDivision`, `semanaCliente`) se captura como
   /// REFERENCIA del cliente (D7) en cada OP, y con qué etiqueta. NULL en `excel`. JSON para crecer sin migrar.
-  camposVariables Json? @map("campos_variables")
+  camposVariables     Json?   @map("campos_variables")
   /// % ADICIONAL de producción por cliente (petición Daniel): C&A acepta entregar hasta 5% de más;
   /// Daniel fabrica ese 5% + 2% de merma → ~7% arriba. Al importar, la MATRIZ de cada OP se genera con
   /// `ceil(cantidad_cliente × (1 + pct/100))` por talla; el RENGLÓN del pedido conserva la cantidad
@@ -1268,34 +1268,34 @@ model TelaCategoria {
 /// de F4 cuelguen de ella sin retocarla. El mapeo del par viejo → esta tabla lo hace el
 /// ETL de E6. `idCategoria` OPCIONAL (no romper el ETL si la tela vieja no trae categoría).
 model Tela {
-  id             Int                @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   /// Nombre de la tela. Único global (ADR-0007).
-  nombre         String             @unique
-  descripcion    String?
+  nombre       String         @unique
+  descripcion  String?
   /// Categoría (opcional para no romper el ETL de E6). Restrict: una categoría en uso
   /// no se borra físico → se desactiva.
-  idCategoria    Int?               @map("id_categoria")
-  categoria      TelaCategoria?     @relation(fields: [idCategoria], references: [id], onDelete: Restrict)
+  idCategoria  Int?           @map("id_categoria")
+  categoria    TelaCategoria? @relation(fields: [idCategoria], references: [id], onDelete: Restrict)
   /// Unidad en que se compra y se consume (kg o m). OBLIGATORIA: de ella depende que el stock, el
   /// consumo y el costo por prenda signifiquen algo. Era texto libre y venía NULL en todas las
   /// telas — se cerró a enum el 30-jul-2026 (ver {@link UnidadTela}).
-  unidadMedida   UnidadTela         @default(KG) @map("unidad_medida")
+  unidadMedida UnidadTela     @default(KG) @map("unidad_medida")
 
   // ── Identidad en 4 datos (Daniel, 6-ago-2026 §Post-F9.11): tipo (= la categoría de arriba) ·
   // composición · proveedor dueño · nombre del proveedor. Se lee "Felpa · Alsatex · Felpa Suiza". ──
 
   /// Composición ("50% Algodón, 50% Poliéster"), del catálogo. Opcional en las 877 migradas
   /// (el viejo no la traía); la UI la pide en telas nuevas. Restrict.
-  idComposicion Int?             @map("id_composicion")
-  composicion   ComposicionTela? @relation(fields: [idComposicion], references: [id], onDelete: Restrict)
+  idComposicion   Int?             @map("id_composicion")
+  composicion     ComposicionTela? @relation(fields: [idComposicion], references: [id], onDelete: Restrict)
   /// Proveedor DUEÑO del artículo: la felpa de Alsatex y la de otro proveedor son telas DISTINTAS
   /// (no son el mismo rollo y no se revuelven en inventario). OBLIGATORIO en telas nuevas (lo exige
   /// el contrato, no la base): en las migradas viene NULL porque el viejo lo embebía en el nombre
   /// ("FelpaAlsa") y se va llenando al depurar. Restrict.
-  idProveedor Int?       @map("id_proveedor")
-  proveedor   Proveedor? @relation("TelaProveedorDueno", fields: [idProveedor], references: [id], onDelete: Restrict)
+  idProveedor     Int?             @map("id_proveedor")
+  proveedor       Proveedor?       @relation("TelaProveedorDueno", fields: [idProveedor], references: [id], onDelete: Restrict)
   /// Cómo le llama el proveedor a esta tela ("Felpa Suiza"). Buscable.
-  nombreProveedor String? @map("nombre_proveedor")
+  nombreProveedor String?          @map("nombre_proveedor")
 
   // ── El COMPLEMENTO es PARTE de la misma tela (Daniel: *"es como parte de la misma tela para el
   // manejo de todo… mismo color, mismo pantone"*). Una tela = cuerpo + complemento OPCIONAL, nunca
@@ -1303,28 +1303,28 @@ model Tela {
   // hacía: ExTela1/ExTela2). Comprar solo complemento = entrada con el cuerpo en 0. ──
 
   /// Nombre del componente CUERPO ("Felpa", "Terry"; viejo: `Texto1`). Null = sin nombre especial.
-  nombreCuerpo String? @map("nombre_cuerpo")
+  nombreCuerpo      String?            @map("nombre_cuerpo")
   /// Nombre del COMPLEMENTO ("Cardigan"; viejo: `Texto2`). NULL = esta tela NO lleva complemento —
   /// esa es la bandera: se define desde el alta, como pidió Daniel.
-  nombreComplemento String? @map("nombre_complemento")
+  nombreComplemento String?            @map("nombre_complemento")
   /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
   /// LEGADO desde A1.1 (Daniel, 6-ago-2026): redundante con nombreCuerpo/nombreComplemento;
   /// la UI ya no lo captura ni lo muestra. La columna se conserva (sin migración de borrado).
-  tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
+  tipoComponente    TipoComponenteTela @default(OTRO) @map("tipo_componente")
   /// Peso de la tela en gramos por metro cuadrado (A1.1, Daniel 6-ago-2026). Informativo, opcional.
-  peso           Decimal?           @db.Decimal(8, 2)
+  peso              Decimal?           @db.Decimal(8, 2)
   /// Ancho de la tela en metros (A1.1). Informativo, opcional.
-  ancho          Decimal?           @db.Decimal(8, 2)
+  ancho             Decimal?           @db.Decimal(8, 2)
   /// Tela de uso frecuente (preselección en la UI de captura).
-  favorito       Boolean            @default(false)
+  favorito          Boolean            @default(false)
   /// Precio de referencia por unidad (informativo; el costo real va por lote/orden).
-  precioSugerido Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
+  precioSugerido    Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
   /// ¿Es tela de producción (vs. muestra/insumo no productivo)? Default true.
   /// LEGADO desde A1.1 (Daniel, 6-ago-2026): la casilla salió de la UI (ya no se captura ni
   /// se muestra); el dato se conserva con su default server-side. La columna NO se borra.
-  paraProduccion Boolean            @default(true) @map("para_produccion")
+  paraProduccion    Boolean            @default(true) @map("para_produccion")
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
-  activo         Boolean            @default(true)
+  activo            Boolean            @default(true)
 
   /// Colores disponibles de esta tela con su precio (N:N a Color).
   colores            TelaColor[]
@@ -1372,15 +1372,15 @@ model Tela {
 /// catálogo de prenda. Unicidad del nombre POR TELA (el dominio la valida insensible a
 /// mayúsculas; el unique exacto respalda la carrera, mismo patrón que `Color.nombre`).
 model TelaColor {
-  id     Int @id @default(autoincrement())
-  idTela Int @map("id_tela")
+  id                Int      @id @default(autoincrement())
+  idTela            Int      @map("id_tela")
   /// Nombre LIBRE del color de ESTA tela ("Marino Alsa 3040"). Único por tela.
-  nombre String
+  nombre            String
   /// Pantone del color de ESTA tela (Daniel: va ligado al color de cada tela; dos partidas pueden
   /// traer tonos distintos del MISMO pantone). Opcional y buscable.
-  pantone String?
+  pantone           String?
   /// Precio del metro/kg del CUERPO en este color (informativo; el costo real va por lote).
-  precio Decimal? @db.Decimal(12, 2)
+  precio            Decimal? @db.Decimal(12, 2)
   /// Precio del COMPLEMENTO en este color (Daniel: *"el cardigan es otro precio que la tela"*).
   /// Solo tiene sentido si la tela lleva complemento; el dominio lo rechaza si no.
   precioComplemento Decimal? @map("precio_complemento") @db.Decimal(12, 2)
@@ -1388,8 +1388,8 @@ model TelaColor {
   /// N:N viejo usaba. Se conserva para que el MRP/precosto sigan resolviendo precio por esa liga
   /// en lo migrado y para la fusión de colores duplicados. Las filas NUEVAS nacen con NULL: el
   /// color de tela ya NO cuelga del catálogo de prenda (§Post-F9.11).
-  idColor Int?   @map("id_color")
-  color   Color? @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idColor           Int?     @map("id_color")
+  color             Color?   @relation(fields: [idColor], references: [id], onDelete: Restrict)
 
   tela Tela @relation(fields: [idTela], references: [id], onDelete: Cascade)
 
@@ -1432,7 +1432,7 @@ model PartidaTela {
   telaColor   TelaColor @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
 
   /// Número de lote del PROVEEDOR (texto libre, opcional y buscable — opción B de Daniel).
-  loteProveedor String? @map("lote_proveedor")
+  loteProveedor String?   @map("lote_proveedor")
   /// Factura/remisión de la entrada (texto del proveedor; opcional).
   factura       String?
   /// Fecha de la entrada de la partida (solo fecha; opcional).
@@ -1527,9 +1527,11 @@ model EntradaTela {
   motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
 
   /// Renglones/partidas del documento (cada uno crea SU partida al confirmar).
-  lineas   EntradaTelaLinea[]
+  lineas      EntradaTelaLinea[]
+  /// Recepciones de compra generadas al confirmar (una por OC surtida, §Post-F9.14). Restrict.
+  recepciones RecepcionCompra[]
   /// Adjuntos del documento (el PDF de la factura/remisión), en R2.
-  archivos EntradaTelaArchivo[]
+  archivos    EntradaTelaArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1580,6 +1582,18 @@ model EntradaTelaLinea {
   idPartida Int?         @map("id_partida")
   partida   PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
 
+  /// Renglón de ORDEN DE COMPRA que este renglón de la factura SURTE (§Post-F9.14, petición de
+  /// Daniel 7-ago-2026: *"al dar entrada de tela de una factura, la relacionemos con la OC de esa
+  /// tela… se marca con estatus de recibido"*). NULL = tela sin orden de compra (compra suelta),
+  /// que sigue siendo un caso válido. Es POR RENGLÓN a propósito: una factura del proveedor puede
+  /// amparar tela de dos OCs distintas y hasta tela suelta en el mismo documento.
+  ///
+  /// Al CONFIRMAR el documento, los renglones con este campo generan la `RecepcionCompra` de su OC
+  /// —la misma contabilidad que la recepción de F4— y por eso la OC pasa a `recibida_parcial` o
+  /// `recibida_total`. Restrict: un renglón de OC ya surtido no se borra físico.
+  idOrdenCompraLinea Int?              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea? @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Restrict)
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -1587,6 +1601,7 @@ model EntradaTelaLinea {
 
   @@index([idEntradaTela])
   @@index([idTelaColor])
+  @@index([idOrdenCompraLinea])
   @@index([idPartida])
   @@map("entrada_tela_linea")
 }
@@ -3220,20 +3235,20 @@ model MovimientoDetTela {
   // complemento); `cantidadComplemento` NULL cuando la tela no lleva complemento. ──
 
   /// Color de tela (hijo de la tela) del renglón NUEVO. NULL = fila del flujo viejo por Lote. Restrict.
-  idTelaColor Int?       @map("id_tela_color")
-  telaColor   TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+  idTelaColor Int?         @map("id_tela_color")
+  telaColor   TelaColor?   @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
   /// Partida de la ENTRADA (traza; NULL en salidas — el consumo empareja por tela+color). Restrict.
   idPartida   Int?         @map("id_partida")
   partida     PartidaTela? @relation(fields: [idPartida], references: [id], onDelete: Restrict)
 
   /// Cantidad de tela (positiva; el signo lo da la dirección del tipo de movimiento). Decimal.
   /// En el flujo NUEVO por color es el CUERPO y admite 0 (entrada de solo complemento).
-  cantidad  Decimal  @db.Decimal(14, 4)
+  cantidad             Decimal  @db.Decimal(14, 4)
   /// Cantidad del COMPLEMENTO (cardigan) que viaja JUNTA en el mismo renglón (Daniel: el
   /// complemento es parte de la misma tela). NULL si la tela no lleva complemento o fila vieja.
-  cantidadComplemento Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
+  cantidadComplemento  Decimal? @map("cantidad_complemento") @db.Decimal(14, 4)
   /// Costo unitario del CUERPO. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
-  costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
+  costoUnit            Decimal? @map("costo_unit") @db.Decimal(12, 4)
   /// Costo unitario del COMPLEMENTO (cardigan) — B1. El complemento tiene SU propio precio
   /// (Daniel: *"el cardigan es otro precio que la tela"*), así que el renglón valúa por separado
   /// cada componente: `costoUnit × cantidad` + `costoUnitComplemento × cantidadComplemento`. Lo
@@ -3782,10 +3797,11 @@ model OrdenCompraLinea {
   /// el estatus de la OC (parcial/total).
   recepcionLineas RecepcionCompraLinea[]
 
-  creadoEn        DateTime @default(now()) @map("creado_en")
-  creadoPorId     String?  @map("creado_por_id")
-  modificadoEn    DateTime @updatedAt @map("modificado_en")
-  modificadoPorId String?  @map("modificado_por_id")
+  creadoEn          DateTime           @default(now()) @map("creado_en")
+  creadoPorId       String?            @map("creado_por_id")
+  modificadoEn      DateTime           @updatedAt @map("modificado_en")
+  modificadoPorId   String?            @map("modificado_por_id")
+  entradaTelaLineas EntradaTelaLinea[]
 
   @@index([idOrdenCompra])
   @@index([idTela])
@@ -3879,6 +3895,13 @@ model RecepcionCompra {
   idAlmacen Int     @map("id_almacen")
   almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
 
+  /// Documento de ENTRADA DE TELA que generó esta recepción (§Post-F9.14). NULL = recepción
+  /// capturada directo contra la OC (las de avíos y todas las históricas). Con valor, la recepción
+  /// es el "recibo" de esa factura contra la OC: es lo que permite verla desde la orden de compra y
+  /// lo que el CANCELAR de la factura busca para reversarla. Restrict.
+  idEntradaTela Int?         @map("id_entrada_tela")
+  entradaTela   EntradaTela? @relation(fields: [idEntradaTela], references: [id], onDelete: Restrict)
+
   /// Factura del proveedor de esta recepción (texto; opcional). El lote de tela también la guarda.
   factura String?
   /// Fecha de la recepción (solo fecha).
@@ -3904,6 +3927,7 @@ model RecepcionCompra {
   @@unique([idEmpresa, folio])
   @@index([idOrdenCompra])
   @@index([idAlmacen])
+  @@index([idEntradaTela])
   @@index([reversadaEn])
   @@map("recepciones_compra")
 }
@@ -5308,11 +5332,11 @@ model CostoOrden {
   /// COMPRA. Es el tercer origen del costo, junto al teórico (`*Calc`) y el guardado (`*Cost`):
   /// NO se suma a nada, solo deja constancia de CON QUÉ se costeó. NULL en las órdenes costeadas
   /// antes de esta columna (histórico intacto).
-  telaReal     Decimal? @map("tela_real") @db.Decimal(14, 2)
-  aviosReal    Decimal? @map("avios_real") @db.Decimal(14, 2)
+  telaReal  Decimal? @map("tela_real") @db.Decimal(14, 2)
+  aviosReal Decimal? @map("avios_real") @db.Decimal(14, 2)
   /// Otros costos + su descripción (ex `CostoOrd.Otros`/`DescOtros`), para flexibilidad.
-  otros        Decimal? @db.Decimal(14, 2)
-  descOtros    String?  @map("desc_otros")
+  otros     Decimal? @db.Decimal(14, 2)
+  descOtros String?  @map("desc_otros")
 
   /// Costo TOTAL de la orden = Σ de los GUARDADOS (doc 06 §3). Lo ARMA el dominio al
   /// guardar (nunca se edita a mano ni suma los teóricos). NULLABLE hasta el primer guardado.

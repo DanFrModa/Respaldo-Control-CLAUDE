@@ -23,21 +23,31 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     `compras.autorizar` (ex-acceso #8) y registra usuario+fecha en `Bitacora` (A7). OC autorizada
     **bloqueada** salvo admin (decisión **(a)**) + "Duplicar a nueva OC". El `Totales` viejo NO se
     almacena: es derivado de las líneas.
-  - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`. `recibirCompra` es **UNA transacción
-    (A2)**: valida OC `autorizada`/`recibida_parcial` (decisión **(b)**, deny-by-default A4) y el
-    almacén destino (`comun/almacenes.ts`), folio A3, crea `RecepcionCompra`/`Linea` y —desde **B1**
-    (6-ago-2026)— para TELA **exige el COLOR** (`idTelaColor`, nunca lo adivina) y crea su
-    **`PartidaTela`** en vez del `Lote` de D5 (que quedó como legado en cuarentena; ver
-    [`inventario-telas-avios.md`](inventario-telas-avios.md) §A2). El complemento (cardigan) viaja en
-    el mismo renglón con su propio costo y **NO cuenta contra lo pedido** (`cantidadRecibida` sigue
-    midiéndose por el cuerpo, que es lo que leen MRP y el auto-avance de RC). Avíos y libres, sin
-    cambio. Registra la entrada al kardex (`entrada-recepcion`) **convirtiendo cantidad
-    ×factor y costo ÷factor** (invariante de valuación `cantidad×costoUnit = cantidadOC×precioOC`,
-    D1/D3), recalcula el estatus de la OC **bajo `pg_advisory_xact_lock` por OC** (namespace `bigint`
-    `0x4f43`, anti-carrera R7) y **publica `material-recibido` vía OUTBOX transaccional** (el evento
-    nunca se pierde; consumidor en F5). `reversarRecepcion` = movimiento(s) inverso(s) auditado(s)
-    (D3) que destraba el candado de cancelación de OC. Contrato del evento + patrón outbox en
-    **ADR-0011**.
+  - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`.
+    - ⚠️ **Desde §Post-F9.14 (7-ago-2026) la TELA no se recibe por aquí:** `recibirCompra` rechaza
+      los renglones de tela apuntando a la factura. La tela se recibe capturando la
+      **factura/remisión** del proveedor (`dominio/inventarios/entradas-tela.ts`) con cada renglón
+      ligado a su `OrdenCompraLinea`; al confirmarla llama a `registrarRecepcionesDesdeEntradaTela`
+      (en este mismo archivo), que escribe **esta misma contabilidad** —una `RecepcionCompra` por OC
+      surtida, recálculo de estatus R7 y evento `material-recibido`— **sin mover inventario otra
+      vez** (reusa la partida y el movimiento de la entrada). Una sola puerta = la tela no se puede
+      recibir dos veces. `reversarRecepcionesDeEntradaTela` hace el camino inverso al cancelar la
+      factura. Los locks de OC se toman al PRINCIPIO de la tx y en orden ascendente en AMBAS puertas
+      (`bloquearOrdenesDeRenglones`), para que no se traben entre sí. Consulta de apoyo:
+      `lineasTelaPendientesDeProveedor` → `GET /api/compras/lineas-tela-pendientes`.
+    - **Avíos y líneas libres** siguen recibiéndose desde la OC, sin cambio. `recibirCompra` es
+      **UNA transacción (A2)**: valida OC `autorizada`/`recibida_parcial` (decisión **(b)**,
+      deny-by-default A4) y el almacén destino (`comun/almacenes.ts`), folio A3, crea
+      `RecepcionCompra`/`Linea`, registra la entrada al kardex (`entrada-recepcion`) **convirtiendo
+      cantidad ×factor y costo ÷factor** (invariante de valuación
+      `cantidad×costoUnit = cantidadOC×precioOC`, D1/D3), recalcula el estatus de la OC **bajo
+      `pg_advisory_xact_lock` por OC** (namespace `bigint` `0x4f43`, anti-carrera R7) y **publica
+      `material-recibido` vía OUTBOX transaccional** (el evento nunca se pierde; consumidor en F5).
+      `reversarRecepcion` = movimiento(s) inverso(s) auditado(s) (D3) que destraba el candado de
+      cancelación de OC. Contrato del evento + patrón outbox en **ADR-0011**.
+    - *Histórico:* entre **B1** (6-ago) y **§Post-F9.14** (7-ago) esta misma función recibía TELA por
+      color creando su `PartidaTela`; ese código se retiró al dejar una sola puerta. Las recepciones
+      de tela creadas en ese lapso siguen vivas y son idénticas a las que escribe la factura.
   - `mrp.ts` — el **corazón MRP** (R3/R7):
     - `explosionarOrden` — requerido = `consumoPorPrenda` del BOM con bandera `paraProduccion` ×
       Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. Persiste el
@@ -68,10 +78,10 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
   server-side en cada una; OpenAPI regenerado + cliente del frontend sincronizado. Permisos:
   `compras.ver/.administrar/.cancelar/.autorizar/.recibir`, `notas.ver/.administrar/.cancelar`.
 - **Frontend** `frontend/src/modulos/{compras,notas-salida}/` — listado/captura de OC, bandeja de
-  autorización (móvil), compras por orden, recepción de tela **por color** (con su partida y el
-  cardigan en el mismo renglón; avíos igual que antes), explosión (con
-  "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil), captura/consulta de
-  notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
+  autorización (móvil), compras por orden, recepción de **avíos** (la tela se recibe por su factura
+  desde §Post-F9.14: el renglón de tela se muestra deshabilitado con la nota de a dónde ir),
+  explosión (con "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil),
+  captura/consulta de notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
   - **Proveedor de la OC acotado por sus renglones (§Post-F9.12, 7-ago-2026):** el selector del
     encabezado se filtra en vivo por el rol (R15) que piden los renglones capturados — solo telas →
     `vende-telas`, solo avíos → `vende-avios`, **mixta o solo líneas libres → sin acotar** (una OC
