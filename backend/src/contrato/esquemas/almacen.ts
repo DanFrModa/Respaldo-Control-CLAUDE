@@ -35,6 +35,17 @@ export const esquemaAlmacenCrear = z.object({
     .int({ error: 'La empresa debe ser un id entero' })
     .positive({ error: 'La empresa debe ser un id positivo' })
     .optional(),
+  /**
+   * CORTADOR dueño del almacén (§Post-F9.13): opcional y SOLO para almacenes de TELA. Es un
+   * proveedor con rol `corte`; el dominio valida ambas cosas. `null` = sin cortador (y en la
+   * edición, quitar la liga que hubiera).
+   */
+  idCortador: z
+    .number({ error: 'El cortador debe ser un número' })
+    .int({ error: 'El cortador debe ser un id entero' })
+    .positive({ error: 'El cortador debe ser un id positivo' })
+    .nullable()
+    .optional(),
 });
 
 /** Datos validados de alta de almacén. */
@@ -71,6 +82,15 @@ export const esquemaAlmacenSalida = z
       .int()
       .nullable()
       .describe('Empresa dueña, o null si es un almacén global.'),
+    idCortador: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene.'),
+    cortador: z
+      .string()
+      .nullable()
+      .describe('Nombre del cortador ligado (para pintarlo sin otra consulta), o null.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),

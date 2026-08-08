@@ -1658,3 +1658,76 @@ ayuda para capturar, no un candado hacia atrás.
 1. **Sin migración** — no se agregó ni una columna: el dato ya existía.
 2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
 3. **Nada que correr a mano.** Es un cambio de pantallas (el API ya sabía filtrar por rol desde F1).
+
+---
+
+## 2026-08-07 — El almacén del cortador: descargar y traspasar sin buscarlo
+
+Dos peticiones de Daniel: *"ligar cada almacén de telas (opcional) a un cortador… y cuando
+seleccionemos a un cortador, que por default abra la ventana de descarga de tela con el almacén
+relacionado"*, y *"es muy importante hacer una pantalla de traspaso de telas entre almacenes:
+recibo la tela en Naucalpan (el principal) y de ahí le mando la tela a un cortador; en ese momento
+debo hacer el movimiento al almacén del cortador para poder descargarlo de ese almacén"*.
+
+### La pantalla de traspaso ya existía (y ya estaba en el menú)
+
+Está en **Inventarios › Telas › Traspaso de telas por color**. Hace exactamente el movimiento del
+ejemplo: saca del almacén origen y mete al destino en una sola operación (si algo falla, no se hace
+ninguna de las dos), y el servidor verifica que el origen tenga suficiente de la tela **y** de su
+cardigan.
+
+No se construyó otra —tener el mismo movimiento en dos pantallas es la mejor forma de que un día
+las dos digan cosas distintas—, pero sí se arregló lo que la hacía incómoda para este flujo:
+
+- Antes listaba **todos** los almacenes, incluidos los de producto terminado y los de avíos. Ahora
+  solo los de **telas**.
+- Cada almacén dice **de qué cortador es**: "Bodega Montaño · Taller Montaño".
+
+### Ligar un almacén a su cortador
+
+En **Administración › Almacenes**, al dar de alta o editar un almacén de tipo *Telas*, aparece el
+campo **Cortador (opcional)**. Solo ofrece terceros marcados con el rol *Corte*. La lista de
+almacenes muestra una columna nueva con el cortador de cada bodega.
+
+Tres reglas, y las tres avisan qué hacer si algo no cuadra:
+
+- Solo los almacenes de **Telas** pueden tener cortador. Si intentas cambiar a *PT* un almacén que
+  ya lo tiene, primero hay que quitarle la liga.
+- El tercero tiene que estar marcado con el rol **Corte**. Si no, el mensaje te dice que se lo
+  marques en su ficha de proveedor.
+- **Un cortador solo puede tener un almacén.** Si intentas ligarlo a un segundo, el sistema te dice
+  a cuál está ligado hoy. Es a propósito: con dos bodegas por cortador, "el almacén de este
+  cortador" no tendría respuesta y el default de abajo sería una adivinanza.
+
+### Al capturar el corte, los dos atajos
+
+En el avance de producción, en la etapa **Corte**, en cuanto eliges el cortador aparecen:
+
+- **Descargar tela del inventario** → abre la salida de tela con la **orden y el almacén de ese
+  cortador** ya puestos.
+- **Mandar tela al cortador** (nuevo) → abre el traspaso con el **destino** ya puesto. El origen lo
+  eliges tú: de qué bodega sale la tela es decisión de quien captura, no algo que deba adivinarse.
+
+El mismo botón de descarga se agregó a **Producción › Captura de corte** (la pantalla del menú),
+para que no dependa de por dónde entraste.
+
+Una aclaración sobre el *"que abra automáticamente"*: lo que se hizo es que **el enlace que ya
+existía se lleve el almacén**, no que la pantalla se abra sola al elegir cortador. Con la matriz del
+corte a medio capturar, sacarte de la pantalla sin que lo pidas te haría perder lo tecleado — por eso
+ese enlace ya te preguntaba antes de salir. El ahorro real (no buscar el almacén entre todos) queda
+igual.
+
+### Dos cosas que conviene saber
+
+- **El almacén se propone, no se impone.** Solo se pone si el campo está vacío, y una sola vez: si
+  lo cambias o lo borras a propósito, no te lo volvemos a poner. Y si el cortador todavía no tiene
+  almacén ligado, simplemente no se propone nada (no es un error).
+- **Si una bodega de tela dejó de aparecer** en la salida o el traspaso, es que está capturada con
+  otro tipo (PT o Avíos): se le corrige el tipo en *Administración › Almacenes*.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Una migración automática** (`20260807120000_almacen_cortador`): una columna opcional en
+   almacenes, su índice único y la llave foránea. Aditiva, sin borrados.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.**

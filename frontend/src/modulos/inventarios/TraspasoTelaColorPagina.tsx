@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -22,6 +23,13 @@ function hoy(): string {
  * cada renglón. El backend valida que el ORIGEN aguante los dos componentes (bajo lock, D3).
  * Permiso `inventario-telas.mover`. El traspaso del flujo viejo por lote sigue en "Traspaso de
  * materiales".
+ *
+ * Es la pantalla del flujo que describió Daniel (§Post-F9.13): *"recibo la tela en el almacén
+ * Naucalpan (que es el principal) y de ahí le mando la tela a un cortador y en ese momento debo de
+ * hacer el movimiento entre almacenes al almacén del cortador para poder descargarlo de ese
+ * almacén"*. Por eso: los selectores solo listan almacenes de TELA, cada uno dice de qué cortador
+ * es, y acepta el deep-link `state.idCortador` del avance de producción para llegar con el destino
+ * ya puesto.
  */
 export function TraspasoTelaColorPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -33,13 +41,48 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
 
+  // Solo almacenes de TELA: un traspaso de tela nunca sale ni entra a una bodega de PT o de avíos.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   const traspasar = useTraspasarTelaColor();
+
+  // DEEP-LINK "Mandar tela al cortador" (§Post-F9.13): llega el cortador y se traduce a SU almacén
+  // como DESTINO. El origen lo elige el usuario (de dónde sale la tela es decisión suya).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [idCortadorDeepLink] = useState<number | null>(() => {
+    const state: unknown = location.state;
+    if (typeof state !== 'object' || state === null || !('idCortador' in state)) return null;
+    const id = (state as Record<string, unknown>).idCortador;
+    return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+  });
+  const listaAlmacenes = almacenes.data?.datos;
+  // El deep-link se atiende UNA sola vez. El candado es un ref y no una dependencia porque la
+  // lista de almacenes puede llegar con identidad nueva en cada render: sin él, el `navigate` de
+  // adentro dispararía otro render, que volvería a entrar al efecto — un bucle.
+  const cortadorAtendido = useRef(false);
+  useEffect(() => {
+    if (idCortadorDeepLink === null || listaAlmacenes === undefined || cortadorAtendido.current) {
+      return;
+    }
+    cortadorAtendido.current = true;
+    const suyo = listaAlmacenes.find((a) => a.idCortador === idCortadorDeepLink);
+    if (suyo !== undefined) {
+      setIdAlmacenDestino((actual) => (actual === '' ? String(suyo.id) : actual));
+    }
+    // Se limpia aunque el cortador no tenga almacén ligado: el deep-link ya se atendió.
+    void navigate(location.pathname, { replace: true, state: null });
+  }, [idCortadorDeepLink, listaAlmacenes, location.pathname, navigate]);
+
+  /** Etiqueta del almacén en los selectores: dice de qué cortador es, si lo tiene. */
+  function etiquetaAlmacen(a: { nombre: string; cortador: string | null }): string {
+    return a.cortador === null ? a.nombre : `${a.nombre} · ${a.cortador}`;
+  }
 
   const almacenesDistintos =
     idAlmacenOrigen !== '' && idAlmacenDestino !== '' && idAlmacenOrigen !== idAlmacenDestino;
@@ -108,7 +151,7 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
                 <option value="">Elige el origen…</option>
                 {(almacenes.data?.datos ?? []).map((a) => (
                   <option key={a.id} value={String(a.id)}>
-                    {a.nombre}
+                    {etiquetaAlmacen(a)}
                   </option>
                 ))}
               </SelectNativo>
@@ -125,7 +168,7 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
                 <option value="">Elige el destino…</option>
                 {(almacenes.data?.datos ?? []).map((a) => (
                   <option key={a.id} value={String(a.id)}>
-                    {a.nombre}
+                    {etiquetaAlmacen(a)}
                   </option>
                 ))}
               </SelectNativo>

@@ -53,6 +53,14 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
   existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
   como datos de orden SIN tocar existencias (etapa posterior del track).
+- **Almacén ligado a su CORTADOR (§Post-F9.13, 7-ago-2026):** `Almacen.idCortador` (nullable,
+  **único**, FK Restrict a `Proveedor`) validado en `dominio/admin/almacenes.ts` — solo tipo TELA,
+  proveedor activo con rol `corte`, y un cortador = un almacén (si no, "el almacén de este cortador"
+  sería ambiguo). Lo consumen los deep-links del avance de producción: **"Descargar tela"** manda
+  `state.idCortador` a la salida por color (que preselecciona SU almacén) y **"Mandar tela al
+  cortador"** al traspaso (que preselecciona el DESTINO; el origen lo elige el usuario). La
+  preselección ocurre **una sola vez y solo con el campo vacío** — nunca pisa lo que el usuario
+  eligió. Salida y traspaso listan **solo almacenes `tipo: TELA`**.
 - **Quién puede surtir tela: solo el rol `vende-telas`** (§Post-F9.12, 7-ago-2026). El selector de
   proveedor se acota **en servidor** (`GET /api/proveedores?rol=`) vía el hook compartido
   `useProveedoresPorRol` en: alta/edición de tela del catálogo (el proveedor DUEÑO de A1), entrada

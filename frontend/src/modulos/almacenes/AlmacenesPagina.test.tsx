@@ -41,6 +41,8 @@ function almacen(id: number, nombre: string, activo = true): Almacen {
     tipo: 'PT',
     activo,
     idEmpresa: 1,
+    idCortador: null,
+    cortador: null,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',

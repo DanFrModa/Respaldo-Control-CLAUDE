@@ -1,4 +1,6 @@
+import { Scissors } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useCrearCorte, usePendientesOrden } from '@/api/etapas';
@@ -52,6 +54,7 @@ export function CapturaCortePagina(): React.JSX.Element {
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
 
+  const navegar = useNavigate();
   const orden = useOrden(idOrden);
   const pendientes = usePendientesOrden(idOrden, idOrden !== undefined);
   const crear = useCrearCorte();
@@ -251,13 +254,36 @@ export function CapturaCortePagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">
                     Total a cortar: <strong>{total.toLocaleString('es-MX')}</strong> pzas
                   </span>
-                  <Button onClick={guardar} disabled={!puedeGuardar} data-testid="corte-guardar">
-                    {crear.isPending ? 'Guardando…' : 'Guardar corte'}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* §Post-F9.13: el mismo puente que el panel de avance, para que la captura
+                        de corte del menú no se quede sin él (la descarga llega con la orden y el
+                        almacén del cortador ya puestos). Aquí NO hay confirmación de salida: esta
+                        pantalla es una ruta propia y el navegador conserva la captura al volver. */}
+                    {idCortador !== '' && tienePermiso('inventario-telas.mover') ? (
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          void navegar('/inventarios/telas/salida-orden', {
+                            state: {
+                              ...(idOrden === undefined ? {} : { idOrden }),
+                              idCortador: Number(idCortador),
+                            },
+                          })
+                        }
+                        data-testid="corte-descargar-tela"
+                      >
+                        <Scissors aria-hidden />
+                        Descargar tela del inventario
+                      </Button>
+                    ) : null}
+                    <Button onClick={guardar} disabled={!puedeGuardar} data-testid="corte-guardar">
+                      {crear.isPending ? 'Guardando…' : 'Guardar corte'}
+                    </Button>
+                  </div>
                 </div>
               </>
             )}

@@ -190,6 +190,18 @@ export function AvanceProduccion({
   const [etapaActiva, setEtapaActiva] = useState<ClaveEtapa>('corte');
   const [capturaAbierta, setCapturaAbierta] = useState(false);
   const [aCancelar, setACancelar] = useState<EtapaHistorial | null>(null);
+  /**
+   * Proveedor elegido DENTRO de la captura abierta, levantado hasta aquí (§Post-F9.13): los puentes
+   * a inventario ("descargar tela" / "mandar tela al cortador") viven en esta barra, arriba de la
+   * captura, y necesitan saber a qué cortador se le está registrando el corte. Se limpia al
+   * cambiar de etapa o al cerrar la captura para no arrastrar un cortador que ya no está a la vista.
+   */
+  const [proveedorEnCaptura, setProveedorEnCaptura] = useState<number | null>(null);
+  useEffect(() => {
+    if (!capturaAbierta) {
+      setProveedorEnCaptura(null);
+    }
+  }, [capturaAbierta, etapaActiva]);
 
   // Esc cierra el panel — pero NO mientras el diálogo de cancelación está abierto: su propio Esc
   // lo cierra (Radix) y si este listener también corriera, tiraría el panel entero y se perdería
@@ -341,12 +353,50 @@ export function AvanceProduccion({
                     ) {
                       return;
                     }
-                    void navigate('/inventarios/telas/salida-orden', { state: { idOrden } });
+                    // §Post-F9.13: si ya se eligió el cortador, viaja con la orden para que la
+                    // salida arranque en SU almacén (el ligado en el catálogo). Sin cortador
+                    // elegido todavía, el enlace sigue funcionando igual que antes.
+                    void navigate('/inventarios/telas/salida-orden', {
+                      state: {
+                        idOrden,
+                        ...(proveedorEnCaptura === null ? {} : { idCortador: proveedorEnCaptura }),
+                      },
+                    });
                   }}
                   data-testid="avance-descargar-tela"
                 >
                   <Scissors aria-hidden />
                   Descargar tela del inventario
+                </Button>
+              ) : null}
+              {/* §Post-F9.13 (Daniel): "de ahí le mando la tela a un cortador y en ese momento
+                  debo de hacer el movimiento entre almacenes al almacén del cortador para poder
+                  descargarlo de ese almacén". El traspaso ANTECEDE a la descarga, así que el
+                  atajo vive junto a ella y llega con el destino ya puesto. */}
+              {etapaActiva === 'corte' &&
+              proveedorEnCaptura !== null &&
+              tienePermiso('inventario-telas.mover') ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (
+                      capturaAbierta &&
+                      !window.confirm(
+                        'Se va a salir del avance para traspasar la tela y se perderá lo que ' +
+                          'lleves capturado en el corte. ¿Continuar?',
+                      )
+                    ) {
+                      return;
+                    }
+                    void navigate('/inventarios/telas/traspaso', {
+                      state: { idCortador: proveedorEnCaptura },
+                    });
+                  }}
+                  data-testid="avance-traspasar-tela"
+                >
+                  <Scissors aria-hidden />
+                  Mandar tela al cortador
                 </Button>
               ) : null}
               {puedeCapturar(etapaActiva, tienePermiso) ? (
@@ -372,6 +422,7 @@ export function AvanceProduccion({
                 orden={orden.data}
                 wip={wip.data}
                 procesos={procesos.data?.datos ?? []}
+                alElegirProveedor={setProveedorEnCaptura}
                 alRegistrado={() => {
                   setCapturaAbierta(false);
                   void refrescarTodo();
@@ -520,6 +571,7 @@ function CapturaMovimiento({
   orden,
   wip,
   procesos,
+  alElegirProveedor,
   alRegistrado,
   alCancelar,
 }: {
@@ -527,6 +579,11 @@ function CapturaMovimiento({
   orden: NonNullable<ReturnType<typeof useOrden>['data']>;
   wip: WipOrden;
   procesos: readonly TipoProceso[];
+  /**
+   * Avisa al panel qué proveedor está elegido (§Post-F9.13): los puentes a inventario viven en la
+   * barra de arriba y necesitan el cortador para llevarse SU almacén.
+   */
+  alElegirProveedor: (id: number | null) => void;
   alRegistrado: () => void;
   /** Cierra la captura sin guardar (botón "Cancelar" del proto). */
   alCancelar: () => void;
@@ -541,6 +598,10 @@ function CapturaMovimiento({
     etapa === 'entrega-maquila' ? (orden.idMaquilero ?? null) : null,
   );
   const [idProcesoAplicacion, setIdProcesoAplicacion] = useState<string>('');
+  // Espeja el proveedor elegido hacia el panel (los puentes a inventario están fuera de aquí).
+  useEffect(() => {
+    alElegirProveedor(idProveedor);
+  }, [idProveedor, alElegirProveedor]);
   const [observaciones, setObservaciones] = useState('');
   const [valores, setValores] = useState<Record<string, number>>({});
   const [idAlmacenPrimeras, setIdAlmacenPrimeras] = useState<string>('');
