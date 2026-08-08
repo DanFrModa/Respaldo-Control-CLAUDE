@@ -11,8 +11,19 @@ const mutate = vi.fn();
 vi.mock('@/api/inventario-materiales', () => ({
   useSalidaTelaColorAOrden: () => ({ mutate, isPending: false }),
 }));
+const almacenesQuery = vi.fn();
 vi.mock('@/api/almacenes', () => ({
-  useAlmacenes: () => ({ data: { datos: [{ id: 5, nombre: 'Bodega A' }] } }),
+  useAlmacenes: (query: unknown) => {
+    almacenesQuery(query);
+    return {
+      data: {
+        datos: [
+          { id: 5, nombre: 'Bodega A', idCortador: null, cortador: null },
+          { id: 8, nombre: 'Taller Montaño', idCortador: 99, cortador: 'Montaño' },
+        ],
+      },
+    };
+  },
 }));
 // SelectorOrden emite una orden al hacer click.
 vi.mock('@/modulos/produccion/SelectorOrden', () => ({
@@ -121,5 +132,50 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
     });
     expect(screen.getByTestId('salida-color-almacen')).toBeInTheDocument();
     expect(useOrden).toHaveBeenCalledWith(42);
+  });
+  it('solo ofrece almacenes de TELA (no bodegas de PT ni de avíos)', () => {
+    renderConProveedores(<SalidaTelaColorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+    });
+    // El filtro lo aplica el SERVIDOR: la pantalla pide la lista ya acotada.
+    expect(almacenesQuery).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'TELA' }));
+  });
+
+  it('con el CORTADOR en el deep-link arranca en SU almacén (§Post-F9.13)', async () => {
+    useOrden.mockReturnValue({
+      data: { id: 42, folio: 5424, codigoModelo: 'M-9', cliente: 'C&A' },
+      isError: false,
+    });
+    renderConProveedores(<SalidaTelaColorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+      rutaInicial: {
+        pathname: '/inventarios/telas/salida-orden',
+        state: { idOrden: 42, idCortador: 99 },
+      },
+    });
+
+    await waitFor(() => {
+      // El almacén ligado a ese cortador queda elegido sin que el usuario lo busque.
+      expect(screen.getByTestId('salida-color-almacen')).toHaveValue('8');
+    });
+  });
+
+  it('un cortador SIN almacén ligado no rompe nada: el campo queda vacío', async () => {
+    useOrden.mockReturnValue({
+      data: { id: 42, folio: 5424, codigoModelo: 'M-9', cliente: 'C&A' },
+      isError: false,
+    });
+    renderConProveedores(<SalidaTelaColorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+      rutaInicial: {
+        pathname: '/inventarios/telas/salida-orden',
+        state: { idOrden: 42, idCortador: 12345 },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Sin orden seleccionada.')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('salida-color-almacen')).toHaveValue('');
   });
 });

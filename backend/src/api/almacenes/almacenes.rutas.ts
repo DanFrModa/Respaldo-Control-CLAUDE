@@ -25,7 +25,7 @@ import {
   esquemaAlmacenSalida,
   esquemaErrorApi,
 } from '../../contrato/index.js';
-import type { Almacen } from '../../datos/index.js';
+import type { AlmacenConCortador } from '../../dominio/admin/almacenes.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
@@ -37,13 +37,15 @@ import {
 } from '../../dominio/admin/almacenes.js';
 
 /** Proyecta el modelo Prisma `Almacen` a la forma JSON del contrato (fechas ISO). */
-function aAlmacenSalida(almacen: Almacen): z.infer<typeof esquemaAlmacenSalida> {
+function aAlmacenSalida(almacen: AlmacenConCortador): z.infer<typeof esquemaAlmacenSalida> {
   return {
     id: almacen.id,
     nombre: almacen.nombre,
     tipo: almacen.tipo,
     activo: almacen.activo,
     idEmpresa: almacen.idEmpresa,
+    idCortador: almacen.idCortador,
+    cortador: almacen.cortador?.nombre ?? null,
     creadoEn: almacen.creadoEn.toISOString(),
     creadoPorId: almacen.creadoPorId,
     modificadoEn: almacen.modificadoEn.toISOString(),

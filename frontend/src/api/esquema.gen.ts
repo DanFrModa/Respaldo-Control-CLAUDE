@@ -434,6 +434,10 @@ export interface paths {
                 activo: boolean;
                 /** @description Empresa dueña, o null si es un almacén global. */
                 idEmpresa: number | null;
+                /** @description Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene. */
+                idCortador: number | null;
+                /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
+                cortador: string | null;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -558,6 +562,7 @@ export interface paths {
             /** @enum {string} */
             tipo: 'PT' | 'TELA' | 'AVIO';
             idEmpresa?: number;
+            idCortador?: number | null;
           };
         };
       };
@@ -582,6 +587,10 @@ export interface paths {
               activo: boolean;
               /** @description Empresa dueña, o null si es un almacén global. */
               idEmpresa: number | null;
+              /** @description Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene. */
+              idCortador: number | null;
+              /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
+              cortador: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -727,6 +736,10 @@ export interface paths {
               activo: boolean;
               /** @description Empresa dueña, o null si es un almacén global. */
               idEmpresa: number | null;
+              /** @description Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene. */
+              idCortador: number | null;
+              /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
+              cortador: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -861,6 +874,10 @@ export interface paths {
               activo: boolean;
               /** @description Empresa dueña, o null si es un almacén global. */
               idEmpresa: number | null;
+              /** @description Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene. */
+              idCortador: number | null;
+              /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
+              cortador: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -980,6 +997,7 @@ export interface paths {
             /** @enum {string} */
             tipo?: 'PT' | 'TELA' | 'AVIO';
             idEmpresa?: number;
+            idCortador?: number | null;
             activo?: boolean;
           };
         };
@@ -1005,6 +1023,10 @@ export interface paths {
               activo: boolean;
               /** @description Empresa dueña, o null si es un almacén global. */
               idEmpresa: number | null;
+              /** @description Proveedor CORTADOR dueño del almacén (§Post-F9.13), o null si no tiene. */
+              idCortador: number | null;
+              /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
+              cortador: string | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).

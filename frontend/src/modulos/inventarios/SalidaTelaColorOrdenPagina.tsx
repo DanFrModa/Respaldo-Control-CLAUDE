@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -22,12 +22,12 @@ function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Lee `state.idOrden` del deep-link (enlace "Descargar tela" del avance de producción). */
-function leerIdOrdenDeepLink(state: unknown): number | null {
-  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
+/** Lee un id entero positivo de una clave del `state` del deep-link, o null. */
+function leerIdDeepLink(state: unknown, clave: string): number | null {
+  if (typeof state !== 'object' || state === null || !(clave in state)) {
     return null;
   }
-  const id = state.idOrden;
+  const id = (state as Record<string, unknown>)[clave];
   return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
 }
 
@@ -37,7 +37,9 @@ function leerIdOrdenDeepLink(state: unknown): number | null {
  * cuerpo y el complemento viajan JUNTOS en el mismo renglón. Como puede haber PARTIDAS con tonos
  * distintos del mismo color, la pantalla AVISA el riesgo de tono SIN bloquear (DECISIONES
  * §Post-F9.11 punto 2). Conserva el deep-link `state.idOrden` de "Descargar tela" (avance de
- * producción / centro de órdenes). El servidor valida no-negativo de AMBOS componentes bajo lock
+ * producción / centro de órdenes) y, desde §Post-F9.13, también `state.idCortador`: con el corte
+ * capturado a nombre de un cortador, la salida arranca en SU almacén (el que tiene ligado en el
+ * catálogo) sin que haya que buscarlo. El servidor valida no-negativo de AMBOS componentes bajo lock
  * (D3). La salida vieja por lote sigue como "Salida a orden por lote (legado)".
  * `inventario-telas.mover` gobierna la captura.
  */
@@ -50,7 +52,11 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
   // "atrás" no lo vuelvan a aplicar (patrón de la pantalla por lote que esta sustituye).
   const location = useLocation();
   const navigate = useNavigate();
-  const [idDeepLink] = useState<number | null>(() => leerIdOrdenDeepLink(location.state));
+  const [idDeepLink] = useState<number | null>(() => leerIdDeepLink(location.state, 'idOrden'));
+  // Cortador del corte que se estaba capturando: se traduce a SU almacén en cuanto llega la lista.
+  const [idCortadorDeepLink] = useState<number | null>(() =>
+    leerIdDeepLink(location.state, 'idCortador'),
+  );
   const ordenDeepLink = useOrden(idDeepLink ?? undefined);
 
   const [orden, setOrden] = useState<Orden | undefined>(undefined);
@@ -59,18 +65,43 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
 
+  // Solo almacenes de TELA: la salida de tela no puede salir de una bodega de PT ni de avíos.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   const crear = useSalidaTelaColorAOrden();
+
+  // Almacén del cortador que venía en el deep-link (§Post-F9.13). Se resuelve contra la lista ya
+  // cargada: la liga vive en el catálogo de almacenes, así que no hace falta otra consulta.
+  const listaAlmacenes = almacenes.data?.datos;
+  // Se propone UNA sola vez (ref, no dependencia): si el usuario borra el almacén a propósito, no
+  // se lo volvemos a poner en el siguiente render.
+  const cortadorAtendido = useRef(false);
+  useEffect(() => {
+    if (idCortadorDeepLink === null || listaAlmacenes === undefined || cortadorAtendido.current) {
+      return;
+    }
+    cortadorAtendido.current = true;
+    const suyo = listaAlmacenes.find((a) => a.idCortador === idCortadorDeepLink);
+    if (suyo !== undefined) {
+      // Solo se propone si el usuario aún no eligió: nunca pisa su elección.
+      setIdAlmacen((actual) => (actual === '' ? String(suyo.id) : actual));
+    }
+  }, [idCortadorDeepLink, listaAlmacenes]);
 
   // La orden del deep-link se fija SOLO una vez y solo si el usuario no eligió otra a mano.
   const ordenDeepLinkData = ordenDeepLink.data;
   useEffect(() => {
     if (idDeepLink === null) {
+      // Sin orden pero CON cortador (§Post-F9.13): el state ya se leyó a estado local al montar,
+      // así que se limpia igual para que un refresh o un "atrás" no lo reapliquen.
+      if (idCortadorDeepLink !== null) {
+        void navigate(location.pathname, { replace: true, state: null });
+      }
       return;
     }
     if (ordenDeepLinkData !== undefined) {
@@ -80,7 +111,14 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
     if (ordenDeepLinkData !== undefined || ordenDeepLink.isError) {
       void navigate(location.pathname, { replace: true, state: null });
     }
-  }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate]);
+  }, [
+    idDeepLink,
+    idCortadorDeepLink,
+    ordenDeepLinkData,
+    ordenDeepLink.isError,
+    location.pathname,
+    navigate,
+  ]);
 
   const totalCuerpo = renglones.reduce((s, r) => s + r.cantidad, 0);
   const totalComplemento = renglones.reduce((s, r) => s + r.cantidadComplemento, 0);

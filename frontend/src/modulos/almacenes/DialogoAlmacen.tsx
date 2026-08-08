@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -11,6 +11,7 @@ import {
   TIPOS_ALMACEN,
 } from '@/api/esquemas';
 import { useActualizarAlmacen, useCrearAlmacen } from '@/api/almacenes';
+import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import type { Almacen } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +40,9 @@ import { SelectNativo } from '@/components/ui/native-select';
  * permiso) se muestra como toast con el mensaje en español del backend.
  *
  * La validacion de captura es solo UX: el backend re-valida y es la autoridad.
+ *
+ * El CORTADOR (§Post-F9.13) va como estado local, no como campo del schema: solo aplica a los
+ * almacenes de TELA y el backend lo valida a fondo (tipo, rol `corte` y un cortador = un almacén).
  */
 export function DialogoAlmacen({
   abierto,
@@ -60,6 +64,18 @@ export function DialogoAlmacen({
     defaultValues: { nombre: '', tipo: 'PT' },
   });
 
+  // Cortador ligado (§Post-F9.13). Estado local: no es texto del schema y solo aplica a TELA.
+  const [idCortador, setIdCortador] = useState<number | null>(null);
+  const tipoElegido = formulario.watch('tipo');
+  const esDeTela = tipoElegido === 'TELA';
+
+  // Solo terceros con el rol "corte" (el backend exige lo mismo).
+  const cortadores = useProveedoresPorRol(COD_ROL_PROVEEDOR.corte);
+  const listaCortadores = cortadores.data?.datos ?? [];
+  // El cortador ya ligado se conserva como opción aunque no venga en la página cargada.
+  const ligadoFueraDeLista =
+    idCortador !== null && !listaCortadores.some((p) => p.id === idCortador);
+
   // Al abrir, sincroniza el formulario con el almacen en edicion (o lo limpia
   // para un alta). `reset` corre solo cuando cambia la apertura o el almacen.
   useEffect(() => {
@@ -67,13 +83,18 @@ export function DialogoAlmacen({
       formulario.reset(
         almacen ? { nombre: almacen.nombre, tipo: almacen.tipo } : { nombre: '', tipo: 'PT' },
       );
+      setIdCortador(almacen?.idCortador ?? null);
     }
   }, [abierto, almacen, formulario]);
 
   const enviar = formulario.handleSubmit((datos) => {
+    // Fuera de TELA la liga no existe: se manda null explícito para no dejar una liga huérfana
+    // si el usuario cambió el tipo de un almacén que ya tenía cortador.
+    const cortador = datos.tipo === 'TELA' ? idCortador : null;
     if (esEdicion) {
       actualizar.mutate(
-        { id: almacen.id, cuerpo: datos },
+        // En edición `idCortador` viaja SIEMPRE (incluido null): así se puede QUITAR la liga.
+        { id: almacen.id, cuerpo: { ...datos, idCortador: cortador } },
         {
           onSuccess: (resultado) => {
             toast.success(`Almacén "${resultado.nombre}" actualizado.`);
@@ -84,13 +105,16 @@ export function DialogoAlmacen({
       );
       return;
     }
-    crear.mutate(datos, {
-      onSuccess: (resultado) => {
-        toast.success(`Almacén "${resultado.nombre}" creado.`);
-        alCambiarAbierto(false);
+    crear.mutate(
+      { ...datos, ...(cortador === null ? {} : { idCortador: cortador }) },
+      {
+        onSuccess: (resultado) => {
+          toast.success(`Almacén "${resultado.nombre}" creado.`);
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
       },
-      onError: (error) => toast.error(error.message),
-    });
+    );
   });
 
   const { errors } = formulario.formState;
@@ -144,6 +168,39 @@ export function DialogoAlmacen({
               </FieldDescription>
               <FieldError errors={[errors.tipo]} />
             </Field>
+
+            {/* Cortador dueño del almacén (§Post-F9.13). Solo tiene sentido en TELA: es lo que
+                hace que la descarga de tela salga por default de la bodega de ese taller. */}
+            {esDeTela ? (
+              <Field>
+                <FieldLabel htmlFor="almacen-cortador">Cortador (opcional)</FieldLabel>
+                <SelectNativo
+                  id="almacen-cortador"
+                  value={idCortador === null ? '' : String(idCortador)}
+                  onChange={(e) =>
+                    setIdCortador(e.target.value === '' ? null : Number(e.target.value))
+                  }
+                  disabled={guardando}
+                  data-testid="almacen-cortador"
+                >
+                  <option value="">— Sin cortador —</option>
+                  {ligadoFueraDeLista && idCortador !== null ? (
+                    <option value={String(idCortador)}>
+                      {almacen?.cortador ?? 'Cortador actual'}
+                    </option>
+                  ) : null}
+                  {listaCortadores.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </SelectNativo>
+                <FieldDescription>
+                  Si este almacén es el del taller de un cortador, ligarlo hace que al capturar su
+                  corte la descarga de tela salga de aquí. Un cortador solo puede tener un almacén.
+                </FieldDescription>
+              </Field>
+            ) : null}
           </FieldGroup>
 
           <DialogFooter>

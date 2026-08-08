@@ -388,6 +388,47 @@ describe('Captura del avance · descargar tela', () => {
     }
   });
 
+  it('con el CORTADOR elegido, la descarga se lleva su id (§Post-F9.13)', async () => {
+    const usuario = userEvent.setup();
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      pintar();
+      await abrirCaptura(usuario, 'corte');
+
+      // Se elige el cortador en la captura (el corte arranca SIN proveedor: no hay default).
+      await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+      await usuario.click(await screen.findByText('Maquila del Sur'));
+
+      await usuario.click(screen.getByTestId('avance-descargar-tela'));
+      expect(navegar).toHaveBeenCalledWith('/inventarios/telas/salida-orden', {
+        state: { idOrden: 1, idCortador: 99 },
+      });
+    } finally {
+      confirmar.mockRestore();
+    }
+  });
+
+  it('"Mandar tela al cortador" aparece SOLO con cortador elegido y lleva su id', async () => {
+    const usuario = userEvent.setup();
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      pintar();
+      // Sin captura abierta (y por tanto sin cortador) el atajo no existe.
+      expect(screen.queryByTestId('avance-traspasar-tela')).not.toBeInTheDocument();
+
+      await abrirCaptura(usuario, 'corte');
+      await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+      await usuario.click(await screen.findByText('Maquila del Sur'));
+
+      await usuario.click(screen.getByTestId('avance-traspasar-tela'));
+      expect(navegar).toHaveBeenCalledWith('/inventarios/telas/traspaso', {
+        state: { idCortador: 99 },
+      });
+    } finally {
+      confirmar.mockRestore();
+    }
+  });
+
   it('el enlace NO aparece en las otras etapas', async () => {
     const usuario = userEvent.setup();
     pintar();

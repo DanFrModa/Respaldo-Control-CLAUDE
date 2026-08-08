@@ -846,3 +846,27 @@ El ETL de terceros llena **las dos** de forma consistente (`TipoProv` T → tipo
 - **Efecto lateral a cuidar:** un proveedor de telas al que le falte la casilla `Vende telas` deja de aparecer en esas pantallas. Es el comportamiento pedido; se corrige marcándole el rol en su ficha.
 - **Aplica en:** solo **frontend**. El API ya soportaba `GET /api/proveedores?rol=<id>` desde F1-E1B; hook nuevo `useProveedoresPorRol` (`frontend/src/api/proveedores.ts`) que centraliza el patrón. **SIN migración, SIN permisos nuevos, SIN seed.**
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.13) — Almacén de telas ligado a su CORTADOR, y el traspaso al taller (DANIEL, 7-ago-2026)
+
+Daniel: *"En la sección de almacenes de telas, estaría bien que podamos ligar cada almacén de telas (opcional) a un cortador. Y entonces cuando seleccionemos a un cortador, automáticamente por default abre la ventana de descarga de tela con el almacén relacionado a ese cortador."* Y: *"También es muy importante hacer una pantalla de traspaso de telas entre almacenes. Ejemplo: recibo la tela en el almacén 'Naucalpan' (que es el principal) y de ahí le mando la tela a un cortador y en ese momento debo de hacer el movimiento entre almacenes al almacén del cortador para poder descargarlo de ese almacén."*
+
+**1. La pantalla de traspaso YA EXISTÍA** (etapa A2, 6-ago): *Inventarios › Telas › Traspaso de telas por color*, con sus dos patas atómicas y la validación de no-negativo bajo lock. No se construyó una nueva —habría sido duplicar el mismo movimiento con dos reglas—, se **corrigió lo que la hacía inservible para este flujo**: listaba almacenes de PT y de avíos junto a los de tela, y no había forma de saber qué bodega era de qué taller.
+
+**2. `Almacen.idCortador`** — liga OPCIONAL a un `Proveedor` con rol `corte`. Tres reglas, todas en dominio (A1/A4) y con mensajes que dicen qué hacer:
+- **Solo almacenes de TELA.** En uno de PT o avíos la liga no significaría nada. Cambiar a PT/AVIO un almacén que ya tiene cortador se rechaza: primero se le quita la liga.
+- **El tercero debe ser cortador de verdad** (activo + rol `corte`). Si no, el error dice *"márcale el rol Corte en su ficha de proveedor"* en vez de dejar al usuario adivinando.
+- **Un cortador, un almacén** (índice único en BD + verificación previa que NOMBRA el almacén que ya lo tiene). Con dos almacenes por cortador, *"¿cuál es el almacén de este cortador?"* no tendría respuesta y el default de la descarga sería una moneda al aire.
+
+**3. Los puentes desde la captura del corte.** *"Automáticamente por default abre la ventana"* se implementó como **el enlace que ya existía llevándose el dato**, no como una navegación que se dispara sola: con la matriz del corte a medio teclear, sacar al usuario de la pantalla sin que lo pida sería hostil (por eso el enlace ya preguntaba antes de salir, §Post-F9.8). Al elegir el cortador aparecen dos botones en el avance de producción:
+- **"Descargar tela del inventario"** → salida a orden con la orden **y el almacén del cortador** ya puestos.
+- **"Mandar tela al cortador"** (nuevo) → traspaso con el **destino** ya puesto. El **origen NO se adivina**: de qué bodega sale la tela es decisión de quien captura. Va junto a la descarga porque en el flujo de Daniel el traspaso la ANTECEDE.
+
+El mismo puente de descarga se agregó a *Producción › Captura de corte* (la pantalla del menú), para no repetir la deuda de §Post-F9.7 donde una de las dos pantallas del mismo acto se quedó sin el default.
+
+**4. Lo propuesto nunca pisa lo elegido.** El almacén se pre-selecciona **solo si el campo está vacío**, y una sola vez: si el usuario lo cambia o lo borra a propósito, no se le vuelve a poner. Un cortador **sin** almacén ligado simplemente no propone nada (no es un error).
+
+- **Efecto lateral a cuidar:** los selectores de almacén de la salida y del traspaso de tela ahora **solo listan almacenes de tipo TELA**. Si alguna bodega de tela está capturada con otro tipo, hay que corregirle el tipo en *Administración › Almacenes* para que vuelva a aparecer.
+- **Defecto propio encontrado y cerrado en la misma ronda:** la primera versión del efecto que resuelve el deep-link dependía de la lista de almacenes y llamaba a `navigate` dentro; con una identidad de datos nueva por render eso era un **bucle infinito** (lo cazó la prueba nueva del traspaso, que se colgó). Se cerró con un candado por `ref` en ambas pantallas.
+- **Aplica en:** migración aditiva `20260807120000_almacen_cortador` (columna nullable + índice único + FK Restrict). **SIN permisos nuevos → no requiere `SEED_ON_START`.**
+- **Fecha:** 2026-08-07.

@@ -143,6 +143,11 @@ export function AlmacenesPagina(): React.JSX.Element {
         <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>{ETIQUETAS_TIPO_ALMACEN[a.tipo]}</TipoBadge>
       ),
     },
+    // Cortador ligado (§Post-F9.13): de un vistazo se ve qué bodega es de qué taller.
+    {
+      encabezado: 'Cortador',
+      render: (a) => <span className="text-muted-foreground">{a.cortador ?? '—'}</span>,
+    },
   ];
 
   return (

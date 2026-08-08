@@ -389,6 +389,16 @@ model Almacen {
   idEmpresa Int?        @map("id_empresa")
   empresa   Empresa?    @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
 
+  /// CORTADOR dueño del almacén (§Post-F9.13, petición de Daniel 7-ago-2026): liga OPCIONAL de un
+  /// almacén de TELA con el taller de corte que lo usa. Sirve para que, al capturar el corte con
+  /// ese cortador, la descarga de tela salga por default de SU almacén, y para que el traspaso
+  /// "Naucalpan → taller" se encuentre solo. Es un `Proveedor` con rol `corte` (lo valida el
+  /// dominio, no la BD). **ÚNICO a propósito**: un cortador tiene a lo más UN almacén — con dos, la
+  /// pregunta "¿cuál es el almacén de este cortador?" no tendría respuesta y el default sería una
+  /// moneda al aire. Restrict: un proveedor con almacén ligado no se borra físico.
+  idCortador Int?       @unique @map("id_cortador")
+  cortador   Proveedor? @relation("AlmacenCortador", fields: [idCortador], references: [id], onDelete: Restrict)
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -680,6 +690,11 @@ model Proveedor {
 
   /// Telas de las que este proveedor es el DUEÑO del artículo (§Post-F9.11). Restrict.
   telasComoDueno Tela[] @relation("TelaProveedorDueno")
+
+  /// Almacén de TELA ligado a este tercero como CORTADOR (§Post-F9.13). Es 0..1: el almacén
+  /// declara a su cortador y la liga es única, para que "el almacén de este cortador" nunca
+  /// sea ambiguo.
+  almacenComoCortador Almacen? @relation("AlmacenCortador")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
