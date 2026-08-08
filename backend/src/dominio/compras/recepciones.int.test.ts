@@ -98,6 +98,23 @@ async function ocTelaAutorizada(cantidad = 750, precio = 10) {
 }
 
 /**
+ * Crea una OC autorizada con una línea de AVÍO. Desde §Post-F9.14 es la vía que se recibe DESDE la
+ * orden de compra: la tela se recibe capturando su factura (`entradas-tela`), no aquí.
+ */
+async function ocAvioAutorizada(cantidad = 750, precio = 10) {
+  const oc = await crearOC(
+    sesion(PERM),
+    {
+      idProveedor: proveedor.id,
+      lineas: [{ idAvio: avioBoton.id, cantidad, precio, unidad: 'pza' }],
+    },
+    bd(),
+  );
+  await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+  return oc;
+}
+
+/**
  * Existencia (cuerpo + complemento) de un COLOR de tela en el almacén, leyendo la BD directa
  * (Σ movimientos, D3 — nunca la vista).
  */
@@ -118,102 +135,9 @@ describe('Recepción (F4-E3) — regla (b): solo OC autorizada/recibida_parcial'
   it('recibir contra una OC en borrador (no autorizada) → ErrorConflicto', async () => {
     const oc = await crearOC(
       sesion(PERM),
-      { idProveedor: proveedor.id, lineas: [{ idTela: telaFelpa.id, cantidad: 100, precio: 5 }] },
+      { idProveedor: proveedor.id, lineas: [{ idAvio: avioBoton.id, cantidad: 100, precio: 5 }] },
       bd(),
     );
-    const idLineaOC = oc.lineas[0]!.id;
-    await expect(
-      recibirCompra(
-        sesion(PERM),
-        {
-          idOrdenCompra: oc.id,
-          idAlmacen: almacen.id,
-          fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: idLineaOC,
-              cantidad: 100,
-              telaColor: { idTelaColor: colorFelpaRojo.id },
-            },
-          ],
-        },
-        bd(),
-      ),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
-  });
-});
-
-describe('Recepción (B1) — entrada de tela POR COLOR: partida + Σ movimientos + valuación (D3, D1)', () => {
-  it('recibe total: crea la PARTIDA, mueve el kardex por color (cuerpo+complemento) y deja existencia', async () => {
-    const oc = await ocTelaAutorizada(750, 10);
-    const idLineaOC = oc.lineas[0]!.id;
-
-    const rec = await recibirCompra(
-      sesion(PERM),
-      {
-        idOrdenCompra: oc.id,
-        idAlmacen: almacen.id,
-        factura: 'F-555',
-        fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 750,
-            telaColor: {
-              idTelaColor: colorFelpaRojo.id,
-              cantidadComplemento: 120, // el cardigan viaja JUNTO en el mismo renglón
-              loteProveedor: 'LOTE-A7',
-            },
-          },
-        ],
-      },
-      bd(),
-    );
-
-    const linea = rec.lineas[0]!;
-    expect(linea.tipo).toBe('tela');
-    // B1: ya NO se crea lote; la traza es la PARTIDA (con su folio y el lote del proveedor).
-    expect(linea.idLote).toBeNull();
-    expect(linea.idPartida).not.toBeNull();
-    expect(linea.partidaFolio).toBe(1);
-    expect(linea.loteProveedor).toBe('LOTE-A7');
-    expect(linea.idTelaColor).toBe(colorFelpaRojo.id);
-    expect(linea.idMovimiento).not.toBeNull();
-    expect(linea.cantidadRecibida).toBe(750);
-    expect(linea.cantidadComplemento).toBe(120);
-    expect(linea.costoUnit).toBe(10); // factor 1 para tela
-
-    // Existencia = Σ movimientos (D3), por tela×COLOR: cuerpo 750 y complemento 120.
-    expect(await existenciaColor(colorFelpaRojo.id)).toEqual({ cuerpo: 750, complemento: 120 });
-
-    // Valuación cuadra: cuerpo × costo == cantidad × precio de la línea de OC (importe 7500).
-    expect(linea.cantidadRecibida * linea.costoUnit!).toBe(750 * 10);
-
-    // El renglón de kardex trae la dimensión nueva completa (color + partida + complemento) y el
-    // costo del CUERPO (el complemento entra sin valuación propia: la OC trae un solo precio).
-    const dets = await cliente.movimientoDetTela.findMany({
-      where: { idMovimiento: linea.idMovimiento! },
-    });
-    expect(dets).toHaveLength(1);
-    expect(dets[0]!.idTelaColor).toBe(colorFelpaRojo.id);
-    expect(dets[0]!.idPartida).toBe(linea.idPartida);
-    expect(dets[0]!.idLote).toBeNull();
-    expect(Number(dets[0]!.costoUnit)).toBe(10);
-
-    // La partida quedó sellada con la factura de la recepción y su lote del proveedor.
-    const partida = await cliente.partidaTela.findUniqueOrThrow({
-      where: { id: linea.idPartida! },
-    });
-    expect(partida.factura).toBe('F-555');
-    expect(partida.idTelaColor).toBe(colorFelpaRojo.id);
-
-    // Estatus de la OC → recibida_total (R7): el COMPLEMENTO no cuenta contra lo pedido.
-    const ocBd = await cliente.ordenCompra.findUnique({ where: { id: oc.id } });
-    expect(ocBd?.estatus).toBe('recibida_total');
-  });
-
-  it('sin COLOR la línea de tela se RECHAZA (la OC no lo determina — regla explícita de B1)', async () => {
-    const oc = await ocTelaAutorizada(100, 3);
     const idLineaOC = oc.lineas[0]!.id;
     await expect(
       recibirCompra(
@@ -226,20 +150,17 @@ describe('Recepción (B1) — entrada de tela POR COLOR: partida + Σ movimiento
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
-    // Nada se escribió (rollback completo, A2).
-    expect(await cliente.recepcionCompra.count({ where: { idOrdenCompra: oc.id } })).toBe(0);
-    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(0);
-    expect(await cliente.partidaTela.count()).toBe(0);
+    ).rejects.toBeInstanceOf(ErrorConflicto);
   });
+});
 
-  it('un color de OTRA tela se RECHAZA (no se recibe una tela y se inventaría otra)', async () => {
-    const otraTela = await cliente.tela.create({ data: { nombre: 'Jersey' } });
-    const colorAjeno = await cliente.telaColor.create({
-      data: { idTela: otraTela.id, nombre: 'Azul' },
-    });
-    const oc = await ocTelaAutorizada(100, 3);
+describe('Recepción — §Post-F9.14: la TELA ya no se recibe desde la orden de compra', () => {
+  it('un renglón de tela se RECHAZA y el mensaje apunta a la factura', async () => {
+    const oc = await ocTelaAutorizada(750, 10);
     const idLineaOC = oc.lineas[0]!.id;
+
+    // Decisión de Daniel (7-ago-2026): una sola puerta para la tela. Si esta siguiera viva, la
+    // misma tela podría recibirse dos veces (una por cada camino) e inflar el inventario.
     await expect(
       recibirCompra(
         sesion(PERM),
@@ -250,146 +171,25 @@ describe('Recepción (B1) — entrada de tela POR COLOR: partida + Σ movimiento
           lineas: [
             {
               idOrdenCompraLinea: idLineaOC,
-              cantidad: 100,
-              telaColor: { idTelaColor: colorAjeno.id },
-            },
-          ],
-        },
-        bd(),
-      ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
-    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(0);
-  });
-
-  it('el COMPLEMENTO puede traer su propio precio y viaja al kardex (costoUnitComplemento, B1)', async () => {
-    const oc = await ocTelaAutorizada(200, 10);
-    const rec = await recibirCompra(
-      sesion(PERM),
-      {
-        idOrdenCompra: oc.id,
-        idAlmacen: almacen.id,
-        fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: oc.lineas[0]!.id,
-            cantidad: 200,
-            telaColor: {
-              idTelaColor: colorFelpaRojo.id,
-              cantidadComplemento: 30,
-              // La OC trae UN precio por línea (el del cuerpo); el del cardigan se captura aquí.
-              precioUnitComplemento: 140,
-            },
-          },
-        ],
-      },
-      bd(),
-    );
-    const det = await cliente.movimientoDetTela.findFirstOrThrow({
-      where: { idMovimiento: rec.lineas[0]!.idMovimiento! },
-    });
-    expect(Number(det.costoUnit)).toBe(10); // cuerpo: precio de la línea de OC ÷ factor
-    expect(Number(det.costoUnitComplemento)).toBe(140); // cardigan: su propio precio
-  });
-
-  it('sin precio del complemento, el complemento entra SIN valuar (NULL, hueco visible)', async () => {
-    const oc = await ocTelaAutorizada(100, 5);
-    const rec = await recibirCompra(
-      sesion(PERM),
-      {
-        idOrdenCompra: oc.id,
-        idAlmacen: almacen.id,
-        fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: oc.lineas[0]!.id,
-            cantidad: 100,
-            telaColor: { idTelaColor: colorFelpaRojo.id, cantidadComplemento: 10 },
-          },
-        ],
-      },
-      bd(),
-    );
-    const det = await cliente.movimientoDetTela.findFirstOrThrow({
-      where: { idMovimiento: rec.lineas[0]!.idMovimiento! },
-    });
-    expect(Number(det.costoUnit)).toBe(5);
-    expect(det.costoUnitComplemento).toBeNull();
-  });
-
-  it('un bloque `telaColor` en una línea de AVÍO o LIBRE se RECHAZA (error de captura, no se ignora)', async () => {
-    // AVÍO.
-    const ocAvio = await crearOC(
-      sesion(PERM),
-      {
-        idProveedor: proveedor.id,
-        lineas: [{ idAvio: avioBoton.id, cantidad: 10, precio: 3, unidad: 'pza' }],
-      },
-      bd(),
-    );
-    await autorizarOC(sesion(PERM_AUTORIZAR), ocAvio.id, bd());
-    await expect(
-      recibirCompra(
-        sesion(PERM),
-        {
-          idOrdenCompra: ocAvio.id,
-          idAlmacen: almacen.id,
-          fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: ocAvio.lineas[0]!.id,
-              cantidad: 10,
+              cantidad: 750,
               telaColor: { idTelaColor: colorFelpaRojo.id },
             },
           ],
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/factura o remisión/);
 
-    // LIBRE.
-    const ocLibre = await crearOC(
-      sesion(PERM),
-      {
-        idProveedor: proveedor.id,
-        lineas: [{ descripcionLibre: 'Flete', cantidad: 1, precio: 300 }],
-      },
-      bd(),
-    );
-    await autorizarOC(sesion(PERM_AUTORIZAR), ocLibre.id, bd());
-    await expect(
-      recibirCompra(
-        sesion(PERM),
-        {
-          idOrdenCompra: ocLibre.id,
-          idAlmacen: almacen.id,
-          fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: ocLibre.lineas[0]!.id,
-              cantidad: 1,
-              telaColor: { idTelaColor: colorFelpaRojo.id },
-            },
-          ],
-        },
-        bd(),
-      ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
-
-    // Nada se inventarió por ninguna de las dos.
-    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(0);
+    // Y NADA se escribió: ni recepción, ni partida, ni existencia (A2).
+    expect(await cliente.recepcionCompra.count({ where: { idOrdenCompra: oc.id } })).toBe(0);
+    expect(await cliente.partidaTela.count()).toBe(0);
+    expect(await existenciaColor(colorFelpaRojo.id)).toEqual({ cuerpo: 0, complemento: 0 });
+    const ocBd = await cliente.ordenCompra.findUnique({ where: { id: oc.id } });
+    expect(ocBd?.estatus).toBe('autorizada');
   });
 
-  it('una tela SIN complemento rechaza la cantidad de complemento', async () => {
-    const lisa = await cliente.tela.create({ data: { nombre: 'Popelina' } });
-    const colorLisa = await cliente.telaColor.create({
-      data: { idTela: lisa.id, nombre: 'Blanco' },
-    });
-    const oc = await crearOC(
-      sesion(PERM),
-      { idProveedor: proveedor.id, lineas: [{ idTela: lisa.id, cantidad: 50, precio: 2 }] },
-      bd(),
-    );
-    await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+  it('el renglón se rechaza AUNQUE no se mande color (no es un problema de captura)', async () => {
+    const oc = await ocTelaAutorizada(100, 1);
     await expect(
       recibirCompra(
         sesion(PERM),
@@ -397,23 +197,17 @@ describe('Recepción (B1) — entrada de tela POR COLOR: partida + Σ movimiento
           idOrdenCompra: oc.id,
           idAlmacen: almacen.id,
           fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: oc.lineas[0]!.id,
-              cantidad: 50,
-              telaColor: { idTelaColor: colorLisa.id, cantidadComplemento: 10 },
-            },
-          ],
+          lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 100 }],
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/factura o remisión/);
   });
 });
 
 describe('Recepción (F4-E3) — parciales acumuladas: estatus parcial → total (R7)', () => {
   it('dos recepciones suman y el estatus pasa de parcial a total', async () => {
-    const oc = await ocTelaAutorizada(1000, 4);
+    const oc = await ocAvioAutorizada(1000, 4);
     const idLineaOC = oc.lineas[0]!.id;
 
     // Primera recepción: 400 de 1000 → parcial.
@@ -423,13 +217,7 @@ describe('Recepción (F4-E3) — parciales acumuladas: estatus parcial → total
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 400,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 400 }],
       },
       bd(),
     );
@@ -443,13 +231,7 @@ describe('Recepción (F4-E3) — parciales acumuladas: estatus parcial → total
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-21',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 600,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 600 }],
       },
       bd(),
     );
@@ -511,7 +293,7 @@ describe('Recepción (F4-E3) — avío con conversión (R1)', () => {
 
 describe('Recepción (F4-E3) — OUTBOX atómico (ADR-0011)', () => {
   it('la fila EventoOutbox existe tras un commit exitoso', async () => {
-    const oc = await ocTelaAutorizada(100, 1);
+    const oc = await ocAvioAutorizada(100, 1);
     const idLineaOC = oc.lineas[0]!.id;
     const rec = await recibirCompra(
       sesion(PERM),
@@ -519,13 +301,7 @@ describe('Recepción (F4-E3) — OUTBOX atómico (ADR-0011)', () => {
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 100,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 100 }],
       },
       bd(),
     );
@@ -540,7 +316,7 @@ describe('Recepción (F4-E3) — OUTBOX atómico (ADR-0011)', () => {
   });
 
   it('si la transacción hace ROLLBACK, NO queda recepción ni outbox ni movimiento (A2)', async () => {
-    const oc = await ocTelaAutorizada(100, 1);
+    const oc = await ocAvioAutorizada(100, 1);
     const idLineaOC = oc.lineas[0]!.id;
 
     // Falla provocada: el COLOR no existe → ErrorNoEncontrado DESPUÉS de haber creado el
@@ -553,11 +329,9 @@ describe('Recepción (F4-E3) — OUTBOX atómico (ADR-0011)', () => {
           idAlmacen: almacen.id,
           fecha: '2026-06-20',
           lineas: [
-            {
-              idOrdenCompraLinea: idLineaOC,
-              cantidad: 100,
-              telaColor: { idTelaColor: 999999 },
-            },
+            { idOrdenCompraLinea: idLineaOC, cantidad: 100 },
+            // Renglón inexistente: revienta DESPUÉS de que el primero ya escribió → rollback.
+            { idOrdenCompraLinea: 999999, cantidad: 1 },
           ],
         },
         bd(),
@@ -576,7 +350,7 @@ describe('Recepción (F4-E3) — OUTBOX atómico (ADR-0011)', () => {
 
 describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', () => {
   it('reversa la recepción: existencia vuelve a 0 vía inverso, recepción marcada (no borrada)', async () => {
-    const oc = await ocTelaAutorizada(500, 3);
+    const oc = await ocAvioAutorizada(500, 3);
     const idLineaOC = oc.lineas[0]!.id;
     const rec = await recibirCompra(
       sesion(PERM),
@@ -584,17 +358,11 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 500,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 500 }],
       },
       bd(),
     );
-    expect(await existenciaColor(colorFelpaRojo.id)).toEqual({ cuerpo: 500, complemento: 0 });
+    expect(await existenciaAvio(avioBoton.id)).toBe(500);
 
     const reversada = await reversarRecepcion(
       sesion(PERM),
@@ -605,10 +373,9 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
     expect(reversada.reversada).toBe(true);
     expect(reversada.motivoReverso).toBe('llegó dañada');
 
-    // Existencia de nuevo en 0 (entrada + su inverso se neutralizan POR COLOR), pero los DOS
-    // movimientos siguen existiendo (D3) y la PARTIDA se conserva como traza de lo que llegó.
-    expect(await existenciaColor(colorFelpaRojo.id)).toEqual({ cuerpo: 0, complemento: 0 });
-    expect(await cliente.partidaTela.count()).toBe(1);
+    // Existencia de nuevo en 0 (entrada + su inverso se neutralizan), pero los DOS movimientos
+    // siguen existiendo (D3): nada se borra.
+    expect(await existenciaAvio(avioBoton.id)).toBe(0);
     expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(2);
 
     // La recepción NO se borró (reverso suave).
@@ -625,7 +392,7 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
   });
 
   it('destraba la cancelación de la OC: con recepción activa NO se cancela; reversada SÍ', async () => {
-    const oc = await ocTelaAutorizada(200, 2);
+    const oc = await ocAvioAutorizada(200, 2);
     const idLineaOC = oc.lineas[0]!.id;
     const rec = await recibirCompra(
       sesion(PERM),
@@ -633,13 +400,7 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-20',
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad: 200,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 200 }],
       },
       bd(),
     );
@@ -657,7 +418,7 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
 });
 
 describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
-  /** Recibe una cantidad de tela contra una línea de OC (helper local). */
+  /** Recibe una cantidad de AVÍO contra una línea de OC (helper local). */
   async function recibir(idOc: number, idLineaOC: number, cantidad: number, fecha: string) {
     await recibirCompra(
       sesion(PERM),
@@ -665,13 +426,7 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
         idOrdenCompra: idOc,
         idAlmacen: almacen.id,
         fecha,
-        lineas: [
-          {
-            idOrdenCompraLinea: idLineaOC,
-            cantidad,
-            telaColor: { idTelaColor: colorFelpaRojo.id },
-          },
-        ],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad }],
       },
       bd(),
     );
@@ -679,9 +434,9 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
 
   it('cuenta las abiertas y suma (cantidad − recibido) × precio (criterio de recepciones)', async () => {
     // A: autorizada, 100 @ 5, nada recibido → pendiente 500.
-    await ocTelaAutorizada(100, 5);
+    await ocAvioAutorizada(100, 5);
     // B: autorizada, 200 @ 3, recibe 50 → parcial; pendiente 150 × 3 = 450.
-    const ocB = await ocTelaAutorizada(200, 3);
+    const ocB = await ocAvioAutorizada(200, 3);
     await recibir(ocB.id, ocB.lineas[0]!.id, 50, '2026-06-20');
     // C: borrador (NO autorizada) → no entra en el resumen.
     await crearOC(
@@ -696,7 +451,7 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
   });
 
   it('una OC totalmente recibida deja de contar (sin pendiente)', async () => {
-    const oc = await ocTelaAutorizada(100, 4);
+    const oc = await ocAvioAutorizada(100, 4);
     await recibir(oc.id, oc.lineas[0]!.id, 100, '2026-06-20'); // completa → recibida_total
     const resumen = await resumenOC(sesion(PERM), {}, bd());
     expect(resumen.ocAbiertas).toBe(0);
@@ -705,7 +460,7 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
 
   it('el filtro por proveedor acota el universo del resumen', async () => {
     const otro = await cliente.proveedor.create({ data: { nombre: 'Otro Proveedor' } });
-    await ocTelaAutorizada(100, 5); // proveedor base → pendiente 500
+    await ocAvioAutorizada(100, 5); // proveedor base → pendiente 500
     // OC autorizada de OTRO proveedor: 10 @ 7 = 70 pendiente.
     const ocOtro = await crearOC(
       sesion(PERM),
@@ -777,7 +532,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
     const almacenAjeno = await cliente.almacen.create({
       data: { nombre: 'Bodega ajena', tipo: 'TELA', idEmpresa: otraEmpresa.id },
     });
-    const oc = await ocTelaAutorizada(100, 1);
+    const oc = await ocAvioAutorizada(100, 1);
     const idLineaOC = oc.lineas[0]!.id;
 
     await expect(
@@ -787,13 +542,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
           idOrdenCompra: oc.id,
           idAlmacen: almacenAjeno.id,
           fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: idLineaOC,
-              cantidad: 100,
-              telaColor: { idTelaColor: colorFelpaRojo.id },
-            },
-          ],
+          lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 100 }],
         },
         bd(),
       ),
@@ -808,7 +557,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
     const almacenInactivo = await cliente.almacen.create({
       data: { nombre: 'Bodega vieja', tipo: 'TELA', activo: false },
     });
-    const oc = await ocTelaAutorizada(50, 1);
+    const oc = await ocAvioAutorizada(50, 1);
     const idLineaOC = oc.lineas[0]!.id;
     await expect(
       recibirCompra(
@@ -817,13 +566,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
           idOrdenCompra: oc.id,
           idAlmacen: almacenInactivo.id,
           fecha: '2026-06-20',
-          lineas: [
-            {
-              idOrdenCompraLinea: idLineaOC,
-              cantidad: 50,
-              telaColor: { idTelaColor: colorFelpaRojo.id },
-            },
-          ],
+          lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 50 }],
         },
         bd(),
       ),
@@ -833,7 +576,7 @@ describe('Recepción (F4-E3) — B1: el almacén destino se valida por empresa (
 
 describe('Recepción (F4-E3) — B2: recepciones concurrentes de la misma OC (estatus correcto)', () => {
   it('dos recepciones EN PARALELO que entre ambas completan la OC → recibida_total (sin carrera)', async () => {
-    const oc = await ocTelaAutorizada(1000, 2);
+    const oc = await ocAvioAutorizada(1000, 2);
     const idLineaOC = oc.lineas[0]!.id;
 
     const recepcion = (cantidad: number, fecha: string) =>
@@ -843,13 +586,7 @@ describe('Recepción (F4-E3) — B2: recepciones concurrentes de la misma OC (es
           idOrdenCompra: oc.id,
           idAlmacen: almacen.id,
           fecha,
-          lineas: [
-            {
-              idOrdenCompraLinea: idLineaOC,
-              cantidad,
-              telaColor: { idTelaColor: colorFelpaRojo.id },
-            },
-          ],
+          lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad }],
         },
         bd(),
       );
@@ -865,8 +602,6 @@ describe('Recepción (F4-E3) — B2: recepciones concurrentes de la misma OC (es
     // Las dos recepciones existen y la existencia total = 1000 (Σ movimientos, D3).
     const recs = await listarRecepcionesDeOC(sesion(PERM), oc.id, bd());
     expect(recs.recepciones).toHaveLength(2);
-    // Dos partidas (una por recepción) y la existencia del COLOR suma las dos.
-    expect(recs.recepciones.every((r) => r.lineas[0]!.idPartida !== null)).toBe(true);
-    expect(await existenciaColor(colorFelpaRojo.id)).toEqual({ cuerpo: 1000, complemento: 0 });
+    expect(await existenciaAvio(avioBoton.id)).toBe(1000);
   });
 });

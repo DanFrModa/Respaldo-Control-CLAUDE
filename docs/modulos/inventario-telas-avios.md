@@ -53,6 +53,15 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
   existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
   como datos de orden SIN tocar existencias (etapa posterior del track).
+- **La entrada por factura LIGADA a su orden de compra (§Post-F9.14, 7-ago-2026):**
+  `EntradaTelaLinea.idOrdenCompraLinea` (nullable, **por renglón**: una factura puede surtir dos OCs
+  y traer tela suelta). Al CONFIRMAR, `confirmarEntradaTela` llama a
+  `registrarRecepcionesDesdeEntradaTela` (`dominio/compras/recepciones.ts`) y escribe una
+  `RecepcionCompra` por OC surtida —con `id_entrada_tela` como traza— reusando la partida y el
+  movimiento ya creados: la tela entra UNA vez al kardex y suma UNA vez a lo recibido. La OC pasa
+  sola a `recibida_parcial`/`recibida_total` (R7) y sale el evento `material-recibido` (RC). Al
+  CANCELAR, esas recepciones se reversan (suave) y la OC vuelve a pendiente. **`recibirCompra` ya
+  NO recibe tela** (ver [`compras-mrp.md`](compras-mrp.md)): una sola puerta.
 - **Almacén ligado a su CORTADOR (§Post-F9.13, 7-ago-2026):** `Almacen.idCortador` (nullable,
   **único**, FK Restrict a `Proveedor`) validado en `dominio/admin/almacenes.ts` — solo tipo TELA,
   proveedor activo con rol `corte`, y un cortador = un almacén (si no, "el almacén de este cortador"

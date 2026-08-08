@@ -74,6 +74,12 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import {
+  bloquearOrdenesDeRenglones,
+  registrarRecepcionesDesdeEntradaTela,
+  reversarRecepcionesDeEntradaTela,
+  type RenglonEntradaTelaRecibido,
+} from '../compras/recepciones.js';
+import {
   aLineasMotor,
   crearPartidaTela,
   resolverColores,
@@ -115,6 +121,8 @@ const incluirEntradaTela = {
         },
       },
       partida: { select: { folio: true } },
+      // §Post-F9.14: la OC que surte el renglón, para mostrar su folio en el documento.
+      ordenCompraLinea: { select: { ordenCompra: { select: { numCompra: true } } } },
     },
   },
   _count: { select: { archivos: true } },
@@ -177,6 +185,9 @@ function aEntradaTelaSalida(
       loteProveedor: l.loteProveedor,
       idPartida: l.idPartida,
       partidaFolio: l.partida === null ? null : Number(l.partida.folio),
+      idOrdenCompraLinea: l.idOrdenCompraLinea,
+      numCompra:
+        l.ordenCompraLinea === null ? null : Number(l.ordenCompraLinea.ordenCompra.numCompra),
     };
   });
 
@@ -368,6 +379,8 @@ function aColumnasLinea(
       ? (l.precioUnitComplemento ?? null)
       : null,
     loteProveedor: l.loteProveedor?.trim() || null,
+    // §Post-F9.14: qué renglón de OC surte este renglón (null = tela suelta, sin orden de compra).
+    idOrdenCompraLinea: l.idOrdenCompraLinea ?? null,
     ...datosCreacion(sesion),
   }));
 }
@@ -504,6 +517,11 @@ export async function actualizarEntradaTela(
  * motor, con el precio del cuerpo como `costoUnit` (D1). Liga documento ↔ movimiento y renglón ↔
  * partida, y marca `confirmada` (A7). Una entrada confirmada ya no se edita: se cancela.
  * Permiso `inventario-telas.mover`.
+ *
+ * §Post-F9.14: los renglones que traen `idOrdenCompraLinea` generan además la RECEPCIÓN de su orden
+ * de compra (una por OC surtida) — misma contabilidad que la recepción de F4, sin mover inventario
+ * otra vez: la tela entra UNA sola vez al kardex y suma UNA sola vez a lo recibido de la OC. Con
+ * eso la orden pasa sola a `recibida_parcial`/`recibida_total` y la Ruta Crítica se entera.
  */
 export async function confirmarEntradaTela(
   sesion: SesionUsuario,
@@ -537,6 +555,7 @@ export async function confirmarEntradaTela(
             precioUnit: true,
             precioUnitComplemento: true,
             loteProveedor: true,
+            idOrdenCompraLinea: true,
           },
         },
       },
@@ -544,6 +563,14 @@ export async function confirmarEntradaTela(
     if (documento.lineas.length === 0) {
       throw new ErrorValidacion('La entrada no tiene renglones: no hay nada que dar de alta.');
     }
+
+    // §Post-F9.14 — los locks de las OCs surtidas se toman AQUÍ, ANTES de crear partidas y de mover
+    // el kardex: así esta puerta y `recibirCompra` toman los recursos en el MISMO orden (primero la
+    // OC, luego el inventario) y no pueden interbloquearse entre sí.
+    const idsLineaOC = documento.lineas
+      .map((l) => l.idOrdenCompraLinea)
+      .filter((id): id is number => id !== null);
+    await bloquearOrdenesDeRenglones(tx, idsLineaOC);
 
     const fecha = documento.fecha.toISOString().slice(0, 10);
     const lineas: LineaColorBase[] = documento.lineas.map((l) => ({
@@ -624,6 +651,44 @@ export async function confirmarEntradaTela(
       throw new ErrorConflicto('Esa entrada ya fue confirmada por otra captura.');
     }
 
+    // 4) §Post-F9.14 — RECEPCIÓN contra las OCs surtidas (si algún renglón las trae). No mueve
+    //    inventario: reusa la partida y el movimiento que ya se crearon arriba.
+    const renglonesConOC: RenglonEntradaTelaRecibido[] = [];
+    documento.lineas.forEach((linea, i) => {
+      if (linea.idOrdenCompraLinea === null) {
+        return;
+      }
+      const color = colores.get(linea.idTelaColor);
+      const idPartida = idPartidaPorLinea[i];
+      if (color === undefined || idPartida === undefined) {
+        return; // inalcanzable: `validarCabeceraYLineas` ya resolvió todos los colores.
+      }
+      renglonesConOC.push({
+        idOrdenCompraLinea: linea.idOrdenCompraLinea,
+        idTelaColor: linea.idTelaColor,
+        idTela: color.idTela,
+        cantidad: Number(linea.cantidad),
+        cantidadComplemento: aNumero(linea.cantidadComplemento),
+        costoUnit: aNumero(linea.precioUnit),
+        idPartida,
+      });
+    });
+    await registrarRecepcionesDesdeEntradaTela(
+      tx,
+      sesion,
+      {
+        idEmpresa,
+        idEntradaTela: id,
+        folioEntrada: Number(documento.folio),
+        idAlmacen: documento.idAlmacen,
+        idProveedor: documento.idProveedor,
+        factura: documento.numeroDocumento,
+        fecha,
+        idMovimiento: movimiento.id,
+      },
+      renglonesConOC,
+    );
+
     await registrarBitacora(tx, sesion, {
       entidad: 'EntradaTela',
       idEntidad: id,
@@ -632,6 +697,7 @@ export async function confirmarEntradaTela(
         confirmada: true,
         idMovimiento: movimiento.id,
         partidas: idPartidaPorLinea.length,
+        recepcionesGeneradas: renglonesConOC.length > 0,
       },
     });
   }, bd);
@@ -669,7 +735,13 @@ export async function cancelarEntradaTela(
   await enTransaccion(async (tx) => {
     const documento = await tx.entradaTela.findFirst({
       where: { id, idEmpresa },
-      select: { id: true, folio: true, estatus: true, idMovimiento: true },
+      select: {
+        id: true,
+        folio: true,
+        estatus: true,
+        idMovimiento: true,
+        lineas: { select: { idOrdenCompraLinea: true } },
+      },
     });
     if (documento === null) {
       throw new ErrorNoEncontrado('EntradaTela', id);
@@ -677,6 +749,14 @@ export async function cancelarEntradaTela(
     if (documento.estatus === EstatusEntradaTela.cancelada) {
       throw new ErrorConflicto(`La entrada ${Number(documento.folio)} ya está cancelada.`);
     }
+
+    // Mismo orden de recursos que al confirmar (OC primero): los locks van ANTES de tocar nada.
+    await bloquearOrdenesDeRenglones(
+      tx,
+      documento.lineas
+        .map((l) => l.idOrdenCompraLinea)
+        .filter((idLinea): idLinea is number => idLinea !== null),
+    );
 
     // El WHERE con el estatus previo serializa dos cancelaciones concurrentes: la segunda no
     // encuentra fila y truena ANTES de generar un segundo inverso.
@@ -697,6 +777,13 @@ export async function cancelarEntradaTela(
     if (documento.estatus === EstatusEntradaTela.confirmada && documento.idMovimiento !== null) {
       const tipoInverso = await tipoPorCodigo(tx, COD_AJUSTE_SALIDA);
       await cancelarMovimientoMaterial(sesion, documento.idMovimiento, tipoInverso.id, { tx });
+      // §Post-F9.14: y las OCs que había surtido vuelven a quedar pendientes de recibir.
+      await reversarRecepcionesDeEntradaTela(
+        tx,
+        sesion,
+        id,
+        `Cancelación de la entrada de tela ${Number(documento.folio)}: ${datos.motivo}`,
+      );
     }
 
     await registrarBitacora(tx, sesion, {

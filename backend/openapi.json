@@ -65829,6 +65829,267 @@
         }
       }
     },
+    "/api/compras/lineas-tela-pendientes": {
+      "get": {
+        "summary": "Renglones de tela pendientes de recibir, por proveedor",
+        "tags": [
+          "compras"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idProveedor",
+            "required": true,
+            "description": "Proveedor cuyas órdenes de compra abiertas se consultan."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renglones de tela con pendiente por recibir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompraLinea": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "numCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la orden de compra."
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tela": {
+                            "type": "string"
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "cantidad": {
+                            "type": "number",
+                            "description": "Cantidad pedida en la OC."
+                          },
+                          "recibido": {
+                            "type": "number",
+                            "description": "Ya recibido (recepciones activas)."
+                          },
+                          "pendiente": {
+                            "type": "number",
+                            "description": "Lo que falta por recibir."
+                          },
+                          "precio": {
+                            "type": "number",
+                            "description": "Precio unitario de la OC."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompraLinea",
+                          "idOrdenCompra",
+                          "numCompra",
+                          "idTela",
+                          "tela",
+                          "unidad",
+                          "cantidad",
+                          "recibido",
+                          "pendiente",
+                          "precio"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglones de tela con pendiente por recibir."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/recepciones-compra/{id}": {
       "get": {
         "summary": "Obtener una recepción de compra",
@@ -84244,6 +84505,32 @@
                                     }
                                   ],
                                   "description": "Folio de la partida, o null."
+                                },
+                                "idOrdenCompraLinea": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                                },
+                                "numCompra": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                                 }
                               },
                               "required": [
@@ -84263,7 +84550,9 @@
                                 "importe",
                                 "loteProveedor",
                                 "idPartida",
-                                "partidaFolio"
+                                "partidaFolio",
+                                "idOrdenCompraLinea",
+                                "numCompra"
                               ],
                               "additionalProperties": false,
                               "description": "Renglón (partida) de una entrada de tela."
@@ -84613,6 +84902,19 @@
                           "description": "Número de lote del proveedor de esta partida (opcional).",
                           "type": "string",
                           "maxLength": 100
+                        },
+                        "idOrdenCompraLinea": {
+                          "description": "Renglón de OC que surte este renglón, o null si la tela no viene de una OC.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -84948,6 +85250,32 @@
                               }
                             ],
                             "description": "Folio de la partida, o null."
+                          },
+                          "idOrdenCompraLinea": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                          },
+                          "numCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                           }
                         },
                         "required": [
@@ -84967,7 +85295,9 @@
                           "importe",
                           "loteProveedor",
                           "idPartida",
-                          "partidaFolio"
+                          "partidaFolio",
+                          "idOrdenCompraLinea",
+                          "numCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón (partida) de una entrada de tela."
@@ -85534,6 +85864,32 @@
                               }
                             ],
                             "description": "Folio de la partida, o null."
+                          },
+                          "idOrdenCompraLinea": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                          },
+                          "numCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                           }
                         },
                         "required": [
@@ -85553,7 +85909,9 @@
                           "importe",
                           "loteProveedor",
                           "idPartida",
-                          "partidaFolio"
+                          "partidaFolio",
+                          "idOrdenCompraLinea",
+                          "numCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón (partida) de una entrada de tela."
@@ -85869,6 +86227,19 @@
                           "description": "Número de lote del proveedor de esta partida (opcional).",
                           "type": "string",
                           "maxLength": 100
+                        },
+                        "idOrdenCompraLinea": {
+                          "description": "Renglón de OC que surte este renglón, o null si la tela no viene de una OC.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -86217,6 +86588,32 @@
                               }
                             ],
                             "description": "Folio de la partida, o null."
+                          },
+                          "idOrdenCompraLinea": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                          },
+                          "numCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                           }
                         },
                         "required": [
@@ -86236,7 +86633,9 @@
                           "importe",
                           "loteProveedor",
                           "idPartida",
-                          "partidaFolio"
+                          "partidaFolio",
+                          "idOrdenCompraLinea",
+                          "numCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón (partida) de una entrada de tela."
@@ -86803,6 +87202,32 @@
                               }
                             ],
                             "description": "Folio de la partida, o null."
+                          },
+                          "idOrdenCompraLinea": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                          },
+                          "numCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                           }
                         },
                         "required": [
@@ -86822,7 +87247,9 @@
                           "importe",
                           "loteProveedor",
                           "idPartida",
-                          "partidaFolio"
+                          "partidaFolio",
+                          "idOrdenCompraLinea",
+                          "numCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón (partida) de una entrada de tela."
@@ -87411,6 +87838,32 @@
                               }
                             ],
                             "description": "Folio de la partida, o null."
+                          },
+                          "idOrdenCompraLinea": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta."
+                          },
+                          "numCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null."
                           }
                         },
                         "required": [
@@ -87430,7 +87883,9 @@
                           "importe",
                           "loteProveedor",
                           "idPartida",
-                          "partidaFolio"
+                          "partidaFolio",
+                          "idOrdenCompraLinea",
+                          "numCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón (partida) de una entrada de tela."

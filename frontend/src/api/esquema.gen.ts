@@ -26978,6 +26978,143 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/compras/lineas-tela-pendientes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Renglones de tela pendientes de recibir, por proveedor */
+    get: {
+      parameters: {
+        query: {
+          /** @description Proveedor cuyas órdenes de compra abiertas se consultan. */
+          idProveedor: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Renglones de tela con pendiente por recibir. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                idOrdenCompraLinea: number;
+                idOrdenCompra: number;
+                /** @description Folio de la orden de compra. */
+                numCompra: number;
+                idTela: number;
+                tela: string;
+                unidad: string | null;
+                /** @description Cantidad pedida en la OC. */
+                cantidad: number;
+                /** @description Ya recibido (recepciones activas). */
+                recibido: number;
+                /** @description Lo que falta por recibir. */
+                pendiente: number;
+                /** @description Precio unitario de la OC. */
+                precio: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/recepciones-compra/{id}': {
     parameters: {
       query?: never;
@@ -34256,6 +34393,10 @@ export interface paths {
                   idPartida: number | null;
                   /** @description Folio de la partida, o null. */
                   partidaFolio: number | null;
+                  /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                  idOrdenCompraLinea: number | null;
+                  /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                  numCompra: number | null;
                 }[];
                 /** @description Σ de las cantidades de cuerpo (derivada). */
                 totalCuerpo: number;
@@ -34398,6 +34539,8 @@ export interface paths {
               precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
+              /** @description Renglón de OC que surte este renglón, o null si la tela no viene de una OC. */
+              idOrdenCompraLinea?: number | null;
             }[];
           };
         };
@@ -34475,6 +34618,10 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                idOrdenCompraLinea: number | null;
+                /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                numCompra: number | null;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -34672,6 +34819,10 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                idOrdenCompraLinea: number | null;
+                /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                numCompra: number | null;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -34810,6 +34961,8 @@ export interface paths {
               precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
+              /** @description Renglón de OC que surte este renglón, o null si la tela no viene de una OC. */
+              idOrdenCompraLinea?: number | null;
             }[];
           };
         };
@@ -34887,6 +35040,10 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                idOrdenCompraLinea: number | null;
+                /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                numCompra: number | null;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -35087,6 +35244,10 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                idOrdenCompraLinea: number | null;
+                /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                numCompra: number | null;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -35293,6 +35454,10 @@ export interface paths {
                 idPartida: number | null;
                 /** @description Folio de la partida, o null. */
                 partidaFolio: number | null;
+                /** @description Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta. */
+                idOrdenCompraLinea: number | null;
+                /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
+                numCompra: number | null;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;

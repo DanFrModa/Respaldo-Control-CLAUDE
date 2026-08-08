@@ -83,6 +83,18 @@ export const esquemaEntradaTelaLineaEntrada = z
       .max(100)
       .optional()
       .describe('Número de lote del proveedor de esta partida (opcional).'),
+    /**
+     * Renglón de ORDEN DE COMPRA que surte este renglón (§Post-F9.14). Omitirlo o mandarlo `null` =
+     * tela SIN orden de compra, que sigue siendo válido. Al confirmar el documento, los renglones
+     * con OC generan la recepción de esa orden y la marcan como recibida.
+     */
+    idOrdenCompraLinea: z
+      .number({ error: 'El renglón de la orden de compra debe ser un número' })
+      .int({ error: 'El renglón de la orden de compra debe ser un id entero' })
+      .positive({ error: 'El renglón de la orden de compra debe ser un id positivo' })
+      .nullable()
+      .optional()
+      .describe('Renglón de OC que surte este renglón, o null si la tela no viene de una OC.'),
   })
   .refine((l) => l.cantidad > 0 || (l.cantidadComplemento ?? 0) > 0, {
     error: 'Captura cantidad de cuerpo o de complemento (al menos una mayor que 0)',
@@ -177,6 +189,16 @@ export const esquemaEntradaTelaLineaSalida = z
     loteProveedor: z.string().nullable(),
     idPartida: z.number().int().nullable().describe('Partida creada al confirmar, o null.'),
     partidaFolio: z.number().int().nullable().describe('Folio de la partida, o null.'),
+    idOrdenCompraLinea: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta.'),
+    numCompra: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null.'),
   })
   .describe('Renglón (partida) de una entrada de tela.');
 

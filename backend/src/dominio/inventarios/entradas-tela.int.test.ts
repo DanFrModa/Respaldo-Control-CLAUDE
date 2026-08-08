@@ -13,7 +13,10 @@
  *      la existencia vuelve a 0; cancelar un borrador no genera movimiento;
  *  (g) una entrada confirmada YA NO se edita ni se re-cancela;
  *  (h) el listado filtra/busca y pagina por empresa activa;
- *  (i) el AVISO SUAVE de factura repetida (mismo proveedor + mismo número) avisa pero NO bloquea.
+ *  (i) el AVISO SUAVE de factura repetida (mismo proveedor + mismo número) avisa pero NO bloquea;
+ *  (j) §Post-F9.14 — la liga con la ORDEN DE COMPRA: confirmar la factura genera la RECEPCIÓN de
+ *      cada OC surtida, marca su estatus (R7), emite el evento del outbox y NO cuenta la tela dos
+ *      veces; cancelarla reversa esas recepciones y la OC vuelve a quedar pendiente.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -30,6 +33,7 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { crearOC, autorizarOC } from '../compras/ordenes-compra.js';
 import { kardexTelaColor } from './partidas-telas.js';
 import {
   actualizarEntradaTela,
@@ -623,5 +627,232 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
     const conTotales = await obtenerEntradaTela(sesion(), entrada.id, bd());
     expect(conTotales.lineas[0]!.precioUnit).toBe(33);
     expect(conTotales.totalImporte).toBe(330);
+  });
+});
+
+describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', () => {
+  const PERM_COMPRAS: ClavePermiso[] = [
+    ...PERM,
+    'compras.ver',
+    'compras.administrar',
+    'compras.autorizar',
+  ];
+
+  /** OC autorizada del proveedor base con una línea de la felpa. */
+  async function ocFelpaAutorizada(cantidad = 100, precio = 12) {
+    const oc = await crearOC(
+      sesion(PERM_COMPRAS),
+      {
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: telaFelpa.id, cantidad, precio, unidad: 'kg' }],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_COMPRAS), oc.id, bd());
+    return oc;
+  }
+
+  /** Captura una entrada de 1 renglón ligado al renglón de OC dado. */
+  async function capturarConOC(idOrdenCompraLinea: number, cantidad: number, precioUnit = 12) {
+    return crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-500',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-07',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: colorMarino.id, cantidad, precioUnit, idOrdenCompraLinea }],
+      },
+      bd(),
+    );
+  }
+
+  it('confirmar la factura marca la OC como recibida y NO cuenta la tela dos veces', async () => {
+    const oc = await ocFelpaAutorizada(100, 12);
+    const idLineaOC = oc.lineas[0]!.id;
+    const entrada = await capturarConOC(idLineaOC, 100);
+
+    // En BORRADOR la OC no se entera de nada.
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'autorizada',
+    );
+    expect(await cliente.recepcionCompra.count()).toBe(0);
+
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    // La OC quedó RECIBIDA TOTAL y existe SU recibo, ligado al documento de entrada.
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+    const recepciones = await cliente.recepcionCompra.findMany({
+      where: { idOrdenCompra: oc.id },
+      include: { lineas: true },
+    });
+    expect(recepciones).toHaveLength(1);
+    expect(recepciones[0]?.idEntradaTela).toBe(entrada.id);
+    expect(recepciones[0]?.factura).toBe('F-500');
+    expect(Number(recepciones[0]?.lineas[0]?.cantidadRecibida)).toBe(100);
+
+    // La tela entró UNA sola vez: un movimiento de kardex y la existencia = 100.
+    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(1);
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 0 });
+    // Y el renglón de la recepción apunta a ESE movimiento y a la partida de la entrada.
+    expect(recepciones[0]?.lineas[0]?.idMovimiento).not.toBeNull();
+    expect(recepciones[0]?.lineas[0]?.idPartida).not.toBeNull();
+
+    // El evento del outbox salió (la Ruta Crítica se entera igual que por la otra puerta).
+    const eventos = await cliente.eventoOutbox.findMany({
+      where: { idEmpresa: empresa.id, tipo: 'material-recibido' },
+    });
+    expect(eventos).toHaveLength(1);
+  });
+
+  it('surtir de menos deja la OC en parcial; una segunda factura la completa', async () => {
+    const oc = await ocFelpaAutorizada(100, 12);
+    const idLineaOC = oc.lineas[0]!.id;
+
+    const primera = await capturarConOC(idLineaOC, 40);
+    await confirmarEntradaTela(sesion(), primera.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_parcial',
+    );
+
+    const segunda = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-501',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-08',
+        idAlmacen: almacen.id,
+        lineas: [
+          {
+            idTelaColor: colorMarino.id,
+            cantidad: 60,
+            precioUnit: 12,
+            idOrdenCompraLinea: idLineaOC,
+          },
+        ],
+      },
+      bd(),
+    );
+    await confirmarEntradaTela(sesion(), segunda.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 0 });
+  });
+
+  it('una factura puede surtir DOS órdenes de compra distintas (liga por renglón)', async () => {
+    const ocA = await ocFelpaAutorizada(30, 12);
+    const ocB = await ocFelpaAutorizada(50, 12);
+
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-600',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-07',
+        idAlmacen: almacen.id,
+        lineas: [
+          {
+            idTelaColor: colorMarino.id,
+            cantidad: 30,
+            precioUnit: 12,
+            idOrdenCompraLinea: ocA.lineas[0]!.id,
+          },
+          {
+            idTelaColor: colorBlanco.id,
+            cantidad: 50,
+            precioUnit: 12,
+            idOrdenCompraLinea: ocB.lineas[0]!.id,
+          },
+          // …y un tercer renglón SIN orden de compra: tela suelta en la misma factura.
+          { idTelaColor: colorBlanco.id, cantidad: 5, precioUnit: 12 },
+        ],
+      },
+      bd(),
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    // Una recepción POR OC, las dos ligadas al mismo documento.
+    const recepciones = await cliente.recepcionCompra.findMany({ orderBy: { id: 'asc' } });
+    expect(recepciones).toHaveLength(2);
+    expect(recepciones.every((r) => r.idEntradaTela === entrada.id)).toBe(true);
+    for (const oc of [ocA, ocB]) {
+      expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+        'recibida_total',
+      );
+    }
+    // El renglón suelto entró al inventario igual, sin recepción que lo respalde.
+    expect(await existencia(colorBlanco.id)).toEqual({ cuerpo: 55, complemento: 0 });
+  });
+
+  it('cancelar la factura reversa la recepción y la OC vuelve a quedar pendiente', async () => {
+    const oc = await ocFelpaAutorizada(100, 12);
+    const entrada = await capturarConOC(oc.lineas[0]!.id, 100);
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    await cancelarEntradaTela(sesion(), entrada.id, { motivo: 'la tela llegó manchada' }, bd());
+
+    // La OC regresa a "autorizada" (ya no tiene nada recibido) y la recepción queda REVERSADA,
+    // no borrada (D3).
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'autorizada',
+    );
+    const recepcion = await cliente.recepcionCompra.findFirstOrThrow();
+    expect(recepcion.reversadaEn).not.toBeNull();
+    expect(recepcion.motivoReverso).toContain('la tela llegó manchada');
+    // Existencia de vuelta en 0 por el inverso, con los DOS movimientos vivos.
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 0, complemento: 0 });
+    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(2);
+  });
+
+  it('rechaza ligar a una OC de OTRO proveedor', async () => {
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro Proveedor' } });
+    const ocAjena = await crearOC(
+      sesion(PERM_COMPRAS),
+      { idProveedor: otro.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1 }] },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_COMPRAS), ocAjena.id, bd());
+
+    const entrada = await capturarConOC(ocAjena.lineas[0]!.id, 10);
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /otro proveedor/,
+    );
+    // Y NADA quedó escrito: la transacción entera se revirtió (A2).
+    expect(await cliente.recepcionCompra.count()).toBe(0);
+    expect(await cliente.partidaTela.count()).toBe(0);
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 0, complemento: 0 });
+  });
+
+  it('rechaza un color que no es de la tela que pide la OC', async () => {
+    const ocLisa = await crearOC(
+      sesion(PERM_COMPRAS),
+      { idProveedor: proveedor.id, lineas: [{ idTela: telaLisa.id, cantidad: 10, precio: 1 }] },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_COMPRAS), ocLisa.id, bd());
+
+    // El renglón trae un color de la FELPA contra una OC de la LISA.
+    const entrada = await capturarConOC(ocLisa.lineas[0]!.id, 10);
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('rechaza una OC que todavía NO está autorizada', async () => {
+    const borrador = await crearOC(
+      sesion(PERM_COMPRAS),
+      { idProveedor: proveedor.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1 }] },
+      bd(),
+    );
+    const entrada = await capturarConOC(borrador.lineas[0]!.id, 10);
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
   });
 });

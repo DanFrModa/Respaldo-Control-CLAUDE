@@ -34,6 +34,19 @@ export interface RenglonTelaColor {
   precioUnit?: number;
   /** Precio por unidad del COMPLEMENTO (solo con `conPrecios`; vive en el documento). */
   precioUnitComplemento?: number;
+  /** Renglón de OC que SURTE este renglón (§Post-F9.14; solo la entrada por factura). */
+  idOrdenCompraLinea?: number;
+}
+
+/** Renglón de OC pendiente de recibir, tal como lo ofrece el selector (§Post-F9.14). */
+export interface LineaOcPendiente {
+  idOrdenCompraLinea: number;
+  numCompra: number;
+  idTela: number;
+  tela: string;
+  unidad: string | null;
+  pendiente: number;
+  precio: number;
 }
 
 /**
@@ -45,6 +58,11 @@ export interface RenglonTelaColor {
  * partida, y con `conPrecios` (documento de entrada por factura/remisión, B1) los DOS precios
  * unitarios — prellenados con los del catálogo del color como SUGERENCIA (la fuente de verdad del
  * costo es lo que se captura aquí, D1). Presentación pura (A1): el backend valida.
+ *
+ * Con `lineasOc` (entrada por factura, §Post-F9.14) cada renglón puede además AMARRARSE a su
+ * renglón de orden de compra: el selector solo ofrece los renglones pendientes de la MISMA tela que
+ * se está capturando —así no se puede ligar felpa contra una OC de mesh— y deja elegir "sin orden
+ * de compra" para la tela suelta.
  */
 export function CapturaRenglonesTelaColor({
   renglones,
@@ -52,6 +70,7 @@ export function CapturaRenglonesTelaColor({
   soloLectura = false,
   conLoteProveedor = false,
   conPrecios = false,
+  lineasOc,
 }: {
   renglones: RenglonTelaColor[];
   onChange: (renglones: RenglonTelaColor[]) => void;
@@ -59,6 +78,12 @@ export function CapturaRenglonesTelaColor({
   conLoteProveedor?: boolean;
   /** Muestra y captura los precios unitarios de cuerpo y complemento (B1). */
   conPrecios?: boolean;
+  /**
+   * Renglones de OC pendientes del proveedor (§Post-F9.14). `undefined` = esta pantalla no liga a
+   * órdenes de compra (ajuste, traspaso, salida); un arreglo (aunque sea vacío) enciende el
+   * selector "Renglón de OC" del alta y su columna en la tabla.
+   */
+  lineasOc?: readonly LineaOcPendiente[];
 }): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
   const [idTelaColor, setIdTelaColor] = useState<string>('');
@@ -67,6 +92,7 @@ export function CapturaRenglonesTelaColor({
   const [loteProveedor, setLoteProveedor] = useState<string>('');
   const [precioUnit, setPrecioUnit] = useState<string>('');
   const [precioComplemento, setPrecioComplemento] = useState<string>('');
+  const [idLineaOc, setIdLineaOc] = useState<string>('');
 
   const llevaComplemento = tela !== undefined && tela.nombreComplemento !== null;
   const colorElegido = tela?.colores.find((c) => String(c.id) === idTelaColor);
@@ -122,6 +148,7 @@ export function CapturaRenglonesTelaColor({
       Number.isFinite(precioComplNum)
         ? { precioUnitComplemento: precioComplNum }
         : {}),
+      ...(idLineaOc === '' ? {} : { idOrdenCompraLinea: Number(idLineaOc) }),
     };
     if (conLoteProveedor) {
       // ENTRADA: el MISMO tela+color PUEDE repetirse — una factura con dos lotes del mismo color
@@ -149,6 +176,7 @@ export function CapturaRenglonesTelaColor({
     setLoteProveedor('');
     setPrecioUnit('');
     setPrecioComplemento('');
+    setIdLineaOc('');
   }
 
   function quitar(indice: number): void {
@@ -234,6 +262,32 @@ export function CapturaRenglonesTelaColor({
                 />
               </Field>
             ) : null}
+            {/* §Post-F9.14 — a qué renglón de OC surte este renglón. Solo se ofrecen los
+                pendientes de LA MISMA tela: ligar felpa contra una OC de otra tela es un error que
+                el servidor rechazaría, y aquí ni siquiera se puede cometer. */}
+            {lineasOc !== undefined ? (
+              <Field>
+                <FieldLabel htmlFor="captura-color-oc">Renglón de OC</FieldLabel>
+                <SelectNativo
+                  id="captura-color-oc"
+                  value={idLineaOc}
+                  onChange={(e) => setIdLineaOc(e.target.value)}
+                  disabled={soloLectura}
+                  data-testid="captura-color-oc"
+                >
+                  <option value="">Sin orden de compra</option>
+                  {lineasOc
+                    .filter((l) => l.idTela === tela.id)
+                    .map((l) => (
+                      <option key={l.idOrdenCompraLinea} value={String(l.idOrdenCompraLinea)}>
+                        {`OC ${String(l.numCompra)} · faltan ${l.pendiente.toLocaleString('es-MX')}${
+                          l.unidad === null ? '' : ` ${l.unidad}`
+                        }`}
+                      </option>
+                    ))}
+                </SelectNativo>
+              </Field>
+            ) : null}
             {conPrecios ? (
               <Field>
                 <FieldLabel htmlFor="captura-color-precio">
@@ -305,6 +359,7 @@ export function CapturaRenglonesTelaColor({
                   <TableHead className="text-right">Complemento</TableHead>
                 ) : null}
                 {conLoteProveedor ? <TableHead>Lote prov.</TableHead> : null}
+                {lineasOc !== undefined ? <TableHead>Orden de compra</TableHead> : null}
                 {conPrecios ? <TableHead className="text-right">Precio</TableHead> : null}
                 <TableHead />
               </TableRow>
@@ -329,6 +384,16 @@ export function CapturaRenglonesTelaColor({
                   {conLoteProveedor ? (
                     <TableCell className="text-xs text-muted-foreground">
                       {r.loteProveedor ?? '—'}
+                    </TableCell>
+                  ) : null}
+                  {lineasOc !== undefined ? (
+                    <TableCell className="text-xs text-muted-foreground">
+                      {r.idOrdenCompraLinea === undefined
+                        ? '—'
+                        : `OC ${String(
+                            lineasOc.find((l) => l.idOrdenCompraLinea === r.idOrdenCompraLinea)
+                              ?.numCompra ?? '',
+                          )}`}
                     </TableCell>
                   ) : null}
                   {conPrecios ? (
