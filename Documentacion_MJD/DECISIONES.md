@@ -940,3 +940,24 @@ Daniel, con una OC autorizada de BLOOM TEXTILES llena de renglones de tela en pa
 - **Consecuencia práctica que Daniel debe conocer:** las OCs **migradas no se pueden recibir por factura**, porque sus renglones no apuntan al catálogo. Para el flujo nuevo hay que capturar OCs nuevas con telas del catálogo — consistente con *"vamos a meter todas las telas desde cero"*.
 - **Aplica en:** frontend-only. SIN migración, SIN permisos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.17) — "Hice la OC pero al refrescar el listado, no la veo": las secuencias de folio que los ETL dejaron en cero (DANIEL, 7-ago-2026)
+
+Daniel, después de capturar su primera orden de compra nueva: *"Hice la OC pero al refrescar el listado, no la veo"*.
+
+**La OC SÍ se guardó.** Estaba **invisible**, no perdida: tomó **folio 1** y el listado ordena por folio **descendente** (`numCompra desc` por default), así que se fue hasta la **última página**, detrás de las ~7,978 órdenes migradas (folios hasta ~7,920).
+
+**Causa raíz — un hueco de los ETL, no del módulo de compras.** Cuando un ETL migra un documento con su folio **explícito** del sistema viejo, tiene que dejar la **secuencia** de esa serie adelantada al máximo migrado (`sembrarSecuencia`), o la primera captura nueva arranca en 1. De las 12 secuencias del sistema, los ETL solo sembraban **4** (`pedido`, `orden` en F2-E5; `etapa-mov` en F3-E6; `auditoria` en F6-E6). **`etl-compras-notas.ts` (F4-E6) no sembraba ninguna de las suyas** → `orden-compra` y `nota-salida` quedaron en cero.
+
+**Y era peor que un problema de orden:** el unique `(idEmpresa, numCompra)` seguía ahí. La captura funcionó porque el folio 1 estaba libre (el histórico viejo arranca más arriba), pero en cuanto la serie nueva alcanzara un folio ya migrado, la captura habría **tronado con choque de unique** — un error opaco para el usuario, en medio de su trabajo.
+
+**Lo que se hizo — la red permanente, no el parche:**
+1. **`backend/migracion/reparar-secuencias.ts` (nuevo).** Recalcula **toda** serie con histórico contra el **máximo real por empresa** de su tabla, para las 7 series que se migran con folio explícito (`pedido`, `orden`, `etapa-mov`, `auditoria`, `orden-compra`, `nota-salida`, `movimiento-tercero`). Es **idempotente** y **monótono** (`sembrarSecuencia` usa `GREATEST`: **nunca retrocede** una serie que la captura ya avanzó), así que se puede correr cuantas veces se quiera y conviene correrlo **después de CUALQUIER ETL**. Acepta un filtro de claves para que un ETL siembre solo las suyas sin duplicar la lógica.
+2. **`etl-compras-notas.ts` ahora siembra sus dos series al cerrar la carga** (`orden-compra`, `nota-salida`), reusando ese mismo motor. El hueco no se puede volver a abrir por olvido.
+3. **Cuidado que costó encontrar:** el campo del folio **no se llama igual en todas las tablas** — es `folio` en pedidos/órdenes/etapas/terceros, pero **`numCompra`** en OC, **`numNota`** en notas y **`numAuditoria`** en auditorías. El script lo lee por nombre de campo, serie por serie.
+4. Las secuencias que **no** entran son las que nacen legítimamente en cero: `entrada-tela`, `partida-tela`, `proyecto`, `recepcion-compra` (su histórico no se migra con folio propio) y `movimiento` (los movimientos migrados salen del motor de kardex, que **siempre** pide `siguienteFolio` — nunca folio explícito).
+
+- **PASO MANUAL DE GABRIEL (obligatorio en `prueba`, y en producción cuando se migre):** correr una vez, desde `backend/`, **`npx tsx --env-file=.env migracion/reparar-secuencias.ts`** (NUNCA `npm run`: no lleva `--env-file`). Hasta que se corra, las OC nuevas seguirán tomando folios bajos.
+- **La OC de folio 1 que Daniel ya capturó sigue existiendo** (al final del listado). Los folios no se reescriben —son la identidad del documento y ya viajaron a la bitácora—, así que si la quiere con folio de la serie real, lo correcto es **cancelarla y recapturarla** después de correr el script.
+- **Aplica en:** backend (script de migración + siembra en el ETL de F4-E6). SIN migración de esquema, SIN permisos nuevos → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-07.

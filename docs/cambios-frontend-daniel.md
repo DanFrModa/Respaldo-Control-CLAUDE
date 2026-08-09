@@ -1934,3 +1934,54 @@ catálogo. Encaja con lo que ya habíamos acordado: el catálogo de telas arranc
 ### Nota de despliegue (para Gabriel)
 
 Solo pantallas. **Sin migración, cero permisos nuevos → no** hace falta `SEED_ON_START`.
+
+---
+
+## "Hice la OC pero al refrescar el listado, no la veo" (7-ago-2026)
+
+**Tu orden SÍ se guardó.** Estaba **invisible**, no perdida.
+
+### Qué pasó
+
+La orden tomó el **folio 1**. El listado se ordena por folio de mayor a menor, así que tu orden nueva
+se fue hasta la **última página**, detrás de las ~7,978 órdenes viejas que migramos (que llegan al
+folio ~7,920).
+
+El motivo: cuando migramos el histórico, cada documento entró con **su folio del sistema viejo**. En
+esos casos hay que dejar el contador de folios adelantado hasta el último migrado; si no, la primera
+captura nueva vuelve a empezar en 1. Eso se estaba haciendo con pedidos, órdenes de producción,
+etapas y auditorías — pero **faltaba en órdenes de compra y notas de salida**.
+
+Y no era solo un problema de orden en la lista: el folio no se puede repetir dentro de una empresa,
+así que en cuanto el contador nuevo hubiera alcanzado un folio ya usado por el histórico, la captura
+te habría **tronado con un error raro** en plena chamba.
+
+### Qué se arregló
+
+**El contador de folios se repara contra la realidad, en todas las series.** Se hizo una herramienta
+que revisa cada tipo de documento, busca el folio más alto que existe de verdad y deja el contador
+justo arriba. Se puede correr las veces que quieras: **nunca hace retroceder** un contador que la
+captura ya avanzó.
+
+Además, **el ETL de compras ahora adelanta sus contadores solo**, al terminar de cargar. El olvido no
+se puede repetir.
+
+### Lo que necesitas saber
+
+- De aquí en adelante, **las órdenes nuevas nacen con folio arriba del histórico** y aparecen
+  hasta arriba del listado, como esperas.
+- **La orden con folio 1 que ya capturaste sigue ahí** (al final de la lista). Los folios no se
+  reescriben —son la identidad del documento y ya quedaron en la bitácora—, así que si la quieres con
+  su folio de la serie real, lo limpio es **cancelarla y volverla a capturar**.
+
+### Nota de despliegue (para Gabriel)
+
+Sin migración y sin permisos nuevos → **no** hace falta `SEED_ON_START`. **Pero sí hay un paso
+manual, una vez, en `prueba`** (y otra vez en producción cuando se migre): desde `backend/`
+
+```
+npx tsx --env-file=.env migracion/reparar-secuencias.ts
+```
+
+(nunca `npm run`: esos no llevan `--env-file`). Hasta que se corra, las OC nuevas seguirán tomando
+folios bajos.
