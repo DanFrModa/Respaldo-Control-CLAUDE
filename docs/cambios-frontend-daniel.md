@@ -1792,3 +1792,56 @@ Se corrige y se vuelve a confirmar.
 3. **Nada que correr a mano.**
 4. ⚠️ Si en `prueba` hay órdenes de compra de tela a medio recibir, de aquí en adelante se terminan
    de recibir por la factura, no desde la orden.
+
+---
+
+## 2026-08-07 — Corrección: la tela es del proveedor, y la entrada se arranca desde la OC
+
+Daniel, después de probar lo anterior: *"El punto 3 no me gustó cómo quedó. Hay algo que me hace
+ruido. Cada proveedor de telas tiene sus telas definidas. No puedo meter una felpa alsatex en el
+proveedor bloom… Y la manera de relacionar la OC tampoco me gusta. Chance estaría mejor recibir las
+telas a partir de las OC. La buscamos ahí y damos la entrada desde allá."*
+
+Las dos observaciones eran correctas. Esto las atiende.
+
+### La tela ya solo se ofrece si es de ese proveedor
+
+Era un **defecto**, no una decisión: el catálogo ya guarda de quién es cada tela (lo hiciste
+obligatorio cuando rehicimos el catálogo), pero el buscador no lo estaba respetando. Ahora, al
+capturar una factura, el buscador de telas **solo ofrece las telas de ese proveedor**.
+
+Es estricto: las telas viejas migradas, que no tienen dueño, **no aparecen**. Quedamos en que el
+catálogo se captura desde cero y esas solo sirven para el histórico de consumos.
+
+### Ahora se empieza por la orden de compra
+
+En **Compras › Órdenes de compra**, al seleccionar una orden autorizada que tenga tela, aparece el
+botón **"Dar entrada a la tela"**. Eso abre la captura de la factura ya con:
+
+- El **proveedor puesto y bloqueado** — lo define la orden. (Si se pudiera cambiar, los renglones
+  quedarían ligados a una orden de otro proveedor.)
+- Un panel **"Pendiente de la orden de compra"** con un renglón por cada tela y **cuánto falta**.
+  Cada uno tiene su botón **Capturar**, que llena la tela, la cantidad que falta y el precio de la
+  orden.
+
+Lo único que te queda por capturar es **de qué color llegó** (y el lote, si lo traes) — que es
+justo lo que la orden de compra no dice. Las cantidades y el precio quedan editables, porque lo que
+llegó puede no ser exactamente lo pedido.
+
+**Se quitó el campo "Renglón de OC"** que había que buscar en una lista: ya no hace falta, la liga
+viene de la orden.
+
+La captura **desde el menú** (*Inventarios › Telas › Entradas › nueva*) sigue existiendo para la
+**tela suelta**, la que no viene de una orden de compra. Ahí no aparece el panel.
+
+### Lo que NO cambió
+
+Todo lo de ayer sigue igual por dentro: la factura es la que mete la tela al inventario, genera el
+recibo de la orden, la marca como recibida y avisa a la Ruta Crítica. Lo que cambió es **por dónde
+entras**, no cómo funciona.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Sin migración** — los dos cambios son de consulta y de pantallas.
+2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+3. **Nada que correr a mano.**

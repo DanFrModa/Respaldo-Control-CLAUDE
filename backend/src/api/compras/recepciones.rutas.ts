@@ -121,6 +121,12 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
           .int()
           .positive()
           .describe('Proveedor cuyas órdenes de compra abiertas se consultan.'),
+        idOrdenCompra: z.coerce
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Acota a UNA orden de compra (la entrada de tela arranca desde ella).'),
       }),
       response: {
         200: z
@@ -146,7 +152,11 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const datos = await lineasTelaPendientesDeProveedor(sesion, request.query.idProveedor);
+      const datos = await lineasTelaPendientesDeProveedor(
+        sesion,
+        request.query.idProveedor,
+        request.query.idOrdenCompra,
+      );
       return { datos };
     },
   });

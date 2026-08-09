@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
+import type * as ReactRouter from 'react-router-dom';
+
 import { OrdenesCompraPagina } from './OrdenesCompraPagina';
 import { ocDePrueba } from './fixtures';
 
@@ -24,6 +26,13 @@ vi.mock('@/api/ordenes-compra', () => ({
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Telas del Norte' }] } }),
 }));
+
+// El botón "Dar entrada a la tela" navega (§Post-F9.15): se espía la navegación.
+const { navegar } = vi.hoisted(() => ({ navegar: vi.fn() }));
+vi.mock('react-router-dom', async () => {
+  const real = await vi.importActual<typeof ReactRouter>('react-router-dom');
+  return { ...real, useNavigate: () => navegar };
+});
 
 // El detalle abre estos diálogos (montados solo al usarse): se simplifican.
 vi.mock('./DialogoEditarOc', () => ({ DialogoEditarOc: () => null }));
@@ -51,6 +60,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     autorizarMutate.mockReset();
     duplicarMutate.mockReset();
     useOrdenesCompraMock.mockReset();
+    navegar.mockReset();
     resumenOc = { data: { ocAbiertas: 0, porRecibir: 0 } };
   });
 
@@ -156,5 +166,44 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     const detalle = screen.getByTestId('detalle-oc');
     expect(within(detalle).getByTestId('editar-oc')).toBeInTheDocument();
     expect(within(detalle).queryByTestId('ver-oc')).not.toBeInTheDocument();
+  });
+
+  describe('§Post-F9.15 — dar entrada a la tela desde la OC', () => {
+    /** Abre el cajón de detalle de la única OC (tabla-first, R9). */
+    function abrirDetalle(): void {
+      fireEvent.click(screen.getByTestId('fila-oc'));
+    }
+
+    it('con la OC AUTORIZADA y renglón de tela, el botón lleva la orden y su proveedor', () => {
+      paginaConUna('autorizada');
+      renderConProveedores(<OrdenesCompraPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver', 'inventario-telas.mover']),
+      });
+      abrirDetalle();
+
+      fireEvent.click(screen.getByTestId('entrada-tela-oc'));
+      // El proveedor viaja en el enlace: la captura lo fija sin gastar otra consulta.
+      expect(navegar).toHaveBeenCalledWith('/inventarios/telas/entradas/nueva', {
+        state: { idOrdenCompra: 1, idProveedor: 5 },
+      });
+    });
+
+    it('NO aparece en una OC que todavía no se autoriza', () => {
+      paginaConUna('pendiente_autorizacion');
+      renderConProveedores(<OrdenesCompraPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver', 'inventario-telas.mover']),
+      });
+      abrirDetalle();
+      expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
+    });
+
+    it('NO aparece sin permiso para mover inventario de telas', () => {
+      paginaConUna('autorizada');
+      renderConProveedores(<OrdenesCompraPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver']),
+      });
+      abrirDetalle();
+      expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
+    });
   });
 });

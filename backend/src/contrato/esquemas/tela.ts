@@ -649,6 +649,15 @@ export const esquemaListarTelas = z
       .positive()
       .optional()
       .describe('Filtra por id de categoría.'),
+    idProveedor: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Filtra por el PROVEEDOR DUEÑO de la tela (§Post-F9.15). Estricto: las telas migradas ' +
+          'sin dueño no aparecen.',
+      ),
     incluirInactivos: z
       .stringbool()
       .default(false)

@@ -9450,6 +9450,8 @@ export interface paths {
           idColor?: number;
           /** @description Filtra por id de categoría. */
           idCategoria?: number;
+          /** @description Filtra por el PROVEEDOR DUEÑO de la tela (§Post-F9.15). Estricto: las telas migradas sin dueño no aparecen. */
+          idProveedor?: number;
           /** @description Incluye las desactivadas ("true"/"false"). */
           incluirInactivos?: string;
           /** @description Columna de orden. */
@@ -26991,6 +26993,8 @@ export interface paths {
         query: {
           /** @description Proveedor cuyas órdenes de compra abiertas se consultan. */
           idProveedor: number;
+          /** @description Acota a UNA orden de compra (la entrada de tela arranca desde ella). */
+          idOrdenCompra?: number;
         };
         header?: never;
         path?: never;

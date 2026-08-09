@@ -1113,6 +1113,8 @@ export async function obtenerRecepcionCompra(
 export async function lineasTelaPendientesDeProveedor(
   sesion: SesionUsuario,
   idProveedor: number,
+  /** Acota a UNA orden de compra (§Post-F9.15: la entrada arranca desde la OC). */
+  idOrdenCompra?: number,
   bd?: ContextoBd,
 ): Promise<
   {
@@ -1134,6 +1136,7 @@ export async function lineasTelaPendientesDeProveedor(
   const lineas = await cliente.ordenCompraLinea.findMany({
     where: {
       idTela: { not: null },
+      ...(idOrdenCompra === undefined ? {} : { idOrdenCompra }),
       ordenCompra: {
         idEmpresa: sesion.idEmpresaActiva,
         idProveedor,

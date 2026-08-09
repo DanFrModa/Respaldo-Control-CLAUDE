@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type * as ReactRouter from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,8 +24,8 @@ vi.mock('@/api/entradas-tela', () => ({
 }));
 const espiaLineasOc = vi.fn();
 vi.mock('@/api/compras-lineas-tela', () => ({
-  useLineasTelaPendientes: (idProveedor: number | undefined) => {
-    espiaLineasOc(idProveedor);
+  useLineasTelaPendientes: (idProveedor: number | undefined, idOrdenCompra?: number) => {
+    espiaLineasOc(idProveedor, idOrdenCompra);
     return {
       data:
         idProveedor === undefined
@@ -75,29 +75,40 @@ vi.mock('react-router-dom', async () => {
   return { ...real, useNavigate: () => navegar, useParams: () => ({}) };
 });
 // La captura de renglones se simula: un botón que emite un renglón ya armado.
+// `vi.hoisted`: el `vi.mock` se iza por encima de las declaraciones del módulo.
+const { espiaProveedorTelas } = vi.hoisted(() => ({ espiaProveedorTelas: vi.fn() }));
 vi.mock('./CapturaRenglonesTelaColor', () => ({
-  CapturaRenglonesTelaColor: ({ onChange }: { onChange: (renglones: unknown[]) => void }) => (
-    <button
-      type="button"
-      data-testid="agregar-renglon"
-      onClick={() =>
-        onChange([
-          {
-            idTelaColor: 71,
-            tela: 'Felpa Suiza',
-            color: 'Marino',
-            nombreComplemento: 'Cardigan',
-            cantidad: 300,
-            cantidadComplemento: 45,
-            loteProveedor: 'L-A',
-            precioUnit: 90,
-            precioUnitComplemento: 120,
-          },
-        ])
-      }
-    >
-      agregar renglón
-    </button>
+  CapturaRenglonesTelaColor: ({
+    onChange,
+    idProveedorTelas,
+  }: {
+    onChange: (renglones: unknown[]) => void;
+    idProveedorTelas?: number;
+  }) => (
+    <>
+      {espiaProveedorTelas(idProveedorTelas)}
+      <button
+        type="button"
+        data-testid="agregar-renglon"
+        onClick={() =>
+          onChange([
+            {
+              idTelaColor: 71,
+              tela: 'Felpa Suiza',
+              color: 'Marino',
+              nombreComplemento: 'Cardigan',
+              cantidad: 300,
+              cantidadComplemento: 45,
+              loteProveedor: 'L-A',
+              precioUnit: 90,
+              precioUnitComplemento: 120,
+            },
+          ])
+        }
+      >
+        agregar renglón
+      </button>
+    </>
   ),
 }));
 
@@ -266,9 +277,42 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     });
 
     // Sin proveedor elegido no hay universo que consultar (la consulta queda apagada).
-    expect(espiaLineasOc).toHaveBeenCalledWith(undefined);
+    expect(espiaLineasOc).toHaveBeenCalledWith(undefined, undefined);
 
     await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
-    expect(espiaLineasOc).toHaveBeenCalledWith(3);
+    expect(espiaLineasOc).toHaveBeenCalledWith(3, undefined);
+  });
+
+  it('§Post-F9.15: llegando DESDE la OC, el proveedor queda FIJO y los pendientes son de esa orden', async () => {
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+      rutaInicial: {
+        pathname: '/inventarios/telas/entradas/nueva',
+        state: { idOrdenCompra: 7, idProveedor: 3 },
+      },
+    });
+
+    await waitFor(() => {
+      // El proveedor lo puso la orden…
+      expect(screen.getByTestId('entrada-proveedor')).toHaveValue('3');
+    });
+    // …y no se puede cambiar (cambiarlo dejaría los renglones ligados a otra orden).
+    expect(screen.getByTestId('entrada-proveedor')).toBeDisabled();
+    expect(screen.getByTestId('entrada-proveedor-ayuda')).toHaveTextContent('orden de compra');
+    // Los pendientes se piden ACOTADOS a esa OC, no a todo el proveedor.
+    expect(espiaLineasOc).toHaveBeenCalledWith(3, 7);
+  });
+
+  it('§Post-F9.15: el buscador de telas se acota al proveedor DUEÑO', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    // El editor de renglones recibe el proveedor: "no puedo meter una felpa alsatex en bloom".
+    await waitFor(() => {
+      expect(espiaProveedorTelas).toHaveBeenCalledWith(3);
+    });
   });
 });
