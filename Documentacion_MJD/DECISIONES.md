@@ -919,3 +919,24 @@ Daniel, después de probar §Post-F9.14: *"El punto 3 no me gustó cómo quedó.
 - **EXCEPCIÓN deliberada:** una tela SIN dueño (migrada) **no se rechaza**. Bloquearlas dejaría OCs viejas imposibles de editar, y como el catálogo se captura desde cero, las telas nuevas siempre traen dueño → la puerta se cierra sola sin trabar lo viejo.
 
 **PENDIENTE ABIERTO — la CxP de la entrada (DANIEL, 7-ago-2026):** *"es importante aclarar que desde que demos entrada a las telas, se debe de generar la cuenta por pagar del proveedor… y está bueno subir la factura de una vez y que se registre también para las CxP"*. **Registrado, NO construido todavía.** F9 dejó el gancho listo: `registrarCargoCompraCxp` (`dominio/terceros/cxp/cxp.ts`) con origen `entrada_sin_factura` y `esFiscal: false` — su propio TSDoc dice *"deja el origen LISTO para que el flujo de recepción de F4 lo invoque"*. Eso además **resuelve la duda del IVA sin preguntar**: el cargo de la entrada nace **por el importe de la mercancía, sin impuestos y no fiscal**, y la factura FISCAL se concilia después importando su CFDI (F9-E3, con anti-duplicado por UUID). Falta decidir/resolver al construirlo: (a) el **permiso** — quien confirma la entrada tiene `inventario-telas.mover`, no `cxp.administrar`, así que el cargo debe nacer como **consecuencia del acto ya autorizado** (sin exigir permiso de CxP), igual que el movimiento de kardex; (b) `refTipo: 'entrada-tela'` + `refId` para la traza; (c) **cancelar la entrada debe cancelar el cargo** por su inverso; (d) cómo se ve el PDF de la factura desde CxP.
+
+#### (Post-F9.16) — "No me aparece el botón. ¿Por qué es?" — la pantalla debe DECIRLO (DANIEL, 7-ago-2026)
+
+Daniel, con una OC autorizada de BLOOM TEXTILES llena de renglones de tela en pantalla: *"No me aparece el botón que dices. ¿Por qué es?"*.
+
+**Causa:** los renglones de esa OC son de **TEXTO LIBRE**, no telas del catálogo. Es una OC **migrada**, y el ETL de F4-E6 cargó las líneas legacy **solo como texto** (documentado: *"líneas legacy SOLO texto libre"*). El botón "Dar entrada a la tela" exige `idTela != null`, así que su ausencia era **correcta**.
+
+**El defecto era de la PANTALLA, no de la regla:** (a) la tabla de renglones mostraba `tela ?? avio ?? descripcionLibre` sin distinguirlos, así que un texto libre se veía **idéntico** a una tela del catálogo; y (b) el botón simplemente **no se pintaba**, sin decir por qué. Esconder una acción sin explicarla convierte una regla razonable en un misterio — y el que la sufre es quien opera.
+
+**Lo que se hizo:**
+1. **Columna "Tipo"** en los renglones del detalle de la OC: `Tela` (verde) / `Avío` / `Texto libre`. De un vistazo se ve qué es cada renglón — y por qué una OC migrada no se puede recibir por factura.
+2. El helper booleano `puedeRecibirTelaDeLaOc` se volvió **`motivoNoRecibirTela`**, que devuelve `null` (sí se puede) o **el motivo**. Cuando no se puede, la barra de acciones pinta la razón en texto:
+   - sin autorizar → *"La orden todavía no está autorizada: primero autorízala."*;
+   - cancelada → *"La orden está cancelada."*;
+   - renglones de avío → *"…no trae telas del catálogo… Los avíos se reciben en Compras › Recepción."*;
+   - renglones de texto libre → *"Los renglones de esta orden son de TEXTO LIBRE, no telas del catálogo (así se migraron las órdenes viejas)…"*.
+3. **Excepción: falta de permiso NO se explica.** Sin `inventario-telas.mover` no se pinta ni el botón ni la nota — la acción no existe para ese usuario (A4, deny-by-default: la UI esconde, no informa de lo que no le toca).
+
+- **Consecuencia práctica que Daniel debe conocer:** las OCs **migradas no se pueden recibir por factura**, porque sus renglones no apuntan al catálogo. Para el flujo nuevo hay que capturar OCs nuevas con telas del catálogo — consistente con *"vamos a meter todas las telas desde cero"*.
+- **Aplica en:** frontend-only. SIN migración, SIN permisos → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-07.

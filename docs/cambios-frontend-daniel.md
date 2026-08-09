@@ -1889,3 +1889,48 @@ comportamiento acordado: el catálogo arranca desde cero.
 
 1. **Sin migración**, **cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
 2. **Nada que correr a mano.**
+
+---
+
+## 2026-08-07 — "No me aparece el botón. ¿Por qué es?"
+
+Daniel, con la OC 7920 de BLOOM TEXTILES en pantalla —autorizada y llena de renglones—: *"No me
+aparece el botón que dices. ¿Por qué es?"*
+
+### La causa
+
+Los renglones de esa orden son de **texto libre**, no telas del catálogo. Es una orden **migrada**
+del sistema viejo, y la migración cargó sus renglones **solo como texto** (por eso las descripciones
+traen la composición y el pantone metidos en el nombre: *"Terry Ibiza 52% pol.48% alg. Pantone crema
+11-0507 tcx"*).
+
+El botón exige renglones de **tela del catálogo**, así que su ausencia era correcta. **El problema
+era que la pantalla no te lo decía**, y encima la tabla mostraba igual un renglón de tela que uno de
+texto libre. Esconder un botón sin explicar por qué convierte una regla razonable en un misterio.
+
+### Qué cambió
+
+**1. Columna "Tipo" en los renglones de la orden.** Ahora cada renglón dice si es **Tela** (en verde),
+**Avío** o **Texto libre**. De un vistazo se ve qué trae la orden.
+
+**2. Cuando no se puede dar entrada, la pantalla dice por qué**, en lugar de solo ocultar el botón:
+
+| Situación | Lo que ahora dice |
+|---|---|
+| La orden no está autorizada | *"La orden todavía no está autorizada: primero autorízala."* |
+| La orden está cancelada | *"La orden está cancelada."* |
+| Trae avíos, no telas | *"…no trae telas del catálogo. Los avíos se reciben en Compras › Recepción."* |
+| Renglones de texto libre | *"Los renglones de esta orden son de TEXTO LIBRE, no telas del catálogo (así se migraron las órdenes viejas)…"* |
+
+La única que **no** se explica es la falta de permiso: si tu usuario no puede mover inventario de
+telas, no ves ni el botón ni la nota — esa acción simplemente no existe para él.
+
+### Lo importante que se desprende de esto
+
+**Las órdenes de compra migradas no se pueden recibir por factura**, porque sus renglones no apuntan
+al catálogo de telas. Para probar el flujo completo hace falta una **OC nueva** con telas del
+catálogo. Encaja con lo que ya habíamos acordado: el catálogo de telas arranca desde cero.
+
+### Nota de despliegue (para Gabriel)
+
+Solo pantallas. **Sin migración, cero permisos nuevos → no** hace falta `SEED_ON_START`.
