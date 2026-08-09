@@ -37,6 +37,15 @@ export type TelaColor = Tela['colores'][number];
 
 /** Unidad en que se compra y se consume una tela: `KG` (kilos) o `M` (metros). */
 export type UnidadTela = Tela['unidadMedida'];
+
+/**
+ * Como se escribe la unidad donde la lee una persona (KG -> kg, M -> m). Vive aqui para que todas
+ * las pantallas la escriban igual: la usa la existencia de telas y la unidad del renglon de OC
+ * (§Post-F9.18: en tela la unidad la manda la tela, no se teclea).
+ */
+export function etiquetaUnidadTela(unidad: UnidadTela): string {
+  return unidad === 'KG' ? 'kg' : 'm';
+}
 /** Parametros de consulta del listado de telas (querystring; incluye `idCategoria`). */
 export type TelasQuery = NonNullable<paths['/api/telas']['get']['parameters']['query']>;
 /** Cuerpo de alta de tela (`POST /api/telas`). */

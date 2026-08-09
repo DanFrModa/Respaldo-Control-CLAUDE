@@ -1,7 +1,7 @@
 import { Grid3x3, Trash2Icon } from 'lucide-react';
 
 import type { Avio } from '@/api/avios';
-import type { Tela } from '@/api/telas';
+import { etiquetaUnidadTela, type Tela } from '@/api/telas';
 import type { Color, OrdenLigera, Talla } from '@/api/tipos';
 import {
   MatrizColorTalla,
@@ -78,6 +78,22 @@ export function EditorLineasOc({
     });
   }
 
+  /**
+   * Al elegir una TELA (§Post-F9.18): la UNIDAD la manda la tela (kg o m), nunca se teclea — *"no
+   * puede ser una tela que se compra en kilos y en la OC la unidad sea piezas"*. Y si esa tela lleva
+   * COMPLEMENTO (Cardigan), el renglón abre su campo; si no lo lleva, se limpia lo que hubiera.
+   */
+  function elegirTela(clave: string, idTela: number | null): void {
+    const tela = telas.find((t) => t.id === idTela);
+    actualizar(clave, {
+      idTela,
+      unidad: tela === undefined ? '' : etiquetaUnidadTela(tela.unidadMedida),
+      ...(tela?.nombreComplemento == null
+        ? { cantidadComplemento: '', precioComplemento: '' }
+        : {}),
+    });
+  }
+
   /** Al elegir un avío, precarga su precio de referencia si tiene un único proveedor (R1). */
   function elegirAvio(clave: string, idAvio: number | null): void {
     const avio = avios.find((a) => a.id === idAvio);
@@ -103,6 +119,59 @@ export function EditorLineasOc({
       cambios.precio = String(prov.precio);
     }
     actualizar(clave, cambios);
+  }
+
+  /**
+   * Bloque del COMPLEMENTO de un renglón de tela (§Post-F9.18). Se pinta SOLO cuando la tela
+   * elegida define complemento (`nombreComplemento`), y entonces su cantidad es obligatoria: el
+   * servidor no deja autorizar la OC sin ella. El precio es opcional (vacío = el del cuerpo).
+   */
+  function renglonComplemento(renglon: RenglonOcCaptura, indice: number): React.JSX.Element | null {
+    const tela = telas.find((t) => t.id === renglon.idTela);
+    const complemento = tela?.nombreComplemento ?? null;
+    if (complemento === null) {
+      return null;
+    }
+    return (
+      <div className="mt-2 rounded-md bg-primary-soft p-2" data-testid="complemento-oc">
+        <p className="text-xs text-muted-foreground">
+          Esta tela se compra junto con su <strong>{complemento}</strong>.
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label className="text-xs text-muted-foreground">
+            Cantidad de {complemento}
+            <Input
+              className="mt-1"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              aria-label={`Cantidad de ${complemento} del renglón ${indice + 1}`}
+              disabled={soloLectura}
+              value={renglon.cantidadComplemento}
+              onChange={(e) => actualizar(renglon.clave, { cantidadComplemento: e.target.value })}
+              data-testid="cantidad-complemento-oc"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Precio de {complemento}
+            <Input
+              className="mt-1"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              aria-label={`Precio de ${complemento} del renglón ${indice + 1}`}
+              disabled={soloLectura}
+              placeholder="Igual que el cuerpo"
+              value={renglon.precioComplemento}
+              onChange={(e) => actualizar(renglon.clave, { precioComplemento: e.target.value })}
+              data-testid="precio-complemento-oc"
+            />
+          </label>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -163,9 +232,10 @@ export function EditorLineasOc({
                       disabled={soloLectura}
                       value={renglon.idTela === null ? '' : String(renglon.idTela)}
                       onChange={(e) =>
-                        actualizar(renglon.clave, {
-                          idTela: e.target.value === '' ? null : Number(e.target.value),
-                        })
+                        elegirTela(
+                          renglon.clave,
+                          e.target.value === '' ? null : Number(e.target.value),
+                        )
                       }
                       data-testid="selector-tela-oc"
                     >
@@ -271,8 +341,10 @@ export function EditorLineasOc({
                   <Input
                     className="mt-1"
                     aria-label={`Unidad del renglón ${indice + 1}`}
-                    disabled={soloLectura}
-                    placeholder="rollo, m, pza…"
+                    // §Post-F9.18: en TELA la unidad la manda la tela — se muestra, no se teclea.
+                    disabled={soloLectura || renglon.tipo === 'tela'}
+                    readOnly={renglon.tipo === 'tela'}
+                    placeholder={renglon.tipo === 'tela' ? 'La pone la tela' : 'rollo, m, pza…'}
                     value={renglon.unidad}
                     onChange={(e) => actualizar(renglon.clave, { unidad: e.target.value })}
                     data-testid="unidad-oc"
@@ -317,6 +389,10 @@ export function EditorLineasOc({
                   </SelectNativo>
                 </label>
               </div>
+
+              {/* COMPLEMENTO de la tela (§Post-F9.18). Solo aparece si la tela elegida lo define:
+                  esa tela SE COMPRA junto con su Cardigan, en el mismo renglón. */}
+              {renglon.tipo === 'tela' ? renglonComplemento(renglon, indice) : null}
 
               {/* Detalle por talla×color (decisión c). */}
               <div className="mt-3 space-y-2">
@@ -368,9 +444,22 @@ export function EditorLineasOc({
       )}
 
       {!soloLectura ? (
-        <Button type="button" variant="outline" onClick={agregar} data-testid="agregar-renglon-oc">
-          Agregar renglón
-        </Button>
+        <div className="space-y-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={agregar}
+            data-testid="agregar-renglon-oc"
+          >
+            Agregar renglón
+          </Button>
+          {/* Daniel (§Post-F9.18): *"una OC puede ir ligada a varias OP"*. Ya se puede —la liga es
+              POR RENGLÓN—, pero no se veía; decirlo aquí evita capturar dos órdenes de compra. */}
+          <p className="text-xs text-muted-foreground" data-testid="ayuda-varias-ordenes-oc">
+            Cada renglón se liga a su propia orden de producción: una misma orden de compra puede
+            surtir varias OP.
+          </p>
+        </div>
       ) : null}
 
       <p className="text-right text-base font-semibold">

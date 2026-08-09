@@ -1985,3 +1985,64 @@ npx tsx --env-file=.env migracion/reparar-secuencias.ts
 
 (nunca `npm run`: esos no llevan `--env-file`). Hasta que se corra, las OC nuevas seguirán tomando
 folios bajos.
+
+---
+
+## Las seis reglas de la orden de compra que pediste (7-ago-2026)
+
+### 1. La fecha de la orden es la del día que se hace
+
+El campo de "Fecha de emisión" **ya no se puede escribir**: dice *"Hoy — la pone el sistema al
+crearla"*, y el sistema la sella al guardar. Si duplicas una orden, la copia se emite **hoy** (es un
+documento nuevo), no el día de la original. Las órdenes viejas conservan su fecha.
+
+### 2. La fecha de entrega es obligatoria
+
+Sin ella no te deja guardar. Y una vez capturada, no se puede dejar en blanco. (Las órdenes viejas
+que se migraron sin fecha de entrega siguen abriéndose y editándose sin problema.)
+
+### 3. La dirección de entrega ahora es un catálogo
+
+Hay una pantalla nueva: **Catálogos › Direcciones de entrega**. Cada dirección lleva:
+
+- un **nombre corto** con el que la eliges (ej. "Naucalpan");
+- la **dirección completa**, tal como debe salir impresa;
+- contacto y teléfono (opcionales);
+- la casilla **"es la de siempre"** — esa se preselecciona sola al capturar una orden de compra.
+
+En la orden ya no se teclea la dirección: la eliges por su nombre y debajo se ve el texto completo
+que va a salir impreso. Así siempre está escrita igual y siempre correcta.
+
+> **Lo primero que hay que hacer:** el catálogo **arranca vacío** (una dirección es dato del
+> negocio, no algo que el sistema deba inventar). Da de alta las direcciones que usas y marca la de
+> siempre como favorita; mientras esté vacío, el selector de la orden te lo dice.
+
+### 4. La unidad de la tela la manda la tela
+
+Si una tela se compra en **kilos**, el renglón dice "kg" y **no se puede cambiar**. La unidad se
+llena sola al elegir la tela. (En **avíos** sí se sigue capturando, porque ahí la presentación —rollo,
+caja— es distinta de la unidad de consumo —metros, piezas— y el sistema convierte entre las dos.)
+
+### 5. Una orden de compra puede ir ligada a varias OP
+
+**Ya se podía** — la liga es **por renglón**: cada renglón elige su propia orden de producción, y la
+orden de compra queda ligada a todas las que aparezcan en sus renglones. Lo que faltaba era que se
+viera: ahora lo dice abajo del editor de renglones. No hace falta capturar dos órdenes de compra.
+
+### 6. La tela se compra con su complemento (Cardigan)
+
+Cuando la tela tiene complemento, el renglón abre un bloque que dice *"esta tela se compra junto con
+su Cardigan"* y te pide **la cantidad del Cardigan** (y su precio, si es distinto al del cuerpo; si
+lo dejas vacío se cobra al mismo precio). Todo va en **el mismo renglón** — igual que cuando recibes
+la tela — y el importe del complemento ya viene sumado en el subtotal.
+
+Sin esa cantidad **no te deja guardar** la orden. Un caso especial: las órdenes de compra que genera
+la **explosión de materiales** no saben cuánto Cardigan lleva la tela (la receta del modelo guarda un
+solo consumo), así que nacen con ese dato pendiente — y el sistema **no las deja autorizar** hasta
+que alguien lo captura. Preferimos pedírtelo a inventar una cantidad.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (tabla nueva de direcciones + dos columnas en los renglones de OC) y
+**cero permisos nuevos** → **no** hace falta `SEED_ON_START`. El único paso manual es capturar las
+direcciones de entrega en el catálogo.

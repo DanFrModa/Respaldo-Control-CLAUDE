@@ -50,6 +50,14 @@ export const UNIDADES_TELA = ['KG', 'M'] as const;
 /** Unidad de una tela. */
 export type UnidadTela = (typeof UNIDADES_TELA)[number];
 
+/**
+ * Cómo se escribe cada unidad donde la lee una persona (impresos, renglones de OC…). Se usa como
+ * la `unidad` de un renglón de tela en la orden de compra: ahí NO se captura, la manda la tela
+ * (§Post-F9.18 — *"la unidad de las telas va ligado a la tela; no puede ser una tela que se compra
+ * en kilos y en la OC la unidad sea piezas"*).
+ */
+export const ETIQUETA_UNIDAD_TELA: Record<UnidadTela, string> = { KG: 'kg', M: 'm' };
+
 /** Clave de tipo de componente de tela. */
 export type TipoComponenteTelaClave = (typeof TIPOS_COMPONENTE_TELA)[number];
 

@@ -3671,6 +3671,39 @@ model MovimientoTercero {
 // OC padre (permite reescribir el set completo en la transacción A2, igual que F2).
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Dirección de entrega (catálogo global, §Post-F9.18 — petición de Daniel: *"la dirección de
+/// entrega debe de ser un catálogo de los que se llenan automáticamente, para que la dirección,
+/// que en el 95% es la misma, tenga la dirección correcta y escrita siempre de la misma manera"*).
+/// Antes era texto libre en la OC (`entregaEn`) y salía escrito distinto en cada orden.
+/// SIN permiso propio: se gobierna con `compras.ver`/`compras.administrar` (mismo criterio que
+/// `TelaCategoria` con `telas.administrar`, ADR-0009) → no requiere `SEED_ON_START`.
+/// Borrado suave + auditoría A7. Global, no por empresa (ADR-0007/A9: los catálogos son globales).
+model DireccionEntrega {
+  id        Int     @id @default(autoincrement())
+  /// Nombre corto con el que se elige ("Naucalpan", "Bodega Cortador Montaño"). Único global.
+  nombre    String  @unique
+  /// La dirección COMPLETA, tal como debe salir impresa en la OC.
+  direccion String  @db.Text
+  /// A quién buscar en esa dirección (opcional).
+  contacto  String?
+  telefono  String?
+  /// La de todos los días: se preselecciona al capturar una OC nueva. La UI cuida que solo
+  /// una la tenga (el dominio la apaga en las demás al prenderla aquí).
+  favorita  Boolean @default(false)
+  /// Borrado suave (plan §4).
+  activo    Boolean @default(true)
+
+  /// Órdenes de compra que entregan aquí. Restrict: una dirección en uso no se borra.
+  ordenesCompra OrdenCompra[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("direcciones_entrega")
+}
+
 /// Estatus de la orden de compra (F4-E2). `borrador` recién capturada (editable);
 /// `pendiente_autorizacion` lista para revisión; `autorizada` aprobada y bloqueada para
 /// el usuario normal (decisión (a)); `recibida_parcial`/`recibida_total` los pondrá la
@@ -3703,12 +3736,20 @@ model OrdenCompra {
   idProveedor Int       @map("id_proveedor")
   proveedor   Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
 
-  /// Fecha de emisión de la OC.
-  fecha        DateTime? @db.Date
-  /// Fecha de entrega esperada del material.
-  fechaEntrega DateTime? @map("fecha_entrega") @db.Date
-  /// Dónde se entrega el material (texto libre).
-  entregaEn    String?   @map("entrega_en")
+  /// Fecha de EMISIÓN. En las OC nuevas la pone el SERVIDOR (= el día en que se captura, sin
+  /// opción a cambiarla — §Post-F9.18); nullable por el histórico migrado.
+  fecha              DateTime?         @db.Date
+  /// Fecha de entrega esperada del material. OBLIGATORIA en las OC nuevas (§Post-F9.18);
+  /// nullable por el histórico migrado, que muchas veces no la traía.
+  fechaEntrega       DateTime?         @map("fecha_entrega") @db.Date
+  /// Dirección de entrega DEL CATÁLOGO (§Post-F9.18: el 95% de las OC entregan en el mismo lugar,
+  /// y tecleado a mano salía escrito distinto cada vez). Restrict: una dirección en uso no se borra.
+  idDireccionEntrega Int?              @map("id_direccion_entrega")
+  direccionEntrega   DireccionEntrega? @relation(fields: [idDireccionEntrega], references: [id], onDelete: Restrict)
+  /// Dónde se entrega el material (texto libre). LEGADO: es lo único que traen las OC migradas y
+  /// las capturadas antes del catálogo. En las nuevas se copia el texto de la dirección elegida
+  /// (para que impresos y consultas viejas sigan leyendo un solo campo, sin join).
+  entregaEn          String?           @map("entrega_en")
 
   /// Estatus del documento (ver enum). DERIVADO/controlado por los servicios; default borrador.
   estatus EstatusOrdenCompra @default(borrador)
@@ -3747,6 +3788,7 @@ model OrdenCompra {
   @@index([idProveedor])
   @@index([estatus])
   @@index([fecha])
+  @@index([idDireccionEntrega])
   @@map("ordenes_compra")
 }
 
@@ -3775,11 +3817,26 @@ model OrdenCompraLinea {
   idAvioProveedor Int?  @map("id_avio_proveedor")
 
   /// Cantidad a comprar (en `unidad`). Decimal. Si la línea usa matriz, = Σ de la matriz.
+  /// En una tela CON complemento, ésta es la cantidad del CUERPO.
   cantidad Decimal @db.Decimal(14, 2)
-  /// Unidad/presentación de compra (texto: rollo, m, pza…).
+  /// Unidad/presentación de compra (texto: rollo, m, pza…). En líneas de TELA ya NO se captura:
+  /// la fija la `unidadMedida` de la tela (§Post-F9.18 — una tela que se compra en kilos no puede
+  /// pedirse en piezas). En avíos SÍ es libre (rollo/caja vs m/pza: R1 tiene su factor).
   unidad   String?
-  /// Precio unitario de la línea (D1: precio actual). Decimal.
+  /// Precio unitario de la línea (D1: precio actual). Decimal. En tela con complemento, del CUERPO.
   precio   Decimal @db.Decimal(12, 2)
+
+  // ── COMPLEMENTO de la tela (§Post-F9.18; Daniel: *"la tela se debe de comprar con su
+  // complemento en caso de tenerlo (Cardigan)"*). El complemento es PARTE de la misma tela
+  // (`Tela.nombreComplemento` es la bandera), así que viaja en el MISMO renglón con su propia
+  // cantidad y precio — igual que `EntradaTelaLinea` ya lo hacía al recibir. NULL en avíos, en
+  // líneas libres, en telas sin complemento y en todo el histórico migrado. ──
+
+  /// Cantidad del COMPLEMENTO a comprar (misma unidad que el cuerpo). Obligatoria (>0) cuando la
+  /// tela define `nombreComplemento`; NULL en cualquier otro caso (lo valida el dominio).
+  cantidadComplemento Decimal? @map("cantidad_complemento") @db.Decimal(14, 2)
+  /// Precio unitario del COMPLEMENTO. NULL = se cobra al mismo precio que el cuerpo.
+  precioComplemento   Decimal? @map("precio_complemento") @db.Decimal(12, 2)
 
   /// Orden de PRODUCCIÓN a la que se liga este renglón (R7, liga por línea). NULLABLE
   /// (compras genéricas/stock no ligan). Restrict.

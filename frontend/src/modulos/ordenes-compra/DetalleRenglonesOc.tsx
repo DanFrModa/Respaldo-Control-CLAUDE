@@ -45,7 +45,26 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
           <tbody>
             {oc.lineas.map((linea) => (
               <tr key={linea.id} className="border-b align-top" data-testid="fila-renglon-oc">
-                <td className="px-2 py-1.5">{descripcionMaterial(linea)}</td>
+                <td className="px-2 py-1.5">
+                  {descripcionMaterial(linea)}
+                  {/* §Post-F9.18: el COMPLEMENTO (Cardigan) va en el MISMO renglón que el cuerpo,
+                      con su propia cantidad y precio, y su importe está dentro del subtotal. Se
+                      dice aquí para que no parezca que falta un renglón. */}
+                  {linea.nombreComplementoTela !== null ? (
+                    <span
+                      className="block text-xs text-muted-foreground"
+                      data-testid="complemento-detalle-oc"
+                    >
+                      + {linea.nombreComplementoTela}:{' '}
+                      {linea.cantidadComplemento === null
+                        ? 'falta capturar la cantidad'
+                        : `${linea.cantidadComplemento.toLocaleString('es-MX')} ${linea.unidad ?? ''}` +
+                          (linea.precioComplemento === null
+                            ? ' (al precio del cuerpo)'
+                            : ` a ${formatearMoneda(linea.precioComplemento)}`)}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-2 py-1.5">
                   <ChipEstado tono={linea.idTela !== null ? 'ok' : 'neutro'} sinPunto>
                     {linea.idTela !== null

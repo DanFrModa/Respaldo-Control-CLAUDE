@@ -151,6 +151,29 @@ ETL idempotente, por lotes, CP850, vía dominio modo-migración (`backend/migrac
   de ventana y colisión de unique se OMITE *y se LISTA* en el reporte de cuadre. El cuadre de Gabriel
   es **reporte-vs-reporte** entre corridas, no contra cifras a mano.
 
+## Reglas de captura de la OC (§Post-F9.18, dictadas por Daniel)
+
+Seis reglas que el **dominio** impone (la UI solo ayuda; el servidor es la autoridad, A1):
+
+| Regla | Dónde vive | Nota |
+|---|---|---|
+| La **fecha de emisión** la pone el servidor (hoy) | `crearOC`/`duplicarOC` (`hoyColumna()`) | No viaja en ningún cuerpo de entrada. El histórico entra por `crearOCMigrada` y conserva la suya. |
+| La **fecha de entrega** es obligatoria y no se vacía | `esquemaCompraCrear` (requerida) / `esquemaCompraEditarCuerpo` (opcional **no** nullable) | Las migradas sin fecha siguen editables. |
+| La **dirección de entrega** sale del catálogo | `DireccionEntrega` + `exigirDireccionEntregaValida` | Global (ADR-0007), favorita única, gobernada por `compras.*` (sin permisos propios). El texto se **copia** a `entregaEn` para impresos/consultas viejas. |
+| La **unidad** de un renglón de tela la manda la tela | `validarLineas` (normaliza con `ETIQUETA_UNIDAD_TELA`) | Ignora lo que venga en el cuerpo. En **avíos** sigue libre (presentación ≠ unidad de consumo, R1). |
+| Una OC liga **varias OP** | `OrdenCompraLinea.idOrden` → N:N derivado | Ya existía; se hizo visible en la UI y quedó probado. |
+| La tela se compra **con su complemento** | `validarLineas` + `exigirComplementosCapturados` | `cantidadComplemento`/`precioComplemento` por renglón; el importe suma al subtotal. |
+
+**El complemento y la explosión MRP** (la única excepción, cerrada sin inventar datos): el BOM guarda
+un solo `consumoPorPrenda` por tela, así que la explosión **no sabe** cuánto complemento comprar. Sus
+OC nacen con `cantidadComplemento` en NULL —vía la bandera interna `automatica` de `crearOC`, que NO
+viaja por el API— y **`autorizarOC` las detiene** hasta que alguien capture la cantidad. La fecha de
+entrega y la dirección de esas OC salen de la **orden de producción** y de la **favorita** del
+catálogo; si falta alguna, el error dice exactamente qué falta.
+
+**El catálogo de direcciones nace vacío** a propósito (una dirección es dato del negocio): se captura
+en *Catálogos › Direcciones de entrega* antes de la primera OC.
+
 ## Reglas que el módulo respeta
 
 A1 (lógica en dominio) · A2 (recepción/confirmación/reverso en transacción) · A3 (folios por

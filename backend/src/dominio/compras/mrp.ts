@@ -64,7 +64,7 @@ import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
-import { ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { existenciaAvioTotalEmpresa } from '../../comun/kardex.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -769,10 +769,38 @@ export async function generarOCDesdeExplosion(
     // La orden debe ser de la empresa activa (A9).
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa },
-      select: { id: true },
+      select: { id: true, folio: true, fechaEntrega: true },
     });
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', idOrden);
+    }
+
+    // §Post-F9.18: toda OC nace con FECHA DE ENTREGA y DIRECCIÓN del catálogo. Aquí no se inventan:
+    // se toman de lo que ya existe — la fecha de entrega de la ORDEN de producción y la dirección
+    // FAVORITA del catálogo — salvo que la pantalla mande las suyas. Si no hay de dónde, se dice
+    // exactamente qué falta en vez de generar una OC a medias.
+    const fechaEntrega =
+      cuerpo.fechaEntrega ??
+      (orden.fechaEntrega === null ? null : orden.fechaEntrega.toISOString().slice(0, 10));
+    if (fechaEntrega === null) {
+      throw new ErrorValidacion(
+        `La orden ${String(orden.folio)} no tiene fecha de entrega, y toda orden de compra la ` +
+          `necesita. Captúrala en la orden, o indica la fecha de entrega al generar las compras.`,
+      );
+    }
+    let idDireccionEntrega = cuerpo.idDireccionEntrega;
+    if (idDireccionEntrega === undefined) {
+      const favorita = await tx.direccionEntrega.findFirst({
+        where: { favorita: true, activo: true },
+        select: { id: true },
+      });
+      if (favorita === null) {
+        throw new ErrorValidacion(
+          'No hay una dirección de entrega marcada como favorita en el catálogo: márcala en ' +
+            'Compras › Direcciones de entrega, o elige una al generar las compras.',
+        );
+      }
+      idDireccionEntrega = favorita.id;
     }
 
     const requerimientos = await tx.requerimientoOrden.findMany({
@@ -810,6 +838,8 @@ export async function generarOCDesdeExplosion(
     for (const [idProveedor, lista] of porProveedor) {
       const entrada: EntradaCrearOC = {
         idProveedor,
+        fechaEntrega,
+        idDireccionEntrega,
         lineas: lista.map((r) => ({
           idTela: r.idTela,
           idAvio: r.idAvio,
@@ -820,7 +850,11 @@ export async function generarOCDesdeExplosion(
         })),
       };
       // REUSA crearOC (se une a esta tx): folio atómico, auditoría, ligas N:N — sin duplicar nada.
-      const oc = await crearOC(sesion, entrada, { tx });
+      // `automatica`: la explosión NO sabe cuánto COMPLEMENTO (Cardigan) lleva una tela que lo
+      // tiene —el BOM guarda un solo consumo por tela—, así que estas OC nacen con el complemento
+      // PENDIENTE en vez de con una cantidad inventada. `autorizarOC` no las deja pasar hasta que
+      // alguien lo capture (§Post-F9.18).
+      const oc = await crearOC(sesion, entrada, { tx }, { automatica: true });
       ordenesCompra.push({
         idOrdenCompra: oc.id,
         numCompra: oc.numCompra,

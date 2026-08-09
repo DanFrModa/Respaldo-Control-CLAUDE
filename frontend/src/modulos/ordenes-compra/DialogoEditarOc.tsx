@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
 import { useColores } from '@/api/colores';
+import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
@@ -59,7 +60,8 @@ const AYUDA_POR_ROL: Record<string, string> = {
 
 /**
  * Diálogo de CAPTURA / EDICIÓN de una orden de compra (F4-E2). Si recibe `oc`, edita; si no, da de
- * alta. Encabezado (proveedor, fechas, entregaEn, observaciones, correspondeA) + renglones (editor
+ * alta. Encabezado (proveedor, fecha de entrega OBLIGATORIA, dirección de entrega del CATÁLOGO,
+ * observaciones, correspondeA — la fecha de emisión la pone el servidor, §Post-F9.18) + renglones (editor
  * con matriz). Una OC autorizada (y usuario no admin) va en `soloLectura` (el backend igual bloquea,
  * A1). Acciones de escritura gobernadas por `compras.administrar` (la pantalla oculta el botón que
  * abre el diálogo); el backend es la autoridad.
@@ -99,9 +101,12 @@ export function DialogoEditarOc({
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idProveedor, setIdProveedor] = useState<number | null>(null);
-  const [fecha, setFecha] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
-  const [entregaEn, setEntregaEn] = useState('');
+  /**
+   * §Post-F9.18: la dirección de entrega sale de un CATÁLOGO (antes era texto libre y la misma
+   * bodega salía escrita distinto en cada orden). En una OC nueva se preselecciona la FAVORITA.
+   */
+  const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
   const [observaciones, setObservaciones] = useState('');
   const [correspondeA, setCorrespondeA] = useState('');
   const [renglones, setRenglones] = useState<RenglonOcCaptura[]>([]);
@@ -126,6 +131,23 @@ export function DialogoEditarOc({
     { enabled: idProveedor !== null },
   );
 
+  // Catálogo de direcciones de entrega (§Post-F9.18). El servidor las manda con la FAVORITA
+  // primero, así que preseleccionarla es tomar la primera.
+  const direcciones = useDireccionesEntregaActivas();
+  // `useMemo` para que la lista tenga identidad estable: el efecto de abajo depende de ella y con
+  // un arreglo nuevo por render volvería a correr en cada pintada.
+  const listaDirecciones = useMemo(() => direcciones.data?.datos ?? [], [direcciones.data]);
+  useEffect(() => {
+    if (!abierto || oc !== undefined || idDireccionEntrega !== null) {
+      return;
+    }
+    const favorita = listaDirecciones.find((d) => d.favorita) ?? listaDirecciones[0];
+    if (favorita !== undefined) {
+      setIdDireccionEntrega(favorita.id);
+    }
+  }, [abierto, oc, idDireccionEntrega, listaDirecciones]);
+  const direccionElegida = listaDirecciones.find((d) => d.id === idDireccionEntrega);
+
   // Rol al que se acota la lista, recalculado con cada cambio de renglones.
   const rolProveedor = useMemo(() => rolSegunRenglones(renglones), [renglones]);
   const proveedores = useProveedoresPorRol(rolProveedor);
@@ -142,18 +164,16 @@ export function DialogoEditarOc({
     if (oc !== undefined) {
       setIdProveedor(oc.idProveedor);
       setNombreProveedor(oc.proveedor);
-      setFecha(oc.fecha ?? '');
       setFechaEntrega(oc.fechaEntrega ?? '');
-      setEntregaEn(oc.entregaEn ?? '');
+      setIdDireccionEntrega(oc.idDireccionEntrega);
       setObservaciones(oc.observaciones ?? '');
       setCorrespondeA(oc.correspondeA ?? '');
       setRenglones(capturaDesdeOc(oc));
     } else {
       setIdProveedor(null);
       setNombreProveedor('');
-      setFecha('');
       setFechaEntrega('');
-      setEntregaEn('');
+      setIdDireccionEntrega(null);
       setObservaciones('');
       setCorrespondeA('');
       setRenglones([renglonVacio()]);
@@ -165,11 +185,21 @@ export function DialogoEditarOc({
       toast.error('Elige el proveedor de la orden de compra.');
       return;
     }
+    // §Post-F9.18: fecha de entrega y dirección son OBLIGATORIAS. Se avisa aquí para no mandar el
+    // formulario entero y que el servidor lo rechace (él igual re-valida, A1).
+    if (fechaEntrega === '') {
+      toast.error('Captura la fecha de entrega: es obligatoria.');
+      return;
+    }
+    if (idDireccionEntrega === null) {
+      toast.error('Elige la dirección de entrega del catálogo.');
+      return;
+    }
     const encabezado = {
       idProveedor,
-      fecha: fecha === '' ? null : fecha,
-      fechaEntrega: fechaEntrega === '' ? null : fechaEntrega,
-      entregaEn: entregaEn.trim() || null,
+      // La fecha de EMISIÓN no se manda: la pone el servidor con el día de la captura.
+      fechaEntrega,
+      idDireccionEntrega,
       observaciones: observaciones.trim() || null,
       correspondeA: correspondeA.trim() || null,
       lineas: renglones.map(renglonApi),
@@ -269,38 +299,65 @@ export function DialogoEditarOc({
                 </p>
               ) : null}
             </Field>
+            {/* §Post-F9.18: la fecha de emisión NO se captura — es el día en que se hace la OC.
+                Se muestra para que se vea, nunca como campo editable. */}
             <Field>
               <FieldLabel htmlFor="oc-fecha">Fecha de emisión</FieldLabel>
-              <Input
+              <p
                 id="oc-fecha"
-                type="date"
-                disabled={soloLectura}
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
+                className="flex h-9 items-center text-sm text-muted-foreground"
                 data-testid="oc-fecha"
-              />
+              >
+                {esEdicion
+                  ? (oc?.fecha ?? 'Sin fecha (orden migrada)')
+                  : 'Hoy — la pone el sistema al crearla'}
+              </p>
             </Field>
             <Field>
-              <FieldLabel htmlFor="oc-fecha-entrega">Fecha de entrega</FieldLabel>
+              <FieldLabel htmlFor="oc-fecha-entrega">Fecha de entrega *</FieldLabel>
               <Input
                 id="oc-fecha-entrega"
                 type="date"
+                required
                 disabled={soloLectura}
                 value={fechaEntrega}
                 onChange={(e) => setFechaEntrega(e.target.value)}
                 data-testid="oc-fecha-entrega"
               />
             </Field>
+            {/* La dirección sale del CATÁLOGO: siempre escrita igual, y se ve completa debajo. */}
             <Field>
-              <FieldLabel htmlFor="oc-entrega-en">Entregar en</FieldLabel>
-              <Input
-                id="oc-entrega-en"
-                disabled={soloLectura}
-                placeholder="Almacén / dirección de entrega"
-                value={entregaEn}
-                onChange={(e) => setEntregaEn(e.target.value)}
-                data-testid="oc-entrega-en"
-              />
+              <FieldLabel htmlFor="oc-direccion-entrega">Entregar en *</FieldLabel>
+              <SelectNativo
+                id="oc-direccion-entrega"
+                disabled={soloLectura || direcciones.isPending}
+                value={idDireccionEntrega === null ? '' : String(idDireccionEntrega)}
+                onChange={(e) =>
+                  setIdDireccionEntrega(e.target.value === '' ? null : Number(e.target.value))
+                }
+                data-testid="oc-direccion-entrega"
+              >
+                <option value="">
+                  {listaDirecciones.length === 0
+                    ? 'No hay direcciones: dalas de alta en Compras › Direcciones de entrega'
+                    : 'Elige la dirección…'}
+                </option>
+                {/* Una OC migrada (o de una dirección ya desactivada) no pierde la suya. */}
+                {idDireccionEntrega !== null && direccionElegida === undefined ? (
+                  <option value={String(idDireccionEntrega)}>
+                    {oc?.direccionEntregaNombre ?? 'Dirección actual'}
+                  </option>
+                ) : null}
+                {listaDirecciones.map((d) => (
+                  <option key={d.id} value={String(d.id)}>
+                    {d.nombre}
+                    {d.favorita ? ' (la de siempre)' : ''}
+                  </option>
+                ))}
+              </SelectNativo>
+              <p className="text-xs text-muted-foreground" data-testid="oc-direccion-entrega-texto">
+                {direccionElegida?.direccion ?? oc?.entregaEn ?? 'Se llena sola al elegirla.'}
+              </p>
             </Field>
             <Field>
               <FieldLabel htmlFor="oc-corresponde-a">Corresponde a</FieldLabel>

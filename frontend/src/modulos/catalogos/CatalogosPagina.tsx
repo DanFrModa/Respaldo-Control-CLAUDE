@@ -4,6 +4,7 @@ import {
   Contact,
   Images,
   Layers,
+  MapPin,
   Palette,
   Ruler,
   Stamp,
@@ -74,6 +75,14 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     ruta: '/catalogos/temporadas',
     icono: CalendarRange,
     permiso: 'temporadas.ver',
+  },
+  {
+    clave: 'direcciones-entrega',
+    titulo: 'Direcciones de entrega',
+    descripcion: 'A dónde entregan los proveedores (se elige en la orden de compra).',
+    ruta: '/catalogos/direcciones-entrega',
+    icono: MapPin,
+    permiso: 'compras.ver',
   },
   {
     clave: 'etiquetas-marca',
