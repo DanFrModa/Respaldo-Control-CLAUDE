@@ -150,6 +150,19 @@ export {
 } from './esquemas/temporada.js';
 
 export {
+  esquemaDireccionEntregaCrear,
+  esquemaDireccionEntregaEditar,
+  esquemaDireccionEntregaSalida,
+  esquemaDireccionesEntregaQuery,
+  esquemaDireccionesEntregaPagina,
+  type DatosDireccionEntregaCrear,
+  type DatosDireccionEntregaEditar,
+  type DireccionEntregaSalida,
+  type DireccionesEntregaQuery,
+  type DireccionesEntregaPagina,
+} from './esquemas/direccion-entrega.js';
+
+export {
   esquemaEtiquetaMarcaCrear,
   esquemaEtiquetaMarcaEditar,
   esquemaEtiquetaMarcaSalida,
@@ -247,6 +260,7 @@ export {
   esquemaComposicionTelaSalida,
   esquemaComposicionesTelaQuery,
   esquemaComposicionesTelaPagina,
+  ETIQUETA_UNIDAD_TELA,
   type TipoComponenteTelaClave,
   type DatosTelaCrear,
   type DatosTelaEditar,

@@ -16,11 +16,18 @@ const sesionAdmin = () =>
   sesionDePrueba({ permisos: ['compras.ver', 'compras.administrar', 'compras.cancelar'] });
 const sesionSoloVer = () => sesionDePrueba({ permisos: ['compras.ver'] });
 
+/**
+ * Encabezado mínimo que TODA OC nueva exige desde §Post-F9.18: fecha de entrega obligatoria y
+ * dirección de entrega del catálogo. Aquí los ids son ficticios: estas pruebas fallan por permiso o
+ * por Zod ANTES de tocar la base, así que nunca se resuelven contra el catálogo real.
+ */
+const encabezadoOc = { fechaEntrega: '2026-09-30', idDireccionEntrega: 1 } as const;
+
 describe('OC unit — permisos (A4, deny-by-default)', () => {
   it('crearOC sin compras.administrar lanza ErrorPermiso (antes de la BD)', async () => {
-    await expect(crearOC(sesionSoloVer(), { idProveedor: 1, lineas: [] })).rejects.toBeInstanceOf(
-      ErrorPermiso,
-    );
+    await expect(
+      crearOC(sesionSoloVer(), { ...encabezadoOc, idProveedor: 1, lineas: [] }),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
   it('listarOC sin compras.ver lanza ErrorPermiso', async () => {
@@ -45,6 +52,7 @@ describe('OC unit — validación de captura (Zod, antes de la BD)', () => {
   it('crearOC con precio negativo lanza ErrorValidacion', async () => {
     await expect(
       crearOC(sesionAdmin(), {
+        ...encabezadoOc,
         idProveedor: 1,
         lineas: [{ idTela: 1, cantidad: 1, precio: -5 }],
       }),
@@ -54,6 +62,7 @@ describe('OC unit — validación de captura (Zod, antes de la BD)', () => {
   it('crearOC con cantidad cero lanza ErrorValidacion', async () => {
     await expect(
       crearOC(sesionAdmin(), {
+        ...encabezadoOc,
         idProveedor: 1,
         lineas: [{ idTela: 1, cantidad: 0, precio: 5 }],
       }),

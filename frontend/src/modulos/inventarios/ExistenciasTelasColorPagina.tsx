@@ -10,7 +10,7 @@ import {
   usePartidasTela,
 } from '@/api/inventario-materiales';
 import { useProveedores } from '@/api/proveedores';
-import { useTelasCategorias } from '@/api/telas';
+import { etiquetaUnidadTela, useTelasCategorias } from '@/api/telas';
 import type {
   ExistenciaTelaAgrupada,
   ExistenciaTelaColorHijo,
@@ -38,11 +38,6 @@ import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
 
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
-
-/** Etiqueta corta de la unidad (KG → kg, M → m). */
-function unidadCorta(unidad: 'KG' | 'M'): string {
-  return unidad === 'KG' ? 'kg' : 'm';
-}
 
 /** Formatea una cantidad con separador local. */
 function num(valor: number): string {
@@ -373,7 +368,9 @@ function RenglonesDeTela({
         <TablaDensaCelda className="text-xs text-muted-foreground">
           {tela.colores.length} color(es)
         </TablaDensaCelda>
-        <TablaDensaCelda className="text-xs">{unidadCorta(tela.unidadMedida)}</TablaDensaCelda>
+        <TablaDensaCelda className="text-xs">
+          {etiquetaUnidadTela(tela.unidadMedida)}
+        </TablaDensaCelda>
         <TablaDensaCelda numerica className="font-semibold">
           {num(tela.totalCuerpo)}
         </TablaDensaCelda>
@@ -432,7 +429,7 @@ function RenglonColor({
           )
           .join(' · ')}
       </TablaDensaCelda>
-      <TablaDensaCelda className="text-xs">{unidadCorta(tela.unidadMedida)}</TablaDensaCelda>
+      <TablaDensaCelda className="text-xs">{etiquetaUnidadTela(tela.unidadMedida)}</TablaDensaCelda>
       <TablaDensaCelda numerica>{num(color.existenciaCuerpo)}</TablaDensaCelda>
       <TablaDensaCelda numerica>
         {llevaComplemento ? num(color.existenciaComplemento) : '—'}
@@ -474,7 +471,7 @@ function TarjetaTela({
           {num(tela.totalCuerpo)}
           <span className="text-xs font-normal text-muted-foreground">
             {' '}
-            {unidadCorta(tela.unidadMedida)}
+            {etiquetaUnidadTela(tela.unidadMedida)}
           </span>
         </span>
       </div>

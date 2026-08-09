@@ -24695,6 +24695,10 @@ export interface paths {
                 fecha: string | null;
                 /** @description Fecha de entrega esperada, o null. */
                 fechaEntrega: string | null;
+                /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+                idDireccionEntrega: number | null;
+                /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+                direccionEntregaNombre: string | null;
                 /** @description Dónde se entrega, o null. */
                 entregaEn: string | null;
                 /** @description Observaciones, o null. */
@@ -24721,6 +24725,12 @@ export interface paths {
                   idTela: number | null;
                   /** @description Nombre de la tela, o null. */
                   tela: string | null;
+                  /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                  nombreComplementoTela: string | null;
+                  /** @description Cantidad del complemento comprada en este renglón, o null. */
+                  cantidadComplemento: number | null;
+                  /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                  precioComplemento: number | null;
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
                   /** @description Clave/descripción del avío, o null. */
@@ -24735,7 +24745,7 @@ export interface paths {
                   unidad: string | null;
                   /** @description Precio unitario de la línea. */
                   precio: number;
-                  /** @description Subtotal derivado del renglón (cantidad × precio). */
+                  /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                   subtotal: number;
                   /** @description Orden de producción ligada (R7), o null. */
                   idOrden: number | null;
@@ -24886,12 +24896,13 @@ export interface paths {
           'application/json': {
             /** @description Proveedor al que se le compra. */
             idProveedor: number;
-            /** @description Fecha de emisión (YYYY-MM-DD). */
-            fecha?: string | null;
-            /** @description Fecha de entrega esperada (YYYY-MM-DD). */
-            fechaEntrega?: string | null;
-            /** @description Dónde se entrega el material (texto libre). */
-            entregaEn?: string | null;
+            /**
+             * Format: date
+             * @description Fecha de entrega esperada (YYYY-MM-DD). Obligatoria.
+             */
+            fechaEntrega: string;
+            /** @description Dirección de entrega DEL CATÁLOGO (§Post-F9.18). Obligatoria en las OC nuevas. */
+            idDireccionEntrega: number;
             /** @description Observaciones generales. */
             observaciones?: string | null;
             /** @description A qué corresponde la compra (texto libre). */
@@ -24909,10 +24920,14 @@ export interface paths {
               idAvioProveedor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
-              /** @description Unidad/presentación de compra (rollo, m, pza…). */
+              /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
               unidad?: string | null;
-              /** @description Precio unitario de la línea (D1: precio actual). */
+              /** @description Precio unitario de la línea (D1: precio actual). En tela con complemento, del cuerpo. */
               precio: number;
+              /** @description Cantidad del COMPLEMENTO (Cardigan). OBLIGATORIA en telas que definen complemento; prohibida en avíos, líneas libres y telas sin complemento (lo valida el dominio). */
+              cantidadComplemento?: number | null;
+              /** @description Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo. */
+              precioComplemento?: number | null;
               /** @description Orden de PRODUCCIÓN ligada (R7, liga por línea; opcional). */
               idOrden?: number | null;
               /** @description Descripción libre (SOLO líneas no catalogadas; con tela/avío null). */
@@ -24963,6 +24978,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -24989,6 +25008,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -25003,7 +25028,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -25321,6 +25346,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -25347,6 +25376,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -25361,7 +25396,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -25510,12 +25545,13 @@ export interface paths {
           'application/json': {
             /** @description Proveedor (solo editable en borrador/pendiente). */
             idProveedor?: number;
-            /** @description Fecha de emisión (YYYY-MM-DD). */
-            fecha?: string | null;
-            /** @description Fecha de entrega esperada (YYYY-MM-DD). */
-            fechaEntrega?: string | null;
-            /** @description Dónde se entrega el material (texto libre). */
-            entregaEn?: string | null;
+            /**
+             * Format: date
+             * @description Fecha de entrega esperada (YYYY-MM-DD). Obligatoria.
+             */
+            fechaEntrega?: string;
+            /** @description Dirección de entrega DEL CATÁLOGO (§Post-F9.18). Obligatoria en las OC nuevas. */
+            idDireccionEntrega?: number;
             /** @description Observaciones generales. */
             observaciones?: string | null;
             /** @description A qué corresponde la compra (texto libre). */
@@ -25530,10 +25566,14 @@ export interface paths {
               idAvioProveedor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
-              /** @description Unidad/presentación de compra (rollo, m, pza…). */
+              /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
               unidad?: string | null;
-              /** @description Precio unitario de la línea (D1: precio actual). */
+              /** @description Precio unitario de la línea (D1: precio actual). En tela con complemento, del cuerpo. */
               precio: number;
+              /** @description Cantidad del COMPLEMENTO (Cardigan). OBLIGATORIA en telas que definen complemento; prohibida en avíos, líneas libres y telas sin complemento (lo valida el dominio). */
+              cantidadComplemento?: number | null;
+              /** @description Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo. */
+              precioComplemento?: number | null;
               /** @description Orden de PRODUCCIÓN ligada (R7, liga por línea; opcional). */
               idOrden?: number | null;
               /** @description Descripción libre (SOLO líneas no catalogadas; con tela/avío null). */
@@ -25584,6 +25624,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -25610,6 +25654,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -25624,7 +25674,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -25918,6 +25968,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -25944,6 +25998,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -25958,7 +26018,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -26153,6 +26213,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -26179,6 +26243,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -26193,7 +26263,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -26381,6 +26451,10 @@ export interface paths {
               fecha: string | null;
               /** @description Fecha de entrega esperada, o null. */
               fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
               /** @description Dónde se entrega, o null. */
               entregaEn: string | null;
               /** @description Observaciones, o null. */
@@ -26407,6 +26481,12 @@ export interface paths {
                 idTela: number | null;
                 /** @description Nombre de la tela, o null. */
                 tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -26421,7 +26501,7 @@ export interface paths {
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
-                /** @description Subtotal derivado del renglón (cantidad × precio). */
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
                 subtotal: number;
                 /** @description Orden de producción ligada (R7), o null. */
                 idOrden: number | null;
@@ -26553,6 +26633,747 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/compras/direcciones-entrega': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar direcciones de entrega */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en nombre o dirección (insensible a mayúsculas). */
+          busqueda?: string;
+          /** @description Incluye las desactivadas ("true"/"false"). */
+          incluirInactivos?: string;
+          /** @description Columna de ordenamiento. */
+          ordenarPor?: 'nombre' | 'creadoEn';
+          /** @description Dirección del orden (asc/desc). */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de direcciones de entrega. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Direcciones de la página. */
+              datos: {
+                /** @description Id de la dirección. */
+                id: number;
+                /** @description Nombre corto con el que se elige. */
+                nombre: string;
+                /** @description Dirección completa. */
+                direccion: string;
+                /** @description A quién buscar. */
+                contacto: string | null;
+                /** @description Teléfono. */
+                telefono: string | null;
+                /** @description Se preselecciona al capturar una OC nueva. */
+                favorita: boolean;
+                /** @description Falso si está desactivada (borrado suave). */
+                activo: boolean;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que la creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que la modificó. */
+                modificadoPorId: string | null;
+              }[];
+              /** @description Total que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear una dirección de entrega */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre corto con el que se elige ("Naucalpan"). Único global. */
+            nombre: string;
+            /** @description La dirección COMPLETA, tal como debe salir impresa en la OC. */
+            direccion: string;
+            /** @description A quién buscar en esa dirección. */
+            contacto?: string | null;
+            /** @description Teléfono de contacto. */
+            telefono?: string | null;
+            /** @description La de todos los días: se preselecciona al capturar una OC nueva. */
+            favorita?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Dirección de entrega del catálogo (global). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la dirección. */
+              id: number;
+              /** @description Nombre corto con el que se elige. */
+              nombre: string;
+              /** @description Dirección completa. */
+              direccion: string;
+              /** @description A quién buscar. */
+              contacto: string | null;
+              /** @description Teléfono. */
+              telefono: string | null;
+              /** @description Se preselecciona al capturar una OC nueva. */
+              favorita: boolean;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/compras/direcciones-entrega/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una dirección de entrega */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la dirección de entrega. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Dirección de entrega del catálogo (global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la dirección. */
+              id: number;
+              /** @description Nombre corto con el que se elige. */
+              nombre: string;
+              /** @description Dirección completa. */
+              direccion: string;
+              /** @description A quién buscar. */
+              contacto: string | null;
+              /** @description Teléfono. */
+              telefono: string | null;
+              /** @description Se preselecciona al capturar una OC nueva. */
+              favorita: boolean;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Desactivar una dirección de entrega (borrado suave) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la dirección de entrega. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Dirección de entrega del catálogo (global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la dirección. */
+              id: number;
+              /** @description Nombre corto con el que se elige. */
+              nombre: string;
+              /** @description Dirección completa. */
+              direccion: string;
+              /** @description A quién buscar. */
+              contacto: string | null;
+              /** @description Teléfono. */
+              telefono: string | null;
+              /** @description Se preselecciona al capturar una OC nueva. */
+              favorita: boolean;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Actualizar una dirección de entrega */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la dirección de entrega. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre corto con el que se elige ("Naucalpan"). Único global. */
+            nombre?: string;
+            /** @description La dirección COMPLETA, tal como debe salir impresa en la OC. */
+            direccion?: string;
+            /** @description A quién buscar en esa dirección. */
+            contacto?: string | null;
+            /** @description Teléfono de contacto. */
+            telefono?: string | null;
+            /** @description La de todos los días: se preselecciona al capturar una OC nueva. */
+            favorita?: boolean;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Dirección de entrega del catálogo (global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la dirección. */
+              id: number;
+              /** @description Nombre corto con el que se elige. */
+              nombre: string;
+              /** @description Dirección completa. */
+              direccion: string;
+              /** @description A quién buscar. */
+              contacto: string | null;
+              /** @description Teléfono. */
+              telefono: string | null;
+              /** @description Se preselecciona al capturar una OC nueva. */
+              favorita: boolean;
+              /** @description Falso si está desactivada (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
   '/api/ordenes-compra/{idOrdenCompra}/recepciones': {
@@ -27748,6 +28569,13 @@ export interface paths {
              * @default []
              */
             idsRequerimiento?: number[];
+            /**
+             * Format: date
+             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             */
+            fechaEntrega?: string;
+            /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
+            idDireccionEntrega?: number;
           };
         };
       };

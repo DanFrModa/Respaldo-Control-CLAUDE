@@ -137,6 +137,22 @@ export type TemporadaCrear =
 export type TemporadaEditar =
   paths['/api/temporadas/{id}']['patch']['requestBody']['content']['application/json'];
 
+/** Pagina de direcciones de entrega (`GET /api/compras/direcciones-entrega`, §Post-F9.18). */
+export type DireccionesEntregaPagina =
+  paths['/api/compras/direcciones-entrega']['get']['responses']['200']['content']['application/json'];
+/** Una direccion de entrega tal como la devuelve el API. */
+export type DireccionEntrega = DireccionesEntregaPagina['datos'][number];
+/** Parametros de consulta del listado de direcciones de entrega (querystring). */
+export type DireccionesEntregaQuery = NonNullable<
+  paths['/api/compras/direcciones-entrega']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de direccion de entrega. */
+export type DireccionEntregaCrear =
+  paths['/api/compras/direcciones-entrega']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de direccion de entrega. */
+export type DireccionEntregaEditar =
+  paths['/api/compras/direcciones-entrega/{id}']['patch']['requestBody']['content']['application/json'];
+
 /** Pagina de etiquetas de marca (`GET /api/etiquetas-marca`). */
 export type EtiquetasMarcaPagina =
   paths['/api/etiquetas-marca']['get']['responses']['200']['content']['application/json'];

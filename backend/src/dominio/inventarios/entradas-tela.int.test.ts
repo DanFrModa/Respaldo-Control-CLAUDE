@@ -53,6 +53,8 @@ let colorMarino: TelaColor; // de la felpa
 let colorBlanco: TelaColor; // de la felpa
 let colorNegroLisa: TelaColor; // de la lisa
 let almacen: Almacen;
+/** §Post-F9.18: toda OC nueva exige dirección de entrega del catálogo. */
+let direccionEntrega: { id: number };
 
 const PERM: ClavePermiso[] = [
   'inventario-telas.ver',
@@ -84,6 +86,9 @@ beforeEach(async () => {
     },
   });
   telaLisa = await cliente.tela.create({ data: { nombre: 'Lisa Algodón', unidadMedida: 'M' } });
+  direccionEntrega = await cliente.direccionEntrega.create({
+    data: { nombre: 'Bodega Naucalpan', direccion: 'Av. Siempre Viva 123', favorita: true },
+  });
   colorMarino = await cliente.telaColor.create({
     data: { idTela: telaFelpa.id, nombre: 'Marino Alsa 3040', pantone: '19-3920' },
   });
@@ -643,8 +648,11 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const oc = await crearOC(
       sesion(PERM_COMPRAS),
       {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
         idProveedor: proveedor.id,
-        lineas: [{ idTela: telaFelpa.id, cantidad, precio, unidad: 'kg' }],
+        // La felpa lleva Cardigan: §Post-F9.18 exige su cantidad en el mismo renglón.
+        lineas: [{ idTela: telaFelpa.id, cantidad, precio, unidad: 'kg', cantidadComplemento: 5 }],
       },
       bd(),
     );
@@ -814,7 +822,12 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const otro = await cliente.proveedor.create({ data: { nombre: 'Otro Proveedor' } });
     const ocAjena = await crearOC(
       sesion(PERM_COMPRAS),
-      { idProveedor: otro.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1 }] },
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: otro.id,
+        lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1, cantidadComplemento: 1 }],
+      },
       bd(),
     );
     await autorizarOC(sesion(PERM_COMPRAS), ocAjena.id, bd());
@@ -832,7 +845,13 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
   it('rechaza un color que no es de la tela que pide la OC', async () => {
     const ocLisa = await crearOC(
       sesion(PERM_COMPRAS),
-      { idProveedor: proveedor.id, lineas: [{ idTela: telaLisa.id, cantidad: 10, precio: 1 }] },
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        // La lisa NO lleva complemento: su renglón no debe capturarlo.
+        lineas: [{ idTela: telaLisa.id, cantidad: 10, precio: 1 }],
+      },
       bd(),
     );
     await autorizarOC(sesion(PERM_COMPRAS), ocLisa.id, bd());
@@ -847,7 +866,12 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
   it('rechaza una OC que todavía NO está autorizada', async () => {
     const borrador = await crearOC(
       sesion(PERM_COMPRAS),
-      { idProveedor: proveedor.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1 }] },
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 1, cantidadComplemento: 1 }],
+      },
       bd(),
     );
     const entrada = await capturarConOC(borrador.lineas[0]!.id, 10);

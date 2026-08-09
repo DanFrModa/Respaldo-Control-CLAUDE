@@ -116,6 +116,19 @@ export const esquemaGenerarOcCuerpo = z
       .array(z.number().int().positive())
       .default([])
       .describe('Ids de renglones de snapshot a comprar (vacío = todo lo pendiente).'),
+    // §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo. Aquí son OPCIONALES
+    // porque el dominio tiene de dónde sacarlas sin inventar nada: la fecha de entrega de la ORDEN
+    // de producción y la dirección FAVORITA del catálogo. Si se manda, gana lo que se manda.
+    fechaEntrega: z.iso
+      .date({ error: 'La fecha de entrega no es válida' })
+      .optional()
+      .describe('Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.'),
+    idDireccionEntrega: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo.'),
   })
   .describe('Selección de la explosión para generar OC (una OC por proveedor).');
 

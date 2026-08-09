@@ -402,6 +402,35 @@ export const esquemaTemporadaFormulario = z.object({
 /** Datos del formulario de temporada. */
 export type DatosTemporadaFormulario = z.infer<typeof esquemaTemporadaFormulario>;
 
+// ── Direcciones de entrega (§Post-F9.18, espejo de `esquemaDireccionEntregaCrear`) ───────
+
+/**
+ * Captura del formulario de DIRECCION DE ENTREGA. Nombre corto (con el que se elige en la OC) +
+ * la direccion completa tal como debe salir impresa. `favorita` marca la de todos los dias: es la
+ * que la captura de la OC preselecciona.
+ */
+export const esquemaDireccionEntregaFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  direccion: z
+    .string({ error: 'La dirección es obligatoria' })
+    .trim()
+    .min(1, { error: 'La dirección es obligatoria' })
+    .max(1000, { error: 'La dirección no puede tener más de 1000 caracteres' }),
+  contacto: z
+    .string()
+    .trim()
+    .max(200, { error: 'El contacto no puede tener más de 200 caracteres' }),
+  telefono: z.string().trim().max(50, { error: 'El teléfono no puede tener más de 50 caracteres' }),
+  favorita: z.boolean(),
+});
+
+/** Datos del formulario de direccion de entrega. */
+export type DatosDireccionEntregaFormulario = z.infer<typeof esquemaDireccionEntregaFormulario>;
+
 // ── Etiquetas de marca (espejo de `esquemaEtiquetaMarcaCrear`/`Editar`) ───────
 
 /**

@@ -42,6 +42,7 @@ let telaFelpa: Tela;
 let avioBoton: Avio;
 let colorFelpaRojo: TelaColor;
 let almacen: Almacen;
+let direccionEntrega: { id: number };
 
 const PERM: ClavePermiso[] = ['compras.ver', 'compras.administrar', 'compras.recibir'];
 const PERM_AUTORIZAR: ClavePermiso[] = ['compras.ver', 'compras.autorizar'];
@@ -74,6 +75,10 @@ beforeEach(async () => {
   });
   avioBoton = await cliente.avio.create({ data: { clave: 'BOT-01', descripcion: 'Botón' } });
   almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'TELA' } });
+  // §Post-F9.18: toda OC nueva exige dirección de entrega del catálogo.
+  direccionEntrega = await cliente.direccionEntrega.create({
+    data: { nombre: 'Bodega', direccion: 'Av. Siempre Viva 123', favorita: true },
+  });
   // Tipos de movimiento que el dominio de recepción resuelve por código.
   await cliente.tipoMovimientoInventario.createMany({
     data: [
@@ -83,13 +88,23 @@ beforeEach(async () => {
   });
 });
 
+/**
+ * Encabezado mínimo que TODA OC nueva exige desde §Post-F9.18 (fecha de entrega + dirección del
+ * catálogo). La fecha de EMISIÓN ya no se manda: la pone el servidor.
+ */
+function encabezadoOc(): { fechaEntrega: string; idDireccionEntrega: number } {
+  return { fechaEntrega: '2026-09-30', idDireccionEntrega: direccionEntrega.id };
+}
+
 /** Crea una OC autorizada con una línea de tela (felpa). Devuelve la OC. */
 async function ocTelaAutorizada(cantidad = 750, precio = 10) {
   const oc = await crearOC(
     sesion(PERM),
     {
+      ...encabezadoOc(),
       idProveedor: proveedor.id,
-      lineas: [{ idTela: telaFelpa.id, cantidad, precio, unidad: 'm' }],
+      // La felpa lleva Cardigan: desde §Post-F9.18 el renglón exige su cantidad (misma unidad).
+      lineas: [{ idTela: telaFelpa.id, cantidad, precio, unidad: 'm', cantidadComplemento: 10 }],
     },
     bd(),
   );
@@ -105,6 +120,7 @@ async function ocAvioAutorizada(cantidad = 750, precio = 10) {
   const oc = await crearOC(
     sesion(PERM),
     {
+      ...encabezadoOc(),
       idProveedor: proveedor.id,
       lineas: [{ idAvio: avioBoton.id, cantidad, precio, unidad: 'pza' }],
     },
@@ -135,7 +151,11 @@ describe('Recepción (F4-E3) — regla (b): solo OC autorizada/recibida_parcial'
   it('recibir contra una OC en borrador (no autorizada) → ErrorConflicto', async () => {
     const oc = await crearOC(
       sesion(PERM),
-      { idProveedor: proveedor.id, lineas: [{ idAvio: avioBoton.id, cantidad: 100, precio: 5 }] },
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [{ idAvio: avioBoton.id, cantidad: 100, precio: 5 }],
+      },
       bd(),
     );
     const idLineaOC = oc.lineas[0]!.id;
@@ -253,6 +273,7 @@ describe('Recepción (F4-E3) — avío con conversión (R1)', () => {
     const oc = await crearOC(
       sesion(PERM),
       {
+        ...encabezadoOc(),
         idProveedor: proveedor.id,
         lineas: [
           {
@@ -441,7 +462,11 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
     // C: borrador (NO autorizada) → no entra en el resumen.
     await crearOC(
       sesion(PERM),
-      { idProveedor: proveedor.id, lineas: [{ idTela: telaFelpa.id, cantidad: 999, precio: 9 }] },
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: telaFelpa.id, cantidad: 999, precio: 9, cantidadComplemento: 1 }],
+      },
       bd(),
     );
 
@@ -464,7 +489,11 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
     // OC autorizada de OTRO proveedor: 10 @ 7 = 70 pendiente.
     const ocOtro = await crearOC(
       sesion(PERM),
-      { idProveedor: otro.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 7 }] },
+      {
+        ...encabezadoOc(),
+        idProveedor: otro.id,
+        lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 7, cantidadComplemento: 1 }],
+      },
       bd(),
     );
     await autorizarOC(sesion(PERM_AUTORIZAR), ocOtro.id, bd());
@@ -484,6 +513,7 @@ describe('Recepción (F4-E3) — línea LIBRE no inventaría', () => {
     const oc = await crearOC(
       sesion(PERM),
       {
+        ...encabezadoOc(),
         idProveedor: proveedor.id,
         lineas: [{ descripcionLibre: 'Flete', cantidad: 1, precio: 300 }],
       },

@@ -141,7 +141,12 @@ vi.mock('@/api/inventario-materiales', () => ({
   }),
   useCancelarTelaColor: () => ({ mutate: cancelarMutate, isPending: false }),
 }));
-vi.mock('@/api/telas', () => ({ useTelasCategorias: () => ({ data: { datos: [] } }) }));
+// `etiquetaUnidadTela` salió de la pantalla a `@/api/telas` para que todas escriban igual la
+// unidad (kg/m) — el mock la incluye porque la tabla la usa en cada renglón.
+vi.mock('@/api/telas', () => ({
+  useTelasCategorias: () => ({ data: { datos: [] } }),
+  etiquetaUnidadTela: (unidad: 'KG' | 'M') => (unidad === 'KG' ? 'kg' : 'm'),
+}));
 vi.mock('@/api/proveedores', () => ({ useProveedores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
 
