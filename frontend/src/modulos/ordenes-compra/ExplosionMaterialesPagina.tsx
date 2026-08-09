@@ -1,12 +1,14 @@
 import { Info, Printer, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 
+import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { Requerimiento } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
@@ -35,6 +37,19 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const explosion = useExplosion(idOrden ?? undefined);
   const generar = useGenerarOc();
 
+  /**
+   * §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo, incluidas las que
+   * genera esta pantalla. Se piden AQUÍ para que el servidor nunca tenga que adivinarlas: si se
+   * dejan en blanco, el dominio cae a la fecha de entrega de la orden y a la dirección favorita, y
+   * si tampoco existen, dice qué falta.
+   */
+  const [fechaEntrega, setFechaEntrega] = useState('');
+  const direcciones = useDireccionesEntregaActivas();
+  const listaDirecciones = direcciones.data?.datos ?? [];
+  const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
+  const direccionEfectiva =
+    idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? null;
+
   function elegirOrden(id: number): void {
     setIdOrden(id);
     setSeleccion(new Set());
@@ -58,7 +73,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
       return;
     }
     generar.mutate(
-      { idOrden, cuerpo: { idsRequerimiento: [...seleccion] } },
+      {
+        idOrden,
+        cuerpo: {
+          idsRequerimiento: [...seleccion],
+          ...(fechaEntrega === '' ? {} : { fechaEntrega }),
+          ...(direccionEfectiva === null ? {} : { idDireccionEntrega: direccionEfectiva }),
+        },
+      },
       { onSuccess: () => setSeleccion(new Set()) },
     );
   }
@@ -148,6 +170,40 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 >
                   <Printer aria-hidden /> Imprimir
                 </Button>
+                {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
+                    En blanco, el servidor usa la fecha de la orden y la dirección favorita. */}
+                <label className="text-xs text-muted-foreground">
+                  Entrega
+                  <Input
+                    className="mt-1"
+                    type="date"
+                    value={fechaEntrega}
+                    onChange={(e) => setFechaEntrega(e.target.value)}
+                    data-testid="exp-fecha-entrega"
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  Entregar en
+                  <SelectNativo
+                    className="mt-1"
+                    value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
+                    onChange={(e) =>
+                      setIdDireccionEntrega(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    data-testid="exp-direccion-entrega"
+                  >
+                    <option value="">
+                      {listaDirecciones.length === 0
+                        ? 'Sin direcciones dadas de alta'
+                        : 'La de siempre'}
+                    </option>
+                    {listaDirecciones.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.nombre}
+                      </option>
+                    ))}
+                  </SelectNativo>
+                </label>
                 <Button
                   size="sm"
                   onClick={generarOc}

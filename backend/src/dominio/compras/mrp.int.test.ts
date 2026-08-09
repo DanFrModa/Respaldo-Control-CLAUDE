@@ -28,7 +28,7 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
-import { autorizarOC } from './ordenes-compra.js';
+import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 import { recibirCompra } from './recepciones.js';
 import { estatusMaterialesOrden, explosionarOrden, generarOCDesdeExplosion } from './mrp.js';
 
@@ -75,6 +75,8 @@ async function crearOrden(): Promise<number> {
       idCliente: clienteNegocioId,
       estado: 'completa',
       fechaCompletada: new Date(),
+      // §Post-F9.18: la OC que genera el MRP hereda ESTA fecha de entrega (toda OC la exige).
+      fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
       lineas: {
         create: [
           {
@@ -107,6 +109,10 @@ beforeEach(async () => {
   const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
   clienteNegocioId = clienteNegocio.id;
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
+  // §Post-F9.18: la OC generada toma la dirección FAVORITA del catálogo.
+  await cliente.direccionEntrega.create({
+    data: { nombre: 'Naucalpan', direccion: 'Av. Siempre Viva 123', favorita: true },
+  });
   tallaCH = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
   tallaM = await cliente.talla.create({ data: { etiqueta: 'M', orden: 2 } });
   almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'AVIO' } });
@@ -705,5 +711,92 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
     expect(hilo?.existenciaStock).toBeCloseTo(50);
     expect(hilo?.cantidadAComprar).toBeCloseTo(60);
     expect(hilo?.estadoGenerico).toBe('faltante-parcial');
+  });
+});
+
+describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección sin inventar nada', () => {
+  let idOrden: number;
+
+  beforeEach(async () => {
+    idOrden = await crearOrden();
+  });
+
+  it('hereda la fecha de entrega de la ORDEN y la dirección FAVORITA del catálogo', async () => {
+    await explosionarOrden(sesion(), idOrden, bd());
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      { idsRequerimiento: [] },
+      bd(),
+    );
+
+    const primera = resultado.ordenesCompra[0];
+    expect(primera).toBeDefined();
+    const oc = await obtenerOC(sesion(), primera!.idOrdenCompra, bd());
+    expect(oc.fechaEntrega).toBe('2026-09-30');
+    expect(oc.direccionEntregaNombre).toBe('Naucalpan');
+  });
+
+  it('lo que manda la pantalla GANA sobre los respaldos', async () => {
+    const otra = await cliente.direccionEntrega.create({
+      data: { nombre: 'Bodega Montaño', direccion: 'Calle 5 #10' },
+    });
+    await explosionarOrden(sesion(), idOrden, bd());
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      { idsRequerimiento: [], fechaEntrega: '2026-12-01', idDireccionEntrega: otra.id },
+      bd(),
+    );
+
+    const oc = await obtenerOC(sesion(), resultado.ordenesCompra[0]!.idOrdenCompra, bd());
+    expect(oc.fechaEntrega).toBe('2026-12-01');
+    expect(oc.direccionEntregaNombre).toBe('Bodega Montaño');
+  });
+
+  it('sin fecha en la orden Y sin fecha capturada, dice QUÉ falta (no genera a medias)', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
+    await explosionarOrden(sesion(), idOrden, bd());
+
+    await expect(
+      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+    ).rejects.toThrow(/no tiene fecha de entrega/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('sin dirección favorita Y sin dirección capturada, dice QUÉ falta', async () => {
+    await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
+    await explosionarOrden(sesion(), idOrden, bd());
+
+    await expect(
+      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+    ).rejects.toThrow(/favorita/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('la OC generada de una tela CON complemento NO se puede autorizar hasta capturarlo', async () => {
+    // El BOM guarda un solo consumo por tela: la explosión no sabe cuánto Cardigan comprar.
+    await cliente.tela.update({
+      where: { id: telaFelpa.id },
+      data: { nombreComplemento: 'Cardigan' },
+    });
+    await explosionarOrden(sesion(), idOrden, bd());
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      { idsRequerimiento: [] },
+      bd(),
+    );
+
+    // La OC de la TELA existe (nació con el complemento pendiente, a propósito)…
+    const idsOc = resultado.ordenesCompra.map((o) => o.idOrdenCompra);
+    const conTela = await cliente.ordenCompra.findFirstOrThrow({
+      where: { id: { in: idsOc }, lineas: { some: { idTela: telaFelpa.id } } },
+      select: { id: true },
+    });
+    // …pero autorizarla exige capturar el Cardigan.
+    await expect(
+      autorizarOC(sesion(['compras.ver', 'compras.autorizar']), conTela.id, bd()),
+    ).rejects.toThrow(/Cardigan/);
   });
 });
