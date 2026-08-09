@@ -34,6 +34,10 @@ import { sesionEtl } from './comun/sesion-etl.js';
 import { describirVentana, resolverVentana, type ConfigVentana } from './comun/ventana.js';
 import { cargarNotasSalida, type ResultadoNotasSalida } from './loaders/notas-salida.js';
 import { cargarOrdenesCompra, type ResultadoOrdenesCompra } from './loaders/ordenes-compra.js';
+import { repararSecuencias } from './reparar-secuencias.js';
+
+import { CLAVE_SECUENCIA_ORDEN_COMPRA } from '../src/dominio/compras/ordenes-compra.js';
+import { CLAVE_SECUENCIA_NOTA_SALIDA } from '../src/dominio/notas/notas-salida.js';
 
 /** Resultado consolidado del ETL (para el resumen y los tests). */
 export interface ResultadoEtlComprasNotas {
@@ -83,6 +87,18 @@ export async function ejecutarEtlComprasNotas(
     notas.notas,
     `(lineas=${String(notas.lineas)} fueraVentana=${String(notas.fueraVentana)})`,
   );
+
+  // ⭐ Las OC y las notas se migran con su folio EXPLÍCITO del sistema viejo → hay que ADELANTAR sus
+  // secuencias al máximo migrado. Sin esto la primera captura nueva arranca en folio 1: se va al
+  // final del listado (que ordena descendente) y puede chocar contra el unique (idEmpresa, folio).
+  // (Defecto §Post-F9.17 reportado por Daniel: "hice la OC pero al refrescar el listado, no la veo".)
+  console.log('ETL de compras + notas F4-E6 (Pieza A) — sembrando secuencias');
+  for (const linea of await repararSecuencias(cliente, [
+    CLAVE_SECUENCIA_ORDEN_COMPRA,
+    CLAVE_SECUENCIA_NOTA_SALIDA,
+  ])) {
+    console.log(linea);
+  }
 
   console.log('ETL de compras + notas F4-E6 (Pieza A) — fin de carga');
   return { reporte, ventana, ocs, notas };
