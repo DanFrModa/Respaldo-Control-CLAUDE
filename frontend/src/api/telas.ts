@@ -161,11 +161,20 @@ export function useTela(id: number | undefined): UseQueryResult<Tela, ErrorDeApi
 }
 
 /** Lista telas con los filtros dados (mantiene la pagina previa al paginar/buscar). */
-export function useTelas(query: TelasQuery): UseQueryResult<TelasPagina, ErrorDeApi> {
+export function useTelas(
+  query: TelasQuery,
+  /**
+   * `enabled: false` apaga la consulta mientras el universo no está definido — p. ej. la captura de
+   * una OC antes de elegir proveedor: pedir "todas" ofrecería telas que esa OC no puede comprar
+   * (§Post-F9.15).
+   */
+  opciones?: { enabled?: boolean },
+): UseQueryResult<TelasPagina, ErrorDeApi> {
   return useQuery({
     queryKey: claveListaTelas(query),
     queryFn: () => listarTelas(query),
     placeholderData: keepPreviousData,
+    enabled: opciones?.enabled ?? true,
   });
 }
 

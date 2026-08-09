@@ -16,7 +16,10 @@ import { ocDePrueba } from './fixtures';
 const { espiaRolProveedor } = vi.hoisted(() => ({ espiaRolProveedor: vi.fn() }));
 
 const PROVEEDORES_POR_ROL: Record<string, { id: number; nombre: string }[]> = {
-  'vende-telas': [{ id: 5, nombre: 'Telas del Norte' }],
+  'vende-telas': [
+    { id: 5, nombre: 'Telas del Norte' },
+    { id: 21, nombre: 'Bloom Textil' },
+  ],
   'vende-avios': [{ id: 9, nombre: 'Avíos Monterrey' }],
   // Sin acotar: el catálogo completo (incluye un maquilero, que no vende material).
   todos: [
@@ -41,7 +44,22 @@ vi.mock('@/api/ordenes-compra', () => ({
   useCrearOc: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarOc: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock('@/api/telas', () => ({ useTelas: () => ({ data: { datos: [] } }) }));
+const espiaTelasQuery = vi.fn<(query: { idProveedor?: number }, opciones?: unknown) => void>();
+const TELAS_POR_PROVEEDOR: Record<number, { id: number; nombre: string }[]> = {
+  5: [{ id: 30, nombre: 'Felpa Alsatex' }],
+  21: [{ id: 40, nombre: 'Mesh Bloom' }],
+};
+vi.mock('@/api/telas', () => ({
+  useTelas: (query: { idProveedor?: number }, opciones?: { enabled?: boolean }) => {
+    espiaTelasQuery(query, opciones);
+    return {
+      data: {
+        datos:
+          query.idProveedor === undefined ? [] : (TELAS_POR_PROVEEDOR[query.idProveedor] ?? []),
+      },
+    };
+  },
+}));
 vi.mock('@/api/avios', () => ({ useAvios: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/tallas', () => ({ useTallasActivas: () => ({ data: { datos: [] } }) }));
@@ -75,7 +93,7 @@ describe('DialogoEditarOc · proveedor acotado por los renglones', () => {
   it('en una OC nueva (renglón de tela por defecto) solo lista proveedores de telas', () => {
     montar();
     expect(espiaRolProveedor).toHaveBeenCalledWith('vende-telas');
-    expect(opcionesProveedor()).toEqual(['Telas del Norte']);
+    expect(opcionesProveedor()).toEqual(['Telas del Norte', 'Bloom Textil']);
     expect(screen.getByTestId('oc-proveedor-ayuda')).toHaveTextContent('«Vende telas»');
   });
 
@@ -106,5 +124,42 @@ describe('DialogoEditarOc · proveedor acotado por los renglones', () => {
     const selector = screen.getByTestId('oc-proveedor');
     expect(selector).toHaveValue('12');
     expect(within(selector).getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
+  });
+});
+
+describe('DialogoEditarOc · la tela es DEL proveedor (§Post-F9.15)', () => {
+  it('sin proveedor NO consulta telas y el combo lo explica', () => {
+    montar();
+
+    // La consulta queda APAGADA: pedir "todas" ofrecería telas que esta OC no puede comprar.
+    const primeraLlamada = espiaTelasQuery.mock.calls[0];
+    expect(primeraLlamada?.[0]).not.toHaveProperty('idProveedor');
+    expect(primeraLlamada?.[1]).toEqual({ enabled: false });
+    expect(screen.getByTestId('selector-tela-oc')).toHaveTextContent('Elige primero el proveedor');
+  });
+
+  it('al elegir proveedor solo ofrece SUS telas', () => {
+    montar();
+    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+
+    const selector = screen.getByTestId('selector-tela-oc');
+    expect(within(selector).getByRole('option', { name: 'Felpa Alsatex' })).toBeInTheDocument();
+    expect(within(selector).queryByRole('option', { name: 'Mesh Bloom' })).not.toBeInTheDocument();
+  });
+
+  it('cambiar de proveedor LIMPIA las telas capturadas (eran de otro) y avisa', () => {
+    montar();
+    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+    fireEvent.change(screen.getByTestId('selector-tela-oc'), { target: { value: '30' } });
+    expect(screen.getByTestId('selector-tela-oc')).toHaveValue('30');
+
+    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '21' } });
+    // El renglón se conserva, pero su tela se vacía: hay que elegir una del proveedor nuevo.
+    expect(screen.getByTestId('selector-tela-oc')).toHaveValue('');
+    expect(
+      within(screen.getByTestId('selector-tela-oc')).getByRole('option', {
+        name: 'Mesh Bloom',
+      }),
+    ).toBeInTheDocument();
   });
 });

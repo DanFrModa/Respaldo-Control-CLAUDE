@@ -48,6 +48,12 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     - *Histórico:* entre **B1** (6-ago) y **§Post-F9.14** (7-ago) esta misma función recibía TELA por
       color creando su `PartidaTela`; ese código se retiró al dejar una sola puerta. Las recepciones
       de tela creadas en ese lapso siguen vivas y son idénticas a las que escribe la factura.
+    - **La TELA es DEL proveedor de la OC (§Post-F9.15):** `validarLineas` rechaza un renglón cuya
+      tela tenga otro dueño (`Tela.idProveedor`), nombrando al dueño real; al EDITAR se valida
+      contra el proveedor que va a quedar. **Excepción deliberada:** tela sin dueño (migrada) pasa
+      —bloquearla dejaría OCs viejas inmodificables, y el catálogo se captura desde cero—. La
+      pantalla acota el selector al proveedor y **no consulta telas hasta tener uno**; cambiar de
+      proveedor limpia las telas capturadas. El servidor es la autoridad (A1); el filtro es ayuda.
   - `mrp.ts` — el **corazón MRP** (R3/R7):
     - `explosionarOrden` — requerido = `consumoPorPrenda` del BOM con bandera `paraProduccion` ×
       Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. Persiste el

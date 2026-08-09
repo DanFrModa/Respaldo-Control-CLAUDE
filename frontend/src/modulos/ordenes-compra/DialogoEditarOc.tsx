@@ -86,7 +86,6 @@ export function DialogoEditarOc({
   const esEdicion = oc !== undefined;
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
-  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const avios = useAvios({ pagina: 1, porPagina: 100 });
   const colores = useColores({
     pagina: 1,
@@ -113,6 +112,19 @@ export function DialogoEditarOc({
    * la mano se puede seguir mostrando como opción y respetar lo capturado.
    */
   const [nombreProveedor, setNombreProveedor] = useState('');
+
+  // §Post-F9.15 — SOLO las telas de ESTE proveedor: la tela es DEL proveedor (su dueño es parte de
+  // su identidad desde A1). Sin proveedor elegido todavía no hay universo, así que la consulta
+  // queda apagada: pedir "todas" ofrecería telas que esta OC no puede comprar.
+  const telas = useTelas(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      ...(idProveedor === null ? {} : { idProveedor }),
+    },
+    { enabled: idProveedor !== null },
+  );
 
   // Rol al que se acota la lista, recalculado con cada cambio de renglones.
   const rolProveedor = useMemo(() => rolSegunRenglones(renglones), [renglones]);
@@ -221,6 +233,20 @@ export function DialogoEditarOc({
                   const id = valor === '' ? null : Number(valor);
                   setIdProveedor(id);
                   setNombreProveedor(listaProveedores.find((p) => p.id === id)?.nombre ?? '');
+                  // §Post-F9.15: las telas ya capturadas son de OTRO proveedor. Se limpian (el
+                  // renglón se conserva) y se avisa, en vez de dejar que el servidor rechace el
+                  // guardado al final con la orden entera ya tecleada.
+                  setRenglones((previos) => {
+                    if (!previos.some((r) => r.tipo === 'tela' && r.idTela !== null)) {
+                      return previos;
+                    }
+                    toast.warning(
+                      'Cambiaste de proveedor: las telas capturadas eran de otro, hay que elegirlas de nuevo.',
+                    );
+                    return previos.map((r) =>
+                      r.tipo === 'tela' && r.idTela !== null ? { ...r, idTela: null } : r,
+                    );
+                  });
                 }}
                 data-testid="oc-proveedor"
               >
@@ -307,6 +333,11 @@ export function DialogoEditarOc({
               renglones={renglones}
               alCambiar={setRenglones}
               telas={telas.data?.datos ?? []}
+              mensajeSinTelas={
+                idProveedor === null
+                  ? 'Elige primero el proveedor…'
+                  : 'Este proveedor no tiene telas dadas de alta'
+              }
               avios={avios.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
               colores={colores.data?.datos ?? []}
