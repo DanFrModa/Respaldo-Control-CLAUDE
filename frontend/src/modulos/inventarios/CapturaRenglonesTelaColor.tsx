@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import type { Tela } from '@/api/telas';
+import { useTela, type Tela } from '@/api/telas';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,7 @@ export function CapturaRenglonesTelaColor({
   conLoteProveedor = false,
   conPrecios = false,
   lineasOc,
+  idProveedorTelas,
 }: {
   renglones: RenglonTelaColor[];
   onChange: (renglones: RenglonTelaColor[]) => void;
@@ -79,11 +80,15 @@ export function CapturaRenglonesTelaColor({
   /** Muestra y captura los precios unitarios de cuerpo y complemento (B1). */
   conPrecios?: boolean;
   /**
-   * Renglones de OC pendientes del proveedor (§Post-F9.14). `undefined` = esta pantalla no liga a
-   * órdenes de compra (ajuste, traspaso, salida); un arreglo (aunque sea vacío) enciende el
-   * selector "Renglón de OC" del alta y su columna en la tabla.
+   * Renglones de OC PENDIENTES de recibir (§Post-F9.14, replanteado en §Post-F9.15). `undefined` =
+   * esta pantalla no liga a órdenes de compra (ajuste, traspaso, salida). Con un arreglo se pinta el
+   * panel "Pendiente de la orden de compra": cada renglón trae su botón **Capturar**, que precarga
+   * la tela, la cantidad que falta y el precio de la OC — así la liga NO se teclea ni se busca en un
+   * combo, sale de la orden. Sigue siendo posible agregar un renglón a mano (tela suelta).
    */
   lineasOc?: readonly LineaOcPendiente[];
+  /** Acota las telas del buscador al proveedor DUEÑO (§Post-F9.15). */
+  idProveedorTelas?: number | undefined;
 }): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
   const [idTelaColor, setIdTelaColor] = useState<string>('');
@@ -93,6 +98,13 @@ export function CapturaRenglonesTelaColor({
   const [precioUnit, setPrecioUnit] = useState<string>('');
   const [precioComplemento, setPrecioComplemento] = useState<string>('');
   const [idLineaOc, setIdLineaOc] = useState<string>('');
+  /**
+   * Renglón de OC cuyo "Capturar" se acaba de pulsar: se guarda mientras llega la tela por su id
+   * (`useTela` trae sus colores, que el buscador paginado podría no tener a mano). En cuanto llega,
+   * el efecto de abajo llena el formulario y esto se limpia.
+   */
+  const [pendientePrecargando, setPendientePrecargando] = useState<LineaOcPendiente | null>(null);
+  const telaPrecargada = useTela(pendientePrecargando?.idTela);
 
   const llevaComplemento = tela !== undefined && tela.nombreComplemento !== null;
   const colorElegido = tela?.colores.find((c) => String(c.id) === idTelaColor);
@@ -124,6 +136,23 @@ export function CapturaRenglonesTelaColor({
     setPrecioUnit(color?.precio == null ? '' : String(color.precio));
     setPrecioComplemento(color?.precioComplemento == null ? '' : String(color.precioComplemento));
   }
+
+  // Aplica la precarga en cuanto llega la tela: cantidad = lo que FALTA de la OC y precio = el de la
+  // orden (los dos editables — lo que llegó puede no ser lo pedido). El color NO se adivina: la OC
+  // no lo define y es justo lo que el usuario tiene que capturar.
+  useEffect(() => {
+    const pendiente = pendientePrecargando;
+    const datos = telaPrecargada.data;
+    if (pendiente === null || datos === undefined || datos.id !== pendiente.idTela) {
+      return;
+    }
+    setTela(datos);
+    setIdTelaColor('');
+    setCantidad(String(pendiente.pendiente));
+    setPrecioUnit(String(pendiente.precio));
+    setIdLineaOc(String(pendiente.idOrdenCompraLinea));
+    setPendientePrecargando(null);
+  }, [pendientePrecargando, telaPrecargada.data]);
 
   function agregar(): void {
     if (tela === undefined || colorElegido === undefined || !cantidadesValidas) return;
@@ -187,12 +216,55 @@ export function CapturaRenglonesTelaColor({
 
   return (
     <div className="space-y-4" data-testid="captura-renglones-tela-color">
+      {/* §Post-F9.15 — PENDIENTE DE LA ORDEN DE COMPRA. Es el punto de partida que pidió Daniel
+          ("mejor recibir las telas a partir de las OC"): la tela y la cantidad salen de la orden, no
+          se eligen. Solo falta decir de qué COLOR llegó, que es lo que la OC no define. */}
+      {lineasOc !== undefined && lineasOc.length > 0 ? (
+        <div className="space-y-2 rounded-md border border-primary/40 bg-primary-soft p-3">
+          <p className="text-sm font-medium">Pendiente de la orden de compra</p>
+          <ul className="space-y-1.5" data-testid="captura-color-pendientes-oc">
+            {lineasOc.map((l) => {
+              const yaCapturado = renglones.some(
+                (r) => r.idOrdenCompraLinea === l.idOrdenCompraLinea,
+              );
+              return (
+                <li
+                  key={l.idOrdenCompraLinea}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span>
+                    <strong>{l.tela}</strong> · faltan {l.pendiente.toLocaleString('es-MX')}
+                    {l.unidad === null ? '' : ` ${l.unidad}`}
+                    <span className="text-muted-foreground"> · OC {l.numCompra}</span>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={yaCapturado ? 'ghost' : 'outline'}
+                    disabled={soloLectura}
+                    onClick={() => setPendientePrecargando(l)}
+                    data-testid={`captura-color-capturar-oc-${l.idOrdenCompraLinea}`}
+                  >
+                    {yaCapturado ? 'Capturar otro renglón' : 'Capturar'}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Al capturar, la tela y la cantidad salen de la orden. Solo elige el color que llegó (y
+            el lote, si lo traes); las cantidades y el precio se pueden ajustar.
+          </p>
+        </div>
+      ) : null}
+
       <div className="space-y-3 rounded-md border p-3">
         <p className="text-sm font-medium">Agregar renglón (tela → color → cantidades)</p>
         <SelectorTela
           idSeleccionado={tela?.id}
           etiquetaSeleccion={tela?.nombre}
           alSeleccionar={elegirTela}
+          {...(idProveedorTelas === undefined ? {} : { idProveedor: idProveedorTelas })}
           testid="captura-color-tela"
         />
         {tela !== undefined ? (
@@ -260,32 +332,6 @@ export function CapturaRenglonesTelaColor({
                   disabled={soloLectura}
                   data-testid="captura-color-lote-prov"
                 />
-              </Field>
-            ) : null}
-            {/* §Post-F9.14 — a qué renglón de OC surte este renglón. Solo se ofrecen los
-                pendientes de LA MISMA tela: ligar felpa contra una OC de otra tela es un error que
-                el servidor rechazaría, y aquí ni siquiera se puede cometer. */}
-            {lineasOc !== undefined ? (
-              <Field>
-                <FieldLabel htmlFor="captura-color-oc">Renglón de OC</FieldLabel>
-                <SelectNativo
-                  id="captura-color-oc"
-                  value={idLineaOc}
-                  onChange={(e) => setIdLineaOc(e.target.value)}
-                  disabled={soloLectura}
-                  data-testid="captura-color-oc"
-                >
-                  <option value="">Sin orden de compra</option>
-                  {lineasOc
-                    .filter((l) => l.idTela === tela.id)
-                    .map((l) => (
-                      <option key={l.idOrdenCompraLinea} value={String(l.idOrdenCompraLinea)}>
-                        {`OC ${String(l.numCompra)} · faltan ${l.pendiente.toLocaleString('es-MX')}${
-                          l.unidad === null ? '' : ` ${l.unidad}`
-                        }`}
-                      </option>
-                    ))}
-                </SelectNativo>
               </Field>
             ) : null}
             {conPrecios ? (

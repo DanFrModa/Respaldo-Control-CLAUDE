@@ -62,6 +62,14 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   sola a `recibida_parcial`/`recibida_total` (R7) y sale el evento `material-recibido` (RC). Al
   CANCELAR, esas recepciones se reversan (suave) y la OC vuelve a pendiente. **`recibirCompra` ya
   NO recibe tela** (ver [`compras-mrp.md`](compras-mrp.md)): una sola puerta.
+- **Punto de partida: la ORDEN DE COMPRA (§Post-F9.15, replanteo del anterior):** botón "Dar entrada
+  a la tela" en la OC → `state: { idOrdenCompra, idProveedor }` a la captura, que fija el proveedor
+  (deshabilitado) y pinta el panel "Pendiente de la orden de compra" (`GET
+  /api/compras/lineas-tela-pendientes?idProveedor&idOrdenCompra`); cada renglón precarga tela +
+  pendiente + precio + la liga con un clic. **Se retiró** el selector "Renglón de OC". Y el buscador
+  de telas se acota al **proveedor DUEÑO** (`listarTelas` gana el filtro `idProveedor`, ESTRICTO: las
+  migradas sin dueño no aparecen). La contabilidad de §Post-F9.14 NO cambió: esto es el punto de
+  entrada, no el mecanismo.
 - **Almacén ligado a su CORTADOR (§Post-F9.13, 7-ago-2026):** `Almacen.idCortador` (nullable,
   **único**, FK Restrict a `Proveedor`) validado en `dominio/admin/almacenes.ts` — solo tipo TELA,
   proveedor activo con rol `corte`, y un cortador = un almacén (si no, "el almacén de este cortador"

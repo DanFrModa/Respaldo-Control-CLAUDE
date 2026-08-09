@@ -22,9 +22,14 @@ export type LineaTelaPendiente = LineasTelaPendientesRespuesta['datos'][number];
 /** Clave raíz de la caché. */
 export const CLAVE_LINEAS_TELA_PENDIENTES = ['compras', 'lineas-tela-pendientes'] as const;
 
-async function listar(idProveedor: number): Promise<LineaTelaPendiente[]> {
+async function listar(
+  idProveedor: number,
+  idOrdenCompra: number | undefined,
+): Promise<LineaTelaPendiente[]> {
   const { data, error } = await api.GET('/api/compras/lineas-tela-pendientes', {
-    params: { query: { idProveedor } },
+    params: {
+      query: { idProveedor, ...(idOrdenCompra === undefined ? {} : { idOrdenCompra }) },
+    },
   });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -39,10 +44,12 @@ async function listar(idProveedor: number): Promise<LineaTelaPendiente[]> {
  */
 export function useLineasTelaPendientes(
   idProveedor: number | undefined,
+  /** Acota a UNA orden de compra (§Post-F9.15: la entrada arranca desde ella). */
+  idOrdenCompra?: number,
 ): UseQueryResult<LineaTelaPendiente[], ErrorDeApi> {
   return useQuery({
-    queryKey: [...CLAVE_LINEAS_TELA_PENDIENTES, idProveedor ?? 0],
-    queryFn: () => listar(idProveedor as number),
+    queryKey: [...CLAVE_LINEAS_TELA_PENDIENTES, idProveedor ?? 0, idOrdenCompra ?? 0],
+    queryFn: () => listar(idProveedor as number, idOrdenCompra),
     enabled: idProveedor !== undefined,
   });
 }

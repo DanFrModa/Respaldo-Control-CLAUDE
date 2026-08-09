@@ -625,6 +625,17 @@ export const esquemaListarTelas = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(150).optional(),
   idCategoria: z.number().int().positive().optional(),
   idColor: z.number().int().positive().optional(),
+  /**
+   * Filtra por el proveedor DUEÑO de la tela (§Post-F9.15, petición de Daniel 7-ago-2026: *"cada
+   * proveedor de telas tiene sus telas definidas. No puedo meter una felpa alsatex en el proveedor
+   * bloom"*). La identidad de la tela YA incluye a su dueño desde A1 (§Post-F9.11); esto es lo que
+   * permite que las capturas lo respeten en vez de ofrecer el catálogo entero.
+   *
+   * Filtro ESTRICTO: las telas migradas sin dueño (`idProveedor` NULL) NO aparecen. Es lo correcto
+   * — el catálogo se captura desde cero y las migradas quedan como dato informativo del histórico
+   * de consumos (acuerdo con Daniel, 7-ago-2026).
+   */
+  idProveedor: z.number().int().positive().optional(),
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['nombre', 'creadoEn']).default('nombre'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
@@ -1558,6 +1569,7 @@ export async function listarTelas(
     // `idColor` es un filtro LEGACY (§Post-F9.11): pesca por la liga al color de PRENDA que
     // conservan las filas MIGRADAS; los colores nuevos (idColor NULL) no participan.
     ...(filtros.idColor === undefined ? {} : { colores: { some: { idColor: filtros.idColor } } }),
+    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
     ...(busqueda === undefined || busqueda === ''
       ? {}
       : {

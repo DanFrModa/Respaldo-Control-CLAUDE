@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -38,6 +38,17 @@ type TipoDocumento = 'factura' | 'remision';
  * factura y revisarlo antes de confirmarlo desde la lista. La misma pantalla EDITA un borrador
  * (ruta `…/:id/editar`); una entrada confirmada ya no se edita (D3, lo rechaza el backend).
  * Permiso `inventario-telas.mover`.
+ *
+ * §Post-F9.15 — DOS puntos de partida, y el bueno es el segundo:
+ *  • **desde cero** (menú): la factura de tela SUELTA, sin orden de compra;
+ *  • **desde la ORDEN DE COMPRA** (deep-link `state.idOrdenCompra`, botón "Dar entrada a la tela"):
+ *    llega con el PROVEEDOR FIJO —lo define la orden— y con el panel de lo que falta por recibir de
+ *    esa OC, de donde se capturan los renglones con un clic. Es lo que pidió Daniel: *"mejor recibir
+ *    las telas a partir de las OC. La buscamos ahí y damos la entrada desde allá"*.
+ *
+ * En ambos casos el buscador de telas se acota a las telas del PROVEEDOR DUEÑO (§Post-F9.15): *"cada
+ * proveedor de telas tiene sus telas definidas. No puedo meter una felpa alsatex en el proveedor
+ * bloom"*.
  */
 export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -54,6 +65,22 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
 
+  // DEEP-LINK desde la orden de compra (§Post-F9.15). Se lee UNA vez al montar. El PROVEEDOR viaja
+  // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
+  // el emisor sabe; y queda FIJO, porque cambiarlo dejaría los renglones ligados a otra orden.
+  const location = useLocation();
+  const [deepLinkOc] = useState<{ idOrdenCompra: number; idProveedor: number } | null>(() => {
+    const state: unknown = location.state;
+    if (typeof state !== 'object' || state === null) return null;
+    const datos = state as Record<string, unknown>;
+    const idOrdenCompra = datos.idOrdenCompra;
+    const idProveedor = datos.idProveedor;
+    const entero = (v: unknown): v is number =>
+      typeof v === 'number' && Number.isInteger(v) && v > 0;
+    return entero(idOrdenCompra) && entero(idProveedor) ? { idOrdenCompra, idProveedor } : null;
+  });
+  const idOcDeepLink = deepLinkOc?.idOrdenCompra ?? null;
+
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
@@ -66,10 +93,21 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const proveedores = useProveedoresPorRol(COD_ROL_PROVEEDOR.vendeTelas);
   // §Post-F9.14 — renglones de OC pendientes de ESTE proveedor, para amarrar cada renglón de la
   // factura a su orden de compra. Sin proveedor elegido todavía no hay nada que ofrecer.
-  const lineasOc = useLineasTelaPendientes(idProveedor === '' ? undefined : Number(idProveedor));
+  const lineasOc = useLineasTelaPendientes(
+    idProveedor === '' ? undefined : Number(idProveedor),
+    idOcDeepLink ?? undefined,
+  );
   const existente = useEntradaTela(idEditar);
   const crear = useCrearEntradaTela();
   const actualizar = useActualizarEntradaTela();
+
+  // Llegando DESDE la OC: el proveedor se fija con el de la orden (una vez, sin pisar lo que ya
+  // hubiera en un borrador que se esté editando).
+  const proveedorDeLaOc = deepLinkOc?.idProveedor;
+  useEffect(() => {
+    if (proveedorDeLaOc === undefined) return;
+    setIdProveedor((actual) => (actual === '' ? String(proveedorDeLaOc) : actual));
+  }, [proveedorDeLaOc]);
 
   // Al EDITAR: precarga el borrador una vez que llega del servidor.
   useEffect(() => {
@@ -257,7 +295,8 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 id="entrada-proveedor"
                 value={idProveedor}
                 onChange={(e) => setIdProveedor(e.target.value)}
-                disabled={!editable}
+                // Llegando desde la OC el proveedor NO se cambia: lo define la orden.
+                disabled={!editable || idOcDeepLink !== null}
                 data-testid="entrada-proveedor"
               >
                 <option value="">Elige el proveedor…</option>
@@ -271,7 +310,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 ))}
               </SelectNativo>
               <p className="text-xs text-muted-foreground" data-testid="entrada-proveedor-ayuda">
-                Solo proveedores con el rol «Vende telas».
+                {idOcDeepLink === null
+                  ? 'Solo proveedores con el rol «Vende telas».'
+                  : 'Lo define la orden de compra desde la que entraste.'}
               </p>
             </Field>
             <Field>
@@ -321,10 +362,11 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             soloLectura={!puedeMover}
             conLoteProveedor
             conPrecios
-            // §Post-F9.14: el selector "Renglón de OC" aparece en cuanto hay proveedor elegido.
-            // Un arreglo vacío igual lo enciende (dice "Sin orden de compra"), que es lo correcto:
-            // significa "este proveedor no tiene OCs abiertas de tela", no "no se puede ligar".
-            {...(idProveedor === '' ? {} : { lineasOc: lineasOc.data ?? [] })}
+            // §Post-F9.15: el panel "Pendiente de la orden de compra" solo tiene sentido llegando
+            // desde una OC; en la captura suelta (tela sin orden) no se pinta.
+            {...(idOcDeepLink === null ? {} : { lineasOc: lineasOc.data ?? [] })}
+            // Y el buscador de telas se acota a las del proveedor DUEÑO.
+            {...(idProveedor === '' ? {} : { idProveedorTelas: Number(idProveedor) })}
           />
 
           <div className="flex items-center justify-end gap-3">

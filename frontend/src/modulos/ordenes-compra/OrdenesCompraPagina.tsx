@@ -7,6 +7,7 @@ import {
   Copy,
   Factory,
   FileText,
+  PackagePlus,
   Pencil,
   Plus,
   Printer,
@@ -17,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
@@ -111,6 +113,7 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * (parcial/total). Nada se deriva/pivotea en cliente.
  */
 export function OrdenesCompraPagina(): React.JSX.Element {
+  const navigate = useNavigate();
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('compras.administrar');
   const puedeAutorizar = tienePermiso('compras.autorizar');
@@ -119,6 +122,8 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   // precedente del proyecto (TiposProcesoPagina). Debe coincidir con el permiso del backend para no
   // ofrecer un "Editar" que se coma un 409.
   const esAdmin = tienePermiso('roles.administrar');
+  // §Post-F9.15: dar entrada a la tela es capturar su factura → permiso de inventario de telas.
+  const puedeMoverTelas = tienePermiso('inventario-telas.mover');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -199,6 +204,20 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       },
       onError: (error) => toast.error(error.message),
     });
+  }
+
+  /**
+   * ¿Se puede dar entrada a la TELA de esta OC (§Post-F9.15)? Solo con OC recibible y con al menos
+   * un renglón de tela. No se mira el pendiente aquí: eso lo calcula el servidor y lo muestra el
+   * panel de la captura — ocultar el botón por un cálculo de cliente escondería el caso "ya está
+   * todo recibido pero quiero ver por qué".
+   */
+  function puedeRecibirTelaDeLaOc(oc: OrdenCompra): boolean {
+    return (
+      puedeMoverTelas &&
+      (oc.estatus === 'autorizada' || oc.estatus === 'recibida_parcial') &&
+      oc.lineas.some((l) => l.idTela !== null)
+    );
   }
 
   /** ¿La OC se puede editar desde la UI? (el backend re-decide; admin puede tocar autorizadas). */
@@ -561,6 +580,28 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                 >
                   <Copy aria-hidden />
                   Duplicar
+                </Button>
+              ) : null}
+              {/* §Post-F9.15 (Daniel): "mejor recibir las telas a partir de las OC. La buscamos
+                  ahí y damos la entrada desde allá". Abre la captura de la factura con el proveedor
+                  fijo y el panel de lo que falta por recibir de ESTA orden. Solo aparece si la OC
+                  está recibible y tiene renglones de tela. */}
+              {puedeRecibirTelaDeLaOc(seleccion) ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void navigate('/inventarios/telas/entradas/nueva', {
+                      state: {
+                        idOrdenCompra: seleccion.id,
+                        idProveedor: seleccion.idProveedor,
+                      },
+                    })
+                  }
+                  data-testid="entrada-tela-oc"
+                >
+                  <PackagePlus aria-hidden />
+                  Dar entrada a la tela
                 </Button>
               ) : null}
               {puedeAutorizar && seleccion.estatus === 'pendiente_autorizacion' ? (

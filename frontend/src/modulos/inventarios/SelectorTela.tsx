@@ -16,6 +16,7 @@ export function SelectorTela({
   etiquetaSeleccion,
   alSeleccionar,
   alLimpiar,
+  idProveedor,
   testid = 'selector-tela',
 }: {
   idSeleccionado: number | undefined;
@@ -29,6 +30,13 @@ export function SelectorTela({
   alSeleccionar: (tela: Tela) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
   alLimpiar?: () => void;
+  /**
+   * Acota la búsqueda a las telas de ESE proveedor DUEÑO (§Post-F9.15, petición de Daniel:
+   * *"cada proveedor de telas tiene sus telas definidas. No puedo meter una felpa alsatex en el
+   * proveedor bloom"*). El filtro lo aplica el SERVIDOR y es estricto: las telas migradas sin dueño
+   * no aparecen (el catálogo se captura desde cero — acuerdo del 7-ago-2026).
+   */
+  idProveedor?: number | undefined;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -39,6 +47,7 @@ export function SelectorTela({
     ordenarPor: 'nombre',
     direccion: 'asc',
     ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(idProveedor === undefined ? {} : { idProveedor }),
   });
 
   const telas = consulta.data?.datos ?? [];
