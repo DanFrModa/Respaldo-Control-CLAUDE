@@ -425,3 +425,71 @@ describe('OC (F4-E2) — filtro por orden de producción (R7, pantalla "Compras 
     expect(lista.datos).toHaveLength(0);
   });
 });
+
+describe('OC (§Post-F9.15) — la TELA es DEL proveedor de la orden', () => {
+  it('rechaza comprarle a un proveedor una tela que es de OTRO, y dice de quién es', async () => {
+    const bloom = await cliente.proveedor.create({ data: { nombre: 'Bloom Textil' } });
+    const felpaDeBloom = await cliente.tela.create({
+      data: { nombre: 'Felpa Bloom', idProveedor: bloom.id },
+    });
+
+    // `proveedor` (Telas del Norte) no puede surtir una tela cuyo dueño es Bloom.
+    await expect(
+      crearOC(
+        sesion(PERM_ADMIN_OC),
+        {
+          idProveedor: proveedor.id,
+          lineas: [{ idTela: felpaDeBloom.id, cantidad: 10, precio: 1 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Bloom Textil/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('acepta la tela cuyo dueño ES el proveedor de la orden', async () => {
+    const propia = await cliente.tela.create({
+      data: { nombre: 'Felpa del Norte', idProveedor: proveedor.id },
+    });
+    const oc = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { idProveedor: proveedor.id, lineas: [{ idTela: propia.id, cantidad: 10, precio: 1 }] },
+      bd(),
+    );
+    expect(oc.lineas).toHaveLength(1);
+  });
+
+  it('una tela MIGRADA sin dueño se deja pasar (no traba las OCs viejas)', async () => {
+    // `tela` de las fixtures nace sin `idProveedor`: es el caso del catálogo migrado.
+    const oc = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { idProveedor: proveedor.id, lineas: [{ idTela: tela.id, cantidad: 5, precio: 2 }] },
+      bd(),
+    );
+    expect(oc.lineas).toHaveLength(1);
+  });
+
+  it('al EDITAR cambiando de proveedor, las telas deben ser del NUEVO', async () => {
+    const propia = await cliente.tela.create({
+      data: { nombre: 'Felpa del Norte', idProveedor: proveedor.id },
+    });
+    const oc = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { idProveedor: proveedor.id, lineas: [{ idTela: propia.id, cantidad: 10, precio: 1 }] },
+      bd(),
+    );
+    const bloom = await cliente.proveedor.create({ data: { nombre: 'Bloom Textil' } });
+
+    await expect(
+      actualizarOC(
+        sesion(PERM_ADMIN_OC),
+        oc.id,
+        {
+          idProveedor: bloom.id,
+          lineas: [{ idTela: propia.id, cantidad: 10, precio: 1 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Telas del Norte/);
+  });
+});

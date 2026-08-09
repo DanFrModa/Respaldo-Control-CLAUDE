@@ -200,12 +200,22 @@ function esAdmin(sesion: SesionUsuario): boolean {
  *  • Si trae matriz, el par (color, talla) no se repite, color/talla existen, y la SUMA de la
  *    matriz = la `cantidad` del renglón.
  *  • Si liga una orden de producción (`idOrden`), esa orden existe y es de la empresa activa (A9).
+ *  • **La TELA es DEL proveedor de la OC** (§Post-F9.15, Daniel: *"cada proveedor de telas tiene
+ *    sus telas definidas. No puedo meter una felpa alsatex en el proveedor bloom"*). La identidad
+ *    de la tela incluye a su dueño desde A1, así que comprarle a X una tela de Y es un error de
+ *    negocio, no una preferencia de la pantalla — se valida AQUÍ (A1: el servidor es la autoridad;
+ *    el filtro del selector es solo ayuda de captura).
+ *    EXCEPCIÓN deliberada: una tela SIN dueño (`idProveedor` NULL — las migradas) NO se rechaza.
+ *    Bloquearlas dejaría OCs viejas imposibles de editar, y el catálogo se captura desde cero
+ *    (acuerdo con Daniel): las nuevas siempre traen dueño, así que la puerta se cierra sola.
  * Devuelve el conjunto (sin repetidos) de idOrden ligados, para derivar `OrdenCompraOrden`.
  */
 async function validarLineas(
   tx: Tx,
   idEmpresa: number,
   lineas: DatosCompraLineaEntrada[],
+  /** Proveedor de la OC: contra él se valida el dueño de cada tela (§Post-F9.15). */
+  idProveedorOC: number,
 ): Promise<Set<number>> {
   const idsOrdenLigada = new Set<number>();
   const idsTela = new Set<number>();
@@ -260,10 +270,34 @@ async function validarLineas(
     }
   }
 
-  // Existencia de catálogos referenciados (en lote).
-  await exigirTodosExisten(tx, 'Tela', idsTela, (ids) =>
-    tx.tela.findMany({ where: { id: { in: ids } }, select: { id: true } }),
-  );
+  // Existencia de catálogos referenciados (en lote). Las TELAS se leen con su DUEÑO para validar
+  // de una vez que sean de este proveedor (§Post-F9.15) sin una segunda consulta.
+  if (idsTela.size > 0) {
+    const telas = await tx.tela.findMany({
+      where: { id: { in: [...idsTela] } },
+      select: {
+        id: true,
+        nombre: true,
+        idProveedor: true,
+        proveedor: { select: { nombre: true } },
+      },
+    });
+    const porId = new Map(telas.map((tela) => [tela.id, tela]));
+    for (const idTela of idsTela) {
+      const tela = porId.get(idTela);
+      if (tela === undefined) {
+        throw new ErrorNoEncontrado('Tela', idTela);
+      }
+      // NULL = tela migrada sin dueño: se deja pasar a propósito (ver TSDoc de la función).
+      if (tela.idProveedor !== null && tela.idProveedor !== idProveedorOC) {
+        throw new ErrorValidacion(
+          `La tela "${tela.nombre}" es de ${tela.proveedor?.nombre ?? 'otro proveedor'}: no se le ` +
+            `puede comprar a este proveedor. Elige una tela suya, o dale de alta la tela con él ` +
+            `como dueño en el catálogo.`,
+        );
+      }
+    }
+  }
   await exigirTodosExisten(tx, 'Avio', idsAvio, (ids) =>
     tx.avio.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
@@ -519,7 +553,12 @@ export async function crearOC(
 
   const idOC = await enTransaccion(async (tx) => {
     await exigirProveedorExiste(tx, datos.idProveedor);
-    const idsOrden = await validarLineas(tx, sesion.idEmpresaActiva, datos.lineas);
+    const idsOrden = await validarLineas(
+      tx,
+      sesion.idEmpresaActiva,
+      datos.lineas,
+      datos.idProveedor,
+    );
 
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
 
@@ -606,7 +645,14 @@ export async function actualizarOC(
     // que conservar (a diferencia de la matriz de la orden de producción), así que el reemplazo
     // total es correcto y simple; las ligas N:N se re-derivan.
     if (datos.lineas !== undefined) {
-      const idsOrden = await validarLineas(tx, sesion.idEmpresaActiva, datos.lineas);
+      // El proveedor contra el que se validan las telas es el que VA A QUEDAR: si la edición lo
+      // cambia, las telas tienen que ser del nuevo (si no, la OC quedaría inconsistente).
+      const idsOrden = await validarLineas(
+        tx,
+        sesion.idEmpresaActiva,
+        datos.lineas,
+        datos.idProveedor ?? actual.idProveedor,
+      );
       // Cascade borra la matriz de cada línea.
       await tx.ordenCompraLinea.deleteMany({ where: { idOrdenCompra: id } });
       await crearLineas(tx, sesion, id, datos.lineas);

@@ -1845,3 +1845,47 @@ entras**, no cómo funciona.
 1. **Sin migración** — los dos cambios son de consulta y de pantallas.
 2. **Cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
 3. **Nada que correr a mano.**
+
+---
+
+## 2026-08-07 — Y en la orden de compra también: solo las telas de ese proveedor
+
+Daniel, siguiendo el flujo natural desde el principio: *"Estoy intentando hacer una OC desde cero…
+Al seleccionar el proveedor, me vuelve a desplegar todas las telas. Debería de ver solo las telas de
+ese proveedor. ¿O chance se debe a que tengo que meter un nuevo proveedor?"*
+
+**No era por los proveedores: era que el filtro faltaba ahí.** Se había aplicado a la entrada de
+tela, pero no a la captura de la orden de compra — que es justo donde empieza el flujo.
+
+### Qué cambia al capturar una OC
+
+- Mientras no elijas proveedor, el combo de tela dice **"Elige primero el proveedor…"** (antes se
+  quedaba vacío, sin explicar por qué).
+- Al elegirlo, **solo salen sus telas**.
+- Si el proveedor no tiene telas dadas de alta, lo dice: **"Este proveedor no tiene telas dadas de
+  alta"**.
+- Si **cambias de proveedor** con telas ya capturadas, se **limpian** esas telas (el renglón se
+  queda) y te avisa — es preferible a que el sistema te rechace el guardado hasta el final, con la
+  orden entera ya tecleada.
+
+### Y el servidor también lo valida
+
+No es solo la pantalla: si de algún modo se intentara guardar una orden con la tela de otro
+proveedor, **el servidor la rechaza** diciendo de quién es esa tela. La pantalla filtra para
+ayudarte; la regla vive en el servidor.
+
+**Excepción a propósito:** las telas viejas migradas (las que no tienen dueño) **sí** se aceptan.
+Si no, las órdenes de compra viejas quedarían imposibles de editar. Como el catálogo se captura
+desde cero, las telas nuevas siempre traen su proveedor y la regla se cumple sola.
+
+### Sobre tu pregunta
+
+No hace falta meter un proveedor nuevo. Lo que sí va a pasar es que, hasta que captures **telas
+nuevas con su proveedor dueño**, la lista va a salir vacía para cualquier proveedor que elijas —
+porque las telas que hay hoy en `prueba` son las migradas, que no tienen dueño. Es el
+comportamiento acordado: el catálogo arranca desde cero.
+
+### Nota de despliegue (para Gabriel)
+
+1. **Sin migración**, **cero permisos nuevos** → **no** hace falta `SEED_ON_START`.
+2. **Nada que correr a mano.**

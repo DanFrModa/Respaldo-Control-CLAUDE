@@ -34,6 +34,7 @@ export function EditorLineasOc({
   renglones,
   alCambiar,
   telas,
+  mensajeSinTelas,
   avios,
   ordenes,
   colores,
@@ -43,6 +44,8 @@ export function EditorLineasOc({
   renglones: RenglonOcCaptura[];
   alCambiar: (renglones: RenglonOcCaptura[]) => void;
   telas: readonly Tela[];
+  /** Qué decir cuando no hay telas que ofrecer (sin proveedor / proveedor sin telas). */
+  mensajeSinTelas: string;
   avios: readonly Avio[];
   ordenes: readonly OrdenLigera[];
   colores: readonly Color[];
@@ -166,7 +169,12 @@ export function EditorLineasOc({
                       }
                       data-testid="selector-tela-oc"
                     >
-                      <option value="">Elige una tela…</option>
+                      <option value="">
+                        {/* §Post-F9.15: la lista sale VACÍA cuando aún no hay proveedor o cuando
+                            ese proveedor no tiene telas dadas de alta. Decirlo evita el "combo
+                            vacío sin explicación". */}
+                        {telas.length === 0 ? mensajeSinTelas : 'Elige una tela…'}
+                      </option>
                       {telas.map((t) => (
                         <option key={t.id} value={String(t.id)}>
                           {t.nombre}
