@@ -1167,6 +1167,10 @@ export async function resumenOC(
     }
   }
 
+  // ⚠️ `porRecibir` mide SOLO el cuerpo: `cantidadRecibida` no lleva el complemento de la tela
+  // (§Post-F9.18 y su deuda en HOJA-DE-RUTA §4). Cerrarlo pide una columna de complemento recibido
+  // en la recepción Y el criterio de "recibida total" cuando cuerpo y complemento van a distinto
+  // ritmo — regla que Daniel aún no dicta, así que se deja visible en vez de inventada.
   let porRecibir = 0;
   for (const oc of abiertas) {
     for (const l of oc.lineas) {

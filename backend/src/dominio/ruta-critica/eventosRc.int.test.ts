@@ -45,6 +45,7 @@ let colorRojo: Color;
 let tallaCH: Talla;
 let proveedor: Proveedor;
 let tela: Tela;
+let direccionEntrega: { id: number };
 let avio: Avio;
 let almacen: Almacen;
 let clienteNegocioId: number;
@@ -88,6 +89,10 @@ beforeEach(async () => {
   tallaCH = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
   proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor / Maquila SA' } });
   tela = await cliente.tela.create({ data: { nombre: 'Felpa', unidadMedida: 'M' } });
+  // §Post-F9.18: toda OC nueva exige dirección de entrega del catálogo.
+  direccionEntrega = await cliente.direccionEntrega.create({
+    data: { nombre: 'Naucalpan', direccion: 'Av. Siempre Viva 123', favorita: true },
+  });
   avio = await cliente.avio.create({
     data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
   });
@@ -169,6 +174,8 @@ describe('compraTela: OC de tela autorizada/cancelada (post-F9)', () => {
     const oc = await crearOC(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
         idProveedor: proveedor.id,
         lineas: [{ idTela: tela.id, cantidad: 100, precio: 12, idOrden }],
       },
