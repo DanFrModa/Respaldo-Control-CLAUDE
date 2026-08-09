@@ -2046,3 +2046,37 @@ que alguien lo captura. Preferimos pedírtelo a inventar una cantidad.
 Una migración **aditiva** (tabla nueva de direcciones + dos columnas en los renglones de OC) y
 **cero permisos nuevos** → **no** hace falta `SEED_ON_START`. El único paso manual es capturar las
 direcciones de entrega en el catálogo.
+
+---
+
+## Cuándo se marca "recibida" una orden de compra (7-ago-2026)
+
+Con lo que dijiste, quedó así:
+
+### Se cierra contra lo que pide la orden — cardigan incluido
+
+Si la orden pide **cardigan**, la orden **no** se marca como recibida hasta que llegue el cardigan,
+aunque el cuerpo ya haya llegado completo. Si la orden no lo pide, no se espera nada por ese lado.
+
+### En telas, 5% de menos ya cuenta como completo
+
+Como nunca llega la cantidad exacta, si pides **400 kilos** la orden se da por surtida a partir de
+**380** (5% menos). Con 379 sigue abierta. Recibir de más nunca estorba: también cierra.
+
+En **avíos** no hay esa tolerancia: son piezas contadas y lo pedido llega exacto.
+
+### Al capturar la factura te dice qué falta de las dos cosas
+
+El panel "Pendiente de la orden de compra" ahora dice, por ejemplo, *"faltan 380 kg + 5 de
+Cardigan"*, y al pulsar **Capturar** te precarga las **dos** cantidades. Las puedes ajustar: lo que
+llegó manda.
+
+### Lo que falta y quedó para la segunda etapa (como pediste)
+
+**Pedir autorización** cuando la diferencia pasa del 5%. Hoy, si la diferencia es mayor, la orden
+simplemente **no se cierra**: se queda en "recibida parcial" y se ve así en el tablero de compras.
+Nadie te bloquea la entrada de la tela ni te pide permiso — eso viene después.
+
+### Nota de despliegue (para Gabriel)
+
+**Sin migración y sin permisos nuevos** → **no** hace falta `SEED_ON_START`.

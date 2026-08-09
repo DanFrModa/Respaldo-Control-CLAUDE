@@ -174,6 +174,28 @@ catálogo; si falta alguna, el error dice exactamente qué falta.
 **El catálogo de direcciones nace vacío** a propósito (una dirección es dato del negocio): se captura
 en *Catálogos › Direcciones de entrega* antes de la primera OC.
 
+## ¿Cuándo queda RECIBIDA una OC? (§Post-F9.19)
+
+Un solo lugar decide: la función pura **`dominio/compras/tolerancia-recepcion.ts`** (`renglonSurtido`
+/ `faltantePorRecibir`). La usan los TRES sitios que antes comparaban a mano —
+`recalcularEstatusOC` (estatus R7), `resumenOC` (`porRecibir` del tablero) y
+`lineasTelaPendientesDeProveedor` (lo que ofrece la captura de la factura)— para que no puedan
+divergir.
+
+| Caso | Cierra el renglón cuando… |
+|---|---|
+| Tela, sin complemento | cuerpo recibido ≥ pedido × **0.95** (banda del 5%: *"nunca se recibe la cantidad exacta"*) |
+| Tela, con complemento en la OC | **ambos** alcanzan su mínimo con la misma banda (*"si en la OC lleva cardigan, se debe de recibir el cardigan"*) |
+| Avío / línea libre | cuerpo recibido ≥ pedido (sin banda; solo el ruido de redondeo) |
+
+Dentro de la banda, lo que falte **deja de contar** como faltante en el tablero. El complemento que
+la OC pidió **sí cuenta** hasta que llega, valuado a `precioComplemento` o, si no trae, al precio del
+cuerpo.
+
+**Segunda etapa (pendiente, decidido así por Daniel):** **autorizar** una recepción cuya diferencia
+pase del 5%. Hoy esa diferencia simplemente no cierra el renglón — no se bloquea nada. Usará el mismo
+`TOLERANCIA_TELA`.
+
 ## Reglas que el módulo respeta
 
 A1 (lógica en dominio) · A2 (recepción/confirmación/reverso en transacción) · A3 (folios por

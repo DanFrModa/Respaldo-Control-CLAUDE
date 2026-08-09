@@ -27842,10 +27842,18 @@ export interface paths {
                 cantidad: number;
                 /** @description Ya recibido (recepciones activas). */
                 recibido: number;
-                /** @description Lo que falta por recibir. */
+                /** @description Lo que falta del CUERPO (0 dentro de la banda del 5%, §Post-F9.19). */
                 pendiente: number;
                 /** @description Precio unitario de la OC. */
                 precio: number;
+                /** @description Cómo se llama el complemento de la tela ("Cardigan"), o null. */
+                nombreComplemento: string | null;
+                /** @description Complemento que pidió la OC, o null si no lleva. */
+                cantidadComplemento: number | null;
+                /** @description Complemento ya recibido. */
+                recibidoComplemento: number;
+                /** @description Complemento que falta por recibir. */
+                pendienteComplemento: number;
               }[];
             };
           };

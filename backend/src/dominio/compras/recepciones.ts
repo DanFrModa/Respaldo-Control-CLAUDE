@@ -89,6 +89,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { faltantePorRecibir, renglonSurtido } from './tolerancia-recepcion.js';
 /** Clave de la secuencia de folios de recepciones de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_RECEPCION = 'recepcion-compra';
 
@@ -166,6 +167,8 @@ type OCLineaParaRecepcion = {
   idAvioProveedor: number | null;
   descripcionLibre: string | null;
   cantidad: Prisma.Decimal;
+  /** Complemento que pidió la OC (§Post-F9.19): el estatus lo exige cuando existe. */
+  cantidadComplemento: Prisma.Decimal | null;
   precio: Prisma.Decimal;
   idOrden: number | null;
 };
@@ -307,30 +310,42 @@ async function obtenerRecepcion(
 
 // ── Recálculo del estatus de la OC (R7) ──────────────────────────────────────────────────────────
 
-/** Tolerancia por redondeo decimal (cantidadRecibida con 4 decimales). */
-const TOLERANCIA_RECEPCION = 1e-6;
-
 /**
- * Calcula el estatus de recepción de una OC a partir de las cantidades pedidas y lo recibido por
- * línea (FUNCIÓN PURA — sin BD, unit-testeable). Robusto a recepciones acumuladas (el llamador ya
- * sumó lo recibido por línea de TODAS las recepciones activas). Reglas (R7):
- *  • Una línea está completa si Σ recibido ≥ su cantidad pedida (con tolerancia de redondeo).
- *  • TODAS completas → `recibida_total`; algo recibido pero no todo → `recibida_parcial`;
+ * Calcula el estatus de recepción de una OC a partir de lo PEDIDO y lo RECIBIDO por línea (FUNCIÓN
+ * PURA — sin BD, unit-testeable). Robusto a recepciones acumuladas (el llamador ya sumó lo recibido
+ * por línea de TODAS las recepciones activas). Reglas (R7 + §Post-F9.19):
+ *  • Una línea está SURTIDA según {@link renglonSurtido}: el cuerpo alcanza lo pedido —con la banda
+ *    del 5% en TELA, porque *"nunca se recibe la cantidad exacta"*— y, **si la OC pidió complemento
+ *    (Cardigan), el complemento también**. Sin complemento en la OC no se espera complemento.
+ *  • TODAS surtidas → `recibida_total`; algo recibido pero no todo → `recibida_parcial`;
  *    nada recibido → `autorizada` (caso del reverso total).
  *
- * @param lineas       cantidad PEDIDA por línea de OC (`id` + `pedido`).
- * @param recibidoPorLinea  Σ recibido (unidad de consumo) por id de línea de OC.
+ * @param lineas            lo PEDIDO por línea de OC (cuerpo, complemento y si es tela).
+ * @param recibidoPorLinea  Σ recibido de CUERPO (unidad de consumo) por id de línea de OC.
+ * @param recibidoComplementoPorLinea  Σ recibido de COMPLEMENTO por id de línea de OC.
  */
 export function calcularEstatusRecepcion(
-  lineas: { id: number; pedido: number }[],
+  lineas: LineaParaEstatus[],
   recibidoPorLinea: Map<number, number>,
+  recibidoComplementoPorLinea: Map<number, number> = new Map(),
 ): EstatusOrdenCompra {
   let algoRecibido = false;
   let todasCompletas = true;
   for (const linea of lineas) {
     const recibido = recibidoPorLinea.get(linea.id) ?? 0;
-    if (recibido > 0) algoRecibido = true;
-    if (recibido + TOLERANCIA_RECEPCION < linea.pedido) todasCompletas = false;
+    const recibidoComplemento = recibidoComplementoPorLinea.get(linea.id) ?? 0;
+    if (recibido > 0 || recibidoComplemento > 0) algoRecibido = true;
+    if (
+      !renglonSurtido({
+        pedido: linea.pedido,
+        recibido,
+        pedidoComplemento: linea.pedidoComplemento ?? null,
+        recibidoComplemento,
+        esTela: linea.esTela ?? false,
+      })
+    ) {
+      todasCompletas = false;
+    }
   }
   return !algoRecibido
     ? EstatusOrdenCompra.autorizada
@@ -339,11 +354,42 @@ export function calcularEstatusRecepcion(
       : EstatusOrdenCompra.recibida_parcial;
 }
 
+/**
+ * Línea de OC como la ve el recálculo de estatus. `pedidoComplemento`/`esTela` son opcionales para
+ * no romper a quien solo compara cuerpo (avíos, líneas libres y las pruebas viejas de la función
+ * pura); cuando faltan, la línea se trata como no-tela sin complemento — el comportamiento de antes.
+ */
+export interface LineaParaEstatus {
+  id: number;
+  pedido: number;
+  pedidoComplemento?: number | null;
+  esTela?: boolean;
+}
+
+/**
+ * Proyecta una línea de OC leída de Prisma a la forma que espera el recálculo. La usan los 4
+ * llamadores para que TODOS apliquen el mismo criterio (§Post-F9.19: banda de tolerancia en tela +
+ * complemento exigido cuando la OC lo pidió).
+ */
+function aLineaParaEstatus(l: {
+  id: number;
+  cantidad: Prisma.Decimal;
+  cantidadComplemento: Prisma.Decimal | null;
+  idTela: number | null;
+}): LineaParaEstatus {
+  return {
+    id: l.id,
+    pedido: Number(l.cantidad),
+    pedidoComplemento: l.cantidadComplemento === null ? null : Number(l.cantidadComplemento),
+    esTela: l.idTela !== null,
+  };
+}
+
 /** Datos de la OC que necesita el recálculo de estatus (los provee el llamador, ya cargados). */
 interface OCParaEstatus {
   id: number;
   estatus: string;
-  lineas: { id: number; pedido: number }[];
+  lineas: LineaParaEstatus[];
 }
 
 /**
@@ -364,18 +410,20 @@ async function recalcularEstatusOC(
     return; // no se recalcula en borrador/pendiente/cancelada.
   }
 
-  // Σ recibido por línea de OC, sumando solo recepciones ACTIVAS (reversadaEn = null).
+  // Σ recibido por línea de OC (cuerpo Y complemento), solo de recepciones ACTIVAS.
   const sumas = await tx.recepcionCompraLinea.groupBy({
     by: ['idOrdenCompraLinea'],
     where: { recepcionCompra: { idOrdenCompra: oc.id, reversadaEn: null } },
-    _sum: { cantidadRecibida: true },
+    _sum: { cantidadRecibida: true, cantidadComplemento: true },
   });
   const recibidoPorLinea = new Map<number, number>();
+  const recibidoComplementoPorLinea = new Map<number, number>();
   for (const s of sumas) {
     recibidoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0));
+    recibidoComplementoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadComplemento ?? 0));
   }
 
-  const nuevo = calcularEstatusRecepcion(oc.lineas, recibidoPorLinea);
+  const nuevo = calcularEstatusRecepcion(oc.lineas, recibidoPorLinea, recibidoComplementoPorLinea);
   if (nuevo !== oc.estatus) {
     await tx.ordenCompra.update({
       where: { id: oc.id },
@@ -438,6 +486,8 @@ export async function recibirCompra(
             idAvioProveedor: true,
             descripcionLibre: true,
             cantidad: true,
+            // §Post-F9.19: el estatus también mira el COMPLEMENTO que pidió la OC.
+            cantidadComplemento: true,
             precio: true,
             idOrden: true,
           },
@@ -596,7 +646,7 @@ export async function recibirCompra(
     await recalcularEstatusOC(tx, sesion, {
       id: oc.id,
       estatus: oc.estatus,
-      lineas: oc.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+      lineas: oc.lineas.map(aLineaParaEstatus),
     });
 
     await registrarBitacora(tx, sesion, {
@@ -754,7 +804,7 @@ export async function registrarRecepcionesDesdeEntradaTela(
           idEmpresa: true,
           idProveedor: true,
           estatus: true,
-          lineas: { select: { id: true, cantidad: true } },
+          lineas: { select: { id: true, cantidad: true, cantidadComplemento: true, idTela: true } },
         },
       },
     },
@@ -852,7 +902,7 @@ export async function registrarRecepcionesDesdeEntradaTela(
     await recalcularEstatusOC(tx, sesion, {
       id: oc.id,
       estatus: oc.estatus,
-      lineas: oc.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+      lineas: oc.lineas.map(aLineaParaEstatus),
     });
 
     await registrarBitacora(tx, sesion, {
@@ -909,7 +959,13 @@ export async function reversarRecepcionesDeEntradaTela(
     select: {
       id: true,
       ordenCompra: {
-        select: { id: true, estatus: true, lineas: { select: { id: true, cantidad: true } } },
+        select: {
+          id: true,
+          estatus: true,
+          lineas: {
+            select: { id: true, cantidad: true, cantidadComplemento: true, idTela: true },
+          },
+        },
       },
     },
     orderBy: { id: 'asc' },
@@ -929,7 +985,7 @@ export async function reversarRecepcionesDeEntradaTela(
     await recalcularEstatusOC(tx, sesion, {
       id: recepcion.ordenCompra.id,
       estatus: recepcion.ordenCompra.estatus,
-      lineas: recepcion.ordenCompra.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+      lineas: recepcion.ordenCompra.lineas.map(aLineaParaEstatus),
     });
     await registrarBitacora(tx, sesion, {
       entidad: 'RecepcionCompra',
@@ -1026,13 +1082,21 @@ export async function reversarRecepcion(
       select: {
         id: true,
         estatus: true,
-        lineas: { select: { id: true, cantidad: true, idOrden: true } },
+        lineas: {
+          select: {
+            id: true,
+            cantidad: true,
+            cantidadComplemento: true,
+            idTela: true,
+            idOrden: true,
+          },
+        },
       },
     });
     await recalcularEstatusOC(tx, sesion, {
       id: oc.id,
       estatus: oc.estatus,
-      lineas: oc.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
+      lineas: oc.lineas.map(aLineaParaEstatus),
     });
 
     // OUTBOX (F5-E6, decisión (f)): el reverso re-evalúa `recepcionTela` de las órdenes ligadas a la
@@ -1128,6 +1192,12 @@ export async function lineasTelaPendientesDeProveedor(
     recibido: number;
     pendiente: number;
     precio: number;
+    /** Cómo se llama el complemento de esa tela ("Cardigan"), o null si no lleva. */
+    nombreComplemento: string | null;
+    /** Complemento que pidió la OC, y cuánto falta por recibir de él (§Post-F9.19). */
+    cantidadComplemento: number | null;
+    recibidoComplemento: number;
+    pendienteComplemento: number;
   }[]
 > {
   verificarPermiso(sesion, 'compras.ver');
@@ -1148,9 +1218,10 @@ export async function lineasTelaPendientesDeProveedor(
       idOrdenCompra: true,
       idTela: true,
       cantidad: true,
+      cantidadComplemento: true,
       precio: true,
       unidad: true,
-      tela: { select: { nombre: true } },
+      tela: { select: { nombre: true, nombreComplemento: true } },
       ordenCompra: { select: { numCompra: true } },
     },
     orderBy: [{ idOrdenCompra: 'asc' }, { id: 'asc' }],
@@ -1165,28 +1236,50 @@ export async function lineasTelaPendientesDeProveedor(
       idOrdenCompraLinea: { in: lineas.map((l) => l.id) },
       recepcionCompra: { reversadaEn: null },
     },
-    _sum: { cantidadRecibida: true },
+    _sum: { cantidadRecibida: true, cantidadComplemento: true },
   });
   const recibidoPorLinea = new Map(
     sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0)]),
   );
+  const recibidoComplementoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadComplemento ?? 0)]),
+  );
 
-  return lineas
-    .map((l) => {
-      const cantidad = Number(l.cantidad);
-      const recibido = recibidoPorLinea.get(l.id) ?? 0;
-      return {
-        idOrdenCompraLinea: l.id,
-        idOrdenCompra: l.idOrdenCompra,
-        numCompra: Number(l.ordenCompra.numCompra),
-        idTela: l.idTela as number,
-        tela: l.tela?.nombre ?? '(tela)',
-        unidad: l.unidad,
-        cantidad,
-        recibido,
-        pendiente: cantidad - recibido,
-        precio: Number(l.precio),
-      };
-    })
-    .filter((l) => l.pendiente > TOLERANCIA_RECEPCION);
+  return (
+    lineas
+      .map((l) => {
+        const cantidad = Number(l.cantidad);
+        const recibido = recibidoPorLinea.get(l.id) ?? 0;
+        const cantidadComplemento =
+          l.cantidadComplemento === null ? null : Number(l.cantidadComplemento);
+        const recibidoComplemento = recibidoComplementoPorLinea.get(l.id) ?? 0;
+        // MISMO criterio que el estatus (§Post-F9.19): dentro de la banda del 5% ya no falta nada,
+        // y el complemento que pidió la OC cuenta como pendiente hasta que llega.
+        const falta = faltantePorRecibir({
+          pedido: cantidad,
+          recibido,
+          pedidoComplemento: cantidadComplemento,
+          recibidoComplemento,
+          esTela: true,
+        });
+        return {
+          idOrdenCompraLinea: l.id,
+          idOrdenCompra: l.idOrdenCompra,
+          numCompra: Number(l.ordenCompra.numCompra),
+          idTela: l.idTela as number,
+          tela: l.tela?.nombre ?? '(tela)',
+          unidad: l.unidad,
+          cantidad,
+          recibido,
+          pendiente: falta.cuerpo,
+          precio: Number(l.precio),
+          nombreComplemento: l.tela?.nombreComplemento ?? null,
+          cantidadComplemento,
+          recibidoComplemento,
+          pendienteComplemento: falta.complemento,
+        };
+      })
+      // Se ofrece el renglón mientras falte CUERPO o COMPLEMENTO (uno puede haber llegado sin el otro).
+      .filter((l) => l.pendiente > 0 || l.pendienteComplemento > 0)
+  );
 }

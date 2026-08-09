@@ -67948,11 +67948,41 @@
                           },
                           "pendiente": {
                             "type": "number",
-                            "description": "Lo que falta por recibir."
+                            "description": "Lo que falta del CUERPO (0 dentro de la banda del 5%, §Post-F9.19)."
                           },
                           "precio": {
                             "type": "number",
                             "description": "Precio unitario de la OC."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cómo se llama el complemento de la tela (\"Cardigan\"), o null."
+                          },
+                          "cantidadComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Complemento que pidió la OC, o null si no lleva."
+                          },
+                          "recibidoComplemento": {
+                            "type": "number",
+                            "description": "Complemento ya recibido."
+                          },
+                          "pendienteComplemento": {
+                            "type": "number",
+                            "description": "Complemento que falta por recibir."
                           }
                         },
                         "required": [
@@ -67965,7 +67995,11 @@
                           "cantidad",
                           "recibido",
                           "pendiente",
-                          "precio"
+                          "precio",
+                          "nombreComplemento",
+                          "cantidadComplemento",
+                          "recibidoComplemento",
+                          "pendienteComplemento"
                         ],
                         "additionalProperties": false
                       }
