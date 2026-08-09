@@ -188,22 +188,69 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
       });
     });
 
-    it('NO aparece en una OC que todavía no se autoriza', () => {
+    it('en una OC sin autorizar NO aparece, pero DICE por qué (§Post-F9.16)', () => {
       paginaConUna('pendiente_autorizacion');
       renderConProveedores(<OrdenesCompraPagina />, {
         sesion: estadoSesionDePrueba(['compras.ver', 'inventario-telas.mover']),
       });
       abrirDetalle();
       expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
+      expect(screen.getByTestId('oc-sin-entrada-tela')).toHaveTextContent('no está autorizada');
     });
 
-    it('NO aparece sin permiso para mover inventario de telas', () => {
+    it('con renglones de TEXTO LIBRE explica que no son telas del catálogo (§Post-F9.16)', () => {
+      // El caso real que reportó Daniel: OC migrada, autorizada, llena de renglones… de texto.
+      useOrdenesCompraMock.mockReturnValue({
+        data: {
+          datos: [
+            ocDePrueba({
+              estatus: 'autorizada',
+              lineas: [
+                {
+                  id: 10,
+                  idTela: null,
+                  tela: null,
+                  idAvio: null,
+                  avio: null,
+                  idAvioProveedor: null,
+                  descripcionLibre: 'Terry Ibiza 52% pol.48% alg. Pantone crema 11-0507 tcx',
+                  cantidad: 530,
+                  unidad: 'Kilos',
+                  precio: 115,
+                  subtotal: 60950,
+                  idOrden: null,
+                  folioOrden: null,
+                  tallas: [],
+                },
+              ],
+            }),
+          ],
+          total: 1,
+          pagina: 1,
+          porPagina: 10,
+          totalPaginas: 1,
+        },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+      });
+      renderConProveedores(<OrdenesCompraPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver', 'inventario-telas.mover']),
+      });
+      abrirDetalle();
+
+      expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
+      expect(screen.getByTestId('oc-sin-entrada-tela')).toHaveTextContent('TEXTO LIBRE');
+    });
+
+    it('sin permiso no aparece NI la nota (la acción no existe para ese usuario, A4)', () => {
       paginaConUna('autorizada');
       renderConProveedores(<OrdenesCompraPagina />, {
         sesion: estadoSesionDePrueba(['compras.ver']),
       });
       abrirDetalle();
       expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('oc-sin-entrada-tela')).not.toBeInTheDocument();
     });
   });
 });

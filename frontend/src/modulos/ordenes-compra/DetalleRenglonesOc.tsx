@@ -1,4 +1,5 @@
 import type { OrdenCompra, OrdenCompraLinea } from '@/api/tipos';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { formatearMoneda } from '@/lib/formato';
 
 import { descripcionMaterial } from './piezas';
@@ -24,12 +25,16 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
           en ~10 líneas. En escritorio el cajón es más ancho que este mínimo, así que no cambia. */}
       <div className="overflow-x-auto">
         <table
-          className="w-full min-w-[520px] border-collapse text-sm"
+          className="w-full min-w-[600px] border-collapse text-sm"
           data-testid="tabla-renglones-oc"
         >
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="px-2 py-1.5 font-medium">Material</th>
+              {/* §Post-F9.16: el TIPO del renglón. Sin esto, un renglón de "texto libre" (todas las
+                  OCs migradas) se veía IGUAL que uno de tela del catálogo — y no había forma de
+                  entender por qué la orden no ofrece "Dar entrada a la tela". */}
+              <th className="px-2 py-1.5 font-medium">Tipo</th>
               <th className="px-2 py-1.5 text-right font-medium">Cantidad</th>
               <th className="px-2 py-1.5 font-medium">Unidad</th>
               <th className="px-2 py-1.5 text-right font-medium">Precio</th>
@@ -41,6 +46,15 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
             {oc.lineas.map((linea) => (
               <tr key={linea.id} className="border-b align-top" data-testid="fila-renglon-oc">
                 <td className="px-2 py-1.5">{descripcionMaterial(linea)}</td>
+                <td className="px-2 py-1.5">
+                  <ChipEstado tono={linea.idTela !== null ? 'ok' : 'neutro'} sinPunto>
+                    {linea.idTela !== null
+                      ? 'Tela'
+                      : linea.idAvio !== null
+                        ? 'Avío'
+                        : 'Texto libre'}
+                  </ChipEstado>
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">
                   {linea.cantidad.toLocaleString('es-MX')}
                 </td>
@@ -59,7 +73,7 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
           </tbody>
           <tfoot>
             <tr className="font-semibold">
-              <td className="px-2 py-1.5" colSpan={4}>
+              <td className="px-2 py-1.5" colSpan={5}>
                 Total
               </td>
               <td className="px-2 py-1.5 text-right tabular-nums" data-testid="total-detalle-oc">

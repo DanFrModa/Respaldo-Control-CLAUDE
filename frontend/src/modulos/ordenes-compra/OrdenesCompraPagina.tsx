@@ -207,17 +207,31 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   }
 
   /**
-   * ¿Se puede dar entrada a la TELA de esta OC (§Post-F9.15)? Solo con OC recibible y con al menos
-   * un renglón de tela. No se mira el pendiente aquí: eso lo calcula el servidor y lo muestra el
-   * panel de la captura — ocultar el botón por un cálculo de cliente escondería el caso "ya está
-   * todo recibido pero quiero ver por qué".
+   * ¿Se puede dar entrada a la TELA de esta OC (§Post-F9.15)? Devuelve `null` si sí, o el MOTIVO por
+   * el que no. Antes esto era un booleano y el botón simplemente no aparecía — Daniel se topó con una
+   * OC autorizada llena de renglones y no había forma de entender por qué (§Post-F9.16): sus
+   * renglones eran de TEXTO LIBRE, como todas las OCs migradas, no telas del catálogo. Esconder sin
+   * explicar convierte una regla en un misterio.
+   *
+   * NO se mira el pendiente: eso lo calcula el servidor y lo muestra el panel de la captura —
+   * bloquear por un cálculo de cliente taparía el caso "ya recibí todo pero quiero ver el detalle".
    */
-  function puedeRecibirTelaDeLaOc(oc: OrdenCompra): boolean {
-    return (
-      puedeMoverTelas &&
-      (oc.estatus === 'autorizada' || oc.estatus === 'recibida_parcial') &&
-      oc.lineas.some((l) => l.idTela !== null)
-    );
+  function motivoNoRecibirTela(oc: OrdenCompra): string | null {
+    if (!puedeMoverTelas) {
+      // Sin permiso no se dice nada: la acción no existe para este usuario (A4, se esconde).
+      return 'sin-permiso';
+    }
+    if (oc.estatus !== 'autorizada' && oc.estatus !== 'recibida_parcial') {
+      return oc.estatus === 'cancelada'
+        ? 'La orden está cancelada.'
+        : 'La orden todavía no está autorizada: primero autorízala.';
+    }
+    if (!oc.lineas.some((l) => l.idTela !== null)) {
+      return oc.lineas.some((l) => l.idAvio !== null)
+        ? 'Esta orden no trae telas del catálogo (sus renglones son de avío o de texto libre). Los avíos se reciben en Compras › Recepción.'
+        : 'Los renglones de esta orden son de TEXTO LIBRE, no telas del catálogo (así se migraron las órdenes viejas). Para recibirla por factura, sus renglones tienen que apuntar a una tela del catálogo.';
+    }
+    return null;
   }
 
   /** ¿La OC se puede editar desde la UI? (el backend re-decide; admin puede tocar autorizadas). */
@@ -586,7 +600,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   ahí y damos la entrada desde allá". Abre la captura de la factura con el proveedor
                   fijo y el panel de lo que falta por recibir de ESTA orden. Solo aparece si la OC
                   está recibible y tiene renglones de tela. */}
-              {puedeRecibirTelaDeLaOc(seleccion) ? (
+              {motivoNoRecibirTela(seleccion) === null ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -603,7 +617,15 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   <PackagePlus aria-hidden />
                   Dar entrada a la tela
                 </Button>
-              ) : null}
+              ) : motivoNoRecibirTela(seleccion) === 'sin-permiso' ? null : (
+                <p
+                  className="basis-full text-xs text-muted-foreground"
+                  data-testid="oc-sin-entrada-tela"
+                >
+                  <strong>No se puede dar entrada a la tela: </strong>
+                  {motivoNoRecibirTela(seleccion)}
+                </p>
+              )}
               {puedeAutorizar && seleccion.estatus === 'pendiente_autorizacion' ? (
                 <Button
                   size="sm"
