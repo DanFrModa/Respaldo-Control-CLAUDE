@@ -715,11 +715,8 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
 });
 
 describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección sin inventar nada', () => {
-  let idOrden: number;
-
-  beforeEach(async () => {
-    idOrden = await crearOrden();
-  });
+  // La orden y el catálogo los siembra el `beforeEach` del archivo (`idOrden` es del módulo):
+  // volver a crear la orden aquí chocaría contra el unique (idEmpresa, folio).
 
   it('hereda la fecha de entrega de la ORDEN y la dirección FAVORITA del catálogo', async () => {
     await explosionarOrden(sesion(), idOrden, bd());
@@ -779,6 +776,14 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await cliente.tela.update({
       where: { id: telaFelpa.id },
       data: { nombreComplemento: 'Cardigan' },
+    });
+    // La felpa necesita proveedor sugerido para que la explosión le genere OC (amarre R17).
+    const amarre = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: amarre.id },
     });
     await explosionarOrden(sesion(), idOrden, bd());
     const resultado = await generarOCDesdeExplosion(
