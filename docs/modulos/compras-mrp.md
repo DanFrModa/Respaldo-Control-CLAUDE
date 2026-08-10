@@ -192,6 +192,10 @@ Dentro de la banda, lo que falte **deja de contar** como faltante en el tablero.
 la OC pidió **sí cuenta** hasta que llega, valuado a `precioComplemento` o, si no trae, al precio del
 cuerpo.
 
+El tablero *"qué tengo / qué falta"* (`calcularEstatusMaterial`) usa la **misma banda** en las filas
+de tela: sin ella diría "recibido parcial" para siempre en toda tela, contradiciendo a la OC que ya se
+dio por recibida.
+
 **Segunda etapa (pendiente, decidido así por Daniel):** **autorizar** una recepción cuya diferencia
 pase del 5%. Hoy esa diferencia simplemente no cierra el renglón — no se bloquea nada. Usará el mismo
 `TOLERANCIA_TELA`.

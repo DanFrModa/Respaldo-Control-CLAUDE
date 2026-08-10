@@ -65,6 +65,7 @@ import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { minimoParaSurtir } from './tolerancia-recepcion.js';
 import { existenciaAvioTotalEmpresa } from '../../comun/kardex.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -884,9 +885,17 @@ export function calcularEstatusMaterial(
   enOc: number,
   recibido: number,
   esGenericoCubierto: boolean,
+  /**
+   * ¿La fila es de TELA? En tela se aplica la MISMA banda del 5% que cierra la orden de compra
+   * (§Post-F9.19): sin ella, el tablero diría "recibido parcial" para siempre en toda tela —
+   * contradiciendo a la OC, que ya se dio por recibida— porque *"nunca se recibe la cantidad
+   * exacta"*. En avíos no hay banda.
+   */
+  esTela = false,
 ): EstatusMaterial {
   if (esGenericoCubierto) return 'cubierto-por-stock';
-  if (recibido + TOLERANCIA >= aComprar && aComprar > TOLERANCIA) return 'completo';
+  const minimo = minimoParaSurtir(aComprar, esTela);
+  if (recibido + TOLERANCIA >= minimo && aComprar > TOLERANCIA) return 'completo';
   if (recibido > TOLERANCIA) return 'recibido-parcial';
   if (enOc > TOLERANCIA) return 'en-oc';
   return 'pendiente';
@@ -1001,7 +1010,13 @@ export async function estatusMaterialesOrden(
       requerido: Number(r.cantidadRequerida),
       enOc,
       recibido,
-      estatus: calcularEstatusMaterial(aComprar, enOc, recibido, esGenericoCubierto),
+      estatus: calcularEstatusMaterial(
+        aComprar,
+        enOc,
+        recibido,
+        esGenericoCubierto,
+        r.idTela !== null,
+      ),
     });
   }
 

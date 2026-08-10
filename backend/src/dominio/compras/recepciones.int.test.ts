@@ -498,13 +498,15 @@ describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
     );
     await autorizarOC(sesion(PERM_AUTORIZAR), ocOtro.id, bd());
 
+    // §Post-F9.19: el COMPLEMENTO que pidió la OC también es material por recibir, y se valúa al
+    // precio del cuerpo cuando no trae propio → 10×7 (cuerpo) + 1×7 (Cardigan) = 77.
     const soloOtro = await resumenOC(sesion(PERM), { idProveedor: otro.id }, bd());
     expect(soloOtro.ocAbiertas).toBe(1);
-    expect(soloOtro.porRecibir).toBe(70);
+    expect(soloOtro.porRecibir).toBe(77);
 
     const todas = await resumenOC(sesion(PERM), {}, bd());
     expect(todas.ocAbiertas).toBe(2);
-    expect(todas.porRecibir).toBe(570);
+    expect(todas.porRecibir).toBe(577); // 500 del avío + 77 de la tela con su Cardigan
   });
 });
 
