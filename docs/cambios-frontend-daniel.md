@@ -2086,3 +2086,45 @@ Nadie te bloquea la entrada de la tela ni te pide permiso — eso viene después
 ### Nota de despliegue (para Gabriel)
 
 **Sin migración y sin permisos nuevos** → **no** hace falta `SEED_ON_START`.
+
+---
+
+## Leer la factura para llenar la entrada de tela (7-ago-2026)
+
+En la captura de la entrada hay un bloque nuevo arriba: **"Leer la factura (XML)"**.
+
+### Qué hace
+
+Subes el **XML del CFDI** y se llenan solos:
+
+- el **proveedor** (lo reconoce por su RFC),
+- la **fecha** y el **número** de la factura (serie + folio),
+- y **cada renglón** con la cantidad y el precio que el proveedor te facturó, ya emparejado con el
+  renglón de la orden de compra que le corresponde.
+
+Lo único que sigues capturando es el **color** de la tela que llegó — eso la factura no lo dice.
+
+Cada emparejamiento te dice **por qué** se hizo (por el nombre de la tela, porque era el único
+pendiente, o porque la cantidad cuadraba), para que puedas revisarlo de un vistazo y corregir el que
+no te cuadre. Es a propósito **prudente**: prefiere no sugerir a sugerir mal, porque un renglón vacío
+lo arreglas en un clic pero un amarre equivocado se te puede ir sin darte cuenta.
+
+### El PDF sigue igual
+
+Se sube **como adjunto** del documento, para consultar la factura tal cual cuando la necesites. De
+ahí no se leen datos: para eso está el XML, que es exacto.
+
+### La misma factura no se recibe dos veces
+
+Si subes un XML que ya se capturó (en otra entrada o que ya está en Cuentas por pagar), te avisa
+antes de que sigas.
+
+### Lo que falta
+
+Que al **confirmar** la entrada se genere sola la **cuenta por pagar** con esa misma factura. Los
+datos ya quedan guardados; es lo siguiente.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (una columna en las entradas de tela) y **cero permisos nuevos** → **no**
+hace falta `SEED_ON_START`.

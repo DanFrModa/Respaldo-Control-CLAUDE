@@ -33,6 +33,8 @@ import {
   esquemaEntradaTelaAdjuntoCrear,
   esquemaEntradaTelaAdjuntoSubida,
   esquemaEntradaTelaAdjuntosLista,
+  esquemaLeerCfdiEntradaTela,
+  esquemaPropuestaCfdiEntradaTela,
   esquemaErrorApi,
 } from '../../contrato/index.js';
 import type { esquemaEntradaTelaAdjuntoSalida } from '../../contrato/index.js';
@@ -46,6 +48,7 @@ import {
   listarEntradasTela,
   obtenerEntradaTela,
 } from '../../dominio/inventarios/entradas-tela.js';
+import { leerCfdiParaEntradaTela } from '../../dominio/inventarios/cfdi-entrada-tela.js';
 import {
   eliminarAdjuntoEntradaTela,
   listarAdjuntosEntradaTela,
@@ -127,6 +130,32 @@ export const rutasEntradasTela: FastifyPluginCallbackZod = (app, _opciones, done
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const entrada = await crearEntradaTela(sesion, request.body);
       return reply.code(201).send(entrada);
+    },
+  });
+
+  // ── Leer la FACTURA (XML del CFDI) para llenar la captura (§Post-F9.20) ──────
+  // Solo LEE: devuelve una propuesta (proveedor por RFC + conceptos con su renglón de OC sugerido).
+  // Va con `inventario-telas.mover` —quien captura la entrada—, NO con `cxp.administrar`: leer la
+  // factura para recibir mercancía es parte de recibir. El PDF se sigue subiendo como adjunto.
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/entradas/leer-cfdi',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Leer el XML de la factura y proponer los renglones de la entrada',
+      security: SEGURIDAD_SESION,
+      body: esquemaLeerCfdiEntradaTela,
+      response: { 200: esquemaPropuestaCfdiEntradaTela, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return leerCfdiParaEntradaTela(sesion, {
+        xml: request.body.xml,
+        ...(request.body.idOrdenCompra === undefined
+          ? {}
+          : { idOrdenCompra: request.body.idOrdenCompra }),
+      });
     },
   });
 

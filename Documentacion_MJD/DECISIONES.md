@@ -1005,3 +1005,24 @@ Respuesta de Daniel a la pregunta que quedó abierta en §Post-F9.18:
 - **Esto SALDA la deuda que §Post-F9.18 había asumido** (el complemento no se conciliaba contra la OC). No hizo falta migración: `RecepcionCompraLinea.cantidadComplemento` ya existía desde B1 y la entrada de tela ya lo escribía — lo que faltaba era **mirarlo** al decidir el estatus.
 - **Aplica en:** backend (dominio + 1 campo nuevo en la respuesta de `lineas-tela-pendientes`) + la captura de la factura, que ahora dice *"faltan 380 kg + 5 de Cardigan"* y precarga las dos cantidades. **SIN migración, SIN permisos** → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.20) — Leer la FACTURA (XML del CFDI) para llenar la entrada de tela (DANIEL, 7-ago-2026)
+
+Daniel: *"lo ideal es que pueda leer la factura y llenar los campos. ¿Se podría hacer eso?"* → tras proponerle los dos caminos: *"sí, está perfecto que la información la tomes del XML para las dos cosas, y el PDF que se suba solo como referencia para poder consultar siempre la factura"*.
+
+**Del XML, no del PDF.** El CFDI trae los datos **estructurados y exactos** (RFC del emisor, UUID, fecha, serie/folio y cada concepto con cantidad, valor unitario e importe); del PDF habría que adivinarlos con OCR o con una plantilla por proveedor, que se rompe en cuanto cambian el formato. El **PDF se sigue subiendo como adjunto** del documento (mecanismo que ya existía) para consultar la factura tal cual — pero **no es de donde salen los datos**.
+
+**Lo que hace, y lo que deliberadamente NO hace:**
+1. **Solo LEE.** El endpoint devuelve una **propuesta**; no escribe nada. La persona revisa, corrige y captura lo único que el CFDI no dice: **el COLOR** de la tela que llegó.
+2. **Reconoce al proveedor por su RFC** contra el catálogo. Si ninguno lo tiene capturado, lo dice y sugiere capturarlo *"para que la próxima factura se reconozca sola"*.
+3. **Cruza cada concepto con el renglón de OC pendiente** que probablemente surte, en dos pasadas: primero por el **nombre de la tela** dentro de la descripción (normalizando mayúsculas, acentos y signos: el proveedor escribe *"FELPA PERCHADA 100% ALG."* y el catálogo dice *"Felpa Perchada"*), después por **cantidad parecida** o porque solo queda un pendiente. Un renglón de OC **no se le asigna a dos conceptos**, y cada sugerencia dice **por qué** se hizo para que la persona pueda juzgarla.
+4. **Es conservador a propósito:** exige que TODAS las palabras del nombre de la tela aparezcan en la descripción. Preferimos no sugerir a sugerir mal — un renglón vacío se corrige en un clic, pero un amarre equivocado puede pasar desapercibido y descuadrar la orden de compra.
+5. **Las cantidades y precios que valen son los de la FACTURA**, no los que faltaban en la orden: es lo que llegó y lo que se va a pagar. Siguen siendo editables.
+6. **Una factura dirigida a OTRA empresa se RECHAZA**, no se avisa (regla heredada de F9, `validarReceptorCfdi`): recibir mercancía contra el comprobante de alguien más no es una advertencia, es un error. La ÚNICA excepción es cuando la empresa todavía no captura su RFC — ahí no hay contra qué validar, así que se avisa y se deja seguir (recordatorio: capturar el RFC de FR Moda en Administración › Empresas sigue siendo un pendiente de F9).
+7. **La misma factura no se recibe dos veces:** la entrada guarda el `uuidCfdi` con un unique `(idEmpresa, uuidCfdi)`, y al leer se avisa si ese UUID ya está en otra entrada **o** ya se importó a Cuentas por pagar.
+
+- **Permiso `inventario-telas.mover`** (quien captura la entrada), **NO** `cxp.administrar`: leer la factura para recibir mercancía es parte de recibir, no de finanzas.
+- **REUSA el parser de F9** (`terceros/cfdi/parser-cfdi.ts`, el mismo que alimenta CxP): un solo lugar en todo el sistema entiende de CFDI. Se le agregaron `serie`/`folio` (para proponer el número de documento), que es aditivo y no afecta a CxP.
+- **PENDIENTE, la otra mitad de "las dos cosas":** que al **confirmar** la entrada se genere la **CxP** del proveedor con ese mismo CFDI. Los datos ya están (UUID sellado en la entrada) y F9 ya sabe crear el cargo fiscal desde un CFDI (`importarCfdi`); falta cablearlo dentro de la transacción de la confirmación, con el permiso resuelto como dice §Post-F9.15 (el cargo nace como consecuencia del acto ya autorizado, no exigiendo `cxp.administrar` a quien recibe).
+- **Aplica en:** 1 migración **aditiva** (`entradas_tela.uuid_cfdi` + unique por empresa), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-07.

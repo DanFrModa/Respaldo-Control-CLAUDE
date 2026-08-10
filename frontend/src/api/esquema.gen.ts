@@ -35178,6 +35178,8 @@ export interface paths {
                  */
                 tipoDocumento: 'factura' | 'remision';
                 numeroDocumento: string;
+                /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+                uuidCfdi: string | null;
                 idProveedor: number;
                 /** @description Nombre del proveedor. */
                 proveedor: string;
@@ -35367,6 +35369,8 @@ export interface paths {
             fecha: string;
             idAlmacen: number;
             observaciones?: string;
+            /** @description UUID (folio fiscal) del CFDI leído, o null si se capturó a mano. */
+            uuidCfdi?: string | null;
             lineas: {
               idTelaColor: number;
               /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
@@ -35403,6 +35407,8 @@ export interface paths {
                */
               tipoDocumento: 'factura' | 'remision';
               numeroDocumento: string;
+              /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+              uuidCfdi: string | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -35567,6 +35573,178 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/inventarios/telas/entradas/leer-cfdi': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Leer el XML de la factura y proponer los renglones de la entrada */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description XML del CFDI a leer para llenar la entrada de tela. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Contenido del XML del CFDI. */
+            xml: string;
+            /** @description Acota las sugerencias a UNA orden de compra. */
+            idOrdenCompra?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Propuesta leída del CFDI para llenar la entrada de tela. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Folio fiscal del CFDI. */
+              uuid: string;
+              /** @description Serie+Folio del CFDI: el número de factura que se propone para el documento. */
+              numeroDocumento: string;
+              /**
+               * Format: date
+               * @description Fecha de emisión (propuesta para el documento).
+               */
+              fecha: string;
+              emisorRfc: string;
+              emisorNombre: string | null;
+              moneda: string;
+              total: number;
+              /** @description Proveedor del catálogo con ese RFC, o null si ninguno lo tiene. */
+              idProveedor: number | null;
+              proveedor: string | null;
+              /** @description El UUID ya se capturó antes (otra entrada o ya en CxP). */
+              yaUsado: boolean;
+              /** @description Lo que hay que saber antes de aceptar la propuesta. */
+              avisos: string[];
+              conceptos: {
+                /** @description Descripción tal como la escribió el proveedor. */
+                descripcion: string;
+                cantidad: number;
+                valorUnitario: number;
+                importe: number;
+                sugerencia: {
+                  idOrdenCompraLinea: number;
+                  /** @description Folio de la orden de compra. */
+                  numCompra: number;
+                  idTela: number;
+                  tela: string;
+                  unidad: string | null;
+                  /** @description Lo que falta del cuerpo en ese renglón. */
+                  pendiente: number;
+                  /** @description Lo que falta del complemento. */
+                  pendienteComplemento: number;
+                  nombreComplemento: string | null;
+                  /**
+                   * @description Por qué se sugirió (para que la persona pueda juzgarla).
+                   * @enum {string}
+                   */
+                  motivo: 'nombre-de-la-tela' | 'unico-pendiente' | 'cantidad-parecida';
+                } | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/inventarios/telas/entradas/{id}': {
     parameters: {
       query?: never;
@@ -35604,6 +35782,8 @@ export interface paths {
                */
               tipoDocumento: 'factura' | 'remision';
               numeroDocumento: string;
+              /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+              uuidCfdi: string | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -35789,6 +35969,8 @@ export interface paths {
             fecha: string;
             idAlmacen: number;
             observaciones?: string;
+            /** @description UUID (folio fiscal) del CFDI leído, o null si se capturó a mano. */
+            uuidCfdi?: string | null;
             lineas: {
               idTelaColor: number;
               /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
@@ -35825,6 +36007,8 @@ export interface paths {
                */
               tipoDocumento: 'factura' | 'remision';
               numeroDocumento: string;
+              /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+              uuidCfdi: string | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -36029,6 +36213,8 @@ export interface paths {
                */
               tipoDocumento: 'factura' | 'remision';
               numeroDocumento: string;
+              /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+              uuidCfdi: string | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -36239,6 +36425,8 @@ export interface paths {
                */
               tipoDocumento: 'factura' | 'remision';
               numeroDocumento: string;
+              /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
+              uuidCfdi: string | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;

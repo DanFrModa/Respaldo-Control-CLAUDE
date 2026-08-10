@@ -19,6 +19,8 @@ function conReceptor(receptorRfc: string): CfdiParseado {
     uuid: '11111111-1111-1111-1111-111111111111',
     fecha: '2026-07-01',
     fechaTimbrado: null,
+    serie: null,
+    folio: null,
     emisorRfc: 'AAA010101AA1',
     emisorNombre: 'Telas del Norte SA',
     receptorRfc,

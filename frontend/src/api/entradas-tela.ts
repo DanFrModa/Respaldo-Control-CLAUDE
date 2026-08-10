@@ -299,3 +299,40 @@ export function useQuitarAdjuntoEntradaTela(): UseMutationResult<
     },
   });
 }
+
+// ── Leer la FACTURA (XML del CFDI) para llenar la captura (§Post-F9.20) ──────────────────────────
+
+/** Propuesta que devuelve el servidor al leer el XML (proveedor, conceptos y sus sugerencias). */
+export type PropuestaCfdiEntradaTela =
+  paths['/api/inventarios/telas/entradas/leer-cfdi']['post']['responses']['200']['content']['application/json'];
+
+/** Un concepto de la factura con su sugerencia de renglón de OC. */
+export type ConceptoCfdiEntradaTela = PropuestaCfdiEntradaTela['conceptos'][number];
+
+/** Cuerpo de la lectura: el XML y, opcionalmente, la OC desde la que se recibe. */
+export type LeerCfdiEntradaTelaCuerpo =
+  paths['/api/inventarios/telas/entradas/leer-cfdi']['post']['requestBody']['content']['application/json'];
+
+/** Manda el XML al servidor y trae la propuesta. NO escribe nada (por eso no invalida cache). */
+async function leerCfdi(cuerpo: LeerCfdiEntradaTelaCuerpo): Promise<PropuestaCfdiEntradaTela> {
+  const { data, error } = await api.POST('/api/inventarios/telas/entradas/leer-cfdi', {
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lee el XML de la factura para llenar la captura (§Post-F9.20 — Daniel: *"lo ideal es que pueda
+ * leer la factura y llenar los campos"*). Es una mutación porque el XML viaja en el cuerpo, pero el
+ * servidor solo LEE: la propuesta se aplica en pantalla y la persona la revisa antes de guardar.
+ */
+export function useLeerCfdiEntradaTela(): UseMutationResult<
+  PropuestaCfdiEntradaTela,
+  ErrorDeApi,
+  LeerCfdiEntradaTelaCuerpo
+> {
+  return useMutation({ mutationFn: leerCfdi });
+}

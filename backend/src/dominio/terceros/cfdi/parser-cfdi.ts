@@ -42,6 +42,10 @@ export interface CfdiParseado {
   fecha: string;
   /** Fecha del timbrado (ISO) o null. */
   fechaTimbrado: string | null;
+  /** Serie del comprobante (atributo `Serie`), o null. */
+  serie: string | null;
+  /** Folio del comprobante (atributo `Folio`), o null. Serie+Folio es el "número de factura". */
+  folio: string | null;
   /** RFC del emisor (el proveedor). */
   emisorRfc: string;
   /** Razón social del emisor o null. */
@@ -289,6 +293,8 @@ export function parsearCfdi(xml: string): CfdiParseado {
     uuid,
     fecha,
     fechaTimbrado: atributo(timbre, 'FechaTimbrado'),
+    serie: atributo(comprobante, 'Serie'),
+    folio: atributo(comprobante, 'Folio'),
     emisorRfc,
     emisorNombre: atributo(emisor, 'Nombre'),
     receptorRfc,
