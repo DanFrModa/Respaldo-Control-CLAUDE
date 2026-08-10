@@ -76714,6 +76714,11 @@
                             ]
                           },
                           "description": "Cantidades por talla de este color."
+                        },
+                        "numOrdenV1": {
+                          "description": "Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia).",
+                          "type": "string",
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -77187,6 +77192,11 @@
                             ]
                           },
                           "description": "Cantidades por talla de este color."
+                        },
+                        "numOrdenV1": {
+                          "description": "Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia).",
+                          "type": "string",
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -78822,6 +78832,17 @@
                             ],
                             "description": "Folio de la orden, o null."
                           },
+                          "numOrdenV1": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25), o null."
+                          },
                           "entrada": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -78871,6 +78892,7 @@
                           "etiquetaTalla",
                           "idOrden",
                           "folioOrden",
+                          "numOrdenV1",
                           "entrada",
                           "salida",
                           "saldo",

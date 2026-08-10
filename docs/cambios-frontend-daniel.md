@@ -2202,3 +2202,28 @@ informales.
 ### Nota de despliegue (para Gabriel)
 
 **Sin migración, sin permisos nuevos, sin seed** → no hace falta `SEED_ON_START`.
+
+## De qué orden salió lo que hay en el almacén de PT (10-ago-2026)
+
+El inventario de producto terminado arranca **desde cero**, con el conteo físico. Pero las prendas
+que están en el anaquel las fabricaron órdenes **viejas**, que no se migran (la migración lleva solo
+2025-2026).
+
+Por eso, al capturar un movimiento de PT ahora hay un campo **"Orden de Control viejo"**: escribes
+el número tal como aparece en Control viejo y queda guardado con esas prendas, para que después
+puedas ir a consultar allá la información de esa orden.
+
+- Se captura **una vez por movimiento** (cuentas un lote de una orden, lo capturas, y listo). Si un
+  lote mezcla dos órdenes, haz dos movimientos.
+- **No parte tu inventario.** Si cuentas el mismo modelo/color/talla con dos órdenes distintas, sigue
+  siendo el mismo inventario: el número de orden es una nota para consultar, no una división del
+  stock.
+- **Se ve en el kardex**, en la columna de orden, marcado como "(Control viejo)" para no confundirlo
+  con las órdenes del sistema nuevo.
+
+### Los modelos SÍ van a estar
+
+No hace falta capturar a mano números de modelo ni descripciones: **los 4,987 modelos de Control
+migran completos**, con su descripción, y los colores y las tallas también. El corte de 2025-2026 es
+para los **documentos** (pedidos, órdenes, compras), no para los catálogos. Al contar una prenda de
+2019, el modelo está ahí para escogerlo.

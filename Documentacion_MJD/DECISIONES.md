@@ -1134,3 +1134,22 @@ Sube a **regla de toda la migración** lo que §Post-F9.23 había hecho solo par
 
 - **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa con `ETL_DESDE=2025` al correr la migración.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.25) — El almacén de PT arranca en CERO, y recuerda de qué orden vieja salió (DANIEL, 10-ago-2026)
+
+> *"Sí, el almacén de PT empieza también desde cero. Acá el único tema es que será bueno incluir un campo de orden de producción para poder saber qué orden anterior es la que se fabricó. Para poder consultar información en Control viejo."*
+
+Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `IPT_Movs` (5,072 movimientos, el último de 2023) no aporta nada y **el inventario de producto terminado arranca vacío**, igual que el de telas (§Post-F9.11 punto 5). El arranque es el **conteo físico**.
+
+**El campo: `MovimientoDetPt.numOrdenV1`** (texto, opcional).
+- **Por qué TEXTO y no la llave `idOrden`** que ya existía (F6-E2 "PT por orden", ADR-0014): esa FK solo puede apuntar a órdenes que viven en v2, y de 5,451 solo migran 262. Las prendas que están hoy en el anaquel las fabricaron órdenes **viejas**, que no se migran. Se guarda el número **tal como lo imprime Control viejo**, que es exactamente para lo que Daniel lo pidió: poder ir a consultarlo allá.
+- **Es INFORMATIVO: no entra en la llave de existencia** (modelo×color×talla×orden×almacén). Dos conteos del mismo artículo con distinta orden vieja son el **mismo** inventario — lo que cambia es de dónde vino, no qué hay en el anaquel. Fragmentar el stock por una nota de consulta habría partido en pedazos el inventario de arranque, y las vistas, los locks y las sumas del kardex no se tocan.
+- **Se captura UNA vez por movimiento** y se replica a cada color. El API lo recibe por color (mismo nivel que `idOrden`), pero en el conteo se cuenta un lote de una orden a la vez: pedirlo color por color sería teclear lo mismo N veces. Si un movimiento mezclara dos órdenes, se capturan dos movimientos.
+- **El movimiento INVERSO lo hereda**, para que el renglón que anula se lea igual que el que anuló.
+- **Se ve en el kardex**: la columna de orden muestra la orden de v2 si existe, y si no el nº con la marca "(Control viejo)".
+
+**⚠️ NO hacen falta campos temporales para modelo, color ni talla.** Daniel lo planteó (*"al no tener un catálogo de dónde vamos a tomar los modelos existentes, tendríamos que hacer campos temporales también para números de modelo, descripción, colores, tallas"*), pero el supuesto no se sostiene y se verificó contra el dump: **el corte de 2025-2026 aplica a DOCUMENTOS con fecha, no a los catálogos.** Los **4,987 modelos** de `Modelos.csv` migran completos con su descripción (aunque solo 241 se usaron en órdenes de 2025/26), y **colores y tallas** vienen de sus propias tablas, no de las órdenes. Al contar una prenda de 2019, el modelo **está** en el catálogo para escogerlo. Lo único que de verdad no existe es la **orden**, que es justo lo que resuelve este campo.
+
+- **Queda abierto (Daniel):** ¿se depura también el catálogo de modelos, como el de proveedores? Recomendación: **no**. Un modelo no estorba (no se ofrece al capturar salvo que se busque) y es lo que permite identificar lo que hay en el almacén sin teclear descripciones a mano. Si se depurara a 241, **entonces sí** harían falta los campos temporales.
+- **Aplica en:** 1 migración **aditiva** (`movimiento_det_pt.num_orden_v1` + índice), SIN permisos, SIN seed → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-10.

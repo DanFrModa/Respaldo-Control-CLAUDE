@@ -8,7 +8,7 @@ import { useCrearMovimientoPt, useTiposMovimiento } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import {
@@ -45,6 +45,9 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
   const [fecha, setFecha] = useState(hoy());
   const [observaciones, setObservaciones] = useState('');
+  // §Post-F9.25 — nº de la orden del sistema VIEJO que fabricó estas prendas. Es lo que permite ir a
+  // consultar la orden en Control viejo: esas órdenes no se migraron (la migración lleva 2025-2026).
+  const [numOrdenV1, setNumOrdenV1] = useState('');
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
 
@@ -113,12 +116,13 @@ export function MovimientosPtPagina(): React.JSX.Element {
         idModelo: modelo.id,
         fecha,
         ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
-        lineas: aLineasApi(lineas),
+        lineas: aLineasApi(lineas, numOrdenV1),
       },
       {
         onSuccess: (mov) => {
           toast.success(`Movimiento #${mov.folio} guardado (${mov.totalPiezas} pzas).`);
           limpiarMatriz();
+          setNumOrdenV1('');
         },
         onError: (error) => toast.error(error.message),
       },
@@ -229,16 +233,32 @@ export function MovimientosPtPagina(): React.JSX.Element {
                 </Field>
               </div>
 
-              <Field>
-                <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
-                <Input
-                  id="obs"
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Opcional"
-                  disabled={!puedeMover}
-                />
-              </Field>
+              <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">
+                <Field>
+                  <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+                  <Input
+                    id="obs"
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    placeholder="Opcional"
+                    disabled={!puedeMover}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="mov-orden-v1">Orden de Control viejo</FieldLabel>
+                  <Input
+                    id="mov-orden-v1"
+                    value={numOrdenV1}
+                    onChange={(e) => setNumOrdenV1(e.target.value)}
+                    placeholder="Ej. 12345"
+                    disabled={!puedeMover}
+                    data-testid="mov-orden-v1"
+                  />
+                  <FieldDescription>
+                    De qué orden salieron estas prendas, para poder consultarla en Control viejo.
+                  </FieldDescription>
+                </Field>
+              </div>
 
               <div>
                 <h3 className="mb-2 text-sm font-medium">Cantidades (color × talla)</h3>

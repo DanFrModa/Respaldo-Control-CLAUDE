@@ -31497,6 +31497,8 @@ export interface paths {
                 idTalla: number;
                 cantidad: number;
               }[];
+              /** @description Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia). */
+              numOrdenV1?: string;
             }[];
           };
         };
@@ -31701,6 +31703,8 @@ export interface paths {
                 idTalla: number;
                 cantidad: number;
               }[];
+              /** @description Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia). */
+              numOrdenV1?: string;
             }[];
           };
         };
@@ -32365,6 +32369,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden, o null. */
                 folioOrden: number | null;
+                /** @description Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25), o null. */
+                numOrdenV1: string | null;
                 /** @description Piezas que entran en este renglón (0 si es salida). */
                 entrada: number;
                 /** @description Piezas que salen en este renglón (0 si es entrada). */

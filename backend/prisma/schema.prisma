@@ -3206,6 +3206,21 @@ model MovimientoDetPt {
   idOrden Int?   @map("id_orden")
   orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
 
+  /// NÚMERO DE ORDEN DEL SISTEMA VIEJO (§Post-F9.25 — Daniel: *"será bueno incluir un campo de orden
+  /// de producción para poder saber qué orden anterior es la que se fabricó, para poder consultar
+  /// información en Control viejo"*).
+  ///
+  /// POR QUÉ TEXTO Y NO LA LLAVE `idOrden`: la migración lleva solo 2025-2026 (§Post-F9.24) y el
+  /// almacén de PT arranca de un CONTEO FÍSICO desde cero, pero las prendas contadas las fabricaron
+  /// órdenes VIEJAS que no existen en v2. Una FK no puede apuntar a una orden que no se migró; este
+  /// campo guarda el número tal como lo imprime Control viejo, para poder ir a consultarlo allá.
+  ///
+  /// Es INFORMATIVO: **no** entra en la llave de existencia (modelo×color×talla×orden×almacén). Dos
+  /// conteos del mismo artículo con distinta orden vieja son el MISMO inventario — lo que cambia es
+  /// de dónde vino, no qué hay en el anaquel. Fragmentar el stock por una nota de consulta habría
+  /// partido en pedazos el inventario de arranque.
+  numOrdenV1 String? @map("num_orden_v1")
+
   /// Cantidad de prendas (positiva; el signo lo da la dirección del tipo de movimiento).
   cantidad  Int
   /// Costo unitario al momento del movimiento. NULLABLE y NULL en toda F3 (D1/D2 — ADR-0010 §4).
@@ -3220,6 +3235,7 @@ model MovimientoDetPt {
   @@index([idModelo, idColor, idTalla])
   @@index([idOrden])
   @@index([idOrden, idModelo, idColor, idTalla])
+  @@index([numOrdenV1])
   @@map("movimiento_det_pt")
 }
 
