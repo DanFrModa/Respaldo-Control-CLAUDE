@@ -660,8 +660,17 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     return oc;
   }
 
-  /** Captura una entrada de 1 renglón ligado al renglón de OC dado. */
-  async function capturarConOC(idOrdenCompraLinea: number, cantidad: number, precioUnit = 12) {
+  /**
+   * Captura una entrada de 1 renglón ligado al renglón de OC dado. `cantidadComplemento` entrega el
+   * CARDIGAN que la OC pidió (§Post-F9.19: la orden no cierra sin él); se puede pasar 0 para probar
+   * justamente el caso en que falta.
+   */
+  async function capturarConOC(
+    idOrdenCompraLinea: number,
+    cantidad: number,
+    precioUnit = 12,
+    cantidadComplemento = 5,
+  ) {
     return crearEntradaTela(
       sesion(),
       {
@@ -670,7 +679,15 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
         idProveedor: proveedor.id,
         fecha: '2026-08-07',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: colorMarino.id, cantidad, precioUnit, idOrdenCompraLinea }],
+        lineas: [
+          {
+            idTelaColor: colorMarino.id,
+            cantidad,
+            precioUnit,
+            idOrdenCompraLinea,
+            ...(cantidadComplemento > 0 ? { cantidadComplemento } : {}),
+          },
+        ],
       },
       bd(),
     );
@@ -702,9 +719,9 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     expect(recepciones[0]?.factura).toBe('F-500');
     expect(Number(recepciones[0]?.lineas[0]?.cantidadRecibida)).toBe(100);
 
-    // La tela entró UNA sola vez: un movimiento de kardex y la existencia = 100.
+    // La tela entró UNA sola vez: un movimiento de kardex, cuerpo 100 + cardigan 5 (§Post-F9.19).
     expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(1);
-    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 0 });
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 5 });
     // Y el renglón de la recepción apunta a ESE movimiento y a la partida de la entrada.
     expect(recepciones[0]?.lineas[0]?.idMovimiento).not.toBeNull();
     expect(recepciones[0]?.lineas[0]?.idPartida).not.toBeNull();
@@ -720,7 +737,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const oc = await ocFelpaAutorizada(100, 12);
     const idLineaOC = oc.lineas[0]!.id;
 
-    const primera = await capturarConOC(idLineaOC, 40);
+    const primera = await capturarConOC(idLineaOC, 40, 12, 0);
     await confirmarEntradaTela(sesion(), primera.id, bd());
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_parcial',
@@ -739,6 +756,8 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
             idTelaColor: colorMarino.id,
             cantidad: 60,
             precioUnit: 12,
+            // La primera factura no trajo cardigan: aquí llega el que la OC pidió.
+            cantidadComplemento: 5,
             idOrdenCompraLinea: idLineaOC,
           },
         ],
@@ -749,7 +768,69 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_total',
     );
-    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 0 });
+    expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 100, complemento: 5 });
+  });
+
+  it('§Post-F9.19: si la OC pidió CARDIGAN, el cuerpo completo NO cierra la orden', async () => {
+    // Daniel: *"si en la OC lleva cardigan, se debe de recibir el cardigan"*.
+    const oc = await ocFelpaAutorizada(100, 12);
+    const idLineaOC = oc.lineas[0]!.id;
+
+    // Llega TODO el cuerpo, cero cardigan.
+    const soloCuerpo = await capturarConOC(idLineaOC, 100, 12, 0);
+    await confirmarEntradaTela(sesion(), soloCuerpo.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_parcial',
+    );
+
+    // Y en cuanto llega el cardigan, cierra.
+    const elCardigan = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-502',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-09',
+        idAlmacen: almacen.id,
+        lineas: [
+          {
+            idTelaColor: colorMarino.id,
+            cantidad: 0,
+            cantidadComplemento: 5,
+            precioUnit: 12,
+            idOrdenCompraLinea: idLineaOC,
+          },
+        ],
+      },
+      bd(),
+    );
+    await confirmarEntradaTela(sesion(), elCardigan.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+  });
+
+  it('§Post-F9.19: en TELA, 5% de menos YA cierra la orden (nunca llega exacto)', async () => {
+    // Daniel: *"si se piden 400 kilos, el proveedor puede entregar +/− 5%"*.
+    const oc = await ocFelpaAutorizada(400, 12);
+    const idLineaOC = oc.lineas[0]!.id;
+
+    // Llegan 380 de 400 (−5%) y el cardigan completo → la OC se da por surtida.
+    const entrada = await capturarConOC(idLineaOC, 380, 12, 5);
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+  });
+
+  it('§Post-F9.19: una diferencia MAYOR al 5% deja la orden abierta (aún sin autorización)', async () => {
+    // La segunda etapa pedirá autorización para recibirla; hoy simplemente no cierra.
+    const oc = await ocFelpaAutorizada(400, 12);
+    const entrada = await capturarConOC(oc.lineas[0]!.id, 300, 12, 5);
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_parcial',
+    );
   });
 
   it('una factura puede surtir DOS órdenes de compra distintas (liga por renglón)', async () => {
@@ -769,12 +850,14 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
             idTelaColor: colorMarino.id,
             cantidad: 30,
             precioUnit: 12,
+            cantidadComplemento: 5,
             idOrdenCompraLinea: ocA.lineas[0]!.id,
           },
           {
             idTelaColor: colorBlanco.id,
             cantidad: 50,
             precioUnit: 12,
+            cantidadComplemento: 5,
             idOrdenCompraLinea: ocB.lineas[0]!.id,
           },
           // …y un tercer renglón SIN orden de compra: tela suelta en la misma factura.
@@ -795,7 +878,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
       );
     }
     // El renglón suelto entró al inventario igual, sin recepción que lo respalde.
-    expect(await existencia(colorBlanco.id)).toEqual({ cuerpo: 55, complemento: 0 });
+    expect(await existencia(colorBlanco.id)).toEqual({ cuerpo: 55, complemento: 5 });
   });
 
   it('cancelar la factura reversa la recepción y la OC vuelve a quedar pendiente', async () => {

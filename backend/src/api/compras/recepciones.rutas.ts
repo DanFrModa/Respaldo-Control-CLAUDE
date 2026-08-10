@@ -141,8 +141,20 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
                 unidad: z.string().nullable(),
                 cantidad: z.number().describe('Cantidad pedida en la OC.'),
                 recibido: z.number().describe('Ya recibido (recepciones activas).'),
-                pendiente: z.number().describe('Lo que falta por recibir.'),
+                pendiente: z
+                  .number()
+                  .describe('Lo que falta del CUERPO (0 dentro de la banda del 5%, §Post-F9.19).'),
                 precio: z.number().describe('Precio unitario de la OC.'),
+                nombreComplemento: z
+                  .string()
+                  .nullable()
+                  .describe('Cómo se llama el complemento de la tela ("Cardigan"), o null.'),
+                cantidadComplemento: z
+                  .number()
+                  .nullable()
+                  .describe('Complemento que pidió la OC, o null si no lleva.'),
+                recibidoComplemento: z.number().describe('Complemento ya recibido.'),
+                pendienteComplemento: z.number().describe('Complemento que falta por recibir.'),
               }),
             ),
           })

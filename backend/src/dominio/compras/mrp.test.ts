@@ -79,6 +79,16 @@ describe('MRP unit — semáforo de estatus de material (R7, función pura)', ()
   it('respeta la tolerancia de redondeo en "completo"', () => {
     expect(calcularEstatusMaterial(100, 100, 100 - 1e-9, false)).toBe('completo');
   });
+
+  it('§Post-F9.19: aplica la banda del 5% en tela Y en avío', () => {
+    // Sin la banda, el tablero diría "recibido parcial" para siempre, aunque la OC ya se haya dado
+    // por recibida: *"nunca se recibe la cantidad exacta"* y *"en avíos también puede haber una
+    // diferencia"*.
+    expect(calcularEstatusMaterial(400, 400, 380, false, 'tela')).toBe('completo');
+    expect(calcularEstatusMaterial(400, 400, 379, false, 'tela')).toBe('recibido-parcial');
+    expect(calcularEstatusMaterial(180, 180, 171, false, 'avio')).toBe('completo');
+    expect(calcularEstatusMaterial(180, 180, 170, false, 'avio')).toBe('recibido-parcial');
+  });
 });
 
 describe('MRP unit — estado de genérico tras netear (decisión d, función pura)', () => {

@@ -65,6 +65,7 @@ import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { minimoParaSurtir, type TipoRenglonCompra } from './tolerancia-recepcion.js';
 import { existenciaAvioTotalEmpresa } from '../../comun/kardex.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -884,9 +885,17 @@ export function calcularEstatusMaterial(
   enOc: number,
   recibido: number,
   esGenericoCubierto: boolean,
+  /**
+   * Tipo de la fila: elige su banda de tolerancia, la MISMA que cierra la orden de compra
+   * (§Post-F9.19). Sin banda, el tablero diría "recibido parcial" para siempre —contradiciendo a la
+   * OC, que ya se dio por recibida— porque *"nunca se recibe la cantidad exacta"*, ni en tela ni en
+   * avíos.
+   */
+  tipo: TipoRenglonCompra = 'avio',
 ): EstatusMaterial {
   if (esGenericoCubierto) return 'cubierto-por-stock';
-  if (recibido + TOLERANCIA >= aComprar && aComprar > TOLERANCIA) return 'completo';
+  const minimo = minimoParaSurtir(aComprar, tipo);
+  if (recibido + TOLERANCIA >= minimo && aComprar > TOLERANCIA) return 'completo';
   if (recibido > TOLERANCIA) return 'recibido-parcial';
   if (enOc > TOLERANCIA) return 'en-oc';
   return 'pendiente';
@@ -1001,7 +1010,13 @@ export async function estatusMaterialesOrden(
       requerido: Number(r.cantidadRequerida),
       enOc,
       recibido,
-      estatus: calcularEstatusMaterial(aComprar, enOc, recibido, esGenericoCubierto),
+      estatus: calcularEstatusMaterial(
+        aComprar,
+        enOc,
+        recibido,
+        esGenericoCubierto,
+        r.idTela !== null ? 'tela' : 'avio',
+      ),
     });
   }
 

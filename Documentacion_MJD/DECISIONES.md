@@ -983,3 +983,25 @@ Daniel, siguiendo el flujo de compras desde cero, dictó seis cosas de la OC (la
 - **PASO MANUAL DE DANIEL/GABRIEL (una vez):** el catálogo de direcciones **nace vacío** — no se siembra porque una dirección es dato del negocio y no se inventa. Antes de capturar la primera OC hay que dar de alta las direcciones en **Catálogos › Direcciones de entrega** y marcar la de siempre como favorita. Mientras esté vacío, el selector de la OC lo dice con letras.
 - **Aplica en:** 1 migración **aditiva** (`20260809120000_oc_direccion_entrega_y_complemento`: tabla `direcciones_entrega` + `ordenes_compra.id_direccion_entrega` + `orden_compra_linea.cantidad_complemento`/`precio_complemento`), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.19) — ¿Cuándo se marca RECIBIDA una orden de compra? (DANIEL, 7-ago-2026)
+
+Respuesta de Daniel a la pregunta que quedó abierta en §Post-F9.18:
+
+> *"No siempre lleva cardigan. Más bien, se debe de marcar como recibido si se recibe lo mismo que está en la OC. Si en la OC lleva cardigan, se debe de recibir el cardigan."*
+>
+> *"Es importante aclarar que en telas nunca se recibe la cantidad exacta que se pide. Si se piden 400 kilos, el proveedor puede entregar +/− 5%. Se me ocurre que si hay una diferencia más grande de ese porcentaje, se necesite una autorización para recibir esa tela (lo podemos hacer en una segunda etapa… ahorita ya quiero terminar con eso). Entonces ahorita lo que podemos hacer simplemente es saber que la cantidad que se recibe nunca va a coincidir exacto con lo de la OC."*
+
+**El criterio, tal como quedó** (función pura `dominio/compras/tolerancia-recepcion.ts`, para que TODOS lo apliquen igual):
+
+1. **Se cierra contra lo que la OC PIDIÓ, cuerpo y complemento.** Si la OC pidió Cardigan, la orden NO pasa a `recibida_total` hasta que llegue el Cardigan — aunque el cuerpo llegue completo. Si la OC no lo pidió (*"no siempre lleva cardigan"*), no se espera nada por ese lado.
+2. **Hay banda de tolerancia del 5% por debajo de lo pedido.** 400 kg se dan por surtidos con 380; con 379 la orden sigue abierta. Por arriba nunca estorba (recibir más ya cumple). Sin esta banda, **toda** OC se quedaría en `recibida_parcial` para siempre, porque el proveedor nunca entrega la cantidad exacta.
+3. **La banda NO es exclusiva de la tela** (aclaración de Daniel el mismo día: *"en avíos también puede haber una diferencia"*): también aplica a **avíos y líneas libres** — 171 de 180 piezas ya cierran. Lo que sí puede ser distinto por material es CUÁNTA diferencia es normal, así que la banda vive en `TOLERANCIA_POR_TIPO` (`tela` y `avio`, hoy **5% las dos** —el único número que Daniel dio— en constantes separadas para poder afinar una sin tocar la otra).
+4. **La cantidad recibida SIEMPRE se captura** y nunca se asume igual a la pedida (*"siempre debe de haber un campo para definir lo que se recibe realmente"*): la recepción de avíos (`recibirCompra`) y la factura de telas (`entradas-tela`) traen el campo editable, y el dominio **no rechaza** que difiera, ni por arriba ni por abajo. Esto ya era así desde F4-E3/B1; la aclaración lo vuelve explícito y probado.
+5. **El mismo criterio manda en los tres lugares** donde antes se comparaba a mano: el estatus de la OC (`recalcularEstatusOC`), el `porRecibir` del tablero de compras (`resumenOC`) y los renglones que la captura de la factura ofrece como pendientes (`lineasTelaPendientesDeProveedor`). Dentro de la banda, lo que falte **deja de contar como faltante**; el complemento que la OC pidió **sí cuenta** hasta que llega, valuado a su precio (o al del cuerpo si no trae propio).
+
+- **Un cuarto lugar que también lo aplica:** el tablero *"qué tengo / qué falta"* de la orden (`calcularEstatusMaterial`, R7) usa la misma banda en **todas** sus filas. Sin eso el tablero diría "recibido parcial" para siempre, **contradiciendo** a la OC que ya se dio por recibida — dos pantallas del mismo hecho diciendo cosas distintas.
+- **SEGUNDA ETAPA (decidida así por Daniel, no es un olvido):** **autorizar** una recepción cuya diferencia pase del 5%. Hoy una diferencia mayor simplemente **no cierra** el renglón: la OC queda `recibida_parcial` y se ve en el tablero; no se bloquea la entrada ni se le pide permiso a nadie. Cuando se construya, usará el mismo `TOLERANCIA_TELA` de la función pura.
+- **Esto SALDA la deuda que §Post-F9.18 había asumido** (el complemento no se conciliaba contra la OC). No hizo falta migración: `RecepcionCompraLinea.cantidadComplemento` ya existía desde B1 y la entrada de tela ya lo escribía — lo que faltaba era **mirarlo** al decidir el estatus.
+- **Aplica en:** backend (dominio + 1 campo nuevo en la respuesta de `lineas-tela-pendientes`) + la captura de la factura, que ahora dice *"faltan 380 kg + 5 de Cardigan"* y precarga las dos cantidades. **SIN migración, SIN permisos** → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-07.

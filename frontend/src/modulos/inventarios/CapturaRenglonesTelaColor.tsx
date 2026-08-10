@@ -47,6 +47,11 @@ export interface LineaOcPendiente {
   unidad: string | null;
   pendiente: number;
   precio: number;
+  /** Cómo se llama el complemento de esa tela ("Cardigan"), o null si no lleva (§Post-F9.19). */
+  nombreComplemento: string | null;
+  /** Complemento que pidió la OC, y lo que falta por recibir de él. */
+  cantidadComplemento: number | null;
+  pendienteComplemento: number;
 }
 
 /**
@@ -149,6 +154,11 @@ export function CapturaRenglonesTelaColor({
     setTela(datos);
     setIdTelaColor('');
     setCantidad(String(pendiente.pendiente));
+    // §Post-F9.19: si la OC pidió complemento, se precarga lo que falta de él (editable: lo que
+    // llegó puede no ser lo pedido).
+    setCantidadComplemento(
+      pendiente.pendienteComplemento > 0 ? String(pendiente.pendienteComplemento) : '',
+    );
     setPrecioUnit(String(pendiente.precio));
     setIdLineaOc(String(pendiente.idOrdenCompraLinea));
     setPendientePrecargando(null);
@@ -235,6 +245,14 @@ export function CapturaRenglonesTelaColor({
                   <span>
                     <strong>{l.tela}</strong> · faltan {l.pendiente.toLocaleString('es-MX')}
                     {l.unidad === null ? '' : ` ${l.unidad}`}
+                    {/* §Post-F9.19: si la OC pidió complemento, TAMBIÉN hay que recibirlo — la
+                        orden no cierra sin él. Se dice aquí para que no se olvide al capturar. */}
+                    {l.nombreComplemento !== null && l.cantidadComplemento !== null ? (
+                      <span data-testid="pendiente-complemento-oc">
+                        {' '}
+                        + {l.pendienteComplemento.toLocaleString('es-MX')} de {l.nombreComplemento}
+                      </span>
+                    ) : null}
                     <span className="text-muted-foreground"> · OC {l.numCompra}</span>
                   </span>
                   <Button

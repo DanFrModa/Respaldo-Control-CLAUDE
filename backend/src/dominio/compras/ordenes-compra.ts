@@ -36,6 +36,7 @@ import {
   esquemaCompraCancelarCuerpo,
 } from '../../contrato/esquemas/compra.js';
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
+import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -1145,7 +1146,20 @@ export async function resumenOC(
 
   const abiertas = await cliente.ordenCompra.findMany({
     where,
-    select: { id: true, lineas: { select: { id: true, cantidad: true, precio: true } } },
+    select: {
+      id: true,
+      lineas: {
+        select: {
+          id: true,
+          cantidad: true,
+          // §Post-F9.19: el complemento también es material que falta y que se paga.
+          cantidadComplemento: true,
+          precio: true,
+          precioComplemento: true,
+          idTela: true,
+        },
+      },
+    },
   });
   const ocAbiertas = abiertas.length;
   if (ocAbiertas === 0) {
@@ -1156,26 +1170,39 @@ export async function resumenOC(
   // `recalcularEstatusOC`. Un solo groupBy para todas las líneas de las OC abiertas.
   const idsLinea = abiertas.flatMap((oc) => oc.lineas.map((l) => l.id));
   const recibidoPorLinea = new Map<number, number>();
+  const recibidoComplementoPorLinea = new Map<number, number>();
   if (idsLinea.length > 0) {
     const sumas = await cliente.recepcionCompraLinea.groupBy({
       by: ['idOrdenCompraLinea'],
       where: { idOrdenCompraLinea: { in: idsLinea }, recepcionCompra: { reversadaEn: null } },
-      _sum: { cantidadRecibida: true },
+      _sum: { cantidadRecibida: true, cantidadComplemento: true },
     });
     for (const s of sumas) {
       recibidoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0));
+      recibidoComplementoPorLinea.set(
+        s.idOrdenCompraLinea,
+        Number(s._sum.cantidadComplemento ?? 0),
+      );
     }
   }
 
-  // ⚠️ `porRecibir` mide SOLO el cuerpo: `cantidadRecibida` no lleva el complemento de la tela
-  // (§Post-F9.18 y su deuda en HOJA-DE-RUTA §4). Cerrarlo pide una columna de complemento recibido
-  // en la recepción Y el criterio de "recibida total" cuando cuerpo y complemento van a distinto
-  // ritmo — regla que Daniel aún no dicta, así que se deja visible en vez de inventada.
+  // §Post-F9.19: `porRecibir` usa el MISMO criterio que el estatus (`faltantePorRecibir`), así que
+  // un renglón de tela dentro de la banda del 5% deja de contar como faltante —*"la cantidad que se
+  // recibe nunca va a coincidir exacto con la OC"*— y el COMPLEMENTO que la OC pidió SÍ cuenta,
+  // valuado a su precio (o al del cuerpo si no trae propio).
   let porRecibir = 0;
   for (const oc of abiertas) {
     for (const l of oc.lineas) {
-      const pendiente = Math.max(0, l.cantidad.toNumber() - (recibidoPorLinea.get(l.id) ?? 0));
-      porRecibir += pendiente * l.precio.toNumber();
+      const precio = l.precio.toNumber();
+      const falta = faltantePorRecibir({
+        pedido: l.cantidad.toNumber(),
+        recibido: recibidoPorLinea.get(l.id) ?? 0,
+        pedidoComplemento: l.cantidadComplemento === null ? null : l.cantidadComplemento.toNumber(),
+        recibidoComplemento: recibidoComplementoPorLinea.get(l.id) ?? 0,
+        tipo: l.idTela !== null ? 'tela' : 'avio',
+      });
+      porRecibir += falta.cuerpo * precio;
+      porRecibir += falta.complemento * (l.precioComplemento?.toNumber() ?? precio);
     }
   }
   return { ocAbiertas, porRecibir: redondear2(porRecibir) };
