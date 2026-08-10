@@ -45,6 +45,10 @@ import { cargarEmpresas } from './loaders/empresas.js';
 import { cargarEtiquetasMarca } from './loaders/etiquetas-marca.js';
 import { cargarGeneros } from './loaders/generos.js';
 import { cargarProveedores } from './loaders/proveedores.js';
+import {
+  describirProveedoresActivos,
+  resolverProveedoresActivos,
+} from './comun/proveedores-activos.js';
 import { cargarTallas } from './loaders/tallas.js';
 import { cargarTelaCategorias } from './loaders/tela-categorias.js';
 import { cargarTelas } from './loaders/telas.js';
@@ -78,9 +82,16 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   log('Temporadas', await cargarTemporadas(sesion, cliente, reporte));
   log('Tela-categorías', await cargarTelaCategorias(sesion, cliente, reporte));
 
+  const cfgActivos = resolverProveedoresActivos();
+  console.log(`  ${describirProveedoresActivos(cfgActivos)}`);
   const prov = await cargarProveedores(sesion, cliente, reporte);
   log('Proveedores', prov);
   console.log(`    (fusiones de roles de terceros: ${String(prov.fusiones)})`);
+  if (prov.depurados > 0) {
+    console.log(
+      `    (DEPURADOS por no tener movimiento desde ${String(cfgActivos.desde)}: ${String(prov.depurados)} — la lista completa va en el reporte)`,
+    );
+  }
 
   log('Almacenes', await cargarAlmacenes(sesion, cliente, reporte, idEmpresa));
   log('Bordados', await cargarBordados(sesion, cliente, reporte));

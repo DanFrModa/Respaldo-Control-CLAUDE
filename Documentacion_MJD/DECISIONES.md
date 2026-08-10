@@ -1070,3 +1070,32 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 - **Aplica en:** SIN migración, SIN permisos nuevos, SIN seed → **no requiere `SEED_ON_START`**.
 - **Pendiente de captura (Daniel):** revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados — mientras esté en NULL se comportan como formales.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.23) — Depurar el catálogo de proveedores: solo los de 2025-2026 (DANIEL, 10-ago-2026)
+
+> *"Me gustaría depurar el catálogo de proveedores… creo que lo mejor va a ser empezar desde cero. Hay demasiados proveedores con los que ya no se trabaja. Creo que la decisión que te dio Gabriel es trabajar con información de 2025 y 2026 de Control. Solo vamos a jalar esos proveedores y corregirlos porque les falta mucha información."*
+
+**Los números del dump (verificados, 10-ago-2026):** el Access acumuló **1,052 filas** en cuatro catálogos de terceros (443 Proveedores + 69 Cortadores + 496 Maquileros + 44 Estampadores) en ~20 años. Con movimiento **desde 2025** quedan **155**: 92 comerciales, 5 cortadores y 58 talleres. **Se depura el 85 %.**
+
+**La regla: un tercero está vivo si MOVIÓ algo**, no si el catálogo lo tiene. No se mira ninguna bandera `Activo` del viejo (nadie la mantuvo), sino los documentos con fecha:
+
+| Tipo | De dónde sale que está vivo |
+|---|---|
+| Comercial (telas/avíos/servicios) | `OrdCompra.IdProveedor` |
+| Cortador | `Corte.IdCortadores` |
+| Taller (costura y/o estampado) | `Entregas`, `Recibos`, `Notas`, `EntregasEst`, `RecibosEst` |
+
+**⚠️ HALLAZGO — `Estampadores.csv` es un catálogo MUERTO.** `EntregasEst.IdMaquileros` y `RecibosEst.IdMaquileros` **apuntan a `Maquileros`, no a `Estampadores`**: de los 15 ids que estampan en 2025/26, **14 existen en `Maquileros` y ninguno en `Estampadores`** (el 15º es `0`, el nulo del viejo). Quien estampa es un **taller** del catálogo de maquileros. El ETL de F1-E6 venía creando 44 proveedores "estampadores" que nadie usa; con la depuración quedan fuera **los 44**. No es un descuido: es la consecuencia correcta de la regla, y se reporta explícito.
+
+**Cómo quedó (`migracion/comun/proveedores-activos.ts` + el loader):**
+- **Configurable y por defecto NO recorta** (mismo criterio que `ventana.ts`): sin `ETL_PROVEEDORES_DESDE` se cargan todos, como hasta hoy. Con `ETL_PROVEEDORES_DESDE=2025` entra la depuración. Así una corrida vieja sigue dando lo mismo y el recorte es una decisión explícita de quien migra.
+- **Nada se descarta en silencio** (plan §7): cada tercero depurado sale en el reporte con su nombre, su fuente y su id viejo; el resumen imprime cuántos fueron.
+- **Un movimiento sin fecha legible NO declara vivo a nadie**, y el `0` del viejo (su nulo) nunca revive: preferimos dejar fuera a un dudoso —se da de alta en un minuto— que arrastrar de vuelta la basura que se está depurando.
+- **El análisis y la carga comparten el módulo**, para que no puedan discrepar.
+
+**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Emite factura (CFDI)?` (§Post-F9.22), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
+
+**⚠️ CONSECUENCIA QUE HAY QUE CONFIRMAR CON GABRIEL (no la decide este cambio):** el catálogo depurado **solo alcanza para migrar historia de 2025-2026**. Los ETL de F3-E6 (producción), F4-E6 (compras/notas) y F5-E7 (RC) hoy cargan el histórico **completo**, y esas filas apuntan a los ~897 terceros depurados. **O la migración entera se acota a 2025-2026** —que es lo que Daniel entiende que decidió Gabriel, y lo que ya vale para los consumos de tela (§Post-F9.11 punto 5, *"2025-2026, ~400 órdenes"*)— **o esos ETL se quedan sin proveedor** y omitirían masivamente. Mientras no se confirme, la depuración **está apagada por default**.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa al correr la migración.
+- **Fecha:** 2026-08-10.

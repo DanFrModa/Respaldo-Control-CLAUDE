@@ -33,6 +33,7 @@ import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
+import { resolverProveedoresActivos, type FuenteTercero } from '../comun/proveedores-activos.js';
 import {
   mapearRolProveedorComercial,
   mapearTipoProveedor,
@@ -115,6 +116,8 @@ async function fusionarRoles(
 /** Resultado de la fusión de terceros: el resumen + cuántas fusiones de roles ocurrieron. */
 export interface ResultadoProveedores extends ResultadoLoader {
   fusiones: number;
+  /** Terceros dejados fuera por NO tener movimiento en la ventana (§Post-F9.23). */
+  depurados: number;
 }
 
 export async function cargarProveedores(
@@ -131,6 +134,26 @@ export async function cargarProveedores(
   let omitidos = 0;
   let omitidosValidacion = 0;
   let fusiones = 0;
+  let depurados = 0;
+
+  // §Post-F9.23 — quién sigue vivo. Por defecto NO recorta; con `ETL_PROVEEDORES_DESDE=2025`
+  // solo entran los terceros que movieron algo de ese año en adelante.
+  const activos = resolverProveedoresActivos();
+
+  /**
+   * ¿Se carga este tercero? Si la depuración está activa y NO movió nada en la ventana, se
+   * cuenta y se REPORTA con nombre y fuente — nada se descarta en silencio (plan §7). El
+   * reporte es la lista que Daniel revisa antes de dar por buena la depuración.
+   */
+  function sigueVivo(fuente: FuenteTercero, idViejo: string | undefined, nombre: string): boolean {
+    if (activos.desde === 0 || activos.activo(fuente, idViejo)) return true;
+    depurados += 1;
+    reporte.agregar(
+      `Terceros DEPURADOS (sin movimiento desde ${String(activos.desde)})`,
+      `"${nombre}" (${fuente} #${idViejo ?? '?'})`,
+    );
+    return false;
+  }
 
   function rolId(codigo: string): number {
     const id = rolPorCodigo.get(codigo);
@@ -285,6 +308,7 @@ export async function cargarProveedores(
     }
     // Rol según TipoProv: T→vende-telas, H→vende-avios, S/vacío→otros-servicios (F4/MRP
     // filtra proveedores por rol). El `tipo` enum se conserva como clasificador rápido.
+    if (!sigueVivo('comercial', fila.IdProveedor, nombre)) continue;
     const codRolComercial = mapearRolProveedorComercial(fila.TipoProv);
     const idNuevo = await crearOFusionar(
       nombre,
@@ -309,6 +333,7 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!sigueVivo('cortador', fila.IdCortadores, nombre)) continue;
     const idNuevo = await crearOFusionar(
       nombre,
       [rolId(COD_ROL.corte)],
@@ -326,6 +351,7 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!sigueVivo('taller', fila.IdMaquileros, nombre)) continue;
     const costura = parsearBandera(fila.Costura);
     const proceso = parsearBandera(fila.Proceso);
     // Aclaración de Daniel: Costura→maquila-costura; Proceso(=decorado)→estampado; ambas→ambos
@@ -362,6 +388,7 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
+    if (!sigueVivo('estampador', fila.IdEstampadores, nombre)) continue;
     const idNuevo = await crearOFusionar(
       nombre,
       [rolId(COD_ROL.estampado)],
@@ -379,5 +406,5 @@ export async function cargarProveedores(
     });
   }
 
-  return { creados, existentes, omitidos, omitidosValidacion, fusiones };
+  return { creados, existentes, omitidos, omitidosValidacion, fusiones, depurados };
 }

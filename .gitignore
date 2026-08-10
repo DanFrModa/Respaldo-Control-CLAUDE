@@ -49,3 +49,6 @@ Respaldo CLAUDE/
 backend/reporte-etl-*.txt
 backend/migracion/_progreso.ts
 backend/analisis-tallas-*.txt
+
+# Generado por backend/migracion/analisis/proveedores-depuracion.ts (no se versiona: se regenera)
+backend/proveedores-a-corregir.csv

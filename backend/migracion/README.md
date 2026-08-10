@@ -136,6 +136,18 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 > (default **0 = sin recorte**, anclada a `ETL_VENTANA_REF`=hoy) si quieres recortar por antigüedad
 > además del recorte por empresa. Cada corrida escribe `reporte-etl-f4e6-{compras,telas}-*.txt`.
 
+> **Depuración de PROVEEDORES (§Post-F9.23):** el Access trae **1,052 filas** de terceros en cuatro
+> catálogos y solo **155** movieron algo desde 2025. Exporta `ETL_PROVEEDORES_DESDE=2025` antes de
+> `etl-catalogos` para cargar **solo esos** (default **sin variable = se cargan todos**, como hasta hoy).
+> Un tercero está vivo si MOVIÓ algo (OC, corte, entrega, recibo, nota o estampado), no por la bandera
+> `Activo` del viejo. **Ojo:** `EntregasEst/RecibosEst.IdMaquileros` apuntan a **Maquileros**, no a
+> `Estampadores` → ese catálogo (44) queda fuera COMPLETO, y es correcto: quien estampa es un taller.
+> Los depurados salen uno por uno en el reporte. ⚠️ Con la depuración activa **solo se puede migrar
+> historia de 2025-2026**: los ETL de F3/F4/F5 cargan histórico completo y apuntarían a proveedores que
+> ya no existen. Para ver a quién afecta y qué información falta, SIN tocar la BD:
+> `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts` (escribe
+> `proveedores-a-corregir.csv` con los 155 y las columnas por llenar).
+
 > **Orden de F3 (importante):** `etl-produccion` carga corte/envío/recibo/EsMa **sin** efectos de kardex
 > (los recibos de costura del histórico NO generan entrada a PT, porque esa entrada ya vive en `IPT_Movs`).
 > `etl-ipt` carga el kardex como **único** origen de existencias (`origenTipo = 'migracion'`). Así NO hay
