@@ -2163,3 +2163,42 @@ recapturar a mano cada factura que ya se recibió.
 
 Una migración **aditiva** (dos columnas en las entradas de tela) y **cero permisos nuevos** → **no**
 hace falta `SEED_ON_START`.
+
+## Los dos tipos de proveedor: el que factura y el que no (10-ago-2026)
+
+> *"Tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para
+> todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Para los que no, todo se
+> tiene que meter manual."* — Daniel
+
+La casilla ya existía en el alta del proveedor (**"¿Emite factura (CFDI)?"**). Ahora **manda**.
+
+### Cuando eliges un proveedor que NO factura
+
+- **Desaparece** el recuadro de *"Leer la factura (XML)"*: no hay factura que leer.
+- El **tipo de documento** se pone en **Remisión** y la opción *"Factura"* ya no aparece.
+- La pantalla te lo dice, y te dice qué sí va a pasar.
+
+### Y aun así se le genera su cuenta por pagar
+
+Esta es la parte importante. Como **nunca** va a llegar su factura, esperar por ella sería no
+registrarle **nunca** la deuda. Entonces, al confirmar la entrada, su cuenta por pagar nace con el
+**importe de los renglones** que capturaste (cuerpo + cardigan). Queda marcada como **no fiscal**,
+así que **no** se le aparece al contador entre las facturas — pero sí en lo que se le debe.
+
+Si no capturaste precios, no se genera nada: el sistema no inventa una deuda de cero.
+
+### Si te equivocas de casilla
+
+- Subir el XML de un proveedor marcado como que **no** factura: se **rechaza** al guardar.
+- Leer un XML de alguien marcado así: te **avisa** para que corrijas el catálogo (el XML es prueba
+  de que sí timbra), pero no lo corrige solo — esa casilla la defines tú.
+
+### Los proveedores que vienen de Access
+
+A los que **nunca** se les contestó la pregunta se les trata **como si facturaran** (es lo prudente:
+si mandan factura, se puede recibir). Vale la pena darles una pasada al catálogo y marcar a los
+informales.
+
+### Nota de despliegue (para Gabriel)
+
+**Sin migración, sin permisos nuevos, sin seed** → no hace falta `SEED_ON_START`.

@@ -30,6 +30,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
 import { rfcEmpresaActiva, uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
+import { admiteCfdi, exigirProveedorQueFactura } from '../terceros/facturacion-proveedor.js';
 import { validarReceptorCfdi } from '../terceros/cfdi/cfdi-proveedor.js';
 import { normalizarRfc, parsearCfdi, type CfdiConcepto } from '../terceros/cfdi/parser-cfdi.js';
 import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
@@ -225,7 +226,7 @@ export async function leerCfdiParaEntradaTela(
 
   const proveedor = await cliente.proveedor.findFirst({
     where: { rfc: { equals: parsed.emisorRfc, mode: 'insensitive' } },
-    select: { id: true, nombre: true, activo: true },
+    select: { id: true, nombre: true, activo: true, factura: true },
   });
   if (proveedor === null) {
     avisos.push(
@@ -234,6 +235,17 @@ export async function leerCfdiParaEntradaTela(
     );
   } else if (!proveedor.activo) {
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);
+  }
+  // §Post-F9.22 — contradicción entre el catálogo y la realidad: el proveedor está marcado como que
+  // NO factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML es
+  // prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir el
+  // catálogo en vez de corregirlo solos, porque la casilla la define quien da de alta al proveedor.
+  if (proveedor !== null && !admiteCfdi(proveedor.factura)) {
+    avisos.push(
+      `El proveedor "${proveedor.nombre}" está dado de alta como que NO emite factura, pero este ` +
+        `CFDI es suyo. Corrige la casilla "¿Emite factura (CFDI)?" en el catálogo de proveedores: ` +
+        `si no, no vas a poder guardar la entrada con esta factura.`,
+    );
   }
 
   // El MISMO UUID no se recibe dos veces: ni como otra entrada de tela, ni ya importado a CxP.
@@ -337,8 +349,12 @@ export async function sellarCfdiEnEntrada(
   // quien no facturó. Se valida aquí porque el proveedor lo elige la pantalla, no el XML.
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: datos.idProveedor },
-    select: { nombre: true, rfc: true },
+    select: { nombre: true, rfc: true, factura: true },
   });
+  // §Post-F9.22 — el que NO factura no puede traer factura. Se corta antes de subir nada a R2.
+  if (proveedor !== null) {
+    exigirProveedorQueFactura(proveedor, 'guardar la entrada con una factura (CFDI)');
+  }
   if (
     proveedor !== null &&
     proveedor.rfc !== null &&

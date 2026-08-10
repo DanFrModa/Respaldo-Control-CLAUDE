@@ -1042,3 +1042,31 @@ Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrad
 - **El PDF sigue siendo solo referencia** (adjunto del documento, §Post-F9.20): los datos y el respaldo fiscal salen del XML.
 - **Aplica en:** 1 migración **aditiva** (`entradas_tela.total_cfdi` + `id_archivo_cfdi`), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.22) — Dos tipos de proveedor: el que factura y el que no (DANIEL, 10-ago-2026)
+
+> *"Recuerda que en algún momento hablamos que tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
+
+La bandera ya existía desde **F1-E1B** (R15 §4): `Proveedor.factura`, capturada en el alta con la casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que faltaba es que esa casilla **MANDARA** en el flujo. Esta decisión la vuelve la que decide el camino, y lo hace en **un solo lugar** del dominio (`terceros/facturacion-proveedor.ts`) para que no se conteste distinto en cada módulo — la distinción es del **tercero**, no del documento.
+
+**Los tres estados (y por qué son tres, no dos):**
+
+| Estado | Qué significa | Cómo opera |
+|---|---|---|
+| `factura` (true) | Emite CFDI | Camino fiscal: se lee el XML y la CxP nace por el **total del comprobante** (con impuestos) |
+| `sin-factura` (false) | No emite | Todo **a mano**: nunca hay XML ni UUID, el documento es **remisión/nota** |
+| `no-definida` (null) | Nadie contestó la pregunta | Se trata **como los que facturan**, y se avisa para que se defina en el catálogo |
+
+El **NULL no es "no factura"**: son los proveedores que venían **migrados de Access**, donde la pregunta jamás se hizo. Tratarlos como informales habría apagado en silencio la lectura de facturas de casi todos los proveedores que ya existen. El sistema no decide por ellos lo que nadie capturó.
+
+**Cómo quedó en la entrada de tela** (el único flujo que hoy lee CFDI; la regla queda lista para los que vengan):
+
+1. **El que NO factura pierde el camino del CFDI.** La pantalla esconde el lector del XML y quita la opción *"Factura"* del tipo de documento (se corrige solo a **remisión**); el **servidor lo rechaza** igual — esconder no es impedir (A4). Un cargo fiscal de alguien que no timbra ensuciaría la contabilidad del contador.
+2. **Y aun así le nace su cuenta por pagar** — esta es la parte importante. Si esperáramos su factura, esa deuda **no se registraría nunca**. El cargo nace **NO FISCAL** por lo capturado a mano: la suma de `cantidad × precio` del cuerpo **y del complemento**. Sin IVA que sumar, esa suma **es** lo que se le debe. El motor de terceros ya distinguía fiscal/no fiscal desde F9 (es lo mismo que el fold de EsMa con los maquileros sin factura, `modalidadFacturacion`): no se inventó nada nuevo.
+3. **Sin precios capturados no se inventa una deuda de cero.** Queda visible en el documento (los renglones sin precio se ven), no callado.
+4. **Contradicción catálogo ↔ realidad:** si se lee un CFDI de un proveedor marcado como que NO factura, **leer solo avisa** (leer no escribe nada, y el XML es prueba de que sí timbra) y pide corregir el catálogo; **guardar sí lo rechaza**. La casilla la define quien da de alta al proveedor, así que no se corrige sola.
+5. **El que SÍ factura, pero todavía sin CFDI** (llegó con remisión y la factura viene después) sigue como en §Post-F9.21: **no se inventa cargo**, se registrará con la factura, que es la que trae el importe bueno.
+
+- **Aplica en:** SIN migración, SIN permisos nuevos, SIN seed → **no requiere `SEED_ON_START`**.
+- **Pendiente de captura (Daniel):** revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados — mientras esté en NULL se comportan como formales.
+- **Fecha:** 2026-08-10.

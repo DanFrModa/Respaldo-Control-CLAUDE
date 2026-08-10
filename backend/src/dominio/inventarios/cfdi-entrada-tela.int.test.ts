@@ -111,6 +111,14 @@ beforeEach(async () => {
     data: { nombre: 'Naucalpan', direccion: 'Av. Siempre Viva 123', favorita: true },
   });
   idDireccionEntrega = direccion.id;
+  // Confirmar una entrada mueve el kardex, y el motor exige el tipo de movimiento sembrado (nunca
+  // lo inventa). `limpiarBaseDatos` se lleva el catálogo, así que se re-siembra en cada prueba.
+  await cliente.tipoMovimientoInventario.createMany({
+    data: [
+      { codigo: 'entrada-recepcion', nombre: 'Entrada por Recepción', direccion: 'entrada' },
+      { codigo: 'ajuste-salida', nombre: 'Ajuste (Salida)', direccion: 'salida' },
+    ],
+  });
   expect(almacen.id).toBeGreaterThan(0);
 });
 
@@ -427,5 +435,219 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
       ),
     ).rejects.toThrow(/la entrada es del proveedor/);
     expect(await cliente.entradaTela.count()).toBe(0);
+  });
+});
+
+describe('Proveedor que NO factura (§Post-F9.22)', () => {
+  /** Servicio de archivos falso (idéntico al del bloque de arriba: aquí no hay R2). */
+  const archivosFalsos = {
+    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
+      Promise.resolve({
+        bucket: 'pruebas',
+        key: `cfdi/${datos.nombreOriginal}`,
+        nombreOriginal: datos.nombreOriginal,
+        tipoMime: datos.tipoMime,
+        tamanoBytes: 100,
+      }),
+  } as unknown as Parameters<typeof crearEntradaTela>[3];
+
+  /** Un tercero informal: da de alta con la casilla "¿Emite factura?" en NO. */
+  async function proveedorInformal() {
+    return cliente.proveedor.create({
+      data: { nombre: 'Talleres Don Chuy', factura: false },
+    });
+  }
+
+  it('al confirmar le nace su CxP NO FISCAL, por la suma de los renglones capturados a mano', async () => {
+    const informal = await proveedorInformal();
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Gris' },
+    });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-31',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: color.id, cantidad: 12, precioUnit: 45.5 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    expect(entrada.uuidCfdi).toBeNull();
+
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    const cargos = await cliente.movimientoTercero.findMany();
+    expect(cargos).toHaveLength(1);
+    // 12 × 45.50 = 546. Sin IVA que sumar: esa suma ES lo que se le debe.
+    expect(Number(cargos[0]?.monto)).toBe(546);
+    expect(cargos[0]?.esFiscal).toBe(false);
+    expect(cargos[0]?.uuidCfdi).toBeNull();
+    expect(cargos[0]?.idProveedor).toBe(informal.id);
+    expect(cargos[0]?.refTipo).toBe('entrada-tela');
+  });
+
+  it('el complemento (cardigan) también suma a lo que se le debe', async () => {
+    const informal = await proveedorInformal();
+    const tela = await cliente.tela.create({
+      data: {
+        nombre: 'Felpa con Cardigan',
+        idProveedor: informal.id,
+        unidadMedida: 'KG',
+        nombreComplemento: 'Cardigan',
+      },
+    });
+    const color = await cliente.telaColor.create({ data: { idTela: tela.id, nombre: 'Negro' } });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-32',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [
+          {
+            idTelaColor: color.id,
+            cantidad: 10,
+            precioUnit: 100,
+            cantidadComplemento: 2,
+            precioUnitComplemento: 50,
+          },
+        ],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    const cargos = await cliente.movimientoTercero.findMany();
+    // 10×100 (cuerpo) + 2×50 (cardigan) = 1100.
+    expect(Number(cargos[0]?.monto)).toBe(1100);
+  });
+
+  it('sin precios capturados NO se inventa una deuda de cero', async () => {
+    const informal = await proveedorInformal();
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Crudo' },
+    });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-33',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: color.id, cantidad: 7 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+  });
+
+  it('cancelar la entrada también revierte el cargo NO fiscal', async () => {
+    const informal = await proveedorInformal();
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Verde' },
+    });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-34',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: color.id, cantidad: 4, precioUnit: 25 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    await cancelarEntradaTela(sesion(), entrada.id, { motivo: 'Se devolvió' }, bd());
+
+    const cargos = await cliente.movimientoTercero.findMany({ orderBy: { id: 'asc' } });
+    expect(cargos).toHaveLength(2);
+    expect(cargos.reduce((s, c) => s + Number(c.monto), 0)).toBe(0);
+  });
+
+  it('NO se le puede capturar el documento como FACTURA', async () => {
+    const informal = await proveedorInformal();
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Azul' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'F-1',
+          idProveedor: informal.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/NO emite factura/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
+  it('RECHAZA subirle un XML, aunque la pantalla lo hubiera dejado pasar', async () => {
+    const informal = await cliente.proveedor.create({
+      data: { nombre: 'Informal con RFC', rfc: 'TNO850101BBB', factura: false },
+    });
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Café' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'remision',
+          numeroDocumento: 'NOTA-35',
+          idProveedor: informal.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          xmlCfdi: xmlCfdi({
+            emisorRfc: 'TNO850101BBB',
+            receptorRfc: 'FRM900101AAA',
+            uuid: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
+          }),
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/NO emite factura/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
+  it('leer un CFDI de un proveedor marcado "no factura" AVISA para corregir el catálogo', async () => {
+    await cliente.proveedor.update({
+      where: { id: proveedor.id },
+      data: { factura: false },
+    });
+    const propuesta = await leerCfdiParaEntradaTela(
+      sesion(),
+      {
+        xml: xmlCfdi({
+          emisorRfc: 'TNO850101BBB',
+          receptorRfc: 'FRM900101AAA',
+          uuid: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+          conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
+        }),
+      },
+      bd(),
+    );
+    expect(propuesta.avisos.some((a) => /NO emite factura/.test(a))).toBe(true);
   });
 });
