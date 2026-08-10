@@ -2058,12 +2058,18 @@ Con lo que dijiste, quedó así:
 Si la orden pide **cardigan**, la orden **no** se marca como recibida hasta que llegue el cardigan,
 aunque el cuerpo ya haya llegado completo. Si la orden no lo pide, no se espera nada por ese lado.
 
-### En telas, 5% de menos ya cuenta como completo
+### 5% de menos ya cuenta como completo — en telas y en avíos
 
 Como nunca llega la cantidad exacta, si pides **400 kilos** la orden se da por surtida a partir de
 **380** (5% menos). Con 379 sigue abierta. Recibir de más nunca estorba: también cierra.
 
-En **avíos** no hay esa tolerancia: son piezas contadas y lo pedido llega exacto.
+Lo mismo aplica en **avíos**: 171 de 180 piezas ya cierran. La tolerancia está guardada por separado
+para telas y para avíos (hoy 5% en las dos), así que si en piezas quieres que sea más estricta, se
+cambia solo esa.
+
+**Y la cantidad que llegó siempre se captura**: tanto al recibir avíos como al capturar la factura de
+la tela, el campo viene con lo que pide la orden pero lo puedes cambiar por lo que de verdad llegó —
+de más o de menos. El sistema nunca lo asume ni te lo rechaza.
 
 ### Al capturar la factura te dice qué falta de las dos cosas
 

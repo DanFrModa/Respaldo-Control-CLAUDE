@@ -4,61 +4,69 @@ import {
   faltantePorRecibir,
   minimoParaSurtir,
   renglonSurtido,
-  TOLERANCIA_TELA,
+  TOLERANCIA_POR_TIPO,
 } from './tolerancia-recepcion.js';
 
 /**
  * Unit del criterio "¿está surtido este renglón?" (§Post-F9.19), dictado por Daniel:
  *  • se cierra contra lo que la OC pidió, **cuerpo y complemento** ("si en la OC lleva cardigan, se
  *    debe de recibir el cardigan"; "no siempre lleva cardigan");
- *  • en TELA hay banda del 5% por debajo, porque *"nunca se recibe la cantidad exacta que se pide:
- *    si se piden 400 kilos, el proveedor puede entregar +/− 5%"*;
- *  • en avíos y líneas libres NO hay banda (son piezas contadas).
+ *  • hay banda de tolerancia por debajo, porque *"nunca se recibe la cantidad exacta que se pide: si
+ *    se piden 400 kilos, el proveedor puede entregar +/− 5%"* — y *"en avíos también puede haber una
+ *    diferencia"*, así que la banda NO es exclusiva de la tela (hoy 5% en las dos, en constantes
+ *    separadas para poder afinar una sin tocar la otra).
  * Función pura: sin base de datos.
  */
 
 describe('minimoParaSurtir', () => {
-  it('en tela pide 5% menos; en avío pide lo pedido completo', () => {
-    expect(TOLERANCIA_TELA).toBe(0.05);
-    expect(minimoParaSurtir(400, true)).toBeCloseTo(380);
-    expect(minimoParaSurtir(400, false)).toBe(400);
+  it('pide 5% menos, y la banda vive por tipo de material', () => {
+    expect(TOLERANCIA_POR_TIPO.tela).toBe(0.05);
+    expect(TOLERANCIA_POR_TIPO.avio).toBe(0.05);
+    expect(minimoParaSurtir(400, 'tela')).toBeCloseTo(380);
+    expect(minimoParaSurtir(180, 'avio')).toBeCloseTo(171);
   });
 });
 
 describe('renglonSurtido — TELA con banda del 5%', () => {
   it('400 kilos pedidos: 380 SÍ cierran (−5%), 379 no', () => {
-    expect(renglonSurtido({ pedido: 400, recibido: 380, esTela: true })).toBe(true);
-    expect(renglonSurtido({ pedido: 400, recibido: 379, esTela: true })).toBe(false);
+    expect(renglonSurtido({ pedido: 400, recibido: 380, tipo: 'tela' })).toBe(true);
+    expect(renglonSurtido({ pedido: 400, recibido: 379, tipo: 'tela' })).toBe(false);
   });
 
   it('recibir MÁS de lo pedido cierra (el excedente nunca estorba)', () => {
-    expect(renglonSurtido({ pedido: 400, recibido: 420, esTela: true })).toBe(true);
+    expect(renglonSurtido({ pedido: 400, recibido: 420, tipo: 'tela' })).toBe(true);
   });
 
   it('la cantidad EXACTA cierra, obviamente', () => {
-    expect(renglonSurtido({ pedido: 400, recibido: 400, esTela: true })).toBe(true);
+    expect(renglonSurtido({ pedido: 400, recibido: 400, tipo: 'tela' })).toBe(true);
   });
 
   it('una entrega parcial de verdad (la mitad) NO cierra', () => {
-    expect(renglonSurtido({ pedido: 400, recibido: 200, esTela: true })).toBe(false);
+    expect(renglonSurtido({ pedido: 400, recibido: 200, tipo: 'tela' })).toBe(false);
   });
 });
 
-describe('renglonSurtido — AVÍO / línea libre sin banda', () => {
-  it('180 piezas pedidas: 180 cierran, 179 no (aquí no hay ±5%)', () => {
-    expect(renglonSurtido({ pedido: 180, recibido: 180, esTela: false })).toBe(true);
-    expect(renglonSurtido({ pedido: 180, recibido: 179, esTela: false })).toBe(false);
+describe('renglonSurtido — AVÍO (también admite diferencia)', () => {
+  it('180 piezas pedidas: 171 YA cierran (−5%), 170 no', () => {
+    // Daniel: *"en avíos también puede haber una diferencia"*.
+    expect(renglonSurtido({ pedido: 180, recibido: 171, tipo: 'avio' })).toBe(true);
+    expect(renglonSurtido({ pedido: 180, recibido: 170, tipo: 'avio' })).toBe(false);
   });
 
-  it('tolera el ruido de redondeo decimal', () => {
-    expect(renglonSurtido({ pedido: 180, recibido: 179.9999999, esTela: false })).toBe(true);
+  it('recibir de más también cierra, y tolera el ruido de redondeo', () => {
+    expect(renglonSurtido({ pedido: 180, recibido: 200, tipo: 'avio' })).toBe(true);
+    expect(renglonSurtido({ pedido: 180, recibido: 179.9999999, tipo: 'avio' })).toBe(true);
+  });
+
+  it('una entrega parcial de verdad (la mitad) NO cierra', () => {
+    expect(renglonSurtido({ pedido: 180, recibido: 90, tipo: 'avio' })).toBe(false);
   });
 });
 
 describe('renglonSurtido — COMPLEMENTO (Cardigan)', () => {
   it('sin complemento en la OC, el cuerpo basta ("no siempre lleva cardigan")', () => {
     expect(
-      renglonSurtido({ pedido: 400, recibido: 400, pedidoComplemento: null, esTela: true }),
+      renglonSurtido({ pedido: 400, recibido: 400, pedidoComplemento: null, tipo: 'tela' }),
     ).toBe(true);
   });
 
@@ -69,7 +77,7 @@ describe('renglonSurtido — COMPLEMENTO (Cardigan)', () => {
         recibido: 400,
         pedidoComplemento: 50,
         recibidoComplemento: 0,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toBe(false);
   });
@@ -81,7 +89,7 @@ describe('renglonSurtido — COMPLEMENTO (Cardigan)', () => {
         recibido: 380,
         pedidoComplemento: 50,
         recibidoComplemento: 47.5,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toBe(true);
     // El cardigan corto más allá de la banda deja el renglón abierto.
@@ -91,7 +99,7 @@ describe('renglonSurtido — COMPLEMENTO (Cardigan)', () => {
         recibido: 400,
         pedidoComplemento: 50,
         recibidoComplemento: 40,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toBe(false);
   });
@@ -103,7 +111,7 @@ describe('renglonSurtido — COMPLEMENTO (Cardigan)', () => {
         recibido: 0,
         pedidoComplemento: 50,
         recibidoComplemento: 50,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toBe(false);
   });
@@ -117,7 +125,7 @@ describe('faltantePorRecibir', () => {
         recibido: 385,
         pedidoComplemento: 50,
         recibidoComplemento: 49,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toEqual({ cuerpo: 0, complemento: 0 });
   });
@@ -129,7 +137,7 @@ describe('faltantePorRecibir', () => {
         recibido: 300,
         pedidoComplemento: 50,
         recibidoComplemento: 10,
-        esTela: true,
+        tipo: 'tela',
       }),
     ).toEqual({ cuerpo: 100, complemento: 40 });
   });
@@ -140,7 +148,7 @@ describe('faltantePorRecibir', () => {
       recibido: 100,
       pedidoComplemento: 20,
       recibidoComplemento: 30,
-      esTela: false,
+      tipo: 'avio',
     });
     expect(falta.cuerpo).toBe(80);
     expect(falta.complemento).toBe(0);

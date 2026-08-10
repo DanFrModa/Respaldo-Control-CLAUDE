@@ -1199,7 +1199,7 @@ export async function resumenOC(
         recibido: recibidoPorLinea.get(l.id) ?? 0,
         pedidoComplemento: l.cantidadComplemento === null ? null : l.cantidadComplemento.toNumber(),
         recibidoComplemento: recibidoComplementoPorLinea.get(l.id) ?? 0,
-        esTela: l.idTela !== null,
+        tipo: l.idTela !== null ? 'tela' : 'avio',
       });
       porRecibir += falta.cuerpo * precio;
       porRecibir += falta.complemento * (l.precioComplemento?.toNumber() ?? precio);

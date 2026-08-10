@@ -637,3 +637,44 @@ describe('Recepción (F4-E3) — B2: recepciones concurrentes de la misma OC (es
     expect(await existenciaAvio(avioBoton.id)).toBe(1000);
   });
 });
+
+describe('Recepción (§Post-F9.19) — en AVÍOS también se admite diferencia', () => {
+  /** Recibe una cantidad contra el primer renglón de la OC (helper local de este bloque). */
+  async function recibirAvio(idOc: number, idLineaOC: number, cantidad: number) {
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: idOc,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad }],
+      },
+      bd(),
+    );
+  }
+
+  it('171 de 180 piezas (−5%) YA cierra la orden; 170 la deja abierta', async () => {
+    // Daniel: *"en avíos también puede haber una diferencia. Siempre debe de haber un campo para
+    // definir lo que se recibe realmente"* — el campo existe (la cantidad se captura y NO se asume
+    // igual a la pedida), y la diferencia dentro de la banda cierra la orden.
+    const corta = await ocAvioAutorizada(180, 2);
+    await recibirAvio(corta.id, corta.lineas[0]!.id, 170);
+    expect((await cliente.ordenCompra.findUnique({ where: { id: corta.id } }))?.estatus).toBe(
+      'recibida_parcial',
+    );
+
+    const enBanda = await ocAvioAutorizada(180, 2);
+    await recibirAvio(enBanda.id, enBanda.lineas[0]!.id, 171);
+    expect((await cliente.ordenCompra.findUnique({ where: { id: enBanda.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+  });
+
+  it('recibir MÁS de lo pedido también cierra (y no truena)', async () => {
+    const oc = await ocAvioAutorizada(100, 2);
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 115);
+    expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
+      'recibida_total',
+    );
+  });
+});

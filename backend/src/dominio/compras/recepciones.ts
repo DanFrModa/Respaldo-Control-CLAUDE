@@ -89,7 +89,11 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { faltantePorRecibir, renglonSurtido } from './tolerancia-recepcion.js';
+import {
+  faltantePorRecibir,
+  renglonSurtido,
+  type TipoRenglonCompra,
+} from './tolerancia-recepcion.js';
 /** Clave de la secuencia de folios de recepciones de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_RECEPCION = 'recepcion-compra';
 
@@ -341,7 +345,7 @@ export function calcularEstatusRecepcion(
         recibido,
         pedidoComplemento: linea.pedidoComplemento ?? null,
         recibidoComplemento,
-        esTela: linea.esTela ?? false,
+        tipo: linea.tipo ?? 'avio',
       })
     ) {
       todasCompletas = false;
@@ -355,15 +359,16 @@ export function calcularEstatusRecepcion(
 }
 
 /**
- * Línea de OC como la ve el recálculo de estatus. `pedidoComplemento`/`esTela` son opcionales para
- * no romper a quien solo compara cuerpo (avíos, líneas libres y las pruebas viejas de la función
- * pura); cuando faltan, la línea se trata como no-tela sin complemento — el comportamiento de antes.
+ * Línea de OC como la ve el recálculo de estatus. `pedidoComplemento`/`tipo` son opcionales para no
+ * romper a quien solo compara cuerpo (líneas libres y las pruebas de la función pura); cuando faltan,
+ * la línea se trata como `avio` sin complemento.
  */
 export interface LineaParaEstatus {
   id: number;
   pedido: number;
   pedidoComplemento?: number | null;
-  esTela?: boolean;
+  /** Tipo del renglón: elige su banda de tolerancia. Los libres cuentan como `avio`. */
+  tipo?: TipoRenglonCompra;
 }
 
 /**
@@ -381,7 +386,7 @@ function aLineaParaEstatus(l: {
     id: l.id,
     pedido: Number(l.cantidad),
     pedidoComplemento: l.cantidadComplemento === null ? null : Number(l.cantidadComplemento),
-    esTela: l.idTela !== null,
+    tipo: l.idTela !== null ? 'tela' : 'avio',
   };
 }
 
@@ -1260,7 +1265,7 @@ export async function lineasTelaPendientesDeProveedor(
           recibido,
           pedidoComplemento: cantidadComplemento,
           recibidoComplemento,
-          esTela: true,
+          tipo: 'tela',
         });
         return {
           idOrdenCompraLinea: l.id,
