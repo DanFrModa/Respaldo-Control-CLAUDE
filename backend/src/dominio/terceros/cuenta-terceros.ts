@@ -161,6 +161,24 @@ export async function registrarMovimientoTercero(
   bd?: ContextoBd,
 ): Promise<MovimientoTerceroSalida> {
   verificarPermiso(sesion, 'terceros.administrar');
+  return registrarMovimientoTerceroInterno(sesion, entrada, bd);
+}
+
+/**
+ * MISMO alta, SIN el guard de permiso. **Uso interno del dominio, jamás desde una ruta REST.**
+ *
+ * Existe para los cargos que nacen como CONSECUENCIA de un acto ya autorizado por otro permiso
+ * (§Post-F9.15 punto (a), resuelto en §Post-F9.21): quien confirma una entrada de tela tiene
+ * `inventario-telas.mover`, no `terceros.administrar`, y exigirle el segundo permiso obligaría a que
+ * Finanzas capturara a mano la cuenta por pagar de cada factura que ya se recibió — justo lo que
+ * Daniel pidió evitar. El llamador YA verificó el permiso de SU operación y corre dentro de SU
+ * transacción; aquí solo se registra el movimiento.
+ */
+export async function registrarMovimientoTerceroInterno(
+  sesion: SesionUsuario,
+  entrada: z.input<typeof esquemaMovimientoTerceroCrear>,
+  bd?: ContextoBd,
+): Promise<MovimientoTerceroSalida> {
   const datos: DatosMovimientoTerceroCrear = validarEntrada(esquemaMovimientoTerceroCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
@@ -234,6 +252,21 @@ export async function cancelarMovimientoTercero(
   bd?: ContextoBd,
 ): Promise<MovimientoTerceroSalida> {
   verificarPermiso(sesion, 'terceros.administrar');
+  return cancelarMovimientoTerceroInterno(sesion, id, cuerpo, bd);
+}
+
+/**
+ * MISMA cancelación, SIN el guard de permiso. **Uso interno del dominio, jamás desde una ruta REST.**
+ * El espejo de {@link registrarMovimientoTerceroInterno}: si un acto autorizado creó el cargo (la
+ * confirmación de una entrada de tela), DESHACER ese acto tiene que poder deshacerlo, o la cuenta
+ * por pagar quedaría con un cargo de una entrada cancelada.
+ */
+export async function cancelarMovimientoTerceroInterno(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaMovimientoTerceroCancelar>,
+  bd?: ContextoBd,
+): Promise<MovimientoTerceroSalida> {
   const datos: DatosMovimientoTerceroCancelar = validarEntrada(
     esquemaMovimientoTerceroCancelar,
     cuerpo,

@@ -73,6 +73,12 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
    * pendientes de la OC: las cantidades y precios que valen son los que el proveedor facturó.
    */
   const [propuesta, setPropuesta] = useState<PropuestaCfdiEntradaTela | null>(null);
+  /**
+   * §Post-F9.21 — el CONTENIDO del XML viaja también al GUARDAR: el servidor lo vuelve a parsear
+   * (el total fiscal nunca se acepta del cliente), lo guarda y con eso nace la cuenta por pagar al
+   * confirmar la entrada.
+   */
+  const [xmlCfdi, setXmlCfdi] = useState<string | null>(null);
 
   // DEEP-LINK desde la orden de compra (§Post-F9.15). Se lee UNA vez al montar. El PROVEEDOR viaja
   // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
@@ -125,6 +131,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
           {
             onSuccess: (datos) => {
               setPropuesta(datos);
+              setXmlCfdi(xml);
               setTipoDocumento('factura');
               if (datos.numeroDocumento !== '') setNumeroDocumento(datos.numeroDocumento);
               setFecha(datos.fecha);
@@ -235,6 +242,19 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       ? existente.data.proveedor
       : 'Proveedor actual';
 
+  // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
+  // casilla vive en el catálogo del proveedor y aquí decide el camino. `undefined` (proveedor sin
+  // elegir, o fuera de la lista cargada) = no se sabe: se deja el flujo completo, no se esconde nada
+  // por una duda.
+  const proveedorElegido = listaProveedores.find((p) => String(p.id) === idProveedor);
+  const proveedorSinFactura = proveedorElegido?.factura === false;
+
+  // El que no factura no ampara con factura: su documento es remisión. Se corrige aquí para que la
+  // pantalla no mande al servidor algo que este va a rechazar.
+  useEffect(() => {
+    if (proveedorSinFactura) setTipoDocumento('remision');
+  }, [proveedorSinFactura]);
+
   const guardando = crear.isPending || actualizar.isPending;
   const puedeGuardar =
     editable &&
@@ -252,6 +272,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda de qué factura salió
       // (y el servidor impide recibir la misma dos veces).
       ...(propuesta === null ? {} : { uuidCfdi: propuesta.uuid }),
+      ...(xmlCfdi === null ? {} : { xmlCfdi }),
       idProveedor: Number(idProveedor),
       fecha,
       idAlmacen: Number(idAlmacen),
@@ -277,6 +298,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     observaciones,
     renglones,
     propuesta,
+    xmlCfdi,
   ]);
 
   function guardar(): void {
@@ -357,7 +379,20 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
           {/* §Post-F9.20 — LEER LA FACTURA. Del XML del CFDI salen exactos el proveedor (por su
               RFC), la fecha, el número y cada concepto con su cantidad y precio; el PDF se sigue
               adjuntando aparte, como referencia para consultar la factura tal cual. */}
-          {editable ? (
+          {editable && proveedorSinFactura ? (
+            <p
+              className="rounded-md border border-input bg-muted/40 p-3 text-xs text-muted-foreground"
+              data-testid="entrada-proveedor-sin-factura"
+            >
+              <strong className="font-medium text-foreground">
+                Este proveedor no emite factura.
+              </strong>{' '}
+              Captura el documento a mano (remisión o nota): no hay XML que leer. Al confirmar la
+              entrada se le genera igual su cuenta por pagar, con el importe de los renglones.
+            </p>
+          ) : null}
+
+          {editable && !proveedorSinFactura ? (
             <div
               className="flex flex-wrap items-center gap-3 rounded-md border border-primary/40 bg-primary-soft p-3"
               data-testid="entrada-leer-cfdi"
@@ -394,7 +429,8 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 disabled={!editable}
                 data-testid="entrada-tipo"
               >
-                <option value="factura">Factura</option>
+                {/* El proveedor que no factura no puede amparar con factura (§Post-F9.22). */}
+                {proveedorSinFactura ? null : <option value="factura">Factura</option>}
                 <option value="remision">Remisión</option>
               </SelectNativo>
             </Field>

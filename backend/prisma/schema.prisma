@@ -518,6 +518,8 @@ model Archivo {
   /// Adjunto de una entrada de tela (el PDF de la factura/remisión, B1), si lo hay. Inversa de
   /// `EntradaTelaArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA entrada — Cascade en ambos).
   entradaTelaArchivo     EntradaTelaArchivo?
+  /// Entradas de tela cuyo CFDI es este XML (§Post-F9.21: respalda el cargo fiscal de CxP).
+  entradasTelaCfdi       EntradaTela[]       @relation("EntradaTelaCfdi")
 
   @@map("archivos")
 }
@@ -1505,6 +1507,14 @@ model EntradaTela {
   /// información la tomes del XML"*). NULL cuando se capturó a mano o el proveedor no mandó XML.
   /// ÚNICO por empresa: la misma factura no se recibe dos veces. El PDF adjunto es solo referencia.
   uuidCfdi        String?                  @map("uuid_cfdi")
+  /// TOTAL del CFDI (la verdad fiscal, con impuestos): es el importe con el que nace la CUENTA POR
+  /// PAGAR al confirmar (§Post-F9.21). NO se deriva de los renglones —esos son cantidad×precio sin
+  /// IVA—: el cargo entra por lo que dice la factura. NULL si la entrada no nació de un CFDI.
+  totalCfdi       Decimal?                 @map("total_cfdi") @db.Decimal(14, 2)
+  /// XML de la factura guardado en R2 (el mismo del que se leyeron los datos). Lo necesita el cargo
+  /// fiscal de CxP para quedar respaldado, igual que una importación de CFDI de F9. SetNull.
+  idArchivoCfdi   String?                  @map("id_archivo_cfdi")
+  archivoCfdi     Archivo?                 @relation("EntradaTelaCfdi", fields: [idArchivoCfdi], references: [id], onDelete: SetNull)
   /// Proveedor que surtió la tela. Restrict.
   idProveedor     Int                      @map("id_proveedor")
   proveedor       Proveedor                @relation(fields: [idProveedor], references: [id], onDelete: Restrict)

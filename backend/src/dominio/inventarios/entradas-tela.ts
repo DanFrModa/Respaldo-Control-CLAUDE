@@ -46,16 +46,18 @@ import {
   esquemaEntradaTelaActualizar,
   esquemaEntradaTelaCancelarCuerpo,
   esquemaEntradasTelaQuery,
+  type esquemaMovimientoTerceroCrear,
   type DatosEntradaTelaCrear,
   type EntradaTelaLineaSalida,
   type EntradaTelaSalida,
   type EntradasTelaPagina,
 } from '../../contrato/index.js';
-import { EstatusEntradaTela } from '../../datos/index.js';
+import { EstatusEntradaTela, type TipoDocumentoEntradaTela } from '../../datos/index.js';
 import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
+import { type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -86,6 +88,17 @@ import {
   type LineaColorBase,
 } from './partidas-telas.js';
 import { aDateColumna, aNumero, tipoPorCodigo } from './telas.js';
+import { sellarCfdiEnEntrada, type SelloCfdi } from './cfdi-entrada-tela.js';
+import {
+  cancelarMovimientoTerceroInterno,
+  registrarMovimientoTerceroInterno,
+} from '../terceros/cuenta-terceros.js';
+import { exigirProveedorQueFactura, modalidadFactura } from '../terceros/facturacion-proveedor.js';
+
+/** Origen del cargo de CxP que nace al confirmar una entrada con su CFDI (§Post-F9.21). */
+const ORIGEN_FACTURA_PROVEEDOR = 'factura_proveedor';
+/** Discriminador de la operación ligada al cargo: la entrada de tela que lo originó. */
+const REF_ENTRADA_TELA = 'entrada-tela';
 
 /** Clave de la secuencia de folios del documento de entrada (A3 — por empresa, jamás Max()+1). */
 export const CLAVE_SECUENCIA_ENTRADA_TELA = 'entrada-tela';
@@ -198,6 +211,7 @@ function aEntradaTelaSalida(
     tipoDocumento: e.tipoDocumento,
     numeroDocumento: e.numeroDocumento,
     uuidCfdi: e.uuidCfdi,
+    totalCfdi: e.totalCfdi === null ? null : e.totalCfdi.toNumber(),
     idProveedor: e.idProveedor,
     proveedor: e.proveedor.nombre,
     fecha: e.fecha.toISOString().slice(0, 10),
@@ -341,16 +355,23 @@ async function validarCabeceraYLineas(
   idProveedor: number,
   idAlmacen: number,
   lineas: readonly LineaColorBase[],
+  tipoDocumento?: TipoDocumentoEntradaTela,
 ): ReturnType<typeof resolverColores> {
   const proveedor = await tx.proveedor.findUnique({
     where: { id: idProveedor },
-    select: { id: true, activo: true, nombre: true },
+    select: { id: true, activo: true, nombre: true, factura: true },
   });
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', idProveedor);
   }
   if (!proveedor.activo) {
     throw new ErrorValidacion(`El proveedor "${proveedor.nombre}" está desactivado.`);
+  }
+  // §Post-F9.22 — el proveedor que NO factura no ampara su entrega con una factura: trae remisión o
+  // nota. Se valida aquí (y no solo en la pantalla) porque de este tipo de documento depende cómo
+  // nace su cuenta por pagar.
+  if (tipoDocumento === 'factura') {
+    exigirProveedorQueFactura(proveedor, 'capturar el documento como FACTURA');
   }
   await exigirAlmacen(tx, idAlmacen, idEmpresa);
   // Los renglones REPETIDOS por tela+color SÍ se permiten: cada uno es su propia partida.
@@ -395,10 +416,25 @@ export async function crearEntradaTela(
   sesion: SesionUsuario,
   entrada: EntradaCrearEntradaTela,
   bd?: ContextoBd,
+  /**
+   * Inyectable para probar sin R2 real (mismo patrón que `importarCfdi` de F9). Se pasa TAL CUAL:
+   * el servicio se resuelve solo si de verdad hay XML que subir, para que capturar una entrada sin
+   * factura no exija tener R2 configurado.
+   */
+  archivos?: ServicioArchivos,
 ): Promise<EntradaTelaSalida> {
   verificarPermiso(sesion, 'inventario-telas.mover');
   const datos = validarEntrada(esquemaEntradaTelaCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // §Post-F9.21 — si la captura trae el XML, se RE-PARSEA en el servidor (el total fiscal jamás se
+  // acepta del cliente) y el XML se sube a R2 ANTES de la transacción: si la tx falla, el objeto
+  // queda huérfano (inocuo); al revés —un cargo fiscal sin su XML— sería irrecuperable.
+  const sello: SelloCfdi | null = await sellarCfdiEnEntrada(
+    { xml: datos.xmlCfdi ?? null, idProveedor: datos.idProveedor, idEmpresa },
+    bd,
+    archivos,
+  );
 
   const id = await enTransaccion(async (tx) => {
     const colores = await validarCabeceraYLineas(
@@ -407,6 +443,7 @@ export async function crearEntradaTela(
       datos.idProveedor,
       datos.idAlmacen,
       datos.lineas,
+      datos.tipoDocumento,
     );
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_ENTRADA_TELA);
@@ -416,9 +453,11 @@ export async function crearEntradaTela(
         idEmpresa,
         tipoDocumento: datos.tipoDocumento,
         numeroDocumento: datos.numeroDocumento,
-        // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda DE QUÉ factura salió.
+        // §Post-F9.20/21: si la captura nació de leer el XML, la entrada recuerda DE QUÉ factura
+        // salió, POR CUÁNTO (verdad fiscal) y con qué XML — con eso nace la CxP al confirmar.
         // El unique (idEmpresa, uuidCfdi) impide recibir dos veces el mismo CFDI.
-        uuidCfdi: datos.uuidCfdi ?? null,
+        uuidCfdi: sello?.uuid ?? datos.uuidCfdi ?? null,
+        ...(sello === null ? {} : { totalCfdi: sello.total, idArchivoCfdi: sello.idArchivo }),
         idProveedor: datos.idProveedor,
         fecha: aDateColumna(datos.fecha),
         idAlmacen: datos.idAlmacen,
@@ -478,6 +517,7 @@ export async function actualizarEntradaTela(
       datos.idProveedor,
       datos.idAlmacen,
       datos.lineas,
+      datos.tipoDocumento,
     );
 
     await tx.entradaTelaLinea.deleteMany({ where: { idEntradaTela: id } });
@@ -515,6 +555,93 @@ export async function actualizarEntradaTela(
   return obtener(id, idEmpresa, tienePermiso(sesion, 'telas.ver-totales'), bd);
 }
 
+/** Lo que el cálculo del cargo necesita del documento (evita arrastrar todo el payload). */
+interface DocumentoParaCxP {
+  folio: bigint;
+  fecha: Date;
+  numeroDocumento: string;
+  idProveedor: number;
+  uuidCfdi: string | null;
+  totalCfdi: Prisma.Decimal | null;
+  idArchivoCfdi: string | null;
+  proveedor: { nombre: string; factura: boolean | null };
+  lineas: readonly {
+    cantidad: Prisma.Decimal;
+    cantidadComplemento: Prisma.Decimal | null;
+    precioUnit: Prisma.Decimal | null;
+    precioUnitComplemento: Prisma.Decimal | null;
+  }[];
+}
+
+/**
+ * ¿QUÉ CUENTA POR PAGAR nace al confirmar esta entrada? Los dos tipos de proveedor de Daniel
+ * (§Post-F9.22) se contestan aquí, en un solo lugar:
+ *
+ *  • **Proveedor que FACTURA, con su CFDI capturado** → cargo **FISCAL** por el TOTAL del
+ *    comprobante (con impuestos — NO la suma de renglones, que va sin IVA), respaldado con el XML.
+ *  • **Proveedor que FACTURA, sin CFDI todavía** (llegó con remisión y la factura viene después) →
+ *    NO se inventa cargo: se registrará con la factura, que es la que trae el importe bueno.
+ *  • **Proveedor que NO factura** → nunca va a haber CFDI, así que esperar la factura sería no
+ *    registrarle NUNCA la deuda. El cargo nace **NO FISCAL** por lo capturado a mano: la suma de
+ *    cantidad×precio del cuerpo y del complemento. Sin IVA que sumar, esa suma ES lo que se le debe.
+ *  • **Proveedor sin la casilla definida** (los migrados de Access) → se trata como los que
+ *    facturan: se espera su CFDI. Nada se inventa sobre un dato que nadie capturó.
+ *
+ * Devuelve `null` cuando no hay nada que cobrar. En particular, un documento sin precios capturados
+ * da importe 0 y NO genera cargo: registrar una deuda de cero sería ruido, y el motor de terceros
+ * exige importe ≥ 0.01. Queda visible en el documento (los renglones sin precio se ven), no callado.
+ */
+function cargoDeCuentaPorPagar(
+  documento: DocumentoParaCxP,
+  idEntrada: number,
+): z.input<typeof esquemaMovimientoTerceroCrear> | null {
+  const fecha = documento.fecha.toISOString().slice(0, 10);
+  const comun = {
+    tipoTercero: 'proveedor',
+    idTercero: documento.idProveedor,
+    fecha,
+    origen: ORIGEN_FACTURA_PROVEEDOR,
+    refTipo: REF_ENTRADA_TELA,
+    refId: idEntrada,
+  } as const;
+
+  if (documento.uuidCfdi !== null && documento.totalCfdi !== null) {
+    return {
+      ...comun,
+      importe: documento.totalCfdi.toNumber(),
+      esFiscal: true,
+      uuidCfdi: documento.uuidCfdi,
+      ...(documento.idArchivoCfdi === null ? {} : { idArchivoCfdi: documento.idArchivoCfdi }),
+      observaciones: `Entrada de tela ${String(documento.folio)} · factura ${documento.numeroDocumento}`,
+    };
+  }
+
+  if (modalidadFactura(documento.proveedor.factura) !== 'sin-factura') {
+    return null;
+  }
+
+  const importe = documento.lineas.reduce((suma, l) => {
+    const cuerpo = l.precioUnit === null ? 0 : l.cantidad.toNumber() * l.precioUnit.toNumber();
+    const complemento =
+      l.cantidadComplemento === null || l.precioUnitComplemento === null
+        ? 0
+        : l.cantidadComplemento.toNumber() * l.precioUnitComplemento.toNumber();
+    return suma + cuerpo + complemento;
+  }, 0);
+  // Se redondea a centavos: el importe vive en DECIMAL(14,2) y cantidad×precio puede traer cola.
+  const aPagar = Math.round(importe * 100) / 100;
+  if (aPagar < 0.01) return null;
+
+  return {
+    ...comun,
+    importe: aPagar,
+    esFiscal: false,
+    observaciones:
+      `Entrada de tela ${String(documento.folio)} · ${documento.numeroDocumento} · ` +
+      `proveedor sin factura (importe capturado a mano)`,
+  };
+}
+
 /**
  * CONFIRMA un documento en borrador: en UNA transacción (A2) crea UNA `PartidaTela` por renglón
  * (folio atómico A3 — primero las partidas, luego el folio del movimiento, para no interbloquear) y
@@ -550,6 +677,12 @@ export async function confirmarEntradaTela(
         idProveedor: true,
         numeroDocumento: true,
         tipoDocumento: true,
+        // §Post-F9.21 — con esto nace la CUENTA POR PAGAR del proveedor al confirmar.
+        uuidCfdi: true,
+        totalCfdi: true,
+        idArchivoCfdi: true,
+        // §Post-F9.22 — y la bandera del catálogo decide SI el cargo es fiscal o no.
+        proveedor: { select: { nombre: true, factura: true } },
         lineas: {
           orderBy: { id: 'asc' },
           select: {
@@ -589,6 +722,7 @@ export async function confirmarEntradaTela(
       documento.idProveedor,
       documento.idAlmacen,
       lineas,
+      documento.tipoDocumento,
     );
 
     // 1) Una PARTIDA por renglón (la unidad de entrada; dos lotes del mismo color = dos partidas).
@@ -694,6 +828,17 @@ export async function confirmarEntradaTela(
       renglonesConOC,
     );
 
+    // 5) CUENTA POR PAGAR del proveedor, en la MISMA transacción (A2).
+    //
+    //    PERMISO (cierra el punto (a) de §Post-F9.15): se usa la variante INTERNA del motor de
+    //    terceros — quien confirma tiene `inventario-telas.mover`, y el cargo nace como CONSECUENCIA
+    //    de ese acto ya autorizado. Exigirle `terceros.administrar` obligaría a Finanzas a recapturar
+    //    a mano cada factura ya recibida, que es justo lo que se pidió evitar.
+    const cargo = cargoDeCuentaPorPagar(documento, id);
+    if (cargo !== null) {
+      await registrarMovimientoTerceroInterno(sesion, cargo, { tx });
+    }
+
     await registrarBitacora(tx, sesion, {
       entidad: 'EntradaTela',
       idEntidad: id,
@@ -789,6 +934,29 @@ export async function cancelarEntradaTela(
         id,
         `Cancelación de la entrada de tela ${Number(documento.folio)}: ${datos.motivo}`,
       );
+      // §Post-F9.21: y la CUENTA POR PAGAR que nació al confirmar se cancela por su INVERSO
+      // auditado (D3: nunca se edita ni se borra). Si no se hiciera, quedaría un cargo vivo de una
+      // entrada cancelada — le deberíamos al proveedor una tela que devolvimos.
+      const cargo = await tx.movimientoTercero.findFirst({
+        where: {
+          idEmpresa,
+          refTipo: REF_ENTRADA_TELA,
+          refId: id,
+          cancelado: false,
+          idMovimientoInverso: null,
+        },
+        select: { id: true },
+      });
+      if (cargo !== null) {
+        await cancelarMovimientoTerceroInterno(
+          sesion,
+          cargo.id,
+          {
+            motivo: `Cancelación de la entrada de tela ${Number(documento.folio)}: ${datos.motivo}`,
+          },
+          { tx },
+        );
+      }
     }
 
     await registrarBitacora(tx, sesion, {

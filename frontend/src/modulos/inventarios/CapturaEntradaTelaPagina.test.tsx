@@ -67,7 +67,14 @@ vi.mock('@/api/proveedores', () => ({
     espiaRolProveedor(codigo);
     // El backend ya filtró por rol: solo llegan proveedores de telas.
     return {
-      data: { datos: [{ id: 3, nombre: 'Textiles del Norte' }], total: 1 },
+      data: {
+        datos: [
+          // §Post-F9.22 — los dos tipos de proveedor conviven en el mismo selector.
+          { id: 3, nombre: 'Textiles del Norte', factura: true },
+          { id: 4, nombre: 'Talleres Don Chuy', factura: false },
+        ],
+        total: 2,
+      },
       isPending: false,
       isError: false,
     };
@@ -317,5 +324,31 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     await waitFor(() => {
       expect(espiaProveedorTelas).toHaveBeenCalledWith(3);
     });
+  });
+  it('§Post-F9.22: el proveedor que NO factura pierde el camino del CFDI', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    // Con el que SÍ factura, la pantalla ofrece leer el XML y capturar una factura.
+    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    expect(screen.getByTestId('entrada-leer-cfdi')).toBeInTheDocument();
+    expect(screen.getByTestId('entrada-tipo')).toHaveValue('factura');
+
+    // Con el informal desaparece el lector del XML, la opción "Factura" deja de existir y el
+    // documento se corrige solo a remisión: no se le puede mandar al servidor algo que rechazará.
+    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '4');
+    await waitFor(() => {
+      expect(screen.queryByTestId('entrada-leer-cfdi')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('entrada-tipo')).toHaveValue('remision');
+    expect(
+      within(screen.getByTestId('entrada-tipo')).queryByRole('option', { name: 'Factura' }),
+    ).toBeNull();
+    // Y se dice POR QUÉ, con lo que sí va a pasar: su cuenta por pagar nace igual.
+    expect(screen.getByTestId('entrada-proveedor-sin-factura')).toHaveTextContent(
+      'cuenta por pagar',
+    );
   });
 });

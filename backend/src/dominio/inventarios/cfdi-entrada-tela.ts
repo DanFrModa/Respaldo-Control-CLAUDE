@@ -27,10 +27,16 @@ import { esquemaCfdiXml } from '../../contrato/index.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
 import { rfcEmpresaActiva, uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
+import { admiteCfdi, exigirProveedorQueFactura } from '../terceros/facturacion-proveedor.js';
 import { validarReceptorCfdi } from '../terceros/cfdi/cfdi-proveedor.js';
-import { parsearCfdi, type CfdiConcepto } from '../terceros/cfdi/parser-cfdi.js';
+import { normalizarRfc, parsearCfdi, type CfdiConcepto } from '../terceros/cfdi/parser-cfdi.js';
 import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
+
+/** Carpeta de R2 donde viven los XML de las facturas que entraron por el inventario de telas. */
+const CARPETA_CFDI_ENTRADAS = 'cfdi/entradas-tela';
 
 /** Renglón de OC que la propuesta sugiere para un concepto de la factura. */
 export interface SugerenciaRenglonOc {
@@ -220,7 +226,7 @@ export async function leerCfdiParaEntradaTela(
 
   const proveedor = await cliente.proveedor.findFirst({
     where: { rfc: { equals: parsed.emisorRfc, mode: 'insensitive' } },
-    select: { id: true, nombre: true, activo: true },
+    select: { id: true, nombre: true, activo: true, factura: true },
   });
   if (proveedor === null) {
     avisos.push(
@@ -229,6 +235,17 @@ export async function leerCfdiParaEntradaTela(
     );
   } else if (!proveedor.activo) {
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);
+  }
+  // §Post-F9.22 — contradicción entre el catálogo y la realidad: el proveedor está marcado como que
+  // NO factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML es
+  // prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir el
+  // catálogo en vez de corregirlo solos, porque la casilla la define quien da de alta al proveedor.
+  if (proveedor !== null && !admiteCfdi(proveedor.factura)) {
+    avisos.push(
+      `El proveedor "${proveedor.nombre}" está dado de alta como que NO emite factura, pero este ` +
+        `CFDI es suyo. Corrige la casilla "¿Emite factura (CFDI)?" en el catálogo de proveedores: ` +
+        `si no, no vas a poder guardar la entrada con esta factura.`,
+    );
   }
 
   // El MISMO UUID no se recibe dos veces: ni como otra entrada de tela, ni ya importado a CxP.
@@ -284,4 +301,94 @@ export async function leerCfdiParaEntradaTela(
     avisos,
     conceptos,
   };
+}
+
+// ── Sellar el CFDI en la entrada, para que al confirmar nazca la CxP (§Post-F9.21) ───────────────
+
+/** Lo que queda sellado en la entrada cuando la captura vino de un XML. */
+export interface SelloCfdi {
+  uuid: string;
+  /** TOTAL del comprobante (con impuestos): la verdad fiscal con la que nace el cargo de CxP. */
+  total: number;
+  /** `Archivo` del XML ya subido a R2 (respalda el cargo, igual que una importación de F9). */
+  idArchivo: string;
+}
+
+/**
+ * Re-parsea el XML en el SERVIDOR, valida que sea del proveedor de la entrada y de esta empresa, lo
+ * sube a R2 y devuelve lo que hay que sellar. Devuelve `null` si la captura no trajo XML.
+ *
+ * POR QUÉ SE RE-PARSEA: el total fiscal **jamás** se acepta del cliente — es el importe que se le va
+ * a deber al proveedor. La pantalla ya lo vio al leer la factura, pero quien manda es el XML.
+ *
+ * ORDEN DELIBERADO: la subida a R2 va ANTES de la transacción del llamador. Si la tx falla después,
+ * el objeto queda huérfano en R2 (inocuo). Al revés —un cargo fiscal sin su XML— sería
+ * irrecuperable. Es el mismo criterio que `importarCfdi` de F9.
+ */
+export async function sellarCfdiEnEntrada(
+  datos: { xml: string | null; idProveedor: number; idEmpresa: number },
+  bd?: ContextoBd,
+  /**
+   * Inyectable para probar sin R2 real. Se resuelve PEREZOSAMENTE (después del early return): una
+   * entrada SIN factura no debe exigir que R2 esté configurado — `servicioArchivos()` valida el
+   * entorno y truena si faltan las llaves.
+   */
+  archivos?: ServicioArchivos,
+): Promise<SelloCfdi | null> {
+  if (datos.xml === null || datos.xml.trim() === '') {
+    return null;
+  }
+  const servicio = archivos ?? servicioArchivos();
+  const parsed = parsearCfdi(datos.xml);
+  const cliente = clienteLectura(bd);
+
+  // Comprobante ajeno → se rechaza (misma regla que al leerlo).
+  validarReceptorCfdi(parsed, await rfcEmpresaActiva(cliente, datos.idEmpresa));
+
+  // El emisor DEBE ser el proveedor de la entrada: si no, la cuenta por pagar nacería a nombre de
+  // quien no facturó. Se valida aquí porque el proveedor lo elige la pantalla, no el XML.
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: datos.idProveedor },
+    select: { nombre: true, rfc: true, factura: true },
+  });
+  // §Post-F9.22 — el que NO factura no puede traer factura. Se corta antes de subir nada a R2.
+  if (proveedor !== null) {
+    exigirProveedorQueFactura(proveedor, 'guardar la entrada con una factura (CFDI)');
+  }
+  if (
+    proveedor !== null &&
+    proveedor.rfc !== null &&
+    normalizarRfc(proveedor.rfc) !== normalizarRfc(parsed.emisorRfc)
+  ) {
+    throw new ErrorValidacion(
+      `La factura la emitió el RFC ${parsed.emisorRfc}, pero la entrada es del proveedor ` +
+        `"${proveedor.nombre}" (RFC ${proveedor.rfc}). Corrige el proveedor o sube la factura correcta.`,
+    );
+  }
+
+  // El MISMO CFDI no puede estar ya en Cuentas por pagar (la unique del UUID es el backstop).
+  if (await uuidYaImportado(cliente, parsed.uuid)) {
+    throw new ErrorConflicto(
+      `Esta factura (UUID ${parsed.uuid}) ya está registrada en Cuentas por pagar: no se puede duplicar.`,
+    );
+  }
+
+  const subido = await servicio.subirContenido({
+    nombreOriginal: `cfdi-${parsed.uuid}.xml`,
+    tipoMime: 'application/xml',
+    carpeta: `${CARPETA_CFDI_ENTRADAS}/${parsed.fecha.slice(0, 4)}`,
+    contenido: Buffer.from(datos.xml, 'utf8'),
+  });
+  const archivo = await cliente.archivo.create({
+    data: {
+      bucket: subido.bucket,
+      key: subido.key,
+      nombreOriginal: subido.nombreOriginal,
+      tipoMime: subido.tipoMime,
+      tamanoBytes: subido.tamanoBytes,
+    },
+    select: { id: true },
+  });
+
+  return { uuid: parsed.uuid, total: parsed.total, idArchivo: archivo.id };
 }

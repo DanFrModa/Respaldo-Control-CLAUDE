@@ -128,6 +128,17 @@ const camposCabeceraEntradaTela = {
     .nullable()
     .optional()
     .describe('UUID (folio fiscal) del CFDI leído, o null si se capturó a mano.'),
+  /**
+   * CONTENIDO del XML del CFDI (§Post-F9.21). Cuando viene, el servidor lo **vuelve a parsear** —el
+   * total fiscal NUNCA se acepta del cliente—, lo guarda en R2 y sella en la entrada el UUID, el
+   * total y el archivo: con eso, al confirmar nace la CUENTA POR PAGAR del proveedor.
+   */
+  xmlCfdi: z
+    .string()
+    .max(4_000_000)
+    .nullable()
+    .optional()
+    .describe('XML del CFDI del que se leyeron los datos (para respaldar la CxP al confirmar).'),
 } as const;
 
 /**
@@ -228,6 +239,10 @@ export const esquemaEntradaTelaSalida = z
       .string()
       .nullable()
       .describe('UUID del CFDI del que se leyeron los datos, o null si se capturó a mano.'),
+    totalCfdi: z
+      .number()
+      .nullable()
+      .describe('Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar.'),
     idProveedor: z.number().int(),
     proveedor: z.string().describe('Nombre del proveedor.'),
     fecha: z.string().describe('Fecha del documento (YYYY-MM-DD).'),
