@@ -1834,3 +1834,16 @@ export type SaludFiscal =
   paths['/api/reportes-fiscales/salud']['get']['responses']['200']['content']['application/json'];
 /** Un saldo fiscal por tercero del tablero de salud. */
 export type SaldoFiscalTercero = SaludFiscal['saldos'][number];
+
+/** Pagina del archivo historico de ordenes (`GET /api/historico-ordenes`, §Post-F9.26). */
+export type HistoricoOrdenesPagina =
+  paths['/api/historico-ordenes']['get']['responses']['200']['content']['application/json'];
+/** Un renglon del archivo historico. */
+export type HistoricoOrdenResumen = HistoricoOrdenesPagina['datos'][number];
+/** Filtros del buscador del archivo historico (querystring). */
+export type HistoricoOrdenesQuery = NonNullable<
+  paths['/api/historico-ordenes']['get']['parameters']['query']
+>;
+/** Ficha completa de una orden historica (matriz color x talla + quien la trabajo). */
+export type HistoricoOrdenDetalle =
+  paths['/api/historico-ordenes/{id}']['get']['responses']['200']['content']['application/json'];

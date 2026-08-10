@@ -127,6 +127,7 @@ import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
 import { DireccionesEntregaPagina } from '@/modulos/direcciones-entrega/DireccionesEntregaPagina';
+import { ArchivoOrdenesPagina } from '@/modulos/historico/ArchivoOrdenesPagina';
 import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
 import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
@@ -171,6 +172,7 @@ const router = createBrowserRouter([
           { path: 'catalogos/temporadas', element: <TemporadasPagina /> },
           // §Post-F9.18: catálogo de direcciones de entrega de la OC (permisos de compras).
           { path: 'catalogos/direcciones-entrega', element: <DireccionesEntregaPagina /> },
+          { path: 'produccion/archivo-ordenes', element: <ArchivoOrdenesPagina /> },
           { path: 'catalogos/etiquetas-marca', element: <EtiquetasMarcaPagina /> },
           { path: 'catalogos/colores', element: <ColoresPagina /> },
           { path: 'catalogos/tallas', element: <TallasCurvasPagina /> },

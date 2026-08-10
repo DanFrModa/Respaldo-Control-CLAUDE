@@ -2227,3 +2227,46 @@ No hace falta capturar a mano números de modelo ni descripciones: **los 4,987 m
 migran completos**, con su descripción, y los colores y las tallas también. El corte de 2025-2026 es
 para los **documentos** (pedidos, órdenes, compras), no para los catálogos. Al contar una prenda de
 2019, el modelo está ahí para escogerlo.
+
+## Archivo de órdenes: la producción vieja, para consultar (10-ago-2026)
+
+> *"Me gustaría tenerlas también como archivo histórico de órdenes… para poder buscar por cliente,
+> número de modelo, tipo de prenda, fecha de producción, maquilero, etc."* — Daniel
+
+Está en **Producción › Archivo de órdenes**. Son las **5,451 órdenes** del sistema anterior, con sus
+**39,866** cantidades por color y talla y sus movimientos de producción.
+
+### Qué puedes buscar
+
+Cliente, maquilero, tipo de prenda, rango de fechas — y una caja libre donde puedes teclear el
+número de orden, el código del modelo o el cliente.
+
+Lo del **maquilero** tiene un detalle que vale la pena saber: busca en dos lados. En el sistema
+viejo, el taller que aparece en la orden no siempre es el que la trabajó (el que cosió está en las
+entregas y recibos, el que estampó en los de estampado). Así que si buscas un taller, salen las
+órdenes donde aparece **de cualquier forma**.
+
+### Qué ves al abrir una orden
+
+Le das clic al número y se abre la ficha: modelo, tipo de prenda, cliente, tela, composición, la
+**matriz completa de colores y tallas** con sus cantidades, y **quién la trabajó** — cortador, taller
+de costura y estampador, cada uno con lo que cortó, entregó o recibió.
+
+### Lo que NO se puede
+
+**Nada se edita.** No hay botón de "Nueva", ni de editar, ni de borrar. Es un archivo: se mira y ya.
+Tampoco alimenta inventarios, costos ni ruta crítica — es información muerta, a propósito.
+
+### Dos cosas que vas a notar
+
+- **Los colores se ven como los escribieron.** Vas a encontrar "MARINO", "Marino" y "MAR." como
+  cosas distintas, porque en el viejo era texto libre. No los junté: adivinar equivalencias entre
+  39 mil renglones es la clase de cosa que mete errores que nadie nota.
+- **Los maquileros aparecen escritos, no como catálogo.** Es a propósito: así los ~897 talleres con
+  los que ya no trabajas no vuelven a llenar el catálogo que acabamos de depurar.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (3 tablas nuevas) y **cero permisos nuevos** → **no** hace falta
+`SEED_ON_START`. El archivo se llena corriendo, después de `etl-catalogos`:
+`npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente, se puede repetir).

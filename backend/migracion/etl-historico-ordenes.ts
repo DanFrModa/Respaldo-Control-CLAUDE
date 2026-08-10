@@ -1,0 +1,86 @@
+/**
+ * ETL del ARCHIVO HISTÓRICO DE ÓRDENES del sistema viejo (§Post-F9.26).
+ *
+ * Daniel (10-ago-2026): *"me gustaría tenerlas también como archivo histórico de órdenes… para poder
+ * buscar por cliente, número de modelo, tipo de prenda, fecha de producción, maquilero, etc."*
+ *
+ * Carga **TODAS** las órdenes del viejo (5,451) con su matriz color×talla y sus movimientos de
+ * producción, como un archivo PLANO de solo consulta. Es lo único del ETL que ignora a propósito la
+ * ventana de 2025-2026 (§Post-F9.24): existe justamente para guardar lo que la ventana deja fuera.
+ *
+ * SE CORRE DESPUÉS de `etl-catalogos` (necesita los mapeos de Empresa y Modelo):
+ *
+ *     npx tsx --env-file=.env migracion/etl-historico-ordenes.ts
+ *
+ * NUNCA con `npm run etl:*` (esos no cargan `.env` a propósito, para no romper el CI).
+ *
+ * Es IDEMPOTENTE: re-correrlo no duplica (la llave es `(idEmpresa, idOrdenV1)`).
+ */
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+
+import { Reporte } from './comun/reporte.js';
+import { cargarHistoricoOrdenes } from './loaders/historico-ordenes.js';
+
+export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
+  const reporte = new Reporte();
+
+  console.log('ETL del archivo histórico de órdenes (§Post-F9.26) — inicio');
+  console.log('  (carga TODAS las órdenes del viejo: es el archivo de consulta, no lo operativo)');
+
+  const r = await cargarHistoricoOrdenes(cliente, reporte);
+
+  console.log(`  Órdenes históricas insertadas: ${String(r.ordenes)}`);
+  console.log(`  Ya existían (idempotencia):    ${String(r.existentes)}`);
+  console.log(`  Celdas color×talla:           ${String(r.celdas)}`);
+  console.log(`  Movimientos de producción:    ${String(r.procesos)}`);
+  if (r.sinEmpresa > 0) {
+    console.log(`  Sin empresa mapeada (omitidas): ${String(r.sinEmpresa)}`);
+  }
+  if (r.sinModelo > 0) {
+    console.log(`  Sin modelo ligado (con código en texto): ${String(r.sinModelo)}`);
+  }
+
+  return reporte;
+}
+
+async function main(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (url === undefined || url.trim() === '') {
+    console.error(
+      'Falta DATABASE_URL. Corre el ETL así, desde backend/:\n' +
+        '  npx tsx --env-file=.env migracion/etl-historico-ordenes.ts',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const cliente = crearClientePrisma(url, {
+    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
+    poolMax: 12,
+  });
+  try {
+    const reporte = await ejecutarEtl(cliente);
+    const texto = reporte.aTexto();
+    console.log('\n' + texto);
+
+    const salida = join(
+      process.cwd(),
+      `reporte-etl-historico-ordenes-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`,
+    );
+    writeFileSync(salida, `${texto}\n`, { encoding: 'utf-8' });
+    console.log(`\nReporte escrito en: ${salida}`);
+  } finally {
+    await cliente.$disconnect();
+  }
+}
+
+const ejecutadoComoScript =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (ejecutadoComoScript) {
+  await main();
+}

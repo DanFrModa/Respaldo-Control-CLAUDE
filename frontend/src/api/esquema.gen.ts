@@ -378,6 +378,241 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/historico-ordenes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Buscar en el archivo histórico de órdenes del sistema viejo */
+    get: {
+      parameters: {
+        query?: {
+          pagina?: number;
+          porPagina?: number;
+          ordenarPor?: 'fecha' | 'numero' | 'cliente' | 'totalPiezas';
+          direccion?: 'asc' | 'desc';
+          busqueda?: string;
+          /** @description Coincidencia parcial del cliente. */
+          cliente?: string;
+          /** @description Coincidencia parcial del taller: el de la orden O el de cualquiera de sus procesos. */
+          maquilero?: string;
+          idModelo?: number;
+          /** @description Tipo de prenda (vive en el modelo; el archivo filtra a través de él). */
+          idTipoProducto?: number;
+          idGenero?: number;
+          /** @description Fecha de producción desde (YYYY-MM-DD). */
+          desde?: string;
+          /** @description Fecha de producción hasta (YYYY-MM-DD). */
+          hasta?: string;
+          /** @description Las canceladas se muestran por defecto: parte de la historia es saber qué NO se hizo. */
+          incluirCanceladas?: 'true' | 'false';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                id: number;
+                numero: string;
+                fecha: string | null;
+                fechaEntrega: string | null;
+                idModelo: number | null;
+                /** @description Código del modelo (del catálogo, o el del viejo). */
+                modelo: string | null;
+                descripcionModelo: string | null;
+                tipoProducto: string | null;
+                genero: string | null;
+                cliente: string | null;
+                maquilero: string | null;
+                etiquetaMarca: string | null;
+                totalPiezas: number;
+                cancelada: boolean;
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/historico-ordenes/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Ficha de una orden histórica (matriz color×talla y quién la trabajó) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              numero: string;
+              fecha: string | null;
+              fechaEntrega: string | null;
+              idModelo: number | null;
+              /** @description Código del modelo (del catálogo, o el del viejo). */
+              modelo: string | null;
+              descripcionModelo: string | null;
+              tipoProducto: string | null;
+              genero: string | null;
+              cliente: string | null;
+              maquilero: string | null;
+              etiquetaMarca: string | null;
+              totalPiezas: number;
+              cancelada: boolean;
+              tela: string | null;
+              composicion: string | null;
+              observaciones: string | null;
+              motivoCancelada: string | null;
+              /** @description Id de la orden en el sistema viejo (para rastrearla allá). */
+              idOrdenV1: string;
+              lineas: {
+                color: string;
+                talla: string;
+                cantidad: number;
+              }[];
+              procesos: {
+                /** @enum {string} */
+                tipo:
+                  | 'corte'
+                  | 'envio_maquila'
+                  | 'recibo_maquila'
+                  | 'envio_estampado'
+                  | 'recibo_estampado';
+                fecha: string | null;
+                tercero: string | null;
+                cantidad: number;
+                observaciones: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/almacenes': {
     parameters: {
       query?: never;

@@ -1153,3 +1153,31 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 - **Queda abierto (Daniel):** ¿se depura también el catálogo de modelos, como el de proveedores? Recomendación: **no**. Un modelo no estorba (no se ofrece al capturar salvo que se busque) y es lo que permite identificar lo que hay en el almacén sin teclear descripciones a mano. Si se depurara a 241, **entonces sí** harían falta los campos temporales.
 - **Aplica en:** 1 migración **aditiva** (`movimiento_det_pt.num_orden_v1` + índice), SIN permisos, SIN seed → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.26) — Archivo histórico de órdenes: la historia se consulta, no se opera (DANIEL, 10-ago-2026)
+
+> *"¿Qué pasa si dejamos todos esos modelos con su información de producción a manera informativa con la información que hay? Es decir, sin poder manipular las órdenes y sin poder ver toda la info de una OP, pero sí con algo de información fija… sin jalar maquileros, estampadores dentro de un catálogo, sino como un campo informativo. ¿Podría ser viable?"* → y al confirmar el lugar: *"me gustaría tenerlas también como archivo histórico de órdenes. Normalmente cuando queremos consultar algo de información, lo hacemos más desde las órdenes de producción que del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de prenda, fecha de producción, maquilero, etc."*
+
+**El problema que resuelve.** La migración lleva solo 2025-2026 (§Post-F9.24): de 5,451 órdenes del viejo, **262** entran como órdenes OPERATIVAS. Las otras ~5,200 son historia que se quiere **consultar**. Traerlas como `Orden` obligaría a arrastrar folios, kardex, costeo, ruta crítica, existencias y los catálogos de terceros que justo se depuraron (§Post-F9.23) — es decir, deshacer la depuración para poder mirar el pasado.
+
+**La idea de Daniel es la que lo hace barato: si es de SOLO LECTURA, no arrastra nada.** Tres tablas planas (`HistoricoOrdenV1` + sus líneas + sus procesos), sin folios, sin estados, sin permisos de operación.
+
+**Las dos reglas que lo mantienen inocuo:**
+1. **Los terceros van como TEXTO** (`maquilero`, `tercero` del proceso), no como FK a `Proveedor`. El nombre se resuelve UNA vez, al migrar, leyendo los CSV del viejo. Un taller que no sobrevivió a la depuración aparece escrito y **no revive** como proveedor.
+2. **La única FK de verdad es al `Modelo`**, porque los modelos migran completos (4,987). Es la que permite filtrar por **tipo de prenda** y **género** sin duplicar esos campos — y la razón por la que el catálogo de modelos **no** se depura (ver abajo).
+
+**Lo que se cargó (medido sobre el dump):** 5,451 órdenes · 39,866 celdas color×talla · los cinco documentos de producción del viejo (corte 6,967 · entregas 7,334 · recibos 12,440 · entregas est. 4,496 · recibos est. 4,059). ~85,000 renglones en total.
+
+**Dónde se ve:** *Producción › Archivo de órdenes*, con los filtros que Daniel pidió textualmente — **cliente, modelo, tipo de prenda, fecha de producción y maquilero** — más una caja de búsqueda libre (número de orden / modelo / cliente). El número de orden abre la ficha: matriz color×talla y **quién la trabajó** (cortador, taller de costura, estampador, con sus cantidades).
+
+**El filtro de maquilero mira DOS lados** (y esto importa): en el viejo, el taller de la cabecera de la orden no es necesariamente quien la trabajó — el que cosió está en `Entregas`/`Recibos` y el que estampó en `EntregasEst`/`RecibosEst`. Buscar solo por la cabecera dejaría fuera justo lo que se busca (*"¿qué le hemos mandado a este taller?"*), así que la búsqueda cubre también los procesos.
+
+**Lo que NO se hace, a propósito:**
+- **No se normalizan los colores.** El viejo los guardaba como texto libre, así que conviven "MARINO", "Marino" y "MAR.". En un archivo de consulta eso se lee y se entiende; adivinar equivalencias entre 39,866 celdas metería errores silenciosos.
+- **No se depura el catálogo de MODELOS** (a diferencia de proveedores). Un modelo no estorba —no se ofrece al capturar salvo que se busque— y es lo que permite identificar lo que hay en el almacén y filtrar el archivo por tipo de prenda. Depurarlo obligaría además a capturar a mano el número, descripción, colores y tallas en el conteo inicial de PT, que es trabajo extra para quien cuenta.
+- **No hay escritura.** El dominio (`dominio/consultas/historico-ordenes.ts`) solo expone `listar` y `obtener`; las rutas son solo `GET`. El ETL escribe con Prisma directo — excepción consciente a A1, porque no hay regla de negocio que proteger (sin folios, sin kardex, sin estados) y una capa de dominio de escritura sería ceremonia sobre un `INSERT`.
+
+**Permiso:** se REUSA `ordenes.ver` (quien ve órdenes ve las viejas). **Cero permisos nuevos, cero seed.**
+
+- **Aplica en:** 1 migración **aditiva** (3 tablas + 1 enum) y 1 ETL nuevo que se corre a mano después de `etl-catalogos`: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente).
+- **Fecha:** 2026-08-10.

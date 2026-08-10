@@ -96,6 +96,7 @@ import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
 import { rutasHitosRc } from './api/ruta-critica/hitos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
+import { rutasHistoricoOrdenes } from './api/consultas/historico-ordenes.rutas.js';
 import { rutasResumen } from './api/resumen/resumen.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
 import { rutasSesion } from './api/sesion/sesion.rutas.js';
@@ -173,6 +174,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // vencer (semáforo RC) + cortes por semana, en una respuesta. Cada bloque respeta el permiso de
   // su dominio dueño (A4, patrón contarAlertas): sin permiso, el bloque llega null.
   await app.register(rutasResumen, { prefix: '/api' });
+  await app.register(rutasHistoricoOrdenes, { prefix: '/api' });
   await app.register(rutasAlmacenes, { prefix: '/api' });
   // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes. NOTA: cortadores y
   // maquileros se fusionaron en proveedores (un tercero con sus roles de servicio, D12/R15).
