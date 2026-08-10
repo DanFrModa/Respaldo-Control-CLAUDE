@@ -26,10 +26,13 @@
  * cero. Se reporta explícito (§7 del plan: nada se descarta en silencio).
  *
  * CONFIGURABLE, y por defecto **NO recorta** — igual que `ventana.ts`: quien corre el ETL decide.
- *  • `ETL_PROVEEDORES_DESDE` (año, p. ej. `2025`): solo entran los terceros con movimiento en ese
- *    año o después. Sin la variable (o `0`) se cargan **todos**, como hasta hoy.
+ *  • Lo normal es NO poner nada aquí: el año sale de **`ETL_DESDE`**, el interruptor de toda la
+ *    migración (§Post-F9.24), para que el catálogo y los documentos no puedan desalinearse.
+ *  • `ETL_PROVEEDORES_DESDE` (año) lo sobreescribe, por si alguna vez conviene depurar el catálogo
+ *    con un criterio distinto al de los documentos. Sin ninguna de las dos, se cargan **todos**.
  */
 import { leerCsv } from './csv.js';
+import { leerDesdeAnio } from './ventana.js';
 
 /** Fuentes de terceros del sistema viejo (una por catálogo del Access). */
 export type FuenteTercero = 'comercial' | 'cortador' | 'taller' | 'estampador';
@@ -44,10 +47,18 @@ export interface ProveedoresActivos {
   conteos: Record<FuenteTercero, number>;
 }
 
-/** Lee `ETL_PROVEEDORES_DESDE` (año ≥ 1900; default 0 = sin recorte). Inválido → 0. */
+/**
+ * Año de corte. Sale de `ETL_DESDE` —el interruptor de TODA la migración (§Post-F9.24)— para que
+ * el catálogo de proveedores y los documentos que lo usan no puedan quedar desalineados: si la
+ * migración lleva 2025-2026, los proveedores son los de 2025-2026.
+ *
+ * `ETL_PROVEEDORES_DESDE` sigue existiendo y **gana** si se pone: sirve para depurar el catálogo
+ * con un criterio distinto al de los documentos (p. ej. cargar más historia pero solo los
+ * proveedores recientes). Inválido o ausente en ambas → 0 = no se depura.
+ */
 function leerDesde(): number {
   const crudo = (process.env.ETL_PROVEEDORES_DESDE ?? '').trim();
-  if (crudo === '') return 0;
+  if (crudo === '') return leerDesdeAnio();
   const n = Number(crudo);
   return Number.isInteger(n) && n >= 1900 ? n : 0;
 }
@@ -137,7 +148,7 @@ export function resolverProveedoresActivos(): ProveedoresActivos {
 /** Frase para el reporte de cuadre: qué ventana se aplicó (o que no se aplicó ninguna). */
 export function describirProveedoresActivos(cfg: ProveedoresActivos): string {
   if (cfg.desde === 0) {
-    return 'Proveedores: SIN depuración (se cargan todos los del Access). Para depurar, corre el ETL con ETL_PROVEEDORES_DESDE=2025.';
+    return 'Proveedores: SIN depuración (se cargan todos los del Access). Para depurar, corre el ETL con ETL_DESDE=2025.';
   }
   const { comercial, cortador, taller } = cfg.conteos;
   return (

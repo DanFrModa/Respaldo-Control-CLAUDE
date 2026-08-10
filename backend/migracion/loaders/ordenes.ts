@@ -71,6 +71,7 @@ import {
   parsearTexto,
 } from '../comun/valores.js';
 import { CAMPO_D7_PEDIDO_CLIENTE } from './clientes.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Texto por defecto cuando una orden cancelada del viejo no trae motivo. */
@@ -91,6 +92,8 @@ export interface ResultadoOrdenes {
   coloresCreados: number;
   /** # de tallas creadas al vuelo (token sin match en catálogo). */
   tallasCreadas: number;
+  /** # de órdenes excluidas por la ventana temporal (§Post-F9.24). Listadas en el reporte. */
+  fueraVentana: number;
 }
 
 /** Renglón crudo de `OrdenesDet`: color + las 8 cantidades. */
@@ -187,6 +190,7 @@ export async function cargarOrdenes(
     monarchDefault: 0,
     coloresCreados: 0,
     tallasCreadas: 0,
+    fueraVentana: 0,
   };
 
   // ── PRE-PASADA SECUENCIAL: resolver/crear TODOS los colores y tallas distintos ──────────────
@@ -194,7 +198,27 @@ export async function cargarOrdenes(
   // para las etiquetas de talla) los nombres distintos, y los resuelve/crea de una vez. Así el
   // bucle concurrente posterior solo LEE las cachés. Es idempotente: re-ejecutar reusa lo que ya
   // exista (no crea duplicados) y NO vuelve a contar/reportar lo que ya estaba en catálogo.
-  const filasOrden = leerCsv('Ordenes.csv');
+  // §Post-F9.24 — la migración lleva solo 2025-2026 (Daniel/Gabriel, 10-ago-2026). Recortar AQUÍ
+  // es lo que hace que el corte alcance a todo F3/F5/F6/F7: cortes, envíos, recibos, auditorías,
+  // rutas críticas y costos cuelgan de la orden, así que si la orden no se migra, ellos tampoco.
+  const ventana = resolverVentana();
+  const { dentro: filasOrden, fuera: fueraVentana } = filtrarPorVentana(
+    leerCsv('Ordenes.csv'),
+    'Fecha',
+    ventana,
+    reporte,
+    'Órdenes',
+    (f) => `IdOrdenes=${f.IdOrdenes ?? '?'} Numero=${f.Numero ?? '?'}`,
+  );
+  // El detalle se leyó ANTES del recorte (lo necesitaban los colores). Se poda al mismo conjunto:
+  // si no, se pre-crearían colores y tallas sacados de 20 años de órdenes que no vamos a migrar —
+  // justo la basura de catálogo que se está depurando.
+  if (ventana.corte !== null) {
+    const vivas = new Set(filasOrden.map((f) => (f.IdOrdenes ?? '').trim()));
+    for (const idOrd of [...detPorOrden.keys()]) {
+      if (!vivas.has(idOrd)) detPorOrden.delete(idOrd);
+    }
+  }
   await precrearColores(sesion, bd, cliente, reporte, resultado, {
     detPorOrden,
     idPorColorNorm,
@@ -263,6 +287,7 @@ export async function cargarOrdenes(
     resultado.monarchDefault += c.monarchDefault;
   }
 
+  resultado.fueraVentana = fueraVentana;
   return resultado;
 }
 

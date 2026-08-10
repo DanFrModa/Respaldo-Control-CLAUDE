@@ -1099,3 +1099,38 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 
 - **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa al correr la migración.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.24) — La migración lleva SOLO 2025 y 2026 (DANIEL + GABRIEL, 10-ago-2026)
+
+> Daniel, confirmando: *"Sí… vamos a pasar información solo de 2025 y 2026."*
+
+Sube a **regla de toda la migración** lo que §Post-F9.23 había hecho solo para el catálogo de proveedores, y generaliza lo que §Post-F9.11 punto 5 ya decía para los consumos de tela (*"2025-2026, ~400 órdenes"*).
+
+**Un solo interruptor: `ETL_DESDE`.** `ETL_DESDE=2025` fija el corte al **1-ene-2025**, sin depender de qué día se corra el ETL. Convive con el `ETL_VENTANA_ANIOS` de F4 (*"los últimos N años"*), pero **`ETL_DESDE` gana** cuando vienen los dos: una fecha explícita manda sobre una relativa. Sin ninguna de las dos, **no recorta** (se migra todo, como hasta hoy). El mismo interruptor alimenta la depuración de proveedores (§Post-F9.23), para que el catálogo y los documentos no puedan quedar desalineados.
+
+**Dónde se recorta, y por qué ahí.** El corte se aplica en los documentos **ancla**, no en cada loader:
+- **`Pedidos`** (por `FechaPedido`, que es la fecha del documento — `FechaElaboracion` es cuándo se capturó).
+- **`Ordenes`** (por `Fecha`). **Esta es la que arrastra todo lo demás:** cortes, envíos, recibos, rutas críticas, auditorías, comentarios y costos cuelgan de la orden, así que si la orden no se migra, ellos tampoco. Se poda también el detalle (`OrdenesDet`) al mismo conjunto: si no, se pre-crearían colores y tallas sacados de 20 años de órdenes que no vamos a migrar — justo la basura de catálogo que se está depurando.
+- Los de **F4** (OC, notas de salida, entradas/salidas de tela) ya tenían ventana y ahora obedecen el mismo interruptor sin tocarlos.
+
+**Un DOCUMENTO sin fecha legible SE QUEDA** — al revés que en la depuración de proveedores. Es deliberado: un tercero dudoso se vuelve a dar de alta en un minuto, pero un documento que se tira no se recupera. Ante la duda con un documento, se migra y se reporta.
+
+**Nada se descarta en silencio** (plan §7): cada pedido y cada orden excluidos salen listados en el reporte con su id y su fecha, y el resumen imprime los conteos y la ventana aplicada — aunque no recorte.
+
+**Qué queda con el corte (medido sobre el dump, 10-ago-2026):**
+
+| Tabla del viejo | Total | En 2025-2026 |
+|---|---|---|
+| `Ordenes` | 5,451 | **262** |
+| `Pedidos` | 1,529 | **112** (incluye 18 sin fecha, que se quedan) |
+| `EsMa` | 11,369 | **384** |
+| `OrdCompra` | 7,978 | **554** |
+| Proveedores (4 catálogos) | 1,052 | **155** |
+
+**⚠️ TRES TABLAS SE QUEDAN EN CERO — hay que decidirlas, no dejarlas pasar:**
+- **`IPT_Movs` (5,072 movimientos, el último de 2023):** es el **único** origen de las existencias de producto terminado (F3-E6). Con el corte, **el inventario de PT arrancaría en CERO**. Es el mismo caso que las telas (§Post-F9.11 punto 5: *"partir de un inventario físico desde cero"*), pero para PT **esa decisión no está tomada**. **Pendiente de Daniel.**
+- **`CC_Auditorias` (488, la última de 2017):** el histórico de calidad desaparece. El módulo arranca vacío.
+- **`PedidosReales` (161, el último de 2010):** la función dejó de usarse hace 16 años; no migra nada.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa con `ETL_DESDE=2025` al correr la migración.
+- **Fecha:** 2026-08-10.

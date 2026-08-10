@@ -136,9 +136,20 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 > (default **0 = sin recorte**, anclada a `ETL_VENTANA_REF`=hoy) si quieres recortar por antigüedad
 > además del recorte por empresa. Cada corrida escribe `reporte-etl-f4e6-{compras,telas}-*.txt`.
 
+> **⭐ LA MIGRACIÓN LLEVA SOLO 2025-2026 (§Post-F9.24 — Daniel/Gabriel, 10-ago-2026).** Exporta
+> **`ETL_DESDE=2025`** antes de correr CUALQUIER ETL: fija el corte al 1-ene-2025 y con él se recortan
+> pedidos, órdenes (y con ellas todo lo que les cuelga: corte, envíos, recibos, RC, auditorías,
+> costos), OC, notas y telas, **y también el catálogo de proveedores**. Un solo interruptor para que
+> nada quede desalineado. Gana sobre `ETL_VENTANA_ANIOS`. Sin la variable NO recorta (se migra todo).
+> Un documento **sin fecha legible se queda** (un documento tirado no se recupera); un **proveedor**
+> dudoso, no (se da de alta en un minuto). Todo lo excluido sale listado en el reporte.
+> **⚠️ Con el corte, `IPT_Movs` (última de 2023) queda en CERO → el inventario de producto terminado
+> arrancaría vacío.** Está PENDIENTE de decisión de Daniel. Igual pasa con `CC_Auditorias` (2017) y
+> `PedidosReales` (2010).
+
 > **Depuración de PROVEEDORES (§Post-F9.23):** el Access trae **1,052 filas** de terceros en cuatro
-> catálogos y solo **155** movieron algo desde 2025. Exporta `ETL_PROVEEDORES_DESDE=2025` antes de
-> `etl-catalogos` para cargar **solo esos** (default **sin variable = se cargan todos**, como hasta hoy).
+> catálogos y solo **155** movieron algo desde 2025. Con `ETL_DESDE=2025` se cargan **solo esos**
+> (`ETL_PROVEEDORES_DESDE` lo sobreescribe si alguna vez quieres otro criterio) (default **sin variable = se cargan todos**, como hasta hoy).
 > Un tercero está vivo si MOVIÓ algo (OC, corte, entrega, recibo, nota o estampado), no por la bandera
 > `Activo` del viejo. **Ojo:** `EntregasEst/RecibosEst.IdMaquileros` apuntan a **Maquileros**, no a
 > `Estampadores` → ese catálogo (44) queda fuera COMPLETO, y es correcto: quien estampa es un taller.
