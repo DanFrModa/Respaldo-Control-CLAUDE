@@ -73,6 +73,12 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
    * pendientes de la OC: las cantidades y precios que valen son los que el proveedor facturó.
    */
   const [propuesta, setPropuesta] = useState<PropuestaCfdiEntradaTela | null>(null);
+  /**
+   * §Post-F9.21 — el CONTENIDO del XML viaja también al GUARDAR: el servidor lo vuelve a parsear
+   * (el total fiscal nunca se acepta del cliente), lo guarda y con eso nace la cuenta por pagar al
+   * confirmar la entrada.
+   */
+  const [xmlCfdi, setXmlCfdi] = useState<string | null>(null);
 
   // DEEP-LINK desde la orden de compra (§Post-F9.15). Se lee UNA vez al montar. El PROVEEDOR viaja
   // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
@@ -125,6 +131,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
           {
             onSuccess: (datos) => {
               setPropuesta(datos);
+              setXmlCfdi(xml);
               setTipoDocumento('factura');
               if (datos.numeroDocumento !== '') setNumeroDocumento(datos.numeroDocumento);
               setFecha(datos.fecha);
@@ -252,6 +259,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda de qué factura salió
       // (y el servidor impide recibir la misma dos veces).
       ...(propuesta === null ? {} : { uuidCfdi: propuesta.uuid }),
+      ...(xmlCfdi === null ? {} : { xmlCfdi }),
       idProveedor: Number(idProveedor),
       fecha,
       idAlmacen: Number(idAlmacen),
@@ -277,6 +285,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     observaciones,
     renglones,
     propuesta,
+    xmlCfdi,
   ]);
 
   function guardar(): void {

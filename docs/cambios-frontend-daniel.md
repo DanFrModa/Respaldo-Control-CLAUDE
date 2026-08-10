@@ -2128,3 +2128,38 @@ datos ya quedan guardados; es lo siguiente.
 
 Una migración **aditiva** (una columna en las entradas de tela) y **cero permisos nuevos** → **no**
 hace falta `SEED_ON_START`.
+
+---
+
+## La cuenta por pagar se genera sola al confirmar la entrada (7-ago-2026)
+
+Esto cierra lo que pediste hace rato: *"desde que demos entrada a las telas, se debe de generar la
+cuenta por pagar del proveedor"*.
+
+### Cómo funciona
+
+- Al **guardar** la entrada con su XML, el sistema vuelve a leer la factura (no se fía de lo que
+  mandó la pantalla: el total es lo que le vas a deber al proveedor), comprueba que **quien facturó
+  sea el proveedor de la entrada** y guarda la factura.
+- Al **confirmar** —el momento en que la tela entra al inventario— se genera sola la **cuenta por
+  pagar**, por el **total de la factura con impuestos** (no por la suma de los renglones, que va sin
+  IVA), con su UUID y su XML de respaldo, y ligada a esa entrada.
+- Si **cancelas** la entrada, la cuenta por pagar se cancela también, con su movimiento inverso.
+  Nunca se borra nada: queda el rastro completo.
+
+### Si no hay factura, no hay cargo
+
+Una **remisión** o una captura a mano entran al inventario igual, pero **no** generan cuenta por
+pagar. Es a propósito: un cargo sin comprobante no es una cuenta por pagar, es una suposición.
+Finanzas la registrará cuando llegue la factura.
+
+### Quién puede hacerlo
+
+Quien recibe la tela. **No** hace falta darle permisos de Finanzas: el cargo nace como consecuencia
+de una entrada que esa persona ya estaba autorizada a confirmar. Lo contrario obligaría a Finanzas a
+recapturar a mano cada factura que ya se recibió.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (dos columnas en las entradas de tela) y **cero permisos nuevos** → **no**
+hace falta `SEED_ON_START`.

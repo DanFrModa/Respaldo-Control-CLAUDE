@@ -35180,6 +35180,8 @@ export interface paths {
                 numeroDocumento: string;
                 /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
                 uuidCfdi: string | null;
+                /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+                totalCfdi: number | null;
                 idProveedor: number;
                 /** @description Nombre del proveedor. */
                 proveedor: string;
@@ -35371,6 +35373,8 @@ export interface paths {
             observaciones?: string;
             /** @description UUID (folio fiscal) del CFDI leído, o null si se capturó a mano. */
             uuidCfdi?: string | null;
+            /** @description XML del CFDI del que se leyeron los datos (para respaldar la CxP al confirmar). */
+            xmlCfdi?: string | null;
             lineas: {
               idTelaColor: number;
               /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
@@ -35409,6 +35413,8 @@ export interface paths {
               numeroDocumento: string;
               /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
               uuidCfdi: string | null;
+              /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+              totalCfdi: number | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -35784,6 +35790,8 @@ export interface paths {
               numeroDocumento: string;
               /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
               uuidCfdi: string | null;
+              /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+              totalCfdi: number | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -35971,6 +35979,8 @@ export interface paths {
             observaciones?: string;
             /** @description UUID (folio fiscal) del CFDI leído, o null si se capturó a mano. */
             uuidCfdi?: string | null;
+            /** @description XML del CFDI del que se leyeron los datos (para respaldar la CxP al confirmar). */
+            xmlCfdi?: string | null;
             lineas: {
               idTelaColor: number;
               /** @description Cantidad del CUERPO (admite 0 si el renglón es de solo complemento). */
@@ -36009,6 +36019,8 @@ export interface paths {
               numeroDocumento: string;
               /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
               uuidCfdi: string | null;
+              /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+              totalCfdi: number | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -36215,6 +36227,8 @@ export interface paths {
               numeroDocumento: string;
               /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
               uuidCfdi: string | null;
+              /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+              totalCfdi: number | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;
@@ -36427,6 +36441,8 @@ export interface paths {
               numeroDocumento: string;
               /** @description UUID del CFDI del que se leyeron los datos, o null si se capturó a mano. */
               uuidCfdi: string | null;
+              /** @description Total del CFDI (verdad fiscal): el importe con el que nace la CxP al confirmar. */
+              totalCfdi: number | null;
               idProveedor: number;
               /** @description Nombre del proveedor. */
               proveedor: string;

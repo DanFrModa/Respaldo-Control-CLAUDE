@@ -1026,3 +1026,19 @@ Daniel: *"lo ideal es que pueda leer la factura y llenar los campos. ¿Se podrí
 - **PENDIENTE, la otra mitad de "las dos cosas":** que al **confirmar** la entrada se genere la **CxP** del proveedor con ese mismo CFDI. Los datos ya están (UUID sellado en la entrada) y F9 ya sabe crear el cargo fiscal desde un CFDI (`importarCfdi`); falta cablearlo dentro de la transacción de la confirmación, con el permiso resuelto como dice §Post-F9.15 (el cargo nace como consecuencia del acto ya autorizado, no exigiendo `cxp.administrar` a quien recibe).
 - **Aplica en:** 1 migración **aditiva** (`entradas_tela.uuid_cfdi` + unique por empresa), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
+
+#### (Post-F9.21) — La CUENTA POR PAGAR nace al confirmar la entrada de tela (DANIEL, 7-ago-2026)
+
+Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrada a las telas, se debe de generar la cuenta por pagar del proveedor… y está bueno subir la factura de una vez"*), ahora con la información del **XML del CFDI** como pidió Daniel en §Post-F9.20 (*"que la información la tomes del XML para las dos cosas"*).
+
+**Cómo quedó:**
+1. **Al GUARDAR** la entrada, si la captura vino de un XML, el servidor lo **vuelve a parsear** — el total fiscal **jamás** se acepta del cliente: es el importe que se le va a deber al proveedor —, valida que el **emisor sea el proveedor de la entrada** (si no, la CxP nacería a nombre de quien no facturó) y que el CFDI no esté ya en CxP, sube el XML a R2 y sella en la entrada `uuidCfdi` + `totalCfdi` + el archivo.
+2. **Al CONFIRMAR** (el momento en que la tela entra al inventario) nace el cargo de CxP **en la MISMA transacción** (A2): **fiscal**, por el **TOTAL del comprobante** (con impuestos — NO por la suma de renglones, que es cantidad×precio sin IVA), con su UUID, su RFC y el XML como respaldo, y ligado a la entrada (`refTipo: 'entrada-tela'`, `refId`) — que era el punto **(b)** de §Post-F9.15.
+3. **Al CANCELAR** la entrada, el cargo se cancela por su **INVERSO auditado** (D3: nunca se edita ni se borra) — punto **(c)** de §Post-F9.15. Sin esto quedaría un cargo vivo de una entrada cancelada: le deberíamos al proveedor una tela que devolvimos.
+4. **SIN CFDI no se inventa cargo.** Una remisión o una captura a mano entran al inventario igual, pero no generan CxP: Finanzas la registrará cuando llegue la factura. Es deliberado — un cargo sin comprobante no es una cuenta por pagar, es una suposición.
+
+**El permiso — punto (a) de §Post-F9.15, resuelto:** quien confirma la entrada tiene `inventario-telas.mover`, no `terceros.administrar`. Se agregaron al motor de terceros las variantes **internas** `registrarMovimientoTerceroInterno` / `cancelarMovimientoTerceroInterno`: mismo código, sin el guard, **de uso exclusivo del dominio** (jamás desde una ruta REST), para los cargos que nacen como **consecuencia de un acto ya autorizado por otro permiso**. Exigir el segundo permiso obligaría a Finanzas a recapturar a mano cada factura ya recibida — justo lo que se pidió evitar.
+
+- **El PDF sigue siendo solo referencia** (adjunto del documento, §Post-F9.20): los datos y el respaldo fiscal salen del XML.
+- **Aplica en:** 1 migración **aditiva** (`entradas_tela.total_cfdi` + `id_archivo_cfdi`), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-07.
