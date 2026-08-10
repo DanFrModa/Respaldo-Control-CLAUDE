@@ -4,12 +4,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import type { MatrizLinea } from '@/componentes/matriz-color-talla/MatrizColorTalla';
+
 import { aLineasApi, totalMatriz } from './matriz-inventario';
 
-const matriz = [
-  { idColor: 1, cantidades: { 10: 3, 11: 0 } },
-  { idColor: 2, cantidades: { 10: 5 } },
-  { idColor: 3, cantidades: { 10: 0 } },
+const matriz: MatrizLinea[] = [
+  { idColor: 1, color: 'Marino', cantidades: { 10: 3, 11: 0 } },
+  { idColor: 2, color: 'Blanco', cantidades: { 10: 5 } },
+  { idColor: 3, color: 'Rojo', cantidades: { 10: 0 } },
 ];
 
 describe('aLineasApi', () => {
