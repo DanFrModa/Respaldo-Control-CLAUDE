@@ -86318,6 +86318,17 @@
                           "numeroDocumento": {
                             "type": "string"
                           },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
+                          },
                           "idProveedor": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -86696,6 +86707,7 @@
                           "idEmpresa",
                           "tipoDocumento",
                           "numeroDocumento",
+                          "uuidCfdi",
                           "idProveedor",
                           "proveedor",
                           "fecha",
@@ -86951,6 +86963,18 @@
                     "type": "string",
                     "maxLength": 2000
                   },
+                  "uuidCfdi": {
+                    "description": "UUID (folio fiscal) del CFDI leído, o null si se capturó a mano.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "lineas": {
                     "minItems": 1,
                     "type": "array",
@@ -87062,6 +87086,17 @@
                     },
                     "numeroDocumento": {
                       "type": "string"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
                     },
                     "idProveedor": {
                       "type": "integer",
@@ -87441,6 +87476,7 @@
                     "idEmpresa",
                     "tipoDocumento",
                     "numeroDocumento",
+                    "uuidCfdi",
                     "idProveedor",
                     "proveedor",
                     "fecha",
@@ -87466,6 +87502,399 @@
                   ],
                   "additionalProperties": false,
                   "description": "Documento de entrada de tela por factura/remisión con sus partidas."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventarios/telas/entradas/leer-cfdi": {
+      "post": {
+        "summary": "Leer el XML de la factura y proponer los renglones de la entrada",
+        "tags": [
+          "inventario-telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "xml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Contenido del XML del CFDI."
+                  },
+                  "idOrdenCompra": {
+                    "description": "Acota las sugerencias a UNA orden de compra.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "xml"
+                ],
+                "description": "XML del CFDI a leer para llenar la entrada de tela."
+              }
+            }
+          },
+          "description": "XML del CFDI a leer para llenar la entrada de tela."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Propuesta leída del CFDI para llenar la entrada de tela.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uuid": {
+                      "type": "string",
+                      "description": "Folio fiscal del CFDI."
+                    },
+                    "numeroDocumento": {
+                      "type": "string",
+                      "description": "Serie+Folio del CFDI: el número de factura que se propone para el documento."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de emisión (propuesta para el documento)."
+                    },
+                    "emisorRfc": {
+                      "type": "string"
+                    },
+                    "emisorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "moneda": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "number"
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proveedor del catálogo con ese RFC, o null si ninguno lo tiene."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "yaUsado": {
+                      "type": "boolean",
+                      "description": "El UUID ya se capturó antes (otra entrada o ya en CxP)."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Lo que hay que saber antes de aceptar la propuesta."
+                    },
+                    "conceptos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción tal como la escribió el proveedor."
+                          },
+                          "cantidad": {
+                            "type": "number"
+                          },
+                          "valorUnitario": {
+                            "type": "number"
+                          },
+                          "importe": {
+                            "type": "number"
+                          },
+                          "sugerencia": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "idOrdenCompraLinea": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "numCompra": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Folio de la orden de compra."
+                                  },
+                                  "idTela": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "tela": {
+                                    "type": "string"
+                                  },
+                                  "unidad": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "pendiente": {
+                                    "type": "number",
+                                    "description": "Lo que falta del cuerpo en ese renglón."
+                                  },
+                                  "pendienteComplemento": {
+                                    "type": "number",
+                                    "description": "Lo que falta del complemento."
+                                  },
+                                  "nombreComplemento": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "motivo": {
+                                    "type": "string",
+                                    "enum": [
+                                      "nombre-de-la-tela",
+                                      "unico-pendiente",
+                                      "cantidad-parecida"
+                                    ],
+                                    "description": "Por qué se sugirió (para que la persona pueda juzgarla)."
+                                  }
+                                },
+                                "required": [
+                                  "idOrdenCompraLinea",
+                                  "numCompra",
+                                  "idTela",
+                                  "tela",
+                                  "unidad",
+                                  "pendiente",
+                                  "pendienteComplemento",
+                                  "nombreComplemento",
+                                  "motivo"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "descripcion",
+                          "cantidad",
+                          "valorUnitario",
+                          "importe",
+                          "sugerencia"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Concepto del CFDI con su sugerencia de renglón de orden de compra."
+                      }
+                    }
+                  },
+                  "required": [
+                    "uuid",
+                    "numeroDocumento",
+                    "fecha",
+                    "emisorRfc",
+                    "emisorNombre",
+                    "moneda",
+                    "total",
+                    "idProveedor",
+                    "proveedor",
+                    "yaUsado",
+                    "avisos",
+                    "conceptos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Propuesta leída del CFDI para llenar la entrada de tela."
                 }
               }
             }
@@ -87677,6 +88106,17 @@
                     "numeroDocumento": {
                       "type": "string"
                     },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
+                    },
                     "idProveedor": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -88055,6 +88495,7 @@
                     "idEmpresa",
                     "tipoDocumento",
                     "numeroDocumento",
+                    "uuidCfdi",
                     "idProveedor",
                     "proveedor",
                     "fecha",
@@ -88276,6 +88717,18 @@
                     "type": "string",
                     "maxLength": 2000
                   },
+                  "uuidCfdi": {
+                    "description": "UUID (folio fiscal) del CFDI leído, o null si se capturó a mano.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "lineas": {
                     "minItems": 1,
                     "type": "array",
@@ -88400,6 +88853,17 @@
                     },
                     "numeroDocumento": {
                       "type": "string"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
                     },
                     "idProveedor": {
                       "type": "integer",
@@ -88779,6 +89243,7 @@
                     "idEmpresa",
                     "tipoDocumento",
                     "numeroDocumento",
+                    "uuidCfdi",
                     "idProveedor",
                     "proveedor",
                     "fecha",
@@ -89015,6 +89480,17 @@
                     "numeroDocumento": {
                       "type": "string"
                     },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
+                    },
                     "idProveedor": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -89393,6 +89869,7 @@
                     "idEmpresa",
                     "tipoDocumento",
                     "numeroDocumento",
+                    "uuidCfdi",
                     "idProveedor",
                     "proveedor",
                     "fecha",
@@ -89651,6 +90128,17 @@
                     "numeroDocumento": {
                       "type": "string"
                     },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI del que se leyeron los datos, o null si se capturó a mano."
+                    },
                     "idProveedor": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -90029,6 +90517,7 @@
                     "idEmpresa",
                     "tipoDocumento",
                     "numeroDocumento",
+                    "uuidCfdi",
                     "idProveedor",
                     "proveedor",
                     "fecha",

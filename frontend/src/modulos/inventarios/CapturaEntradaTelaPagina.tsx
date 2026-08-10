@@ -8,7 +8,9 @@ import {
   useActualizarEntradaTela,
   useCrearEntradaTela,
   useEntradaTela,
+  useLeerCfdiEntradaTela,
   type EntradaTelaCrear,
+  type PropuestaCfdiEntradaTela,
 } from '@/api/entradas-tela';
 import { useLineasTelaPendientes } from '@/api/compras-lineas-tela';
 import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
@@ -20,6 +22,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
+import type { LineaOcPendiente } from './CapturaRenglonesTelaColor';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
@@ -64,6 +67,12 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
+  /**
+   * §Post-F9.20 — propuesta leída del XML de la factura (Daniel: *"que la información la tomes del
+   * XML"*). Mientras exista, el panel de captura ofrece los CONCEPTOS DE LA FACTURA en vez de los
+   * pendientes de la OC: las cantidades y precios que valen son los que el proveedor facturó.
+   */
+  const [propuesta, setPropuesta] = useState<PropuestaCfdiEntradaTela | null>(null);
 
   // DEEP-LINK desde la orden de compra (§Post-F9.15). Se lee UNA vez al montar. El PROVEEDOR viaja
   // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
@@ -100,6 +109,75 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const existente = useEntradaTela(idEditar);
   const crear = useCrearEntradaTela();
   const actualizar = useActualizarEntradaTela();
+  const leerCfdi = useLeerCfdiEntradaTela();
+
+  /**
+   * §Post-F9.20 — lee el XML de la factura y llena la captura: proveedor (por RFC), fecha, número de
+   * documento y los renglones con la cantidad y el precio que el proveedor FACTURÓ. Lo único que no
+   * se puede leer del CFDI es el COLOR, que es justo lo que queda por capturar.
+   */
+  function alElegirXml(archivo: File | undefined): void {
+    if (archivo === undefined) return;
+    void archivo.text().then(
+      (xml) => {
+        leerCfdi.mutate(
+          { xml, ...(idOcDeepLink === null ? {} : { idOrdenCompra: idOcDeepLink }) },
+          {
+            onSuccess: (datos) => {
+              setPropuesta(datos);
+              setTipoDocumento('factura');
+              if (datos.numeroDocumento !== '') setNumeroDocumento(datos.numeroDocumento);
+              setFecha(datos.fecha);
+              // El proveedor solo se toca si NO viene fijo por la orden de compra.
+              if (datos.idProveedor !== null && idOcDeepLink === null) {
+                setIdProveedor(String(datos.idProveedor));
+              }
+              for (const aviso of datos.avisos) {
+                toast.warning(aviso, { duration: 10000 });
+              }
+              const conCruce = datos.conceptos.filter((c) => c.sugerencia !== null).length;
+              toast.success(
+                conCruce > 0
+                  ? `Factura leída: ${String(conCruce)} renglón(es) listos para capturar (solo falta el color).`
+                  : 'Factura leída. Captura los renglones a mano: no se pudo cruzar ningún concepto.',
+              );
+            },
+            onError: (error) => toast.error(error.message),
+          },
+        );
+      },
+      () => toast.error('No se pudo leer el archivo.'),
+    );
+  }
+
+  /**
+   * Lo que el panel de captura ofrece para precargar renglones: los CONCEPTOS de la factura si ya se
+   * leyó el XML (con SU cantidad y SU precio — es lo que llegó y lo que se va a pagar), o los
+   * pendientes de la orden de compra si se está capturando a mano desde ella (§Post-F9.15).
+   */
+  const lineasParaCapturar: LineaOcPendiente[] | undefined =
+    propuesta !== null
+      ? propuesta.conceptos
+          .filter((c) => c.sugerencia !== null)
+          .map((c) => {
+            const s = c.sugerencia as NonNullable<typeof c.sugerencia>;
+            return {
+              idOrdenCompraLinea: s.idOrdenCompraLinea,
+              numCompra: s.numCompra,
+              idTela: s.idTela,
+              tela: s.tela,
+              unidad: s.unidad,
+              // La cantidad y el precio salen de la FACTURA, no de lo que faltaba en la orden.
+              pendiente: c.cantidad,
+              precio: c.valorUnitario,
+              nombreComplemento: s.nombreComplemento,
+              cantidadComplemento: s.nombreComplemento === null ? null : s.pendienteComplemento,
+              pendienteComplemento: s.pendienteComplemento,
+            };
+          })
+      : idOcDeepLink === null
+        ? undefined
+        : (lineasOc.data ?? []);
 
   // Llegando DESDE la OC: el proveedor se fija con el de la orden (una vez, sin pisar lo que ya
   // hubiera en un borrador que se esté editando).
@@ -171,6 +249,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     return {
       tipoDocumento,
       numeroDocumento: numeroDocumento.trim(),
+      // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda de qué factura salió
+      // (y el servidor impide recibir la misma dos veces).
+      ...(propuesta === null ? {} : { uuidCfdi: propuesta.uuid }),
       idProveedor: Number(idProveedor),
       fecha,
       idAlmacen: Number(idAlmacen),
@@ -187,7 +268,16 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
           : { precioUnitComplemento: r.precioUnitComplemento }),
       })),
     };
-  }, [tipoDocumento, numeroDocumento, idProveedor, fecha, idAlmacen, observaciones, renglones]);
+  }, [
+    tipoDocumento,
+    numeroDocumento,
+    idProveedor,
+    fecha,
+    idAlmacen,
+    observaciones,
+    renglones,
+    propuesta,
+  ]);
 
   function guardar(): void {
     if (cuerpo === undefined) return;
@@ -264,6 +354,36 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* §Post-F9.20 — LEER LA FACTURA. Del XML del CFDI salen exactos el proveedor (por su
+              RFC), la fecha, el número y cada concepto con su cantidad y precio; el PDF se sigue
+              adjuntando aparte, como referencia para consultar la factura tal cual. */}
+          {editable ? (
+            <div
+              className="flex flex-wrap items-center gap-3 rounded-md border border-primary/40 bg-primary-soft p-3"
+              data-testid="entrada-leer-cfdi"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Leer la factura (XML)</p>
+                <p className="text-xs text-muted-foreground">
+                  {propuesta === null
+                    ? 'Sube el XML del CFDI y se llenan solos el proveedor, la fecha, el número y los renglones. Solo tendrás que elegir el color.'
+                    : `Factura ${propuesta.numeroDocumento === '' ? propuesta.uuid.slice(0, 8) : propuesta.numeroDocumento} leída · ${propuesta.emisorNombre ?? propuesta.emisorRfc} · ${propuesta.conceptos.length} concepto(s).`}
+                </p>
+              </div>
+              <label className="shrink-0">
+                <span className="sr-only">Archivo XML de la factura</span>
+                <input
+                  type="file"
+                  accept=".xml,text/xml,application/xml"
+                  disabled={leerCfdi.isPending}
+                  onChange={(e) => alElegirXml(e.target.files?.[0])}
+                  className="block w-full text-xs file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-xs"
+                  data-testid="entrada-xml-archivo"
+                />
+              </label>
+            </div>
+          ) : null}
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field>
               <FieldLabel htmlFor="entrada-tipo">Tipo de documento</FieldLabel>
@@ -364,7 +484,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             conPrecios
             // §Post-F9.15: el panel "Pendiente de la orden de compra" solo tiene sentido llegando
             // desde una OC; en la captura suelta (tela sin orden) no se pinta.
-            {...(idOcDeepLink === null ? {} : { lineasOc: lineasOc.data ?? [] })}
+            {...(lineasParaCapturar === undefined ? {} : { lineasOc: lineasParaCapturar })}
             // Y el buscador de telas se acota a las del proveedor DUEÑO.
             {...(idProveedor === '' ? {} : { idProveedorTelas: Number(idProveedor) })}
           />

@@ -117,6 +117,17 @@ const camposCabeceraEntradaTela = {
   fecha: z.iso.date({ error: 'La fecha del documento es obligatoria (YYYY-MM-DD)' }),
   idAlmacen: idPositivo('el almacén destino'),
   observaciones: z.string().trim().max(2000).optional(),
+  /**
+   * UUID del CFDI del que se leyeron los datos (§Post-F9.20). Lo manda la pantalla cuando la captura
+   * nació de leer el XML; el dominio lo sella para que la MISMA factura no se reciba dos veces.
+   */
+  uuidCfdi: z
+    .string()
+    .trim()
+    .max(64)
+    .nullable()
+    .optional()
+    .describe('UUID (folio fiscal) del CFDI leído, o null si se capturó a mano.'),
 } as const;
 
 /**
@@ -213,6 +224,10 @@ export const esquemaEntradaTelaSalida = z
     idEmpresa: z.number().int(),
     tipoDocumento: esquemaTipoDocumentoEntradaTela,
     numeroDocumento: z.string(),
+    uuidCfdi: z
+      .string()
+      .nullable()
+      .describe('UUID del CFDI del que se leyeron los datos, o null si se capturó a mano.'),
     idProveedor: z.number().int(),
     proveedor: z.string().describe('Nombre del proveedor.'),
     fecha: z.string().describe('Fecha del documento (YYYY-MM-DD).'),
@@ -374,3 +389,76 @@ export const esquemaEntradaTelaAdjuntosLista = z
 
 /** Forma de la lista de adjuntos. */
 export type EntradaTelaAdjuntosLista = z.infer<typeof esquemaEntradaTelaAdjuntosLista>;
+
+// ── Leer la factura (XML del CFDI) para llenar la captura (§Post-F9.20) ───────────────────────────
+
+/**
+ * Un concepto de la factura con el renglón de OC que probablemente surte. La sugerencia es eso, una
+ * SUGERENCIA: la pantalla la muestra con su motivo y la persona la acepta o la corrige.
+ */
+export const esquemaConceptoCfdiEntradaTela = z
+  .object({
+    descripcion: z.string().describe('Descripción tal como la escribió el proveedor.'),
+    cantidad: z.number(),
+    valorUnitario: z.number(),
+    importe: z.number(),
+    sugerencia: z
+      .object({
+        idOrdenCompraLinea: z.number().int(),
+        numCompra: z.number().int().describe('Folio de la orden de compra.'),
+        idTela: z.number().int(),
+        tela: z.string(),
+        unidad: z.string().nullable(),
+        pendiente: z.number().describe('Lo que falta del cuerpo en ese renglón.'),
+        pendienteComplemento: z.number().describe('Lo que falta del complemento.'),
+        nombreComplemento: z.string().nullable(),
+        motivo: z
+          .enum(['nombre-de-la-tela', 'unico-pendiente', 'cantidad-parecida'])
+          .describe('Por qué se sugirió (para que la persona pueda juzgarla).'),
+      })
+      .nullable(),
+  })
+  .describe('Concepto del CFDI con su sugerencia de renglón de orden de compra.');
+
+/** Propuesta completa para llenar la captura desde el XML. NO escribe nada. */
+export const esquemaPropuestaCfdiEntradaTela = z
+  .object({
+    uuid: z.string().describe('Folio fiscal del CFDI.'),
+    numeroDocumento: z
+      .string()
+      .describe('Serie+Folio del CFDI: el número de factura que se propone para el documento.'),
+    fecha: z.iso.date().describe('Fecha de emisión (propuesta para el documento).'),
+    emisorRfc: z.string(),
+    emisorNombre: z.string().nullable(),
+    moneda: z.string(),
+    total: z.number(),
+    idProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proveedor del catálogo con ese RFC, o null si ninguno lo tiene.'),
+    proveedor: z.string().nullable(),
+    yaUsado: z.boolean().describe('El UUID ya se capturó antes (otra entrada o ya en CxP).'),
+    avisos: z.array(z.string()).describe('Lo que hay que saber antes de aceptar la propuesta.'),
+    conceptos: z.array(esquemaConceptoCfdiEntradaTela),
+  })
+  .describe('Propuesta leída del CFDI para llenar la entrada de tela.');
+
+/** Forma de la propuesta en la API. */
+export type PropuestaCfdiEntradaTelaSalida = z.infer<typeof esquemaPropuestaCfdiEntradaTela>;
+
+/** Cuerpo de la lectura: el XML + (opcional) la OC desde la que se recibe. */
+export const esquemaLeerCfdiEntradaTela = z
+  .object({
+    xml: z
+      .string({ error: 'Sube el XML de la factura' })
+      .min(1, { error: 'Sube el XML de la factura' })
+      .describe('Contenido del XML del CFDI.'),
+    idOrdenCompra: idPositivo('la orden de compra')
+      .optional()
+      .describe('Acota las sugerencias a UNA orden de compra.'),
+  })
+  .describe('XML del CFDI a leer para llenar la entrada de tela.');
+
+/** Datos validados de la lectura. */
+export type DatosLeerCfdiEntradaTela = z.infer<typeof esquemaLeerCfdiEntradaTela>;

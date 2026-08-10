@@ -197,6 +197,7 @@ function aEntradaTelaSalida(
     idEmpresa: e.idEmpresa,
     tipoDocumento: e.tipoDocumento,
     numeroDocumento: e.numeroDocumento,
+    uuidCfdi: e.uuidCfdi,
     idProveedor: e.idProveedor,
     proveedor: e.proveedor.nombre,
     fecha: e.fecha.toISOString().slice(0, 10),
@@ -415,6 +416,9 @@ export async function crearEntradaTela(
         idEmpresa,
         tipoDocumento: datos.tipoDocumento,
         numeroDocumento: datos.numeroDocumento,
+        // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda DE QUÉ factura salió.
+        // El unique (idEmpresa, uuidCfdi) impide recibir dos veces el mismo CFDI.
+        uuidCfdi: datos.uuidCfdi ?? null,
         idProveedor: datos.idProveedor,
         fecha: aDateColumna(datos.fecha),
         idAlmacen: datos.idAlmacen,
@@ -482,6 +486,7 @@ export async function actualizarEntradaTela(
       data: {
         tipoDocumento: datos.tipoDocumento,
         numeroDocumento: datos.numeroDocumento,
+        uuidCfdi: datos.uuidCfdi ?? null,
         idProveedor: datos.idProveedor,
         fecha: aDateColumna(datos.fecha),
         idAlmacen: datos.idAlmacen,

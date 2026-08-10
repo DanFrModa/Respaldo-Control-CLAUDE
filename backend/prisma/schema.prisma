@@ -1501,6 +1501,10 @@ model EntradaTela {
   tipoDocumento   TipoDocumentoEntradaTela @map("tipo_documento")
   /// Número del documento TAL COMO lo trae el proveedor (texto, buscable).
   numeroDocumento String                   @map("numero_documento")
+  /// UUID (folio fiscal) del CFDI del que se leyeron los datos (§Post-F9.20 — Daniel: *"que la
+  /// información la tomes del XML"*). NULL cuando se capturó a mano o el proveedor no mandó XML.
+  /// ÚNICO por empresa: la misma factura no se recibe dos veces. El PDF adjunto es solo referencia.
+  uuidCfdi        String?                  @map("uuid_cfdi")
   /// Proveedor que surtió la tela. Restrict.
   idProveedor     Int                      @map("id_proveedor")
   proveedor       Proveedor                @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
@@ -1539,6 +1543,7 @@ model EntradaTela {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@unique([idEmpresa, folio])
+  @@unique([idEmpresa, uuidCfdi])
   @@index([idProveedor])
   @@index([idAlmacen])
   @@index([estatus])

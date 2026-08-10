@@ -14,6 +14,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 
 const crearMutate = vi.fn();
 const actualizarMutate = vi.fn();
+const leerCfdiMutate = vi.fn();
 const navegar = vi.fn();
 const useEntradaTelaMock = vi.fn();
 
@@ -21,6 +22,8 @@ vi.mock('@/api/entradas-tela', () => ({
   useCrearEntradaTela: () => ({ mutate: crearMutate, isPending: false }),
   useActualizarEntradaTela: () => ({ mutate: actualizarMutate, isPending: false }),
   useEntradaTela: (id: unknown) => useEntradaTelaMock(id) as unknown,
+  // §Post-F9.20 — lectura del XML de la factura (se espía el cuerpo que manda la pantalla).
+  useLeerCfdiEntradaTela: () => ({ mutate: leerCfdiMutate, isPending: false }),
 }));
 const espiaLineasOc = vi.fn();
 vi.mock('@/api/compras-lineas-tela', () => ({
