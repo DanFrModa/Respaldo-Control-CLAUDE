@@ -56,7 +56,7 @@ import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import { type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -407,8 +407,12 @@ export async function crearEntradaTela(
   sesion: SesionUsuario,
   entrada: EntradaCrearEntradaTela,
   bd?: ContextoBd,
-  /** Inyectable para probar sin R2 real (mismo patrón que `importarCfdi` de F9). */
-  archivos: ServicioArchivos = servicioArchivos(),
+  /**
+   * Inyectable para probar sin R2 real (mismo patrón que `importarCfdi` de F9). Se pasa TAL CUAL:
+   * el servicio se resuelve solo si de verdad hay XML que subir, para que capturar una entrada sin
+   * factura no exija tener R2 configurado.
+   */
+  archivos?: ServicioArchivos,
 ): Promise<EntradaTelaSalida> {
   verificarPermiso(sesion, 'inventario-telas.mover');
   const datos = validarEntrada(esquemaEntradaTelaCrear, entrada);

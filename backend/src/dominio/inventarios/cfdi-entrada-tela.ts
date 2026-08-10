@@ -316,11 +316,17 @@ export interface SelloCfdi {
 export async function sellarCfdiEnEntrada(
   datos: { xml: string | null; idProveedor: number; idEmpresa: number },
   bd?: ContextoBd,
-  archivos: ServicioArchivos = servicioArchivos(),
+  /**
+   * Inyectable para probar sin R2 real. Se resuelve PEREZOSAMENTE (después del early return): una
+   * entrada SIN factura no debe exigir que R2 esté configurado — `servicioArchivos()` valida el
+   * entorno y truena si faltan las llaves.
+   */
+  archivos?: ServicioArchivos,
 ): Promise<SelloCfdi | null> {
   if (datos.xml === null || datos.xml.trim() === '') {
     return null;
   }
+  const servicio = archivos ?? servicioArchivos();
   const parsed = parsearCfdi(datos.xml);
   const cliente = clienteLectura(bd);
 
@@ -351,7 +357,7 @@ export async function sellarCfdiEnEntrada(
     );
   }
 
-  const subido = await archivos.subirContenido({
+  const subido = await servicio.subirContenido({
     nombreOriginal: `cfdi-${parsed.uuid}.xml`,
     tipoMime: 'application/xml',
     carpeta: `${CARPETA_CFDI_ENTRADAS}/${parsed.fecha.slice(0, 4)}`,
