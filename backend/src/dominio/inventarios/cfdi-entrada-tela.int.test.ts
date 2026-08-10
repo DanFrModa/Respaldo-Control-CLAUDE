@@ -199,20 +199,40 @@ describe('Leer el CFDI para la entrada de tela (§Post-F9.20)', () => {
     expect(propuesta.avisos.join(' ')).toMatch(/no se pudieron cruzar/);
   });
 
-  it('avisa cuando el RECEPTOR no es la empresa activa (factura de otra empresa)', async () => {
+  it('RECHAZA una factura dirigida a OTRA empresa (no la avisa: la rechaza)', async () => {
+    // Regla heredada de F9 (`validarReceptorCfdi`) y correcta aquí también: recibir mercancía
+    // contra el comprobante de alguien más no es un aviso, es un error.
+    await expect(
+      leerCfdiParaEntradaTela(
+        sesion(),
+        {
+          xml: xmlCfdi({
+            emisorRfc: 'TNO850101BBB',
+            receptorRfc: 'OTRA010101XXX',
+            uuid: '44444444-4444-4444-4444-444444444444',
+            conceptos: [{ descripcion: 'Felpa Perchada', cantidad: 10, valorUnitario: 1 }],
+          }),
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no al de tu empresa/);
+  });
+
+  it('si la EMPRESA aún no captura su RFC, avisa en vez de trabar la captura', async () => {
+    await cliente.empresa.update({ where: { id: empresa.id }, data: { rfc: null } });
     const propuesta = await leerCfdiParaEntradaTela(
       sesion(),
       {
         xml: xmlCfdi({
           emisorRfc: 'TNO850101BBB',
           receptorRfc: 'OTRA010101XXX',
-          uuid: '44444444-4444-4444-4444-444444444444',
+          uuid: '88888888-8888-8888-8888-888888888888',
           conceptos: [{ descripcion: 'Felpa Perchada', cantidad: 10, valorUnitario: 1 }],
         }),
       },
       bd(),
     );
-    expect(propuesta.avisos.length).toBeGreaterThan(0);
+    expect(propuesta.avisos.join(' ')).toMatch(/RFC del receptor/);
   });
 
   it('avisa si NINGÚN proveedor tiene ese RFC (y no cruza nada)', async () => {

@@ -213,7 +213,9 @@ export async function leerCfdiParaEntradaTela(
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
 
-  // El receptor DEBE ser la empresa activa: una factura de otra empresa no se recibe aquí.
+  // El receptor DEBE ser la empresa activa: `validarReceptorCfdi` (F9) RECHAZA el comprobante ajeno
+  // —recibir mercancía contra la factura de alguien más no es un aviso, es un error— y solo devuelve
+  // aviso cuando la empresa todavía no captura su RFC (ahí no hay contra qué validar).
   const avisos = validarReceptorCfdi(parsed, await rfcEmpresaActiva(cliente, idEmpresa));
 
   const proveedor = await cliente.proveedor.findFirst({
