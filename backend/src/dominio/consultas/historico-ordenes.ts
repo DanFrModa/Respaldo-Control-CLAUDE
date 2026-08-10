@@ -15,10 +15,11 @@
  *
  * A9: todo se filtra por la empresa activa de la sesión.
  *
- * EL FILTRO DE MAQUILERO MIRA DOS LADOS. En el viejo, el taller de la cabecera de la orden no es
- * necesariamente quien la trabajó: el que cosió está en `Entregas`/`Recibos` y el que estampó en
- * `EntregasEst`/`RecibosEst`. Buscar solo por la cabecera dejaría fuera justo lo que se busca
- * ("¿qué le hemos mandado a este taller?"), así que la búsqueda cubre también los procesos.
+ * EL FILTRO DE MAQUILERO MIRA TODOS LOS LADOS. Daniel (§Post-F9.27): *"es importante que vayan
+ * todos. Y no solo el primero. Lo mismo para estampadores."* En el viejo, el taller de la cabecera
+ * no es necesariamente quien trabajó la orden —se corta en uno, se cosen partidas en dos o tres y
+ * se estampa en otro—, así que la búsqueda cubre la cabecera, los tres campos abiertos con TODOS
+ * los participantes y, como red, los movimientos de producción.
  */
 import {
   esquemaHistoricoOrdenesQuery,
@@ -67,6 +68,9 @@ function aResumen(o: OrdenConModelo): HistoricoOrdenResumen {
     genero: o.modelo?.genero?.nombre ?? null,
     cliente: o.cliente,
     maquilero: o.maquilero,
+    cortadores: o.cortadores,
+    maquileros: o.maquileros,
+    estampadores: o.estampadores,
     etiquetaMarca: o.etiquetaMarca,
     totalPiezas: o.totalPiezas,
     cancelada: o.cancelada,
@@ -105,10 +109,15 @@ function construirWhere(
     };
   }
 
-  // El taller: el de la cabecera O el de cualquiera de los procesos (ver TSDoc del módulo).
+  // El taller: la cabecera, los campos abiertos con TODOS los que la trabajaron (§Post-F9.27) o
+  // los procesos. Los campos abiertos van primero porque resuelven la mayoría sin subquery; el
+  // `some` sobre procesos se queda como red por si un nombre solo vive ahí.
   if (f.maquilero !== undefined && f.maquilero !== '') {
     where.OR = [
       { maquilero: contiene(f.maquilero) },
+      { cortadores: contiene(f.maquilero) },
+      { maquileros: contiene(f.maquilero) },
+      { estampadores: contiene(f.maquilero) },
       { procesos: { some: { tercero: contiene(f.maquilero) } } },
     ];
   }

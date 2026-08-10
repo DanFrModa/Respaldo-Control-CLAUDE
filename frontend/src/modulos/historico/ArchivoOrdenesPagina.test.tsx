@@ -26,6 +26,9 @@ vi.mock('@/api/historico-ordenes', () => ({
             genero: 'Caballero',
             cliente: 'C&A',
             maquilero: 'Taller Montaño',
+            cortadores: 'Oscar Aragón',
+            maquileros: 'Taller Montaño · Taller Sosa',
+            estampadores: 'Serigrafía López',
             etiquetaMarca: 'Marilyn',
             totalPiezas: 1200,
             cancelada: false,
@@ -56,6 +59,9 @@ vi.mock('@/api/historico-ordenes', () => ({
             genero: 'Caballero',
             cliente: 'C&A',
             maquilero: 'Taller Montaño',
+            cortadores: 'Oscar Aragón',
+            maquileros: 'Taller Montaño · Taller Sosa',
+            estampadores: 'Serigrafía López',
             etiquetaMarca: 'Marilyn',
             totalPiezas: 1200,
             cancelada: false,
@@ -90,7 +96,8 @@ describe('<ArchivoOrdenesPagina> (§Post-F9.26)', () => {
     renderConProveedores(<ArchivoOrdenesPagina />, { sesion });
 
     expect(screen.getByText('12345')).toBeInTheDocument();
-    expect(screen.getByText('Taller Montaño')).toBeInTheDocument();
+    // §Post-F9.27: la columna muestra TODOS los talleres de costura, no solo el de la cabecera.
+    expect(screen.getByText('Taller Montaño · Taller Sosa')).toBeInTheDocument();
     // Nada de alta: el archivo se llena con el ETL, no desde la aplicación.
     expect(screen.queryByRole('button', { name: /nuev/i })).toBeNull();
   });
@@ -105,8 +112,12 @@ describe('<ArchivoOrdenesPagina> (§Post-F9.26)', () => {
       expect(screen.getByText('Colores y tallas')).toBeInTheDocument();
     });
     expect(screen.getByText('MARINO')).toBeInTheDocument();
-    // El taller que cortó viene como TEXTO del archivo, no de un catálogo.
-    expect(screen.getByText('Oscar Aragón')).toBeInTheDocument();
+    // Los tres roles completos, en campo abierto: quién cortó, quién cosió y quién estampó.
+    expect(screen.getByText('Cortaron')).toBeInTheDocument();
+    expect(screen.getByText('Estamparon')).toBeInTheDocument();
+    expect(screen.getByText('Serigrafía López')).toBeInTheDocument();
+    // Y el taller que cortó viene como TEXTO del archivo, no de un catálogo.
+    expect(screen.getAllByText('Oscar Aragón').length).toBeGreaterThan(0);
     expect(screen.getByText(/Orden 9876 del sistema anterior/)).toBeInTheDocument();
   });
 

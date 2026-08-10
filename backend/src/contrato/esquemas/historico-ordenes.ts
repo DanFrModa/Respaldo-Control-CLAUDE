@@ -42,7 +42,7 @@ export const esquemaHistoricoOrdenesQuery = z.object({
     .max(120)
     .optional()
     .describe(
-      'Coincidencia parcial del taller: el de la orden O el de cualquiera de sus procesos.',
+      'Coincidencia parcial del taller: el de la cabecera, el de cualquiera de los campos abiertos (cortadores/maquileros/estampadores) o el de cualquiera de sus procesos.',
     ),
   idModelo: z.coerce.number().int().positive().optional(),
   idTipoProducto: z.coerce
@@ -76,7 +76,14 @@ export const esquemaHistoricoOrdenResumen = z.object({
   tipoProducto: z.string().nullable(),
   genero: z.string().nullable(),
   cliente: z.string().nullable(),
-  maquilero: z.string().nullable(),
+  maquilero: z.string().nullable().describe('Taller asignado en la cabecera (solo el primero).'),
+  /**
+   * TODOS los que la trabajaron (§Post-F9.27), en campo abierto separado por " · " y ligado a nada.
+   * La cabecera solo guarda al primero, y una orden pasa por varios talleres.
+   */
+  cortadores: z.string().nullable(),
+  maquileros: z.string().nullable(),
+  estampadores: z.string().nullable(),
   etiquetaMarca: z.string().nullable(),
   totalPiezas: z.number().int(),
   cancelada: z.boolean(),

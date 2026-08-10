@@ -1181,3 +1181,28 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 - **Aplica en:** 1 migración **aditiva** (3 tablas + 1 enum) y 1 ETL nuevo que se corre a mano después de `etl-catalogos`: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente).
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.27) — En el archivo van TODOS los talleres, no solo el primero (DANIEL, 10-ago-2026)
+
+> Corrigiendo la primera versión del archivo: *"Está bien lo que comentas, excepto el tema de maquilero. Sí es importante que vayan todos. Y no solo el primero. Lo mismo para estampadores. Pero lo puedes poner en un campo abierto, donde sí pueda encontrarlo, pero no esté ligado a nada."*
+
+**Qué estaba mal.** El archivo (§Post-F9.26) mostraba en el listado el maquilero de la **cabecera** de la orden (`Ordenes.IdMaquileros`) — que es solo el **asignado**. En la realidad del taller, una orden **pasa por varios**: se corta en uno, se cosen partidas en dos o tres, y se estampa en otro. Con la cabecera sola, buscar *"¿qué le hemos mandado a este taller?"* dejaba fuera a la mayoría de los que de verdad trabajaron la orden.
+
+**Cómo quedó.** Tres columnas nuevas de **TEXTO ABIERTO**, ligadas a nada, con los nombres **distintos** de cada rol separados por `" · "`:
+
+| Columna | De dónde sale |
+|---|---|
+| `cortadores` | `Corte` |
+| `maquileros` | `Entregas` + `Recibos` (costura) |
+| `estampadores` | `EntregasEst` + `RecibosEst` |
+
+- **El listado muestra los de costura** (que es lo que se busca a diario) y cae al asignado si la orden no tuvo movimientos; la **ficha muestra los tres roles** completos: *Cortaron · Cosieron · Estamparon*.
+- **El filtro de taller busca en todos lados**: la cabecera, los tres campos abiertos y —como red— los movimientos de producción.
+- **Se ordenan alfabéticamente** a propósito: el orden en que vienen los CSV no es estable, y un archivo cuyo texto cambia entre corridas es un archivo que no se puede comparar.
+
+**Por qué se DUPLICA lo que ya está en `HistoricoOrdenV1Proceso`:** para poder **verlos en el renglón** del listado y buscarlos sin un subquery por fila. Normalmente desnormalizar así es deuda —la copia se desincroniza—, pero este archivo es **inmutable**: se llena una vez con el ETL y no se edita nunca. Es el caso en el que no cuesta nada.
+
+**Sigue sin estar ligado a nada:** son en su mayoría los ~897 talleres que la depuración del catálogo (§Post-F9.23) dejó fuera, y así siguen fuera. Se ven y se buscan; no reviven como `Proveedor`.
+
+- **Aplica en:** la migración del archivo (`20260810190000_historico_ordenes_v1`) se **regeneró** con las tres columnas incluidas, en vez de encimar una segunda — no había corrido en ningún ambiente. SIN permisos, SIN seed.
+- **Fecha:** 2026-08-10.

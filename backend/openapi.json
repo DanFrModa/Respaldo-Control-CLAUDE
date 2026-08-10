@@ -747,7 +747,7 @@
             "in": "query",
             "name": "maquilero",
             "required": false,
-            "description": "Coincidencia parcial del taller: el de la orden O el de cualquiera de sus procesos."
+            "description": "Coincidencia parcial del taller: el de la cabecera, el de cualquiera de los campos abiertos (cortadores/maquileros/estampadores) o el de cualquiera de sus procesos."
           },
           {
             "schema": {
@@ -934,6 +934,37 @@
                               {
                                 "type": "null"
                               }
+                            ],
+                            "description": "Taller asignado en la cabecera (solo el primero)."
+                          },
+                          "cortadores": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "maquileros": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "estampadores": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "etiquetaMarca": {
@@ -967,6 +998,9 @@
                           "genero",
                           "cliente",
                           "maquilero",
+                          "cortadores",
+                          "maquileros",
+                          "estampadores",
                           "etiquetaMarca",
                           "totalPiezas",
                           "cancelada"
@@ -1192,6 +1226,37 @@
                         {
                           "type": "null"
                         }
+                      ],
+                      "description": "Taller asignado en la cabecera (solo el primero)."
+                    },
+                    "cortadores": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maquileros": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "estampadores": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "etiquetaMarca": {
@@ -1355,6 +1420,9 @@
                     "genero",
                     "cliente",
                     "maquilero",
+                    "cortadores",
+                    "maquileros",
+                    "estampadores",
                     "etiquetaMarca",
                     "totalPiezas",
                     "cancelada",

@@ -125,8 +125,13 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
     },
     { encabezado: 'Cliente', render: (o) => o.cliente ?? '—' },
     {
-      encabezado: 'Maquilero',
-      render: (o) => <span className="text-muted-foreground">{o.maquilero ?? '—'}</span>,
+      // §Post-F9.27 — Daniel: *"es importante que vayan todos. Y no solo el primero."* Se muestran
+      // los talleres de COSTURA (que es lo que se busca a diario); el corte y el estampado están en
+      // la ficha. Si no hubo movimientos, se cae al asignado en la cabecera.
+      encabezado: 'Talleres',
+      render: (o) => (
+        <span className="text-muted-foreground">{o.maquileros ?? o.maquilero ?? '—'}</span>
+      ),
     },
     { encabezado: 'Piezas', numerica: true, render: (o) => o.totalPiezas.toLocaleString('es-MX') },
     {
@@ -153,12 +158,12 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
         />
       </Field>
       <Field className="w-40">
-        <FieldLabel htmlFor="hist-maquilero">Maquilero</FieldLabel>
+        <FieldLabel htmlFor="hist-maquilero">Taller</FieldLabel>
         <Input
           id="hist-maquilero"
           value={textoMaquilero}
           onChange={(e) => cambiarFiltro(() => setTextoMaquilero(e.target.value))}
-          placeholder="Todos"
+          placeholder="Corte, costura o estampado"
           data-testid="hist-maquilero"
         />
       </Field>
@@ -256,7 +261,7 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
               <Dato etiqueta="Tipo de prenda" valor={d.tipoProducto} />
               <Dato etiqueta="Género" valor={d.genero} />
               <Dato etiqueta="Marca" valor={d.etiquetaMarca} />
-              <Dato etiqueta="Maquilero" valor={d.maquilero} />
+              <Dato etiqueta="Taller asignado" valor={d.maquilero} />
               <Dato etiqueta="Tela" valor={d.tela} />
               <Dato etiqueta="Composición" valor={d.composicion} />
               <Dato etiqueta="Entrega" valor={d.fechaEntrega} />
@@ -268,6 +273,13 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
                 {d.motivoCancelada ?? 'Sin motivo capturado.'}
               </p>
             ) : null}
+
+            {/* §Post-F9.27 — TODOS los que la trabajaron, de un vistazo y sin abrir la tabla. */}
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <Dato etiqueta="Cortaron" valor={d.cortadores} />
+              <Dato etiqueta="Cosieron" valor={d.maquileros} />
+              <Dato etiqueta="Estamparon" valor={d.estampadores} />
+            </dl>
 
             <section>
               <h3 className="mb-2 text-sm font-semibold">Colores y tallas</h3>

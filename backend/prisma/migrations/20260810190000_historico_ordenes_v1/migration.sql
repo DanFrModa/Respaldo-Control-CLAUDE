@@ -15,6 +15,13 @@
 -- al `Modelo` —los modelos SÍ migran completos— y es la que permite filtrar por tipo de prenda y
 -- género sin duplicar esos datos.
 --
+-- Las columnas `cortadores` / `maquileros` / `estampadores` (§Post-F9.27) concentran, en TEXTO
+-- abierto y separados por " · ", los nombres DISTINTOS de todos los talleres que trabajaron la
+-- orden. Daniel: *"es importante que vayan todos. Y no solo el primero… pero lo puedes poner en un
+-- campo abierto, donde sí pueda encontrarlo, pero no esté ligado a nada."* Duplican lo que ya está
+-- en `historico_orden_v1_proceso` para poder VERLOS en el renglón del listado y buscarlos sin un
+-- subquery por fila; como el archivo es INMUTABLE, esa copia no puede desincronizarse.
+--
 -- Migración puramente ADITIVA: tres tablas nuevas y un enum. No toca nada de lo que ya existe.
 
 -- CreateEnum
@@ -32,6 +39,9 @@ CREATE TABLE "historico_orden_v1" (
     "codigo_modelo_v1" TEXT,
     "cliente" TEXT,
     "maquilero" TEXT,
+    "cortadores" TEXT,
+    "maquileros" TEXT,
+    "estampadores" TEXT,
     "etiqueta_marca" TEXT,
     "tela" TEXT,
     "composicion" TEXT,
@@ -82,6 +92,12 @@ CREATE INDEX "historico_orden_v1_cliente_idx" ON "historico_orden_v1"("cliente")
 
 -- CreateIndex
 CREATE INDEX "historico_orden_v1_maquilero_idx" ON "historico_orden_v1"("maquilero");
+
+-- CreateIndex
+CREATE INDEX "historico_orden_v1_maquileros_idx" ON "historico_orden_v1"("maquileros");
+
+-- CreateIndex
+CREATE INDEX "historico_orden_v1_estampadores_idx" ON "historico_orden_v1"("estampadores");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "historico_orden_v1_id_empresa_id_orden_v1_key" ON "historico_orden_v1"("id_empresa", "id_orden_v1");

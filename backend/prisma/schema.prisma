@@ -6527,9 +6527,36 @@ model HistoricoOrdenV1 {
 
   // ── Terceros y datos como TEXTO (regla 1 del encabezado) ────────────────────
   /// Cliente de la orden.
-  cliente       String?
-  /// Taller de maquila asignado en la orden (`Ordenes.IdMaquileros`, resuelto a nombre).
-  maquilero     String?
+  cliente   String?
+  /// Taller de maquila asignado en la CABECERA de la orden (`Ordenes.IdMaquileros`, resuelto a
+  /// nombre). Es solo el asignado: quien de verdad la trabajó puede ser otro, o varios (ver abajo).
+  maquilero String?
+
+  // ── TODOS los que la trabajaron, en campo abierto (§Post-F9.27) ─────────────
+  //
+  // Daniel (10-ago-2026), corrigiendo la primera versión: *"es importante que vayan todos. Y no
+  // solo el primero. Lo mismo para estampadores. Pero lo puedes poner en un campo abierto, donde
+  // sí pueda encontrarlo, pero no esté ligado a nada."*
+  //
+  // Una orden del viejo pasa por VARIOS talleres: se corta en uno, se cosen partidas en dos o tres
+  // y se estampa en otro. La cabecera solo guarda al primero, así que verla a ella dejaba fuera a
+  // la mayoría. Estas tres columnas concentran los nombres DISTINTOS de cada rol, separados por
+  // " · ", tomados de los movimientos de producción.
+  //
+  // POR QUÉ DUPLICAR lo que ya está en `HistoricoOrdenV1Proceso`: para poder VERLOS en el renglón
+  // del listado y buscarlos sin un subquery por fila. El archivo es INMUTABLE —se llena una vez con
+  // el ETL y no se edita nunca—, así que esta copia no puede desincronizarse: es el caso en el que
+  // desnormalizar no cuesta nada.
+  //
+  // Texto libre, ligado a NADA: son en su mayoría los ~897 talleres que la depuración del catálogo
+  // (§Post-F9.23) dejó fuera, y así siguen fuera.
+
+  /// Cortadores que cortaron la orden; nombres distintos separados por " · ".
+  cortadores    String?
+  /// Talleres de COSTURA por los que pasó (envíos y recibos de maquila).
+  maquileros    String?
+  /// Talleres de ESTAMPADO/aplicación por los que pasó.
+  estampadores  String?
   /// Marca/etiqueta.
   etiquetaMarca String? @map("etiqueta_marca")
   /// Tela de la orden (`IdTelasDis`, resuelto a nombre).
@@ -6557,6 +6584,8 @@ model HistoricoOrdenV1 {
   @@index([fecha])
   @@index([cliente])
   @@index([maquilero])
+  @@index([maquileros])
+  @@index([estampadores])
   @@map("historico_orden_v1")
 }
 

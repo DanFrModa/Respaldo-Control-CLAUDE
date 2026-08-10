@@ -85,7 +85,7 @@ function cantidadesDeRenglon(fila: Record<string, string>): (number | null)[] {
 }
 
 /** Un movimiento de producción leído de su CSV, ya listo para insertar. */
-interface ProcesoCrudo {
+export interface ProcesoCrudo {
   idOrdenV1: string;
   tipo: Prisma.HistoricoOrdenV1ProcesoCreateManyInput['tipo'];
   fecha: Date | null;
@@ -119,6 +119,29 @@ function leerProcesos(
     });
   }
   return salida;
+}
+
+/**
+ * Nombres DISTINTOS de los terceros de ciertos tipos de proceso, unidos por " · " (§Post-F9.27).
+ *
+ * Daniel: *"es importante que vayan todos. Y no solo el primero."* Una orden pasa por varios
+ * talleres —se cosen partidas en dos o tres, se estampa en otro—, y la cabecera solo guarda al
+ * primero. Esto arma el campo abierto donde se ven y se buscan TODOS.
+ *
+ * Se ordenan alfabéticamente para que dos corridas den exactamente el mismo texto (el orden en que
+ * vienen los CSV no es estable, y un archivo que cambia de texto entre corridas es un archivo que
+ * no se puede diffear).
+ */
+export function nombresDistintos(
+  procesos: readonly ProcesoCrudo[],
+  tipos: readonly ProcesoCrudo['tipo'][],
+): string | null {
+  const nombres = new Set<string>();
+  for (const p of procesos) {
+    if (p.tercero !== null && p.tercero !== '' && tipos.includes(p.tipo)) nombres.add(p.tercero);
+  }
+  if (nombres.size === 0) return null;
+  return [...nombres].sort((a, b) => a.localeCompare(b, 'es')).join(' · ');
 }
 
 /** Inserta en tandas (nunca fila por fila — regla de Gabriel). Devuelve cuántas escribió. */
@@ -238,6 +261,7 @@ export async function cargarHistoricoOrdenes(
       }
     }
 
+    const procesosDeEsta = procesosPorOrden.get(idOrdenV1) ?? [];
     cabeceras.push({
       idEmpresa,
       idOrdenV1,
@@ -248,6 +272,10 @@ export async function cargarHistoricoOrdenes(
       codigoModeloV1: modelosV1.get(idModeloV1) ?? null,
       cliente: clientes.get((f.IdClientes ?? '').trim()) ?? null,
       maquilero: maquileros.get((f.IdMaquileros ?? '').trim()) ?? null,
+      // §Post-F9.27 — TODOS los que la trabajaron, no solo el de la cabecera.
+      cortadores: nombresDistintos(procesosDeEsta, ['corte']),
+      maquileros: nombresDistintos(procesosDeEsta, ['envio_maquila', 'recibo_maquila']),
+      estampadores: nombresDistintos(procesosDeEsta, ['envio_estampado', 'recibo_estampado']),
       etiquetaMarca: etiquetas.get((f.IdEtiquetasM ?? '').trim()) ?? null,
       tela: telas.get((f.IdTelasDis ?? '').trim()) ?? null,
       composicion: parsearTexto(f.Composicion),

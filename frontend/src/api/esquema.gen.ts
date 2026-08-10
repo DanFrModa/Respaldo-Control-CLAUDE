@@ -396,7 +396,7 @@ export interface paths {
           busqueda?: string;
           /** @description Coincidencia parcial del cliente. */
           cliente?: string;
-          /** @description Coincidencia parcial del taller: el de la orden O el de cualquiera de sus procesos. */
+          /** @description Coincidencia parcial del taller: el de la cabecera, el de cualquiera de los campos abiertos (cortadores/maquileros/estampadores) o el de cualquiera de sus procesos. */
           maquilero?: string;
           idModelo?: number;
           /** @description Tipo de prenda (vive en el modelo; el archivo filtra a través de él). */
@@ -434,7 +434,11 @@ export interface paths {
                 tipoProducto: string | null;
                 genero: string | null;
                 cliente: string | null;
+                /** @description Taller asignado en la cabecera (solo el primero). */
                 maquilero: string | null;
+                cortadores: string | null;
+                maquileros: string | null;
+                estampadores: string | null;
                 etiquetaMarca: string | null;
                 totalPiezas: number;
                 cancelada: boolean;
@@ -524,7 +528,11 @@ export interface paths {
               tipoProducto: string | null;
               genero: string | null;
               cliente: string | null;
+              /** @description Taller asignado en la cabecera (solo el primero). */
               maquilero: string | null;
+              cortadores: string | null;
+              maquileros: string | null;
+              estampadores: string | null;
               etiquetaMarca: string | null;
               totalPiezas: number;
               cancelada: boolean;

@@ -2241,10 +2241,13 @@ Está en **Producción › Archivo de órdenes**. Son las **5,451 órdenes** del
 Cliente, maquilero, tipo de prenda, rango de fechas — y una caja libre donde puedes teclear el
 número de orden, el código del modelo o el cliente.
 
-Lo del **maquilero** tiene un detalle que vale la pena saber: busca en dos lados. En el sistema
-viejo, el taller que aparece en la orden no siempre es el que la trabajó (el que cosió está en las
-entregas y recibos, el que estampó en los de estampado). Así que si buscas un taller, salen las
-órdenes donde aparece **de cualquier forma**.
+Lo del **taller** tiene un detalle importante: **salen todos, no solo el primero**. En el sistema
+viejo una orden pasa por varios talleres — se corta en uno, se cosen partidas en dos o tres, y se
+estampa en otro —, pero la orden solo guardaba al que tenía asignado. Ahora el archivo concentra
+**todos** los que la trabajaron, y el buscador los encuentra a cualquiera de ellos.
+
+En la lista ves los talleres de **costura** (que es lo que se busca a diario); al abrir la orden ves
+los tres renglones completos: **Cortaron · Cosieron · Estamparon**.
 
 ### Qué ves al abrir una orden
 
