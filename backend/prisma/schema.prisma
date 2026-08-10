@@ -6623,3 +6623,70 @@ model HistoricoOrdenV1Proceso {
   @@index([tercero])
   @@map("historico_orden_v1_proceso")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// DIRECTORIO HISTÓRICO DE TERCEROS DEL SISTEMA VIEJO (§Post-F9.28)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Daniel (10-ago-2026): *"Al no pasar la información de los maquileros, ¿qué hacemos con la
+// información de ellos si quisiera encontrar algún teléfono o nombre? ¿Habrá manera de mantener la
+// información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en
+// algún otro repositorio que no sea el catálogo de proveedores?"*
+//
+// EL PROBLEMA: la depuración (§Post-F9.23) deja fuera del catálogo ~897 de los 1,052 terceros del
+// Access. Eso es lo que se quería —que no estorben al capturar—, pero su TELÉFONO y su DIRECCIÓN
+// siguen siendo útiles: un taller con el que no se trabaja desde 2021 puede volver a hacer falta.
+//
+// LA RESPUESTA A SU PREGUNTA ES SÍ, y es la misma idea que el archivo de órdenes (§Post-F9.26):
+// **una libreta de direcciones aparte, plana y de solo lectura**. NO es el catálogo `Proveedor`:
+//  • No sale en NINGÚN selector ni buscador de captura (ni telas, ni OC, ni maquila).
+//  • No tiene roles, ni `activo`, ni bandera de factura, ni FK a nada.
+//  • No se le puede dar de alta a nada: si un taller vuelve, se da de alta LIMPIO en el catálogo,
+//    copiando de aquí lo que sirva. Que sea de solo lectura es lo que impide que la basura
+//    depurada se cuele de vuelta por la puerta de atrás.
+//
+// Entran **TODOS** los 1,052 (también los 155 que sí sobrevivieron): así el directorio es la foto
+// completa del Access y nadie tiene que preguntarse en cuál de los dos lados buscar.
+
+/// Un tercero del sistema viejo con sus datos de contacto, para consulta (§Post-F9.28).
+model DirectorioTerceroV1 {
+  id Int @id @default(autoincrement())
+
+  /// De qué catálogo del viejo salió: `Proveedores`, `Cortadores`, `Maquileros` o `Estampadores`.
+  /// TEXTO, no enum: es la procedencia del dato, no una clasificación que el sistema use.
+  fuente  String
+  /// Id que tenía en ESE catálogo. Con `fuente` forma la llave de idempotencia del ETL.
+  idViejo String @map("id_viejo")
+
+  nombre      String
+  /// Clave corta de uso diario del taller (`Maquileros.Corto`).
+  corto       String?
+  razonSocial String? @map("razon_social")
+  telefono    String? @db.Text
+  contacto    String?
+  direccion   String? @db.Text
+  /// `Observaciones` del viejo + lo que no tiene columna propia (condiciones, obs. de pago…).
+  notas       String? @db.Text
+
+  /// Qué hacía, en texto legible ("Costura", "Corte", "Vende telas"…). Informativo: NO son los
+  /// roles del catálogo `RolProveedor`, y no se usan para filtrar nada operativo.
+  servicios String?
+
+  /// Fecha del ÚLTIMO movimiento suyo en el viejo (OC, corte, entrega, recibo o nota). Es lo que
+  /// contesta de un vistazo *"¿hace cuánto que no trabajamos con este?"*. NULL = nunca movió nada.
+  ultimaActividad DateTime? @map("ultima_actividad") @db.Date
+  /// Cuántos documentos suyos hay en el viejo (el peso de la relación, no solo la fecha).
+  documentos      Int       @default(0)
+
+  /// `true` si este tercero SÍ sobrevivió a la depuración y existe en el catálogo `Proveedor`
+  /// (§Post-F9.23). Se guarda calculado para poder decir en la pantalla "este ya está dado de
+  /// alta" sin cruzar por nombre en cada consulta — el cruce por nombre es justo lo frágil.
+  enCatalogo Boolean @default(false) @map("en_catalogo")
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@unique([fuente, idViejo])
+  @@index([nombre])
+  @@index([ultimaActividad])
+  @@map("directorio_tercero_v1")
+}

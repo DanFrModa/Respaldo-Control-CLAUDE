@@ -848,6 +848,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         icono: 'camion',
         permisos: 'autenticado',
       },
+      {
+        clave: 'directorio-historico',
+        titulo: 'Directorio histórico',
+        descripcion:
+          'Teléfonos y direcciones de los terceros del sistema anterior (solo consulta; NO es el catálogo)',
+        ruta: '/catalogos/directorio-historico',
+        icono: 'camion',
+        permisos: ['proveedores.ver'],
+      },
     ],
   },
   {

@@ -1206,3 +1206,26 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 - **Aplica en:** la migración del archivo (`20260810190000_historico_ordenes_v1`) se **regeneró** con las tres columnas incluidas, en vez de encimar una segunda — no había corrido en ningún ambiente. SIN permisos, SIN seed.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.28) — Directorio histórico de terceros: la libreta, fuera del catálogo (DANIEL, 10-ago-2026)
+
+> *"Al no pasar la información de los maquileros, ¿qué hacemos con la información de ellos si quisiera encontrar algún teléfono o nombre? ¿Habrá manera de mantener la información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en algún otro repositorio que no sea el catálogo de proveedores?"*
+
+**La pregunta es la correcta, y la respuesta es sí.** La depuración (§Post-F9.23) deja fuera del catálogo **~897 de los 1,052** terceros del Access. Eso es exactamente lo que se quería —que no estorben al capturar una orden o una compra— pero su **teléfono y su dirección siguen sirviendo**: un taller con el que no se trabaja desde 2021 puede volver a hacer falta mañana.
+
+**Cómo quedó:** una tabla aparte, `DirectorioTerceroV1`, con los **1,052** terceros y sus datos de contacto. Es una **libreta de direcciones**, no un catálogo:
+- **No sale en NINGÚN selector de captura** (ni telas, ni OC, ni maquila, ni EsMa).
+- **No tiene roles, ni `activo`, ni bandera de factura, ni FK a nada.**
+- **Es de SOLO LECTURA** y no hay —ni habrá— botón de *"convertir en proveedor"*. Si un taller vuelve, **se da de alta LIMPIO** en el catálogo copiando de aquí lo que sirva. Ese botón sería exactamente la puerta trasera por la que volvería la basura que se acaba de depurar; no ponerlo es la decisión, no un pendiente.
+
+**Entran los 1,052, también los 155 que sobrevivieron**, marcados con `enCatalogo`. Así la libreta es la **foto completa** del Access y nadie tiene que preguntarse en cuál de los dos lados buscar; el filtro *"Solo los que ya no están"* aísla a los depurados cuando eso es lo que se quiere.
+
+**Lo que hace útil a la libreta** —más allá del teléfono— es la **última actividad**: la fecha del último documento suyo en el viejo (OC, corte, entrega, recibo o nota) y **cuántos documentos** tuvo. Contesta de un vistazo *"¿hace cuánto que no trabajamos con este, y qué tanto trabajamos?"*, que es lo que decide si vale la pena volver a llamarlo.
+
+**Se busca también por TELÉFONO**, no solo por nombre: la pregunta era literalmente *"encontrar algún teléfono"*, y a veces se llega al revés (tengo el número, ¿de quién es?).
+
+**Dónde vive:** *Catálogos › Directorio histórico*, **junto** al catálogo de proveedores pero claramente separado de él (el subtítulo dice *"solo consulta; NO es el catálogo"*).
+
+- **Permiso:** se REUSA `proveedores.ver`. Cero permisos nuevos, cero seed.
+- **Aplica en:** 1 migración **aditiva** (una tabla). Se llena con el MISMO ETL del archivo de órdenes (`etl-historico-ordenes`): son las dos mitades de *guardar la historia sin ensuciar los catálogos*.
+- **Fecha:** 2026-08-10.

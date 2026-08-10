@@ -2273,3 +2273,38 @@ Tampoco alimenta inventarios, costos ni ruta crítica — es información muerta
 Una migración **aditiva** (3 tablas nuevas) y **cero permisos nuevos** → **no** hace falta
 `SEED_ON_START`. El archivo se llena corriendo, después de `etl-catalogos`:
 `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente, se puede repetir).
+
+## Directorio histórico: los teléfonos que no se perdieron (10-ago-2026)
+
+> *"Al no pasar la información de los maquileros, ¿qué hacemos con la información de ellos si
+> quisiera encontrar algún teléfono o nombre?… ¿Podríamos guardarlo en algún otro repositorio que no
+> sea el catálogo de proveedores?"* — Daniel
+
+Sí. Está en **Catálogos › Directorio histórico**, al lado del catálogo de proveedores pero **fuera**
+de él.
+
+Son los **1,052 terceros** del sistema anterior —los 155 que se quedaron y los ~897 que se
+depuraron— con su **teléfono, contacto, dirección y notas**. Puedes buscar por nombre, por clave
+corta, por contacto **y por teléfono** (a veces tienes el número y quieres saber de quién es).
+
+### Lo que te dice de cada uno
+
+Además del contacto, **cuándo fue la última vez que trabajó** y **cuántos documentos** tuvo. Eso es
+lo que de verdad decide si vale la pena volver a llamarlo: no es lo mismo un taller que te hizo 47
+órdenes hasta 2021 que uno que te hizo una en 2009.
+
+El filtro **"Solo los que ya no están"** te deja ver exactamente a los que se depuraron.
+
+### Lo que NO tiene, a propósito
+
+**No hay botón de "pasar al catálogo".** Si un taller regresa, lo das de alta **limpio** en
+Proveedores copiando de aquí lo que sirva. Ese botón sería justo la puerta por la que volvería toda
+la basura que acabamos de sacar — no ponerlo es la decisión, no un pendiente.
+
+Tampoco aparece en ningún selector cuando capturas: no lo vas a encontrar al hacer una orden de
+compra ni al enviar a maquila. Solo aquí, cuando lo busques.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (una tabla) y **cero permisos nuevos**. Se llena con el **mismo** ETL del
+archivo de órdenes: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts`.

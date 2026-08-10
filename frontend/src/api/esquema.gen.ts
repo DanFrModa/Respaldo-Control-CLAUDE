@@ -621,6 +621,104 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/directorio-terceros': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Buscar en el directorio histórico de terceros del sistema viejo */
+    get: {
+      parameters: {
+        query?: {
+          pagina?: number;
+          porPagina?: number;
+          ordenarPor?: 'nombre' | 'ultimaActividad' | 'documentos';
+          direccion?: 'asc' | 'desc';
+          busqueda?: string;
+          servicio?: string;
+          enCatalogo?: 'todos' | 'solo-catalogo' | 'solo-fuera';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                id: number;
+                /** @description Catálogo del viejo del que salió (Proveedores, Maquileros…). */
+                fuente: string;
+                nombre: string;
+                corto: string | null;
+                razonSocial: string | null;
+                telefono: string | null;
+                contacto: string | null;
+                direccion: string | null;
+                notas: string | null;
+                servicios: string | null;
+                /** @description Último movimiento suyo en el viejo, o null. */
+                ultimaActividad: string | null;
+                documentos: number;
+                /** @description Si además existe en el catálogo de proveedores de v2. */
+                enCatalogo: boolean;
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/almacenes': {
     parameters: {
       query?: never;

@@ -14,7 +14,11 @@
  *
  * NUNCA con `npm run etl:*` (esos no cargan `.env` a propósito, para no romper el CI).
  *
- * Es IDEMPOTENTE: re-correrlo no duplica (la llave es `(idEmpresa, idOrdenV1)`).
+ * Carga TAMBIÉN el **directorio histórico de terceros** (§Post-F9.28): la libreta de direcciones con
+ * el teléfono y la dirección de los 1,052 terceros del Access, fuera del catálogo `Proveedor`. Son
+ * las dos mitades de lo mismo: guardar la historia sin ensuciar los catálogos.
+ *
+ * Es IDEMPOTENTE: re-correrlo no duplica.
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,6 +27,7 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
+import { cargarDirectorioTerceros } from './loaders/directorio-terceros.js';
 import { cargarHistoricoOrdenes } from './loaders/historico-ordenes.js';
 
 export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
@@ -43,6 +48,14 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   if (r.sinModelo > 0) {
     console.log(`  Sin modelo ligado (con código en texto): ${String(r.sinModelo)}`);
   }
+
+  // §Post-F9.28 — la libreta de direcciones de los terceros del viejo. Va en el MISMO ETL: son las
+  // dos mitades de "guardar la historia sin ensuciar los catálogos".
+  const dir = await cargarDirectorioTerceros(cliente, reporte);
+  console.log(
+    `  Directorio de terceros: ${String(dir.creados)} cargados (${String(dir.existentes)} ya estaban)`,
+  );
+  console.log(`    (de ellos, ${String(dir.enCatalogo)} SÍ están en el catálogo depurado)`);
 
   return reporte;
 }

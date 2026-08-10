@@ -1847,3 +1847,13 @@ export type HistoricoOrdenesQuery = NonNullable<
 /** Ficha completa de una orden historica (matriz color x talla + quien la trabajo). */
 export type HistoricoOrdenDetalle =
   paths['/api/historico-ordenes/{id}']['get']['responses']['200']['content']['application/json'];
+
+/** Pagina del directorio historico de terceros (`GET /api/directorio-terceros`, §Post-F9.28). */
+export type DirectorioTercerosPagina =
+  paths['/api/directorio-terceros']['get']['responses']['200']['content']['application/json'];
+/** Un tercero del directorio historico. */
+export type DirectorioTercero = DirectorioTercerosPagina['datos'][number];
+/** Filtros del buscador del directorio historico (querystring). */
+export type DirectorioTercerosQuery = NonNullable<
+  paths['/api/directorio-terceros']['get']['parameters']['query']
+>;

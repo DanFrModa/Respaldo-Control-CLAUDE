@@ -96,6 +96,7 @@ import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
 import { rutasHitosRc } from './api/ruta-critica/hitos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
+import { rutasDirectorioTerceros } from './api/consultas/directorio-terceros.rutas.js';
 import { rutasHistoricoOrdenes } from './api/consultas/historico-ordenes.rutas.js';
 import { rutasResumen } from './api/resumen/resumen.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -175,6 +176,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // su dominio dueño (A4, patrón contarAlertas): sin permiso, el bloque llega null.
   await app.register(rutasResumen, { prefix: '/api' });
   await app.register(rutasHistoricoOrdenes, { prefix: '/api' });
+  await app.register(rutasDirectorioTerceros, { prefix: '/api' });
   await app.register(rutasAlmacenes, { prefix: '/api' });
   // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes. NOTA: cortadores y
   // maquileros se fusionaron en proveedores (un tercero con sus roles de servicio, D12/R15).
