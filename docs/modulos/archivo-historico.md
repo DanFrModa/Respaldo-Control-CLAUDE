@@ -9,6 +9,17 @@ Nacieron como consecuencia de dos decisiones previas: la **depuración del catá
 lo operativo ~5,200 órdenes y ~897 terceros, y estos dos módulos son donde esa historia **se
 consulta sin volver a ensuciar los catálogos**.
 
+> **⚠️ CUÁNTAS ÓRDENES CARGA DE VERDAD: 3,923, no 5,451** (corregido en la revisión del 11-ago-2026).
+> El loader manda a `sinEmpresa` las órdenes cuya `IdEmpresas` no tiene mapeo, y **las 6 empresas
+> viejas inactivas no migran** (decisión de Gabriel del 17-jun-2026, `docs/hoja-de-ruta/F2-etapas.md`:
+> MJD / Zipora / Skintex / Free Ride / Corporativo / Marilyn). Eso deja fuera **1,528 órdenes** —
+> medido sobre el dump—, y con ellas **10,510 celdas** y **9,204 movimientos de producción**. Lo que
+> se cae es justo **la historia más vieja: 1,523 de esas 1,528 son de 2005-2012**.
+> **Pendiente de decisión de DANIEL:** si esas 1,528 se rescatan en el archivo. No es solo quitar el
+> filtro: `HistoricoOrdenV1.idEmpresa` es **FK real a `Empresa`** y el listado filtra por la empresa
+> activa (A9), así que rescatarlas exige decidir **a qué empresa se cuelgan** (¿el linaje de FR Moda?
+> ¿una empresa "histórica"?) o cambiar el modelo. Anotado como deuda en `HOJA-DE-RUTA.md` §4.
+
 ## La idea que los hace baratos: SOLO LECTURA
 
 Ninguno de los dos tiene alta, edición ni cancelación — y no los va a tener. Se llenan **una vez**
@@ -109,8 +120,11 @@ ventana `ETL_DESDE` de §Post-F9.24 — existe justamente para guardar lo que la
 - **Completa lo que falte**: cabecera e hijos de cada tanda de órdenes viajan en la **misma
   transacción** (`ORDENES_POR_TX`), y al arrancar se detectan las órdenes que quedaron **sin
   detalle** por una corrida interrumpida y se reparan. Antes, una caída después de las cabeceras
-  (son ~85,000 renglones, contra una BD que está del otro lado de la red) dejaba miles de órdenes sin
+  (son ~59,000 renglones, contra una BD que está del otro lado de la red) dejaba miles de órdenes sin
   una sola celda ni proceso **para siempre**, porque la re-corrida las daba por cargadas.
+  La reparación se decide por *"despivotar emite celdas"*, **no** por *"tiene filas en `OrdenesDet`"*:
+  una orden con el detalle todo en ceros tiene filas pero no produce ninguna celda, y con la
+  condición vieja se contaba como reparada en cada corrida sin insertar nada.
 
 **Escritura POR LOTES** (`createMany` en tandas), nunca fila por fila — regla de Gabriel del 19-jun.
 
@@ -131,7 +145,7 @@ el ETL escribe al terminar.
   dos, la ficha está vacía y se descarta **reportándola**.
 - **Los colores NO se normalizan**: el viejo los guardaba como texto libre, así que conviven
   "MARINO", "Marino" y "MAR.". En un archivo de consulta eso se lee y se entiende; adivinar
-  equivalencias entre 39,866 celdas metería errores silenciosos.
+  equivalencias entre ~29,000 celdas metería errores silenciosos.
 
 ## Pruebas
 

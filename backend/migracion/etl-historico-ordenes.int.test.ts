@@ -86,6 +86,10 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27)', () => {
     expect(resultado.existentes).toBe(2);
     expect(resultado.celdas).toBe(0);
     expect(resultado.procesos).toBe(0);
+    // …y NADA se cuenta como "reparado". La 1002 tiene renglón en `OrdenesDet` pero TODO en ceros,
+    // así que no emite ninguna celda: con la condición vieja ("tiene filas en OrdenesDet") se
+    // contaba como reparada en CADA corrida —inflando la nota del reporte— sin insertar una fila.
+    expect(resultado.reparadas).toBe(0);
     expect(await cliente.historicoOrdenV1.count()).toBe(2);
     expect(await cliente.historicoOrdenV1Linea.count()).toBe(3);
     expect(await cliente.historicoOrdenV1Proceso.count()).toBe(5);

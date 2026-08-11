@@ -88,17 +88,42 @@ import {
 } from './partidas-telas.js';
 import { aDateColumna, aNumero, tipoPorCodigo } from './telas.js';
 import {
+  exigirRfcDelProveedor,
   exigirSelloCompatibleConProveedor,
   exigirUuidLibreEnEntradas,
   sellarCfdiEnEntrada,
   type SelloCfdi,
 } from './cfdi-entrada-tela.js';
+import { normalizarRfc } from '../terceros/cfdi/parser-cfdi.js';
 import { uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
 import {
   cancelarMovimientoTerceroInterno,
   registrarMovimientoTerceroInterno,
 } from '../terceros/cuenta-terceros.js';
 import { exigirProveedorQueFactura, modalidadFactura } from '../terceros/facturacion-proveedor.js';
+
+/**
+ * QUÉ HACER cuando el folio fiscal ya está ocupado en Cuentas por pagar. Es UNA sola frase, usada
+ * por los dos mensajes de choque, y dice **la única salida que de verdad existe** hoy.
+ *
+ * POR QUÉ SE REESCRIBIÓ (hallazgo de la revisión del 11-ago-2026): antes proponía dos caminos y
+ * **ninguno** funcionaba —
+ *  • *"quítale la factura a la entrada"*: ya no se puede. El `uuidCfdi` **salió del contrato del
+ *    PUT** (arreglo 1 de §Post-F9.21) y el sello se conserva siempre al editar: no queda ningún
+ *    camino que lo ponga en NULL. Y no se le agregó uno a propósito: soltar un dato fiscal desde la
+ *    edición es justo la superficie que se acaba de cerrar, y un BORRADOR no cuesta nada de
+ *    recapturar (no tocó inventario ni generó cargo).
+ *  • *"cancela ese movimiento en Finanzas"*: no libera nada. La unique de `MovimientoTercero.uuidCfdi`
+ *    es **global**, el movimiento inverso de la cancelación **no copia** el UUID y `uuidYaImportado`
+ *    no filtra los cancelados: una vez importado, ese folio queda consumido para siempre.
+ *
+ * Un mensaje que manda a hacer algo imposible es peor que no decir nada: quien captura pierde el
+ * rato y termina creyendo que el sistema está roto.
+ */
+const SALIDA_UUID_CONSUMIDO =
+  'Ese folio fiscal ya quedó consumido y cancelar el movimiento en Finanzas NO lo libera. Para ' +
+  'recibir la tela: CANCELA este borrador y vuelve a capturarlo SIN el XML (como remisión/captura ' +
+  'a mano) — la deuda con el proveedor ya está registrada en Finanzas, así que no se pierde nada.';
 
 /** Origen del cargo de CxP que nace al confirmar una entrada con su CFDI (§Post-F9.21). */
 const ORIGEN_FACTURA_PROVEEDOR = 'factura_proveedor';
@@ -650,7 +675,7 @@ interface DocumentoParaCxP {
   totalCfdi: Prisma.Decimal | null;
   rfcCfdi: string | null;
   idArchivoCfdi: string | null;
-  proveedor: { nombre: string; factura: boolean | null };
+  proveedor: { nombre: string; rfc: string | null; factura: boolean | null };
   lineas: readonly {
     cantidad: Prisma.Decimal;
     cantidadComplemento: Prisma.Decimal | null;
@@ -692,6 +717,25 @@ function cargoDeCuentaPorPagar(
   } as const;
 
   if (documento.uuidCfdi !== null && documento.totalCfdi !== null) {
+    // ÚLTIMO CERROJO antes de escribir un cargo FISCAL (A4, deny-by-default): el cargo viaja con el
+    // RFC del EMISOR como `rfcTercero`, así que el proveedor al que se le va a deber tiene que ser
+    // ese mismo. Las dos puertas de captura ya lo exigen (`sellarCfdiEnEntrada` al subir el XML y
+    // `exigirSelloCompatibleConProveedor` al editar el borrador); esto es la red por si mañana
+    // apareciera un tercer camino que selle un CFDI — un cargo fiscal a nombre de quien no facturó
+    // no se puede corregir: el UUID queda consumido para siempre.
+    if (documento.rfcCfdi !== null) {
+      const rfcProveedor = exigirRfcDelProveedor(
+        documento.proveedor,
+        'confirmar la entrada con su factura (CFDI)',
+      );
+      if (normalizarRfc(rfcProveedor) !== normalizarRfc(documento.rfcCfdi)) {
+        throw new ErrorValidacion(
+          `La factura de esta entrada la emitió el RFC ${documento.rfcCfdi}, pero el documento ` +
+            `está a nombre del proveedor "${documento.proveedor.nombre}" (RFC ${rfcProveedor}): ` +
+            `la cuenta por pagar nacería a nombre de quien no facturó.`,
+        );
+      }
+    }
     return {
       ...comun,
       importe: documento.totalCfdi.toNumber(),
@@ -766,7 +810,7 @@ export async function confirmarEntradaTela(
     ) {
       throw new ErrorConflicto(
         'Esa factura ya está registrada en Cuentas por pagar: no se puede duplicar el cargo. ' +
-          'Cancela ese movimiento en Finanzas o quítale la factura a la entrada para confirmarla.',
+          SALIDA_UUID_CONSUMIDO,
       );
     }
     throw error;
@@ -801,8 +845,9 @@ async function confirmarEnTransaccion(
         totalCfdi: true,
         rfcCfdi: true,
         idArchivoCfdi: true,
-        // §Post-F9.22 — y la bandera del catálogo decide SI el cargo es fiscal o no.
-        proveedor: { select: { nombre: true, factura: true } },
+        // §Post-F9.22 — y la bandera del catálogo decide SI el cargo es fiscal o no. El `rfc` va
+        // para el cerrojo final: el cargo fiscal no puede nacer a nombre de quien no facturó.
+        proveedor: { select: { nombre: true, rfc: true, factura: true } },
         lineas: {
           orderBy: { id: 'asc' },
           select: {
@@ -967,8 +1012,7 @@ async function confirmarEnTransaccion(
         throw new ErrorConflicto(
           `Esta factura (UUID ${documento.uuidCfdi}) ya está registrada en Cuentas por pagar ` +
             `(se importó desde Finanzas después de capturar la entrada): no se puede duplicar el ` +
-            `cargo. Cancela ese movimiento en Finanzas o quítale la factura a la entrada para ` +
-            `poder confirmarla.`,
+            `cargo. ${SALIDA_UUID_CONSUMIDO}`,
         );
       }
       await registrarMovimientoTerceroInterno(sesion, cargo, { tx });

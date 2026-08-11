@@ -6,10 +6,21 @@
  * del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de prenda, fecha de
  * producción, maquilero, etc."*
  *
- * QUÉ CARGA: **TODAS** las órdenes del viejo (5,451), su matriz color×talla (39,866 celdas) y sus
- * movimientos de producción (corte, envío/recibo de costura y de estampado). Es lo ÚNICO del ETL que
- * ignora a propósito la ventana de 2025-2026 (§Post-F9.24) — precisamente porque su razón de existir
- * es guardar lo que la ventana deja fuera.
+ * QUÉ CARGA: las órdenes del viejo **sin ventana de años**, su matriz color×talla y sus movimientos
+ * de producción (corte, envío/recibo de costura y de estampado). Es lo ÚNICO del ETL que ignora a
+ * propósito la ventana de 2025-2026 (§Post-F9.24) — precisamente porque su razón de existir es
+ * guardar lo que la ventana deja fuera.
+ *
+ * ⚠️ NO SON LAS 5,451 DEL DUMP, SON 3,923 (corregido el 11-ago-2026; antes este encabezado decía
+ * "TODAS" y era falso). Una orden sin `idEmpresa` mapeada se salta (`resultado.sinEmpresa`), y **las
+ * 6 empresas viejas inactivas NO migran** (decisión de Gabriel del 17-jun-2026,
+ * `docs/hoja-de-ruta/F2-etapas.md`), así que quedan fuera **1,528 órdenes** con sus 10,510 celdas y
+ * 9,204 movimientos — y **1,523 de ellas son de 2005-2012**, justo la historia más vieja. Medido:
+ * 3,923 órdenes · 29,356 celdas · 26,092 movimientos ≈ 59,000 renglones (el dump entero: ~80,600).
+ * **Rescatarlas es DECISIÓN DE DANIEL, no del ETL** (`HistoricoOrdenV1.idEmpresa` es FK real a
+ * `Empresa` y el listado filtra por la empresa activa: habría que decidir a qué empresa se cuelgan).
+ * Anotado en `DECISIONES.md §(Post-F9.26)` y en `HOJA-DE-RUTA.md` §4/§6 — por eso el filtro sigue tal
+ * cual: no se cambia el alcance del archivo sin su respuesta.
  *
  * LAS DOS REGLAS QUE LO MANTIENEN INOCUO (ver el encabezado del modelo en `schema.prisma`):
  *  1. **Los terceros se resuelven a TEXTO aquí**, leyendo los CSV del viejo — NO se tocan los
@@ -22,7 +33,7 @@
  * reglas de negocio que proteger — no hay folios, ni kardex, ni existencias, ni estados. El dominio
  * solo lo LEE. Meterle una capa de dominio de escritura sería ceremonia sobre un `INSERT`.
  *
- * POR LOTES (regla de Gabriel, 19-jun): son ~78,000 renglones entre los tres modelos; se escriben con
+ * POR LOTES (regla de Gabriel, 19-jun): son ~59,000 renglones entre los tres modelos; se escriben con
  * `createMany` en tandas, nunca uno por uno.
  *
  * IDEMPOTENTE, y en los dos sentidos: la llave es `(idEmpresa, idOrdenV1)`, así que re-correrlo no
@@ -174,7 +185,7 @@ interface Reparacion {
 /**
  * Cuántas órdenes (con sus hijos) van por TRANSACCIÓN. Cada tanda entra COMPLETA o no entra:
  * cabeceras, celdas y procesos de esas órdenes se escriben en la misma transacción, para que una
- * caída a media carga (son ~85,000 renglones, y Railway rota contraseñas) no pueda dejar órdenes sin
+ * caída a media carga (son ~59,000 renglones, y Railway rota contraseñas) no pueda dejar órdenes sin
  * detalle. Bajo a propósito frente al `LOTE` de filas: una tanda son ~250 cabeceras + sus ~2,000
  * celdas + sus ~1,500 procesos.
  */
@@ -249,7 +260,7 @@ export async function cargarHistoricoOrdenes(
     ]),
   );
   // …y cuáles de esas ya tienen ESCRITOS sus hijos. Sin esto, la idempotencia solo valía si la
-  // corrida terminaba completa: una caída después de las cabeceras (son ~85,000 renglones y la BD
+  // corrida terminaba completa: una caída después de las cabeceras (son ~59,000 renglones y la BD
   // está del otro lado de la red) dejaba miles de órdenes sin una sola celda ni proceso PARA
   // SIEMPRE, porque re-correr las daba por cargadas e insertaba 0. Ahora re-correr COMPLETA lo que
   // falte. La granularidad es la orden entera, y es exacta porque cabecera e hijos se escriben en la
@@ -329,13 +340,21 @@ export async function cargarHistoricoOrdenes(
       resultado.existentes += 1;
       // ¿Le faltan hijos de una corrida anterior interrumpida? Se completa; no se re-inserta lo que
       // ya está (por eso la comprobación es por orden, no por fila).
-      const debeTenerCeldas = (detPorOrden.get(idOrdenV1) ?? []).length > 0;
-      const faltanCeldas = debeTenerCeldas && !conLineas.has(idYaCargada);
+      //
+      // OJO con la condición de las celdas: NO es *"tiene filas en `OrdenesDet`"* sino *"despivotar
+      // emite al menos una celda"*. Una orden cuyo detalle está TODO en ceros tiene filas pero no
+      // produce ninguna celda (`despivotarRenglon` solo emite cantidades > 0), así que con la
+      // condición vieja se contaba como "reparada" en CADA corrida —inflando la nota del reporte—
+      // sin insertar una sola fila. Se calculan las celdas de verdad (solo si hace falta: si la
+      // orden ya tiene líneas escritas, ni se despivota).
+      const tieneDetalle = (detPorOrden.get(idOrdenV1) ?? []).length > 0;
+      const celdasFaltantes =
+        tieneDetalle && !conLineas.has(idYaCargada) ? celdasDe(f, idOrdenV1) : [];
       const faltanProcesos = procesosDeEsta.length > 0 && !conProcesos.has(idYaCargada);
-      if (faltanCeldas || faltanProcesos) {
+      if (celdasFaltantes.length > 0 || faltanProcesos) {
         reparaciones.push({
           idOrden: idYaCargada,
-          celdas: faltanCeldas ? celdasDe(f, idOrdenV1) : [],
+          celdas: celdasFaltantes,
           procesos: faltanProcesos ? procesosDeEsta : [],
         });
       }

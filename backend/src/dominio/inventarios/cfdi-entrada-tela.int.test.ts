@@ -401,6 +401,12 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
       /ya está registrada en Cuentas por pagar/,
     );
+    // …y el mensaje dice la ÚNICA salida que de verdad existe. La anterior proponía dos caminos
+    // imposibles ("cancela el movimiento en Finanzas" no libera el UUID —la unique es global y el
+    // inverso no lo suelta— y "quítale la factura" ya no se puede: el uuid salió del PUT).
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /CANCELA este borrador/,
+    );
     // Y la entrada sigue en borrador (la transacción no dejó nada a medias).
     const despues = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
     expect(despues.estatus).toBe('borrador');
@@ -438,6 +444,44 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
       archivosFalsos,
     );
     await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+  });
+
+  it('RECHAZA subir un XML a un proveedor SIN RFC capturado (con los migrados era un NO-OP)', async () => {
+    // El caso REAL del día 1: los 155 proveedores que sobreviven a la depuración (§Post-F9.23)
+    // vienen del Access con TODO lo fiscal en 0 %, así que ninguno tiene RFC. Cuando la comparación
+    // "el emisor debe ser el proveedor" solo corría *si el proveedor tenía RFC*, se podía leer el
+    // XML de "Textiles del Norte", elegir a mano a este otro y confirmar → cargo FISCAL contra
+    // quien no facturó, con el RFC del emisor pegado. Ahora se corta al guardar.
+    const migrado = await cliente.proveedor.create({
+      data: { nombre: 'Avios del Centro (migrado)' }, // rfc NULL, factura NULL (no-definida)
+    });
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Arena' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A-77',
+          idProveedor: migrado.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          xmlCfdi: xmlCfdi({
+            emisorRfc: 'TNO850101BBB',
+            receptorRfc: 'FRM900101AAA',
+            uuid: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
+            conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
+          }),
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/no tiene RFC capturado/);
+    // Nada quedó escrito: ni la entrada, ni el cargo, ni el UUID consumido.
+    expect(await cliente.entradaTela.count()).toBe(0);
     expect(await cliente.movimientoTercero.count()).toBe(0);
   });
 
@@ -784,6 +828,37 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
     ).rejects.toThrow(/quedaría a nombre del proveedor/);
 
     // Nada cambió: ni el proveedor ni el sello.
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.idProveedor).toBe(proveedor.id);
+    expect(enBd.uuidCfdi).toBe(UUID);
+  });
+
+  it('editar tampoco puede pasársela a un proveedor SIN RFC (el hueco de los migrados)', async () => {
+    // Mismo agujero que al dar de alta, por la otra puerta: el sello ya está guardado y la edición
+    // solo cambia el proveedor. Como el migrado no tiene RFC, la comparación contra `rfcCfdi` se
+    // saltaba sola y al confirmar nacía el cargo FISCAL contra él, con el RFC de Textiles del Norte.
+    const { entrada, idTelaColor } = await borradorConFactura();
+    const migrado = await cliente.proveedor.create({
+      data: { nombre: 'Avios del Centro (migrado)' }, // rfc NULL
+    });
+
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A1045',
+          idProveedor: migrado.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no tiene RFC capturado/);
+
+    // El documento sigue con su proveedor y su sello intactos.
     const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
     expect(enBd.idProveedor).toBe(proveedor.id);
     expect(enBd.uuidCfdi).toBe(UUID);
