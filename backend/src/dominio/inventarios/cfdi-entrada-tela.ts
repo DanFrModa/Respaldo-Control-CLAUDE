@@ -229,9 +229,17 @@ export async function leerCfdiParaEntradaTela(
     select: { id: true, nombre: true, activo: true, factura: true },
   });
   if (proveedor === null) {
+    // OJO CON LO QUE SE ACONSEJA AQUÍ (revisión del 11-ago-2026): *"elige el proveedor a mano"* —lo
+    // que decía este aviso— es un CALLEJÓN SIN SALIDA desde que el RFC del proveedor es obligatorio
+    // con CFDI (`exigirRfcDelProveedor`): si el elegido no tiene RFC, guardar truena; y si tiene
+    // otro, truena por el mismatch. No puede tener este mismo, porque entonces el `findFirst` de
+    // arriba lo habría encontrado. Con los 155 proveedores migrados —todos SIN RFC— eso es el día 1
+    // entero. El aviso dice la ruta que SÍ existe, y por qué.
     avisos.push(
       `Ningún proveedor del catálogo tiene el RFC del emisor (${parsed.emisorRfc}). ` +
-        `Elige el proveedor a mano, o captúrale su RFC para que la próxima factura se reconozca sola.`,
+        `Captúrale ese RFC al proveedor en Catálogos › Proveedores (o dalo de alta con él) y vuelve ` +
+        `a leer la factura: sin RFC no hay contra qué comprobar quién facturó, así que elegir el ` +
+        `proveedor a mano NO deja guardar esta entrada con su factura.`,
     );
   } else if (!proveedor.activo) {
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);
@@ -310,6 +318,12 @@ export interface SelloCfdi {
   uuid: string;
   /** TOTAL del comprobante (con impuestos): la verdad fiscal con la que nace el cargo de CxP. */
   total: number;
+  /**
+   * RFC del EMISOR, tal como venía en el XML. Viaja al cargo de CxP (`rfcTercero`) —el reporte
+   * fiscal del contador lo imprime, y sin él la misma factura se veía distinta según por dónde
+   * hubiera entrado— y queda en la entrada para poder re-validar el sello al editarla.
+   */
+  emisorRfc: string;
   /** `Archivo` del XML ya subido a R2 (respalda el cargo, igual que una importación de F9). */
   idArchivo: string;
 }
@@ -326,7 +340,16 @@ export interface SelloCfdi {
  * irrecuperable. Es el mismo criterio que `importarCfdi` de F9.
  */
 export async function sellarCfdiEnEntrada(
-  datos: { xml: string | null; idProveedor: number; idEmpresa: number },
+  datos: {
+    xml: string | null;
+    idProveedor: number;
+    idEmpresa: number;
+    /**
+     * Entrada que se está RE-sellando (edición de un borrador). Se excluye de la búsqueda de
+     * "ese UUID ya se capturó": volver a subir el MISMO XML a la MISMA entrada no es duplicarla.
+     */
+    idEntradaActual?: number;
+  },
   bd?: ContextoBd,
   /**
    * Inyectable para probar sin R2 real. Se resuelve PEREZOSAMENTE (después del early return): una
@@ -354,16 +377,18 @@ export async function sellarCfdiEnEntrada(
   // §Post-F9.22 — el que NO factura no puede traer factura. Se corta antes de subir nada a R2.
   if (proveedor !== null) {
     exigirProveedorQueFactura(proveedor, 'guardar la entrada con una factura (CFDI)');
-  }
-  if (
-    proveedor !== null &&
-    proveedor.rfc !== null &&
-    normalizarRfc(proveedor.rfc) !== normalizarRfc(parsed.emisorRfc)
-  ) {
-    throw new ErrorValidacion(
-      `La factura la emitió el RFC ${parsed.emisorRfc}, pero la entrada es del proveedor ` +
-        `"${proveedor.nombre}" (RFC ${proveedor.rfc}). Corrige el proveedor o sube la factura correcta.`,
+    // Sin RFC capturado NO se puede comprobar quién facturó: se corta aquí (ver
+    // `exigirRfcDelProveedor` — con los proveedores migrados esta comparación era un NO-OP).
+    const rfcProveedor = exigirRfcDelProveedor(
+      proveedor,
+      'guardar la entrada con una factura (CFDI)',
     );
+    if (normalizarRfc(rfcProveedor) !== normalizarRfc(parsed.emisorRfc)) {
+      throw new ErrorValidacion(
+        `La factura la emitió el RFC ${parsed.emisorRfc}, pero la entrada es del proveedor ` +
+          `"${proveedor.nombre}" (RFC ${rfcProveedor}). Corrige el proveedor o sube la factura correcta.`,
+      );
+    }
   }
 
   // El MISMO CFDI no puede estar ya en Cuentas por pagar (la unique del UUID es el backstop).
@@ -372,6 +397,9 @@ export async function sellarCfdiEnEntrada(
       `Esta factura (UUID ${parsed.uuid}) ya está registrada en Cuentas por pagar: no se puede duplicar.`,
     );
   }
+
+  // Ni puede estar ya capturado en OTRA entrada de tela (se corta ANTES de subir nada a R2).
+  await exigirUuidLibreEnEntradas(cliente, datos.idEmpresa, parsed.uuid, datos.idEntradaActual);
 
   const subido = await servicio.subirContenido({
     nombreOriginal: `cfdi-${parsed.uuid}.xml`,
@@ -390,5 +418,147 @@ export async function sellarCfdiEnEntrada(
     select: { id: true },
   });
 
-  return { uuid: parsed.uuid, total: parsed.total, idArchivo: archivo.id };
+  return {
+    uuid: parsed.uuid,
+    total: parsed.total,
+    emisorRfc: parsed.emisorRfc,
+    idArchivo: archivo.id,
+  };
+}
+
+/**
+ * Exige que ese folio fiscal no esté ya capturado en OTRA entrada de tela de la empresa.
+ *
+ * El unique `(idEmpresa, uuidCfdi)` lo impediría de todos modos, pero con un **P2002 opaco** (500)
+ * —y, en el caso del sellado, después de haber subido ya el XML a R2—. Aquí se corta antes y con un
+ * mensaje que dice DÓNDE está la otra captura, que es lo que la persona necesita saber.
+ *
+ * `idEntradaActual` se excluye: volver a subir el MISMO XML a la MISMA entrada no es duplicarla.
+ */
+export async function exigirUuidLibreEnEntradas(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  uuid: string,
+  idEntradaActual?: number,
+): Promise<void> {
+  const otra = await cliente.entradaTela.findFirst({
+    where: {
+      idEmpresa,
+      uuidCfdi: uuid,
+      ...(idEntradaActual === undefined ? {} : { id: { not: idEntradaActual } }),
+    },
+    select: { folio: true },
+  });
+  if (otra !== null) {
+    throw new ErrorConflicto(
+      `Esta factura (UUID ${uuid}) ya se capturó en la entrada ${String(otra.folio)}: ` +
+        `no se recibe dos veces.`,
+    );
+  }
+}
+
+/**
+ * Exige que el PROVEEDOR tenga su RFC capturado cuando hay un CFDI de por medio, y lo devuelve ya
+ * comprobado (para que quien llama compare sin volver a preguntar por el null).
+ *
+ * POR QUÉ NO BASTA CON *"si tiene RFC, que coincida"* (hallazgo de la revisión del 11-ago-2026): los
+ * **155 proveedores** que sobreviven a la depuración (§Post-F9.23) llegan del Access con **todo lo
+ * fiscal al 0 %** — el viejo nunca tuvo RFC. Con la comparación condicionada a *"si el proveedor
+ * tiene RFC"*, la regla "el emisor DEBE ser el proveedor" era un **NO-OP el día 1**: se leía el XML
+ * de *Textiles del Norte*, se elegía a mano a *Avíos del Centro* (rfc NULL), se confirmaba… y nacía
+ * un cargo **FISCAL** contra Avíos del Centro con el `rfcTercero` de Textiles del Norte. El contador
+ * veía un tercero cuyo nombre y RFC no coinciden, y el UUID quedaba consumido para siempre.
+ *
+ * Por eso, con CFDI, el RFC del proveedor **es obligatorio**: sin él no hay contra qué comprobar
+ * quién facturó, y una validación que no puede comprobar nada no debe dejar pasar (A4).
+ */
+export function exigirRfcDelProveedor(
+  proveedor: { nombre: string; rfc: string | null },
+  queSeIntento: string,
+): string {
+  const rfc = proveedor.rfc?.trim() ?? '';
+  if (rfc === '') {
+    throw new ErrorValidacion(
+      `No se puede ${queSeIntento}: el proveedor "${proveedor.nombre}" no tiene RFC capturado, así ` +
+        `que no hay contra qué comprobar quién emitió el comprobante. Captúrale el RFC en ` +
+        `Catálogos › Proveedores (es el mismo que trae el XML) y vuelve a intentarlo.`,
+    );
+  }
+  return rfc;
+}
+
+/** El sello que ya vive en una entrada (lo que queda del CFDI cuando la edición no trae XML). */
+export interface SelloGuardado {
+  uuidCfdi: string | null;
+  rfcCfdi: string | null;
+  idProveedor: number;
+}
+
+/**
+ * RE-VALIDA un sello YA GUARDADO contra el proveedor con el que va a quedar el documento
+ * (§Post-F9.21/22 — se estrenó al arreglar la edición del borrador).
+ *
+ * EL AGUJERO QUE TAPA: al editar un borrador, la factura NO se vuelve a subir (el sello se
+ * conserva — un dato fiscal no se pierde por editar), pero el PROVEEDOR sí se puede cambiar. Sin
+ * esta validación se podía capturar con el XML de "Textiles X", editar poniendo "Avíos Y" y
+ * confirmar: el cargo FISCAL nacía contra Y respaldado con la factura de X. El emisor del
+ * comprobante y el proveedor al que se le debe TIENEN que ser el mismo.
+ *
+ * Es la misma regla que aplica `sellarCfdiEnEntrada` cuando sí viene el XML; aquí se comprueba
+ * contra el RFC que quedó guardado, sin volver a bajar el XML de R2.
+ *
+ * Con el sello vacío (entrada sin CFDI) no hay nada que validar.
+ */
+export async function exigirSelloCompatibleConProveedor(
+  sello: SelloGuardado,
+  idProveedorNuevo: number,
+  bd?: ContextoBd,
+): Promise<void> {
+  if (sello.uuidCfdi === null) {
+    return;
+  }
+  const cliente = clienteLectura(bd);
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: idProveedorNuevo },
+    select: { nombre: true, rfc: true, factura: true },
+  });
+  if (proveedor === null) {
+    return; // `validarCabeceraYLineas` ya truena por proveedor inexistente, con mejor mensaje.
+  }
+  // §Post-F9.22 — el que NO factura no puede quedarse con una factura amarrada.
+  //
+  // EL CALLEJÓN QUE ESTO ABRE (dicho a propósito, no es un descuido): si a un proveedor migrado se
+  // le marca `factura = false` DESPUÉS de que ya tenía un borrador con CFDI, ese borrador deja de
+  // poder editarse. Tiene DOS salidas reales, y las dos están al alcance de quien captura: (1) si el
+  // proveedor sí timbra —y el XML es la prueba de que sí—, corregir la casilla del catálogo, que es
+  // justo lo que pide el mensaje de abajo; o (2) cancelar el borrador y recapturarlo sin el XML,
+  // que es lo que corresponde si de verdad no factura. NO se agrega una tercera puerta para
+  // "desamarrar" el CFDI: soltar un dato fiscal desde la edición es la superficie que se acaba de
+  // cerrar (el `uuidCfdi` salió del PUT), y un borrador no cuesta nada de recapturar.
+  exigirProveedorQueFactura(proveedor, 'dejar la entrada con una factura (CFDI)');
+
+  if (sello.rfcCfdi === null) {
+    // Entrada sellada ANTES de que se guardara el RFC del emisor: no hay contra qué comparar. Se
+    // permite seguir editándola mientras el proveedor NO cambie; para cambiarlo hay que volver a
+    // subir el XML, que es lo único que puede probar quién facturó. (Tampoco se le exige RFC al
+    // proveedor: sin `rfcCfdi` NO hay `totalCfdi`, así que de ahí no puede nacer un cargo fiscal.)
+    if (idProveedorNuevo !== sello.idProveedor) {
+      throw new ErrorValidacion(
+        `Esta entrada trae una factura (UUID ${sello.uuidCfdi}) capturada sin el RFC del emisor: ` +
+          `para cambiarle el proveedor hay que volver a subir el XML de la factura.`,
+      );
+    }
+    return;
+  }
+  // Con sello COMPLETO (de aquí sale un cargo FISCAL al confirmar) el RFC del proveedor es
+  // obligatorio: sin él, la comparación de abajo se saltaba sola y el cargo nacía contra un tercero
+  // que no era el emisor (ver `exigirRfcDelProveedor`).
+  const rfcProveedor = exigirRfcDelProveedor(proveedor, 'dejar la entrada con una factura (CFDI)');
+  if (normalizarRfc(rfcProveedor) !== normalizarRfc(sello.rfcCfdi)) {
+    throw new ErrorValidacion(
+      `La factura capturada la emitió el RFC ${sello.rfcCfdi}, pero la entrada quedaría a nombre ` +
+        `del proveedor "${proveedor.nombre}" (RFC ${rfcProveedor}). Corrige el proveedor o sube ` +
+        `la factura correcta.`,
+    );
+  }
 }

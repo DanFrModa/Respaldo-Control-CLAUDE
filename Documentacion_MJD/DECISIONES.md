@@ -1043,6 +1043,26 @@ Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrad
 - **Aplica en:** 1 migración **aditiva** (`entradas_tela.total_cfdi` + `id_archivo_cfdi`), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
 
+**Correcciones de la revisión (11-ago-2026) — la regla completa de la EDICIÓN del borrador.** Los puntos 1-4 describían el alta y la confirmación, pero el borrador **se puede editar**, y por ahí se colaban tres agujeros que ya están cerrados:
+
+1. **Editar NO puede perder el sello.** La edición reescribía `uuidCfdi` con lo que mandara la pantalla (que al editar no lo mandaba) y no tocaba `totalCfdi` ni el archivo: el borrador se quedaba **sin folio fiscal**, la cuenta por pagar **no nacía al confirmar** y nadie se enteraba — además de liberar el unique del UUID, con lo que la misma factura se podía capturar dos veces. Ahora **el sello guardado se conserva** y el `uuidCfdi` **salió del contrato del PUT**: un folio fiscal suelto, sin su XML, no prueba nada.
+2. **Editar pasa por las MISMAS guardas que el alta.** Si la edición trae un `xmlCfdi` nuevo, se re-sella con todo el juego de validaciones (receptor = empresa activa, emisor = proveedor, proveedor que sí factura, UUID no repetido ni en otra entrada ni en CxP). Y si NO lo trae, el sello conservado **se re-valida contra el proveedor** con el que va a quedar el documento: sin eso se podía capturar con el XML de *Textiles X*, editar poniendo *Avíos Y* y confirmar → **cargo fiscal contra Y respaldado con la factura de X**.
+3. **El cargo nace CON el RFC del emisor.** El punto 2 decía "con su UUID, su RFC y el XML", pero el RFC no se guardaba en ningún lado: el reporte fiscal del contador lo imprimía vacío, y la **misma** factura se veía distinta según si la había capturado Finanzas o el almacén de telas. Se agregó `entradas_tela.rfc_cfdi` (columna **aditiva y nullable**) y viaja al cargo como `rfcTercero`.
+4. **La carrera con Finanzas se explica, no revienta.** El UUID se verifica al GUARDAR, pero el cargo nace al CONFIRMAR, que puede ser días después: si en medio alguien importó esa factura a CxP, la unique global del UUID tiraba un error opaco (500) y **la tela no podía entrar al almacén**. Ahora se re-checa dentro de la transacción y el choque se traduce a un conflicto legible que dice qué hacer.
+
+**Segunda ronda de la revisión (11-ago-2026) — dos cosas que el papel decía y el código no cumplía:**
+
+5. **Con CFDI, el RFC del proveedor es OBLIGATORIO** (y sin él no se guarda). El punto 1 decía *"valida que el emisor sea el proveedor de la entrada"*, pero la comparación solo corría **si el proveedor tenía RFC capturado** — y los **155 proveedores** que sobreviven a la depuración (§Post-F9.23) llegan del Access con **todo lo fiscal al 0 %**: ninguno lo tiene. Con datos reales, esa validación era un **NO-OP el día 1**: se leía el XML de *Textiles del Norte*, se elegía a mano a *Avíos del Centro* (sin RFC), se confirmaba, y nacía un cargo **FISCAL** contra Avíos del Centro con el RFC de Textiles del Norte — el contador veía un tercero cuyo nombre y RFC no coinciden, y el UUID quedaba consumido. Ahora, **si hay CFDI y el proveedor no tiene RFC, se corta** con un mensaje que dice qué capturar y dónde (*Catálogos › Proveedores*). Aplica en las **dos** puertas (subir el XML y editar el borrador conservando el sello) y hay un **último cerrojo** justo antes de escribir el cargo. **Consecuencia práctica para Daniel/Gabriel:** para recibir por factura hay que **capturarle el RFC al proveedor** — que es, de todos modos, el pendiente de captura que ya dejó §Post-F9.22.
+6. **El mensaje del choque con Finanzas ya no manda a hacer lo imposible.** Proponía *"cancela ese movimiento en Finanzas o quítale la factura a la entrada"*, y **ninguna de las dos existe**: el `uuidCfdi` salió del contrato del PUT (punto 1), así que no hay forma de soltar la factura; y cancelar en Finanzas **no libera el folio** (la unique de `MovimientoTercero.uuidCfdi` es global, el inverso no copia el UUID y el chequeo no mira los cancelados). La salida real —y la que ahora dice el mensaje— es **cancelar el borrador y recapturarlo sin el XML**: la deuda ya está en Finanzas, y un borrador no tocó nada. **No se agregó un "quitar CFDI" al PUT** a propósito: sería reabrir la superficie que el punto 1 acaba de cerrar, para un caso que ya tiene salida. El mismo criterio aplica al callejón hermano —marcarle `factura = false` a un proveedor que ya tenía un borrador con CFDI—: se corrige la casilla del catálogo (el XML prueba que sí timbra) o se cancela el borrador.
+
+**Tercera ronda de la revisión (11-ago-2026) — el aviso que mandaba a un callejón, y dos redes:**
+
+7. **"Elige el proveedor a mano" ya no se ofrece cuando no lleva a ningún lado.** Al leer un CFDI cuyo emisor no está en el catálogo, el aviso proponía elegir el proveedor manualmente — y desde el punto 5 eso **siempre termina en error**: si el elegido no tiene RFC, guardar corta; si tiene otro, corta por el desajuste; y no puede tener el mismo, porque entonces se habría reconocido solo. Con los 155 proveedores migrados (ninguno con RFC) ese es el día 1 entero. Ahora el aviso dice **la ruta que sí existe** —capturarle el RFC al proveedor en *Catálogos › Proveedores*, o darlo de alta con él, y volver a leer la factura— y **la pantalla deja quieto el selector de proveedor** mientras haya un XML leído sin reconocer, en vez de invitar a un intento imposible. Como una factura leída ya no se podía soltar (el `uuidCfdi` salió del PUT y la captura manda siempre el XML), se agregó **"Quitar la factura leída"**: la salida honesta para capturar la entrada sin CFDI, conservando los renglones ya capturados.
+8. **El último cerrojo falla CERRADO.** El cerrojo del punto 5 comprobaba el RFC *"si el cargo trae RFC"*: un cargo fiscal sin RFC del emisor —hoy imposible, porque el mismo sello escribe el total y el RFC juntos— se habría escrito **en silencio**, a nombre de nadie y con el UUID consumido para siempre. Una comprobación que no puede comprobar **no debe dejar pasar** (A4): ahora truena.
+9. **El folio fiscal SUELTO (sin XML) también respeta la casilla.** Dar de alta con `uuidCfdi` pero sin XML no pasaba por *"¿este proveedor factura?"*. Con un proveedor marcado como que **no** factura, al confirmar nacía un cargo **NO fiscal** por los precios capturados, y el UUID quedaba en la entrada pero **no** en el `MovimientoTercero` — así que Finanzas podía importar **ese mismo CFDI** después: **dos cargos por la misma factura**. La edición ya lo prohibía; el alta se había quedado sin esa puerta y ahora la tiene.
+
+- **Aplica en:** 1 migración **aditiva** más (`20260811120000_entrada_tela_rfc_cfdi` → `entradas_tela.rfc_cfdi`), SIN permisos → **no requiere `SEED_ON_START`**.
+
 #### (Post-F9.22) — Dos tipos de proveedor: el que factura y el que no (DANIEL, 10-ago-2026)
 
 > *"Recuerda que en algún momento hablamos que tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
@@ -1070,3 +1090,189 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 - **Aplica en:** SIN migración, SIN permisos nuevos, SIN seed → **no requiere `SEED_ON_START`**.
 - **Pendiente de captura (Daniel):** revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados — mientras esté en NULL se comportan como formales.
 - **Fecha:** 2026-08-10.
+
+#### (Post-F9.23) — Depurar el catálogo de proveedores: solo los de 2025-2026 (DANIEL, 10-ago-2026)
+
+> *"Me gustaría depurar el catálogo de proveedores… creo que lo mejor va a ser empezar desde cero. Hay demasiados proveedores con los que ya no se trabaja. Creo que la decisión que te dio Gabriel es trabajar con información de 2025 y 2026 de Control. Solo vamos a jalar esos proveedores y corregirlos porque les falta mucha información."*
+
+**Los números del dump (verificados, 10-ago-2026):** el Access acumuló **1,052 filas** en cuatro catálogos de terceros (443 Proveedores + 69 Cortadores + 496 Maquileros + 44 Estampadores) en ~20 años. Con movimiento **desde 2025** quedan **155**: 92 comerciales, 5 cortadores y 58 talleres. **Se depura el 85 %.**
+
+**La regla: un tercero está vivo si MOVIÓ algo**, no si el catálogo lo tiene. No se mira ninguna bandera `Activo` del viejo (nadie la mantuvo), sino los documentos con fecha:
+
+| Tipo | De dónde sale que está vivo |
+|---|---|
+| Comercial (telas/avíos/servicios) | `OrdCompra.IdProveedor` |
+| Cortador | `Corte.IdCortadores` |
+| Taller (costura y/o estampado) | `Entregas`, `Recibos`, `Notas`, `EntregasEst`, `RecibosEst` |
+
+**⚠️ HALLAZGO — `Estampadores.csv` es un catálogo MUERTO.** `EntregasEst.IdMaquileros` y `RecibosEst.IdMaquileros` **apuntan a `Maquileros`, no a `Estampadores`**: de los 15 ids que estampan en 2025/26, **14 existen en `Maquileros` y ninguno en `Estampadores`** (el 15º es `0`, el nulo del viejo). Quien estampa es un **taller** del catálogo de maquileros. El ETL de F1-E6 venía creando 44 proveedores "estampadores" que nadie usa; con la depuración quedan fuera **los 44**. No es un descuido: es la consecuencia correcta de la regla, y se reporta explícito.
+
+**Cómo quedó (`migracion/comun/proveedores-activos.ts` + el loader):**
+- **Configurable y por defecto NO recorta** (mismo criterio que `ventana.ts`): sin `ETL_PROVEEDORES_DESDE` se cargan todos, como hasta hoy. Con `ETL_PROVEEDORES_DESDE=2025` entra la depuración. Así una corrida vieja sigue dando lo mismo y el recorte es una decisión explícita de quien migra.
+- **Nada se descarta en silencio** (plan §7): cada tercero depurado sale en el reporte con su nombre, su fuente y su id viejo; el resumen imprime cuántos fueron.
+- **Un movimiento sin fecha legible NO declara vivo a nadie**, y el `0` del viejo (su nulo) nunca revive: preferimos dejar fuera a un dudoso —se da de alta en un minuto— que arrastrar de vuelta la basura que se está depurando.
+- **El análisis y la carga comparten el módulo**, para que no puedan discrepar.
+
+**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Emite factura (CFDI)?` (§Post-F9.22), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
+
+**⚠️ CONSECUENCIA QUE HAY QUE CONFIRMAR CON GABRIEL (no la decide este cambio):** el catálogo depurado **solo alcanza para migrar historia de 2025-2026**. Los ETL de F3-E6 (producción), F4-E6 (compras/notas) y F5-E7 (RC) hoy cargan el histórico **completo**, y esas filas apuntan a los ~897 terceros depurados. **O la migración entera se acota a 2025-2026** —que es lo que Daniel entiende que decidió Gabriel, y lo que ya vale para los consumos de tela (§Post-F9.11 punto 5, *"2025-2026, ~400 órdenes"*)— **o esos ETL se quedan sin proveedor** y omitirían masivamente. Mientras no se confirme, la depuración **está apagada por default**.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa al correr la migración.
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.24) — La migración lleva SOLO 2025 y 2026 (DANIEL + GABRIEL, 10-ago-2026)
+
+> Daniel, confirmando: *"Sí… vamos a pasar información solo de 2025 y 2026."*
+
+Sube a **regla de toda la migración** lo que §Post-F9.23 había hecho solo para el catálogo de proveedores, y generaliza lo que §Post-F9.11 punto 5 ya decía para los consumos de tela (*"2025-2026, ~400 órdenes"*).
+
+**Un solo interruptor: `ETL_DESDE`.** `ETL_DESDE=2025` fija el corte al **1-ene-2025**, sin depender de qué día se corra el ETL. Convive con el `ETL_VENTANA_ANIOS` de F4 (*"los últimos N años"*), pero **`ETL_DESDE` gana** cuando vienen los dos: una fecha explícita manda sobre una relativa. Sin ninguna de las dos, **no recorta** (se migra todo, como hasta hoy). El mismo interruptor alimenta la depuración de proveedores (§Post-F9.23), para que el catálogo y los documentos no puedan quedar desalineados.
+
+**Dónde se recorta, y por qué ahí.** El corte se aplica en los documentos **ancla**, no en cada loader:
+- **`Pedidos`** (por `FechaPedido`, que es la fecha del documento — `FechaElaboracion` es cuándo se capturó).
+- **`Ordenes`** (por `Fecha`). **Esta es la que arrastra todo lo demás:** cortes, envíos, recibos, rutas críticas, auditorías, comentarios y costos cuelgan de la orden, así que si la orden no se migra, ellos tampoco. Se poda también el detalle (`OrdenesDet`) al mismo conjunto: si no, se pre-crearían colores y tallas sacados de 20 años de órdenes que no vamos a migrar — justo la basura de catálogo que se está depurando.
+- Los de **F4** (OC, notas de salida, entradas/salidas de tela) ya tenían ventana y ahora obedecen el mismo interruptor sin tocarlos.
+
+**Un DOCUMENTO sin fecha legible SE QUEDA** — al revés que en la depuración de proveedores. Es deliberado: un tercero dudoso se vuelve a dar de alta en un minuto, pero un documento que se tira no se recupera. Ante la duda con un documento, se migra y se reporta.
+
+**Nada se descarta en silencio** (plan §7): cada pedido y cada orden excluidos salen listados en el reporte con su id y su fecha, y el resumen imprime los conteos y la ventana aplicada — aunque no recorte.
+
+**Qué queda con el corte (medido sobre el dump, 10-ago-2026):**
+
+| Tabla del viejo | Total | En 2025-2026 |
+|---|---|---|
+| `Ordenes` | 5,451 | **262** |
+| `Pedidos` | 1,529 | **112** (incluye 18 sin fecha, que se quedan) |
+| `EsMa` | 11,369 | **384** |
+| `OrdCompra` | 7,978 | **554** |
+| Proveedores (4 catálogos) | 1,052 | **155** |
+
+**⚠️ TRES TABLAS SE QUEDAN EN CERO — hay que decidirlas, no dejarlas pasar:**
+- **`IPT_Movs` (5,072 movimientos, el último de 2023):** es el **único** origen de las existencias de producto terminado (F3-E6). Con el corte, **el inventario de PT arrancaría en CERO**. Es el mismo caso que las telas (§Post-F9.11 punto 5: *"partir de un inventario físico desde cero"*), pero para PT **esa decisión no está tomada**. **Pendiente de Daniel.**
+- **`CC_Auditorias` (488, la última de 2017):** el histórico de calidad desaparece. El módulo arranca vacío.
+- **`PedidosReales` (161, el último de 2010):** la función dejó de usarse hace 16 años; no migra nada.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL: se activa con `ETL_DESDE=2025` al correr la migración.
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.25) — El almacén de PT arranca en CERO, y recuerda de qué orden vieja salió (DANIEL, 10-ago-2026)
+
+> *"Sí, el almacén de PT empieza también desde cero. Acá el único tema es que será bueno incluir un campo de orden de producción para poder saber qué orden anterior es la que se fabricó. Para poder consultar información en Control viejo."*
+
+Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `IPT_Movs` (5,072 movimientos, el último de 2023) no aporta nada y **el inventario de producto terminado arranca vacío**, igual que el de telas (§Post-F9.11 punto 5). El arranque es el **conteo físico**.
+
+**El campo: `MovimientoDetPt.numOrdenV1`** (texto, opcional).
+- **Por qué TEXTO y no la llave `idOrden`** que ya existía (F6-E2 "PT por orden", ADR-0014): esa FK solo puede apuntar a órdenes que viven en v2, y de 5,451 solo migran 262. Las prendas que están hoy en el anaquel las fabricaron órdenes **viejas**, que no se migran. Se guarda el número **tal como lo imprime Control viejo**, que es exactamente para lo que Daniel lo pidió: poder ir a consultarlo allá.
+- **Es INFORMATIVO: no entra en la llave de existencia** (modelo×color×talla×orden×almacén). Dos conteos del mismo artículo con distinta orden vieja son el **mismo** inventario — lo que cambia es de dónde vino, no qué hay en el anaquel. Fragmentar el stock por una nota de consulta habría partido en pedazos el inventario de arranque, y las vistas, los locks y las sumas del kardex no se tocan.
+- **Se captura UNA vez por movimiento** y se replica a cada color. El API lo recibe por color (mismo nivel que `idOrden`), pero en el conteo se cuenta un lote de una orden a la vez: pedirlo color por color sería teclear lo mismo N veces. Si un movimiento mezclara dos órdenes, se capturan dos movimientos.
+- **El movimiento INVERSO lo hereda**, para que el renglón que anula se lea igual que el que anuló.
+- **Se ve en el kardex**: la columna de orden muestra la orden de v2 si existe, y si no el nº con la marca "(Control viejo)".
+
+**⚠️ NO hacen falta campos temporales para modelo, color ni talla.** Daniel lo planteó (*"al no tener un catálogo de dónde vamos a tomar los modelos existentes, tendríamos que hacer campos temporales también para números de modelo, descripción, colores, tallas"*), pero el supuesto no se sostiene y se verificó contra el dump: **el corte de 2025-2026 aplica a DOCUMENTOS con fecha, no a los catálogos.** Los **4,987 modelos** de `Modelos.csv` migran completos con su descripción (aunque solo 241 se usaron en órdenes de 2025/26), y **colores y tallas** vienen de sus propias tablas, no de las órdenes. Al contar una prenda de 2019, el modelo **está** en el catálogo para escogerlo. Lo único que de verdad no existe es la **orden**, que es justo lo que resuelve este campo.
+
+- **Queda abierto (Daniel):** ¿se depura también el catálogo de modelos, como el de proveedores? Recomendación: **no**. Un modelo no estorba (no se ofrece al capturar salvo que se busque) y es lo que permite identificar lo que hay en el almacén sin teclear descripciones a mano. Si se depurara a 241, **entonces sí** harían falta los campos temporales.
+- **Aplica en:** 1 migración **aditiva** (`movimiento_det_pt.num_orden_v1` + índice), SIN permisos, SIN seed → **no requiere `SEED_ON_START`**.
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.26) — Archivo histórico de órdenes: la historia se consulta, no se opera (DANIEL, 10-ago-2026)
+
+> *"¿Qué pasa si dejamos todos esos modelos con su información de producción a manera informativa con la información que hay? Es decir, sin poder manipular las órdenes y sin poder ver toda la info de una OP, pero sí con algo de información fija… sin jalar maquileros, estampadores dentro de un catálogo, sino como un campo informativo. ¿Podría ser viable?"* → y al confirmar el lugar: *"me gustaría tenerlas también como archivo histórico de órdenes. Normalmente cuando queremos consultar algo de información, lo hacemos más desde las órdenes de producción que del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de prenda, fecha de producción, maquilero, etc."*
+
+**El problema que resuelve.** La migración lleva solo 2025-2026 (§Post-F9.24): de 5,451 órdenes del viejo, **262** entran como órdenes OPERATIVAS. Las otras ~5,200 son historia que se quiere **consultar**, y traerlas como `Orden` obligaría a arrastrar folios, kardex, costeo, ruta crítica, existencias y los catálogos de terceros que justo se depuraron (§Post-F9.23) — es decir, deshacer la depuración para poder mirar el pasado.
+
+**El archivo NO tiene ventana de años: van también las 262 recientes.** Una orden de 2025 aparece **a propósito en los dos lados**: viva en Producción, donde se opera, y en el archivo, donde se busca — así *"¿qué le hemos mandado a este taller?"* no cambia de respuesta el 1 de enero, ni hay que preguntarse en cuál de los dos lugares buscar. Las dos caras son de solo lectura desde el archivo: no hay forma de operar una orden desde aquí.
+
+**SON LAS 5,451, TODAS** — pero no siempre lo fueron: la primera versión cargaba **3,923** (las de las 2 empresas activas) porque el loader saltaba las órdenes sin empresa mapeada y **las 6 empresas viejas inactivas no migran** (decisión de Gabriel del 17-jun-2026: MJD / Zipora / Skintex / Free Ride / Corporativo / Marilyn; ver `docs/hoja-de-ruta/F2-etapas.md`). Eso dejaba fuera **1,528 órdenes** con **10,497 celdas** y **9,204 movimientos**, y lo que se caía era **la historia más vieja**: **1,523 de esas 1,528 son de 2005-2012** (2 de 2014 y 3 de 2016). **Daniel decidió rescatarlas el 11-ago-2026 — ver §(Post-F9.29), abajo.**
+
+**La idea de Daniel es la que lo hace barato: si es de SOLO LECTURA, no arrastra nada.** Tres tablas planas (`HistoricoOrdenV1` + sus líneas + sus procesos), sin folios, sin estados, sin permisos de operación.
+
+**Las dos reglas que lo mantienen inocuo:**
+1. **Los terceros van como TEXTO** (`maquilero`, `tercero` del proceso), no como FK a `Proveedor`. El nombre se resuelve UNA vez, al migrar, leyendo los CSV del viejo. Un taller que no sobrevivió a la depuración aparece escrito y **no revive** como proveedor.
+2. **La única FK de verdad es al `Modelo`**, porque los modelos migran completos (4,987). Es la que permite filtrar por **tipo de prenda** y **género** sin duplicar esos campos — y la razón por la que el catálogo de modelos **no** se depura (ver abajo).
+
+**Lo que se carga (medido sobre el dump, con el rescate de §Post-F9.29 ya incluido):** **5,451 órdenes** —todas— · **39,853 celdas** color×talla · **35,296 movimientos de producción** de los cinco documentos del viejo (corte 6,967 · entregas 7,334 · recibos 12,440 · entregas est. 4,496 · recibos est. 4,059). **80,600 renglones en total.** *(Las celdas cargables son 39,853 y no 39,866 porque **13 celdas de 11 renglones de `OrdenesDet` son huérfanas**: apuntan a órdenes que no existen en `Ordenes.csv`. Sin cabecera no hay dónde colgarlas.)*
+
+**Dónde se ve:** *Producción › Archivo de órdenes*, con los filtros que Daniel pidió textualmente — **cliente, modelo, tipo de prenda, fecha de producción y maquilero** — más una caja de búsqueda libre (número de orden / modelo / cliente). El número de orden abre la ficha: matriz color×talla y **quién la trabajó** (cortador, taller de costura, estampador, con sus cantidades).
+
+**El filtro de maquilero mira DOS lados** (y esto importa): en el viejo, el taller de la cabecera de la orden no es necesariamente quien la trabajó — el que cosió está en `Entregas`/`Recibos` y el que estampó en `EntregasEst`/`RecibosEst`. Buscar solo por la cabecera dejaría fuera justo lo que se busca (*"¿qué le hemos mandado a este taller?"*), así que la búsqueda cubre también los procesos.
+
+**Lo que NO se hace, a propósito:**
+- **No se normalizan los colores.** El viejo los guardaba como texto libre, así que conviven "MARINO", "Marino" y "MAR.". En un archivo de consulta eso se lee y se entiende; adivinar equivalencias entre casi 40,000 celdas metería errores silenciosos.
+- **No se depura el catálogo de MODELOS** (a diferencia de proveedores). Un modelo no estorba —no se ofrece al capturar salvo que se busque— y es lo que permite identificar lo que hay en el almacén y filtrar el archivo por tipo de prenda. Depurarlo obligaría además a capturar a mano el número, descripción, colores y tallas en el conteo inicial de PT, que es trabajo extra para quien cuenta.
+- **No hay escritura.** El dominio (`dominio/consultas/historico-ordenes.ts`) solo expone `listar` y `obtener`; las rutas son solo `GET`. El ETL escribe con Prisma directo — excepción consciente a A1, porque no hay regla de negocio que proteger (sin folios, sin kardex, sin estados) y una capa de dominio de escritura sería ceremonia sobre un `INSERT`.
+
+**Permiso:** se REUSA `ordenes.ver` (quien ve órdenes ve las viejas). **Cero permisos nuevos, cero seed.**
+
+- **Aplica en:** 1 migración **aditiva** (3 tablas + 1 enum) y 1 ETL nuevo que se corre a mano después de `etl-catalogos`: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente).
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.27) — En el archivo van TODOS los talleres, no solo el primero (DANIEL, 10-ago-2026)
+
+> Corrigiendo la primera versión del archivo: *"Está bien lo que comentas, excepto el tema de maquilero. Sí es importante que vayan todos. Y no solo el primero. Lo mismo para estampadores. Pero lo puedes poner en un campo abierto, donde sí pueda encontrarlo, pero no esté ligado a nada."*
+
+**Qué estaba mal.** El archivo (§Post-F9.26) mostraba en el listado el maquilero de la **cabecera** de la orden (`Ordenes.IdMaquileros`) — que es solo el **asignado**. En la realidad del taller, una orden **pasa por varios**: se corta en uno, se cosen partidas en dos o tres, y se estampa en otro. Con la cabecera sola, buscar *"¿qué le hemos mandado a este taller?"* dejaba fuera a la mayoría de los que de verdad trabajaron la orden.
+
+**Cómo quedó.** Tres columnas nuevas de **TEXTO ABIERTO**, ligadas a nada, con los nombres **distintos** de cada rol separados por `" · "`:
+
+| Columna | De dónde sale |
+|---|---|
+| `cortadores` | `Corte` |
+| `maquileros` | `Entregas` + `Recibos` (costura) |
+| `estampadores` | `EntregasEst` + `RecibosEst` |
+
+- **El listado muestra los de costura** (que es lo que se busca a diario) y cae al asignado si la orden no tuvo movimientos; la **ficha muestra los tres roles** completos: *Cortaron · Cosieron · Estamparon*.
+- **El filtro de taller busca en todos lados**: la cabecera, los tres campos abiertos y —como red— los movimientos de producción.
+- **Se ordenan alfabéticamente** a propósito: el orden en que vienen los CSV no es estable, y un archivo cuyo texto cambia entre corridas es un archivo que no se puede comparar.
+
+**Por qué se DUPLICA lo que ya está en `HistoricoOrdenV1Proceso`:** para poder **verlos en el renglón** del listado y buscarlos sin un subquery por fila. Normalmente desnormalizar así es deuda —la copia se desincroniza—, pero este archivo es **inmutable**: se llena una vez con el ETL y no se edita nunca. Es el caso en el que no cuesta nada.
+
+**Sigue sin estar ligado a nada:** son en su mayoría los ~897 talleres que la depuración del catálogo (§Post-F9.23) dejó fuera, y así siguen fuera. Se ven y se buscan; no reviven como `Proveedor`.
+
+- **Aplica en:** la migración del archivo (`20260810190000_historico_ordenes_v1`) se **regeneró** con las tres columnas incluidas, en vez de encimar una segunda — no había corrido en ningún ambiente. SIN permisos, SIN seed.
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.28) — Directorio histórico de terceros: la libreta, fuera del catálogo (DANIEL, 10-ago-2026)
+
+> *"Al no pasar la información de los maquileros, ¿qué hacemos con la información de ellos si quisiera encontrar algún teléfono o nombre? ¿Habrá manera de mantener la información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en algún otro repositorio que no sea el catálogo de proveedores?"*
+
+**La pregunta es la correcta, y la respuesta es sí.** La depuración (§Post-F9.23) deja fuera del catálogo **~897 de los 1,052** terceros del Access. Eso es exactamente lo que se quería —que no estorben al capturar una orden o una compra— pero su **teléfono y su dirección siguen sirviendo**: un taller con el que no se trabaja desde 2021 puede volver a hacer falta mañana.
+
+**Cómo quedó:** una tabla aparte, `DirectorioTerceroV1`, con los terceros del Access y sus datos de contacto. Es una **libreta de direcciones**, no un catálogo:
+- **No sale en NINGÚN selector de captura** (ni telas, ni OC, ni maquila, ni EsMa).
+- **No tiene roles, ni `activo`, ni bandera de factura, ni FK a nada.**
+- **Es de SOLO LECTURA** y no hay —ni habrá— botón de *"convertir en proveedor"*. Si un taller vuelve, **se da de alta LIMPIO** en el catálogo copiando de aquí lo que sirva. Ese botón sería exactamente la puerta trasera por la que volvería la basura que se acaba de depurar; no ponerlo es la decisión, no un pendiente.
+
+**Entran TODOS, también los 155 que sobrevivieron**, marcados con `enCatalogo`. Así la libreta es la **foto completa** del Access y nadie tiene que preguntarse en cuál de los dos lados buscar; el filtro *"Solo los que ya no están"* aísla a los depurados cuando eso es lo que se quiere.
+
+**Cuántos son, exactamente: 1,046 de las 1,052 filas** (corregido en la revisión del 11-ago-2026). Doce fichas no traen `Nombre`/`Apellidos`, y la primera versión las descartaba **en silencio** — entre ellas **Bordaprint, Fit Print y Eurobordados**, con teléfono y dirección reales, que es literalmente lo que la libreta existe para conservar. Su identidad vive en la clave corta (`Corto`), así que **el nombre cae a `Corto` cuando no hay otro** (el mismo fallback que ya usaba el archivo de órdenes): seis se recuperan así. Las **6** restantes son cascarones sin un solo dato —ni nombre, ni clave, ni teléfono— y se descartan **listándolas en el reporte** (plan §7: nada en silencio).
+
+**Lo que hace útil a la libreta** —más allá del teléfono— es la **última actividad**: la fecha del último documento suyo en el viejo (OC, corte, entrega, recibo o nota) y **cuántos documentos** tuvo. Contesta de un vistazo *"¿hace cuánto que no trabajamos con este, y qué tanto trabajamos?"*, que es lo que decide si vale la pena volver a llamarlo.
+
+**Se busca también por TELÉFONO**, no solo por nombre: la pregunta era literalmente *"encontrar algún teléfono"*, y a veces se llega al revés (tengo el número, ¿de quién es?).
+
+**Dónde vive:** *Catálogos › Directorio histórico*, **junto** al catálogo de proveedores pero claramente separado de él (el subtítulo dice *"solo consulta; NO es el catálogo"*).
+
+- **Permiso:** se REUSA `proveedores.ver`. Cero permisos nuevos, cero seed.
+- **Aplica en:** 1 migración **aditiva** (una tabla). Se llena con el MISMO ETL del archivo de órdenes (`etl-historico-ordenes`): son las dos mitades de *guardar la historia sin ensuciar los catálogos*.
+- **Fecha:** 2026-08-10.
+
+#### (Post-F9.29) — El archivo lleva TODAS las órdenes; la empresa vieja se guarda escrita (DANIEL, 11-ago-2026)
+
+> Sobre las 1,528 órdenes que el archivo (§Post-F9.26) dejaba fuera por pertenecer a las 6 empresas viejas que no migran: *"Sí, está bien, rescata todas y solo pon en algún lugar la empresa a la que correspondía."*
+
+**Qué estaba mal.** El archivo cargaba **3,923 de las 5,451** órdenes del viejo. Las que no tenían su empresa mapeada se saltaban, y como **las 6 empresas inactivas no migran** (decisión de Gabriel del 17-jun-2026: MJD / Zipora / Skintex / Free Ride / Corporativo / Marilyn), se caían **1,528 órdenes** con **10,497 celdas** y **9,204 movimientos**. Y lo que se caía era justo **la historia más vieja** —**1,523 de esas 1,528 son de 2005-2012**—, es decir, precisamente la razón de existir de un archivo de solo consulta.
+
+**Cómo quedó.** Se cargan **las 5,451**. Las de empresas que ya no existen **se cuelgan de la empresa principal** y **conservan escrita la empresa a la que pertenecían**, en la columna nueva `HistoricoOrdenV1.empresaV1`. Es el mismo criterio que se usó con los talleres en §Post-F9.27: **el dato viejo se guarda como TEXTO, ligado a nada** — no revive como entidad, no aparece en ningún selector, no se puede operar.
+
+- **Por qué colgarlas de una empresa viva y no de una empresa "histórica" nueva:** `idEmpresa` es **FK real a `Empresa`**, y el listado filtra por la **empresa activa** de la sesión (A9). Crear una empresa "histórica" reabriría justo lo que la decisión de Gabriel cerró (y arrastraría la membresía usuario↔empresa que todavía no existe); colgarlas de una empresa que nadie tiene activa sería rescatarlas para que nadie las vea.
+- **Cuál es la principal: FR Moda.** Es la del seed F0, la favorita, la que el resto del ETL usa para los almacenes y la que la gente tiene activa al entrar. Marilyn Fitness es la **misma empresa renombrada** (no son dos negocios), así que la elección no parte nada. El loader la resuelve en tres escalones: **FR Moda por nombre → la favorita → la primera empresa del mapeo** (este último, determinista, es para los ambientes de prueba).
+- **Lo que ya estaba bien no se toca:** una orden cuya empresa **sí** mapea se queda en la suya. Rescatar no es reasignar.
+- **`empresaV1` se llena SIEMPRE**, también en las órdenes de las 2 empresas activas: si solo lo trajeran las rescatadas, un valor vacío sería ambiguo (*¿es de la empresa activa, o el CSV no traía nombre?*).
+- **Dónde se ve y cómo se busca:** en la **ficha** de la orden (*Empresa (Control viejo)*), no como columna del listado —que ya lleva 8—, y **se busca desde la caja de búsqueda libre**. Eso último importa: como todas las rescatadas comparten `idEmpresa`, ese texto es la **única** forma de volver a juntar la historia de una empresa extinta (teclear "Zipora" las trae todas).
+- **Nada en silencio (plan §7):** el ETL ya no reporta "omitidas"; reporta **cuántas se rescataron y de qué empresa vieja era cada grupo** (agrupado por empresa, no 1,528 renglones), y lo dice también en el resumen de consola.
+
+**Lo que se carga ahora, medido sobre el dump:** **5,451 órdenes · 39,853 celdas · 35,296 movimientos = 80,600 renglones** (antes: 3,923 · 29,356 · 26,092 ≈ 59,400). *(Las celdas son 39,853 y no 39,866 porque 13 celdas de 11 renglones de `OrdenesDet` son **huérfanas**: apuntan a órdenes que no existen en `Ordenes.csv`.)*
+
+- **Aplica en:** la migración del archivo (`20260810190000_historico_ordenes_v1`) se **regeneró** con la columna incluida —no había corrido en ningún ambiente—, igual que se hizo con §Post-F9.27; es aditiva y nullable. SIN permisos, SIN seed. El ETL es idempotente, pero **re-correrlo no rellena `empresaV1` de órdenes ya cargadas**: como la tabla nace en esta misma entrega, no hay ninguna.
+- **Con esto se cierra la deuda** que §Post-F9.26 dejó anotada en `HOJA-DE-RUTA.md` §4.
+- **Fecha:** 2026-08-11.

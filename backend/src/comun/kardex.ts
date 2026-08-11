@@ -47,6 +47,12 @@ export interface LineaMovimientoPt {
    * pasan; los movimientos manuales no.
    */
   idOrden?: number | null;
+  /**
+   * Nº de la orden del SISTEMA VIEJO que fabricó estas prendas (§Post-F9.25). Texto, porque esa
+   * orden NO existe en v2 (la migración lleva solo 2025-2026) y una FK no puede apuntarle. Es
+   * INFORMATIVO: no entra en la llave de existencia ni en los locks.
+   */
+  numOrdenV1?: string | null;
   /** Cantidad de prendas, entera y POSITIVA (≥1). El signo lo aplica el kardex por la dirección. */
   cantidad: number;
 }
@@ -226,6 +232,8 @@ export async function registrarMovimientoPt(
             idColor: linea.idColor,
             idTalla: linea.idTalla,
             idOrden: linea.idOrden ?? null,
+            // §Post-F9.25 — referencia a la orden del sistema viejo (texto, solo consulta).
+            numOrdenV1: linea.numOrdenV1 ?? null,
             cantidad: linea.cantidad,
           })),
         },
@@ -404,6 +412,9 @@ export async function cancelarMovimientoPt(
             // El inverso hereda la ORDEN del renglón original (F6-E2 "PT por orden"): así neutraliza
             // el MISMO bucket de orden y la existencia por orden no queda descuadrada.
             idOrden: det.idOrden,
+            // El inverso también hereda la referencia a la orden vieja: el renglón que anula debe
+            // poder leerse igual que el que anuló (§Post-F9.25).
+            numOrdenV1: det.numOrdenV1,
             cantidad: det.cantidad,
           })),
         },

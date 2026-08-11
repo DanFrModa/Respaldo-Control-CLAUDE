@@ -161,10 +161,17 @@ export type DatosEntradaTelaCrear = z.infer<typeof esquemaEntradaTelaCrear>;
 /**
  * Edición de un documento de entrada de tela EN BORRADOR (una confirmada ya no se edita, D3): el
  * cuerpo REEMPLAZA cabecera y renglones completos.
+ *
+ * SIN `uuidCfdi`, a propósito (arreglo del ciclo de revisión de §Post-F9.21): el folio fiscal de una
+ * entrada NO se toca desde el cliente al editar. Si la edición NO trae XML, el sello que ya está
+ * guardado se CONSERVA (que la pantalla mande o deje de mandar el uuid no puede borrar un dato
+ * fiscal); si trae `xmlCfdi`, el servidor lo vuelve a parsear y re-sella con TODAS las guardas del
+ * alta (receptor, emisor = proveedor, UUID no repetido). Un uuid suelto —sin su XML— no prueba nada
+ * y por eso ya no se acepta.
  */
-export const esquemaEntradaTelaActualizar = esquemaEntradaTelaCrear.describe(
-  'Edición de una entrada de tela en borrador (reemplaza cabecera y renglones).',
-);
+export const esquemaEntradaTelaActualizar = esquemaEntradaTelaCrear
+  .omit({ uuidCfdi: true })
+  .describe('Edición de una entrada de tela en borrador (reemplaza cabecera y renglones).');
 
 /** Datos validados de edición de entrada de tela. */
 export type DatosEntradaTelaActualizar = z.infer<typeof esquemaEntradaTelaActualizar>;

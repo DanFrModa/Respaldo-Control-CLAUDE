@@ -136,6 +136,9 @@ model Empresa {
   /// Hitos de orden capturados en esta empresa (post-F9, A9). Restrict.
   hitosOrden             HitoOrden[]
 
+  /// Archivo histórico de órdenes del sistema viejo (§Post-F9.26, solo consulta).
+  historicoOrdenesV1 HistoricoOrdenV1[]
+
   @@map("empresas")
 }
 
@@ -1511,6 +1514,14 @@ model EntradaTela {
   /// PAGAR al confirmar (§Post-F9.21). NO se deriva de los renglones —esos son cantidad×precio sin
   /// IVA—: el cargo entra por lo que dice la factura. NULL si la entrada no nació de un CFDI.
   totalCfdi       Decimal?                 @map("total_cfdi") @db.Decimal(14, 2)
+  /// RFC del EMISOR del CFDI, tal como venía en el XML. Se guarda por dos razones:
+  ///  1. El cargo de CxP nace CON su RFC (igual que una importación de CFDI de F9), que es lo que
+  ///     el reporte fiscal del contador imprime; sin él, la misma factura se veía distinta según
+  ///     por dónde hubiera entrado.
+  ///  2. Es lo que permite RE-VALIDAR el sello al editar el borrador —¿el proveedor que quedó sigue
+  ///     siendo el que facturó?— sin volver a bajar el XML de R2.
+  /// NULL si la entrada no nació de un CFDI (o si es anterior a esta columna).
+  rfcCfdi         String?                  @map("rfc_cfdi")
   /// XML de la factura guardado en R2 (el mismo del que se leyeron los datos). Lo necesita el cargo
   /// fiscal de CxP para quedar respaldado, igual que una importación de CFDI de F9. SetNull.
   idArchivoCfdi   String?                  @map("id_archivo_cfdi")
@@ -2035,6 +2046,9 @@ model Modelo {
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
+
+  /// Órdenes del sistema VIEJO que fabricaron este modelo (archivo de consulta, §Post-F9.26).
+  historicoOrdenesV1 HistoricoOrdenV1[]
 
   @@map("modelos")
 }
@@ -3206,6 +3220,21 @@ model MovimientoDetPt {
   idOrden Int?   @map("id_orden")
   orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
 
+  /// NÚMERO DE ORDEN DEL SISTEMA VIEJO (§Post-F9.25 — Daniel: *"será bueno incluir un campo de orden
+  /// de producción para poder saber qué orden anterior es la que se fabricó, para poder consultar
+  /// información en Control viejo"*).
+  ///
+  /// POR QUÉ TEXTO Y NO LA LLAVE `idOrden`: la migración lleva solo 2025-2026 (§Post-F9.24) y el
+  /// almacén de PT arranca de un CONTEO FÍSICO desde cero, pero las prendas contadas las fabricaron
+  /// órdenes VIEJAS que no existen en v2. Una FK no puede apuntar a una orden que no se migró; este
+  /// campo guarda el número tal como lo imprime Control viejo, para poder ir a consultarlo allá.
+  ///
+  /// Es INFORMATIVO: **no** entra en la llave de existencia (modelo×color×talla×orden×almacén). Dos
+  /// conteos del mismo artículo con distinta orden vieja son el MISMO inventario — lo que cambia es
+  /// de dónde vino, no qué hay en el anaquel. Fragmentar el stock por una nota de consulta habría
+  /// partido en pedazos el inventario de arranque.
+  numOrdenV1 String? @map("num_orden_v1")
+
   /// Cantidad de prendas (positiva; el signo lo da la dirección del tipo de movimiento).
   cantidad  Int
   /// Costo unitario al momento del movimiento. NULLABLE y NULL en toda F3 (D1/D2 — ADR-0010 §4).
@@ -3220,6 +3249,7 @@ model MovimientoDetPt {
   @@index([idModelo, idColor, idTalla])
   @@index([idOrden])
   @@index([idOrden, idModelo, idColor, idTalla])
+  @@index([numOrdenV1])
   @@map("movimiento_det_pt")
 }
 
@@ -6436,4 +6466,249 @@ model NegociacionEvento {
   @@index([idPrecostoAnterior])
   @@index([idPrecostoNuevo])
   @@map("negociacion_evento")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ARCHIVO HISTÓRICO DE ÓRDENES DEL SISTEMA VIEJO (§Post-F9.26)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Daniel (10-ago-2026): *"me gustaría tenerlas también como archivo histórico de órdenes.
+// Normalmente cuando queremos consultar algo de información, lo hacemos más desde las órdenes de
+// producción que del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de
+// prenda, fecha de producción, maquilero, etc."* — y antes: *"sin poder manipular las órdenes…
+// pero sí con algo de información fija… sin jalar maquileros, estampadores dentro de un catálogo,
+// sino como un campo informativo"*.
+//
+// POR QUÉ ESTO EXISTE Y NO SON `Orden`s NORMALES: la migración lleva solo 2025-2026 (§Post-F9.24),
+// así que de 5,451 órdenes del viejo solo 262 entran como órdenes OPERATIVAS. Las otras ~5,200 son
+// historia que se quiere CONSULTAR, no operar. Traerlas como `Orden` obligaría a arrastrar folios,
+// kardex, costeo, ruta crítica, existencias y los catálogos de terceros que justo se depuraron
+// (§Post-F9.23). Aquí no: es un archivo PLANO y de SOLO LECTURA.
+//
+// LAS DOS REGLAS QUE LO MANTIENEN INOCUO:
+//  1. **Los terceros van como TEXTO** (`maquilero`, `cortador`…), no como FK a `Proveedor`. El
+//     nombre se resuelve UNA vez, al migrar, desde los CSV del viejo. Así el catálogo depurado no
+//     se vuelve a llenar de los 897 terceros muertos.
+//  2. **Nada de esto alimenta nada.** No hay kardex, ni costos, ni RC, ni secuencias de folio. El
+//     dominio solo LEE. La única FK "de verdad" es al `Modelo`, porque los modelos SÍ migran
+//     completos — y es la que permite filtrar por tipo de prenda y género sin duplicar esos datos.
+
+/// Etapa de producción registrada en el archivo histórico (equivalentes viejos de F3).
+enum ProcesoHistoricoV1 {
+  /// `Corte` — quién cortó y cuánto.
+  corte
+  /// `Entregas` — envío a maquila de COSTURA.
+  envio_maquila
+  /// `Recibos` — recibo de maquila de COSTURA.
+  recibo_maquila
+  /// `EntregasEst` — envío a ESTAMPADO/aplicación.
+  envio_estampado
+  /// `RecibosEst` — recibo de ESTAMPADO/aplicación.
+  recibo_estampado
+
+  @@map("proceso_historico_v1")
+}
+
+/// Una orden de producción del sistema viejo, congelada para consulta (§Post-F9.26).
+model HistoricoOrdenV1 {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// `Ordenes.IdOrdenes` del viejo. Es la llave de IDEMPOTENCIA del ETL (re-correrlo no duplica).
+  idOrdenV1 String @map("id_orden_v1")
+  /// `Ordenes.Numero` — el número que la gente conoce y por el que va a buscar. TEXTO: en el viejo
+  /// no siempre es un entero limpio, y aquí no se numera nada (no hay secuencia, A3 no aplica).
+  numero    String
+
+  /// Nombre de la empresa a la que la orden pertenecía en el sistema viejo (`Empresas.Empresa`),
+  /// en TEXTO y ligado a nada (§Post-F9.29).
+  ///
+  /// Daniel (11-ago-2026), sobre las 1,528 órdenes de las 6 empresas que no migran: *"sí, está bien,
+  /// rescata todas y solo pon en algún lugar la empresa a la que correspondía."* `idEmpresa` es FK
+  /// real y solo puede apuntar a una empresa VIVA, así que esas órdenes se cuelgan de la empresa
+  /// principal (FR Moda) para que existan y se puedan consultar (A9: el listado filtra por la empresa
+  /// activa); esta columna conserva de QUIÉN eran de verdad. Mismo criterio que los talleres
+  /// (§Post-F9.27): el dato viejo se guarda escrito, no revive como entidad.
+  ///
+  /// Se llena SIEMPRE, también en las órdenes de las 2 empresas activas: si solo lo trajeran las
+  /// rescatadas, un valor vacío sería ambiguo (¿es de la empresa activa, o el CSV no traía nombre?).
+  empresaV1 String? @map("empresa_v1")
+
+  /// Fecha de la orden y fecha de entrega comprometida (solo día).
+  fecha        DateTime? @db.Date
+  fechaEntrega DateTime? @db.Date
+
+  /// Modelo, ligado DE VERDAD: los modelos migran completos, así que se puede filtrar por tipo de
+  /// prenda y género a través de él sin copiar esos campos. Restrict. NULL si no se pudo mapear.
+  idModelo       Int?    @map("id_modelo")
+  modelo         Modelo? @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  /// Código del modelo TAL COMO lo traía el viejo. Respalda la búsqueda cuando `idModelo` es NULL
+  /// (modelo que no se pudo mapear) — que la orden no aparezca por un mapeo fallido sería peor.
+  codigoModeloV1 String? @map("codigo_modelo_v1")
+
+  // ── Terceros y datos como TEXTO (regla 1 del encabezado) ────────────────────
+  /// Cliente de la orden.
+  cliente   String?
+  /// Taller de maquila asignado en la CABECERA de la orden (`Ordenes.IdMaquileros`, resuelto a
+  /// nombre). Es solo el asignado: quien de verdad la trabajó puede ser otro, o varios (ver abajo).
+  maquilero String?
+
+  // ── TODOS los que la trabajaron, en campo abierto (§Post-F9.27) ─────────────
+  //
+  // Daniel (10-ago-2026), corrigiendo la primera versión: *"es importante que vayan todos. Y no
+  // solo el primero. Lo mismo para estampadores. Pero lo puedes poner en un campo abierto, donde
+  // sí pueda encontrarlo, pero no esté ligado a nada."*
+  //
+  // Una orden del viejo pasa por VARIOS talleres: se corta en uno, se cosen partidas en dos o tres
+  // y se estampa en otro. La cabecera solo guarda al primero, así que verla a ella dejaba fuera a
+  // la mayoría. Estas tres columnas concentran los nombres DISTINTOS de cada rol, separados por
+  // " · ", tomados de los movimientos de producción.
+  //
+  // POR QUÉ DUPLICAR lo que ya está en `HistoricoOrdenV1Proceso`: para poder VERLOS en el renglón
+  // del listado y buscarlos sin un subquery por fila. El archivo es INMUTABLE —se llena una vez con
+  // el ETL y no se edita nunca—, así que esta copia no puede desincronizarse: es el caso en el que
+  // desnormalizar no cuesta nada.
+  //
+  // Texto libre, ligado a NADA: son en su mayoría los ~897 talleres que la depuración del catálogo
+  // (§Post-F9.23) dejó fuera, y así siguen fuera.
+
+  /// Cortadores que cortaron la orden; nombres distintos separados por " · ".
+  cortadores    String?
+  /// Talleres de COSTURA por los que pasó (envíos y recibos de maquila).
+  maquileros    String?
+  /// Talleres de ESTAMPADO/aplicación por los que pasó.
+  estampadores  String?
+  /// Marca/etiqueta.
+  etiquetaMarca String? @map("etiqueta_marca")
+  /// Tela de la orden (`IdTelasDis`, resuelto a nombre).
+  tela          String?
+  composicion   String?
+  observaciones String? @db.Text
+
+  /// La orden se canceló en el viejo (`OrdCancelada`). Se conserva: parte de la historia es saber
+  /// qué NO se hizo.
+  cancelada       Boolean @default(false)
+  motivoCancelada String? @map("motivo_cancelada") @db.Text
+
+  /// Suma de la matriz color×talla. Se guarda calculada para poder listar y ordenar sin agregar
+  /// 39,853 celdas en cada consulta.
+  totalPiezas Int @default(0) @map("total_piezas")
+
+  lineas   HistoricoOrdenV1Linea[]
+  procesos HistoricoOrdenV1Proceso[]
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@unique([idEmpresa, idOrdenV1])
+  @@index([idEmpresa, numero])
+  @@index([idModelo])
+  @@index([fecha])
+  @@index([cliente])
+  @@index([maquilero])
+  @@index([maquileros])
+  @@index([estampadores])
+  @@map("historico_orden_v1")
+}
+
+/// Una celda color×talla de una orden histórica (`OrdenesDet` ya despivotado).
+model HistoricoOrdenV1Linea {
+  id       Int              @id @default(autoincrement())
+  idOrden  Int              @map("id_orden")
+  orden    HistoricoOrdenV1 @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  /// Color TAL COMO lo escribió el viejo (texto libre, sin normalizar: ver §Post-F9.26 — adivinar
+  /// equivalencias entre casi 40,000 celdas metería errores silenciosos).
+  color    String
+  /// Etiqueta de talla ya interpretada de la cadena posicional `Ordenes.Tallas` (reusa el lector
+  /// de F2, `migracion/comun/tallas-orden.ts`).
+  talla    String
+  cantidad Int
+
+  @@index([idOrden])
+  @@map("historico_orden_v1_linea")
+}
+
+/// Un movimiento de producción de una orden histórica: quién la cortó, cosió o estampó y cuánto.
+model HistoricoOrdenV1Proceso {
+  id      Int              @id @default(autoincrement())
+  idOrden Int              @map("id_orden")
+  orden   HistoricoOrdenV1 @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  tipo          ProcesoHistoricoV1
+  fecha         DateTime?          @db.Date
+  /// Nombre del cortador/taller/estampador, resuelto al migrar. TEXTO (regla 1 del encabezado).
+  tercero       String?
+  cantidad      Int
+  observaciones String?            @db.Text
+
+  @@index([idOrden])
+  @@index([tercero])
+  @@map("historico_orden_v1_proceso")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// DIRECTORIO HISTÓRICO DE TERCEROS DEL SISTEMA VIEJO (§Post-F9.28)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Daniel (10-ago-2026): *"Al no pasar la información de los maquileros, ¿qué hacemos con la
+// información de ellos si quisiera encontrar algún teléfono o nombre? ¿Habrá manera de mantener la
+// información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en
+// algún otro repositorio que no sea el catálogo de proveedores?"*
+//
+// EL PROBLEMA: la depuración (§Post-F9.23) deja fuera del catálogo ~897 de los 1,052 terceros del
+// Access. Eso es lo que se quería —que no estorben al capturar—, pero su TELÉFONO y su DIRECCIÓN
+// siguen siendo útiles: un taller con el que no se trabaja desde 2021 puede volver a hacer falta.
+//
+// LA RESPUESTA A SU PREGUNTA ES SÍ, y es la misma idea que el archivo de órdenes (§Post-F9.26):
+// **una libreta de direcciones aparte, plana y de solo lectura**. NO es el catálogo `Proveedor`:
+//  • No sale en NINGÚN selector ni buscador de captura (ni telas, ni OC, ni maquila).
+//  • No tiene roles, ni `activo`, ni bandera de factura, ni FK a nada.
+//  • No se le puede dar de alta a nada: si un taller vuelve, se da de alta LIMPIO en el catálogo,
+//    copiando de aquí lo que sirva. Que sea de solo lectura es lo que impide que la basura
+//    depurada se cuele de vuelta por la puerta de atrás.
+//
+// Entran **TODOS** los 1,052 (también los 155 que sí sobrevivieron): así el directorio es la foto
+// completa del Access y nadie tiene que preguntarse en cuál de los dos lados buscar.
+
+/// Un tercero del sistema viejo con sus datos de contacto, para consulta (§Post-F9.28).
+model DirectorioTerceroV1 {
+  id Int @id @default(autoincrement())
+
+  /// De qué catálogo del viejo salió: `Proveedores`, `Cortadores`, `Maquileros` o `Estampadores`.
+  /// TEXTO, no enum: es la procedencia del dato, no una clasificación que el sistema use.
+  fuente  String
+  /// Id que tenía en ESE catálogo. Con `fuente` forma la llave de idempotencia del ETL.
+  idViejo String @map("id_viejo")
+
+  nombre      String
+  /// Clave corta de uso diario del taller (`Maquileros.Corto`).
+  corto       String?
+  razonSocial String? @map("razon_social")
+  telefono    String? @db.Text
+  contacto    String?
+  direccion   String? @db.Text
+  /// `Observaciones` del viejo + lo que no tiene columna propia (condiciones, obs. de pago…).
+  notas       String? @db.Text
+
+  /// Qué hacía, en texto legible ("Costura", "Corte", "Vende telas"…). Informativo: NO son los
+  /// roles del catálogo `RolProveedor`, y no se usan para filtrar nada operativo.
+  servicios String?
+
+  /// Fecha del ÚLTIMO movimiento suyo en el viejo (OC, corte, entrega, recibo o nota). Es lo que
+  /// contesta de un vistazo *"¿hace cuánto que no trabajamos con este?"*. NULL = nunca movió nada.
+  ultimaActividad DateTime? @map("ultima_actividad") @db.Date
+  /// Cuántos documentos suyos hay en el viejo (el peso de la relación, no solo la fecha).
+  documentos      Int       @default(0)
+
+  /// `true` si este tercero SÍ sobrevivió a la depuración y existe en el catálogo `Proveedor`
+  /// (§Post-F9.23). Se guarda calculado para poder decir en la pantalla "este ya está dado de
+  /// alta" sin cruzar por nombre en cada consulta — el cruce por nombre es justo lo frágil.
+  enCatalogo Boolean @default(false) @map("en_catalogo")
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@unique([fuente, idViejo])
+  @@index([nombre])
+  @@index([ultimaActividad])
+  @@map("directorio_tercero_v1")
 }

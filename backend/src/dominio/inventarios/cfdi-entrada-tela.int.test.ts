@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -7,7 +9,12 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { autorizarOC, crearOC } from '../compras/ordenes-compra.js';
 import { leerCfdiParaEntradaTela } from './cfdi-entrada-tela.js';
-import { cancelarEntradaTela, confirmarEntradaTela, crearEntradaTela } from './entradas-tela.js';
+import {
+  actualizarEntradaTela,
+  cancelarEntradaTela,
+  confirmarEntradaTela,
+  crearEntradaTela,
+} from './entradas-tela.js';
 
 /**
  * Integración de LEER LA FACTURA (XML del CFDI) para llenar la entrada de tela (§Post-F9.20).
@@ -68,6 +75,29 @@ function xmlCfdi(opciones: {
   </cfdi:Complemento>
 </cfdi:Comprobante>`;
 }
+
+/**
+ * Servicio de archivos FALSO (en las pruebas no hay R2), **calcado del real en lo que importa**: la
+ * key lleva un **segmento único por subida** (`carpeta/uuid/nombre`, ver `comun/archivos.ts`).
+ *
+ * POR QUÉ ASÍ Y NO `cfdi/<nombre>` (lección del CI del 11-ago-2026): con una key DETERMINISTA, subir
+ * dos veces el mismo XML —que es justo lo que prueba "volver a subir el MISMO XML a la MISMA
+ * entrada"— chocaba con el unique de `Archivo.key` y la prueba fallaba **por el doble**, no por el
+ * sistema (el real nunca colisiona: mete un `randomUUID()` en la key). Un doble que no puede
+ * colisionar esconde colisiones; uno que colisiona donde el real no, inventa fallos.
+ *
+ * Uno solo para TODO el archivo: tres copias divergentes era exactamente el terreno del defecto.
+ */
+const archivosFalsos = {
+  subirContenido: (datos: { nombreOriginal: string; tipoMime: string; carpeta: string }) =>
+    Promise.resolve({
+      bucket: 'pruebas',
+      key: `${datos.carpeta}/${randomUUID()}/${datos.nombreOriginal}`,
+      nombreOriginal: datos.nombreOriginal,
+      tipoMime: datos.tipoMime,
+      tamanoBytes: 100,
+    }),
+} as unknown as Parameters<typeof crearEntradaTela>[3];
 
 /** Crea una OC autorizada con un renglón por tela dada. Devuelve la OC proyectada. */
 async function ocAutorizada(lineas: { idTela: number; cantidad: number; precio: number }[]) {
@@ -312,22 +342,13 @@ describe('Leer el CFDI para la entrada de tela (§Post-F9.20)', () => {
 });
 
 describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
-  /** Servicio de archivos falso: guarda en memoria (no hay R2 en las pruebas). */
-  const archivosFalsos = {
-    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
-      Promise.resolve({
-        bucket: 'pruebas',
-        key: `cfdi/${datos.nombreOriginal}`,
-        nombreOriginal: datos.nombreOriginal,
-        tipoMime: datos.tipoMime,
-        tamanoBytes: 100,
-      }),
-  } as unknown as Parameters<typeof crearEntradaTela>[3];
-
-  /** Captura una entrada CON su XML y devuelve el documento creado. */
+  /**
+   * Captura una entrada CON su XML y devuelve el documento creado. El color se deriva del uuid
+   * (unique `(idTela, nombre)`): así llamarlo dos veces en una prueba nunca choca en el catálogo.
+   */
   async function capturarConXml(uuid: string, valorUnitario = 92) {
     const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Marino' },
+      data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
     });
     return crearEntradaTela(
       sesion(),
@@ -369,6 +390,57 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     expect(cargos[0]?.refTipo).toBe('entrada-tela');
     expect(cargos[0]?.refId).toBe(entrada.id);
     expect(cargos[0]?.idArchivoCfdi).not.toBeNull();
+    // El RFC del EMISOR viaja al cargo, igual que en una importación de CFDI de F9: es lo que el
+    // reporte fiscal del contador imprime (sin él salía "—" según por dónde hubiera entrado).
+    expect(cargos[0]?.rfcTercero).toBe('TNO850101BBB');
+  });
+
+  it('un cargo FISCAL sin RFC del emisor NO se confirma: la última red falla CERRADA', async () => {
+    // Hoy este estado es inalcanzable —el mismo sello escribe `totalCfdi` y `rfcCfdi` juntos—, así
+    // que se fabrica a mano tocando la fila. Es justo lo que la red existe para atajar: si mañana
+    // apareciera un camino que sella sin RFC, el cargo fiscal nacería a nombre de nadie y el UUID
+    // quedaría consumido para siempre. Una comprobación que no puede comprobar no deja pasar (A4).
+    const entrada = await capturarConXml('abababab-abab-abab-abab-abababababab');
+    await cliente.entradaTela.update({ where: { id: entrada.id }, data: { rfcCfdi: null } });
+
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(/RFC/);
+    // Y nada quedó a medias: sin cargo, y la entrada sigue en borrador.
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.estatus).toBe('borrador');
+  });
+
+  it('NO se puede confirmar si Finanzas importó esa MISMA factura mientras tanto', async () => {
+    const uuid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+    const entrada = await capturarConXml(uuid);
+    // Entre el guardado y la confirmación (pueden pasar días), alguien importa el CFDI a CxP: la
+    // unique global del UUID reventaría con un P2002 opaco y la TELA no podría entrar al almacén.
+    await cliente.movimientoTercero.create({
+      data: {
+        idEmpresa: empresa.id,
+        folio: 1n,
+        tipoTercero: 'proveedor',
+        idProveedor: proveedor.id,
+        fecha: new Date('2026-08-05T00:00:00.000Z'),
+        origen: 'factura_proveedor',
+        monto: 920,
+        esFiscal: true,
+        uuidCfdi: uuid,
+      },
+    });
+
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /ya está registrada en Cuentas por pagar/,
+    );
+    // …y el mensaje dice la ÚNICA salida que de verdad existe. La anterior proponía dos caminos
+    // imposibles ("cancela el movimiento en Finanzas" no libera el UUID —la unique es global y el
+    // inverso no lo suelta— y "quítale la factura" ya no se puede: el uuid salió del PUT).
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /CANCELA este borrador/,
+    );
+    // Y la entrada sigue en borrador (la transacción no dejó nada a medias).
+    const despues = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(despues.estatus).toBe('borrador');
   });
 
   it('cancelar la entrada cancela el cargo por su INVERSO (nunca lo borra, D3)', async () => {
@@ -406,6 +478,44 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     expect(await cliente.movimientoTercero.count()).toBe(0);
   });
 
+  it('RECHAZA subir un XML a un proveedor SIN RFC capturado (con los migrados era un NO-OP)', async () => {
+    // El caso REAL del día 1: los 155 proveedores que sobreviven a la depuración (§Post-F9.23)
+    // vienen del Access con TODO lo fiscal en 0 %, así que ninguno tiene RFC. Cuando la comparación
+    // "el emisor debe ser el proveedor" solo corría *si el proveedor tenía RFC*, se podía leer el
+    // XML de "Textiles del Norte", elegir a mano a este otro y confirmar → cargo FISCAL contra
+    // quien no facturó, con el RFC del emisor pegado. Ahora se corta al guardar.
+    const migrado = await cliente.proveedor.create({
+      data: { nombre: 'Avios del Centro (migrado)' }, // rfc NULL, factura NULL (no-definida)
+    });
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Arena' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A-77',
+          idProveedor: migrado.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          xmlCfdi: xmlCfdi({
+            emisorRfc: 'TNO850101BBB',
+            receptorRfc: 'FRM900101AAA',
+            uuid: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
+            conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
+          }),
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/no tiene RFC capturado/);
+    // Nada quedó escrito: ni la entrada, ni el cargo, ni el UUID consumido.
+    expect(await cliente.entradaTela.count()).toBe(0);
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+  });
+
   it('rechaza el XML de un emisor que NO es el proveedor de la entrada', async () => {
     const otro = await cliente.proveedor.create({
       data: { nombre: 'Otro Proveedor', rfc: 'OTR990101ZZZ' },
@@ -439,18 +549,6 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
 });
 
 describe('Proveedor que NO factura (§Post-F9.22)', () => {
-  /** Servicio de archivos falso (idéntico al del bloque de arriba: aquí no hay R2). */
-  const archivosFalsos = {
-    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
-      Promise.resolve({
-        bucket: 'pruebas',
-        key: `cfdi/${datos.nombreOriginal}`,
-        nombreOriginal: datos.nombreOriginal,
-        tipoMime: datos.tipoMime,
-        tamanoBytes: 100,
-      }),
-  } as unknown as Parameters<typeof crearEntradaTela>[3];
-
   /** Un tercero informal: da de alta con la casilla "¿Emite factura?" en NO. */
   async function proveedorInformal() {
     return cliente.proveedor.create({
@@ -631,6 +729,35 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
+  it('RECHAZA tambien el UUID SUELTO (folio fiscal sin XML): era la puerta del doble cargo', async () => {
+    // Sin XML pero con folio fiscal tecleado, el alta no pasaba por esta guarda: al confirmar nacía
+    // un cargo NO fiscal (por precios capturados) SIN el uuid en el `MovimientoTercero`, y Finanzas
+    // podía importar después ese mismo CFDI — dos cargos por la misma factura.
+    const informal = await cliente.proveedor.create({
+      data: { nombre: 'Informal con folio', factura: false },
+    });
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Verde' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'remision',
+          numeroDocumento: 'NOTA-36',
+          idProveedor: informal.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          uuidCfdi: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/NO emite factura/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
   it('leer un CFDI de un proveedor marcado "no factura" AVISA para corregir el catálogo', async () => {
     await cliente.proveedor.update({
       where: { id: proveedor.id },
@@ -649,5 +776,264 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
       bd(),
     );
     expect(propuesta.avisos.some((a) => /NO emite factura/.test(a))).toBe(true);
+  });
+});
+
+describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21)', () => {
+  const UUID = 'f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1';
+
+  /**
+   * Captura un borrador CON su XML y devuelve el documento y el color usado.
+   *
+   * El COLOR se deriva del uuid: hay pruebas que llaman a este helper DOS veces (dos entradas con
+   * facturas distintas) y `TelaColor` tiene unique `(idTela, nombre)` — con el nombre fijo, la
+   * segunda llamada reventaba en el `create` y la prueba fallaba antes de llegar a lo que verifica.
+   */
+  async function borradorConFactura(uuid = UUID) {
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
+    });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A1045',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-05',
+        idAlmacen: almacen.id,
+        xmlCfdi: xmlCfdi({
+          emisorRfc: 'TNO850101BBB',
+          receptorRfc: 'FRM900101AAA',
+          uuid,
+          conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
+        }),
+        lineas: [{ idTelaColor: color.id, cantidad: 10, precioUnit: 92 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    return { entrada, idTelaColor: color.id };
+  }
+
+  it('editar SIN volver a subir el XML conserva el sello, y la CxP sí nace al confirmar', async () => {
+    const { entrada, idTelaColor } = await borradorConFactura();
+
+    // Así edita la pantalla un borrador: cabecera + renglones, sin el XML (que ya está guardado).
+    const editada = await actualizarEntradaTela(
+      sesion(),
+      entrada.id,
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A1045',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-05',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor, cantidad: 12, precioUnit: 92 }],
+      },
+      bd(),
+    );
+
+    expect(editada.uuidCfdi).toBe(UUID);
+    expect(editada.totalCfdi).toBe(920);
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.idArchivoCfdi).not.toBeNull();
+    expect(enBd.rfcCfdi).toBe('TNO850101BBB');
+
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    const cargos = await cliente.movimientoTercero.findMany();
+    expect(cargos).toHaveLength(1);
+    expect(cargos[0]?.esFiscal).toBe(true);
+    expect(Number(cargos[0]?.monto)).toBe(920);
+    expect(cargos[0]?.rfcTercero).toBe('TNO850101BBB');
+  });
+
+  it('editar NO puede cambiar el proveedor dejando amarrada la factura de otro', async () => {
+    const { entrada, idTelaColor } = await borradorConFactura();
+    const otro = await cliente.proveedor.create({
+      data: { nombre: 'Avios del Centro', rfc: 'ACE010101QQQ' },
+    });
+
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A1045',
+          idProveedor: otro.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/quedaría a nombre del proveedor/);
+
+    // Nada cambió: ni el proveedor ni el sello.
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.idProveedor).toBe(proveedor.id);
+    expect(enBd.uuidCfdi).toBe(UUID);
+  });
+
+  it('editar tampoco puede pasársela a un proveedor SIN RFC (el hueco de los migrados)', async () => {
+    // Mismo agujero que al dar de alta, por la otra puerta: el sello ya está guardado y la edición
+    // solo cambia el proveedor. Como el migrado no tiene RFC, la comparación contra `rfcCfdi` se
+    // saltaba sola y al confirmar nacía el cargo FISCAL contra él, con el RFC de Textiles del Norte.
+    const { entrada, idTelaColor } = await borradorConFactura();
+    const migrado = await cliente.proveedor.create({
+      data: { nombre: 'Avios del Centro (migrado)' }, // rfc NULL
+    });
+
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A1045',
+          idProveedor: migrado.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no tiene RFC capturado/);
+
+    // El documento sigue con su proveedor y su sello intactos.
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.idProveedor).toBe(proveedor.id);
+    expect(enBd.uuidCfdi).toBe(UUID);
+  });
+
+  it('editar tampoco puede dejársela a un proveedor que NO factura', async () => {
+    const { entrada, idTelaColor } = await borradorConFactura();
+    const informal = await cliente.proveedor.create({
+      data: { nombre: 'Talleres Don Chuy', factura: false },
+    });
+
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'remision',
+          numeroDocumento: 'NOTA-9',
+          idProveedor: informal.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/NO emite factura/);
+  });
+
+  it('editar CON un XML nuevo re-sella (y pasa por las MISMAS guardas del alta)', async () => {
+    const { entrada, idTelaColor } = await borradorConFactura();
+    const uuidNuevo = 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2';
+
+    const editada = await actualizarEntradaTela(
+      sesion(),
+      entrada.id,
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A1046',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-05',
+        idAlmacen: almacen.id,
+        xmlCfdi: xmlCfdi({
+          emisorRfc: 'TNO850101BBB',
+          receptorRfc: 'FRM900101AAA',
+          uuid: uuidNuevo,
+          conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 5, valorUnitario: 100 }],
+        }),
+        lineas: [{ idTelaColor, cantidad: 5, precioUnit: 100 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+
+    expect(editada.uuidCfdi).toBe(uuidNuevo);
+    expect(editada.totalCfdi).toBe(500); // el total lo dice el XML, nunca el cliente
+
+    // Y el XML de OTRO emisor se sigue rechazando al editar, igual que al dar de alta.
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A1047',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          xmlCfdi: xmlCfdi({
+            emisorRfc: 'XXX010101YYY',
+            receptorRfc: 'FRM900101AAA',
+            uuid: 'f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3',
+            conceptos: [{ descripcion: 'FELPA', cantidad: 1, valorUnitario: 1 }],
+          }),
+          lineas: [{ idTelaColor, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/la entrada es del proveedor/);
+  });
+
+  it('re-sellar con el XML de una factura YA capturada en otra entrada da conflicto legible', async () => {
+    const primera = await borradorConFactura();
+    const segunda = await borradorConFactura('f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4');
+
+    await expect(
+      actualizarEntradaTela(
+        sesion(),
+        segunda.entrada.id,
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A1045',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-05',
+          idAlmacen: almacen.id,
+          xmlCfdi: xmlCfdi({
+            emisorRfc: 'TNO850101BBB',
+            receptorRfc: 'FRM900101AAA',
+            uuid: UUID, // el de la PRIMERA entrada
+            conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
+          }),
+          lineas: [{ idTelaColor: segunda.idTelaColor, cantidad: 10, precioUnit: 92 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/ya se capturó en la entrada/);
+    expect(primera.entrada.uuidCfdi).toBe(UUID);
+  });
+
+  it('volver a subir el MISMO XML a la MISMA entrada no se toma por duplicado', async () => {
+    const { entrada, idTelaColor } = await borradorConFactura();
+
+    const editada = await actualizarEntradaTela(
+      sesion(),
+      entrada.id,
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A1045',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-05',
+        idAlmacen: almacen.id,
+        xmlCfdi: xmlCfdi({
+          emisorRfc: 'TNO850101BBB',
+          receptorRfc: 'FRM900101AAA',
+          uuid: UUID,
+          conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
+        }),
+        lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    expect(editada.uuidCfdi).toBe(UUID);
   });
 });

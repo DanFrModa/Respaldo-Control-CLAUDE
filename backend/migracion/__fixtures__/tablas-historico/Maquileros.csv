@@ -1,0 +1,5 @@
+IdMaquileros,Corto,Nombre,Apellidos,Telefonos,Direccion,Observaciones,ObsPago,Costura,Proceso
+20,TSOSA,Taller,Sosa,5555-2222,Calle 1,,,1,0
+21,MONT,,,5555-3333,Calle 2,Solo tiene clave corta,,1,0
+22,,,,,,,,1,0
+30,BORD,Bordados,SA,5555-4444,Calle 3,,,0,1

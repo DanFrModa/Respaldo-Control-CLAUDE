@@ -2202,3 +2202,155 @@ informales.
 ### Nota de despliegue (para Gabriel)
 
 **Sin migración, sin permisos nuevos, sin seed** → no hace falta `SEED_ON_START`.
+
+## De qué orden salió lo que hay en el almacén de PT (10-ago-2026)
+
+El inventario de producto terminado arranca **desde cero**, con el conteo físico. Pero las prendas
+que están en el anaquel las fabricaron órdenes **viejas**, que no se migran (la migración lleva solo
+2025-2026).
+
+Por eso, al capturar un movimiento de PT ahora hay un campo **"Orden de Control viejo"**: escribes
+el número tal como aparece en Control viejo y queda guardado con esas prendas, para que después
+puedas ir a consultar allá la información de esa orden.
+
+- Se captura **una vez por movimiento** (cuentas un lote de una orden, lo capturas, y listo). Si un
+  lote mezcla dos órdenes, haz dos movimientos.
+- **No parte tu inventario.** Si cuentas el mismo modelo/color/talla con dos órdenes distintas, sigue
+  siendo el mismo inventario: el número de orden es una nota para consultar, no una división del
+  stock.
+- **Se ve en el kardex**, en la columna de orden, marcado como "(Control viejo)" para no confundirlo
+  con las órdenes del sistema nuevo.
+
+### Los modelos SÍ van a estar
+
+No hace falta capturar a mano números de modelo ni descripciones: **los 4,987 modelos de Control
+migran completos**, con su descripción, y los colores y las tallas también. El corte de 2025-2026 es
+para los **documentos** (pedidos, órdenes, compras), no para los catálogos. Al contar una prenda de
+2019, el modelo está ahí para escogerlo.
+
+## Archivo de órdenes: la producción vieja, para consultar (10-ago-2026)
+
+> *"Me gustaría tenerlas también como archivo histórico de órdenes… para poder buscar por cliente,
+> número de modelo, tipo de prenda, fecha de producción, maquilero, etc."* — Daniel
+
+Está en **Producción › Archivo de órdenes**. Son las **5,451 órdenes** del sistema anterior —todas,
+sin faltar ninguna—, con sus **39,853** cantidades por color y talla y sus **35,296** movimientos de
+producción.
+
+### Qué puedes buscar
+
+Cliente, maquilero, tipo de prenda, rango de fechas — y una caja libre donde puedes teclear el
+número de orden, el código del modelo o el cliente.
+
+Lo del **taller** tiene un detalle importante: **salen todos, no solo el primero**. En el sistema
+viejo una orden pasa por varios talleres — se corta en uno, se cosen partidas en dos o tres, y se
+estampa en otro —, pero la orden solo guardaba al que tenía asignado. Ahora el archivo concentra
+**todos** los que la trabajaron, y el buscador los encuentra a cualquiera de ellos.
+
+En la lista ves los talleres de **costura** (que es lo que se busca a diario); al abrir la orden ves
+los tres renglones completos: **Cortaron · Cosieron · Estamparon**.
+
+### Qué ves al abrir una orden
+
+Le das clic al número y se abre la ficha: modelo, tipo de prenda, cliente, tela, composición, la
+**matriz completa de colores y tallas** con sus cantidades, y **quién la trabajó** — cortador, taller
+de costura y estampador, cada uno con lo que cortó, entregó o recibió.
+
+### Lo que NO se puede
+
+**Nada se edita.** No hay botón de "Nueva", ni de editar, ni de borrar. Es un archivo: se mira y ya.
+Tampoco alimenta inventarios, costos ni ruta crítica — es información muerta, a propósito.
+
+### Dos cosas que vas a notar
+
+- **Los colores se ven como los escribieron.** Vas a encontrar "MARINO", "Marino" y "MAR." como
+  cosas distintas, porque en el viejo era texto libre. No los junté: adivinar equivalencias entre
+  casi 40 mil renglones es la clase de cosa que mete errores que nadie nota.
+- **Los maquileros aparecen escritos, no como catálogo.** Es a propósito: así los ~897 talleres con
+  los que ya no trabajas no vuelven a llenar el catálogo que acabamos de depurar.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (3 tablas nuevas) y **cero permisos nuevos** → **no** hace falta
+`SEED_ON_START`. El archivo se llena corriendo, después de `etl-catalogos`:
+`npx tsx --env-file=.env migracion/etl-historico-ordenes.ts` (idempotente, se puede repetir).
+
+## Directorio histórico: los teléfonos que no se perdieron (10-ago-2026)
+
+> *"Al no pasar la información de los maquileros, ¿qué hacemos con la información de ellos si
+> quisiera encontrar algún teléfono o nombre?… ¿Podríamos guardarlo en algún otro repositorio que no
+> sea el catálogo de proveedores?"* — Daniel
+
+Sí. Está en **Catálogos › Directorio histórico**, al lado del catálogo de proveedores pero **fuera**
+de él.
+
+Son los **1,052 terceros** del sistema anterior —los 155 que se quedaron y los ~897 que se
+depuraron— con su **teléfono, contacto, dirección y notas**. Puedes buscar por nombre, por clave
+corta, por contacto **y por teléfono** (a veces tienes el número y quieres saber de quién es).
+
+### Lo que te dice de cada uno
+
+Además del contacto, **cuándo fue la última vez que trabajó** y **cuántos documentos** tuvo. Eso es
+lo que de verdad decide si vale la pena volver a llamarlo: no es lo mismo un taller que te hizo 47
+órdenes hasta 2021 que uno que te hizo una en 2009.
+
+El filtro **"Solo los que ya no están"** te deja ver exactamente a los que se depuraron.
+
+### Lo que NO tiene, a propósito
+
+**No hay botón de "pasar al catálogo".** Si un taller regresa, lo das de alta **limpio** en
+Proveedores copiando de aquí lo que sirva. Ese botón sería justo la puerta por la que volvería toda
+la basura que acabamos de sacar — no ponerlo es la decisión, no un pendiente.
+
+Tampoco aparece en ningún selector cuando capturas: no lo vas a encontrar al hacer una orden de
+compra ni al enviar a maquila. Solo aquí, cuando lo busques.
+
+### Nota de despliegue (para Gabriel)
+
+Una migración **aditiva** (una tabla) y **cero permisos nuevos**. Se llena con el **mismo** ETL del
+archivo de órdenes: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts`.
+
+## En el archivo están TODAS las órdenes, incluidas las de las empresas viejas (11-ago-2026)
+
+> *"Sí, está bien, rescata todas y solo pon en algún lugar la empresa a la que correspondía."* —
+> Daniel
+
+El archivo cargaba **3,923** de las 5,451 órdenes. Faltaban **1,528**: las de las **seis empresas
+viejas** del sistema anterior (MJD, Zipora, Skintex, Free Ride, Corporativo MJD y Marilyn), que no
+existen en el sistema nuevo. Y eran justamente **las más viejas**: 1,523 de ellas son de **2005 a
+2012**, que es la historia que un archivo de consulta existe para guardar.
+
+**Ahora están todas.** Las de esas empresas se guardaron bajo **FR Moda** —tenían que colgar de una
+empresa que exista para poder verse—, pero **no se perdió de quién eran**: cada orden trae escrita
+la empresa a la que pertenecía.
+
+- **Al abrir una orden** ves el dato *Empresa (Control viejo)* con el nombre tal cual venía.
+- **En la caja de búsqueda** puedes teclear el nombre de la empresa vieja (por ejemplo *Zipora*) y te
+  trae todas sus órdenes. Es la forma de volver a mirar la historia de una empresa completa.
+- No lo puse como columna de la lista porque ya son ocho y casi siempre es el mismo valor; en la
+  ficha está siempre a la vista.
+- Las órdenes que ya estaban bien **no se movieron**: cada una se queda con su empresa.
+
+### Nota de despliegue (para Gabriel)
+
+La migración del archivo se **regeneró** con la columna nueva (no había corrido en ningún ambiente),
+así que sigue siendo **una sola migración aditiva** y **cero permisos nuevos** → **no** hace falta
+`SEED_ON_START`. El ETL es el mismo de siempre:
+`npx tsx --env-file=.env migracion/etl-historico-ordenes.ts`.
+
+## Al leer una factura de un proveedor que no reconoce, la pantalla ya dice qué hacer (11-ago-2026)
+
+Cuando subes el XML de una factura y **ningún proveedor del catálogo tiene ese RFC**, antes el aviso
+decía *"elige el proveedor a mano"* — y eso no funcionaba nunca: para recibir con factura, el RFC de
+quien la emitió tiene que coincidir con el del proveedor, y hoy **ningún proveedor traído de Control
+viejo tiene RFC capturado**. Elegías uno, guardabas, y salía un error.
+
+Ahora la pantalla dice la ruta que sí sirve:
+
+- Un aviso claro con el RFC que no reconoció, y qué hacer: **capturarle ese RFC al proveedor** en
+  *Catálogos › Proveedores* (o darlo de alta con él) y **volver a leer la factura**.
+- El selector de proveedor queda **quieto** mientras eso pase, para no invitarte a un intento que
+  termina en error.
+- Y hay un botón **"Quitar la factura leída"**: si prefieres capturar esa entrada sin factura, lo
+  aprietas y sigues — **los renglones que ya capturaste se conservan**. Antes, una vez leído el XML
+  la única salida era recargar la pantalla y perder el trabajo.

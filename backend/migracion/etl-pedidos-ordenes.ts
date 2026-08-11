@@ -34,6 +34,7 @@ import { calcularCuadreF2, formatearCuadreF2 } from './cuadre-f2.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import { cargarComentariosOrden } from './loaders/comentarios-orden.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarOrdenes } from './loaders/ordenes.js';
 import { cargarPedidos } from './loaders/pedidos.js';
 import { cargarPedidosReales } from './loaders/pedidos-reales.js';
@@ -83,9 +84,17 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   const reporte = new Reporte();
 
   console.log('ETL de pedidos y órdenes F2-E5 — inicio');
+  // §Post-F9.24: la ventana se imprime SIEMPRE, aunque no recorte, para que quede claro qué se
+  // migró en esta corrida.
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const pedidos = await cargarPedidos(sesion, cliente, reporte);
   log('Pedidos', pedidos.pedidos);
+  if (pedidos.fueraVentana > 0) {
+    console.log(`    (fuera de la ventana: ${String(pedidos.fueraVentana)} pedidos)`);
+  }
   log('PedidoLinea', pedidos.lineas);
 
   const reales = await cargarPedidosReales(sesion, cliente, reporte);
@@ -101,6 +110,11 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   console.log(
     `    (colores creados al vuelo=${String(ordenes.coloresCreados)} tallas creadas al vuelo=${String(ordenes.tallasCreadas)})`,
   );
+  if (ordenes.fueraVentana > 0) {
+    console.log(
+      `    (fuera de la ventana: ${String(ordenes.fueraVentana)} órdenes — y con ellas su corte, envíos, recibos, RC, auditorías y costos)`,
+    );
+  }
 
   log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte));
 

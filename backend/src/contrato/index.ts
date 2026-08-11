@@ -2007,3 +2007,26 @@ export {
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';
+
+// ── Archivo histórico de órdenes del sistema viejo (§Post-F9.26, solo lectura) ────────────────────
+export {
+  PROCESOS_HISTORICOS,
+  esquemaHistoricoOrdenesQuery,
+  esquemaHistoricoOrdenResumen,
+  esquemaHistoricoOrdenesPagina,
+  esquemaHistoricoOrdenDetalle,
+  type DatosHistoricoOrdenesQuery,
+  type HistoricoOrdenResumen,
+  type HistoricoOrdenesPagina,
+  type HistoricoOrdenDetalle,
+} from './esquemas/historico-ordenes.js';
+
+// ── Directorio histórico de terceros del sistema viejo (§Post-F9.28, solo lectura) ────────────────
+export {
+  esquemaDirectorioTercerosQuery,
+  esquemaDirectorioTercero,
+  esquemaDirectorioTercerosPagina,
+  type DatosDirectorioTercerosQuery,
+  type DirectorioTercero,
+  type DirectorioTercerosPagina,
+} from './esquemas/directorio-terceros.js';

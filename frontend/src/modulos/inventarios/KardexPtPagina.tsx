@@ -152,7 +152,13 @@ function KardexPorModelo(): React.JSX.Element {
                   </TablaDensaCelda>
                   <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
                   <TablaDensaCelda className="text-muted-foreground">
-                    {r.folioOrden === null ? 'Sin orden' : `#${String(r.folioOrden)}`}
+                    {/* La orden de v2 si existe; si no, el nº de Control viejo (§Post-F9.25), que es
+                        lo que hay para el inventario de arranque. */}
+                    {r.folioOrden !== null
+                      ? `#${String(r.folioOrden)}`
+                      : r.numOrdenV1 !== null && r.numOrdenV1 !== ''
+                        ? `${r.numOrdenV1} (Control viejo)`
+                        : 'Sin orden'}
                   </TablaDensaCelda>
                   <TablaDensaCelda>{r.color}</TablaDensaCelda>
                   <TablaDensaCelda>{r.etiquetaTalla}</TablaDensaCelda>

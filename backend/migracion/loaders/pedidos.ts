@@ -34,12 +34,15 @@ import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFechaSoloDia, parsearBandera } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Resultado del loader de pedidos: pedidos + renglones (para el log/cuadre). */
 export interface ResultadoPedidos {
   pedidos: ResultadoLoader;
   lineas: ResultadoLoader;
+  /** # de pedidos excluidos por la ventana temporal (§Post-F9.24). Listados en el reporte. */
+  fueraVentana: number;
 }
 
 /** Renglón crudo de `PedidosDet` ya parseado (sin el idModelo resuelto). */
@@ -94,7 +97,18 @@ export async function cargarPedidos(
 
   // Cada pedido + sus renglones es una unidad INDEPENDIENTE → carga concurrente acotada (con
   // reintento ante cortes transitorios; la unidad es idempotente por (idEmpresa, folio)).
-  const filas = leerCsv('Pedidos.csv');
+  // §Post-F9.24 — la migración lleva solo 2025-2026 (Daniel/Gabriel, 10-ago-2026). El recorte va
+  // ANTES de procesar: lo anterior al corte ni se toca, y sale listado en el reporte.
+  const ventana = resolverVentana();
+  const { dentro: filas, fuera: fueraVentana } = filtrarPorVentana(
+    leerCsv('Pedidos.csv'),
+    // `FechaPedido` es la fecha del documento (`FechaElaboracion` es cuándo se capturó).
+    'FechaPedido',
+    ventana,
+    reporte,
+    'Pedidos',
+    (f) => `IdPedidos=${f.IdPedidos ?? '?'}`,
+  );
   const contribs = await enLotes(
     filas,
     (f): Promise<ContribPedido> =>
@@ -135,7 +149,7 @@ export async function cargarPedidos(
     lineas.omitidos += c.lineasOmitidas;
   }
 
-  return { pedidos, lineas };
+  return { pedidos, lineas, fueraVentana };
 }
 
 /** Mapeos de F1 que necesita cada pedido (clave vieja → id nuevo). */

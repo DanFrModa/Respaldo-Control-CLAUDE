@@ -83,6 +83,12 @@ interface Celda {
   idColor: number;
   idTalla: number;
   cantidad: number;
+  /**
+   * Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25). Se captura por COLOR
+   * (un color de un modelo salió de una orden) y viaja a cada celda de ese color. Informativo: no
+   * entra en la llave de existencia ni en los locks de no-negativo.
+   */
+  numOrdenV1?: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
@@ -110,7 +116,13 @@ function aplanarYValidar(lineas: DatosMovPtLineaEntrada[]): Celda[] {
         throw new ErrorValidacion('Las cantidades deben ser enteros ≥ 0.');
       }
       if (t.cantidad > 0) {
-        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+        celdas.push({
+          idColor: linea.idColor,
+          idTalla: t.idTalla,
+          cantidad: t.cantidad,
+          // El nº de orden vieja se captura por color y se replica a sus tallas.
+          numOrdenV1: linea.numOrdenV1 ?? null,
+        });
       }
     }
   }
@@ -127,6 +139,8 @@ function aLineasMotor(idModelo: number, celdas: Celda[]): LineaMovimientoPt[] {
     idColor: c.idColor,
     idTalla: c.idTalla,
     cantidad: c.cantidad,
+    // §Post-F9.25 — de qué orden VIEJA salieron estas prendas (solo consulta).
+    numOrdenV1: c.numOrdenV1 ?? null,
   }));
 }
 
@@ -696,6 +710,7 @@ export async function kardexPt(
       idColor: true,
       idTalla: true,
       idOrden: true,
+      numOrdenV1: true,
       cantidad: true,
       color: { select: { nombre: true } },
       talla: { select: { etiqueta: true } },
@@ -750,6 +765,7 @@ export async function kardexPt(
       etiquetaTalla: d.talla.etiqueta,
       idOrden: d.idOrden,
       folioOrden: d.orden === null ? null : Number(d.orden.folio),
+      numOrdenV1: d.numOrdenV1,
       entrada,
       salida,
       saldo,

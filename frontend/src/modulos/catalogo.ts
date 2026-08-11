@@ -362,6 +362,16 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             subVista: true,
           },
           {
+            clave: 'archivo-ordenes',
+            titulo: 'Archivo de órdenes',
+            descripcion:
+              'Producción del sistema anterior (solo consulta): busca por cliente, modelo, tipo de prenda, fecha o maquilero',
+            ruta: '/produccion/archivo-ordenes',
+            icono: 'lista-tareas',
+            permisos: ['ordenes.ver'],
+            subVista: true,
+          },
+          {
             clave: 'corte-semanal',
             titulo: 'Corte semanal',
             descripcion: 'Piezas cortadas por cortador y por semana',
@@ -837,6 +847,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         ruta: '/catalogos/proveedores',
         icono: 'camion',
         permisos: 'autenticado',
+      },
+      {
+        clave: 'directorio-historico',
+        titulo: 'Directorio histórico',
+        descripcion:
+          'Teléfonos y direcciones de los terceros del sistema anterior (solo consulta; NO es el catálogo)',
+        ruta: '/catalogos/directorio-historico',
+        icono: 'camion',
+        permisos: ['proveedores.ver'],
       },
     ],
   },

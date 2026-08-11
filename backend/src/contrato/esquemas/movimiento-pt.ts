@@ -37,6 +37,20 @@ const esquemaMovPtLinea = z.object({
     .array(esquemaMovPtTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
     .describe('Cantidades por talla de este color.'),
+  /**
+   * Número de la orden de producción del SISTEMA VIEJO que fabricó estas prendas (§Post-F9.25).
+   * Es TEXTO libre y opcional a propósito: el conteo inicial de PT es de prendas hechas por órdenes
+   * que NO se migraron (la migración lleva solo 2025-2026), así que no hay llave a la que apuntar —
+   * se guarda el número para poder consultarlo en Control viejo. NO afecta la existencia.
+   */
+  numOrdenV1: z
+    .string()
+    .trim()
+    .max(40, { error: 'El número de orden no puede pasar de 40 caracteres' })
+    .optional()
+    .describe(
+      'Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia).',
+    ),
 });
 
 /** La matriz color×talla de un movimiento (al menos un color). */
@@ -341,6 +355,10 @@ const esquemaKardexPtRenglon = z.object({
     .nullable()
     .describe('Orden de producción del renglón, o null (bucket sin orden).'),
   folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
+  numOrdenV1: z
+    .string()
+    .nullable()
+    .describe('Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25), o null.'),
   entrada: z.number().int().describe('Piezas que entran en este renglón (0 si es salida).'),
   salida: z.number().int().describe('Piezas que salen en este renglón (0 si es entrada).'),
   saldo: z.number().int().describe('Saldo corrido del artículo tras este movimiento.'),

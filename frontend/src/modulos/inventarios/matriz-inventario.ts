@@ -15,16 +15,30 @@ export function totalMatriz(lineas: readonly MatrizLinea[]): number {
   );
 }
 
-/** Convierte la matriz de captura al cuerpo `lineas` que espera el API (descartando ceros). */
+/**
+ * Convierte la matriz de captura al cuerpo `lineas` que espera el API (descartando ceros).
+ *
+ * `numOrdenV1` (§Post-F9.25) es el nº de la orden del sistema VIEJO que fabricó estas prendas. El
+ * API lo recibe POR COLOR, pero la pantalla lo captura UNA vez por movimiento y lo replica: en el
+ * conteo inicial se cuenta un lote de una orden a la vez, y pedirlo color por color sería teclear lo
+ * mismo N veces. Si un movimiento mezclara dos órdenes, se capturan dos movimientos.
+ */
 export function aLineasApi(
   lineas: readonly MatrizLinea[],
-): { idColor: number; tallas: { idTalla: number; cantidad: number }[] }[] {
+  numOrdenV1?: string,
+): {
+  idColor: number;
+  tallas: { idTalla: number; cantidad: number }[];
+  numOrdenV1?: string;
+}[] {
+  const ref = (numOrdenV1 ?? '').trim();
   return lineas
     .map((l) => ({
       idColor: l.idColor,
       tallas: Object.entries(l.cantidades)
         .map(([idTalla, cantidad]) => ({ idTalla: Number(idTalla), cantidad }))
         .filter((t) => t.cantidad > 0),
+      ...(ref === '' ? {} : { numOrdenV1: ref }),
     }))
     .filter((l) => l.tallas.length > 0);
 }

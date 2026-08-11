@@ -42,6 +42,9 @@ npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv
 npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-historicos # F9: importación masiva de CFDI (XML)
 npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
 
+# Post-F9 (archivo histórico de órdenes + directorio de terceros) — ⚠️ DESPUÉS de `etl-catalogos`:
+npx tsx --env-file=.env migracion/etl-historico-ordenes.ts # §Post-F9.26/27/29: las 5,451 órdenes viejas + §Post-F9.28: la libreta de terceros
+
 # ⚠️ AL FINAL DE TODA CARGA/RECARGA (obligatorio, ver abajo):
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone al día el estado completa/incompleta
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opcional) simula: reporta sin escribir
@@ -136,6 +139,41 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 > (default **0 = sin recorte**, anclada a `ETL_VENTANA_REF`=hoy) si quieres recortar por antigüedad
 > además del recorte por empresa. Cada corrida escribe `reporte-etl-f4e6-{compras,telas}-*.txt`.
 
+> **Post-F9 (archivo histórico + directorio de terceros — importante):** `etl-historico-ordenes` es
+> **lo único del ETL que IGNORA la ventana de años** (`ETL_DESDE`): existe justamente para guardar lo
+> que la ventana deja fuera. Carga **las 5,451 órdenes** del viejo con su matriz color×talla y sus
+> movimientos (80,600 renglones), planas y de **solo lectura**, más la **libreta de terceros**
+> (§Post-F9.28). Las órdenes de las **6 empresas que no migran** se **rescatan** colgadas de la
+> empresa principal, con su empresa original escrita en `empresaV1` (§Post-F9.29).
+> **⚠️ VA DESPUÉS DE `etl-catalogos`** (necesita los mapeos de Empresa y Modelo): si se corre antes,
+> TODAS las órdenes se cargarían como rescatadas —bajo una sola empresa— y sin modelo ligado, y
+> **re-correrlo NO lo repara** (la idempotencia nunca reescribe la cabecera: habría que vaciar las
+> tres tablas). Por eso el loader **se niega a arrancar** si no hay mapeos de empresa. Es idempotente
+> y re-correrlo **completa** lo que una corrida interrumpida dejó a medias.
+
+> **⭐ LA MIGRACIÓN LLEVA SOLO 2025-2026 (§Post-F9.24 — Daniel/Gabriel, 10-ago-2026).** Exporta
+> **`ETL_DESDE=2025`** antes de correr CUALQUIER ETL: fija el corte al 1-ene-2025 y con él se recortan
+> pedidos, órdenes (y con ellas todo lo que les cuelga: corte, envíos, recibos, RC, auditorías,
+> costos), OC, notas y telas, **y también el catálogo de proveedores**. Un solo interruptor para que
+> nada quede desalineado. Gana sobre `ETL_VENTANA_ANIOS`. Sin la variable NO recorta (se migra todo).
+> Un documento **sin fecha legible se queda** (un documento tirado no se recupera); un **proveedor**
+> dudoso, no (se da de alta en un minuto). Todo lo excluido sale listado en el reporte.
+> **⚠️ Con el corte, `IPT_Movs` (última de 2023) queda en CERO → el inventario de producto terminado
+> arrancaría vacío.** Está PENDIENTE de decisión de Daniel. Igual pasa con `CC_Auditorias` (2017) y
+> `PedidosReales` (2010).
+
+> **Depuración de PROVEEDORES (§Post-F9.23):** el Access trae **1,052 filas** de terceros en cuatro
+> catálogos y solo **155** movieron algo desde 2025. Con `ETL_DESDE=2025` se cargan **solo esos**
+> (`ETL_PROVEEDORES_DESDE` lo sobreescribe si alguna vez quieres otro criterio) (default **sin variable = se cargan todos**, como hasta hoy).
+> Un tercero está vivo si MOVIÓ algo (OC, corte, entrega, recibo, nota o estampado), no por la bandera
+> `Activo` del viejo. **Ojo:** `EntregasEst/RecibosEst.IdMaquileros` apuntan a **Maquileros**, no a
+> `Estampadores` → ese catálogo (44) queda fuera COMPLETO, y es correcto: quien estampa es un taller.
+> Los depurados salen uno por uno en el reporte. ⚠️ Con la depuración activa **solo se puede migrar
+> historia de 2025-2026**: los ETL de F3/F4/F5 cargan histórico completo y apuntarían a proveedores que
+> ya no existen. Para ver a quién afecta y qué información falta, SIN tocar la BD:
+> `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts` (escribe
+> `proveedores-a-corregir.csv` con los 155 y las columnas por llenar).
+
 > **Orden de F3 (importante):** `etl-produccion` carga corte/envío/recibo/EsMa **sin** efectos de kardex
 > (los recibos de costura del histórico NO generan entrada a PT, porque esa entrada ya vive en `IPT_Movs`).
 > `etl-ipt` carga el kardex como **único** origen de existencias (`origenTipo = 'migracion'`). Así NO hay
@@ -213,6 +251,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/cuadre-f7.ts`                | **F7: cuadre** (conteos v1/v2 + análisis empírico de la regalía D2: ¿el `Costo` viejo la incluía? + delta esperado)                                                                                                                  |
 | `migracion/etl-terceros-saldos.ts`      | **F9: saldos iniciales** de CxC/CxP (corte SINUBE → aperturas vía modo migración del motor; por lotes; `-- --archivo=<csv>`)                                                                                                         |
 | `migracion/etl-cfdi-masivo.ts`          | **F9: importación masiva de CFDI** (carpeta de XML → reusa E3/E4; compra/venta por RFC de empresa; `-- --dir=<carpeta>`)                                                                                                             |
+| `migracion/etl-historico-ordenes.ts`    | **Post-F9: archivo histórico de órdenes** (las 5,451 del viejo, con `empresaV1` — §Post-F9.26/27/29) **+ directorio histórico de terceros** (§Post-F9.28). ⚠️ Va DESPUÉS de `etl-catalogos`: sin sus mapeos se niega a correr |
 | `migracion/cuadre-f9.ts`                | **F9: cuadre** (saldo esperado del corte vs Σ aperturas cargadas; descuadres listados; `-- --archivo=<csv>`)                                                                                                                         |
 | `migracion/cuadre.ts`                   | Cuadre F1 (conteos v1 CSV vs v2)                                                                                                                                                                                                     |
 | `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |
