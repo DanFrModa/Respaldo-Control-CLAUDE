@@ -32,6 +32,7 @@ import { contarFilasCsv } from './comun/csv.js';
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { describirVentana, resolverVentana, type ConfigVentana } from './comun/ventana.js';
+import { lineaColisiones } from './comun/colision-folio.js';
 import { cargarNotasSalida, type ResultadoNotasSalida } from './loaders/notas-salida.js';
 import { cargarOrdenesCompra, type ResultadoOrdenesCompra } from './loaders/ordenes-compra.js';
 import { repararSecuencias } from './reparar-secuencias.js';
@@ -80,6 +81,8 @@ export async function ejecutarEtlComprasNotas(
     ocs.ocs,
     `(lineas=${String(ocs.lineas)} ligas=${String(ocs.ligas)} fueraVentana=${String(ocs.fueraVentana)})`,
   );
+  const avisoOc = lineaColisiones('OrdenCompra', ocs.colisionesFolio);
+  if (avisoOc !== null) console.log(avisoOc);
 
   const notas = await cargarNotasSalida(sesion, cliente, reporte, ventana);
   log(
@@ -87,6 +90,8 @@ export async function ejecutarEtlComprasNotas(
     notas.notas,
     `(lineas=${String(notas.lineas)} fueraVentana=${String(notas.fueraVentana)})`,
   );
+  const avisoNotas = lineaColisiones('NotaSalida', notas.colisionesFolio);
+  if (avisoNotas !== null) console.log(avisoNotas);
 
   // ⭐ Las OC y las notas se migran con su folio EXPLÍCITO del sistema viejo → hay que ADELANTAR sus
   // secuencias al máximo migrado. Sin esto la primera captura nueva arranca en folio 1: se va al
@@ -149,10 +154,10 @@ async function formatearCuadreF4eA(
     '  Esta corrida:',
     `   OC creadas=${String(ocs.ocs.creados)} existentes=${String(ocs.ocs.existentes)} ` +
       `omitidas=${String(ocs.ocs.omitidos)} omitidasValidacion=${String(ocs.ocs.omitidosValidacion ?? 0)} ` +
-      `fueraVentana=${String(ocs.fueraVentana)}`,
+      `fueraVentana=${String(ocs.fueraVentana)} colisionesFolio=${String(ocs.colisionesFolio)}`,
     `   Notas creadas=${String(notas.notas.creados)} existentes=${String(notas.notas.existentes)} ` +
       `omitidas=${String(notas.notas.omitidos)} omitidasValidacion=${String(notas.notas.omitidosValidacion ?? 0)} ` +
-      `fueraVentana=${String(notas.fueraVentana)}`,
+      `fueraVentana=${String(notas.fueraVentana)} colisionesFolio=${String(notas.colisionesFolio)}`,
     '',
     '  Nota: las OC y notas legacy NO generan movimientos de kardex (documento histórico).',
     '  El kardex de telas (entradas/salidas/traspasos) lo migra la Pieza B (etl-telas).',

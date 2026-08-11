@@ -8,6 +8,12 @@
  *   Alm_Prd (195) × Alm_Prd_Det (910)   → RegistroProductividad (área almacén; 1 registro por DETALLE,
  *                                          aplanando el encabezado-día: fecha/personas/horas)
  *
+ * ⭐ VENTANA TEMPORAL (§Post-F9.24, agregada el 11-ago-2026). Ninguno de los dos depende de la
+ * orden, así que sin recorte propio ignoraban `ETL_DESDE` y cargaban los 16 años completos aunque la
+ * migración lleve solo 2025-2026: los KPI de productividad arrancarían con historia que se decidió
+ * NO traer. IP recorta por `IP_Productiv.Fecha`; almacén por la fecha del encabezado-día
+ * (`Alm_Prd.FechaAlm`), y sus detalles se van con su encabezado. Lo excluido se cuenta y se REPORTA.
+ *
  * Nota de idempotencia (patrón de los ETL previos): `registrarProductividad` no tiene clave natural,
  * así que la idempotencia la da el `MapeoMigracion` (se escribe TRAS crear). Un corte entre el create
  * y el mapeo podría, en una 2ª corrida, duplicar esa única fila (ventana de un round-trip) — mismo
@@ -30,9 +36,10 @@ import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearDinero, parsearEntero, parsearFecha } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
-type EstadoContrib = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type EstadoContrib = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 /** `YYYY-MM-DD` (UTC) de una fecha parseada, o `null` si no había. */
 function aIso(fecha: Date | null): string | null {
@@ -40,8 +47,17 @@ function aIso(fecha: Date | null): string | null {
 }
 
 /** Reduce las contribuciones por-fila a un `ResultadoLoader`. */
-function reducir(contribs: { ok: boolean; valor?: EstadoContrib }[]): ResultadoLoader {
-  const r: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
+function reducir(
+  contribs: { ok: boolean; valor?: EstadoContrib }[],
+  fueraVentana = 0,
+): ResultadoLoader {
+  const r: ResultadoLoader = {
+    creados: 0,
+    existentes: 0,
+    omitidos: 0,
+    omitidosValidacion: 0,
+    fueraVentana,
+  };
   for (const res of contribs) {
     if (!res.ok) {
       r.omitidosValidacion = (r.omitidosValidacion ?? 0) + 1;
@@ -51,6 +67,7 @@ function reducir(contribs: { ok: boolean; valor?: EstadoContrib }[]): ResultadoL
     if (e === 'creado') r.creados += 1;
     else if (e === 'existente') r.existentes += 1;
     else if (e === 'omitido') r.omitidos += 1;
+    else if (e === 'fueraVentana') r.fueraVentana = (r.fueraVentana ?? 0) + 1;
     else r.omitidosValidacion = (r.omitidosValidacion ?? 0) + 1;
   }
   return r;
@@ -124,12 +141,24 @@ export async function cargarProductividadIp(
     mapaActividad: await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.actividadIp),
     yaMigrados: new Set((await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.productividadIp)).keys()),
   };
-  const contribs = await enLotes(
+  // §Post-F9.24: recorte por la fecha del registro, ANTES de procesar. Lo excluido sale listado.
+  const { dentro, fuera } = filtrarPorVentana(
     leerCsv('IP_Productiv.csv'),
+    'Fecha',
+    resolverVentana(),
+    reporte,
+    'Productividad IP (IP_Productiv)',
+    (f) => `IdIP_Productiv=${f.IdIP_Productiv ?? '?'}`,
+  );
+  const contribs = await enLotes(
+    dentro,
     (f) => conReintentoTransitorio(() => procesarProdIp(ctx, f)),
     CONCURRENCIA_ETL,
   );
-  return reducir(contribs.map((c) => (c.ok ? { ok: true, valor: c.valor } : { ok: false })));
+  return reducir(
+    contribs.map((c) => (c.ok ? { ok: true, valor: c.valor } : { ok: false })),
+    fuera,
+  );
 }
 
 // ── Productividad Almacén ────────────────────────────────────────────────────────────────────────
@@ -147,6 +176,8 @@ interface ContextoAlm {
   bd: ContextoBd;
   reporte: Reporte;
   cabeceras: Map<string, CabeceraAlm>;
+  /** Encabezados-día que la ventana dejó fuera (ya reportados UNA vez, al filtrar). */
+  idsCabFueraVentana: Set<string>;
   mapaActividad: Map<string, number>;
   mapaCliente: Map<string, number>;
   yaMigrados: Set<string>;
@@ -163,8 +194,11 @@ async function procesarProdAlm(
   }
   if (ctx.yaMigrados.has(idViejo)) return 'existente';
 
-  const cab = ctx.cabeceras.get((f.IdAlm_Prd ?? '').trim());
+  const idCab = (f.IdAlm_Prd ?? '').trim();
+  const cab = ctx.cabeceras.get(idCab);
   if (cab === undefined) {
+    // Su encabezado-día quedó FUERA de la ventana: no es dato roto, es el recorte (ya listado).
+    if (ctx.idsCabFueraVentana.has(idCab)) return 'fueraVentana';
     ctx.reporte.agregar(
       'Alm_Prd_Det sin encabezado Alm_Prd (OMITIDO)',
       `IdAlm_Prd_Det=${idViejo} IdAlm_Prd=${f.IdAlm_Prd ?? ''}`,
@@ -221,8 +255,29 @@ export async function cargarProductividadAlmacen(
   cliente: ClienteMapeo,
   reporte: Reporte,
 ): Promise<ResultadoLoader> {
+  // §Post-F9.24: el recorte va en el ENCABEZADO-DÍA (`Alm_Prd.FechaAlm` es la fecha; el detalle no
+  // trae fecha propia). Los detalles de un encabezado excluido se cuentan como `fueraVentana`, NO
+  // como "sin encabezado" (que es un diagnóstico distinto: dato roto).
+  const todasLasCabeceras = leerCsv('Alm_Prd.csv');
+  const { dentro: cabsDentro, fuera: cabsFuera } = filtrarPorVentana(
+    todasLasCabeceras,
+    'FechaAlm',
+    resolverVentana(),
+    reporte,
+    'Productividad Almacén (Alm_Prd, encabezado-día)',
+    (f) => `IdAlm_Prd=${f.IdAlm_Prd ?? '?'}`,
+  );
+  const idsCabFueraVentana = new Set<string>();
+  if (cabsFuera > 0) {
+    const vivas = new Set(cabsDentro.map((f) => (f.IdAlm_Prd ?? '').trim()));
+    for (const f of todasLasCabeceras) {
+      const id = (f.IdAlm_Prd ?? '').trim();
+      if (id !== '' && !vivas.has(id)) idsCabFueraVentana.add(id);
+    }
+  }
+
   const cabeceras = new Map<string, CabeceraAlm>();
-  for (const f of leerCsv('Alm_Prd.csv')) {
+  for (const f of cabsDentro) {
     const id = (f.IdAlm_Prd ?? '').trim();
     if (id === '') continue;
     cabeceras.set(id, {
@@ -238,6 +293,7 @@ export async function cargarProductividadAlmacen(
     bd: { cliente: cliente as PrismaClient },
     reporte,
     cabeceras,
+    idsCabFueraVentana,
     mapaActividad: await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.actividadAlmacen),
     mapaCliente: await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.cliente),
     yaMigrados: new Set(

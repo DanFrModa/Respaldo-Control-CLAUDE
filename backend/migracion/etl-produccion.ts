@@ -118,7 +118,11 @@ export async function ejecutarEtlProduccion(
   );
 
   const cargos = await cargarCargosEsMa(sesion, cliente, reporte);
-  log('Cargos EsMa', cargos);
+  log('Cargos EsMa', cargos.movimientos);
+  if (cargos.fueraVentana > 0) {
+    // §Post-F9.24: EsMa recorta por la fecha de su cabecera, igual que los abonos/descuentos/pagos.
+    console.log(`    (fuera de la ventana: ${String(cargos.fueraVentana)} cargos EsMa)`);
+  }
 
   console.log('ETL de producción F3-E6 — sembrando secuencias');
   await sembrarSecuenciasF3(cliente);

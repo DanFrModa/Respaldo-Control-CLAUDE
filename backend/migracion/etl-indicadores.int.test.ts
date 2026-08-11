@@ -13,7 +13,7 @@
  */
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../src/datos/index.js';
 import {
@@ -52,6 +52,13 @@ beforeEach(async () => {
   process.env.TABLAS_DIR = DIR_FIXTURES;
   await limpiarBaseDatos(cliente);
   await sembrarEstado();
+});
+
+afterEach(() => {
+  // Las pruebas de ventana ensucian el entorno del proceso: se limpia SIEMPRE, pase lo que pase.
+  delete process.env.ETL_DESDE;
+  delete process.env.ETL_VENTANA_ANIOS;
+  delete process.env.ETL_VENTANA_REF;
 });
 
 afterAll(async () => {
@@ -184,6 +191,42 @@ describe('ETL de indicadores F7-E6 (integración, fixtures committeados)', () =>
     const ex = await consultarExactitud(sesion, uno.id, { cliente });
     expect(ex.renglones).toHaveLength(1);
     expect(ex.renglones[0]?.idMovimientoAjuste).toBeNull(); // sin ajuste de kardex (D6)
+  });
+
+  // ── VENTANA TEMPORAL (§Post-F9.24) ───────────────────────────────────────────────────────────
+  describe('ventana temporal (ETL_DESDE)', () => {
+    it('los CATÁLOGOS no se recortan, pero la productividad, muestrarios y cíclico SÍ — y se REPORTA', async () => {
+      // El corte real del go-live. Los fixtures son de 2008-2009 → nada de eso debe entrar. Antes
+      // de este arreglo, los tres loaders ignoraban `ETL_DESDE` y cargaban los 16 años completos.
+      process.env.ETL_DESDE = '2025';
+
+      const reporte = await ejecutarEtlIndicadores(cliente);
+      const t = await conteos();
+
+      // Catálogos: el corte aplica a DOCUMENTOS con fecha, no a catálogos (§Post-F9.25).
+      expect(t.personalIp).toBe(2);
+      expect(t.actIp).toBe(2);
+      expect(t.actAlm).toBe(2);
+      // Documentos con fecha: todos fuera.
+      expect(t.prodIp).toBe(0);
+      expect(t.prodAlm).toBe(0);
+      expect(t.muestrarios).toBe(0);
+      expect(t.ciclicos).toBe(0);
+
+      // NADA EN SILENCIO (§7): cada fuente lista lo que dejó fuera.
+      const titulos = reporte.obtenerSecciones().map((sec) => sec.titulo);
+      for (const etiqueta of [
+        'Productividad IP (IP_Productiv)',
+        'Productividad Almacén (Alm_Prd, encabezado-día)',
+        'Muestrarios (IP_MuesPend)',
+        'Inventario cíclico histórico (Alm_InvCic)',
+      ]) {
+        expect(titulos.some((t2) => t2.startsWith(`${etiqueta}: FUERA de la ventana`))).toBe(true);
+      }
+      // Los detalles de almacén NO se confunden con "sin encabezado" (dato roto): esa sección
+      // no aparece, porque sus encabezados salieron por la ventana, no por estar rotos.
+      expect(titulos.some((t2) => t2.includes('sin encabezado Alm_Prd'))).toBe(false);
+    }, 180_000);
   });
 });
 

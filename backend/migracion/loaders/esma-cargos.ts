@@ -26,6 +26,16 @@
  * o quedar sin cargo). Por eso el cargo migrado no liga al recibo y el conteo difiere a propósito.
  *
  * Idempotencia: por el `MapeoMigracion` de `IdEsMa_Recibos`.
+ *
+ * ⭐ VENTANA TEMPORAL (§Post-F9.24, arreglada el 11-ago-2026). TODO lo de EsMa —cargos y los tres
+ * movimientos planos— recorta por la fecha de la CABECERA `EsMa.FechaEsMa`, que es la fecha del
+ * documento. Antes solo los cargos quedaban acotados de rebote (dependen del mapeo de la orden) y
+ * los movimientos planos NO tenían ventana ni dependían de la orden: con `ETL_DESDE=2025` habrían
+ * entrado **384 cargos** contra **554 abonos + 743 descuentos + 5,935 pagos COMPLETOS**, y el saldo
+ * de cada maquilero (derivado, D3) habría salido masivamente NEGATIVO — como si a todos se les
+ * hubiera pagado de más durante 16 años. La ventana va en los CUATRO por la MISMA fecha justamente
+ * para que la cuenta corriente quede coherente: o entra el documento EsMa completo, o no entra.
+ * Lo excluido se cuenta y se REPORTA (§7).
  */
 import {
   crearCargoEsMaMigrado,
@@ -50,10 +60,21 @@ import {
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearBandera, parsearDinero, parsearFecha, parsearTexto } from '../comun/valores.js';
+import { dentroVentana, resolverVentana, type ConfigVentana } from '../comun/ventana.js';
 import type { Reporte } from '../comun/reporte.js';
 import type { ResultadoLoader } from './clientes.js';
 import { cargarMapaOrdenV2 } from './produccion-comun.js';
 import { resolverTipoProceso } from './produccion-tipos.js';
+
+/**
+ * Resultado de un loader de EsMa: el resumen estándar + lo que la ventana temporal dejó fuera
+ * (§Post-F9.24). Se cuenta aparte de los `omitidos` porque no es un dato roto: es el recorte.
+ */
+export interface ResultadoEsMa {
+  movimientos: ResultadoLoader;
+  /** # de filas excluidas porque su cabecera `EsMa` es anterior al corte. Listadas en el reporte. */
+  fueraVentana: number;
+}
 
 /** Cabecera `EsMa`: maquilero + fecha + obs, indexada por `IdEsMa`. Compartida por los loaders de
  * movimientos planos (abonos/descuentos/pagos, F6-E6): todos toman de aquí el maquilero + fecha + obs. */
@@ -102,7 +123,7 @@ export async function cargarCargosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
-): Promise<ResultadoLoader> {
+): Promise<ResultadoEsMa> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const cli = cliente as PrismaClient;
 
@@ -113,7 +134,10 @@ export async function cargarCargosEsMa(
       'CargoEsMa: falta el TipoProceso costura/estampado (re-sembrar) — flujo OMITIDO',
       'EsMa_Recibos.csv',
     );
-    return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
+    return {
+      movimientos: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
+      fueraVentana: 0,
+    };
   }
 
   const mapaOrdenV2 = await cargarMapaOrdenV2(cliente);
@@ -126,13 +150,15 @@ export async function cargarCargosEsMa(
   // Cabeceras EsMa por IdEsMa (helper compartido con los loaders de movimientos planos).
   const cabeceras = cargarCabecerasEsMa();
 
-  const resultado: ResultadoLoader = {
+  const movimientos: ResultadoLoader = {
     creados: 0,
     existentes: 0,
     omitidos: 0,
     omitidosValidacion: 0,
   };
+  let fueraVentana = 0;
 
+  const ventana = resolverVentana();
   const filas = leerCsv('EsMa_Recibos.csv');
   const contribs = await enLotes(
     filas,
@@ -145,6 +171,7 @@ export async function cargarCargosEsMa(
           mapaEstampador,
           idProcCostura,
           idProcEstampado,
+          ventana,
         }),
       ),
     CONCURRENCIA_ETL,
@@ -152,17 +179,18 @@ export async function cargarCargosEsMa(
 
   for (const res of contribs) {
     if (!res.ok) {
-      resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
+      movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
       continue;
     }
     const e = res.valor;
-    if (e === 'creado') resultado.creados += 1;
-    else if (e === 'existente') resultado.existentes += 1;
-    else if (e === 'omitido') resultado.omitidos += 1;
-    else resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
+    if (e === 'creado') movimientos.creados += 1;
+    else if (e === 'existente') movimientos.existentes += 1;
+    else if (e === 'omitido') movimientos.omitidos += 1;
+    else if (e === 'fueraVentana') fueraVentana += 1;
+    else movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
   }
 
-  return resultado;
+  return { movimientos, fueraVentana };
 }
 
 interface ContextoCargos {
@@ -172,9 +200,10 @@ interface ContextoCargos {
   mapaEstampador: Map<string, number>;
   idProcCostura: number;
   idProcEstampado: number;
+  ventana: ConfigVentana;
 }
 
-type EstadoContrib = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+type EstadoContrib = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
 
 async function procesarCargo(
   sesion: SesionUsuario,
@@ -200,6 +229,16 @@ async function procesarCargo(
       `IdEsMa_Recibos=${idCargoViejo} IdEsMa=${idEsMa}`,
     );
     return 'omitido';
+  }
+
+  // Ventana temporal por la fecha de la CABECERA (la del documento EsMa). Va en los cuatro loaders
+  // de EsMa con el MISMO criterio para que la cuenta corriente del maquilero quede coherente.
+  if (!dentroVentana(cab.fecha, ctx.ventana)) {
+    reporte.agregar(
+      'CargoEsMa FUERA de la ventana temporal (cabecera EsMa anterior al corte)',
+      `IdEsMa_Recibos=${idCargoViejo} IdEsMa=${idEsMa} fecha=${cab.fecha?.toISOString().slice(0, 10) ?? '(sin fecha)'}`,
+    );
+    return 'fueraVentana';
   }
 
   const idOrden = ctx.mapaOrdenV2.get(idOrdenViejo);
@@ -339,6 +378,7 @@ interface ContextoMovimiento {
   mapaMaquilero: Map<string, number>;
   mapaEstampador: Map<string, number>;
   idEmpresa: number;
+  ventana: ConfigVentana;
 }
 
 /**
@@ -352,7 +392,7 @@ export async function cargarMovimientosPlanosEsMa(
   cliente: ClienteMapeo,
   reporte: Reporte,
   cfg: ConfigMovimientoPlano,
-): Promise<ResultadoLoader> {
+): Promise<ResultadoEsMa> {
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const cli = cliente as PrismaClient;
 
@@ -364,13 +404,15 @@ export async function cargarMovimientosPlanosEsMa(
     ENTIDAD_MAPEO.proveedorPorIdEstampadores,
   );
 
-  const resultado: ResultadoLoader = {
+  const movimientos: ResultadoLoader = {
     creados: 0,
     existentes: 0,
     omitidos: 0,
     omitidosValidacion: 0,
   };
+  let fueraVentana = 0;
 
+  const ventana = resolverVentana();
   const filas = leerCsv(cfg.archivo);
   const contribs = await enLotes(
     filas,
@@ -382,6 +424,7 @@ export async function cargarMovimientosPlanosEsMa(
           mapaMaquilero,
           mapaEstampador,
           idEmpresa,
+          ventana,
         }),
       ),
     CONCURRENCIA_ETL,
@@ -389,17 +432,18 @@ export async function cargarMovimientosPlanosEsMa(
 
   for (const res of contribs) {
     if (!res.ok) {
-      resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
+      movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
       continue;
     }
     const e = res.valor;
-    if (e === 'creado') resultado.creados += 1;
-    else if (e === 'existente') resultado.existentes += 1;
-    else if (e === 'omitido') resultado.omitidos += 1;
-    else resultado.omitidosValidacion = (resultado.omitidosValidacion ?? 0) + 1;
+    if (e === 'creado') movimientos.creados += 1;
+    else if (e === 'existente') movimientos.existentes += 1;
+    else if (e === 'omitido') movimientos.omitidos += 1;
+    else if (e === 'fueraVentana') fueraVentana += 1;
+    else movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
   }
 
-  return resultado;
+  return { movimientos, fueraVentana };
 }
 
 /** Procesa UNA fila de movimiento plano (abono/descuento/pago). */
@@ -427,6 +471,18 @@ async function procesarMovimientoPlano(
       `${cfg.columnaId}=${idViejo} IdEsMa=${idEsMa}`,
     );
     return 'omitido';
+  }
+
+  // ⭐ Ventana temporal por la fecha de la CABECERA (§Post-F9.24). Este loader NO depende de la
+  // orden, así que sin este recorte cargaba los 554 abonos + 743 descuentos + 5,935 pagos COMPLETOS
+  // contra apenas los cargos de 2025-2026: el saldo del maquilero (derivado, D3) salía masivamente
+  // negativo, como si a todos se les hubiera pagado de más durante 16 años.
+  if (!dentroVentana(cab.fecha, ctx.ventana)) {
+    reporte.agregar(
+      `${cfg.etiqueta} FUERA de la ventana temporal (cabecera EsMa anterior al corte)`,
+      `${cfg.columnaId}=${idViejo} IdEsMa=${idEsMa} fecha=${cab.fecha?.toISOString().slice(0, 10) ?? '(sin fecha)'}`,
+    );
+    return 'fueraVentana';
   }
 
   const idMaquilero = resolverMaquileroCabecera(

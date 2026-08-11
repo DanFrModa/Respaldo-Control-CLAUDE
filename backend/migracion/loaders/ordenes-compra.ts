@@ -23,6 +23,13 @@
  *
  * Idempotencia: por el `MapeoMigracion` de `IdOrdCompra` y, en su defecto, por el unique
  * `(idEmpresa, numCompra)`. En 2ª corrida no duplica.
+ *
+ * ⚠️ COLISIÓN DE FOLIO: encontrar una OC con ese `numCompra` ya NO basta para darla por "la misma".
+ * En el re-volcado del go-live, v2 pudo capturar su propia OC con ese número y el Access traer otra
+ * distinta con el mismo — mapearlas juntas ligaba las recepciones y las ligas N:N del volcado nuevo
+ * a la OC equivocada, en silencio. `comun/colision-folio.ts` distingue la recuperación de una
+ * corrida cortada (la creó el ETL y nadie más la reclama) de la colisión, que NO se migra y se
+ * REPORTA.
  */
 import { crearOCMigrada, type LineaOCMigrada } from '../../src/dominio/compras/migracion.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
@@ -40,6 +47,7 @@ import {
 } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import { GuardiaFolios } from '../comun/colision-folio.js';
 import { intentarCrear } from '../comun/saneo.js';
 import {
   parsearBandera,
@@ -63,6 +71,12 @@ export interface ResultadoOrdenesCompra {
   ligas: number;
   /** # de OC excluidas por la ventana temporal. */
   fueraVentana: number;
+  /**
+   * # de OC NO migradas porque su `numCompra` ya lo ocupaba OTRA OC en v2 (ver
+   * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era justo lo
+   * que las volvía invisibles. Salen listadas una por una en el reporte.
+   */
+  colisionesFolio: number;
 }
 
 /** Mapeos + cachés que necesita cada OC. */
@@ -73,11 +87,19 @@ interface ContextoOC {
   detPorOC: Map<string, Record<string, string>[]>;
   ordsPorOC: Map<string, string[]>;
   ventana: ConfigVentana;
+  /** Guardia de colisión de folio del re-volcado (`comun/colision-folio.ts`). */
+  guardia: GuardiaFolios;
 }
 
 /** Contribución de UNA OC a los conteos. */
 interface ContribOC {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
+  estado:
+    | 'creado'
+    | 'existente'
+    | 'omitido'
+    | 'omitidoValidacion'
+    | 'fueraVentana'
+    | 'colisionFolio';
   lineas: number;
   ligas: number;
 }
@@ -127,6 +149,7 @@ export async function cargarOrdenesCompra(
     lineas: 0,
     ligas: 0,
     fueraVentana: 0,
+    colisionesFolio: 0,
   };
 
   const ctx: ContextoOC = {
@@ -136,6 +159,7 @@ export async function cargarOrdenesCompra(
     detPorOC,
     ordsPorOC,
     ventana,
+    guardia: new GuardiaFolios(cliente, ENTIDAD_MAPEO.ordenCompra, 'OrdenCompra'),
   };
 
   const filas = leerCsv('OrdCompra.csv');
@@ -155,6 +179,7 @@ export async function cargarOrdenesCompra(
     else if (c.estado === 'existente') resultado.ocs.existentes += 1;
     else if (c.estado === 'omitido') resultado.ocs.omitidos += 1;
     else if (c.estado === 'fueraVentana') resultado.fueraVentana += 1;
+    else if (c.estado === 'colisionFolio') resultado.colisionesFolio += 1;
     else resultado.ocs.omitidosValidacion = (resultado.ocs.omitidosValidacion ?? 0) + 1;
     resultado.lineas += c.lineas;
     resultado.ligas += c.ligas;
@@ -224,12 +249,24 @@ async function procesarOC(
     return sin('fueraVentana');
   }
 
-  // Idempotencia adicional por el unique (idEmpresa, numCompra): si ya existe, mapea y sale.
+  // Idempotencia adicional por el unique (idEmpresa, numCompra). OJO: que exista una OC con ese
+  // número NO prueba que sea la misma. Puede ser la corrida anterior cortada entre el `create` y el
+  // `guardarMapeo`… o una OC que v2 capturó con ese mismo número, que es OTRO documento; mapearla
+  // sin distinguir ligaba recepciones y ligas N:N a la OC equivocada, en silencio.
   const existePorFolio = await cliente.ordenCompra.findUnique({
     where: { idEmpresa_numCompra: { idEmpresa, numCompra: BigInt(numCompraN) } },
-    select: { id: true },
+    select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
+    if ((await ctx.guardia.clasificar(idViejo, existePorFolio)) === 'colision') {
+      ctx.guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio: numCompraN,
+        existente: existePorFolio,
+      });
+      return sin('colisionFolio');
+    }
+    ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.ordenCompra, idViejo, existePorFolio.id);
     return sin('existente');
   }
@@ -309,6 +346,9 @@ async function procesarOC(
   if (creada === null) {
     return sin('omitidoValidacion');
   }
+  // Se reclama el folio ANTES de mapearlo: entre el create y el guardarMapeo el mapeo aún no está
+  // en la BD, y una fila concurrente con el mismo número lo tomaría por "recuperación".
+  ctx.guardia.registrarCreado(idViejo, creada.idOrdenCompra);
   await guardarMapeo(cliente, ENTIDAD_MAPEO.ordenCompra, idViejo, creada.idOrdenCompra);
   return { estado: 'creado', lineas: creada.lineas, ligas: creada.ligas };
 }

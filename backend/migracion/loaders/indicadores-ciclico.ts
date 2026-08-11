@@ -39,6 +39,7 @@ import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { sesionEtl } from '../comun/sesion-etl.js';
 import { parsearEntero, parsearFechaSoloDia } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import { asegurarSentinelas } from './ipt-kardex.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -92,7 +93,20 @@ export async function cargarCiclicoHistorico(
     (await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.inventarioCiclicoHist)).keys(),
   );
 
-  for (const f of leerCsv('Alm_InvCic.csv')) {
+  // §Post-F9.24: recorte por `FechaIC` (la fecha del conteo), ANTES de procesar. No depende de la
+  // orden, así que sin esto ignoraba `ETL_DESDE` y traía los 542 conteos de todos los años aunque la
+  // migración lleve solo 2025-2026. Lo excluido sale listado uno por uno en el reporte.
+  const { dentro: filas, fuera: fueraVentana } = filtrarPorVentana(
+    leerCsv('Alm_InvCic.csv'),
+    'FechaIC',
+    resolverVentana(),
+    reporte,
+    'Inventario cíclico histórico (Alm_InvCic)',
+    (f) => `IdAlm_InvCic=${f.IdAlm_InvCic ?? '?'}`,
+  );
+  r.fueraVentana = fueraVentana;
+
+  for (const f of filas) {
     const idViejo = (f.IdAlm_InvCic ?? '').trim();
     if (idViejo === '') {
       r.omitidos += 1;

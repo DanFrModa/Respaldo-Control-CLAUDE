@@ -32,6 +32,7 @@ import { contarFilasCsv } from './comun/csv.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import { cargarDefectos } from './loaders/calidad-defectos.js';
+import { lineaColisiones } from './comun/colision-folio.js';
 import { cargarAuditorias } from './loaders/calidad-auditorias.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 
@@ -84,6 +85,8 @@ export async function ejecutarEtlCalidad(cliente: PrismaClient): Promise<Reporte
       auditorias.maquileroSinMapeo,
     )})`,
   );
+  const avisoAud = lineaColisiones('Auditoria', auditorias.colisionesFolio);
+  if (avisoAud !== null) console.log(avisoAud);
 
   console.log('ETL de calidad F6-E6 — recalibrando secuencias');
   await recalibrarSecuencias(cliente);

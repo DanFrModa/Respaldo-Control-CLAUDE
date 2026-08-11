@@ -16,6 +16,9 @@
  *    desde FechaDet/OrdCancelada (no re-sellados), snapshots V1, auditoría original.
  *  • SIEMBRA DE SECUENCIAS: tras migrar, un pedido y una orden NUEVOS (captura por el servicio
  *    normal) salen con folio > máximo migrado, sin colisión con el unique (idEmpresa, folio).
+ *  • ⭐ COLISIÓN DE FOLIO (el re-volcado del go-live): si v2 ya capturó su propio documento con el
+ *    folio que trae el Access, el ETL NO lo mapea (los hijos del volcado se pegarían al documento
+ *    equivocado) y lo REPORTA; y la recuperación legítima de una corrida cortada SIGUE funcionando.
  */
 import { fileURLToPath } from 'node:url';
 
@@ -28,7 +31,8 @@ import type { PrismaClient } from '../src/datos/index.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
 
 import { ejecutarEtlPedidosOrdenes } from './etl-pedidos-ordenes.js';
-import { sesionEtl } from './comun/sesion-etl.js';
+import { ID_USUARIO_ETL, sesionEtl } from './comun/sesion-etl.js';
+import { tituloColisionFolio } from './comun/colision-folio.js';
 import { ENTIDAD_MAPEO, guardarMapeo } from './comun/mapeo.js';
 import { CAMPO_D7_PEDIDO_CLIENTE } from './loaders/clientes.js';
 
@@ -306,5 +310,124 @@ describe('ETL de pedidos y órdenes F2-E5 (integración, fixtures committeados)'
     });
     const nuevaOrden = await crearOrden(sesion, { idPedidoLinea: renglon.id }, bd());
     expect(nuevaOrden.folio).toBeGreaterThan(9004);
+  });
+
+  // ── COLISIÓN DE FOLIO (§ el arreglo del re-volcado del go-live) ──────────────────────────────
+  describe('COLISIÓN DE FOLIO en el re-volcado', () => {
+    /** Deja en v2 una orden capturada POR UNA PERSONA con el folio 9001, que el Access también trae. */
+    async function capturarOrdenPropiaEnV2(folio: bigint): Promise<number> {
+      const modelo = await cliente.modelo.findFirstOrThrow({ where: { codigo: 'M001' } });
+      const clienteFila = await cliente.cliente.findFirstOrThrow({
+        where: { nombre: 'Liverpool' },
+      });
+      const orden = await cliente.orden.create({
+        data: {
+          folio,
+          idEmpresa: idEmpresaFR,
+          idModelo: modelo.id,
+          idCliente: clienteFila.id,
+          observaciones: 'ORDEN PROPIA DE v2 (capturada a mano)',
+          creadoPorId: 'usr-daniel',
+          modificadoPorId: 'usr-daniel',
+        },
+        select: { id: true },
+      });
+      return orden.id;
+    }
+
+    it('NO mapea la orden de v2, NO la pisa, y la LISTA en el reporte', async () => {
+      const idOrdenDeV2 = await capturarOrdenPropiaEnV2(9001n);
+
+      const reporte = await ejecutarEtlPedidosOrdenes(cliente);
+
+      // 1) La orden de v2 sigue siendo suya: ni se pisó ni se duplicó el folio.
+      const conFolio9001 = await cliente.orden.findMany({
+        where: { idEmpresa: idEmpresaFR, folio: 9001n },
+        select: { id: true, observaciones: true, creadoPorId: true },
+      });
+      expect(conFolio9001).toHaveLength(1);
+      expect(conFolio9001[0]?.id).toBe(idOrdenDeV2);
+      expect(conFolio9001[0]?.creadoPorId).toBe('usr-daniel');
+
+      // 2) ⭐ LO CRÍTICO: NO hay mapeo IdOrdenes=1 → orden de v2. Sin él, los hijos del volcado
+      //    (comentarios, cortes, envíos, recibos, cargos EsMa, costos, RC) no pueden pegarse a la
+      //    orden equivocada — que era exactamente el daño silencioso.
+      const mapeo = await cliente.mapeoMigracion.findUnique({
+        where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.orden, claveVieja: '1' } },
+      });
+      expect(mapeo).toBeNull();
+      // Y en efecto: los 2 comentarios de IdOrdenes=1 NO se colgaron de la orden de v2.
+      expect(await cliente.ordenComentario.count({ where: { idOrden: idOrdenDeV2 } })).toBe(0);
+
+      // 3) NADA EN SILENCIO (§7): la colisión sale listada con su folio y su clave vieja.
+      const seccion = reporte
+        .obtenerSecciones()
+        .find((sec) => sec.titulo === tituloColisionFolio('Orden'));
+      expect(seccion).toBeDefined();
+      expect(seccion?.renglones.join('\n')).toContain('folio=9001');
+      expect(seccion?.renglones.join('\n')).toContain('claveVieja=1');
+
+      // 4) Las demás órdenes del volcado SÍ entraron (la colisión es puntual, no aborta el ETL).
+      expect(await cliente.orden.count({ where: { creadoPorId: ID_USUARIO_ETL } })).toBe(3);
+    }, 180_000);
+
+    it('el mismo guardia protege los PEDIDOS (folio ocupado por un pedido capturado en v2)', async () => {
+      const clienteFila = await cliente.cliente.findFirstOrThrow({
+        where: { nombre: 'Liverpool' },
+      });
+      const propio = await cliente.pedido.create({
+        data: {
+          folio: 5001n,
+          idEmpresa: idEmpresaFR,
+          idCliente: clienteFila.id,
+          creadoPorId: 'usr-daniel',
+          modificadoPorId: 'usr-daniel',
+        },
+        select: { id: true },
+      });
+
+      const reporte = await ejecutarEtlPedidosOrdenes(cliente);
+
+      expect(
+        await cliente.mapeoMigracion.findUnique({
+          where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.pedido, claveVieja: '10' } },
+        }),
+      ).toBeNull();
+      // El pedido de v2 no recibió los renglones del volcado.
+      expect(await cliente.pedidoLinea.count({ where: { idPedido: propio.id } })).toBe(0);
+      expect(
+        reporte.obtenerSecciones().some((sec) => sec.titulo === tituloColisionFolio('Pedido')),
+      ).toBe(true);
+    }, 180_000);
+
+    it('RECUPERACIÓN: una corrida cortada entre el create y el mapeo SÍ se retoma (no es colisión)', async () => {
+      // 1ª corrida completa: las órdenes quedan creadas por el ETL y mapeadas.
+      await ejecutarEtlPedidosOrdenes(cliente);
+      const orden9001 = await cliente.orden.findFirstOrThrow({
+        where: { idEmpresa: idEmpresaFR, folio: 9001n },
+        select: { id: true, creadoPorId: true },
+      });
+      expect(orden9001.creadoPorId).toBe(ID_USUARIO_ETL);
+
+      // Se simula el corte: el documento está en la BD, pero su renglón de mapeo NO llegó a
+      // escribirse. Es el escenario que el fallback existía para rescatar.
+      await cliente.mapeoMigracion.delete({
+        where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.orden, claveVieja: '1' } },
+      });
+
+      const reporte = await ejecutarEtlPedidosOrdenes(cliente);
+
+      // Se re-mapea a la MISMA orden (no se duplica, no se reporta como colisión).
+      const mapeo = await cliente.mapeoMigracion.findUniqueOrThrow({
+        where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.orden, claveVieja: '1' } },
+      });
+      expect(mapeo.idNuevo).toBe(String(orden9001.id));
+      expect(await cliente.orden.count({ where: { idEmpresa: idEmpresaFR, folio: 9001n } })).toBe(
+        1,
+      );
+      expect(
+        reporte.obtenerSecciones().some((sec) => sec.titulo === tituloColisionFolio('Orden')),
+      ).toBe(false);
+    }, 180_000);
   });
 });

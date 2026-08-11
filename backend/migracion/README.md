@@ -2,9 +2,88 @@
 
 Scripts que migran los datos reales del sistema viejo (CSV en `Respaldo CLAUDE/TABLAS/`, **encoding CP850**) a la BD de v2, cargando **vía los servicios de dominio** (modo migración), de forma **idempotente** y re-ejecutable.
 
+---
+
+## 🚨 REGLAS DE GO-LIVE (leer ANTES de tocar nada — auditoría del 11-ago-2026)
+
+Daniel, 11-ago-2026: _"Las bases de datos de Control no están actualizadas. Cuando pongamos en producción, subiré las bases de datos de ese momento para migrar la última info. Es decir, habrán algunas órdenes más y más información."_ Es decir: **el volcado del go-live es OTRO volcado, más nuevo**, y estas cuatro reglas son las que lo hacen seguro.
+
+### Regla 1 (DURA) — el ETL de documentos corre UNA sola vez, sobre BASE LIMPIA
+
+En producción los ETL de **documentos** (pedidos, órdenes, producción, compras, notas, telas, EsMa, calidad, costos, RC, indicadores, archivo histórico) se corren **una única vez, contra una base recién creada**. Después de eso **ningún ETL de documentos se vuelve a correr sobre esa base**.
+
+No es una recomendación de higiene: es lo que hace **inocuos** los riesgos que a propósito NO se arreglaron en código, porque solo existen al re-volcar encima de una base ya viva —
+
+- **BOM de modelos y Ruta Crítica se REEMPLAZAN al re-correr** (borran y rehacen su detalle): pisarían lo que se hubiera editado en v2.
+- **Los cambios a documentos ya migrados NO se recogen**: si en el Access nuevo una orden se canceló, una OC cambió de estatus o un costo se recalculó, la fila ya migrada **no se actualiza** (los loaders resuelven "ya existe" y salen). El ETL trae lo NUEVO, no reconcilia lo viejo.
+- **El mapeo de renglones de pedido es POSICIONAL** (`loaders/pedidos.ts`): al retomar un pedido ya existente, cada `IdPedidosDet` se casa con el renglón de v2 **por orden de creación**. Si alguien insertó/borró un renglón en v2, el emparejamiento se corre.
+
+Y por si la regla se rompiera, el código ahora **avisa** en vez de callar: ver *colisión de folio*, abajo.
+
+### Regla 2 — `etl-ipt` y `etl-telas` NO se corren en el go-live
+
+El **inventario de producto terminado** y el **de telas** arrancan del **CONTEO FÍSICO** que captura Daniel, no del histórico:
+
+- PT → `DECISIONES.md §Post-F9.25` (*"el almacén de PT empieza también desde cero"*).
+- Telas → `DECISIONES.md §Post-F9.11` punto 5 (*"partir de un inventario físico desde cero"*).
+
+Por eso `etl-ipt.ts` y `etl-telas.ts` **están fuera del orden de corrida de abajo**. ⚠️ **Correrlos DESPUÉS del conteo físico lo PISA**: meten movimientos históricos al mismo kardex, y como existencia = Σ movimientos (D3), el conteo capturado queda sumado con historia vieja. (Con `ETL_DESDE=2025` ambos cargan cero de todas formas — desde el 11-ago-2026 `etl-ipt` **sí** obedece la ventana; antes la ignoraba —, pero la regla no depende de eso: simplemente no se corren.)
+
+### Regla 3 — orden de corrida del go-live, con `ETL_DESDE=2025` desde el PRIMER comando
+
+```bash
+cd backend
+export ETL_DESDE=2025            # ⚠️ ANTES del primer comando, y en la MISMA terminal para todos
+
+# 1. Catálogos y modelos (la base de todos los mapeos).
+npx tsx --env-file=.env migracion/etl-catalogos.ts
+npx tsx --env-file=.env migracion/etl-modelos.ts
+
+# 2. Documentos ancla (el corte se aplica aquí y ARRASTRA a todo lo que les cuelga).
+npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts
+
+# 3. Lo que cuelga de la orden.
+npx tsx --env-file=.env migracion/etl-produccion.ts     # corte/envío/recibo + cargos EsMa (SIN kardex)
+npx tsx --env-file=.env migracion/etl-compras-notas.ts  # OC + notas de salida
+npx tsx --env-file=.env migracion/etl-ruta-critica.ts   # RC completa
+npx tsx --env-file=.env migracion/etl-calidad.ts        # defectos + auditorías
+npx tsx --env-file=.env migracion/etl-esma.ts           # cargos + abonos/descuentos/pagos
+npx tsx --env-file=.env migracion/etl-costos.ts         # CostoOrd → CostoOrden
+npx tsx --env-file=.env migracion/etl-indicadores.ts    # personal/actividades + productividad + fichas + muestrarios + cíclico
+
+# 4. Archivo histórico (IGNORA la ventana a propósito: existe para guardar lo que ella deja fuera).
+npx tsx --env-file=.env migracion/etl-historico-ordenes.ts
+
+# 5. Cierre OBLIGATORIO.
+npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts
+npx tsx --env-file=.env migracion/reparar-secuencias.ts
+
+# ❌ NO se corren: etl-ipt (PT) ni etl-telas (telas) — ver la Regla 2.
+# F9 (etl-terceros-saldos / etl-cfdi-masivo) NO sale de Access: va cuando llegue el corte de SINUBE.
+```
+
+**Por qué `export` y no `ETL_DESDE=2025 npx tsx …` comando por comando:** si se olvida en UNO SOLO, ese ETL migra el histórico completo y **desalinea a todos los demás** — carga filas que apuntan a proveedores depurados, o mete al kardex partidas de hace años que ningún otro ETL trajo. Un interruptor, una vez, para toda la sesión. Verifícalo con `echo $ETL_DESDE` antes de empezar; además **cada ETL imprime la ventana que aplicó** en su primera línea, así que si un reporte dice "Ventana temporal: DESACTIVADA", ese ETL corrió mal.
+
+### Regla 4 — los ensayos en `prueba` se hacen sobre BASE VACIADA
+
+La base de `prueba` de hoy tiene **la foto vieja** del Access **y** documentos que Daniel capturó a mano. Un ensayo re-corriendo encima **no mide el go-live**: mide un re-volcado, que es justo el escenario que la Regla 1 prohíbe. Además activa la **colisión de folio** (la orden 8001 de Daniel contra la 8001 del Access nuevo). Para ensayar: **vaciar la base** (o levantar una nueva), aplicar migraciones + seed, y correr la Regla 3 completa desde cero.
+
+### La red de seguridad: COLISIÓN DE FOLIO
+
+Los cinco loaders con folio propio (`Pedido`, `Orden`, `OrdenCompra`, `NotaSalida`, `Auditoria`) resolvían "ya existe" por `(idEmpresa, folio)` y, si lo encontraban, **mapeaban la clave vieja a ese documento y salían como `existente`**. Sobre base limpia eso recupera una corrida cortada; sobre base viva **casaba dos documentos distintos** y todos los hijos del volcado nuevo (cortes, envíos, recibos, cargos EsMa, costos, RC, auditorías) se pegaban al documento equivocado — **en silencio**.
+
+Ahora (`comun/colision-folio.ts`) el ETL distingue:
+
+- documento existente **creado por el ETL** (`creado_por_id = 'etl-sistema'`) y que **ninguna otra clave vieja reclama** → es la corrida cortada: se mapea y sigue como `existente`;
+- **cualquier otro caso** (lo capturó una persona, no trae `creado_por_id`, o ya es de otra clave vieja) → **COLISIÓN**: no se crea, **no se mapea** y se **REPORTA** con folio, clave vieja e id de v2.
+
+Las colisiones se cuentan **aparte** de los `existentes` y el ETL las grita en consola. **Si ves una sola colisión, para**: la base no estaba limpia.
+
+---
+
 ## ⚠️ Cómo se corren (IMPORTANTE)
 
-Córrelos **desde `backend/`** con `npx tsx` y **siempre pasando `--env-file=.env`**:
+Córrelos **desde `backend/`** con `npx tsx` y **siempre pasando `--env-file=.env`**. Este bloque es el **catálogo completo** de scripts (útil para recargar una fase suelta en `prueba`); **para el go-live manda la Regla 3 de arriba**, que no es igual: deja fuera `etl-ipt` y `etl-telas`.
 
 ```bash
 cd backend
@@ -13,12 +92,12 @@ npx tsx --env-file=.env migracion/cuadre-f2.ts             # F2: solo el reporte
 
 # F3 (producción + inventario PT) — EN ESTE ORDEN:
 npx tsx --env-file=.env migracion/etl-produccion.ts        # F3: corte/envío/recibo/EsMa (SIN kardex)
-npx tsx --env-file=.env migracion/etl-ipt.ts               # F3: kardex histórico de IPT (genera el kardex)
+npx tsx --env-file=.env migracion/etl-ipt.ts               # F3: kardex histórico de IPT ❌ NO EN EL GO-LIVE (Regla 2: el PT arranca del conteo físico; correrlo lo PISA)
 npx tsx --env-file=.env migracion/cuadre-f3.ts             # F3: solo el reporte de cuadre de toda la fase
 
 # F4 (compras / MRP / telas) — EN ESTE ORDEN:
 npx tsx --env-file=.env migracion/etl-compras-notas.ts     # F4: OC + notas legacy (texto libre, SIN kardex)
-npx tsx --env-file=.env migracion/etl-telas.ts             # F4: entradas/salidas/traspasos + lotes legacy (kardex de tela)
+npx tsx --env-file=.env migracion/etl-telas.ts             # F4: kardex de tela ❌ NO EN EL GO-LIVE (Regla 2: las telas arrancan del conteo físico; correrlo lo PISA)
 npx tsx --env-file=.env migracion/cuadre-f4.ts             # F4: cuadre TelasColAlm v1 vs Σ movimientos v2
 npx tsx --env-file=.env migracion/_progreso.ts             # F4: chequeo rápido de conteos (local, gitignored)
 
@@ -158,9 +237,31 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 > nada quede desalineado. Gana sobre `ETL_VENTANA_ANIOS`. Sin la variable NO recorta (se migra todo).
 > Un documento **sin fecha legible se queda** (un documento tirado no se recupera); un **proveedor**
 > dudoso, no (se da de alta en un minuto). Todo lo excluido sale listado en el reporte.
-> **⚠️ Con el corte, `IPT_Movs` (última de 2023) queda en CERO → el inventario de producto terminado
-> arrancaría vacío.** Está PENDIENTE de decisión de Daniel. Igual pasa con `CC_Auditorias` (2017) y
-> `PedidosReales` (2010).
+>
+> **Dónde se aplica el corte, loader por loader** (corregido el 11-ago-2026 — la lista anterior daba
+> por hecho que "depender de la orden" bastaba, y para dos loaders era FALSO):
+>
+> - **Por su propia fecha:** `Pedidos` (`FechaPedido`) · `Ordenes` (`Fecha`) · OC (`Fecha`) · notas
+>   (`FechaElaboracion`) · entradas/salidas de tela · **`IPT_Movs` (`Fecha`)** · **EsMa, los cuatro
+>   conceptos, por `EsMa.FechaEsMa`** · **productividad IP (`Fecha`) y almacén (`Alm_Prd.FechaAlm`)**
+>   · **muestrarios (`FechaSolicitado`)** · **cíclico histórico (`FechaIC`)**. Los **negritas** son los
+>   que se arreglaron el 11-ago: NO dependen de la orden y NO leían `ETL_DESDE`.
+> - **De rebote, por la ORDEN** (si la orden no migra, ellos tampoco): corte, envíos, recibos,
+>   comentarios, costos, fichas confiables, auditorías de calidad, ruta crítica, pedidos reales.
+> - **NO se recortan:** los **catálogos** (modelos, colores, tallas, telas…) — el corte aplica a
+>   DOCUMENTOS con fecha, no a catálogos (§Post-F9.25); los **proveedores** llevan su propio criterio
+>   (`ETL_PROVEEDORES_DESDE`, §Post-F9.23); y el **archivo histórico** lo ignora a propósito.
+>
+> **⚠️ Con el corte, `IPT_Movs` (última de 2023) queda en CERO → el inventario de PT arranca vacío.**
+> Ya está DECIDIDO (**§Post-F9.25**: arranca del conteo físico) y por eso `etl-ipt` **no se corre en el
+> go-live** (Regla 2). Igual pasa con `CC_Auditorias` (2017) y `PedidosReales` (2010): sus módulos
+> arrancan vacíos, y es lo esperado.
+>
+> **⚠️ EsMa entero recorta por la fecha de su CABECERA, en los CUATRO conceptos.** Es deliberado: los
+> abonos/descuentos/pagos NO dependen de la orden, así que sin ventana propia habrían entrado
+> COMPLETOS (554 + 743 + 5,935) contra apenas **384** documentos EsMa de 2025-2026 → el saldo de cada
+> maquilero (derivado, D3) saldría masivamente NEGATIVO, como si a todos se les hubiera pagado de más
+> durante 16 años. O entra el documento EsMa completo, o no entra.
 
 > **Depuración de PROVEEDORES (§Post-F9.23):** el Access trae **1,052 filas** de terceros en cuatro
 > catálogos y solo **155** movieron algo desde 2025. Con `ETL_DESDE=2025` se cargan **solo esos**

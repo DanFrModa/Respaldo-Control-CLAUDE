@@ -32,6 +32,15 @@
  *    como FK ni efecto (la entrada de PT del recibo la genera E4 sobre datos nuevos; aquí NO).
  *  • CANTIDAD ≤ 0 en un renglón → OMITIDO + reportado (el motor exige entero positivo).
  *
+ * ⭐ VENTANA TEMPORAL (§Post-F9.24, arreglada el 11-ago-2026). Este loader NO dependía de la orden
+ * (resuelve el modelo por `NumMod` contra el catálogo, que migra completo) y NO leía `ETL_DESDE`, así
+ * que con el corte de 2025-2026 cargaba igual los ~5,072 movimientos de 2019-2023 y el kardex de PT
+ * —existencia = Σ movimientos, D3— quedaba INFLADO con partidas de hace años, invisibles porque van
+ * con el Color/Talla sentinela que no sale en los selectores. Ahora recorta por `IPT_Movs.Fecha` (la
+ * fecha del documento) y CUENTA/REPORTA lo excluido, como los loaders de F2/F4. Con `ETL_DESDE=2025`
+ * este ETL queda en CERO — que es exactamente lo decidido: el almacén de PT arranca del CONTEO
+ * FÍSICO (§Post-F9.25), no del histórico. Por eso `etl-ipt` NO se corre en el go-live.
+ *
  * Idempotencia: por `Movimiento.origenId` = `IdIPT_MovsDet` con `origenTipo='migracion'`. Antes de
  * crear, se consulta el set de origenId ya migrados (una sola query) y se saltan los existentes; una
  * 2ª corrida no duplica. Carga CONCURRENTE acotada (`enLotes` + `conReintentoTransitorio`), POR
@@ -53,6 +62,7 @@ import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFecha, parsearTexto } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Nombre/etiqueta del Color y la Talla SENTINELA (decisión (c)). Inactivos, reusados por todo IPT. */
@@ -128,6 +138,10 @@ export interface ResultadoIptKardex {
   direccionDiscordante: number;
   /** # de renglones con IdIPT_TipoMov 0/vacío (tipo derivado de EnSa). */
   tipoVacio: number;
+  /** # de CABECERAS `IPT_Movs` excluidas por la ventana temporal. Listadas en el reporte. */
+  cabecerasFueraVentana: number;
+  /** # de RENGLONES `IPT_MovsDet` que se fueron con esas cabeceras (no entraron al kardex). */
+  detallesFueraVentana: number;
 }
 
 /** Tipo de movimiento del catálogo, resuelto por código (id + dirección). */
@@ -227,9 +241,34 @@ export async function cargarIptKardex(
     });
   }
 
-  // IPT_Movs: IdIPT_Movs → encabezado crudo.
+  // ── VENTANA TEMPORAL (§Post-F9.24) ─────────────────────────────────────────────────────────
+  // El recorte va en la CABECERA (`IPT_Movs.Fecha` es la fecha del movimiento; el detalle no trae
+  // fecha propia). Las cabeceras excluidas salen listadas UNA por una en el reporte; sus renglones
+  // se cuentan aparte para que el resumen cuadre (renglones vistos = migrados + omitidos + fuera).
+  const ventana = resolverVentana();
+  const todasLasCabeceras = leerCsv('IPT_Movs.csv');
+  const { dentro: filasMov, fuera: cabecerasFueraVentana } = filtrarPorVentana(
+    todasLasCabeceras,
+    'Fecha',
+    ventana,
+    reporte,
+    'IPT_Movs (inventario PT)',
+    (f) => `IdIPT_Movs=${f.IdIPT_Movs ?? '?'}`,
+  );
+  // Ids de las cabeceras excluidas: sin esto, sus renglones caerían en "sin encabezado mapeable",
+  // que es un diagnóstico DISTINTO (dato roto) y confundiría el reporte.
+  const idsFueraVentana = new Set<string>();
+  if (cabecerasFueraVentana > 0) {
+    const vivas = new Set(filasMov.map((f) => (f.IdIPT_Movs ?? '').trim()));
+    for (const f of todasLasCabeceras) {
+      const id = (f.IdIPT_Movs ?? '').trim();
+      if (id !== '' && !vivas.has(id)) idsFueraVentana.add(id);
+    }
+  }
+
+  // IPT_Movs: IdIPT_Movs → encabezado crudo (solo los de DENTRO de la ventana).
   const movPorId = new Map<string, MovCrudo>();
-  for (const f of leerCsv('IPT_Movs.csv')) {
+  for (const f of filasMov) {
     const id = (f.IdIPT_Movs ?? '').trim();
     if (id === '') continue;
     movPorId.set(id, {
@@ -258,6 +297,8 @@ export async function cargarIptKardex(
     piezas: 0,
     direccionDiscordante: 0,
     tipoVacio: 0,
+    cabecerasFueraVentana,
+    detallesFueraVentana: 0,
   };
 
   const detalles = leerCsv('IPT_MovsDet.csv');
@@ -276,6 +317,7 @@ export async function cargarIptKardex(
     modeloV1PorId,
     modAlmPorId,
     movPorId,
+    idsFueraVentana,
     yaMigrados,
   };
 
@@ -300,6 +342,8 @@ export async function cargarIptKardex(
       if (c.tipoVacio) resultado.tipoVacio += 1;
     } else if (c.estado === 'existente') {
       resultado.movimientos.existentes += 1;
+    } else if (c.estado === 'fueraVentana') {
+      resultado.detallesFueraVentana += 1;
     } else if (c.estado === 'omitido') {
       resultado.movimientos.omitidos += 1;
     } else {
@@ -327,12 +371,14 @@ interface ContextoIpt {
   modeloV1PorId: Map<string, { numMod: string; idEmpresaV1: string }>;
   modAlmPorId: Map<string, { idModeloV1: string; idAlmacenV1: string }>;
   movPorId: Map<string, MovCrudo>;
+  /** Cabeceras `IPT_Movs` que la ventana dejó fuera (ya reportadas UNA vez, al filtrar). */
+  idsFueraVentana: Set<string>;
   yaMigrados: Set<string>;
 }
 
 /** Contribución de UN renglón IPT_MovsDet a los conteos. */
 interface ContribDet {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
   piezas: number;
   direccionDiscordante: boolean;
   tipoVacio: boolean;
@@ -430,6 +476,11 @@ async function procesarDetalle(ctx: ContextoIpt, f: Record<string, string>): Pro
 
   const mov = ctx.movPorId.get(idMovV1);
   if (mov === undefined) {
+    // Su cabecera quedó FUERA de la ventana: no es un dato roto, es el recorte. Ya salió listada
+    // una vez (al filtrar); aquí solo se cuenta el renglón, sin repetir 6,886 renglones de reporte.
+    if (ctx.idsFueraVentana.has(idMovV1)) {
+      return SIN('fueraVentana');
+    }
     ctx.reporte.agregar(
       'IPT_MovsDet sin IPT_Movs (encabezado) mapeable (omitido)',
       `IdIPT_MovsDet=${idDet} IdIPT_Movs=${idMovV1}`,

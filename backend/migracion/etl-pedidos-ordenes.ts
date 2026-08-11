@@ -33,6 +33,7 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 import { calcularCuadreF2, formatearCuadreF2 } from './cuadre-f2.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { lineaColisiones } from './comun/colision-folio.js';
 import { cargarComentariosOrden } from './loaders/comentarios-orden.js';
 import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarOrdenes } from './loaders/ordenes.js';
@@ -95,6 +96,8 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   if (pedidos.fueraVentana > 0) {
     console.log(`    (fuera de la ventana: ${String(pedidos.fueraVentana)} pedidos)`);
   }
+  const avisoPedidos = lineaColisiones('Pedido', pedidos.colisionesFolio);
+  if (avisoPedidos !== null) console.log(avisoPedidos);
   log('PedidoLinea', pedidos.lineas);
 
   const reales = await cargarPedidosReales(sesion, cliente, reporte);
@@ -115,6 +118,9 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
       `    (fuera de la ventana: ${String(ordenes.fueraVentana)} órdenes — y con ellas su corte, envíos, recibos, RC, auditorías y costos)`,
     );
   }
+
+  const avisoOrdenes = lineaColisiones('Orden', ordenes.colisionesFolio);
+  if (avisoOrdenes !== null) console.log(avisoOrdenes);
 
   log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte));
 

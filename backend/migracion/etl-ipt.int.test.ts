@@ -16,6 +16,9 @@
  *  • EXISTENCIA = Σ de movimientos (D3): la suma del kardex por modelo×almacén es la esperada.
  *  • IDEMPOTENCIA: 2ª corrida no duplica.
  *  • CUADRE F3: el bloque de NO DOBLE CONTEO da verde (todo el kardex es origen 'migracion').
+ *  • ⭐ VENTANA TEMPORAL (§Post-F9.24): este ETL NO dependía de la orden y NO leía `ETL_DESDE`, así
+ *    que con el corte de 2025-2026 metía igual los movimientos de 2019-2023 y el kardex de PT
+ *    (existencia = Σ movimientos, D3) quedaba inflado. Ahora recorta por `IPT_Movs.Fecha` y REPORTA.
  */
 import { fileURLToPath } from 'node:url';
 
@@ -117,6 +120,10 @@ afterEach(() => {
   } else {
     process.env.TABLAS_DIR = tablasDirPrevio;
   }
+  // Las pruebas de ventana ensucian el entorno del proceso: se limpia SIEMPRE, pase lo que pase.
+  delete process.env.ETL_DESDE;
+  delete process.env.ETL_VENTANA_ANIOS;
+  delete process.env.ETL_VENTANA_REF;
 });
 
 /** Σ del kardex por modelo×almacén (entrada +, salida −), directo del detalle (D3). */
@@ -224,5 +231,57 @@ describe('ETL de inventario PT (kardex histórico) F3-E6 Pieza B (integración, 
     expect(cuadre.existencias.descuadres.some((d) => d.includes('Δ=8'))).toBe(true);
     // IPT_Mod_Alm 13 (M999) y 14 (M004 empresa 0) no son mapeables.
     expect(cuadre.existencias.noMapeables).toBe(2);
+  });
+
+  // ── VENTANA TEMPORAL (§Post-F9.24) ───────────────────────────────────────────────────────────
+  describe('ventana temporal (ETL_DESDE / ETL_VENTANA_*)', () => {
+    it('MIXTA: solo entran los movimientos posteriores al corte; lo anterior se REPORTA', async () => {
+      // Corte al 17-ago-2020 (los fixtures son de jul-ago 2020): quedan fuera las cabeceras
+      // 1 (28/07), 2 (15/08) y 3 (16/08) → sus 5 renglones (100, 101, 102, 108, 109).
+      process.env.ETL_VENTANA_ANIOS = '1';
+      process.env.ETL_VENTANA_REF = '2021-08-17';
+
+      const reporte = await ejecutarEtlIpt(cliente);
+
+      // Solo los detalles 103 (mov 4, 17/08) y 104 (mov 5, 18/08) entraron al kardex.
+      const movimientos = await cliente.movimiento.findMany({
+        where: { origenTipo: ORIGEN.migracion },
+        select: { origenId: true },
+      });
+      expect(movimientos.map((m) => m.origenId).sort()).toEqual(['103', '104']);
+
+      // Las existencias de 2020 NO están: el kardex ya no arrastra lo anterior al corte.
+      expect(await existencia(idModeloM001, idAlmPrimeras)).toBe(0);
+      expect(await existencia(idModeloM001, idAlmSegundas)).toBe(0);
+      expect(await existencia(idModeloM002, idAlmPrimeras)).toBe(48);
+
+      // NADA EN SILENCIO (§7): las cabeceras excluidas salen listadas con su id y su fecha.
+      const seccion = reporte
+        .obtenerSecciones()
+        .find((sec) => sec.titulo.startsWith('IPT_Movs (inventario PT): FUERA de la ventana'));
+      expect(seccion?.renglones).toHaveLength(3);
+      expect(seccion?.renglones.join('\n')).toContain('IdIPT_Movs=1');
+      // Y sus renglones NO se confunden con "sin encabezado mapeable" (dato roto), que es otra cosa.
+      expect(
+        reporte
+          .obtenerSecciones()
+          .find((sec) => sec.titulo.includes('sin IPT_Movs (encabezado) mapeable'))?.renglones,
+      ).toBeUndefined();
+    }, 180_000);
+
+    it('ETL_DESDE=2025 (el corte real del go-live): el kardex de PT queda en CERO', async () => {
+      // §Post-F9.25 — el almacén de PT arranca del CONTEO FÍSICO, no del histórico. Antes de este
+      // arreglo, este mismo escenario cargaba los 5 movimientos igual.
+      process.env.ETL_DESDE = '2025';
+
+      const reporte = await ejecutarEtlIpt(cliente);
+
+      expect(await cliente.movimiento.count({ where: { origenTipo: ORIGEN.migracion } })).toBe(0);
+      expect(await cliente.movimientoDetPt.count()).toBe(0);
+      const seccion = reporte
+        .obtenerSecciones()
+        .find((sec) => sec.titulo.startsWith('IPT_Movs (inventario PT): FUERA de la ventana'));
+      expect(seccion?.renglones).toHaveLength(7); // las 7 cabeceras del fixture
+    }, 180_000);
   });
 });
