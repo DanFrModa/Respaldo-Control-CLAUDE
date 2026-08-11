@@ -32,6 +32,7 @@
  *    con un criterio distinto al de los documentos. Sin ninguna de las dos, se cargan **todos**.
  */
 import { leerCsv } from './csv.js';
+import { parsearFecha } from './valores.js';
 import { leerDesdeAnio } from './ventana.js';
 
 /** Fuentes de terceros del sistema viejo (una por catálogo del Access). */
@@ -64,16 +65,19 @@ function leerDesde(): number {
 }
 
 /**
- * Año de una fecha del Access (`dd/mm/aaaa hh:mm:ss`). Devuelve `null` si no se puede leer — y un
- * movimiento sin fecha legible **NO** declara vivo a nadie: preferimos dejar fuera a un tercero
- * dudoso (se vuelve a dar de alta en un minuto) que arrastrar de vuelta la basura que se está
- * depurando.
+ * Año de una fecha del Access. Delega en el parser OFICIAL del ETL (`comun/valores.ts`) en vez de
+ * cortar la cadena a mano: ese acepta `d/m/yyyy` sin ceros a la izquierda y valida el rango, que es
+ * como el Access puede exportar según la configuración regional de quien haga el volcado. Un
+ * segundo parser divergente habría depurado terceros VIVOS en cuanto el dump cambiara de formato,
+ * sin avisar de nada.
+ *
+ * Devuelve `null` si no se puede leer — y un movimiento sin fecha legible **NO** declara vivo a
+ * nadie: preferimos dejar fuera a un tercero dudoso (se vuelve a dar de alta en un minuto) que
+ * arrastrar de vuelta la basura que se está depurando.
  */
 function anioDe(valor: string | undefined): number | null {
-  const v = (valor ?? '').trim();
-  if (v.length < 10) return null;
-  const anio = Number(v.slice(6, 10));
-  return Number.isInteger(anio) ? anio : null;
+  const fecha = parsearFecha(valor);
+  return fecha === null ? null : fecha.getUTCFullYear();
 }
 
 /** Ids de una columna de un CSV cuyas filas caen en `desde` o después. Ignora vacíos y `"0"`. */

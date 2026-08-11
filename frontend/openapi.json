@@ -89969,18 +89969,6 @@
                     "type": "string",
                     "maxLength": 2000
                   },
-                  "uuidCfdi": {
-                    "description": "UUID (folio fiscal) del CFDI leído, o null si se capturó a mano.",
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 64
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "xmlCfdi": {
                     "description": "XML del CFDI del que se leyeron los datos (para respaldar la CxP al confirmar).",
                     "anyOf": [

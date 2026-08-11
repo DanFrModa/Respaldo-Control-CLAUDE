@@ -310,6 +310,12 @@ export interface SelloCfdi {
   uuid: string;
   /** TOTAL del comprobante (con impuestos): la verdad fiscal con la que nace el cargo de CxP. */
   total: number;
+  /**
+   * RFC del EMISOR, tal como venía en el XML. Viaja al cargo de CxP (`rfcTercero`) —el reporte
+   * fiscal del contador lo imprime, y sin él la misma factura se veía distinta según por dónde
+   * hubiera entrado— y queda en la entrada para poder re-validar el sello al editarla.
+   */
+  emisorRfc: string;
   /** `Archivo` del XML ya subido a R2 (respalda el cargo, igual que una importación de F9). */
   idArchivo: string;
 }
@@ -326,7 +332,16 @@ export interface SelloCfdi {
  * irrecuperable. Es el mismo criterio que `importarCfdi` de F9.
  */
 export async function sellarCfdiEnEntrada(
-  datos: { xml: string | null; idProveedor: number; idEmpresa: number },
+  datos: {
+    xml: string | null;
+    idProveedor: number;
+    idEmpresa: number;
+    /**
+     * Entrada que se está RE-sellando (edición de un borrador). Se excluye de la búsqueda de
+     * "ese UUID ya se capturó": volver a subir el MISMO XML a la MISMA entrada no es duplicarla.
+     */
+    idEntradaActual?: number;
+  },
   bd?: ContextoBd,
   /**
    * Inyectable para probar sin R2 real. Se resuelve PEREZOSAMENTE (después del early return): una
@@ -373,6 +388,9 @@ export async function sellarCfdiEnEntrada(
     );
   }
 
+  // Ni puede estar ya capturado en OTRA entrada de tela (se corta ANTES de subir nada a R2).
+  await exigirUuidLibreEnEntradas(cliente, datos.idEmpresa, parsed.uuid, datos.idEntradaActual);
+
   const subido = await servicio.subirContenido({
     nombreOriginal: `cfdi-${parsed.uuid}.xml`,
     tipoMime: 'application/xml',
@@ -390,5 +408,103 @@ export async function sellarCfdiEnEntrada(
     select: { id: true },
   });
 
-  return { uuid: parsed.uuid, total: parsed.total, idArchivo: archivo.id };
+  return {
+    uuid: parsed.uuid,
+    total: parsed.total,
+    emisorRfc: parsed.emisorRfc,
+    idArchivo: archivo.id,
+  };
+}
+
+/**
+ * Exige que ese folio fiscal no esté ya capturado en OTRA entrada de tela de la empresa.
+ *
+ * El unique `(idEmpresa, uuidCfdi)` lo impediría de todos modos, pero con un **P2002 opaco** (500)
+ * —y, en el caso del sellado, después de haber subido ya el XML a R2—. Aquí se corta antes y con un
+ * mensaje que dice DÓNDE está la otra captura, que es lo que la persona necesita saber.
+ *
+ * `idEntradaActual` se excluye: volver a subir el MISMO XML a la MISMA entrada no es duplicarla.
+ */
+export async function exigirUuidLibreEnEntradas(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  uuid: string,
+  idEntradaActual?: number,
+): Promise<void> {
+  const otra = await cliente.entradaTela.findFirst({
+    where: {
+      idEmpresa,
+      uuidCfdi: uuid,
+      ...(idEntradaActual === undefined ? {} : { id: { not: idEntradaActual } }),
+    },
+    select: { folio: true },
+  });
+  if (otra !== null) {
+    throw new ErrorConflicto(
+      `Esta factura (UUID ${uuid}) ya se capturó en la entrada ${String(otra.folio)}: ` +
+        `no se recibe dos veces.`,
+    );
+  }
+}
+
+/** El sello que ya vive en una entrada (lo que queda del CFDI cuando la edición no trae XML). */
+export interface SelloGuardado {
+  uuidCfdi: string | null;
+  rfcCfdi: string | null;
+  idProveedor: number;
+}
+
+/**
+ * RE-VALIDA un sello YA GUARDADO contra el proveedor con el que va a quedar el documento
+ * (§Post-F9.21/22 — se estrenó al arreglar la edición del borrador).
+ *
+ * EL AGUJERO QUE TAPA: al editar un borrador, la factura NO se vuelve a subir (el sello se
+ * conserva — un dato fiscal no se pierde por editar), pero el PROVEEDOR sí se puede cambiar. Sin
+ * esta validación se podía capturar con el XML de "Textiles X", editar poniendo "Avíos Y" y
+ * confirmar: el cargo FISCAL nacía contra Y respaldado con la factura de X. El emisor del
+ * comprobante y el proveedor al que se le debe TIENEN que ser el mismo.
+ *
+ * Es la misma regla que aplica `sellarCfdiEnEntrada` cuando sí viene el XML; aquí se comprueba
+ * contra el RFC que quedó guardado, sin volver a bajar el XML de R2.
+ *
+ * Con el sello vacío (entrada sin CFDI) no hay nada que validar.
+ */
+export async function exigirSelloCompatibleConProveedor(
+  sello: SelloGuardado,
+  idProveedorNuevo: number,
+  bd?: ContextoBd,
+): Promise<void> {
+  if (sello.uuidCfdi === null) {
+    return;
+  }
+  const cliente = clienteLectura(bd);
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: idProveedorNuevo },
+    select: { nombre: true, rfc: true, factura: true },
+  });
+  if (proveedor === null) {
+    return; // `validarCabeceraYLineas` ya truena por proveedor inexistente, con mejor mensaje.
+  }
+  // §Post-F9.22 — el que NO factura no puede quedarse con una factura amarrada.
+  exigirProveedorQueFactura(proveedor, 'dejar la entrada con una factura (CFDI)');
+
+  if (sello.rfcCfdi === null) {
+    // Entrada sellada ANTES de que se guardara el RFC del emisor: no hay contra qué comparar. Se
+    // permite seguir editándola mientras el proveedor NO cambie; para cambiarlo hay que volver a
+    // subir el XML, que es lo único que puede probar quién facturó.
+    if (idProveedorNuevo !== sello.idProveedor) {
+      throw new ErrorValidacion(
+        `Esta entrada trae una factura (UUID ${sello.uuidCfdi}) capturada sin el RFC del emisor: ` +
+          `para cambiarle el proveedor hay que volver a subir el XML de la factura.`,
+      );
+    }
+    return;
+  }
+  if (proveedor.rfc !== null && normalizarRfc(proveedor.rfc) !== normalizarRfc(sello.rfcCfdi)) {
+    throw new ErrorValidacion(
+      `La factura capturada la emitió el RFC ${sello.rfcCfdi}, pero la entrada quedaría a nombre ` +
+        `del proveedor "${proveedor.nombre}" (RFC ${proveedor.rfc}). Corrige el proveedor o sube ` +
+        `la factura correcta.`,
+    );
+  }
 }

@@ -1043,6 +1043,15 @@ Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrad
 - **Aplica en:** 1 migración **aditiva** (`entradas_tela.total_cfdi` + `id_archivo_cfdi`), SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-08-07.
 
+**Correcciones de la revisión (11-ago-2026) — la regla completa de la EDICIÓN del borrador.** Los puntos 1-4 describían el alta y la confirmación, pero el borrador **se puede editar**, y por ahí se colaban tres agujeros que ya están cerrados:
+
+1. **Editar NO puede perder el sello.** La edición reescribía `uuidCfdi` con lo que mandara la pantalla (que al editar no lo mandaba) y no tocaba `totalCfdi` ni el archivo: el borrador se quedaba **sin folio fiscal**, la cuenta por pagar **no nacía al confirmar** y nadie se enteraba — además de liberar el unique del UUID, con lo que la misma factura se podía capturar dos veces. Ahora **el sello guardado se conserva** y el `uuidCfdi` **salió del contrato del PUT**: un folio fiscal suelto, sin su XML, no prueba nada.
+2. **Editar pasa por las MISMAS guardas que el alta.** Si la edición trae un `xmlCfdi` nuevo, se re-sella con todo el juego de validaciones (receptor = empresa activa, emisor = proveedor, proveedor que sí factura, UUID no repetido ni en otra entrada ni en CxP). Y si NO lo trae, el sello conservado **se re-valida contra el proveedor** con el que va a quedar el documento: sin eso se podía capturar con el XML de *Textiles X*, editar poniendo *Avíos Y* y confirmar → **cargo fiscal contra Y respaldado con la factura de X**.
+3. **El cargo nace CON el RFC del emisor.** El punto 2 decía "con su UUID, su RFC y el XML", pero el RFC no se guardaba en ningún lado: el reporte fiscal del contador lo imprimía vacío, y la **misma** factura se veía distinta según si la había capturado Finanzas o el almacén de telas. Se agregó `entradas_tela.rfc_cfdi` (columna **aditiva y nullable**) y viaja al cargo como `rfcTercero`.
+4. **La carrera con Finanzas se explica, no revienta.** El UUID se verifica al GUARDAR, pero el cargo nace al CONFIRMAR, que puede ser días después: si en medio alguien importó esa factura a CxP, la unique global del UUID tiraba un error opaco (500) y **la tela no podía entrar al almacén**. Ahora se re-checa dentro de la transacción y el choque se traduce a un conflicto legible que dice qué hacer.
+
+- **Aplica en:** 1 migración **aditiva** más (`entradas_tela.rfc_cfdi`), SIN permisos → **no requiere `SEED_ON_START`**.
+
 #### (Post-F9.22) — Dos tipos de proveedor: el que factura y el que no (DANIEL, 10-ago-2026)
 
 > *"Recuerda que en algún momento hablamos que tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
@@ -1158,7 +1167,9 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 > *"¿Qué pasa si dejamos todos esos modelos con su información de producción a manera informativa con la información que hay? Es decir, sin poder manipular las órdenes y sin poder ver toda la info de una OP, pero sí con algo de información fija… sin jalar maquileros, estampadores dentro de un catálogo, sino como un campo informativo. ¿Podría ser viable?"* → y al confirmar el lugar: *"me gustaría tenerlas también como archivo histórico de órdenes. Normalmente cuando queremos consultar algo de información, lo hacemos más desde las órdenes de producción que del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de prenda, fecha de producción, maquilero, etc."*
 
-**El problema que resuelve.** La migración lleva solo 2025-2026 (§Post-F9.24): de 5,451 órdenes del viejo, **262** entran como órdenes OPERATIVAS. Las otras ~5,200 son historia que se quiere **consultar**. Traerlas como `Orden` obligaría a arrastrar folios, kardex, costeo, ruta crítica, existencias y los catálogos de terceros que justo se depuraron (§Post-F9.23) — es decir, deshacer la depuración para poder mirar el pasado.
+**El problema que resuelve.** La migración lleva solo 2025-2026 (§Post-F9.24): de 5,451 órdenes del viejo, **262** entran como órdenes OPERATIVAS. Las otras ~5,200 son historia que se quiere **consultar**, y traerlas como `Orden` obligaría a arrastrar folios, kardex, costeo, ruta crítica, existencias y los catálogos de terceros que justo se depuraron (§Post-F9.23) — es decir, deshacer la depuración para poder mirar el pasado.
+
+**En el archivo van las 5,451, también las 262 recientes** (por eso la tabla de abajo dice 5,451 y no ~5,200). Una orden de 2025 aparece **a propósito en los dos lados**: viva en Producción, donde se opera, y en el archivo, donde se busca — así *"¿qué le hemos mandado a este taller?"* no cambia de respuesta el 1 de enero, ni hay que preguntarse en cuál de los dos lugares buscar. Las dos caras son de solo lectura desde el archivo: no hay forma de operar una orden desde aquí.
 
 **La idea de Daniel es la que lo hace barato: si es de SOLO LECTURA, no arrastra nada.** Tres tablas planas (`HistoricoOrdenV1` + sus líneas + sus procesos), sin folios, sin estados, sin permisos de operación.
 
@@ -1213,12 +1224,14 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 **La pregunta es la correcta, y la respuesta es sí.** La depuración (§Post-F9.23) deja fuera del catálogo **~897 de los 1,052** terceros del Access. Eso es exactamente lo que se quería —que no estorben al capturar una orden o una compra— pero su **teléfono y su dirección siguen sirviendo**: un taller con el que no se trabaja desde 2021 puede volver a hacer falta mañana.
 
-**Cómo quedó:** una tabla aparte, `DirectorioTerceroV1`, con los **1,052** terceros y sus datos de contacto. Es una **libreta de direcciones**, no un catálogo:
+**Cómo quedó:** una tabla aparte, `DirectorioTerceroV1`, con los terceros del Access y sus datos de contacto. Es una **libreta de direcciones**, no un catálogo:
 - **No sale en NINGÚN selector de captura** (ni telas, ni OC, ni maquila, ni EsMa).
 - **No tiene roles, ni `activo`, ni bandera de factura, ni FK a nada.**
 - **Es de SOLO LECTURA** y no hay —ni habrá— botón de *"convertir en proveedor"*. Si un taller vuelve, **se da de alta LIMPIO** en el catálogo copiando de aquí lo que sirva. Ese botón sería exactamente la puerta trasera por la que volvería la basura que se acaba de depurar; no ponerlo es la decisión, no un pendiente.
 
-**Entran los 1,052, también los 155 que sobrevivieron**, marcados con `enCatalogo`. Así la libreta es la **foto completa** del Access y nadie tiene que preguntarse en cuál de los dos lados buscar; el filtro *"Solo los que ya no están"* aísla a los depurados cuando eso es lo que se quiere.
+**Entran TODOS, también los 155 que sobrevivieron**, marcados con `enCatalogo`. Así la libreta es la **foto completa** del Access y nadie tiene que preguntarse en cuál de los dos lados buscar; el filtro *"Solo los que ya no están"* aísla a los depurados cuando eso es lo que se quiere.
+
+**Cuántos son, exactamente: 1,046 de las 1,052 filas** (corregido en la revisión del 11-ago-2026). Doce fichas no traen `Nombre`/`Apellidos`, y la primera versión las descartaba **en silencio** — entre ellas **Bordaprint, Fit Print y Eurobordados**, con teléfono y dirección reales, que es literalmente lo que la libreta existe para conservar. Su identidad vive en la clave corta (`Corto`), así que **el nombre cae a `Corto` cuando no hay otro** (el mismo fallback que ya usaba el archivo de órdenes): seis se recuperan así. Las **6** restantes son cascarones sin un solo dato —ni nombre, ni clave, ni teléfono— y se descartan **listándolas en el reporte** (plan §7: nada en silencio).
 
 **Lo que hace útil a la libreta** —más allá del teléfono— es la **última actividad**: la fecha del último documento suyo en el viejo (OC, corte, entrega, recibo o nota) y **cuántos documentos** tuvo. Contesta de un vistazo *"¿hace cuánto que no trabajamos con este, y qué tanto trabajamos?"*, que es lo que decide si vale la pena volver a llamarlo.
 

@@ -6,7 +6,8 @@
  * información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en
  * algún otro repositorio que no sea el catálogo de proveedores?"*
  *
- * La respuesta es esta libreta: los 1,052 terceros del Access con su teléfono y su dirección,
+ * La respuesta es esta libreta: los terceros del Access con su teléfono y su dirección (1,046 de las
+ * 1,052 fichas; las 6 que quedan fuera están vacías y el ETL las reporta),
  * **fuera** del catálogo `Proveedor`. La depuración (§Post-F9.23) sigue valiendo —esos ~897 no
  * estorban al capturar— pero su dato de contacto no se pierde.
  *
@@ -82,7 +83,12 @@ export async function listarDirectorioTerceros(
 
   // Desempate por id para que la paginación sea estable (muchos comparten fecha nula).
   const orderBy: Prisma.DirectorioTerceroV1OrderByWithRelationInput[] = [
-    { [f.ordenarPor]: f.direccion },
+    // `ultimaActividad` es NULLABLE y en Postgres `DESC` implica `NULLS FIRST`: ordenar por
+    // "¿con quién trabajamos más recientemente?" —la consulta natural de esta libreta— llenaba la
+    // primera página con los que nunca movieron nada. Los nulos van SIEMPRE al final.
+    f.ordenarPor === 'ultimaActividad'
+      ? { ultimaActividad: { sort: f.direccion, nulls: 'last' } }
+      : { [f.ordenarPor]: f.direccion },
     { id: 'asc' },
   ];
 

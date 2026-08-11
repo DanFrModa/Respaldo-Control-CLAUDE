@@ -270,7 +270,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       tipoDocumento,
       numeroDocumento: numeroDocumento.trim(),
       // §Post-F9.20: si la captura nació de leer el XML, la entrada recuerda de qué factura salió
-      // (y el servidor impide recibir la misma dos veces).
+      // (y el servidor impide recibir la misma dos veces). Al EDITAR no se manda: el sello ya vive
+      // en el documento y el servidor lo conserva — solo un XML nuevo lo reemplaza (el contrato del
+      // PUT ni siquiera acepta `uuidCfdi`, para que la pantalla no pueda borrar un dato fiscal).
       ...(propuesta === null ? {} : { uuidCfdi: propuesta.uuid }),
       ...(xmlCfdi === null ? {} : { xmlCfdi }),
       idProveedor: Number(idProveedor),
@@ -321,7 +323,10 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     if (idEditar === undefined) {
       crear.mutate(cuerpo, alTerminar);
     } else {
-      actualizar.mutate({ id: idEditar, cuerpo }, alTerminar);
+      // El PUT no lleva `uuidCfdi` (ver arriba): se quita explícitamente en vez de confiar en que
+      // el servidor lo ignore.
+      const { uuidCfdi: _sello, ...paraEditar } = cuerpo;
+      actualizar.mutate({ id: idEditar, cuerpo: paraEditar }, alTerminar);
     }
   }
 

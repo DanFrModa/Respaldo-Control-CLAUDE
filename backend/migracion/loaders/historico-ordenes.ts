@@ -25,8 +25,11 @@
  * POR LOTES (regla de Gabriel, 19-jun): son ~78,000 renglones entre los tres modelos; se escriben con
  * `createMany` en tandas, nunca uno por uno.
  *
- * IDEMPOTENTE: la llave es `(idEmpresa, idOrdenV1)`. Re-correrlo NO duplica — las órdenes que ya
- * están se saltan (con su detalle), y solo se insertan las que falten.
+ * IDEMPOTENTE, y en los dos sentidos: la llave es `(idEmpresa, idOrdenV1)`, así que re-correrlo no
+ * duplica; y re-correrlo además **COMPLETA lo que falte**. Cabecera e hijos de cada tanda de órdenes
+ * viajan en la MISMA transacción, y al arrancar se detectan las órdenes que quedaron sin detalle por
+ * una corrida interrumpida (antes: si la carga se caía después de las cabeceras, esas órdenes se
+ * quedaban sin una sola celda ni proceso para siempre, porque la re-corrida las daba por cargadas).
  */
 import type { Prisma, PrismaClient } from '../../src/datos/index.js';
 
@@ -53,6 +56,8 @@ export interface ResultadoHistoricoOrdenes {
   procesos: number;
   /** Órdenes cuyo modelo no se pudo mapear (quedan con el código en texto). */
   sinModelo: number;
+  /** Órdenes que ya estaban SIN su detalle (corrida anterior interrumpida) y se completaron. */
+  reparadas: number;
 }
 
 /** Lee un CSV de catálogo y devuelve `id viejo → nombre`, saltando ids vacíos. */
@@ -144,15 +149,69 @@ export function nombresDistintos(
   return [...nombres].sort((a, b) => a.localeCompare(b, 'es')).join(' · ');
 }
 
-/** Inserta en tandas (nunca fila por fila — regla de Gabriel). Devuelve cuántas escribió. */
-async function insertarPorLotes<T>(
+/** Celda color×talla ya despivotada, antes de conocer el id nuevo de su orden. */
+interface CeldaCruda {
+  color: string;
+  talla: string;
+  cantidad: number;
+}
+
+/** Una orden con TODO su detalle, lista para escribirse (cabecera + hijos van juntos). */
+interface TrabajoOrden {
+  idOrdenV1: string;
+  cabecera: Prisma.HistoricoOrdenV1CreateManyInput;
+  celdas: CeldaCruda[];
+  procesos: ProcesoCrudo[];
+}
+
+/** Lo que le falta a una orden YA cargada (re-corrida después de una caída a media carga). */
+interface Reparacion {
+  idOrden: number;
+  celdas: CeldaCruda[];
+  procesos: ProcesoCrudo[];
+}
+
+/**
+ * Cuántas órdenes (con sus hijos) van por TRANSACCIÓN. Cada tanda entra COMPLETA o no entra:
+ * cabeceras, celdas y procesos de esas órdenes se escriben en la misma transacción, para que una
+ * caída a media carga (son ~85,000 renglones, y Railway rota contraseñas) no pueda dejar órdenes sin
+ * detalle. Bajo a propósito frente al `LOTE` de filas: una tanda son ~250 cabeceras + sus ~2,000
+ * celdas + sus ~1,500 procesos.
+ */
+const ORDENES_POR_TX = 250;
+
+/**
+ * Opciones de cada transacción de carga. Explícitas porque la BD está del otro lado de la red
+ * (Railway) y los defaults de Prisma (maxWait 2 s / timeout 5 s) dan `P2028` con tandas de miles de
+ * filas. Es el mismo criterio con el que el script del ETL crea su cliente.
+ */
+const OPCIONES_TX = { maxWait: 20_000, timeout: 120_000 } as const;
+
+/** Inserta en tandas (nunca fila por fila — regla de Gabriel). Devuelve cuántas filas ENTRARON. */
+async function insertarEnTandas<T>(
   filas: T[],
-  escribir: (tanda: T[]) => Promise<unknown>,
+  escribir: (tanda: T[]) => Promise<{ count: number }>,
 ): Promise<number> {
+  let escritas = 0;
   for (let i = 0; i < filas.length; i += LOTE) {
-    await escribir(filas.slice(i, i + LOTE));
+    escritas += (await escribir(filas.slice(i, i + LOTE))).count;
   }
-  return filas.length;
+  return escritas;
+}
+
+/** Proyecta los procesos de una orden a las filas de `HistoricoOrdenV1Proceso`. */
+function aFilasProceso(
+  idOrden: number,
+  procesos: readonly ProcesoCrudo[],
+): Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] {
+  return procesos.map((p) => ({
+    idOrden,
+    tipo: p.tipo,
+    fecha: p.fecha,
+    tercero: p.tercero,
+    cantidad: p.cantidad,
+    observaciones: p.observaciones,
+  }));
 }
 
 export async function cargarHistoricoOrdenes(
@@ -179,11 +238,27 @@ export async function cargarHistoricoOrdenes(
     celdas: 0,
     procesos: 0,
     sinModelo: 0,
+    reparadas: 0,
   };
 
-  // Lo que YA está cargado (idempotencia): se salta sin volver a tocarlo.
-  const yaCargadas = new Set(
-    (await cli.historicoOrdenV1.findMany({ select: { idOrdenV1: true } })).map((o) => o.idOrdenV1),
+  // Lo que YA está cargado (idempotencia): `idOrdenV1` → id nuevo.
+  const yaCargadas = new Map(
+    (await cli.historicoOrdenV1.findMany({ select: { id: true, idOrdenV1: true } })).map((o) => [
+      o.idOrdenV1,
+      o.id,
+    ]),
+  );
+  // …y cuáles de esas ya tienen ESCRITOS sus hijos. Sin esto, la idempotencia solo valía si la
+  // corrida terminaba completa: una caída después de las cabeceras (son ~85,000 renglones y la BD
+  // está del otro lado de la red) dejaba miles de órdenes sin una sola celda ni proceso PARA
+  // SIEMPRE, porque re-correr las daba por cargadas e insertaba 0. Ahora re-correr COMPLETA lo que
+  // falte. La granularidad es la orden entera, y es exacta porque cabecera e hijos se escriben en la
+  // MISMA transacción (ver `ORDENES_POR_TX`): nunca queda una orden a medias.
+  const conLineas = new Set(
+    (await cli.historicoOrdenV1Linea.groupBy({ by: ['idOrden'] })).map((g) => g.idOrden),
+  );
+  const conProcesos = new Set(
+    (await cli.historicoOrdenV1Proceso.groupBy({ by: ['idOrden'] })).map((g) => g.idOrden),
   );
 
   // Detalle color×talla agrupado por orden (se lee una vez).
@@ -213,31 +288,8 @@ export async function cargarHistoricoOrdenes(
     procesosPorOrden.set(p.idOrdenV1, lista);
   }
 
-  // ── Cabeceras ────────────────────────────────────────────────────────────────
-  const cabeceras: Prisma.HistoricoOrdenV1CreateManyInput[] = [];
-  /** idOrdenV1 → celdas/procesos, para escribirlos cuando ya se conozcan los ids nuevos. */
-  const pendientes = new Map<
-    string,
-    { celdas: { color: string; talla: string; cantidad: number }[] }
-  >();
-
-  for (const f of leerCsv('Ordenes.csv')) {
-    const idOrdenV1 = (f.IdOrdenes ?? '').trim();
-    if (idOrdenV1 === '' || yaCargadas.has(idOrdenV1)) {
-      if (idOrdenV1 !== '') resultado.existentes += 1;
-      continue;
-    }
-    const idEmpresa = mapaEmpresa.get((f.IdEmpresas ?? '').trim());
-    if (idEmpresa === undefined) {
-      // Las 6 empresas muertas del viejo no migraron: sus órdenes no tienen dónde colgar.
-      resultado.sinEmpresa += 1;
-      continue;
-    }
-
-    const idModeloV1 = (f.IdModelos ?? '').trim();
-    const idModelo = mapaModelo.get(idModeloV1) ?? null;
-    if (idModelo === null) resultado.sinModelo += 1;
-
+  /** Despivota la matriz color×talla de una orden (reporta la cadena ambigua una sola vez). */
+  function celdasDe(f: Record<string, string>, idOrdenV1: string): CeldaCruda[] {
     // Matriz color×talla: se despivota con el MISMO lector posicional de F2 (`Ordenes.Tallas` viene
     // en ventanas fijas de 2 chars). Si la cadena es ambigua se reporta, pero la cantidad NO se
     // pierde: lo dudoso es la etiqueta, no el número.
@@ -248,7 +300,7 @@ export async function cargarHistoricoOrdenes(
         `Orden ${(f.Numero ?? '?').trim()} · "${tallas.original}"`,
       );
     }
-    const celdas: { color: string; talla: string; cantidad: number }[] = [];
+    const celdas: CeldaCruda[] = [];
     for (const det of detPorOrden.get(idOrdenV1) ?? []) {
       const color = (det.Color ?? '').trim();
       for (const c of despivotarRenglon(cantidadesDeRenglon(det), tallas.porColumna)) {
@@ -260,69 +312,140 @@ export async function cargarHistoricoOrdenes(
         });
       }
     }
+    return celdas;
+  }
+
+  // ── Qué hay que escribir: órdenes NUEVAS y órdenes ya cargadas a las que les FALTA el detalle ──
+  const nuevas: TrabajoOrden[] = [];
+  const reparaciones: Reparacion[] = [];
+
+  for (const f of leerCsv('Ordenes.csv')) {
+    const idOrdenV1 = (f.IdOrdenes ?? '').trim();
+    if (idOrdenV1 === '') continue;
 
     const procesosDeEsta = procesosPorOrden.get(idOrdenV1) ?? [];
-    cabeceras.push({
-      idEmpresa,
-      idOrdenV1,
-      numero: (f.Numero ?? '').trim() || idOrdenV1,
-      fecha: parsearFecha(f.Fecha),
-      fechaEntrega: parsearFecha(f.FechaEntrega),
-      idModelo,
-      codigoModeloV1: modelosV1.get(idModeloV1) ?? null,
-      cliente: clientes.get((f.IdClientes ?? '').trim()) ?? null,
-      maquilero: maquileros.get((f.IdMaquileros ?? '').trim()) ?? null,
-      // §Post-F9.27 — TODOS los que la trabajaron, no solo el de la cabecera.
-      cortadores: nombresDistintos(procesosDeEsta, ['corte']),
-      maquileros: nombresDistintos(procesosDeEsta, ['envio_maquila', 'recibo_maquila']),
-      estampadores: nombresDistintos(procesosDeEsta, ['envio_estampado', 'recibo_estampado']),
-      etiquetaMarca: etiquetas.get((f.IdEtiquetasM ?? '').trim()) ?? null,
-      tela: telas.get((f.IdTelasDis ?? '').trim()) ?? null,
-      composicion: parsearTexto(f.Composicion),
-      observaciones: parsearTexto(f.Observaciones),
-      cancelada: parsearBandera(f.OrdCancelada),
-      motivoCancelada: parsearTexto(f.MotivoCancelada),
-      totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),
-    });
-    pendientes.set(idOrdenV1, { celdas });
-  }
-
-  resultado.ordenes = await insertarPorLotes(cabeceras, (tanda) =>
-    cli.historicoOrdenV1.createMany({ data: tanda, skipDuplicates: true }),
-  );
-
-  // ── Hijos: se resuelven los ids nuevos de una sola lectura ───────────────────
-  const idsNuevos = new Map(
-    (await cli.historicoOrdenV1.findMany({ select: { id: true, idOrdenV1: true } })).map((o) => [
-      o.idOrdenV1,
-      o.id,
-    ]),
-  );
-
-  const lineas: Prisma.HistoricoOrdenV1LineaCreateManyInput[] = [];
-  const procesos: Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] = [];
-  for (const [idOrdenV1, datos] of pendientes) {
-    const idOrden = idsNuevos.get(idOrdenV1);
-    if (idOrden === undefined) continue;
-    for (const c of datos.celdas) lineas.push({ idOrden, ...c });
-    for (const p of procesosPorOrden.get(idOrdenV1) ?? []) {
-      procesos.push({
-        idOrden,
-        tipo: p.tipo,
-        fecha: p.fecha,
-        tercero: p.tercero,
-        cantidad: p.cantidad,
-        observaciones: p.observaciones,
-      });
+    const idYaCargada = yaCargadas.get(idOrdenV1);
+    if (idYaCargada !== undefined) {
+      resultado.existentes += 1;
+      // ¿Le faltan hijos de una corrida anterior interrumpida? Se completa; no se re-inserta lo que
+      // ya está (por eso la comprobación es por orden, no por fila).
+      const debeTenerCeldas = (detPorOrden.get(idOrdenV1) ?? []).length > 0;
+      const faltanCeldas = debeTenerCeldas && !conLineas.has(idYaCargada);
+      const faltanProcesos = procesosDeEsta.length > 0 && !conProcesos.has(idYaCargada);
+      if (faltanCeldas || faltanProcesos) {
+        reparaciones.push({
+          idOrden: idYaCargada,
+          celdas: faltanCeldas ? celdasDe(f, idOrdenV1) : [],
+          procesos: faltanProcesos ? procesosDeEsta : [],
+        });
+      }
+      continue;
     }
+
+    const idEmpresa = mapaEmpresa.get((f.IdEmpresas ?? '').trim());
+    if (idEmpresa === undefined) {
+      // Las 6 empresas muertas del viejo no migraron: sus órdenes no tienen dónde colgar.
+      resultado.sinEmpresa += 1;
+      continue;
+    }
+
+    const idModeloV1 = (f.IdModelos ?? '').trim();
+    const idModelo = mapaModelo.get(idModeloV1) ?? null;
+    if (idModelo === null) resultado.sinModelo += 1;
+
+    const celdas = celdasDe(f, idOrdenV1);
+    nuevas.push({
+      idOrdenV1,
+      celdas,
+      procesos: procesosDeEsta,
+      cabecera: {
+        idEmpresa,
+        idOrdenV1,
+        numero: (f.Numero ?? '').trim() || idOrdenV1,
+        fecha: parsearFecha(f.Fecha),
+        fechaEntrega: parsearFecha(f.FechaEntrega),
+        idModelo,
+        codigoModeloV1: modelosV1.get(idModeloV1) ?? null,
+        cliente: clientes.get((f.IdClientes ?? '').trim()) ?? null,
+        maquilero: maquileros.get((f.IdMaquileros ?? '').trim()) ?? null,
+        // §Post-F9.27 — TODOS los que la trabajaron, no solo el de la cabecera.
+        cortadores: nombresDistintos(procesosDeEsta, ['corte']),
+        maquileros: nombresDistintos(procesosDeEsta, ['envio_maquila', 'recibo_maquila']),
+        estampadores: nombresDistintos(procesosDeEsta, ['envio_estampado', 'recibo_estampado']),
+        etiquetaMarca: etiquetas.get((f.IdEtiquetasM ?? '').trim()) ?? null,
+        tela: telas.get((f.IdTelasDis ?? '').trim()) ?? null,
+        composicion: parsearTexto(f.Composicion),
+        observaciones: parsearTexto(f.Observaciones),
+        cancelada: parsearBandera(f.OrdCancelada),
+        motivoCancelada: parsearTexto(f.MotivoCancelada),
+        totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),
+      },
+    });
   }
 
-  resultado.celdas = await insertarPorLotes(lineas, (tanda) =>
-    cli.historicoOrdenV1Linea.createMany({ data: tanda }),
-  );
-  resultado.procesos = await insertarPorLotes(procesos, (tanda) =>
-    cli.historicoOrdenV1Proceso.createMany({ data: tanda }),
-  );
+  // ── Escritura: cabecera + hijos JUNTOS, por tandas, cada tanda en UNA transacción ────────────
+  for (let i = 0; i < nuevas.length; i += ORDENES_POR_TX) {
+    const tanda = nuevas.slice(i, i + ORDENES_POR_TX);
+    await cli.$transaction(async (tx) => {
+      const creadas = await tx.historicoOrdenV1.createMany({
+        data: tanda.map((t) => t.cabecera),
+        skipDuplicates: true,
+      });
+      // Se cuenta lo REALMENTE insertado, no lo intentado: con `skipDuplicates` no es lo mismo.
+      resultado.ordenes += creadas.count;
+
+      // Los ids nuevos se leen DENTRO de la transacción, acotados a esta tanda.
+      const ids = new Map(
+        (
+          await tx.historicoOrdenV1.findMany({
+            where: { idOrdenV1: { in: tanda.map((t) => t.idOrdenV1) } },
+            select: { id: true, idOrdenV1: true },
+          })
+        ).map((o) => [o.idOrdenV1, o.id]),
+      );
+
+      const lineas: Prisma.HistoricoOrdenV1LineaCreateManyInput[] = [];
+      const procesos: Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] = [];
+      for (const t of tanda) {
+        const idOrden = ids.get(t.idOrdenV1);
+        if (idOrden === undefined) continue; // inalcanzable: se acaba de insertar.
+        for (const c of t.celdas) lineas.push({ idOrden, ...c });
+        procesos.push(...aFilasProceso(idOrden, t.procesos));
+      }
+      resultado.celdas += await insertarEnTandas(lineas, (lote) =>
+        tx.historicoOrdenV1Linea.createMany({ data: lote }),
+      );
+      resultado.procesos += await insertarEnTandas(procesos, (lote) =>
+        tx.historicoOrdenV1Proceso.createMany({ data: lote }),
+      );
+    }, OPCIONES_TX);
+  }
+
+  // ── Reparación de corridas anteriores interrumpidas ─────────────────────────
+  for (let i = 0; i < reparaciones.length; i += ORDENES_POR_TX) {
+    const tanda = reparaciones.slice(i, i + ORDENES_POR_TX);
+    await cli.$transaction(async (tx) => {
+      const lineas: Prisma.HistoricoOrdenV1LineaCreateManyInput[] = [];
+      const procesos: Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] = [];
+      for (const r of tanda) {
+        for (const c of r.celdas) lineas.push({ idOrden: r.idOrden, ...c });
+        procesos.push(...aFilasProceso(r.idOrden, r.procesos));
+      }
+      resultado.celdas += await insertarEnTandas(lineas, (lote) =>
+        tx.historicoOrdenV1Linea.createMany({ data: lote }),
+      );
+      resultado.procesos += await insertarEnTandas(procesos, (lote) =>
+        tx.historicoOrdenV1Proceso.createMany({ data: lote }),
+      );
+    }, OPCIONES_TX);
+  }
+  if (reparaciones.length > 0) {
+    resultado.reparadas = reparaciones.length;
+    reporte.nota(
+      `Histórico: ${String(reparaciones.length)} órdenes que ya estaban cargadas SIN su detalle ` +
+        `(corrida anterior interrumpida) se completaron en esta corrida.`,
+    );
+  }
 
   if (resultado.sinEmpresa > 0) {
     reporte.nota(

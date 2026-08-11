@@ -80,9 +80,15 @@ vi.mock('@/api/proveedores', () => ({
     };
   },
 }));
+// Los parámetros de ruta son MUTABLES: `…/:id/editar` es lo que distingue el alta de la edición, y
+// hay pruebas de las dos (cada una fija `parametrosRuta.valor` antes de renderizar).
+const { parametrosRuta } = vi.hoisted(() => {
+  const parametrosRuta: { valor: { id?: string } } = { valor: {} };
+  return { parametrosRuta };
+});
 vi.mock('react-router-dom', async () => {
   const real = await vi.importActual<typeof ReactRouter>('react-router-dom');
-  return { ...real, useNavigate: () => navegar, useParams: () => ({}) };
+  return { ...real, useNavigate: () => navegar, useParams: () => parametrosRuta.valor };
 });
 // La captura de renglones se simula: un botón que emite un renglón ya armado.
 // `vi.hoisted`: el `vi.mock` se iza por encima de las declaraciones del módulo.
@@ -131,6 +137,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     navegar.mockReset();
     useEntradaTelaMock.mockReset();
     useEntradaTelaMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    parametrosRuta.valor = {};
   });
 
   it('manda cabecera + renglones (con precios y lote del proveedor) al guardar el borrador', async () => {
@@ -350,5 +357,44 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     expect(screen.getByTestId('entrada-proveedor-sin-factura')).toHaveTextContent(
       'cuenta por pagar',
     );
+  });
+
+  it('al EDITAR un borrador NO manda `uuidCfdi`: el sello de la factura no se toca desde aquí', async () => {
+    // El borrador nació de un XML (trae su UUID sellado). Editarlo NO puede borrarlo: el cuerpo del
+    // PUT ni siquiera lo lleva — el servidor conserva el sello y solo un XML nuevo lo reemplaza.
+    parametrosRuta.valor = { id: '5' };
+    useEntradaTelaMock.mockReturnValue({
+      data: {
+        id: 5,
+        folio: 12,
+        estatus: 'borrador',
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A-1001',
+        uuidCfdi: '11111111-1111-1111-1111-111111111111',
+        totalCfdi: 920,
+        idProveedor: 3,
+        proveedor: 'Textiles del Norte',
+        fecha: '2026-08-06',
+        idAlmacen: 2,
+        observaciones: null,
+        avisos: [],
+        lineas: [],
+      },
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    await usuario.click(screen.getByTestId('agregar-renglon'));
+    await usuario.click(screen.getByTestId('entrada-guardar'));
+
+    expect(actualizarMutate).toHaveBeenCalledTimes(1);
+    const argumentos = actualizarMutate.mock.calls[0]?.[0] as { id: number; cuerpo: object };
+    expect(argumentos.id).toBe(5);
+    expect(argumentos.cuerpo).not.toHaveProperty('uuidCfdi');
+    expect(crearMutate).not.toHaveBeenCalled();
   });
 });

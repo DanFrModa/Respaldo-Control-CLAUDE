@@ -141,6 +141,28 @@ function construirWhere(
   return where;
 }
 
+/**
+ * Cláusula de orden de UNA columna, con los NULOS SIEMPRE AL FINAL.
+ *
+ * En Postgres `DESC` implica `NULLS FIRST`, y el orden por defecto del archivo es justamente
+ * `fecha desc`: sin esto, la primera página se llenaba con las órdenes viejas que no traían fecha
+ * (el viejo la dejaba vacía a menudo) en vez de con las más recientes — que es lo que se busca. Lo
+ * mismo con el cliente. `numero` y `totalPiezas` no son nullable: van con la forma simple.
+ */
+function columnaDeOrden(
+  columna: DatosHistoricoOrdenesQuery['ordenarPor'],
+  direccion: 'asc' | 'desc',
+): Prisma.HistoricoOrdenV1OrderByWithRelationInput {
+  switch (columna) {
+    case 'fecha':
+      return { fecha: { sort: direccion, nulls: 'last' } };
+    case 'cliente':
+      return { cliente: { sort: direccion, nulls: 'last' } };
+    default:
+      return { [columna]: direccion };
+  }
+}
+
 /** Lista el archivo con filtros y paginación. Permiso `ordenes.ver`. */
 export async function listarHistoricoOrdenes(
   sesion: SesionUsuario,
@@ -154,7 +176,7 @@ export async function listarHistoricoOrdenes(
 
   // Desempate por id: sin él, dos órdenes de la misma fecha pueden bailar entre páginas.
   const orderBy: Prisma.HistoricoOrdenV1OrderByWithRelationInput[] = [
-    { [f.ordenarPor]: f.direccion },
+    columnaDeOrden(f.ordenarPor, f.direccion),
     { id: 'desc' },
   ];
 

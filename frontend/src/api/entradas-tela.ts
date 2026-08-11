@@ -41,6 +41,12 @@ export type EntradasTelaQuery = NonNullable<
 /** Cuerpo de alta de una entrada de tela. */
 export type EntradaTelaCrear =
   paths['/api/inventarios/telas/entradas']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de EDICIÓN del borrador. NO es igual al de alta: no lleva `uuidCfdi` (el folio fiscal ya
+ * está sellado en el documento y el servidor lo conserva; solo un `xmlCfdi` nuevo lo reemplaza).
+ */
+export type EntradaTelaActualizar =
+  paths['/api/inventarios/telas/entradas/{id}']['put']['requestBody']['content']['application/json'];
 /** Un renglón de captura del documento. */
 export type EntradaTelaLineaEntrada = NonNullable<EntradaTelaCrear['lineas']>[number];
 /** Cuerpo de la cancelación (motivo obligatorio). */
@@ -77,7 +83,7 @@ async function crear(cuerpo: EntradaTelaCrear): Promise<EntradaTela> {
 /** Argumentos de la edición del borrador. */
 export interface ArgsActualizarEntradaTela {
   id: number;
-  cuerpo: EntradaTelaCrear;
+  cuerpo: EntradaTelaActualizar;
 }
 
 async function actualizar({ id, cuerpo }: ArgsActualizarEntradaTela): Promise<EntradaTela> {

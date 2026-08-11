@@ -56,6 +56,11 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
     `  Directorio de terceros: ${String(dir.creados)} cargados (${String(dir.existentes)} ya estaban)`,
   );
   console.log(`    (de ellos, ${String(dir.enCatalogo)} SÍ están en el catálogo depurado)`);
+  if (dir.descartados > 0) {
+    console.log(
+      `    Fichas VACÍAS del Access que quedaron fuera: ${String(dir.descartados)} (detalle en el reporte)`,
+    );
+  }
 
   return reporte;
 }

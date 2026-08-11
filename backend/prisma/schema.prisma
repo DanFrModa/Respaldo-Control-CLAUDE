@@ -1514,6 +1514,14 @@ model EntradaTela {
   /// PAGAR al confirmar (§Post-F9.21). NO se deriva de los renglones —esos son cantidad×precio sin
   /// IVA—: el cargo entra por lo que dice la factura. NULL si la entrada no nació de un CFDI.
   totalCfdi       Decimal?                 @map("total_cfdi") @db.Decimal(14, 2)
+  /// RFC del EMISOR del CFDI, tal como venía en el XML. Se guarda por dos razones:
+  ///  1. El cargo de CxP nace CON su RFC (igual que una importación de CFDI de F9), que es lo que
+  ///     el reporte fiscal del contador imprime; sin él, la misma factura se veía distinta según
+  ///     por dónde hubiera entrado.
+  ///  2. Es lo que permite RE-VALIDAR el sello al editar el borrador —¿el proveedor que quedó sigue
+  ///     siendo el que facturó?— sin volver a bajar el XML de R2.
+  /// NULL si la entrada no nació de un CFDI (o si es anterior a esta columna).
+  rfcCfdi         String?                  @map("rfc_cfdi")
   /// XML de la factura guardado en R2 (el mismo del que se leyeron los datos). Lo necesita el cargo
   /// fiscal de CxP para quedar respaldado, igual que una importación de CFDI de F9. SetNull.
   idArchivoCfdi   String?                  @map("id_archivo_cfdi")

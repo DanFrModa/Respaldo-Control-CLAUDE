@@ -36324,8 +36324,6 @@ export interface paths {
             fecha: string;
             idAlmacen: number;
             observaciones?: string;
-            /** @description UUID (folio fiscal) del CFDI leído, o null si se capturó a mano. */
-            uuidCfdi?: string | null;
             /** @description XML del CFDI del que se leyeron los datos (para respaldar la CxP al confirmar). */
             xmlCfdi?: string | null;
             lineas: {

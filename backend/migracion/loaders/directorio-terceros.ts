@@ -6,9 +6,16 @@
  * información acá, sin tener toda la información basura en el catálogo? ¿Podríamos guardarlo en
  * algún otro repositorio que no sea el catálogo de proveedores?"*
  *
- * Carga los **1,052** terceros de los cuatro catálogos del Access con sus datos de contacto, como
- * una libreta de direcciones **plana y de solo lectura** — deliberadamente fuera del catálogo
- * `Proveedor`, para que la depuración (§Post-F9.23) siga sirviendo de algo.
+ * Carga los terceros de los cuatro catálogos del Access con sus datos de contacto, como una libreta
+ * de direcciones **plana y de solo lectura** — deliberadamente fuera del catálogo `Proveedor`, para
+ * que la depuración (§Post-F9.23) siga sirviendo de algo.
+ *
+ * CUÁNTOS SON, exactamente (medido sobre el dump): de las **1,052** filas de los cuatro catálogos se
+ * cargan **1,046**. Doce no traen `Nombre`/`Apellidos`; seis de ellas sí traen `Corto` —"Bordaprint",
+ * "Fit Print", "Eurobordados", "Polanco", "Edgar", "Lunabet"—, y esas entran con su clave corta como
+ * nombre (tres de ellas con teléfono y dirección reales: justo lo que la libreta existe para
+ * guardar). Las **6** restantes son cascarones sin un solo dato: se descartan y se REPORTAN, nunca
+ * en silencio (plan §7).
  *
  * ENTRAN TODOS, también los 155 que sobrevivieron: se marcan con `enCatalogo` para que la pantalla
  * pueda decir *"este ya está dado de alta"*. Así el directorio es la foto completa del Access y
@@ -40,6 +47,8 @@ export interface ResultadoDirectorioTerceros {
   existentes: number;
   /** De los cargados, cuántos SÍ están en el catálogo depurado. */
   enCatalogo: number;
+  /** Fichas VACÍAS del Access que no se pudieron cargar (sin nombre ni clave corta). */
+  descartados: number;
 }
 
 /** Un documento del viejo que "cuenta" como actividad de un tercero. */
@@ -151,8 +160,20 @@ export async function cargarDirectorioTerceros(
 
   const filas: Prisma.DirectorioTerceroV1CreateManyInput[] = [];
   let existentes = 0;
+  let descartados = 0;
 
-  /** Agrega un tercero al lote, si no estaba ya. `catalogoActividad` puede diferir de `fuente`. */
+  /**
+   * Agrega un tercero al lote, si no estaba ya. `catalogoActividad` puede diferir de `fuente`.
+   *
+   * EL NOMBRE CAE A `Corto` CUANDO NO HAY OTRO. Varios talleres y estampadores del viejo tienen su
+   * identidad SOLO en la clave corta (`Nombre`/`Apellidos` vacíos): "Bordaprint", "Fit Print",
+   * "Eurobordados"… y con ella su teléfono y su dirección, que es LITERALMENTE lo que esta libreta
+   * existe para conservar. Descartarlos por no traer nombre largo tiraba justo el dato pedido. Es el
+   * mismo fallback que ya usa el archivo de órdenes (`historico-ordenes.ts`, `mapaMaquileros`).
+   *
+   * Lo que aun así queda fuera —fichas sin nombre NI clave corta, cascarones con una bandera y nada
+   * más— se REPORTA (plan §7: nada se descarta en silencio).
+   */
   function agregar(
     fuente: string,
     idViejo: string,
@@ -162,7 +183,26 @@ export async function cargarDirectorioTerceros(
       'fuente' | 'idViejo' | 'ultimaActividad' | 'documentos' | 'enCatalogo'
     >,
   ): void {
-    if (idViejo === '' || datos.nombre.trim() === '') return;
+    if (idViejo === '') {
+      descartados += 1;
+      reporte.agregar(
+        'Directorio histórico: ficha sin id (no se puede cargar)',
+        `${fuente} · "${datos.nombre.trim()}"`,
+      );
+      return;
+    }
+    const nombre = datos.nombre.trim() !== '' ? datos.nombre.trim() : (datos.corto ?? '').trim();
+    if (nombre === '') {
+      descartados += 1;
+      reporte.agregar(
+        'Directorio histórico: ficha VACÍA del Access (sin nombre ni clave corta; se descarta)',
+        `${fuente} #${idViejo}` +
+          (datos.telefono === null || datos.telefono === undefined
+            ? ''
+            : ` · tel. ${datos.telefono}`),
+      );
+      return;
+    }
     if (yaCargados.has(`${fuente}:${idViejo}`)) {
       existentes += 1;
       return;
@@ -170,11 +210,12 @@ export async function cargarDirectorioTerceros(
     const act = actividad.get(`${catalogoActividad}:${idViejo}`);
     filas.push({
       ...datos,
+      nombre,
       fuente,
       idViejo,
       ultimaActividad: act?.ultima ?? null,
       documentos: act?.documentos ?? 0,
-      enCatalogo: enCatalogo.has(normalizarParaDedup(datos.nombre)),
+      enCatalogo: enCatalogo.has(normalizarParaDedup(nombre)),
     });
   }
 
@@ -238,6 +279,12 @@ export async function cargarDirectorioTerceros(
     `Directorio histórico: ${String(filas.length)} terceros cargados; ${String(conCatalogo)} de ellos SÍ están ` +
       `en el catálogo depurado (los demás viven solo aquí, para consultar su teléfono o dirección).`,
   );
+  if (descartados > 0) {
+    reporte.nota(
+      `Directorio histórico: ${String(descartados)} fichas del Access quedaron fuera por estar VACÍAS ` +
+        `(sin nombre ni clave corta, y sin teléfono ni dirección que conservar). Ver el detalle arriba.`,
+    );
+  }
 
-  return { creados: filas.length, existentes, enCatalogo: conCatalogo };
+  return { creados: filas.length, existentes, enCatalogo: conCatalogo, descartados };
 }

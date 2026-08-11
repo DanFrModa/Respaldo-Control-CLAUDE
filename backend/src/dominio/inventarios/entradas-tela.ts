@@ -52,8 +52,7 @@ import {
   type EntradaTelaSalida,
   type EntradasTelaPagina,
 } from '../../contrato/index.js';
-import { EstatusEntradaTela, type TipoDocumentoEntradaTela } from '../../datos/index.js';
-import type { Prisma } from '../../datos/index.js';
+import { EstatusEntradaTela, Prisma, type TipoDocumentoEntradaTela } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -88,7 +87,13 @@ import {
   type LineaColorBase,
 } from './partidas-telas.js';
 import { aDateColumna, aNumero, tipoPorCodigo } from './telas.js';
-import { sellarCfdiEnEntrada, type SelloCfdi } from './cfdi-entrada-tela.js';
+import {
+  exigirSelloCompatibleConProveedor,
+  exigirUuidLibreEnEntradas,
+  sellarCfdiEnEntrada,
+  type SelloCfdi,
+} from './cfdi-entrada-tela.js';
+import { uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
 import {
   cancelarMovimientoTerceroInterno,
   registrarMovimientoTerceroInterno,
@@ -318,16 +323,29 @@ async function obtener(
 
 /**
  * Exige que el documento exista, sea de la empresa activa (A9) y esté en `borrador` (lo demás es
- * inmutable, D3). Devuelve su id y estatus.
+ * inmutable, D3). Devuelve su id, folio y el SELLO fiscal que ya trae (para conservarlo/re-validarlo).
  */
 async function exigirBorrador(
   tx: Tx,
   id: number,
   idEmpresa: number,
-): Promise<{ id: number; folio: bigint }> {
+): Promise<{
+  id: number;
+  folio: bigint;
+  uuidCfdi: string | null;
+  rfcCfdi: string | null;
+  idProveedor: number;
+}> {
   const entrada = await tx.entradaTela.findFirst({
     where: { id, idEmpresa },
-    select: { id: true, folio: true, estatus: true },
+    select: {
+      id: true,
+      folio: true,
+      estatus: true,
+      uuidCfdi: true,
+      rfcCfdi: true,
+      idProveedor: true,
+    },
   });
   if (entrada === null) {
     throw new ErrorNoEncontrado('EntradaTela', id);
@@ -339,7 +357,13 @@ async function exigirBorrador(
         : `La entrada ${Number(entrada.folio)} está cancelada: ya no se puede modificar.`,
     );
   }
-  return { id: entrada.id, folio: entrada.folio };
+  return {
+    id: entrada.id,
+    folio: entrada.folio,
+    uuidCfdi: entrada.uuidCfdi,
+    rfcCfdi: entrada.rfcCfdi,
+    idProveedor: entrada.idProveedor,
+  };
 }
 
 /**
@@ -435,6 +459,13 @@ export async function crearEntradaTela(
     bd,
     archivos,
   );
+  // La pantalla puede mandar SOLO el uuid (captura que nació de leer la factura pero cuyo XML no
+  // viaja): ese folio tampoco puede estar ya en otra entrada. Sin este chequeo el choque salía como
+  // un P2002 opaco (500) en vez de decir en qué entrada está la otra captura.
+  const uuidSuelto = datos.uuidCfdi?.trim();
+  if (sello === null && uuidSuelto !== undefined && uuidSuelto !== '') {
+    await exigirUuidLibreEnEntradas(clienteLectura(bd), idEmpresa, uuidSuelto);
+  }
 
   const id = await enTransaccion(async (tx) => {
     const colores = await validarCabeceraYLineas(
@@ -457,7 +488,15 @@ export async function crearEntradaTela(
         // salió, POR CUÁNTO (verdad fiscal) y con qué XML — con eso nace la CxP al confirmar.
         // El unique (idEmpresa, uuidCfdi) impide recibir dos veces el mismo CFDI.
         uuidCfdi: sello?.uuid ?? datos.uuidCfdi ?? null,
-        ...(sello === null ? {} : { totalCfdi: sello.total, idArchivoCfdi: sello.idArchivo }),
+        ...(sello === null
+          ? {}
+          : {
+              totalCfdi: sello.total,
+              idArchivoCfdi: sello.idArchivo,
+              // El RFC del emisor viaja al cargo de CxP (el reporte del contador lo imprime) y es
+              // lo que permite re-validar el sello si después se edita el borrador.
+              rfcCfdi: sello.emisorRfc,
+            }),
         idProveedor: datos.idProveedor,
         fecha: aDateColumna(datos.fecha),
         idAlmacen: datos.idAlmacen,
@@ -498,19 +537,51 @@ export async function crearEntradaTela(
  * sus renglones en UNA transacción (A2). Los renglones viejos se borran y se recrean (todavía no
  * existe ninguna partida ni movimiento colgando de ellos — eso sólo nace al confirmar). Permiso
  * `inventario-telas.mover`.
+ *
+ * EL SELLO DEL CFDI NO SE PIERDE POR EDITAR (arreglo del ciclo de revisión de §Post-F9.21). Antes,
+ * la edición escribía `uuidCfdi` con lo que mandara la pantalla y no tocaba `totalCfdi` /
+ * `idArchivoCfdi`: editar un borrador que había nacido de un XML lo dejaba SIN folio fiscal pero CON
+ * su total colgando, y al confirmar la cuenta por pagar **no nacía**, en silencio. Ahora:
+ *
+ *  • **Sin XML nuevo** → el sello (uuid + total + XML + RFC) se CONSERVA tal cual, y se RE-VALIDA
+ *    contra el proveedor con el que va a quedar el documento: el emisor de la factura y el
+ *    proveedor al que se le va a deber tienen que ser el mismo.
+ *  • **Con `xmlCfdi`** → se re-sella con las MISMAS guardas del alta (`sellarCfdiEnEntrada`:
+ *    receptor = empresa activa, emisor = proveedor, proveedor que sí factura, UUID no repetido ni
+ *    en otra entrada ni en CxP) y el sello viejo se reemplaza completo.
  */
 export async function actualizarEntradaTela(
   sesion: SesionUsuario,
   id: number,
   entrada: EntradaActualizarEntradaTela,
   bd?: ContextoBd,
+  /** Inyectable para probar sin R2 real (igual que en el alta). Solo se usa si viene XML nuevo. */
+  archivos?: ServicioArchivos,
 ): Promise<EntradaTelaSalida> {
   verificarPermiso(sesion, 'inventario-telas.mover');
   const datos = validarEntrada(esquemaEntradaTelaActualizar, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
 
+  // El re-sellado va ANTES de la transacción porque sube el XML a R2 (mismo orden deliberado que el
+  // alta: un objeto huérfano en R2 es inocuo; un cargo fiscal sin su XML, irrecuperable).
+  const selloNuevo: SelloCfdi | null = await sellarCfdiEnEntrada(
+    {
+      xml: datos.xmlCfdi ?? null,
+      idProveedor: datos.idProveedor,
+      idEmpresa,
+      idEntradaActual: id,
+    },
+    bd,
+    archivos,
+  );
+
   await enTransaccion(async (tx) => {
-    await exigirBorrador(tx, id, idEmpresa);
+    const anterior = await exigirBorrador(tx, id, idEmpresa);
+    // Sin XML nuevo, el sello guardado manda — y tiene que seguir cuadrando con el proveedor con el
+    // que va a quedar el documento (si no, el cargo fiscal nacería contra quien no facturó).
+    if (selloNuevo === null) {
+      await exigirSelloCompatibleConProveedor(anterior, datos.idProveedor, { tx });
+    }
     const colores = await validarCabeceraYLineas(
       tx,
       idEmpresa,
@@ -526,7 +597,16 @@ export async function actualizarEntradaTela(
       data: {
         tipoDocumento: datos.tipoDocumento,
         numeroDocumento: datos.numeroDocumento,
-        uuidCfdi: datos.uuidCfdi ?? null,
+        // Las columnas del CFDI SOLO se tocan cuando la edición trae un XML nuevo (si no, ni
+        // aparecen en el `data`: lo guardado se queda como está).
+        ...(selloNuevo === null
+          ? {}
+          : {
+              uuidCfdi: selloNuevo.uuid,
+              totalCfdi: selloNuevo.total,
+              idArchivoCfdi: selloNuevo.idArchivo,
+              rfcCfdi: selloNuevo.emisorRfc,
+            }),
         idProveedor: datos.idProveedor,
         fecha: aDateColumna(datos.fecha),
         idAlmacen: datos.idAlmacen,
@@ -548,7 +628,12 @@ export async function actualizarEntradaTela(
       entidad: 'EntradaTela',
       idEntidad: id,
       accion: 'MODIFICAR',
-      datos: { renglones: datos.lineas.length, numeroDocumento: datos.numeroDocumento },
+      datos: {
+        renglones: datos.lineas.length,
+        numeroDocumento: datos.numeroDocumento,
+        // A7 — que se haya re-sellado la factura (o no) es justo lo que hay que poder auditar.
+        ...(selloNuevo === null ? {} : { cfdiResellado: selloNuevo.uuid }),
+      },
     });
   }, bd);
 
@@ -563,6 +648,7 @@ interface DocumentoParaCxP {
   idProveedor: number;
   uuidCfdi: string | null;
   totalCfdi: Prisma.Decimal | null;
+  rfcCfdi: string | null;
   idArchivoCfdi: string | null;
   proveedor: { nombre: string; factura: boolean | null };
   lineas: readonly {
@@ -611,6 +697,10 @@ function cargoDeCuentaPorPagar(
       importe: documento.totalCfdi.toNumber(),
       esFiscal: true,
       uuidCfdi: documento.uuidCfdi,
+      // El RFC del EMISOR viaja al cargo igual que en una importación de CFDI de F9: es lo que el
+      // reporte fiscal del contador imprime. Sin él, la misma factura se veía distinta según por
+      // dónde hubiera entrado (con RFC desde Finanzas, con "—" desde el almacén de telas).
+      ...(documento.rfcCfdi === null ? {} : { rfcTercero: documento.rfcCfdi }),
       ...(documento.idArchivoCfdi === null ? {} : { idArchivoCfdi: documento.idArchivoCfdi }),
       observaciones: `Entrada de tela ${String(documento.folio)} · factura ${documento.numeroDocumento}`,
     };
@@ -663,6 +753,35 @@ export async function confirmarEntradaTela(
   verificarPermiso(sesion, 'inventario-telas.mover');
   const idEmpresa = sesion.idEmpresaActiva;
 
+  try {
+    await confirmarEnTransaccion(sesion, id, idEmpresa, bd);
+  } catch (error) {
+    // Backstop de la carrera con Finanzas: si esa MISMA factura se importó a CxP justo entre el
+    // re-chequeo y el INSERT, la unique global del UUID lanza P2002. Traducirlo importa: sin esto,
+    // la tela no puede entrar al almacén y quien captura solo ve un 500 sin explicación.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002' &&
+      JSON.stringify(error.meta?.target ?? '').includes('uuid_cfdi')
+    ) {
+      throw new ErrorConflicto(
+        'Esa factura ya está registrada en Cuentas por pagar: no se puede duplicar el cargo. ' +
+          'Cancela ese movimiento en Finanzas o quítale la factura a la entrada para confirmarla.',
+      );
+    }
+    throw error;
+  }
+
+  return obtener(id, idEmpresa, tienePermiso(sesion, 'telas.ver-totales'), bd);
+}
+
+/** Cuerpo transaccional de {@link confirmarEntradaTela} (separado solo para traducir el P2002). */
+async function confirmarEnTransaccion(
+  sesion: SesionUsuario,
+  id: number,
+  idEmpresa: number,
+  bd?: ContextoBd,
+): Promise<void> {
   await enTransaccion(async (tx) => {
     // Lee el documento BAJO la transacción y exige borrador: dos confirmaciones concurrentes se
     // serializan en el UPDATE final (la segunda ya ve `confirmada` y se rechaza).
@@ -680,6 +799,7 @@ export async function confirmarEntradaTela(
         // §Post-F9.21 — con esto nace la CUENTA POR PAGAR del proveedor al confirmar.
         uuidCfdi: true,
         totalCfdi: true,
+        rfcCfdi: true,
         idArchivoCfdi: true,
         // §Post-F9.22 — y la bandera del catálogo decide SI el cargo es fiscal o no.
         proveedor: { select: { nombre: true, factura: true } },
@@ -834,8 +954,23 @@ export async function confirmarEntradaTela(
     //    terceros — quien confirma tiene `inventario-telas.mover`, y el cargo nace como CONSECUENCIA
     //    de ese acto ya autorizado. Exigirle `terceros.administrar` obligaría a Finanzas a recapturar
     //    a mano cada factura ya recibida, que es justo lo que se pidió evitar.
+    //
+    //    CARRERA CONTRA FINANZAS (arreglo del ciclo de revisión): el UUID se verifica al GUARDAR la
+    //    entrada, pero el cargo nace al CONFIRMAR, que puede ser días después. Si en medio alguien
+    //    importó esa MISMA factura desde Finanzas, la unique global de `MovimientoTercero.uuidCfdi`
+    //    dispara un P2002 y la transacción entera se aborta: la TELA no podría entrar al almacén por
+    //    un problema de contabilidad, y con un 500 opaco. Se re-checa aquí dentro (mismo backstop de
+    //    `importarCfdi`, F9) para poder explicarlo; el `catch` de abajo cubre la carrera exacta.
     const cargo = cargoDeCuentaPorPagar(documento, id);
     if (cargo !== null) {
+      if (documento.uuidCfdi !== null && (await uuidYaImportado(tx, documento.uuidCfdi))) {
+        throw new ErrorConflicto(
+          `Esta factura (UUID ${documento.uuidCfdi}) ya está registrada en Cuentas por pagar ` +
+            `(se importó desde Finanzas después de capturar la entrada): no se puede duplicar el ` +
+            `cargo. Cancela ese movimiento en Finanzas o quítale la factura a la entrada para ` +
+            `poder confirmarla.`,
+        );
+      }
       await registrarMovimientoTerceroInterno(sesion, cargo, { tx });
     }
 
@@ -851,8 +986,6 @@ export async function confirmarEntradaTela(
       },
     });
   }, bd);
-
-  return obtener(id, idEmpresa, tienePermiso(sesion, 'telas.ver-totales'), bd);
 }
 
 /**
