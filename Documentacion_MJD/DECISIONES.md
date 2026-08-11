@@ -1128,10 +1128,17 @@ Sube a **regla de toda la migración** lo que §Post-F9.23 había hecho solo par
 
 **Un solo interruptor: `ETL_DESDE`.** `ETL_DESDE=2025` fija el corte al **1-ene-2025**, sin depender de qué día se corra el ETL. Convive con el `ETL_VENTANA_ANIOS` de F4 (*"los últimos N años"*), pero **`ETL_DESDE` gana** cuando vienen los dos: una fecha explícita manda sobre una relativa. Sin ninguna de las dos, **no recorta** (se migra todo, como hasta hoy). El mismo interruptor alimenta la depuración de proveedores (§Post-F9.23), para que el catálogo y los documentos no puedan quedar desalineados.
 
-**Dónde se recorta, y por qué ahí.** El corte se aplica en los documentos **ancla**, no en cada loader:
-- **`Pedidos`** (por `FechaPedido`, que es la fecha del documento — `FechaElaboracion` es cuándo se capturó).
-- **`Ordenes`** (por `Fecha`). **Esta es la que arrastra todo lo demás:** cortes, envíos, recibos, rutas críticas, auditorías, comentarios y costos cuelgan de la orden, así que si la orden no se migra, ellos tampoco. Se poda también el detalle (`OrdenesDet`) al mismo conjunto: si no, se pre-crearían colores y tallas sacados de 20 años de órdenes que no vamos a migrar — justo la basura de catálogo que se está depurando.
-- Los de **F4** (OC, notas de salida, entradas/salidas de tela) ya tenían ventana y ahora obedecen el mismo interruptor sin tocarlos.
+**Dónde se recorta, y por qué ahí** *(corregido el 11-ago-2026: la versión original decía que el corte se aplicaba "en los documentos ANCLA, no en cada loader" y listaba solo Pedidos/Órdenes/F4. Era **falso**: hay siete loaders más que recortan por su PROPIA fecha, porque no cuelgan de la orden y sin ventana propia habrían entrado completos)*:
+
+- **Por su PROPIA fecha** (el loader lee `ETL_DESDE` y filtra):
+  - **`Pedidos`** (por `FechaPedido`, que es la fecha del documento — `FechaElaboracion` es cuándo se capturó).
+  - **`Ordenes`** (por `Fecha`). **Esta es la que arrastra a la mayoría:** cortes, envíos, recibos, rutas críticas, auditorías, comentarios y costos cuelgan de la orden. Se poda también el detalle (`OrdenesDet`) al mismo conjunto: si no, se pre-crearían colores y tallas sacados de 20 años de órdenes que no vamos a migrar — justo la basura de catálogo que se está depurando.
+  - Los de **F4**: **OC** (`Fecha`), **notas de salida** (`FechaElaboracion`) y **entradas/salidas de tela** — ya tenían ventana y obedecen el mismo interruptor.
+  - **`IPT_Movs`** (`Fecha`) — el kardex de PT. No dependía de la orden y no leía la ventana.
+  - **EsMa, los CUATRO conceptos** (cargos, abonos, descuentos y pagos), por `EsMa.FechaEsMa` — ver §Post-F9.31.
+  - **Productividad IP** (`Fecha`) y **de almacén** (`Alm_Prd.FechaAlm`), **muestrarios** (`FechaSolicitado`) y **cíclico histórico** (`FechaIC`).
+- **De REBOTE, por la orden** (si la orden no migra, ellos tampoco): corte, envíos, recibos, comentarios, costos, fichas confiables, auditorías de calidad, ruta crítica y pedidos reales.
+- **NO se recortan:** los **catálogos** (modelos, colores, tallas, telas…) — el corte aplica a DOCUMENTOS con fecha (§Post-F9.25); los **proveedores** llevan su propio criterio (`ETL_PROVEEDORES_DESDE`, §Post-F9.23); y el **archivo histórico** (`etl-historico-ordenes`) lo **ignora a propósito**: existe para guardar lo que la ventana deja fuera.
 
 **Un DOCUMENTO sin fecha legible SE QUEDA** — al revés que en la depuración de proveedores. Es deliberado: un tercero dudoso se vuelve a dar de alta en un minuto, pero un documento que se tira no se recupera. Ante la duda con un documento, se migra y se reporta.
 
@@ -1275,4 +1282,32 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 - **Aplica en:** la migración del archivo (`20260810190000_historico_ordenes_v1`) se **regeneró** con la columna incluida —no había corrido en ningún ambiente—, igual que se hizo con §Post-F9.27; es aditiva y nullable. SIN permisos, SIN seed. El ETL es idempotente, pero **re-correrlo no rellena `empresaV1` de órdenes ya cargadas**: como la tabla nace en esta misma entrega, no hay ninguna.
 - **Con esto se cierra la deuda** que §Post-F9.26 dejó anotada en `HOJA-DE-RUTA.md` §4.
+- **Fecha:** 2026-08-11.
+
+#### (Post-F9.30) — Folio duplicado en el Access: entra CUALQUIERA de los dos, y el otro se reporta (DANIEL, 11-ago-2026)
+
+> Sobre qué hacer cuando el Access trae **dos documentos con el mismo folio** (medido: 4 pares de `NumCompra` repetidos en la empresa 8 con fecha de 2026 — dentro de la ventana —, dos de ellos **con proveedores distintos**):
+>
+> Daniel: *"Mete la que sea. La de mayor monto."* … y al preguntarle si valía la pena construir el desempate: *"Es irrelevante para mí. Es algo demasiado pequeño para gastar tiempo. El hecho de que sea una u otra me da igual."*
+
+**Qué se hace.** En los cinco documentos con folio propio (`Pedido`, `Orden`, `OrdenCompra`, `NotaSalida`, `Auditoria`), cuando dos filas del Access comparten `(empresa, folio)`: **entra la primera que llega** (la que gane la carrera del bucle concurrente) y **la otra NO se migra, se REPORTA** con su folio, su clave vieja, el id del documento con el que chocó y **qué se queda fuera con ella** (sus renglones; en OC además sus ligas a órdenes y sus recepciones).
+
+**Qué NO se hace, y por qué.** **No se implementa la selección "la de mayor monto".** Habría que hacer una **pre-pasada agrupando por folio en los cinco loaders** —leer todas las filas, agrupar, sumar importes, elegir— para cambiar **únicamente CUÁL de los dos gemelos entra**. El dueño dijo explícitamente que le da igual cuál sea, así que el cambio no compra nada de negocio y sí cuesta código y riesgo en los cinco loaders. Queda **escrito como decisión consciente**, no como omisión: si algún día importa cuál entra, esto es lo que habría que construir.
+
+**Lo que sí se construyó** (11-ago-2026), porque es lo que evita que la corrida del go-live **mienta**: separar el **duplicado del ORIGEN** (culpa del Access; la base de v2 puede estar impecable) de la **colisión con V2** (la base no estaba limpia y hay que parar). Antes los dos se reportaban con el mismo texto, el mismo contador y la misma línea de consola —*"si ves una sola colisión, para: la base no estaba limpia"*—, que para el duplicado del origen es un **diagnóstico falso**. Ahora cada uno tiene su sección de reporte, su contador y su aviso. Ver `backend/migracion/comun/colision-folio.ts` y `backend/migracion/README.md`.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL + documentación.
+- **Fecha:** 2026-08-11.
+
+#### (Post-F9.31) — EsMa recorta por la fecha de su CABECERA en los cuatro conceptos, cargos incluidos (11-ago-2026)
+
+**Decisión de negocio, no detalle técnico:** cambia **qué existe en la cuenta corriente del maquilero** después de la migración. Hasta ahora solo vivía en un comentario de código; aquí queda registrada.
+
+**Qué se decidió.** Los **cuatro** conceptos de EsMa —**cargos**, abonos, descuentos y pagos— se recortan por la **fecha de la cabecera `EsMa.FechaEsMa`** (la fecha del documento), no cada uno por su cuenta.
+
+**Por qué.** Los abonos/descuentos/pagos **no cuelgan de una orden**, así que sin ventana propia habrían entrado **completos** (554 + 743 + 5,935) contra los cargos de apenas **384 cabeceras EsMa** de 2025-2026. Como el saldo del maquilero es **derivado** (Σ movimientos, D3), a todos les habría salido un saldo **masivamente negativo** —como si se les hubiera pagado de más durante 16 años—: un dato falso, y de los que se ven en pantalla el primer día.
+
+**El hueco que queda, dicho sin adornos.** El **cargo** necesita **además** el mapeo de su **ORDEN**. Una cabecera EsMa de 2025 cuyo recibo cuelga de una orden de 2024 **pasa la ventana pero pierde su cargo**, mientras los abonos/descuentos/pagos de esa MISMA cabecera sí entran → vuelve el saldo negativo derivado, **más chico pero real**. Y no es un caso rebuscado: una orden cortada en nov-dic se cobra en ene-feb. Por eso **no se afirma** *"o entra el documento EsMa completo, o no entra"*: el ETL **cuenta esos cargos aparte** (`sinMapeoOrden`), los lista uno por uno y **saca el conteo al resumen de la corrida** (`etl-produccion` y `etl-esma`), para que la magnitud del sesgo se **vea** en vez de quedar escondida entre los `omitidos`. Si al leer el reporte del go-live el número es grande, la decisión de qué hacer con esos saldos es de Daniel.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL (`loaders/esma-cargos.ts`) + documentación.
 - **Fecha:** 2026-08-11.

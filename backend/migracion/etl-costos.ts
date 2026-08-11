@@ -18,6 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarCostos } from './loaders/costos.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 import { calcularCuadreF7, formatearCuadreF7 } from './cuadre-f7.js';
@@ -36,6 +37,13 @@ function log(nombre: string, r: ResultadoLoader): void {
 export async function ejecutarEtlCostos(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
   console.log('ETL Costos F7-E6 — inicio');
+  // §Post-F9.24 — la ventana se imprime SIEMPRE, aunque este ETL no recorte por su propia fecha:
+  // el runbook (README, Regla 3) manda verificar en la PRIMERA línea de cada reporte que el corte
+  // fue el mismo en toda la sesión. Un ETL que la calla no se puede verificar.
+  // (Costos recorta DE REBOTE, por la orden: si la orden no migró, su costo tampoco.)
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
   const costos = await cargarCostos(cliente, reporte);
   log('Costos', costos);
   console.log('ETL Costos F7-E6 — fin de carga');

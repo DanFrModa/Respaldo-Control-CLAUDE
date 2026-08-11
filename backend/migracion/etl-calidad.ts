@@ -32,7 +32,8 @@ import { contarFilasCsv } from './comun/csv.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import { cargarDefectos } from './loaders/calidad-defectos.js';
-import { lineaColisiones } from './comun/colision-folio.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
+import { lineaColisionesV2, lineaDuplicadosOrigen } from './comun/colision-folio.js';
 import { cargarAuditorias } from './loaders/calidad-auditorias.js';
 import type { ResultadoLoader } from './loaders/clientes.js';
 
@@ -72,6 +73,13 @@ export async function ejecutarEtlCalidad(cliente: PrismaClient): Promise<Reporte
   const reporte = new Reporte();
 
   console.log('ETL de calidad F6-E6 — inicio');
+  // §Post-F9.24 — la ventana se imprime SIEMPRE, aunque este ETL no recorte por su propia fecha:
+  // el runbook (README, Regla 3) manda verificar en la PRIMERA línea de cada reporte que el corte
+  // fue el mismo en toda la sesión. Un ETL que la calla no se puede verificar.
+  // (Calidad recorta DE REBOTE, por la orden: si la orden no migró, su auditoría tampoco.)
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const defectos = await cargarDefectos(sesion, cliente, reporte);
   log('Defectos', defectos);
@@ -85,7 +93,13 @@ export async function ejecutarEtlCalidad(cliente: PrismaClient): Promise<Reporte
       auditorias.maquileroSinMapeo,
     )})`,
   );
-  const avisoAud = lineaColisiones('Auditoria', auditorias.colisionesFolio);
+  const dupAud = lineaDuplicadosOrigen(
+    'Auditoria',
+    auditorias.duplicadosOrigen,
+    'sus renglones de defectos',
+  );
+  if (dupAud !== null) console.log(dupAud);
+  const avisoAud = lineaColisionesV2('Auditoria', auditorias.colisionesFolio);
   if (avisoAud !== null) console.log(avisoAud);
 
   console.log('ETL de calidad F6-E6 — recalibrando secuencias');

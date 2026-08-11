@@ -48,7 +48,10 @@ function log(nombre: string, res: ResultadoEsMa): void {
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
       (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
       // §Post-F9.24: lo excluido por la ventana se ve SIEMPRE que exista, nunca se calla.
-      (res.fueraVentana > 0 ? ` fueraVentana=${String(res.fueraVentana)}` : ''),
+      (res.fueraVentana > 0 ? ` fueraVentana=${String(res.fueraVentana)}` : '') +
+      // Cargos cuya cabecera EsMa SÍ entró pero cuya orden no está migrada: la cuenta corriente
+      // queda sesgada a lo negativo por ese hueco, así que se ve en el resumen (11-ago-2026).
+      (res.sinMapeoOrden > 0 ? ` sinMapeoOrden=${String(res.sinMapeoOrden)}` : ''),
   );
 }
 
@@ -67,6 +70,14 @@ export async function ejecutarEtlEsma(cliente: PrismaClient): Promise<Reporte> {
 
   const cargos = await cargarCargosEsMa(sesion, cliente, reporte);
   log('Cargos EsMa', cargos);
+  if (cargos.sinMapeoOrden > 0) {
+    console.log(
+      `    ⚠️ ${String(cargos.sinMapeoOrden)} cargo(s) EsMa NO entraron porque su ORDEN no está ` +
+        `migrada, aunque su cabecera EsMa SÍ pasó la ventana. Los abonos/descuentos/pagos de esas ` +
+        `mismas cabeceras SÍ entran, así que el saldo de esos maquileros queda sesgado a lo ` +
+        `NEGATIVO. Están listados uno por uno en el reporte.`,
+    );
+  }
 
   const abonos = await cargarAbonosEsMa(sesion, cliente, reporte);
   log('Abonos', abonos);

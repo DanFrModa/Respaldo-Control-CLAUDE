@@ -78,9 +78,14 @@ export interface ResultadoAuditorias {
   /** Auditorías cuyo maquilero viejo no resolvió a Proveedor (idMaquilero quedó null). */
   maquileroSinMapeo: number;
   /**
-   * # de auditorías NO migradas porque su `numAuditoria` ya lo ocupaba OTRA auditoría en v2 (ver
-   * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era justo lo
-   * que las volvía invisibles. Salen listadas una por una en el reporte.
+   * # de auditorías NO migradas porque el ACCESS trae otra auditoría con el mismo `numAuditoria`
+   * (culpa del origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de auditorías NO migradas porque su `numAuditoria` ya lo ocupaba una auditoría CAPTURADA EN
+   * V2 (ver `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era
+   * justo lo que las volvía invisibles. Salen listadas una por una en el reporte.
    */
   colisionesFolio: number;
 }
@@ -122,7 +127,8 @@ function idUsuarioViejo(crudo: string | undefined | null): string | null {
 
 /** Contribución de UNA auditoría a los conteos (se suma tras los lotes). */
 interface ContribAud {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'colisionFolio';
+  /** `folioOcupado` = duplicado del origen o colisión con v2 (el desglose lo lleva el guardia). */
+  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'folioOcupado';
   detCreados: number;
   detMapeados: number;
   detOmitidos: number;
@@ -170,7 +176,12 @@ export async function cargarAuditorias(
     mapaMaquilero,
     mapaDefecto,
     detPorAud,
-    guardia: new GuardiaFolios(cliente, ENTIDAD_MAPEO.auditoria, 'Auditoria'),
+    guardia: new GuardiaFolios(
+      cliente,
+      ENTIDAD_MAPEO.auditoria,
+      'Auditoria',
+      'sus renglones de defectos (que ya se cuentan en detallesOmitidos)',
+    ),
   };
 
   const filas = leerCsv('CC_Auditorias.csv');
@@ -186,6 +197,7 @@ export async function cargarAuditorias(
     detallesMapeados: 0,
     detallesOmitidos: 0,
     maquileroSinMapeo: 0,
+    duplicadosOrigen: 0,
     colisionesFolio: 0,
   };
   for (const res of contribs) {
@@ -197,8 +209,8 @@ export async function cargarAuditorias(
     if (c.estado === 'creado') resultado.auditorias.creados += 1;
     else if (c.estado === 'existente') resultado.auditorias.existentes += 1;
     else if (c.estado === 'omitido') resultado.auditorias.omitidos += 1;
-    else if (c.estado === 'colisionFolio') resultado.colisionesFolio += 1;
-    else
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.estado !== 'folioOcupado')
       resultado.auditorias.omitidosValidacion = (resultado.auditorias.omitidosValidacion ?? 0) + 1;
     resultado.detallesCreados += c.detCreados;
     resultado.detallesMapeados += c.detMapeados;
@@ -206,6 +218,9 @@ export async function cargarAuditorias(
     resultado.maquileroSinMapeo += c.maquileroSinMapeo;
   }
 
+  const conteos = ctx.guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -267,13 +282,17 @@ async function procesarAuditoria(
     select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
-    if ((await ctx.guardia.clasificar(idViejo, existePorFolio)) === 'colision') {
+    const veredicto = await ctx.guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
       ctx.guardia.reportar(reporte, {
         claveVieja: idViejo,
         folio: num,
         existente: existePorFolio,
+        veredicto,
+        arrastreFila: `detalles=${String(dets.length)}`,
       });
-      return base('colisionFolio', dets.length);
+      // Sus renglones de detalle SÍ se cuentan (en `detallesOmitidos`): no desaparecen del reporte.
+      return base('folioOcupado', dets.length);
     }
     ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cli, ENTIDAD_MAPEO.auditoria, idViejo, existePorFolio.id);

@@ -37,6 +37,7 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarCortes } from './loaders/produccion-corte.js';
 import { cargarEnviosCostura, cargarEnviosEstampado } from './loaders/produccion-envios.js';
 import { cargarRecibosCostura, cargarRecibosEstampado } from './loaders/produccion-recibos.js';
@@ -91,6 +92,14 @@ export async function ejecutarEtlProduccion(
   const reporte = new Reporte();
 
   console.log('ETL de producción F3-E6 — inicio');
+  // §Post-F9.24 — la ventana se imprime SIEMPRE: el runbook (README, Regla 3) manda verificar en la
+  // primera parte del log de CADA ETL que el corte fue el mismo en toda la sesión, y este ETL era
+  // uno de los cinco que la callaban (no se podía verificar).
+  // ⚠️ Y aquí NO es decorativo: los CARGOS EsMa de este ETL recortan por su PROPIA fecha (la de la
+  // cabecera EsMa), así que la ventana cambia lo que carga esta corrida.
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const cortes = await cargarCortes(sesion, cliente, reporte);
   log('Cortes', cortes.cortes);
@@ -122,6 +131,16 @@ export async function ejecutarEtlProduccion(
   if (cargos.fueraVentana > 0) {
     // §Post-F9.24: EsMa recorta por la fecha de su cabecera, igual que los abonos/descuentos/pagos.
     console.log(`    (fuera de la ventana: ${String(cargos.fueraVentana)} cargos EsMa)`);
+  }
+  if (cargos.sinMapeoOrden > 0) {
+    // El otro filtro del cargo, el que la ventana NO cubre: su ORDEN. Una cabecera EsMa de 2025 con
+    // recibo de una orden de 2024 pasa la fecha pero pierde el cargo, mientras sus abonos/pagos sí
+    // entran → saldo del maquilero sesgado a lo negativo. Se ve aquí en vez de quedar escondido.
+    console.log(
+      `    ⚠️ ${String(cargos.sinMapeoOrden)} cargo(s) EsMa NO entraron porque su ORDEN no está ` +
+        `migrada, aunque su cabecera EsMa SÍ pasó la ventana → el saldo de esos maquileros queda ` +
+        `sesgado a lo NEGATIVO. Están listados uno por uno en el reporte.`,
+    );
   }
 
   console.log('ETL de producción F3-E6 — sembrando secuencias');

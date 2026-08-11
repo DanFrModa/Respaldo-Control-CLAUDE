@@ -18,7 +18,9 @@ No es una recomendación de higiene: es lo que hace **inocuos** los riesgos que 
 - **Los cambios a documentos ya migrados NO se recogen**: si en el Access nuevo una orden se canceló, una OC cambió de estatus o un costo se recalculó, la fila ya migrada **no se actualiza** (los loaders resuelven "ya existe" y salen). El ETL trae lo NUEVO, no reconcilia lo viejo.
 - **El mapeo de renglones de pedido es POSICIONAL** (`loaders/pedidos.ts`): al retomar un pedido ya existente, cada `IdPedidosDet` se casa con el renglón de v2 **por orden de creación**. Si alguien insertó/borró un renglón en v2, el emparejamiento se corre.
 
-Y por si la regla se rompiera, el código ahora **avisa** en vez de callar: ver *colisión de folio*, abajo.
+**Si una corrida se INTERRUMPE (Ctrl-C, caída de red, la máquina se durmió): se VACÍA la base y se empieza de nuevo.** No se "retoma". El ETL es idempotente y el camino de recuperación existe, pero es seguro solo mientras el Access no traiga folios duplicados: si la corrida se cortó justo después de crear el documento de la fila `B` (sin alcanzar a escribir su mapeo), en la re-corrida su hermana `A` —misma empresa, mismo folio— lo ve "creado por el ETL y sin dueño", lo toma por recuperación y se mapea a él **en silencio**; los hijos de `A` acaban colgados de un documento hecho con los datos de `B`. Vaciar y volver a empezar cuesta minutos; ese enredo no se ve y no se repara. (Y los folios duplicados en el origen SÍ existen: ver *folio ya ocupado*, abajo.)
+
+Y por si la regla se rompiera, el código ahora **avisa** en vez de callar: ver *folio ya ocupado*, abajo.
 
 ### Regla 2 — `etl-ipt` y `etl-telas` NO se corren en el go-live
 
@@ -58,26 +60,46 @@ npx tsx --env-file=.env migracion/etl-historico-ordenes.ts
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts
 npx tsx --env-file=.env migracion/reparar-secuencias.ts
 
+# 6. CUADRES (obligatorios: son lo ÚNICO que prueba que la migración cuadró — v1 CSV vs v2 BD).
+#    No escriben nada; se leen y se archivan junto con los reporte-etl-*.txt de la corrida.
+npx tsx --env-file=.env migracion/cuadre-f2.ts   # pedidos + órdenes (dos niveles)
+npx tsx --env-file=.env migracion/cuadre-f3.ts   # producción + kardex PT (no-doble-conteo)
+npx tsx --env-file=.env migracion/cuadre-f4.ts   # compras/notas + telas
+npx tsx --env-file=.env migracion/cuadre-f5.ts   # ruta crítica
+npx tsx --env-file=.env migracion/cuadre-f6.ts   # calidad + EsMa (saldo por maquilero)
+npx tsx --env-file=.env migracion/cuadre-f7.ts   # costos + indicadores
+#    ⚠️ En f3 y f4 el kardex de PT y el de telas saldrán en CERO contra el viejo: es lo ESPERADO
+#    (Regla 2 — arrancan del conteo físico, no del histórico). Lo demás sí debe cuadrar.
+
 # ❌ NO se corren: etl-ipt (PT) ni etl-telas (telas) — ver la Regla 2.
 # F9 (etl-terceros-saldos / etl-cfdi-masivo) NO sale de Access: va cuando llegue el corte de SINUBE.
 ```
 
-**Por qué `export` y no `ETL_DESDE=2025 npx tsx …` comando por comando:** si se olvida en UNO SOLO, ese ETL migra el histórico completo y **desalinea a todos los demás** — carga filas que apuntan a proveedores depurados, o mete al kardex partidas de hace años que ningún otro ETL trajo. Un interruptor, una vez, para toda la sesión. Verifícalo con `echo $ETL_DESDE` antes de empezar; además **cada ETL imprime la ventana que aplicó** en su primera línea, así que si un reporte dice "Ventana temporal: DESACTIVADA", ese ETL corrió mal.
+**Por qué `export` y no `ETL_DESDE=2025 npx tsx …` comando por comando:** si se olvida en UNO SOLO, ese ETL migra el histórico completo y **desalinea a todos los demás** — carga filas que apuntan a proveedores depurados, o mete al kardex partidas de hace años que ningún otro ETL trajo. Un interruptor, una vez, para toda la sesión. Verifícalo con `echo $ETL_DESDE` antes de empezar; además **cada ETL imprime la ventana que aplicó** en sus primeras líneas de log (desde el 11-ago-2026 lo hacen los ONCE, no solo seis: faltaban `etl-produccion`, `etl-calidad`, `etl-costos`, `etl-ruta-critica`, `etl-historico-ordenes` y la línea de consola de `etl-telas`), así que si un reporte dice "Ventana temporal: DESACTIVADA", ese ETL corrió mal. **La única excepción es `etl-historico-ordenes`**: imprime la ventana con el aviso de que **la ignora a propósito** (existe para guardar lo que ella deja fuera), así que ahí "DESACTIVADA" o no da igual — no cambia lo que carga.
 
 ### Regla 4 — los ensayos en `prueba` se hacen sobre BASE VACIADA
 
 La base de `prueba` de hoy tiene **la foto vieja** del Access **y** documentos que Daniel capturó a mano. Un ensayo re-corriendo encima **no mide el go-live**: mide un re-volcado, que es justo el escenario que la Regla 1 prohíbe. Además activa la **colisión de folio** (la orden 8001 de Daniel contra la 8001 del Access nuevo). Para ensayar: **vaciar la base** (o levantar una nueva), aplicar migraciones + seed, y correr la Regla 3 completa desde cero.
 
-### La red de seguridad: COLISIÓN DE FOLIO
+### La red de seguridad: FOLIO YA OCUPADO (dos avisos DISTINTOS, no uno)
 
 Los cinco loaders con folio propio (`Pedido`, `Orden`, `OrdenCompra`, `NotaSalida`, `Auditoria`) resolvían "ya existe" por `(idEmpresa, folio)` y, si lo encontraban, **mapeaban la clave vieja a ese documento y salían como `existente`**. Sobre base limpia eso recupera una corrida cortada; sobre base viva **casaba dos documentos distintos** y todos los hijos del volcado nuevo (cortes, envíos, recibos, cargos EsMa, costos, RC, auditorías) se pegaban al documento equivocado — **en silencio**.
 
-Ahora (`comun/colision-folio.ts`) el ETL distingue:
+Ahora (`comun/colision-folio.ts`) el ETL distingue **tres** desenlaces, y los dos malos **NO son el mismo problema** (desde el 11-ago-2026 tienen sección de reporte, contador y línea de consola propios):
 
-- documento existente **creado por el ETL** (`creado_por_id = 'etl-sistema'`) y que **ninguna otra clave vieja reclama** → es la corrida cortada: se mapea y sigue como `existente`;
-- **cualquier otro caso** (lo capturó una persona, no trae `creado_por_id`, o ya es de otra clave vieja) → **COLISIÓN**: no se crea, **no se mapea** y se **REPORTA** con folio, clave vieja e id de v2.
+| Qué pasó | Cómo se detecta | Qué significa | Qué hacer |
+| --- | --- | --- | --- |
+| **Recuperación** | el documento lo creó el ETL (`creado_por_id = 'etl-sistema'`) y **ninguna otra clave vieja lo reclama** | la corrida anterior se cortó entre el `create` y el mapeo | se mapea y sigue como `existente` (pero ver la Regla 1: una corrida interrumpida se limpia, no se retoma) |
+| **⚠️ FOLIO DUPLICADO EN EL ORIGEN** | el documento **ya es de OTRA clave vieja** del Access | **el Access trae dos documentos con el mismo folio.** La base de v2 puede estar impecable | entra UNO (cualquiera) y el otro se **reporta**; revisar la lista con Daniel. **No vacíes nada por esto** |
+| **⚠️ COLISIÓN CON V2** | lo creó alguien que **no** es el ETL (o no trae `creado_por_id`) | **la base NO estaba limpia**: v2 ya tenía su propio documento con ese folio | **para**: vaciar la base y correr la Regla 3 desde cero |
 
-Las colisiones se cuentan **aparte** de los `existentes` y el ETL las grita en consola. **Si ves una sola colisión, para**: la base no estaba limpia.
+En los dos casos malos el documento **no se crea, no se mapea** y se **REPORTA** con folio, clave vieja, id de v2, quién lo creó y **qué se quedó fuera con él** (sus renglones; en OC además sus ligas a órdenes y sus recepciones). Se cuentan **aparte** de los `existentes` —contarlos ahí era justo lo que los volvía invisibles— y el ETL los grita en consola, cada uno con su texto.
+
+**Los duplicados de origen son reales, no teóricos:** medido sobre la foto de hoy hay **4 pares de `NumCompra` repetidos** en la empresa 8 con fecha de 2026 (o sea, DENTRO de la ventana), y **dos de esos pares tienen proveedores distintos**. El volcado del go-live traerá los suyos —el número exacto da igual—: lo que importa es leerlos en el reporte.
+
+**¿Cuál de los dos duplicados entra?** El que gane la carrera del bucle concurrente. Decisión de Daniel (11-ago-2026): _"Mete la que sea… es irrelevante para mí"_ → **no se implementa** ninguna regla de desempate (ni "la de mayor monto"). Ver `Documentacion_MJD/DECISIONES.md §Post-F9.30`.
+
+**Un detalle de contabilidad, para que los números cuadren:** un duplicado detectado por el guardia sale en el contador de duplicados; pero si las dos filas gemelas corren **a la vez** y la perdedora choca contra el unique de la BD, esa cae en `omitidosValidacion` (mismo fenómeno, otra etiqueta). Los **renglones** que se van con la fila que no entró sí se cuentan (`lineas.omitidos` / `detallesOmitidos`) y salen en el detalle del reporte.
 
 ---
 
@@ -259,9 +281,17 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 >
 > **⚠️ EsMa entero recorta por la fecha de su CABECERA, en los CUATRO conceptos.** Es deliberado: los
 > abonos/descuentos/pagos NO dependen de la orden, así que sin ventana propia habrían entrado
-> COMPLETOS (554 + 743 + 5,935) contra apenas **384** documentos EsMa de 2025-2026 → el saldo de cada
-> maquilero (derivado, D3) saldría masivamente NEGATIVO, como si a todos se les hubiera pagado de más
-> durante 16 años. O entra el documento EsMa completo, o no entra.
+> COMPLETOS (554 + 743 + 5,935) contra los cargos de apenas **384 cabeceras EsMa** de 2025-2026 → el
+> saldo de cada maquilero (derivado, D3) saldría masivamente NEGATIVO, como si a todos se les hubiera
+> pagado de más durante 16 años.
+>
+> **Pero la coherencia NO es total, y conviene saberlo antes de leer el cuadre:** el CARGO necesita
+> **además** el mapeo de su ORDEN. Una cabecera EsMa de 2025 cuyo recibo cuelga de una orden de 2024
+> pasa la ventana, pero su cargo se omite por "orden sin mapeo" **mientras los abonos/descuentos/pagos
+> de esa MISMA cabecera sí entran** → vuelve el saldo negativo derivado, más chico pero real. Y no es
+> raro: una orden cortada en nov-dic se cobra en ene-feb. Por eso el ETL **cuenta esos cargos aparte**
+> (`sinMapeoOrden`) y los saca al resumen de la corrida (`etl-produccion` y `etl-esma`), además de
+> listarlos uno por uno: la magnitud del sesgo se VE, en vez de quedar escondida entre los `omitidos`.
 
 > **Depuración de PROVEEDORES (§Post-F9.23):** el Access trae **1,052 filas** de terceros en cuatro
 > catálogos y solo **155** movieron algo desde 2025. Con `ETL_DESDE=2025` se cargan **solo esos**

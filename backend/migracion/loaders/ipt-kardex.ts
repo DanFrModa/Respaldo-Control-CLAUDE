@@ -34,7 +34,8 @@
  *
  * ⭐ VENTANA TEMPORAL (§Post-F9.24, arreglada el 11-ago-2026). Este loader NO dependía de la orden
  * (resuelve el modelo por `NumMod` contra el catálogo, que migra completo) y NO leía `ETL_DESDE`, así
- * que con el corte de 2025-2026 cargaba igual los ~5,072 movimientos de 2019-2023 y el kardex de PT
+ * que con el corte de 2025-2026 cargaba igual las 5,072 CABECERAS `IPT_Movs` de 2020-2023 —y con
+ * ellas sus renglones de `IPT_MovsDet`, que son los movimientos que de verdad entran— y el kardex de PT
  * —existencia = Σ movimientos, D3— quedaba INFLADO con partidas de hace años, invisibles porque van
  * con el Color/Talla sentinela que no sale en los selectores. Ahora recorta por `IPT_Movs.Fecha` (la
  * fecha del documento) y CUENTA/REPORTA lo excluido, como los loaders de F2/F4. Con `ETL_DESDE=2025`

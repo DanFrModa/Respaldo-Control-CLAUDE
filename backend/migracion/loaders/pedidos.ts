@@ -14,12 +14,13 @@
  * 2ª corrida no duplica y re-guarda los mapeos (por si el primer corrido se cortó). Las filas con
  * cliente/empresa/modelo sin mapeo, o con NumeroPed no numérico, se LISTAN al reporte (§7).
  *
- * ⚠️ COLISIÓN DE FOLIO: encontrar un pedido con ese folio ya NO basta para darlo por "el mismo".
+ * ⚠️ FOLIO YA OCUPADO: encontrar un pedido con ese folio ya NO basta para darlo por "el mismo".
  * En el re-volcado del go-live, v2 pudo capturar su propio pedido con ese folio y el Access traer
  * otro distinto con el mismo número — mapearlos juntos colgaba las órdenes del volcado nuevo del
  * renglón de pedido equivocado, en silencio. `comun/colision-folio.ts` distingue la recuperación de
- * una corrida cortada (lo creó el ETL y nadie más lo reclama) de la colisión, que NO se migra y se
- * REPORTA.
+ * una corrida cortada (lo creó el ETL y nadie más lo reclama) del **duplicado del ORIGEN** (el
+ * Access trae dos pedidos con el mismo folio) y de la **colisión con V2** (lo capturó una persona);
+ * los dos últimos NO se migran, se REPORTAN por separado y se cuentan por separado.
  */
 import {
   crearPedidoMigrado,
@@ -52,7 +53,12 @@ export interface ResultadoPedidos {
   /** # de pedidos excluidos por la ventana temporal (§Post-F9.24). Listados en el reporte. */
   fueraVentana: number;
   /**
-   * # de pedidos NO migrados porque su folio ya lo ocupaba OTRO pedido en v2 (ver
+   * # de pedidos NO migrados porque el ACCESS trae otro pedido con el mismo folio (culpa del
+   * origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de pedidos NO migrados porque su folio ya lo ocupaba un pedido CAPTURADO EN V2 (ver
    * `comun/colision-folio.ts`). Se cuentan APARTE de los `existentes`: contarlos ahí era justo lo
    * que los volvía invisibles. Salen listados uno por uno en el reporte.
    */
@@ -71,8 +77,9 @@ interface DetCrudo {
 
 /** Contribución de UN pedido a los conteos (se suma tras los lotes). */
 interface ContribPedido {
-  /** Desenlace del documento pedido. */
-  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'colisionFolio';
+  /** Desenlace del documento pedido (`folioOcupado` = duplicado del origen o colisión con v2: el
+   * desglose lo llevan los contadores del `GuardiaFolios`, no esta etiqueta). */
+  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'folioOcupado';
   /** Renglones creados / existentes / omitidos de ESTE pedido. */
   lineasCreadas: number;
   lineasExistentes: number;
@@ -123,9 +130,15 @@ export async function cargarPedidos(
     'Pedidos',
     (f) => `IdPedidos=${f.IdPedidos ?? '?'}`,
   );
-  // Guardia del re-volcado: distingue la recuperación de una corrida cortada de una COLISIÓN de
-  // folio contra un pedido capturado en v2 (ver `comun/colision-folio.ts`).
-  const guardia = new GuardiaFolios(cliente, ENTIDAD_MAPEO.pedido, 'Pedido');
+  // Guardia del re-volcado: separa la recuperación de una corrida cortada, el DUPLICADO DEL ORIGEN
+  // (el Access trae dos pedidos con el mismo folio) y la COLISIÓN contra un pedido capturado en v2
+  // (ver `comun/colision-folio.ts`).
+  const guardia = new GuardiaFolios(
+    cliente,
+    ENTIDAD_MAPEO.pedido,
+    'Pedido',
+    'sus renglones (y las órdenes que colgaban de ellos quedan sin pedido ligado)',
+  );
   const contribs = await enLotes(
     filas,
     (f): Promise<ContribPedido> =>
@@ -151,7 +164,6 @@ export async function cargarPedidos(
     omitidosValidacion: 0,
   };
   const lineas: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
-  let colisionesFolio = 0;
   for (const res of contribs) {
     // Un fallo de `enLotes` (tras agotar reintentos) cuenta como pedido omitido por validación.
     if (!res.ok) {
@@ -162,14 +174,24 @@ export async function cargarPedidos(
     if (c.pedido === 'creado') pedidos.creados += 1;
     else if (c.pedido === 'existente') pedidos.existentes += 1;
     else if (c.pedido === 'omitido') pedidos.omitidos += 1;
-    else if (c.pedido === 'colisionFolio') colisionesFolio += 1;
-    else pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` no suma al documento aquí: el desglose duplicado-de-origen vs colisión-con-v2
+    // lo lleva el guardia (una sola fuente, ya separada por diagnóstico). Sus RENGLONES sí se
+    // cuentan abajo, en `lineas.omitidos` (antes se perdían sin aparecer en ningún contador).
+    else if (c.pedido !== 'folioOcupado')
+      pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
     lineas.creados += c.lineasCreadas;
     lineas.existentes += c.lineasExistentes;
     lineas.omitidos += c.lineasOmitidas;
   }
 
-  return { pedidos, lineas, fueraVentana, colisionesFolio };
+  const conteos = guardia.conteos;
+  return {
+    pedidos,
+    lineas,
+    fueraVentana,
+    duplicadosOrigen: conteos.duplicadoOrigen,
+    colisionesFolio: conteos.colisionV2,
+  };
 }
 
 /** Mapeos de F1 que necesita cada pedido (clave vieja → id nuevo). */
@@ -255,9 +277,23 @@ async function procesarPedido(
     // `guardarMapeo`… o un pedido que v2 capturó con ese mismo folio, que es OTRO documento.
     // Mapearlo sin distinguir colgaba las órdenes del volcado nuevo del renglón equivocado, en
     // silencio. Ver `comun/colision-folio.ts`.
-    if ((await guardia.clasificar(idViejo, existente)) === 'colision') {
-      guardia.reportar(reporte, { claveVieja: idViejo, folio, existente });
-      return { pedido: 'colisionFolio', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas };
+    const veredicto = await guardia.clasificar(idViejo, existente);
+    if (veredicto !== 'recuperacion') {
+      guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio,
+        existente,
+        veredicto,
+        arrastreFila: `renglones=${String(lineasMigradas.length)}`,
+      });
+      return {
+        pedido: 'folioOcupado',
+        lineasCreadas: 0,
+        lineasExistentes: 0,
+        // Los renglones que se iban a migrar TAMBIÉN se quedan fuera: se cuentan como omitidos para
+        // que no desaparezcan de la contabilidad del reporte.
+        lineasOmitidas: lineasOmitidas + lineasMigradas.length,
+      };
     }
     // Re-guardar mapeos (por si la 1ª corrida se cortó tras crear pero antes de mapear).
     guardia.registrarCreado(idViejo, existente.id);

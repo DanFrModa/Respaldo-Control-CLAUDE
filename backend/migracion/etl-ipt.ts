@@ -22,8 +22,9 @@
  *
  * ⚠️ NO SE CORRE EN EL GO-LIVE. El almacén de producto terminado arranca del CONTEO FÍSICO que
  * captura Daniel (§Post-F9.25), no del histórico. Y desde el 11-ago-2026 este ETL SÍ obedece
- * `ETL_DESDE` (antes lo ignoraba, y con el corte de 2025-2026 metía igual ~5,072 movimientos de
- * 2019-2023 al kardex de PT): con `ETL_DESDE=2025` no carga nada. Correrlo DESPUÉS del conteo
+ * `ETL_DESDE` (antes lo ignoraba, y con el corte de 2025-2026 metía igual las **5,072 CABECERAS**
+ * `IPT_Movs` de **2020-2023** —los movimientos que llegan al kardex son sus renglones de
+ * `IPT_MovsDet`, más— al kardex de PT): con `ETL_DESDE=2025` no carga nada. Correrlo DESPUÉS del conteo
  * físico lo PISA con historia vieja.
  */
 import { writeFileSync } from 'node:fs';

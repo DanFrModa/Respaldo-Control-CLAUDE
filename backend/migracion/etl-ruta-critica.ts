@@ -30,6 +30,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { calcularCuadreF5, formatearCuadreF5 } from './cuadre-f5.js';
 import { verificarCatalogos, type ResultadoCatalogos } from './ruta-critica/catalogos.js';
 import {
@@ -60,6 +61,13 @@ export async function ejecutarEtlRutaCritica(
   const reporte = new Reporte();
 
   console.log('ETL de Ruta Crítica F5-E7 (Pieza B) — inicio');
+  // §Post-F9.24 — la ventana se imprime SIEMPRE, aunque este ETL no recorte por su propia fecha:
+  // el runbook (README, Regla 3) manda verificar en la PRIMERA línea de cada reporte que el corte
+  // fue el mismo en toda la sesión. Un ETL que la calla no se puede verificar.
+  // (La RC recorta DE REBOTE, por la orden: si la orden no migró, su ruta tampoco.)
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const catalogos = await verificarCatalogos(sesion, cliente, reporte);
   console.log(

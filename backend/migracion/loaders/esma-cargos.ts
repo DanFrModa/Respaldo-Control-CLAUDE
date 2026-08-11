@@ -31,11 +31,19 @@
  * movimientos planos— recorta por la fecha de la CABECERA `EsMa.FechaEsMa`, que es la fecha del
  * documento. Antes solo los cargos quedaban acotados de rebote (dependen del mapeo de la orden) y
  * los movimientos planos NO tenían ventana ni dependían de la orden: con `ETL_DESDE=2025` habrían
- * entrado **384 cargos** contra **554 abonos + 743 descuentos + 5,935 pagos COMPLETOS**, y el saldo
- * de cada maquilero (derivado, D3) habría salido masivamente NEGATIVO — como si a todos se les
- * hubiera pagado de más durante 16 años. La ventana va en los CUATRO por la MISMA fecha justamente
- * para que la cuenta corriente quede coherente: o entra el documento EsMa completo, o no entra.
- * Lo excluido se cuenta y se REPORTA (§7).
+ * entrado los cargos de apenas **384 cabeceras EsMa** contra **554 abonos + 743 descuentos + 5,935
+ * pagos COMPLETOS**, y el saldo de cada maquilero (derivado, D3) habría salido masivamente NEGATIVO
+ * — como si a todos se les hubiera pagado de más durante 16 años. La ventana va en los CUATRO por la
+ * MISMA fecha justamente para que la cuenta corriente quede lo más coherente posible. Lo excluido se
+ * cuenta y se REPORTA (§7).
+ *
+ * ⚠️ **La coherencia NO es total, y hay que decirlo:** el cargo necesita ADEMÁS el mapeo de su
+ * ORDEN. Una cabecera EsMa de 2025 cuyo recibo cuelga de una orden de 2024 pasa la ventana, pero su
+ * cargo se OMITE por "orden sin mapeo" mientras los abonos/descuentos/pagos de ESA MISMA cabecera sí
+ * entran → reaparece, más chico, el saldo negativo derivado. Y no es rebuscado: una orden cortada en
+ * nov-dic se cobra en ene-feb. Por eso NO se dice "o entra el documento EsMa completo o no entra";
+ * lo que se hace es **contar aparte** esos cargos (`sinMapeoOrden`) y sacarlos al resumen de la
+ * corrida, para que la magnitud del sesgo se VEA en vez de quedar escondida entre los `omitidos`.
  */
 import {
   crearCargoEsMaMigrado,
@@ -74,6 +82,13 @@ export interface ResultadoEsMa {
   movimientos: ResultadoLoader;
   /** # de filas excluidas porque su cabecera `EsMa` es anterior al corte. Listadas en el reporte. */
   fueraVentana: number;
+  /**
+   * # de CARGOS omitidos porque su ORDEN no está migrada (típicamente: la orden quedó FUERA de la
+   * ventana, aunque la cabecera EsMa esté dentro). Es el hueco de coherencia de la cuenta corriente
+   * —los abonos/descuentos/pagos de esa misma cabecera SÍ entran—, así que se cuenta APARTE de los
+   * `omitidos` para que se vea en el resumen. Siempre 0 en los movimientos planos (no usan orden).
+   */
+  sinMapeoOrden: number;
 }
 
 /** Cabecera `EsMa`: maquilero + fecha + obs, indexada por `IdEsMa`. Compartida por los loaders de
@@ -137,6 +152,7 @@ export async function cargarCargosEsMa(
     return {
       movimientos: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
       fueraVentana: 0,
+      sinMapeoOrden: 0,
     };
   }
 
@@ -157,6 +173,7 @@ export async function cargarCargosEsMa(
     omitidosValidacion: 0,
   };
   let fueraVentana = 0;
+  let sinMapeoOrden = 0;
 
   const ventana = resolverVentana();
   const filas = leerCsv('EsMa_Recibos.csv');
@@ -187,10 +204,14 @@ export async function cargarCargosEsMa(
     else if (e === 'existente') movimientos.existentes += 1;
     else if (e === 'omitido') movimientos.omitidos += 1;
     else if (e === 'fueraVentana') fueraVentana += 1;
-    else movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
+    else if (e === 'sinMapeoOrden') {
+      // Sigue contando como omitido (no cambia el cuadre); el contador propio es para VERLO.
+      movimientos.omitidos += 1;
+      sinMapeoOrden += 1;
+    } else movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
   }
 
-  return { movimientos, fueraVentana };
+  return { movimientos, fueraVentana, sinMapeoOrden };
 }
 
 interface ContextoCargos {
@@ -203,7 +224,14 @@ interface ContextoCargos {
   ventana: ConfigVentana;
 }
 
-type EstadoContrib = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
+type EstadoContrib =
+  | 'creado'
+  | 'existente'
+  | 'omitido'
+  | 'omitidoValidacion'
+  | 'fueraVentana'
+  /** Solo cargos: la cabecera EsMa entra por fecha, pero su ORDEN no está migrada. */
+  | 'sinMapeoOrden';
 
 async function procesarCargo(
   sesion: SesionUsuario,
@@ -243,11 +271,14 @@ async function procesarCargo(
 
   const idOrden = ctx.mapaOrdenV2.get(idOrdenViejo);
   if (idOrden === undefined) {
+    // La cabecera EsMa SÍ pasó la ventana, pero su orden no está migrada (lo normal: la orden es de
+    // antes del corte). Los abonos/descuentos/pagos de esta misma cabecera sí van a entrar, así que
+    // este cargo faltante sesga el saldo del maquilero hacia lo NEGATIVO. Se cuenta aparte.
     reporte.agregar(
-      'CargoEsMa con orden sin mapeo (OMITIDO)',
+      'CargoEsMa con orden sin mapeo (OMITIDO — la cabecera EsMa sí entra, el cargo no: sesga el saldo)',
       `IdEsMa_Recibos=${idCargoViejo} IdOrdenes=${idOrdenViejo}`,
     );
-    return 'omitido';
+    return 'sinMapeoOrden';
   }
   const ordenV2 = await cliente.orden.findUnique({
     where: { id: idOrden },
@@ -440,10 +471,13 @@ export async function cargarMovimientosPlanosEsMa(
     else if (e === 'existente') movimientos.existentes += 1;
     else if (e === 'omitido') movimientos.omitidos += 1;
     else if (e === 'fueraVentana') fueraVentana += 1;
+    // `sinMapeoOrden` no lo produce este loader (los movimientos planos no cuelgan de una orden);
+    // se contempla para que un cambio futuro no lo deje cayendo en `omitidosValidacion`.
+    else if (e === 'sinMapeoOrden') movimientos.omitidos += 1;
     else movimientos.omitidosValidacion = (movimientos.omitidosValidacion ?? 0) + 1;
   }
 
-  return { movimientos, fueraVentana };
+  return { movimientos, fueraVentana, sinMapeoOrden: 0 };
 }
 
 /** Procesa UNA fila de movimiento plano (abono/descuento/pago). */

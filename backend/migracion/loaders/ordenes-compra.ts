@@ -72,7 +72,14 @@ export interface ResultadoOrdenesCompra {
   /** # de OC excluidas por la ventana temporal. */
   fueraVentana: number;
   /**
-   * # de OC NO migradas porque su `numCompra` ya lo ocupaba OTRA OC en v2 (ver
+   * # de OC NO migradas porque el ACCESS trae otra OC con el mismo `numCompra` (culpa del origen,
+   * no de la base de v2). Medido sobre la foto de hoy: 4 pares repetidos en la empresa 8 con fecha
+   * de 2026 —dentro de la ventana—, dos de ellos con proveedores DISTINTOS. Ver
+   * `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de OC NO migradas porque su `numCompra` ya lo ocupaba una OC CAPTURADA EN V2 (ver
    * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era justo lo
    * que las volvía invisibles. Salen listadas una por una en el reporte.
    */
@@ -99,7 +106,8 @@ interface ContribOC {
     | 'omitido'
     | 'omitidoValidacion'
     | 'fueraVentana'
-    | 'colisionFolio';
+    // Duplicado del origen o colisión con v2: el desglose lo lleva el guardia.
+    | 'folioOcupado';
   lineas: number;
   ligas: number;
 }
@@ -149,6 +157,7 @@ export async function cargarOrdenesCompra(
     lineas: 0,
     ligas: 0,
     fueraVentana: 0,
+    duplicadosOrigen: 0,
     colisionesFolio: 0,
   };
 
@@ -159,7 +168,14 @@ export async function cargarOrdenesCompra(
     detPorOC,
     ordsPorOC,
     ventana,
-    guardia: new GuardiaFolios(cliente, ENTIDAD_MAPEO.ordenCompra, 'OrdenCompra'),
+    // El arrastre importa: con la OC que no entra se van sus renglones, sus ligas a órdenes y sus
+    // recepciones de material.
+    guardia: new GuardiaFolios(
+      cliente,
+      ENTIDAD_MAPEO.ordenCompra,
+      'OrdenCompra',
+      'sus renglones, sus ligas a órdenes y sus recepciones de material',
+    ),
   };
 
   const filas = leerCsv('OrdCompra.csv');
@@ -179,12 +195,16 @@ export async function cargarOrdenesCompra(
     else if (c.estado === 'existente') resultado.ocs.existentes += 1;
     else if (c.estado === 'omitido') resultado.ocs.omitidos += 1;
     else if (c.estado === 'fueraVentana') resultado.fueraVentana += 1;
-    else if (c.estado === 'colisionFolio') resultado.colisionesFolio += 1;
-    else resultado.ocs.omitidosValidacion = (resultado.ocs.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.estado !== 'folioOcupado')
+      resultado.ocs.omitidosValidacion = (resultado.ocs.omitidosValidacion ?? 0) + 1;
     resultado.lineas += c.lineas;
     resultado.ligas += c.ligas;
   }
 
+  const conteos = ctx.guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -258,13 +278,18 @@ async function procesarOC(
     select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
-    if ((await ctx.guardia.clasificar(idViejo, existePorFolio)) === 'colision') {
+    const veredicto = await ctx.guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
       ctx.guardia.reportar(reporte, {
         claveVieja: idViejo,
         folio: numCompraN,
         existente: existePorFolio,
+        veredicto,
+        arrastreFila:
+          `renglones=${String((ctx.detPorOC.get(idViejo) ?? []).length)} ` +
+          `ligasAOrden=${String((ctx.ordsPorOC.get(idViejo) ?? []).length)}`,
       });
-      return sin('colisionFolio');
+      return sin('folioOcupado');
     }
     ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.ordenCompra, idViejo, existePorFolio.id);

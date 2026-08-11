@@ -62,7 +62,12 @@ export interface ResultadoNotasSalida {
   /** # de notas excluidas por la ventana temporal. */
   fueraVentana: number;
   /**
-   * # de notas NO migradas porque su `numNota` ya lo ocupaba OTRA nota en v2 (ver
+   * # de notas NO migradas porque el ACCESS trae otra nota con el mismo `numNota` (culpa del
+   * origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de notas NO migradas porque su `numNota` ya lo ocupaba una nota CAPTURADA EN V2 (ver
    * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era justo lo
    * que las volvía invisibles. Salen listadas una por una en el reporte.
    */
@@ -95,7 +100,8 @@ interface ContribNota {
     | 'omitido'
     | 'omitidoValidacion'
     | 'fueraVentana'
-    | 'colisionFolio';
+    // Duplicado del origen o colisión con v2: el desglose lo lleva el guardia.
+    | 'folioOcupado';
   lineas: number;
 }
 
@@ -178,6 +184,7 @@ export async function cargarNotasSalida(
     notas: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
     lineas: 0,
     fueraVentana: 0,
+    duplicadosOrigen: 0,
     colisionesFolio: 0,
   };
 
@@ -187,7 +194,12 @@ export async function cargarNotasSalida(
     detPorNota,
     idAlmacenSentinela,
     ventana,
-    guardia: new GuardiaFolios(cliente, ENTIDAD_MAPEO.notaSalida, 'NotaSalida'),
+    guardia: new GuardiaFolios(
+      cliente,
+      ENTIDAD_MAPEO.notaSalida,
+      'NotaSalida',
+      'sus renglones (el material que salió con esa nota)',
+    ),
   };
 
   const filas = leerCsv('Notas.csv');
@@ -207,11 +219,15 @@ export async function cargarNotasSalida(
     else if (c.estado === 'existente') resultado.notas.existentes += 1;
     else if (c.estado === 'omitido') resultado.notas.omitidos += 1;
     else if (c.estado === 'fueraVentana') resultado.fueraVentana += 1;
-    else if (c.estado === 'colisionFolio') resultado.colisionesFolio += 1;
-    else resultado.notas.omitidosValidacion = (resultado.notas.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.estado !== 'folioOcupado')
+      resultado.notas.omitidosValidacion = (resultado.notas.omitidosValidacion ?? 0) + 1;
     resultado.lineas += c.lineas;
   }
 
+  const conteos = ctx.guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -308,13 +324,16 @@ async function procesarNota(
     select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
-    if ((await ctx.guardia.clasificar(idViejo, existePorFolio)) === 'colision') {
+    const veredicto = await ctx.guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
       ctx.guardia.reportar(reporte, {
         claveVieja: idViejo,
         folio: numNotaN,
         existente: existePorFolio,
+        veredicto,
+        arrastreFila: `renglones=${String((ctx.detPorNota.get(idViejo) ?? []).length)}`,
       });
-      return sin('colisionFolio');
+      return sin('folioOcupado');
     }
     ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.notaSalida, idViejo, existePorFolio.id);
