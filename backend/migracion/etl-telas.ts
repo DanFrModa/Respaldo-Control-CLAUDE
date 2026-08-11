@@ -31,7 +31,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { calcularCuadreF4, formatearCuadreF4 } from './cuadre-f4.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
-import { describirVentana } from './comun/ventana.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarTelasKardex } from './loaders/entradas-salidas-telas.js';
 
 /** Corre el ETL de kardex de telas contra el cliente dado. Devuelve el reporte de incidencias. */
@@ -40,6 +40,10 @@ export async function ejecutarEtlTelas(cliente: PrismaClient): Promise<Reporte> 
   const reporte = new Reporte();
 
   console.log('ETL de inventario de TELAS (kardex histórico) F4-E6 — inicio');
+  // La ventana, en la PRIMERA línea del log (el runbook manda verificarla ahí, README Regla 3). La
+  // aplicada de verdad sale también en las notas del reporte (`r.ventana`), y es la misma: ambas
+  // salen de `resolverVentana()` sobre el mismo entorno.
+  console.log(`  ${describirVentana(resolverVentana())}`);
 
   // Empresa por defecto de las entradas/traspasos (sin orden): FR Moda (la favorita).
   const frModa = await cliente.empresa.findFirst({

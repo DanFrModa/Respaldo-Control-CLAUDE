@@ -33,6 +33,7 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 import { calcularCuadreF2, formatearCuadreF2 } from './cuadre-f2.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { lineaColisionesV2, lineaDuplicadosOrigen } from './comun/colision-folio.js';
 import { cargarComentariosOrden } from './loaders/comentarios-orden.js';
 import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarOrdenes } from './loaders/ordenes.js';
@@ -95,6 +96,16 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   if (pedidos.fueraVentana > 0) {
     console.log(`    (fuera de la ventana: ${String(pedidos.fueraVentana)} pedidos)`);
   }
+  // Dos avisos DISTINTOS: el duplicado lo trae el Access (la base de v2 puede estar impecable); la
+  // colisión con v2 significa que la base no estaba limpia. Ver `comun/colision-folio.ts`.
+  const dupPedidos = lineaDuplicadosOrigen(
+    'Pedido',
+    pedidos.duplicadosOrigen,
+    'sus renglones (y las órdenes que colgaban de ellos quedan sin pedido ligado)',
+  );
+  if (dupPedidos !== null) console.log(dupPedidos);
+  const avisoPedidos = lineaColisionesV2('Pedido', pedidos.colisionesFolio);
+  if (avisoPedidos !== null) console.log(avisoPedidos);
   log('PedidoLinea', pedidos.lineas);
 
   const reales = await cargarPedidosReales(sesion, cliente, reporte);
@@ -115,6 +126,16 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
       `    (fuera de la ventana: ${String(ordenes.fueraVentana)} órdenes — y con ellas su corte, envíos, recibos, RC, auditorías y costos)`,
     );
   }
+
+  const dupOrdenes = lineaDuplicadosOrigen(
+    'Orden',
+    ordenes.duplicadosOrigen,
+    'su matriz color×talla y todo lo que le cuelga (corte, envíos, recibos, cargos EsMa, costos, ' +
+      'ruta crítica y auditorías)',
+  );
+  if (dupOrdenes !== null) console.log(dupOrdenes);
+  const avisoOrdenes = lineaColisionesV2('Orden', ordenes.colisionesFolio);
+  if (avisoOrdenes !== null) console.log(avisoOrdenes);
 
   log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte));
 

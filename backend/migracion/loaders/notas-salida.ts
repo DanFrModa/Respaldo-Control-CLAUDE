@@ -22,6 +22,12 @@
  *
  * Idempotencia: por el `MapeoMigracion` de `IdNotas` y, en su defecto, por el unique
  * `(idEmpresa, numNota)`. En 2ª corrida no duplica.
+ *
+ * ⚠️ COLISIÓN DE FOLIO: encontrar una nota con ese `numNota` ya NO basta para darla por "la misma".
+ * En el re-volcado del go-live, v2 pudo capturar su propia nota con ese número y el Access traer
+ * otra distinta con el mismo — mapearlas juntas era historia pegada al documento equivocado, en
+ * silencio. `comun/colision-folio.ts` distingue la recuperación de una corrida cortada (la creó el
+ * ETL y nadie más la reclama) de la colisión, que NO se migra y se REPORTA.
  */
 import { crearNotaMigrada, type LineaNotaMigrada } from '../../src/dominio/notas/migracion.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
@@ -39,6 +45,7 @@ import {
 } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import { GuardiaFolios } from '../comun/colision-folio.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearFecha, parsearFechaSoloDia, parsearTexto } from '../comun/valores.js';
 import { dentroVentana, type ConfigVentana } from '../comun/ventana.js';
@@ -54,6 +61,17 @@ export interface ResultadoNotasSalida {
   lineas: number;
   /** # de notas excluidas por la ventana temporal. */
   fueraVentana: number;
+  /**
+   * # de notas NO migradas porque el ACCESS trae otra nota con el mismo `numNota` (culpa del
+   * origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de notas NO migradas porque su `numNota` ya lo ocupaba una nota CAPTURADA EN V2 (ver
+   * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era justo lo
+   * que las volvía invisibles. Salen listadas una por una en el reporte.
+   */
+  colisionesFolio: number;
 }
 
 /** Empresa+orden v2 de una orden vieja (para resolver empresa de la nota y ligar renglones). */
@@ -70,11 +88,20 @@ interface ContextoNotas {
   detPorNota: Map<string, Record<string, string>[]>;
   idAlmacenSentinela: number;
   ventana: ConfigVentana;
+  /** Guardia de colisión de folio del re-volcado (`comun/colision-folio.ts`). */
+  guardia: GuardiaFolios;
 }
 
 /** Contribución de UNA nota a los conteos. */
 interface ContribNota {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'fueraVentana';
+  estado:
+    | 'creado'
+    | 'existente'
+    | 'omitido'
+    | 'omitidoValidacion'
+    | 'fueraVentana'
+    // Duplicado del origen o colisión con v2: el desglose lo lleva el guardia.
+    | 'folioOcupado';
   lineas: number;
 }
 
@@ -157,6 +184,8 @@ export async function cargarNotasSalida(
     notas: { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 },
     lineas: 0,
     fueraVentana: 0,
+    duplicadosOrigen: 0,
+    colisionesFolio: 0,
   };
 
   const ctx: ContextoNotas = {
@@ -165,6 +194,12 @@ export async function cargarNotasSalida(
     detPorNota,
     idAlmacenSentinela,
     ventana,
+    guardia: new GuardiaFolios(
+      cliente,
+      ENTIDAD_MAPEO.notaSalida,
+      'NotaSalida',
+      'sus renglones (el material que salió con esa nota)',
+    ),
   };
 
   const filas = leerCsv('Notas.csv');
@@ -184,10 +219,15 @@ export async function cargarNotasSalida(
     else if (c.estado === 'existente') resultado.notas.existentes += 1;
     else if (c.estado === 'omitido') resultado.notas.omitidos += 1;
     else if (c.estado === 'fueraVentana') resultado.fueraVentana += 1;
-    else resultado.notas.omitidosValidacion = (resultado.notas.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.estado !== 'folioOcupado')
+      resultado.notas.omitidosValidacion = (resultado.notas.omitidosValidacion ?? 0) + 1;
     resultado.lineas += c.lineas;
   }
 
+  const conteos = ctx.guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -276,12 +316,26 @@ async function procesarNota(
     return sin('omitido');
   }
 
-  // Idempotencia adicional por el unique (idEmpresa, numNota).
+  // Idempotencia adicional por el unique (idEmpresa, numNota). OJO: que exista una nota con ese
+  // número NO prueba que sea la misma. Puede ser la corrida anterior cortada entre el `create` y el
+  // `guardarMapeo`… o una nota que v2 capturó con ese mismo número, que es OTRO documento.
   const existePorFolio = await cliente.notaSalida.findUnique({
     where: { idEmpresa_numNota: { idEmpresa, numNota: BigInt(numNotaN) } },
-    select: { id: true },
+    select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
+    const veredicto = await ctx.guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
+      ctx.guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio: numNotaN,
+        existente: existePorFolio,
+        veredicto,
+        arrastreFila: `renglones=${String((ctx.detPorNota.get(idViejo) ?? []).length)}`,
+      });
+      return sin('folioOcupado');
+    }
+    ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.notaSalida, idViejo, existePorFolio.id);
     return sin('existente');
   }
@@ -309,6 +363,9 @@ async function procesarNota(
   if (creada === null) {
     return sin('omitidoValidacion');
   }
+  // Se reclama el folio ANTES de mapearlo: entre el create y el guardarMapeo el mapeo aún no está
+  // en la BD, y una fila concurrente con el mismo número lo tomaría por "recuperación".
+  ctx.guardia.registrarCreado(idViejo, creada.idNotaSalida);
   await guardarMapeo(cliente, ENTIDAD_MAPEO.notaSalida, idViejo, creada.idNotaSalida);
   return { estado: 'creado', lineas: creada.lineas };
 }

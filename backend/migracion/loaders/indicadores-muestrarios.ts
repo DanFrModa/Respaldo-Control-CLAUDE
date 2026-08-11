@@ -7,6 +7,11 @@
  * KPI de cumplimiento (`fechaEntregado <= fechaRequerida`) queda bien poblado. Idempotente por
  * `MapeoMigracion(IdIP_MuesPend)`. Empresa (A9) = la de la sesión (el viejo no la llevaba → favorita).
  *
+ * ⭐ VENTANA TEMPORAL (§Post-F9.24, agregada el 11-ago-2026): no depende de la orden, así que sin
+ * recorte propio ignoraba `ETL_DESDE` y traía los muestrarios de todos los años aunque la migración
+ * lleve solo 2025-2026. Recorta por `FechaSolicitado` (la fecha del documento; `FechaRequerida` es
+ * el compromiso, no la fecha en que nació). Lo excluido se cuenta y se REPORTA.
+ *
  * FRICTIONS de origen (§7: se LISTAN, no se inventan):
  *  • `IP_MuesPend.Cliente` es TEXTO libre (p. ej. "Varios", "Walmart"), NO un id. Se resuelve por
  *    NOMBRE normalizado contra el catálogo de clientes migrado. Sin match (p. ej. "Walmart",
@@ -38,6 +43,7 @@ import {
   parsearFecha,
   parsearTexto,
 } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** `YYYY-MM-DD` (UTC) de una fecha, o `undefined` si no había. */
@@ -65,7 +71,19 @@ export async function cargarMuestrarios(
     temporadaPorNombre.set(normalizarParaDedup(t.nombre), t.id);
   }
 
-  for (const f of leerCsv('IP_MuesPend.csv')) {
+  // §Post-F9.24: recorte por `FechaSolicitado` (la fecha del documento), ANTES de procesar. Lo
+  // excluido sale listado uno por uno en el reporte.
+  const { dentro: filas, fuera: fueraVentana } = filtrarPorVentana(
+    leerCsv('IP_MuesPend.csv'),
+    'FechaSolicitado',
+    resolverVentana(),
+    reporte,
+    'Muestrarios (IP_MuesPend)',
+    (f) => `IdIP_MuesPend=${f.IdIP_MuesPend ?? '?'}`,
+  );
+  r.fueraVentana = fueraVentana;
+
+  for (const f of filas) {
     const idViejo = (f.IdIP_MuesPend ?? '').trim();
     if (idViejo === '') {
       r.omitidos += 1;

@@ -35,16 +35,23 @@ import { cargarCargosEsMa } from './loaders/esma-cargos.js';
 import { cargarAbonosEsMa } from './loaders/esma-abonos.js';
 import { cargarDescuentosEsMa } from './loaders/esma-descuentos.js';
 import { cargarPagosEsMa } from './loaders/esma-pagos.js';
-import type { ResultadoLoader } from './loaders/clientes.js';
+import type { ResultadoEsMa } from './loaders/esma-cargos.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { calcularCuadreF6, formatearCuadreF6 } from './cuadre-f6.js';
 
 /** Imprime el resumen de un loader (mismo formato que los demás ETL). */
-function log(nombre: string, r: ResultadoLoader): void {
+function log(nombre: string, res: ResultadoEsMa): void {
+  const r = res.movimientos;
   const omVal = r.omitidosValidacion ?? 0;
   console.log(
     `  ${nombre.padEnd(22)} creados=${String(r.creados).padStart(6)} ` +
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      // §Post-F9.24: lo excluido por la ventana se ve SIEMPRE que exista, nunca se calla.
+      (res.fueraVentana > 0 ? ` fueraVentana=${String(res.fueraVentana)}` : '') +
+      // Cargos cuya cabecera EsMa SÍ entró pero cuya orden no está migrada: la cuenta corriente
+      // queda sesgada a lo negativo por ese hueco, así que se ve en el resumen (11-ago-2026).
+      (res.sinMapeoOrden > 0 ? ` sinMapeoOrden=${String(res.sinMapeoOrden)}` : ''),
   );
 }
 
@@ -54,9 +61,23 @@ export async function ejecutarEtlEsma(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
 
   console.log('ETL EsMa F6-E6 — inicio');
+  // §Post-F9.24: la ventana se imprime SIEMPRE, aunque no recorte. Los CUATRO loaders de EsMa
+  // recortan por la MISMA fecha (la de la cabecera `EsMa`): o entra el documento completo, o no
+  // entra — si no, el saldo derivado del maquilero (D3) sale sesgado.
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const cargos = await cargarCargosEsMa(sesion, cliente, reporte);
   log('Cargos EsMa', cargos);
+  if (cargos.sinMapeoOrden > 0) {
+    console.log(
+      `    ⚠️ ${String(cargos.sinMapeoOrden)} cargo(s) EsMa NO entraron porque su ORDEN no está ` +
+        `migrada, aunque su cabecera EsMa SÍ pasó la ventana. Los abonos/descuentos/pagos de esas ` +
+        `mismas cabeceras SÍ entran, así que el saldo de esos maquileros queda sesgado a lo ` +
+        `NEGATIVO. Están listados uno por uno en el reporte.`,
+    );
+  }
 
   const abonos = await cargarAbonosEsMa(sesion, cliente, reporte);
   log('Abonos', abonos);

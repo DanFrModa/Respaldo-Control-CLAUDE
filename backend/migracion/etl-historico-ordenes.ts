@@ -33,6 +33,7 @@ import { pathToFileURL } from 'node:url';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarDirectorioTerceros } from './loaders/directorio-terceros.js';
 import { cargarHistoricoOrdenes } from './loaders/historico-ordenes.js';
 
@@ -43,6 +44,15 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   console.log(
     '  (carga TODAS las órdenes del viejo —las 5,451—: es el archivo de consulta, no lo operativo)',
   );
+  // La ventana se imprime también aquí, pero con su aviso: este ETL la IGNORA A PROPÓSITO (existe
+  // para guardar justamente lo que ella deja fuera). Sin esta línea, ver "DESACTIVADA" —o no ver
+  // nada— en el único reporte que debe ignorarla confunde a quien sigue el runbook (Regla 3).
+  const ventana = resolverVentana();
+  const avisoVentana =
+    `${describirVentana(ventana)} ⚠️ ESTE ETL IGNORA LA VENTANA A PROPÓSITO: carga el histórico ` +
+    `COMPLETO (es el archivo de consulta). La línea es informativa; no cambia lo que se carga.`;
+  console.log(`  ${avisoVentana}`);
+  reporte.nota(avisoVentana);
 
   const r = await cargarHistoricoOrdenes(cliente, reporte);
 

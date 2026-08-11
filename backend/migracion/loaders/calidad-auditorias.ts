@@ -30,7 +30,10 @@
  * (decisión documentada). Cada `IdCC_AuditoriasDet` viejo se mapea al `AuditoriaDefecto` resultante.
  *
  * Idempotencia: por el `MapeoMigracion` de `IdCC_Auditorias` (y, defensivamente, por el
- * `@@unique(idEmpresa, numAuditoria)`). CONCURRENCIA: cada auditoría + su detalle es una unidad
+ * `@@unique(idEmpresa, numAuditoria)`). ⚠️ COLISIÓN DE FOLIO: encontrar una auditoría con ese
+ * `numAuditoria` ya NO basta para darla por "la misma" — en el re-volcado del go-live puede ser una
+ * auditoría capturada en v2 con el mismo número, que es OTRO documento; `comun/colision-folio.ts`
+ * distingue la recuperación de una corrida cortada de la colisión, que NO se migra y se REPORTA. CONCURRENCIA: cada auditoría + su detalle es una unidad
  * INDEPENDIENTE → `enLotes` (pool acotado) envuelta en `conReintentoTransitorio` (la unidad es
  * idempotente; recupera de cortes de conexión).
  */
@@ -53,6 +56,7 @@ import {
 } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import { GuardiaFolios } from '../comun/colision-folio.js';
 import { intentarCrear } from '../comun/saneo.js';
 import {
   parsearBandera,
@@ -73,6 +77,17 @@ export interface ResultadoAuditorias {
   detallesOmitidos: number;
   /** Auditorías cuyo maquilero viejo no resolvió a Proveedor (idMaquilero quedó null). */
   maquileroSinMapeo: number;
+  /**
+   * # de auditorías NO migradas porque el ACCESS trae otra auditoría con el mismo `numAuditoria`
+   * (culpa del origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de auditorías NO migradas porque su `numAuditoria` ya lo ocupaba una auditoría CAPTURADA EN
+   * V2 (ver `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes`: contarlas ahí era
+   * justo lo que las volvía invisibles. Salen listadas una por una en el reporte.
+   */
+  colisionesFolio: number;
 }
 
 /** Un renglón crudo de `CC_AuditoriasDet` (agrupado por su auditoría). */
@@ -112,7 +127,8 @@ function idUsuarioViejo(crudo: string | undefined | null): string | null {
 
 /** Contribución de UNA auditoría a los conteos (se suma tras los lotes). */
 interface ContribAud {
-  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  /** `folioOcupado` = duplicado del origen o colisión con v2 (el desglose lo lleva el guardia). */
+  estado: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'folioOcupado';
   detCreados: number;
   detMapeados: number;
   detOmitidos: number;
@@ -124,6 +140,8 @@ interface ContextoAud {
   mapaMaquilero: Map<string, number>;
   mapaDefecto: Map<string, number>;
   detPorAud: Map<string, DetalleViejo[]>;
+  /** Guardia de colisión de folio del re-volcado (`comun/colision-folio.ts`). */
+  guardia: GuardiaFolios;
 }
 
 export async function cargarAuditorias(
@@ -153,7 +171,18 @@ export async function cargarAuditorias(
     detPorAud.set(idAud, lista);
   }
 
-  const ctx: ContextoAud = { mapaOrden, mapaMaquilero, mapaDefecto, detPorAud };
+  const ctx: ContextoAud = {
+    mapaOrden,
+    mapaMaquilero,
+    mapaDefecto,
+    detPorAud,
+    guardia: new GuardiaFolios(
+      cliente,
+      ENTIDAD_MAPEO.auditoria,
+      'Auditoria',
+      'sus renglones de defectos (que ya se cuentan en detallesOmitidos)',
+    ),
+  };
 
   const filas = leerCsv('CC_Auditorias.csv');
   const contribs = await enLotes(
@@ -168,6 +197,8 @@ export async function cargarAuditorias(
     detallesMapeados: 0,
     detallesOmitidos: 0,
     maquileroSinMapeo: 0,
+    duplicadosOrigen: 0,
+    colisionesFolio: 0,
   };
   for (const res of contribs) {
     if (!res.ok) {
@@ -178,7 +209,8 @@ export async function cargarAuditorias(
     if (c.estado === 'creado') resultado.auditorias.creados += 1;
     else if (c.estado === 'existente') resultado.auditorias.existentes += 1;
     else if (c.estado === 'omitido') resultado.auditorias.omitidos += 1;
-    else
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.estado !== 'folioOcupado')
       resultado.auditorias.omitidosValidacion = (resultado.auditorias.omitidosValidacion ?? 0) + 1;
     resultado.detallesCreados += c.detCreados;
     resultado.detallesMapeados += c.detMapeados;
@@ -186,6 +218,9 @@ export async function cargarAuditorias(
     resultado.maquileroSinMapeo += c.maquileroSinMapeo;
   }
 
+  const conteos = ctx.guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -239,12 +274,27 @@ async function procesarAuditoria(
   }
   const idEmpresa = orden.idEmpresa;
 
-  // Idempotencia 2 (defensiva): ¿ya existe por (idEmpresa, numAuditoria)? (recupera corrida parcial).
+  // Idempotencia 2 (defensiva): ¿ya existe por (idEmpresa, numAuditoria)? Recupera una corrida
+  // parcial… pero SOLO si de verdad es el mismo documento: en el re-volcado del go-live puede ser
+  // una auditoría capturada en v2 con ese número, que es OTRA. Ver `comun/colision-folio.ts`.
   const existePorFolio = await cli.auditoria.findUnique({
     where: { idEmpresa_numAuditoria: { idEmpresa, numAuditoria: BigInt(num) } },
-    select: { id: true },
+    select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
+    const veredicto = await ctx.guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
+      ctx.guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio: num,
+        existente: existePorFolio,
+        veredicto,
+        arrastreFila: `detalles=${String(dets.length)}`,
+      });
+      // Sus renglones de detalle SÍ se cuentan (en `detallesOmitidos`): no desaparecen del reporte.
+      return base('folioOcupado', dets.length);
+    }
+    ctx.guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cli, ENTIDAD_MAPEO.auditoria, idViejo, existePorFolio.id);
     return base('existente');
   }
@@ -332,6 +382,9 @@ async function procesarAuditoria(
   if (creada === null) {
     return { ...base('omitidoValidacion', detOmitidos), maquileroSinMapeo };
   }
+  // Se reclama el folio ANTES de mapearlo: entre el create y el guardarMapeo el mapeo aún no está
+  // en la BD, y una fila concurrente con el mismo número lo tomaría por "recuperación".
+  ctx.guardia.registrarCreado(idViejo, creada.idAuditoria);
   await guardarMapeo(cli, ENTIDAD_MAPEO.auditoria, idViejo, creada.idAuditoria);
 
   // Mapea cada IdCC_AuditoriasDet viejo → el AuditoriaDefecto creado de su defecto.

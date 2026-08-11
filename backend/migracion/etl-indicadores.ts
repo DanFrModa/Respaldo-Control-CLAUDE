@@ -30,6 +30,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import {
   cargarActividadesAlmacen,
   cargarActividadesIp,
@@ -52,7 +53,9 @@ function log(nombre: string, r: ResultadoLoader): void {
   console.log(
     `  ${nombre.padEnd(26)} creados=${String(r.creados).padStart(6)} ` +
       `existentes=${String(r.existentes).padStart(6)} omitidos=${String(r.omitidos).padStart(6)}` +
-      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : '') +
+      // §Post-F9.24: lo excluido por la ventana se ve SIEMPRE que exista, nunca se calla.
+      ((r.fueraVentana ?? 0) > 0 ? ` fueraVentana=${String(r.fueraVentana ?? 0)}` : ''),
   );
 }
 
@@ -75,6 +78,12 @@ export async function ejecutarEtlIndicadores(cliente: PrismaClient): Promise<Rep
   const sesionGlobal = sesionEtl(idEmpresa); // catálogos globales + productividad/muestrarios
 
   console.log('ETL Indicadores F7-E6 — inicio (empresa favorita id=' + String(idEmpresa) + ')');
+  // §Post-F9.24: la ventana se imprime SIEMPRE, aunque no recorte. Los catálogos (personal,
+  // actividades) NO se recortan —el corte aplica a DOCUMENTOS con fecha, no a catálogos—; sí lo
+  // hacen la productividad, los muestrarios y el cíclico histórico.
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   // 1. Catálogos (antes que su productividad).
   log('Personal IP', await cargarPersonalIp(sesionGlobal, cliente, reporte));

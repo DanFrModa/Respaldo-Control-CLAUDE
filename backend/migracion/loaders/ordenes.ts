@@ -29,8 +29,14 @@
  * colores y tallas distintos necesarios se PRE-CREAN/RESUELVEN en una pre-pasada SECUENCIAL antes
  * del bucle, poblando las cachés `idPorColorNorm`/`idPorTallaNorm`; el bucle concurrente solo LEE.
  *
- * Idempotencia: por el unique `(idEmpresa, folio)` de la orden; en 2ª corrida no duplica. Guarda
- * IdOrdenes→Orden.id.
+ * Idempotencia: por el `MapeoMigracion` de `IdOrdenes` y, en su defecto, por el unique
+ * `(idEmpresa, folio)`; en 2ª corrida no duplica. Guarda IdOrdenes→Orden.id.
+ *
+ * ⚠️ COLISIÓN DE FOLIO: encontrar una orden con ese folio ya NO basta para darla por "la misma".
+ * En el re-volcado del go-live, v2 pudo capturar su propia orden 8001 y el Access traer otra 8001
+ * — mapearlas juntas pegaba TODOS los hijos del volcado nuevo a la orden equivocada, en silencio.
+ * `comun/colision-folio.ts` distingue la recuperación de una corrida cortada (la creó el ETL y
+ * nadie más la reclama) de la colisión (cualquier otro caso), que NO se migra y se REPORTA.
  */
 import {
   agregarReferenciasOrdenMigrada,
@@ -55,6 +61,7 @@ import {
 } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import { GuardiaFolios } from '../comun/colision-folio.js';
 import { intentarCrear, LIMITES, truncarTexto } from '../comun/saneo.js';
 import {
   esIdPedidosDetVacio,
@@ -94,6 +101,17 @@ export interface ResultadoOrdenes {
   tallasCreadas: number;
   /** # de órdenes excluidas por la ventana temporal (§Post-F9.24). Listadas en el reporte. */
   fueraVentana: number;
+  /**
+   * # de órdenes NO migradas porque el ACCESS trae otra orden con el mismo folio (culpa del origen,
+   * no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de órdenes NO migradas porque su folio ya lo ocupaba una orden CAPTURADA EN V2 (ver
+   * `comun/colision-folio.ts`). Se cuentan APARTE de las `existentes` justamente porque contarlas
+   * ahí es lo que las volvía invisibles. Salen listadas una por una en el reporte.
+   */
+  colisionesFolio: number;
 }
 
 /** Renglón crudo de `OrdenesDet`: color + las 8 cantidades. */
@@ -105,7 +123,8 @@ interface DetCrudo {
 
 /** Contribución de UNA orden a los conteos (se suma tras los lotes). */
 interface ContribOrden {
-  orden: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  /** `folioOcupado` = duplicado del origen o colisión con v2 (el desglose lo lleva el guardia). */
+  orden: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'folioOcupado';
   renglonesColor: number;
   celdasTalla: number;
   referencias: number;
@@ -191,6 +210,8 @@ export async function cargarOrdenes(
     coloresCreados: 0,
     tallasCreadas: 0,
     fueraVentana: 0,
+    duplicadosOrigen: 0,
+    colisionesFolio: 0,
   };
 
   // ── PRE-PASADA SECUENCIAL: resolver/crear TODOS los colores y tallas distintos ──────────────
@@ -252,6 +273,16 @@ export async function cargarOrdenes(
     codigoPorIdModelo,
     campoD7PorCliente,
   };
+  // Guardia del re-volcado: separa la recuperación de una corrida cortada, el DUPLICADO DEL ORIGEN
+  // (el Access trae dos órdenes con el mismo folio) y la COLISIÓN contra una orden capturada en v2
+  // (ver `comun/colision-folio.ts`).
+  const guardia = new GuardiaFolios(
+    cliente,
+    ENTIDAD_MAPEO.orden,
+    'Orden',
+    'su matriz color×talla y TODO lo que le cuelga (corte, envíos, recibos, cargos EsMa, costos, ' +
+      'ruta crítica y auditorías), que se quedará sin orden a la cual ligarse',
+  );
   const contribs = await enLotes(
     filasOrden,
     (f): Promise<ContribOrden> =>
@@ -264,6 +295,7 @@ export async function cargarOrdenes(
           mapeos,
           detPorOrden,
           { resolverColor, resolverTalla },
+          guardia,
           f,
         ),
       ),
@@ -280,7 +312,9 @@ export async function cargarOrdenes(
     if (c.orden === 'creado') resultado.ordenes.creados += 1;
     else if (c.orden === 'existente') resultado.ordenes.existentes += 1;
     else if (c.orden === 'omitido') resultado.ordenes.omitidos += 1;
-    else resultado.ordenes.omitidosValidacion = (resultado.ordenes.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` lo cuenta el guardia, ya separado en duplicado-de-origen vs colisión-con-v2.
+    else if (c.orden !== 'folioOcupado')
+      resultado.ordenes.omitidosValidacion = (resultado.ordenes.omitidosValidacion ?? 0) + 1;
     resultado.renglonesColor += c.renglonesColor;
     resultado.celdasTalla += c.celdasTalla;
     resultado.referencias += c.referencias;
@@ -288,6 +322,9 @@ export async function cargarOrdenes(
   }
 
   resultado.fueraVentana = fueraVentana;
+  const conteos = guardia.conteos;
+  resultado.duplicadosOrigen = conteos.duplicadoOrigen;
+  resultado.colisionesFolio = conteos.colisionV2;
   return resultado;
 }
 
@@ -461,6 +498,7 @@ async function procesarOrden(
   mapeos: MapeosOrden,
   detPorOrden: Map<string, DetCrudo[]>,
   resolutores: Resolutores,
+  guardia: GuardiaFolios,
   f: Record<string, string>,
 ): Promise<ContribOrden> {
   const {
@@ -544,9 +582,26 @@ async function procesarOrden(
   }
   const existePorFolio = await cliente.orden.findUnique({
     where: { idEmpresa_folio: { idEmpresa, folio: BigInt(folio) } },
-    select: { id: true },
+    select: { id: true, creadoPorId: true },
   });
   if (existePorFolio !== null) {
+    // Ya hay una orden con ese folio y NINGÚN mapeo la reclama para esta clave vieja. Puede ser la
+    // corrida anterior cortada entre el `create` y el `guardarMapeo`… o una orden que v2 capturó
+    // con ese mismo folio, que es OTRO documento. Mapearla sin distinguir era el defecto grave: los
+    // hijos del volcado (cortes, envíos, recibos, cargos EsMa, costos, RC) se pegaban a la orden
+    // equivocada, en silencio. Ver `comun/colision-folio.ts`.
+    const veredicto = await guardia.clasificar(idViejo, existePorFolio);
+    if (veredicto !== 'recuperacion') {
+      guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio,
+        existente: existePorFolio,
+        veredicto,
+        arrastreFila: `renglonesColorCsv=${String((detPorOrden.get(idViejo) ?? []).length)}`,
+      });
+      return sinContrib('folioOcupado');
+    }
+    guardia.registrarCreado(idViejo, existePorFolio.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.orden, idViejo, existePorFolio.id);
     return sinContrib('existente');
   }
@@ -645,6 +700,9 @@ async function procesarOrden(
   if (creada === null) {
     return sinContrib('omitidoValidacion');
   }
+  // Se reclama el folio ANTES de mapearlo: entre el create y el guardarMapeo el mapeo aún no está
+  // en la BD, y una fila concurrente con el mismo folio lo tomaría por "recuperación".
+  guardia.registrarCreado(idViejo, creada.idOrden);
   await guardarMapeo(cliente, ENTIDAD_MAPEO.orden, idViejo, creada.idOrden);
 
   let referencias = 0;

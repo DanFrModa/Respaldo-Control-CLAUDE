@@ -16,10 +16,14 @@
  *  • IDEMPOTENCIA: 2ª corrida no duplica.
  *  • CUADRE F6: saldos por maquilero v1 comparable == v2 (cuadran), conciliación recibido==cargado,
  *    inconsistencias listadas (cargo sin cabecera, movimientos con maquilero sin mapeo).
+ *  • ⭐ VENTANA TEMPORAL (§Post-F9.24): los movimientos planos (abonos/descuentos/pagos) NO tenían
+ *    ventana y NO dependen de la orden — con `ETL_DESDE=2025` habrían entrado COMPLETOS contra
+ *    apenas los cargos de 2025-2026, y el saldo derivado del maquilero (D3) habría salido
+ *    masivamente negativo. Ahora los CUATRO recortan por la MISMA fecha (la cabecera `EsMa`).
  */
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../src/datos/index.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
@@ -44,6 +48,13 @@ beforeEach(async () => {
   process.env.TABLAS_DIR = DIR_FIXTURES;
   await limpiarBaseDatos(cliente);
   await sembrarEstado();
+});
+
+afterEach(() => {
+  // Las pruebas de ventana ensucian el entorno del proceso: se limpia SIEMPRE, pase lo que pase.
+  delete process.env.ETL_DESDE;
+  delete process.env.ETL_VENTANA_ANIOS;
+  delete process.env.ETL_VENTANA_REF;
 });
 
 afterAll(async () => {
@@ -256,5 +267,52 @@ describe('ETL de EsMa F6-E6 (integración, fixtures committeados)', () => {
     expect(c.inconsistencias.abonosSinMapeo).toBe(1); // abono del maquilero 99
     expect(c.inconsistencias.descuentosSinMapeo).toBe(1);
     expect(c.inconsistencias.pagosSinCabecera).toBe(1); // pago con IdEsMa=0
+  });
+
+  // ── VENTANA TEMPORAL (§Post-F9.24) ───────────────────────────────────────────────────────────
+  describe('ventana temporal (ETL_DESDE / ETL_VENTANA_*)', () => {
+    it('MIXTA: recorta por la fecha de la CABECERA EsMa, en los CUATRO conceptos, y lo REPORTA', async () => {
+      // Corte al 21-ago-2020: la cabecera EsMa 1 (20/08) queda FUERA; la 2 (21/08) y la 3 (22/08),
+      // dentro. Es el escenario que demuestra el sesgo del saldo: sin ventana en los planos, los
+      // abonos/pagos de la cabecera 1 entraban aunque su cargo no.
+      process.env.ETL_VENTANA_ANIOS = '1';
+      process.env.ETL_VENTANA_REF = '2021-08-21';
+
+      const reporte = await ejecutarEtlEsma(cliente);
+      const c = await conteos();
+
+      // Cargos: el de costura cuelga de la cabecera 1 (fuera) → solo queda el de estampado.
+      expect(c.cargos).toBe(1);
+      // Abonos: 1 y 2 son de la cabecera 1 (fuera); 3 es de la 2 (entra); 4 sigue OMITIDO (sin mapeo).
+      expect(c.abonos).toBe(1);
+      // Descuentos: el 1 es de la cabecera 1 (fuera); el 2 sigue OMITIDO (maquilero sin mapeo).
+      expect(c.descuentos).toBe(0);
+      // Pagos: el 1 es de la cabecera 1 (fuera); el 2 entra; el 3 sigue OMITIDO (sin cabecera).
+      expect(c.pagos).toBe(1);
+
+      // NADA EN SILENCIO (§7): cada concepto lista lo suyo, con su id y su fecha.
+      const titulos = reporte.obtenerSecciones().map((sec) => sec.titulo);
+      for (const etiqueta of [
+        'CargoEsMa',
+        'AbonoMaquilero',
+        'DescuentoMaquilero',
+        'PagoMaquilero',
+      ]) {
+        expect(titulos.some((t) => t.startsWith(`${etiqueta} FUERA de la ventana temporal`))).toBe(
+          true,
+        );
+      }
+    }, 180_000);
+
+    it('ETL_DESDE=2025 (el corte real del go-live): EsMa entero queda en CERO, sin saldos sesgados', async () => {
+      process.env.ETL_DESDE = '2025';
+
+      await ejecutarEtlEsma(cliente);
+      const c = await conteos();
+
+      // Lo importante NO es que sea cero, sino que sea cero en los CUATRO: si los planos hubieran
+      // cargado completos contra cero cargos, el saldo de cada maquilero saldría negativo.
+      expect(c).toMatchObject({ cargos: 0, abonos: 0, descuentos: 0, pagos: 0 });
+    }, 180_000);
   });
 });
