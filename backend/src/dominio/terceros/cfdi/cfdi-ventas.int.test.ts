@@ -9,6 +9,8 @@
  *  (e) EMISOR ajeno rechazado (con RFC de empresa configurado); pedido de OTRO cliente → ErrorValidacion;
  *  (f) A4 (deny-by-default de cxc.administrar).
  */
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { ClavePermiso } from '../../../contrato/index.js';
@@ -62,7 +64,9 @@ function archivosFalsos(): ServicioArchivos {
       const carpeta = solicitud.carpeta ?? 'general';
       return Promise.resolve({
         bucket: 'control-v2-prueba',
-        key: `${carpeta}/fake/${solicitud.nombreOriginal}`,
+        // Segmento ÚNICO por subida, como el motor real (`randomUUID()` en `comun/archivos.ts`):
+        // una key determinista hace chocar el unique de `Archivo.key` al re-subir el mismo XML.
+        key: `${carpeta}/fake/${randomUUID()}/${solicitud.nombreOriginal}`,
         nombreOriginal: solicitud.nombreOriginal,
         tipoMime: solicitud.tipoMime,
         tamanoBytes: solicitud.contenido.byteLength,

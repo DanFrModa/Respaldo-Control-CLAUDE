@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -73,6 +75,29 @@ function xmlCfdi(opciones: {
   </cfdi:Complemento>
 </cfdi:Comprobante>`;
 }
+
+/**
+ * Servicio de archivos FALSO (en las pruebas no hay R2), **calcado del real en lo que importa**: la
+ * key lleva un **segmento único por subida** (`carpeta/uuid/nombre`, ver `comun/archivos.ts`).
+ *
+ * POR QUÉ ASÍ Y NO `cfdi/<nombre>` (lección del CI del 11-ago-2026): con una key DETERMINISTA, subir
+ * dos veces el mismo XML —que es justo lo que prueba "volver a subir el MISMO XML a la MISMA
+ * entrada"— chocaba con el unique de `Archivo.key` y la prueba fallaba **por el doble**, no por el
+ * sistema (el real nunca colisiona: mete un `randomUUID()` en la key). Un doble que no puede
+ * colisionar esconde colisiones; uno que colisiona donde el real no, inventa fallos.
+ *
+ * Uno solo para TODO el archivo: tres copias divergentes era exactamente el terreno del defecto.
+ */
+const archivosFalsos = {
+  subirContenido: (datos: { nombreOriginal: string; tipoMime: string; carpeta: string }) =>
+    Promise.resolve({
+      bucket: 'pruebas',
+      key: `${datos.carpeta}/${randomUUID()}/${datos.nombreOriginal}`,
+      nombreOriginal: datos.nombreOriginal,
+      tipoMime: datos.tipoMime,
+      tamanoBytes: 100,
+    }),
+} as unknown as Parameters<typeof crearEntradaTela>[3];
 
 /** Crea una OC autorizada con un renglón por tela dada. Devuelve la OC proyectada. */
 async function ocAutorizada(lineas: { idTela: number; cantidad: number; precio: number }[]) {
@@ -317,22 +342,13 @@ describe('Leer el CFDI para la entrada de tela (§Post-F9.20)', () => {
 });
 
 describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
-  /** Servicio de archivos falso: guarda en memoria (no hay R2 en las pruebas). */
-  const archivosFalsos = {
-    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
-      Promise.resolve({
-        bucket: 'pruebas',
-        key: `cfdi/${datos.nombreOriginal}`,
-        nombreOriginal: datos.nombreOriginal,
-        tipoMime: datos.tipoMime,
-        tamanoBytes: 100,
-      }),
-  } as unknown as Parameters<typeof crearEntradaTela>[3];
-
-  /** Captura una entrada CON su XML y devuelve el documento creado. */
+  /**
+   * Captura una entrada CON su XML y devuelve el documento creado. El color se deriva del uuid
+   * (unique `(idTela, nombre)`): así llamarlo dos veces en una prueba nunca choca en el catálogo.
+   */
   async function capturarConXml(uuid: string, valorUnitario = 92) {
     const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Marino' },
+      data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
     });
     return crearEntradaTela(
       sesion(),
@@ -533,18 +549,6 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
 });
 
 describe('Proveedor que NO factura (§Post-F9.22)', () => {
-  /** Servicio de archivos falso (idéntico al del bloque de arriba: aquí no hay R2). */
-  const archivosFalsos = {
-    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
-      Promise.resolve({
-        bucket: 'pruebas',
-        key: `cfdi/${datos.nombreOriginal}`,
-        nombreOriginal: datos.nombreOriginal,
-        tipoMime: datos.tipoMime,
-        tamanoBytes: 100,
-      }),
-  } as unknown as Parameters<typeof crearEntradaTela>[3];
-
   /** Un tercero informal: da de alta con la casilla "¿Emite factura?" en NO. */
   async function proveedorInformal() {
     return cliente.proveedor.create({
@@ -776,24 +780,18 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
 });
 
 describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21)', () => {
-  /** Servicio de archivos falso (no hay R2 en las pruebas). */
-  const archivosFalsos = {
-    subirContenido: (datos: { nombreOriginal: string; tipoMime: string }) =>
-      Promise.resolve({
-        bucket: 'pruebas',
-        key: `cfdi/${datos.nombreOriginal}`,
-        nombreOriginal: datos.nombreOriginal,
-        tipoMime: datos.tipoMime,
-        tamanoBytes: 100,
-      }),
-  } as unknown as Parameters<typeof crearEntradaTela>[3];
-
   const UUID = 'f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1';
 
-  /** Captura un borrador CON su XML y devuelve el documento y el color usado. */
+  /**
+   * Captura un borrador CON su XML y devuelve el documento y el color usado.
+   *
+   * El COLOR se deriva del uuid: hay pruebas que llaman a este helper DOS veces (dos entradas con
+   * facturas distintas) y `TelaColor` tiene unique `(idTela, nombre)` — con el nombre fijo, la
+   * segunda llamada reventaba en el `create` y la prueba fallaba antes de llegar a lo que verifica.
+   */
   async function borradorConFactura(uuid = UUID) {
     const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Marino' },
+      data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
     });
     const entrada = await crearEntradaTela(
       sesion(),

@@ -8,6 +8,8 @@
  *  (e) receptor ajeno rechazado (con RFC esperado configurado); proveedor≠emisor deja aviso;
  *  (f) A9 (el cargo es de la empresa activa) y A4 (deny-by-default de cxp.administrar).
  */
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { ClavePermiso } from '../../../contrato/index.js';
@@ -65,7 +67,11 @@ function archivosFalsos(): ServicioArchivos {
     subirContenido(solicitud) {
       subirContenidoSpy(solicitud);
       const carpeta = solicitud.carpeta ?? 'general';
-      const key = `${carpeta}/fake/${solicitud.nombreOriginal}`;
+      // La key lleva un SEGMENTO ÚNICO por subida, como el motor real (`comun/archivos.ts` mete un
+      // `randomUUID()`): con una key determinista, subir dos veces el mismo XML choca con el unique
+      // de `Archivo.key` y la prueba falla por el doble, no por el sistema (cicatriz del CI del
+      // 11-ago-2026 en la entrada de tela).
+      const key = `${carpeta}/fake/${randomUUID()}/${solicitud.nombreOriginal}`;
       return Promise.resolve({
         bucket: 'control-v2-prueba',
         key,
