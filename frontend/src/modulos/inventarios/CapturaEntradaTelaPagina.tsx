@@ -158,6 +158,28 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   }
 
   /**
+   * SUELTA la factura leída (§Post-F9.20, arreglado el 11-ago-2026). Una vez leído el XML, la
+   * captura lo manda siempre al guardar; si el emisor no está en el catálogo, guardar es imposible
+   * con cualquier proveedor y sin esto la única salida era recargar y perder lo capturado. Los
+   * renglones ya capturados se CONSERVAN a propósito: lo que se suelta es la factura, no el trabajo.
+   */
+  function quitarFacturaLeida(): void {
+    setPropuesta(null);
+    setXmlCfdi(null);
+    toast.info(
+      'Factura soltada: la entrada se captura sin CFDI (queda como remisión o factura a mano).',
+    );
+  }
+
+  /**
+   * Hay factura leída pero su emisor NO está en el catálogo. Es un callejón sin salida para la
+   * captura —el backend exige que el emisor sea el proveedor, y el que se elija a mano o no tiene
+   * RFC o tiene otro—, así que la pantalla lo dice y deja el selector de proveedor quieto en vez de
+   * invitar a un intento que siempre termina en error.
+   */
+  const sinProveedorDelCfdi = propuesta !== null && propuesta.idProveedor === null;
+
+  /**
    * Lo que el panel de captura ofrece para precargar renglones: los CONCEPTOS de la factura si ya se
    * leyó el XML (con SU cantidad y SU precio — es lo que llegó y lo que se va a pagar), o los
    * pendientes de la orden de compra si se está capturando a mano desde ella (§Post-F9.15).
@@ -421,7 +443,40 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                   data-testid="entrada-xml-archivo"
                 />
               </label>
+              {/* LA SALIDA. Una vez leído el XML, la captura lo manda SIEMPRE al guardar — y si
+                  ningún proveedor tiene el RFC del emisor, guardar no puede funcionar con NINGÚN
+                  proveedor (el backend exige que el emisor sea el proveedor). Sin este botón la
+                  única salida era recargar la pantalla y perder lo capturado. */}
+              {propuesta === null ? null : (
+                <button
+                  type="button"
+                  className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={quitarFacturaLeida}
+                  data-testid="entrada-quitar-cfdi"
+                >
+                  Quitar la factura leída
+                </button>
+              )}
             </div>
+          ) : null}
+
+          {/* El callejón sin salida, dicho ANTES de que la persona lo choque al guardar: hay XML
+              leído pero su emisor no está en el catálogo. Elegir un proveedor a mano no sirve —el
+              backend rechaza cualquier combinación—, así que la pantalla dice la ruta que sí existe
+              y deja el selector quieto (ver el `disabled` de "Proveedor de telas"). */}
+          {editable && sinProveedorDelCfdi ? (
+            <p
+              className="rounded-md border border-warn/40 bg-warn-soft p-3 text-xs"
+              data-testid="entrada-cfdi-sin-proveedor"
+            >
+              <strong className="font-medium">
+                Ningún proveedor del catálogo tiene el RFC {propuesta?.emisorRfc}.
+              </strong>{' '}
+              Captúraselo en <em>Catálogos › Proveedores</em> (o da de alta al proveedor con ese
+              RFC) y vuelve a leer la factura. Elegirlo a mano no sirve: sin RFC no hay contra qué
+              comprobar quién facturó, y la entrada no se deja guardar. Si prefieres capturarla sin
+              factura, usa <em>Quitar la factura leída</em>.
+            </p>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -456,8 +511,10 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 id="entrada-proveedor"
                 value={idProveedor}
                 onChange={(e) => setIdProveedor(e.target.value)}
-                // Llegando desde la OC el proveedor NO se cambia: lo define la orden.
-                disabled={!editable || idOcDeepLink !== null}
+                // Llegando desde la OC el proveedor NO se cambia: lo define la orden. Y con una
+                // factura leída cuyo emisor no está en el catálogo, tampoco: cualquier elección
+                // termina en error al guardar (ver `sinProveedorDelCfdi`).
+                disabled={!editable || idOcDeepLink !== null || sinProveedorDelCfdi}
                 data-testid="entrada-proveedor"
               >
                 <option value="">Elige el proveedor…</option>
@@ -471,9 +528,11 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 ))}
               </SelectNativo>
               <p className="text-xs text-muted-foreground" data-testid="entrada-proveedor-ayuda">
-                {idOcDeepLink === null
-                  ? 'Solo proveedores con el rol «Vende telas».'
-                  : 'Lo define la orden de compra desde la que entraste.'}
+                {sinProveedorDelCfdi
+                  ? 'Lo define la factura: captúrale el RFC al proveedor y vuelve a leerla.'
+                  : idOcDeepLink === null
+                    ? 'Solo proveedores con el rol «Vende telas».'
+                    : 'Lo define la orden de compra desde la que entraste.'}
               </p>
             </Field>
             <Field>

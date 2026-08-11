@@ -359,6 +359,53 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     );
   });
 
+  it('factura leída cuyo EMISOR no está en el catálogo: dice qué hacer y ofrece soltarla', async () => {
+    // El callejón sin salida de la revisión del 11-ago: sin proveedor con ese RFC, guardar es
+    // imposible con CUALQUIER proveedor, así que la pantalla no debe invitar a elegir uno a mano —
+    // debe decir la ruta que sí existe y dejar soltar la factura sin perder lo capturado.
+    leerCfdiMutate.mockImplementation(
+      (_variables: unknown, opciones: { onSuccess: (datos: unknown) => void }) => {
+        opciones.onSuccess({
+          uuid: '22222222-2222-2222-2222-222222222222',
+          numeroDocumento: 'B-77',
+          fecha: '2026-08-06',
+          emisorRfc: 'XXX010101AAA',
+          emisorNombre: 'Telas Desconocidas',
+          moneda: 'MXN',
+          total: 100,
+          idProveedor: null, // ninguno del catálogo tiene ese RFC
+          proveedor: null,
+          yaUsado: false,
+          avisos: [],
+          conceptos: [],
+        });
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    await usuario.upload(
+      screen.getByTestId('entrada-xml-archivo'),
+      new File(['<cfdi/>'], 'factura.xml', { type: 'text/xml' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('entrada-cfdi-sin-proveedor')).toHaveTextContent('XXX010101AAA');
+    });
+    // El selector NO se ofrece: elegir a mano siempre terminaría en 400.
+    expect(screen.getByTestId('entrada-proveedor')).toBeDisabled();
+
+    // …y hay salida: soltar la factura devuelve la captura al camino sin CFDI.
+    await usuario.click(screen.getByTestId('entrada-quitar-cfdi'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('entrada-cfdi-sin-proveedor')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('entrada-proveedor')).toBeEnabled();
+    leerCfdiMutate.mockReset();
+  });
+
   it('al EDITAR un borrador NO manda `uuidCfdi`: el sello de la factura no se toca desde aquí', async () => {
     // El borrador nació de un XML (trae su UUID sellado). Editarlo NO puede borrarlo: el cuerpo del
     // PUT ni siquiera lo lleva — el servidor conserva el sello y solo un XML nuevo lo reemplaza.

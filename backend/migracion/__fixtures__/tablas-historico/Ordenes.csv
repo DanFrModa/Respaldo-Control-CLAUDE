@@ -2,3 +2,4 @@ IdOrdenes,Numero,IdEmpresas,IdModelos,IdClientes,IdMaquileros,IdEtiquetasM,IdTel
 1001,5001,1,77,3,20,4,8,15/03/2019 00:00:00,30/03/2019 00:00:00,CHM G ,100% Algodon,Primera,0,
 1002,5002,1,77,3,21,4,8,2/2/2026 00:00:00,,CHM G ,,,0,
 1003,5003,9,77,3,20,4,8,10/01/2020 00:00:00,,CHM G ,,,0,
+1004,5004,2,77,3,20,4,8,11/01/2020 00:00:00,,CHM G ,,,0,

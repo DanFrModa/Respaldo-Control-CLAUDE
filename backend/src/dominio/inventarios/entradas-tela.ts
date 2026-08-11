@@ -489,7 +489,26 @@ export async function crearEntradaTela(
   // un P2002 opaco (500) en vez de decir en qué entrada está la otra captura.
   const uuidSuelto = datos.uuidCfdi?.trim();
   if (sello === null && uuidSuelto !== undefined && uuidSuelto !== '') {
-    await exigirUuidLibreEnEntradas(clienteLectura(bd), idEmpresa, uuidSuelto);
+    const lectura = clienteLectura(bd);
+    await exigirUuidLibreEnEntradas(lectura, idEmpresa, uuidSuelto);
+    // …y ese folio fiscal tampoco puede ser de un proveedor marcado como que NO factura (hallazgo de
+    // la revisión del 11-ago-2026). No es solo dato contradictorio: al confirmar, ese documento cae
+    // en la rama del proveedor sin factura y nace un cargo **NO fiscal** por los precios capturados,
+    // que NO lleva el UUID al `MovimientoTercero` — así que Finanzas podría importar ESE MISMO CFDI
+    // y cobrarlo otra vez: dos cargos por lo mismo. La edición ya lo prohibía
+    // (`exigirSelloCompatibleConProveedor`); el alta se había quedado sin esta puerta.
+    const proveedor = await lectura.proveedor.findUnique({
+      where: { id: datos.idProveedor },
+      select: { nombre: true, factura: true },
+    });
+    // Si no existe, `validarCabeceraYLineas` truena enseguida con mejor mensaje (mismo criterio que
+    // `exigirSelloCompatibleConProveedor`).
+    if (proveedor !== null) {
+      exigirProveedorQueFactura(
+        proveedor,
+        'capturar la entrada con el folio fiscal (UUID) de una factura',
+      );
+    }
   }
 
   const id = await enTransaccion(async (tx) => {
@@ -723,18 +742,28 @@ function cargoDeCuentaPorPagar(
     // `exigirSelloCompatibleConProveedor` al editar el borrador); esto es la red por si mañana
     // apareciera un tercer camino que selle un CFDI — un cargo fiscal a nombre de quien no facturó
     // no se puede corregir: el UUID queda consumido para siempre.
-    if (documento.rfcCfdi !== null) {
-      const rfcProveedor = exigirRfcDelProveedor(
-        documento.proveedor,
-        'confirmar la entrada con su factura (CFDI)',
+    // Y la red FALLA CERRADA (revisión del 11-ago-2026): si el cargo es fiscal pero no se sabe QUÉ
+    // RFC lo emitió, no hay nada que comparar — y una comprobación que no puede comprobar no debe
+    // dejar pasar (A4, deny-by-default). Hoy es inalcanzable (`rfcCfdi === null ⇒ totalCfdi === null`
+    // porque los dos los escribe el mismo sello), pero condicionar la validación a que el RFC exista
+    // convertía la última red en un colador el día que ese invariante se rompiera.
+    if (documento.rfcCfdi === null) {
+      throw new ErrorValidacion(
+        `La entrada ${String(documento.folio)} trae el total de la factura (UUID ${documento.uuidCfdi}) ` +
+          `pero no el RFC de quien la emitió: no se puede confirmar un cargo fiscal sin saber a ` +
+          `nombre de quién nace. Vuelve a subir el XML de la factura en el borrador.`,
       );
-      if (normalizarRfc(rfcProveedor) !== normalizarRfc(documento.rfcCfdi)) {
-        throw new ErrorValidacion(
-          `La factura de esta entrada la emitió el RFC ${documento.rfcCfdi}, pero el documento ` +
-            `está a nombre del proveedor "${documento.proveedor.nombre}" (RFC ${rfcProveedor}): ` +
-            `la cuenta por pagar nacería a nombre de quien no facturó.`,
-        );
-      }
+    }
+    const rfcProveedor = exigirRfcDelProveedor(
+      documento.proveedor,
+      'confirmar la entrada con su factura (CFDI)',
+    );
+    if (normalizarRfc(rfcProveedor) !== normalizarRfc(documento.rfcCfdi)) {
+      throw new ErrorValidacion(
+        `La factura de esta entrada la emitió el RFC ${documento.rfcCfdi}, pero el documento ` +
+          `está a nombre del proveedor "${documento.proveedor.nombre}" (RFC ${rfcProveedor}): ` +
+          `la cuenta por pagar nacería a nombre de quien no facturó.`,
+      );
     }
     return {
       ...comun,
@@ -743,8 +772,9 @@ function cargoDeCuentaPorPagar(
       uuidCfdi: documento.uuidCfdi,
       // El RFC del EMISOR viaja al cargo igual que en una importación de CFDI de F9: es lo que el
       // reporte fiscal del contador imprime. Sin él, la misma factura se veía distinta según por
-      // dónde hubiera entrado (con RFC desde Finanzas, con "—" desde el almacén de telas).
-      ...(documento.rfcCfdi === null ? {} : { rfcTercero: documento.rfcCfdi }),
+      // dónde hubiera entrado (con RFC desde Finanzas, con "—" desde el almacén de telas). Aquí ya
+      // no puede faltar: el cerrojo de arriba truena si es null.
+      rfcTercero: documento.rfcCfdi,
       ...(documento.idArchivoCfdi === null ? {} : { idArchivoCfdi: documento.idArchivoCfdi }),
       observaciones: `Entrada de tela ${String(documento.folio)} · factura ${documento.numeroDocumento}`,
     };

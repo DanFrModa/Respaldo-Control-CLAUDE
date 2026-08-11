@@ -11,16 +11,19 @@
  * propósito la ventana de 2025-2026 (§Post-F9.24) — precisamente porque su razón de existir es
  * guardar lo que la ventana deja fuera.
  *
- * ⚠️ NO SON LAS 5,451 DEL DUMP, SON 3,923 (corregido el 11-ago-2026; antes este encabezado decía
- * "TODAS" y era falso). Una orden sin `idEmpresa` mapeada se salta (`resultado.sinEmpresa`), y **las
- * 6 empresas viejas inactivas NO migran** (decisión de Gabriel del 17-jun-2026,
- * `docs/hoja-de-ruta/F2-etapas.md`), así que quedan fuera **1,528 órdenes** con sus 10,510 celdas y
- * 9,204 movimientos — y **1,523 de ellas son de 2005-2012**, justo la historia más vieja. Medido:
- * 3,923 órdenes · 29,356 celdas · 26,092 movimientos ≈ 59,000 renglones (el dump entero: ~80,600).
- * **Rescatarlas es DECISIÓN DE DANIEL, no del ETL** (`HistoricoOrdenV1.idEmpresa` es FK real a
- * `Empresa` y el listado filtra por la empresa activa: habría que decidir a qué empresa se cuelgan).
- * Anotado en `DECISIONES.md §(Post-F9.26)` y en `HOJA-DE-RUTA.md` §4/§6 — por eso el filtro sigue tal
- * cual: no se cambia el alcance del archivo sin su respuesta.
+ * SON LAS 5,451 DEL DUMP, TODAS (§Post-F9.29, 11-ago-2026). Antes eran 3,923: las órdenes cuya
+ * `IdEmpresas` no mapea se saltaban, y **las 6 empresas viejas inactivas NO migran** (decisión de
+ * Gabriel del 17-jun-2026, `docs/hoja-de-ruta/F2-etapas.md`), así que se caían **1,528 órdenes** con
+ * sus 10,497 celdas y 9,204 movimientos — y **1,523 de ellas son de 2005-2012**, justo la historia
+ * más vieja, que es la razón de ser del archivo. Daniel: *"sí, está bien, rescata todas y solo pon en
+ * algún lugar la empresa a la que correspondía."* Ahora esas órdenes **se cuelgan de la empresa
+ * principal** (`idEmpresa` es FK real y el listado filtra por la empresa activa, A9) y conservan en
+ * `empresaV1` el nombre de la empresa a la que pertenecían — el mismo criterio que los talleres de
+ * §Post-F9.27: el dato viejo se guarda en TEXTO, ligado a nada. Medido sobre el dump: 5,451 órdenes ·
+ * 39,853 celdas · 35,296 movimientos = 80,600 renglones.
+ *
+ * `empresaV1` se llena en TODAS las órdenes, no solo en las rescatadas: si solo lo trajeran esas, un
+ * valor vacío sería ambiguo (¿es de la empresa activa, o el CSV no traía nombre?).
  *
  * LAS DOS REGLAS QUE LO MANTIENEN INOCUO (ver el encabezado del modelo en `schema.prisma`):
  *  1. **Los terceros se resuelven a TEXTO aquí**, leyendo los CSV del viejo — NO se tocan los
@@ -33,7 +36,7 @@
  * reglas de negocio que proteger — no hay folios, ni kardex, ni existencias, ni estados. El dominio
  * solo lo LEE. Meterle una capa de dominio de escritura sería ceremonia sobre un `INSERT`.
  *
- * POR LOTES (regla de Gabriel, 19-jun): son ~59,000 renglones entre los tres modelos; se escriben con
+ * POR LOTES (regla de Gabriel, 19-jun): son 80,600 renglones entre los tres modelos; se escriben con
  * `createMany` en tandas, nunca uno por uno.
  *
  * IDEMPOTENTE, y en los dos sentidos: la llave es `(idEmpresa, idOrdenV1)`, así que re-correrlo no
@@ -59,8 +62,12 @@ export interface ResultadoHistoricoOrdenes {
   ordenes: number;
   /** Órdenes que ya existían (re-corrida idempotente). */
   existentes: number;
-  /** Órdenes salteadas por no poder ubicar su empresa (las 6 empresas muertas del viejo). */
-  sinEmpresa: number;
+  /**
+   * Órdenes de las 6 empresas muertas del viejo RESCATADAS en esta corrida (§Post-F9.29): se
+   * cargaron colgadas de la empresa principal, conservando su empresa original en `empresaV1`.
+   * Antes este contador era `sinEmpresa` y contaba las que se OMITÍAN; ya no se omite ninguna.
+   */
+  rescatadas: number;
   /** Celdas color×talla insertadas. */
   celdas: number;
   /** Movimientos de producción insertados. */
@@ -185,7 +192,7 @@ interface Reparacion {
 /**
  * Cuántas órdenes (con sus hijos) van por TRANSACCIÓN. Cada tanda entra COMPLETA o no entra:
  * cabeceras, celdas y procesos de esas órdenes se escriben en la misma transacción, para que una
- * caída a media carga (son ~59,000 renglones, y Railway rota contraseñas) no pueda dejar órdenes sin
+ * caída a media carga (son 80,600 renglones, y Railway rota contraseñas) no pueda dejar órdenes sin
  * detalle. Bajo a propósito frente al `LOTE` de filas: una tanda son ~250 cabeceras + sus ~2,000
  * celdas + sus ~1,500 procesos.
  */
@@ -208,6 +215,47 @@ async function insertarEnTandas<T>(
     escritas += (await escribir(filas.slice(i, i + LOTE))).count;
   }
   return escritas;
+}
+
+/** La empresa de la que cuelgan las órdenes rescatadas, y por qué se eligió (para el reporte). */
+interface EmpresaPrincipal {
+  id: number;
+  /** Cómo se resolvió, para que el reporte lo diga en vez de dejarlo a la adivinanza. */
+  criterio: string;
+}
+
+/**
+ * Resuelve la empresa PRINCIPAL: de ella cuelgan las órdenes de las 6 empresas que no migran
+ * (§Post-F9.29). No es una empresa "histórica" nueva —crear una sería reabrir justo lo que la
+ * decisión de Gabriel del 17-jun cerró—, sino la empresa VIVA del grupo.
+ *
+ * Es **FR Moda**: es la del seed F0, la favorita, la que el resto del ETL usa para los almacenes
+ * (`loaders/empresas.ts` la busca igual: por nombre y, si no, la favorita) y la que la gente tiene
+ * activa al entrar — y como el listado del archivo filtra por la empresa activa (A9), colgarlas de
+ * cualquier otra sería rescatarlas para que nadie las vea. Marilyn Fitness es la MISMA empresa
+ * renombrada (CLAUDE.md §8), así que la elección no separa dos negocios: solo elige el nombre vivo.
+ *
+ * El tercer escalón (la primera empresa del mapeo, por id) es para los ambientes de prueba, donde la
+ * empresa no se llama "FR Moda" ni hay favorita. Va ordenado para ser DETERMINISTA.
+ */
+async function resolverEmpresaPrincipal(
+  cli: PrismaClient,
+  mapaEmpresa: Map<string, number>,
+): Promise<EmpresaPrincipal | null> {
+  const frModa = await cli.empresa.findFirst({
+    where: { nombre: { equals: 'FR Moda', mode: 'insensitive' } },
+    select: { id: true },
+  });
+  if (frModa !== null) return { id: frModa.id, criterio: 'FR Moda (por nombre)' };
+
+  const favorita = await cli.empresa.findFirst({ where: { favorita: true }, select: { id: true } });
+  if (favorita !== null) return { id: favorita.id, criterio: 'la empresa favorita' };
+
+  const [primera] = [...mapaEmpresa.values()].sort((a, b) => a - b);
+  if (primera !== undefined) {
+    return { id: primera, criterio: 'la primera empresa del mapeo (no hay FR Moda ni favorita)' };
+  }
+  return null;
 }
 
 /** Proyecta los procesos de una orden a las filas de `HistoricoOrdenV1Proceso`. */
@@ -236,6 +284,9 @@ export async function cargarHistoricoOrdenes(
 
   // Catálogos del VIEJO resueltos a texto (regla 1): jamás se consultan los catálogos de v2.
   const clientes = mapaNombres('Clientes.csv', 'IdClientes', 'Cliente');
+  // §Post-F9.29 — las 8 empresas del viejo por su nombre, incluidas las 6 que no migran: es lo que
+  // conserva de quién era cada orden rescatada.
+  const empresasV1 = mapaNombres('Empresas.csv', 'IdEmpresas', 'Empresa');
   const etiquetas = mapaNombres('EtiquetasM.csv', 'IdEtiquetasM', 'EtiquetaM');
   const telas = mapaNombres('TelasDis.csv', 'IdTelasDis', 'TelaDis');
   const modelosV1 = mapaNombres('Modelos.csv', 'IdModelos', 'Modelo');
@@ -245,12 +296,25 @@ export async function cargarHistoricoOrdenes(
   const resultado: ResultadoHistoricoOrdenes = {
     ordenes: 0,
     existentes: 0,
-    sinEmpresa: 0,
+    rescatadas: 0,
     celdas: 0,
     procesos: 0,
     sinModelo: 0,
     reparadas: 0,
   };
+
+  // De aquí cuelgan las órdenes de las empresas que no migran (§Post-F9.29). Sin ella no hay dónde
+  // colgar NADA (el archivo entero necesita una empresa viva), así que se aborta con un mensaje
+  // claro en vez de perder 1,528 órdenes en silencio: falta correr `etl-catalogos` antes.
+  const principal = await resolverEmpresaPrincipal(cli, mapaEmpresa);
+  if (principal === null) {
+    throw new Error(
+      'No hay ninguna empresa en la base de datos: corre `etl-catalogos` antes que el archivo ' +
+        'histórico (necesita al menos una empresa viva de la que colgar las órdenes).',
+    );
+  }
+  /** Cuántas órdenes se rescataron de cada empresa vieja (para reportarlo, plan §7). */
+  const rescatadasPorEmpresa = new Map<string, number>();
 
   // Lo que YA está cargado (idempotencia): `idOrdenV1` → id nuevo.
   const yaCargadas = new Map(
@@ -260,7 +324,7 @@ export async function cargarHistoricoOrdenes(
     ]),
   );
   // …y cuáles de esas ya tienen ESCRITOS sus hijos. Sin esto, la idempotencia solo valía si la
-  // corrida terminaba completa: una caída después de las cabeceras (son ~59,000 renglones y la BD
+  // corrida terminaba completa: una caída después de las cabeceras (son 80,600 renglones y la BD
   // está del otro lado de la red) dejaba miles de órdenes sin una sola celda ni proceso PARA
   // SIEMPRE, porque re-correr las daba por cargadas e insertaba 0. Ahora re-correr COMPLETA lo que
   // falte. La granularidad es la orden entera, y es exacta porque cabecera e hijos se escriben en la
@@ -361,11 +425,17 @@ export async function cargarHistoricoOrdenes(
       continue;
     }
 
-    const idEmpresa = mapaEmpresa.get((f.IdEmpresas ?? '').trim());
-    if (idEmpresa === undefined) {
-      // Las 6 empresas muertas del viejo no migraron: sus órdenes no tienen dónde colgar.
-      resultado.sinEmpresa += 1;
-      continue;
+    // §Post-F9.29 — la empresa. Si mapea, se RESPETA la suya (no se reasigna nada que ya esté bien);
+    // si no —las 6 empresas muertas del viejo, que no migraron—, la orden se rescata colgándola de la
+    // principal. Ninguna se salta: el nombre real viaja en `empresaV1`, que se llena siempre.
+    const idEmpresaV1 = (f.IdEmpresas ?? '').trim();
+    const empresaV1 = empresasV1.get(idEmpresaV1) ?? null;
+    const idEmpresaPropia = mapaEmpresa.get(idEmpresaV1);
+    const idEmpresa = idEmpresaPropia ?? principal.id;
+    if (idEmpresaPropia === undefined) {
+      resultado.rescatadas += 1;
+      const clave = `${empresaV1 ?? '(sin nombre en Empresas.csv)'} · Id=${idEmpresaV1 === '' ? '(vacío)' : idEmpresaV1}`;
+      rescatadasPorEmpresa.set(clave, (rescatadasPorEmpresa.get(clave) ?? 0) + 1);
     }
 
     const idModeloV1 = (f.IdModelos ?? '').trim();
@@ -381,6 +451,7 @@ export async function cargarHistoricoOrdenes(
         idEmpresa,
         idOrdenV1,
         numero: (f.Numero ?? '').trim() || idOrdenV1,
+        empresaV1,
         fecha: parsearFecha(f.Fecha),
         fechaEntrega: parsearFecha(f.FechaEntrega),
         idModelo,
@@ -466,9 +537,21 @@ export async function cargarHistoricoOrdenes(
     );
   }
 
-  if (resultado.sinEmpresa > 0) {
+  if (resultado.rescatadas > 0) {
+    // Se listan POR EMPRESA VIEJA (no una línea por orden): dice exactamente de quién era cada
+    // rescatada sin llenar el reporte con 1,528 renglones.
+    for (const [empresa, cuantas] of [...rescatadasPorEmpresa].sort((a, b) =>
+      a[0].localeCompare(b[0], 'es'),
+    )) {
+      reporte.agregar(
+        `Histórico: órdenes de empresas que NO migran, rescatadas en la empresa principal (${principal.criterio}) — §Post-F9.29`,
+        `${empresa}: ${String(cuantas)} órdenes`,
+      );
+    }
     reporte.nota(
-      `Histórico: ${String(resultado.sinEmpresa)} órdenes sin empresa mapeada (las 6 empresas viejas que no migran).`,
+      `Histórico: ${String(resultado.rescatadas)} órdenes de las empresas viejas que no migran se ` +
+        `RESCATARON colgándolas de la empresa principal (${principal.criterio}); conservan su empresa ` +
+        `original en el campo "empresaV1" y se pueden buscar por ella (§Post-F9.29).`,
     );
   }
   if (resultado.sinModelo > 0) {

@@ -35,8 +35,9 @@ const NOMBRE_PROCESO: Record<string, string> = {
  * del catálogo de modelos. Para poder buscar por cliente, número de modelo, tipo de prenda, fecha de
  * producción, maquilero, etc."*
  *
- * Son las ~5,200 órdenes que la migración de 2025-2026 deja fuera de lo operativo. La pantalla es
- * de CONSULTA PURA: no hay «Nuevo», ni editar, ni desactivar — no porque falten, sino porque este
+ * Son las 5,451 órdenes del sistema viejo — TODAS, incluidas las de las empresas que ya no existen
+ * (§Post-F9.29: se rescataron colgadas de la empresa principal y la ficha dice de cuál eran). La
+ * pantalla es de CONSULTA PURA: no hay «Nuevo», ni editar, ni desactivar — no porque falten, sino porque este
  * archivo no se toca. El número de orden abre el cajón con la ficha.
  *
  * Permiso: `ordenes.ver` (el backend es la autoridad, A1).
@@ -265,6 +266,12 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
               <Dato etiqueta="Tela" valor={d.tela} />
               <Dato etiqueta="Composición" valor={d.composicion} />
               <Dato etiqueta="Entrega" valor={d.fechaEntrega} />
+              {/* §Post-F9.29 — de qué empresa del sistema viejo era. Las de las 6 empresas que ya
+                  no existen se rescataron colgadas de la empresa principal, así que este texto es
+                  lo único que dice de quién eran. En la FICHA y no en el listado: solo importa al
+                  mirar una orden concreta, y el listado ya lleva 8 columnas. Se busca desde la caja
+                  de búsqueda libre. */}
+              <Dato etiqueta="Empresa (Control viejo)" valor={d.empresaV1} />
             </dl>
 
             {d.cancelada ? (

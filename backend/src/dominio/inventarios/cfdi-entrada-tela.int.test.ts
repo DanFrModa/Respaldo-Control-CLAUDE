@@ -379,6 +379,21 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     expect(cargos[0]?.rfcTercero).toBe('TNO850101BBB');
   });
 
+  it('un cargo FISCAL sin RFC del emisor NO se confirma: la última red falla CERRADA', async () => {
+    // Hoy este estado es inalcanzable —el mismo sello escribe `totalCfdi` y `rfcCfdi` juntos—, así
+    // que se fabrica a mano tocando la fila. Es justo lo que la red existe para atajar: si mañana
+    // apareciera un camino que sella sin RFC, el cargo fiscal nacería a nombre de nadie y el UUID
+    // quedaría consumido para siempre. Una comprobación que no puede comprobar no deja pasar (A4).
+    const entrada = await capturarConXml('abababab-abab-abab-abab-abababababab');
+    await cliente.entradaTela.update({ where: { id: entrada.id }, data: { rfcCfdi: null } });
+
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(/RFC/);
+    // Y nada quedó a medias: sin cargo, y la entrada sigue en borrador.
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+    const enBd = await cliente.entradaTela.findUniqueOrThrow({ where: { id: entrada.id } });
+    expect(enBd.estatus).toBe('borrador');
+  });
+
   it('NO se puede confirmar si Finanzas importó esa MISMA factura mientras tanto', async () => {
     const uuid = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
     const entrada = await capturarConXml(uuid);
@@ -701,6 +716,35 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
             uuid: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+        },
+        bd(),
+        archivosFalsos,
+      ),
+    ).rejects.toThrow(/NO emite factura/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
+  it('RECHAZA tambien el UUID SUELTO (folio fiscal sin XML): era la puerta del doble cargo', async () => {
+    // Sin XML pero con folio fiscal tecleado, el alta no pasaba por esta guarda: al confirmar nacía
+    // un cargo NO fiscal (por precios capturados) SIN el uuid en el `MovimientoTercero`, y Finanzas
+    // podía importar después ese mismo CFDI — dos cargos por la misma factura.
+    const informal = await cliente.proveedor.create({
+      data: { nombre: 'Informal con folio', factura: false },
+    });
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Verde' },
+    });
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'remision',
+          numeroDocumento: 'NOTA-36',
+          idProveedor: informal.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          uuidCfdi: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
           lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
         },
         bd(),

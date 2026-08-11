@@ -229,9 +229,17 @@ export async function leerCfdiParaEntradaTela(
     select: { id: true, nombre: true, activo: true, factura: true },
   });
   if (proveedor === null) {
+    // OJO CON LO QUE SE ACONSEJA AQUÍ (revisión del 11-ago-2026): *"elige el proveedor a mano"* —lo
+    // que decía este aviso— es un CALLEJÓN SIN SALIDA desde que el RFC del proveedor es obligatorio
+    // con CFDI (`exigirRfcDelProveedor`): si el elegido no tiene RFC, guardar truena; y si tiene
+    // otro, truena por el mismatch. No puede tener este mismo, porque entonces el `findFirst` de
+    // arriba lo habría encontrado. Con los 155 proveedores migrados —todos SIN RFC— eso es el día 1
+    // entero. El aviso dice la ruta que SÍ existe, y por qué.
     avisos.push(
       `Ningún proveedor del catálogo tiene el RFC del emisor (${parsed.emisorRfc}). ` +
-        `Elige el proveedor a mano, o captúrale su RFC para que la próxima factura se reconozca sola.`,
+        `Captúrale ese RFC al proveedor en Catálogos › Proveedores (o dalo de alta con él) y vuelve ` +
+        `a leer la factura: sin RFC no hay contra qué comprobar quién facturó, así que elegir el ` +
+        `proveedor a mano NO deja guardar esta entrada con su factura.`,
     );
   } else if (!proveedor.activo) {
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);

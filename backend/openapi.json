@@ -1277,6 +1277,16 @@
                     "cancelada": {
                       "type": "boolean"
                     },
+                    "empresaV1": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "tela": {
                       "anyOf": [
                         {
@@ -1426,6 +1436,7 @@
                     "etiquetaMarca",
                     "totalPiezas",
                     "cancelada",
+                    "empresaV1",
                     "tela",
                     "composicion",
                     "observaciones",

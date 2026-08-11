@@ -30,6 +30,7 @@ async function ordenArchivo(
   numero: string,
   fecha: string | null,
   cli: string | null,
+  empresaV1: string | null = null,
 ): Promise<void> {
   await cliente.historicoOrdenV1.create({
     data: {
@@ -38,6 +39,7 @@ async function ordenArchivo(
       numero,
       fecha: fecha === null ? null : new Date(`${fecha}T00:00:00.000Z`),
       cliente: cli,
+      empresaV1,
     },
   });
 }
@@ -46,9 +48,11 @@ beforeEach(async () => {
   cliente = clientePruebas();
   await limpiarBaseDatos(cliente);
   empresa = await crearEmpresaPrueba(cliente);
-  await ordenArchivo('1', '5001', '2019-03-15', 'Comercial Uno');
-  await ordenArchivo('2', '5002', '2026-02-02', 'Zapatería Dos');
-  await ordenArchivo('3', '5003', null, null); // el viejo la dejó sin fecha ni cliente
+  await ordenArchivo('1', '5001', '2019-03-15', 'Comercial Uno', 'FR Moda');
+  await ordenArchivo('2', '5002', '2026-02-02', 'Zapatería Dos', 'FR Moda');
+  // Rescatada de una empresa que ya no existe (§Post-F9.29): cuelga de la empresa principal, pero
+  // `empresaV1` recuerda de quién era. El viejo además la dejó sin fecha ni cliente.
+  await ordenArchivo('3', '5003', null, null, 'Zipora');
 });
 
 afterAll(async () => {
@@ -86,6 +90,16 @@ describe('Orden del archivo con columnas NULLABLE', () => {
       bd(),
     );
     expect(pagina.datos.map((o) => o.numero)).toEqual(['5001', '5002', '5003']);
+  });
+
+  it('la caja libre encuentra por la EMPRESA del sistema viejo, y la ficha la muestra', async () => {
+    // §Post-F9.29 — las rescatadas cuelgan de la empresa principal, así que `idEmpresa` ya no las
+    // distingue: este texto es la única forma de volver a juntar la historia de Zipora.
+    const pagina = await listarHistoricoOrdenes(sesion(), { busqueda: 'zipo' }, bd());
+    expect(pagina.datos.map((o) => o.numero)).toEqual(['5003']);
+
+    const ficha = await obtenerHistoricoOrden(sesion(), pagina.datos[0]?.id ?? 0, bd());
+    expect(ficha.empresaV1).toBe('Zipora');
   });
 
   it('la ficha se obtiene por id y respeta la empresa activa (A9)', async () => {

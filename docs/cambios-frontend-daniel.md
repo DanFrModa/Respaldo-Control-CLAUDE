@@ -2233,8 +2233,9 @@ para los **documentos** (pedidos, órdenes, compras), no para los catálogos. Al
 > *"Me gustaría tenerlas también como archivo histórico de órdenes… para poder buscar por cliente,
 > número de modelo, tipo de prenda, fecha de producción, maquilero, etc."* — Daniel
 
-Está en **Producción › Archivo de órdenes**. Son las **5,451 órdenes** del sistema anterior, con sus
-**39,866** cantidades por color y talla y sus movimientos de producción.
+Está en **Producción › Archivo de órdenes**. Son las **5,451 órdenes** del sistema anterior —todas,
+sin faltar ninguna—, con sus **39,853** cantidades por color y talla y sus **35,296** movimientos de
+producción.
 
 ### Qué puedes buscar
 
@@ -2264,7 +2265,7 @@ Tampoco alimenta inventarios, costos ni ruta crítica — es información muerta
 
 - **Los colores se ven como los escribieron.** Vas a encontrar "MARINO", "Marino" y "MAR." como
   cosas distintas, porque en el viejo era texto libre. No los junté: adivinar equivalencias entre
-  39 mil renglones es la clase de cosa que mete errores que nadie nota.
+  casi 40 mil renglones es la clase de cosa que mete errores que nadie nota.
 - **Los maquileros aparecen escritos, no como catálogo.** Es a propósito: así los ~897 talleres con
   los que ya no trabajas no vuelven a llenar el catálogo que acabamos de depurar.
 
@@ -2308,3 +2309,48 @@ compra ni al enviar a maquila. Solo aquí, cuando lo busques.
 
 Una migración **aditiva** (una tabla) y **cero permisos nuevos**. Se llena con el **mismo** ETL del
 archivo de órdenes: `npx tsx --env-file=.env migracion/etl-historico-ordenes.ts`.
+
+## En el archivo están TODAS las órdenes, incluidas las de las empresas viejas (11-ago-2026)
+
+> *"Sí, está bien, rescata todas y solo pon en algún lugar la empresa a la que correspondía."* —
+> Daniel
+
+El archivo cargaba **3,923** de las 5,451 órdenes. Faltaban **1,528**: las de las **seis empresas
+viejas** del sistema anterior (MJD, Zipora, Skintex, Free Ride, Corporativo MJD y Marilyn), que no
+existen en el sistema nuevo. Y eran justamente **las más viejas**: 1,523 de ellas son de **2005 a
+2012**, que es la historia que un archivo de consulta existe para guardar.
+
+**Ahora están todas.** Las de esas empresas se guardaron bajo **FR Moda** —tenían que colgar de una
+empresa que exista para poder verse—, pero **no se perdió de quién eran**: cada orden trae escrita
+la empresa a la que pertenecía.
+
+- **Al abrir una orden** ves el dato *Empresa (Control viejo)* con el nombre tal cual venía.
+- **En la caja de búsqueda** puedes teclear el nombre de la empresa vieja (por ejemplo *Zipora*) y te
+  trae todas sus órdenes. Es la forma de volver a mirar la historia de una empresa completa.
+- No lo puse como columna de la lista porque ya son ocho y casi siempre es el mismo valor; en la
+  ficha está siempre a la vista.
+- Las órdenes que ya estaban bien **no se movieron**: cada una se queda con su empresa.
+
+### Nota de despliegue (para Gabriel)
+
+La migración del archivo se **regeneró** con la columna nueva (no había corrido en ningún ambiente),
+así que sigue siendo **una sola migración aditiva** y **cero permisos nuevos** → **no** hace falta
+`SEED_ON_START`. El ETL es el mismo de siempre:
+`npx tsx --env-file=.env migracion/etl-historico-ordenes.ts`.
+
+## Al leer una factura de un proveedor que no reconoce, la pantalla ya dice qué hacer (11-ago-2026)
+
+Cuando subes el XML de una factura y **ningún proveedor del catálogo tiene ese RFC**, antes el aviso
+decía *"elige el proveedor a mano"* — y eso no funcionaba nunca: para recibir con factura, el RFC de
+quien la emitió tiene que coincidir con el del proveedor, y hoy **ningún proveedor traído de Control
+viejo tiene RFC capturado**. Elegías uno, guardabas, y salía un error.
+
+Ahora la pantalla dice la ruta que sí sirve:
+
+- Un aviso claro con el RFC que no reconoció, y qué hacer: **capturarle ese RFC al proveedor** en
+  *Catálogos › Proveedores* (o darlo de alta con él) y **volver a leer la factura**.
+- El selector de proveedor queda **quieto** mientras eso pase, para no invitarte a un intento que
+  termina en error.
+- Y hay un botón **"Quitar la factura leída"**: si prefieres capturar esa entrada sin factura, lo
+  aprietas y sigues — **los renglones que ya capturaste se conservan**. Antes, una vez leído el XML
+  la única salida era recargar la pantalla y perder el trabajo.

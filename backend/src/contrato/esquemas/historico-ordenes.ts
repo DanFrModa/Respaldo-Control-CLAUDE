@@ -33,7 +33,10 @@ export const esquemaHistoricoOrdenesQuery = z.object({
   porPagina: z.coerce.number().int().positive().max(200).default(50),
   ordenarPor: z.enum(ORDENABLES).default('fecha'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
-  /** Texto libre contra número de orden, código/descripción del modelo y cliente. */
+  /**
+   * Texto libre contra número de orden, código/descripción del modelo, cliente y la empresa del
+   * sistema viejo (§Post-F9.29: así se pueden aislar las órdenes de una empresa que ya no existe).
+   */
   busqueda: z.string().trim().max(120).optional(),
   cliente: z.string().trim().max(120).optional().describe('Coincidencia parcial del cliente.'),
   maquilero: z
@@ -114,6 +117,12 @@ const esquemaHistoricoProceso = z.object({
 
 /** La ficha completa de una orden histórica. */
 export const esquemaHistoricoOrdenDetalle = esquemaHistoricoOrdenResumen.extend({
+  /**
+   * Empresa a la que la orden pertenecía en el sistema viejo (§Post-F9.29). Va en la FICHA y no en
+   * el renglón del listado: solo importa al mirar una orden concreta —"¿de quién era esta?"—, y el
+   * listado ya carga 8 columnas. Se puede buscar por ella desde la caja de búsqueda libre.
+   */
+  empresaV1: z.string().nullable(),
   tela: z.string().nullable(),
   composicion: z.string().nullable(),
   observaciones: z.string().nullable(),

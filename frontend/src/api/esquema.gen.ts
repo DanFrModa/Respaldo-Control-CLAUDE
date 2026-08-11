@@ -536,6 +536,7 @@ export interface paths {
               etiquetaMarca: string | null;
               totalPiezas: number;
               cancelada: boolean;
+              empresaV1: string | null;
               tela: string | null;
               composicion: string | null;
               observaciones: string | null;

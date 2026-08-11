@@ -2,23 +2,25 @@
 
 > Cómo quedaron construidos los dos módulos de **CONSULTA de la historia del sistema viejo**. No
 > duplica el funcional (ADR-0002): el QUÉ y el porqué de negocio están en
-> `Documentacion_MJD/DECISIONES.md` §(Post-F9.26), §(Post-F9.27) y §(Post-F9.28). Aquí va el CÓMO.
+> `Documentacion_MJD/DECISIONES.md` §(Post-F9.26) a §(Post-F9.29). Aquí va el CÓMO.
 
 Nacieron como consecuencia de dos decisiones previas: la **depuración del catálogo de proveedores**
 (§Post-F9.23) y el **corte de la migración a 2025-2026** (§Post-F9.24). Entre las dos dejan fuera de
 lo operativo ~5,200 órdenes y ~897 terceros, y estos dos módulos son donde esa historia **se
 consulta sin volver a ensuciar los catálogos**.
 
-> **⚠️ CUÁNTAS ÓRDENES CARGA DE VERDAD: 3,923, no 5,451** (corregido en la revisión del 11-ago-2026).
-> El loader manda a `sinEmpresa` las órdenes cuya `IdEmpresas` no tiene mapeo, y **las 6 empresas
-> viejas inactivas no migran** (decisión de Gabriel del 17-jun-2026, `docs/hoja-de-ruta/F2-etapas.md`:
-> MJD / Zipora / Skintex / Free Ride / Corporativo / Marilyn). Eso deja fuera **1,528 órdenes** —
-> medido sobre el dump—, y con ellas **10,510 celdas** y **9,204 movimientos de producción**. Lo que
-> se cae es justo **la historia más vieja: 1,523 de esas 1,528 son de 2005-2012**.
-> **Pendiente de decisión de DANIEL:** si esas 1,528 se rescatan en el archivo. No es solo quitar el
-> filtro: `HistoricoOrdenV1.idEmpresa` es **FK real a `Empresa`** y el listado filtra por la empresa
-> activa (A9), así que rescatarlas exige decidir **a qué empresa se cuelgan** (¿el linaje de FR Moda?
-> ¿una empresa "histórica"?) o cambiar el modelo. Anotado como deuda en `HOJA-DE-RUTA.md` §4.
+> **CUÁNTAS ÓRDENES CARGA: LAS 5,451 DEL DUMP** — con **39,853 celdas** color×talla y **35,296
+> movimientos de producción**: **80,600 renglones** (medido sobre `Respaldo CLAUDE/TABLAS/`, CP850).
+> Hasta el 11-ago-2026 eran **3,923**: el loader saltaba las órdenes cuya `IdEmpresas` no tenía mapeo,
+> y **las 6 empresas viejas inactivas no migran** (decisión de Gabriel del 17-jun-2026,
+> `docs/hoja-de-ruta/F2-etapas.md`: MJD / Zipora / Skintex / Free Ride / Corporativo / Marilyn), así
+> que se caían **1,528 órdenes** con **10,497 celdas** y **9,204 movimientos** — justo la historia más
+> vieja (**1,523 de las 1,528 son de 2005-2012**). **Daniel las mandó rescatar** (§Post-F9.29): se
+> cuelgan de la **empresa principal** (`idEmpresa` es FK real y el listado filtra por la empresa
+> activa, A9) y conservan en **`empresaV1`** el nombre de la empresa a la que pertenecían. Ver abajo.
+>
+> *(39,853 y no 39,866: **13 celdas de 11 renglones de `OrdenesDet` son huérfanas** — apuntan a
+> órdenes que no existen en `Ordenes.csv`, así que no tienen cabecera de la cual colgar.)*
 
 ## La idea que los hace baratos: SOLO LECTURA
 
@@ -54,6 +56,18 @@ con el ETL y desde la aplicación solo se leen. Por eso:
 Las tres columnas de talleres (§Post-F9.27) **duplican** a propósito lo que ya está en los procesos:
 se ven en el renglón del listado y se buscan sin un subquery por fila. Normalmente eso es deuda —la
 copia se desincroniza—, pero este archivo es **inmutable**, así que aquí no cuesta nada.
+
+**La empresa vieja, también en TEXTO** (`empresaV1`, §Post-F9.29). `idEmpresa` es FK a una empresa
+VIVA, así que las órdenes de las 6 que no migran cuelgan de la **principal** — y este campo es lo
+único que dice de quién eran de verdad. Cómo se elige la principal (`resolverEmpresaPrincipal` del
+loader), en orden: **FR Moda por nombre** → **la empresa favorita** → **la primera del mapeo** (este
+último escalón es para los ambientes de prueba, y va ordenado para ser determinista). Es FR Moda
+porque es la del seed F0, la que el resto del ETL usa para los almacenes y la que la gente tiene
+activa: colgarlas de cualquier otra sería rescatarlas para que nadie las vea. Se llena en **todas**
+las órdenes, no solo en las rescatadas — si solo lo trajeran esas, un vacío sería ambiguo. Va en la
+**ficha** (no en el listado, que ya lleva 8 columnas) y **se busca desde la caja libre**: como todas
+comparten `idEmpresa`, ese texto es la única forma de volver a juntar la historia de una empresa
+extinta. **Las órdenes que SÍ mapean su empresa se quedan en la suya**: rescatar no es reasignar.
 
 ### Dominio y API
 
@@ -120,7 +134,7 @@ ventana `ETL_DESDE` de §Post-F9.24 — existe justamente para guardar lo que la
 - **Completa lo que falte**: cabecera e hijos de cada tanda de órdenes viajan en la **misma
   transacción** (`ORDENES_POR_TX`), y al arrancar se detectan las órdenes que quedaron **sin
   detalle** por una corrida interrumpida y se reparan. Antes, una caída después de las cabeceras
-  (son ~59,000 renglones, contra una BD que está del otro lado de la red) dejaba miles de órdenes sin
+  (son 80,600 renglones, contra una BD que está del otro lado de la red) dejaba miles de órdenes sin
   una sola celda ni proceso **para siempre**, porque la re-corrida las daba por cargadas.
   La reparación se decide por *"despivotar emite celdas"*, **no** por *"tiene filas en `OrdenesDet`"*:
   una orden con el detalle todo en ceros tiene filas pero no produce ninguna celda, y con la
@@ -128,9 +142,9 @@ ventana `ETL_DESDE` de §Post-F9.24 — existe justamente para guardar lo que la
 
 **Escritura POR LOTES** (`createMany` en tandas), nunca fila por fila — regla de Gabriel del 19-jun.
 
-**Nada se descarta en silencio** (plan §7): las cadenas de tallas ambiguas, las órdenes sin empresa
-mapeada, las que no ligan modelo y las fichas vacías del directorio salen listadas en el reporte que
-el ETL escribe al terminar.
+**Nada se descarta en silencio** (plan §7): las cadenas de tallas ambiguas, las órdenes **rescatadas**
+(cuántas y de qué empresa vieja, agrupadas — no 1,528 renglones), las que no ligan modelo y las fichas
+vacías del directorio salen listadas en el reporte que el ETL escribe al terminar.
 
 ### Detalles del viejo que hay que conocer
 
@@ -145,13 +159,16 @@ el ETL escribe al terminar.
   dos, la ficha está vacía y se descarta **reportándola**.
 - **Los colores NO se normalizan**: el viejo los guardaba como texto libre, así que conviven
   "MARINO", "Marino" y "MAR.". En un archivo de consulta eso se lee y se entiende; adivinar
-  equivalencias entre ~29,000 celdas metería errores silenciosos.
+  equivalencias entre casi 40,000 celdas metería errores silenciosos.
 
 ## Pruebas
 
 - `backend/migracion/etl-historico-ordenes.int.test.ts` — carga, idempotencia, **reparación de una
-  corrida interrumpida** y el rescate de los terceros que solo tienen clave corta (fixture propio en
-  `migracion/__fixtures__/tablas-historico/`).
+  corrida interrumpida**, el **rescate por empresa** (§Post-F9.29: la de empresa extinta se carga con
+  su `empresaV1` y sale en el reporte; la que sí mapea NO se reasigna) y el rescate de los terceros
+  que solo tienen clave corta (fixture propio en `migracion/__fixtures__/tablas-historico/`, que
+  incluye `Empresas.csv` y **dos** empresas vivas — con una sola, "cuelga de la principal" y "se
+  queda en la suya" serían indistinguibles).
 - `backend/migracion/loaders/historico-ordenes.test.ts` — unit de `nombresDistintos` (§Post-F9.27).
-- `backend/src/dominio/consultas/*.int.test.ts` — el orden con columnas nullable, contra Postgres de
-  verdad (es donde se ve).
+- `backend/src/dominio/consultas/*.int.test.ts` — el orden con columnas nullable y la búsqueda por
+  `empresaV1`, contra Postgres de verdad (es donde se ve).

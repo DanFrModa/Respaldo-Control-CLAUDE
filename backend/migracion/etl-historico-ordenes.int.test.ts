@@ -10,6 +10,9 @@
  *    cabeceras y muere antes del detalle, re-correr TIENE que completar las celdas y los procesos
  *    que faltan — antes las daba por cargadas e insertaba 0, dejando miles de órdenes vacías para
  *    siempre.
+ *  • **NINGUNA orden se descarta por su empresa** (§Post-F9.29). Las de las 6 empresas viejas que no
+ *    migran se cuelgan de la empresa PRINCIPAL conservando su empresa original en `empresaV1`; las
+ *    que sí mapean su empresa **se quedan en la suya** — rescatar no es reasignar.
  *  • **El directorio no descarta a nadie que tenga datos de contacto.** Varios talleres y
  *    estampadores tienen su identidad solo en `Corto` ("Bordaprint", "Fit Print", "Eurobordados"),
  *    con su teléfono y su dirección — que es literalmente lo que la libreta existe para conservar.
@@ -20,7 +23,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Empresa, PrismaClient } from '../src/datos/index.js';
+import { listarHistoricoOrdenes } from '../src/dominio/consultas/historico-ordenes.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../src/pruebas/contexto.js';
+import { sesionDePrueba } from '../src/pruebas/sesiones.js';
 
 import { ENTIDAD_MAPEO, guardarMapeo } from './comun/mapeo.js';
 import { Reporte } from './comun/reporte.js';
@@ -31,6 +36,7 @@ const DIR_FIXTURES = fileURLToPath(new URL('./__fixtures__/tablas-historico', im
 
 let cliente: PrismaClient;
 let empresa: Empresa;
+let segundaEmpresa: Empresa;
 let tablasDirPrevio: string | undefined;
 
 beforeEach(async () => {
@@ -38,9 +44,14 @@ beforeEach(async () => {
   tablasDirPrevio = process.env.TABLAS_DIR;
   process.env.TABLAS_DIR = DIR_FIXTURES;
   await limpiarBaseDatos(cliente);
+  // DOS empresas vivas, a propósito: con una sola, "la rescatada cuelga de la principal" y "la que
+  // mapea se queda en la suya" serían indistinguibles. La primera (id menor) es la PRINCIPAL — en
+  // pruebas ninguna se llama "FR Moda" ni es favorita, así que el loader cae al tercer escalón.
   empresa = await crearEmpresaPrueba(cliente);
-  // La orden 1003 apunta a la empresa 9, que NO se mapea: es una de las "empresas muertas".
+  segundaEmpresa = await crearEmpresaPrueba(cliente, 'Marilyn Fitness de Prueba');
+  // La orden 1003 apunta a la empresa 9 (Zipora), que NO se mapea: es una de las "empresas muertas".
   await guardarMapeo(cliente, ENTIDAD_MAPEO.empresa, '1', empresa.id);
+  await guardarMapeo(cliente, ENTIDAD_MAPEO.empresa, '2', segundaEmpresa.id);
 });
 
 afterAll(async () => {
@@ -56,12 +67,13 @@ async function cargarArchivo() {
   return { resultado, reporte };
 }
 
-describe('Archivo histórico de órdenes (§Post-F9.26/27)', () => {
+describe('Archivo histórico de órdenes (§Post-F9.26/27/29)', () => {
   it('carga cabeceras, matriz color×talla y los cinco documentos de producción', async () => {
     const { resultado } = await cargarArchivo();
 
-    expect(resultado.ordenes).toBe(2); // 1001 y 1002 (la 1003 no tiene empresa mapeada)
-    expect(resultado.sinEmpresa).toBe(1);
+    // LAS CUATRO: ninguna se descarta por su empresa (§Post-F9.29).
+    expect(resultado.ordenes).toBe(4);
+    expect(resultado.rescatadas).toBe(1); // la 1003, de la empresa 9 (Zipora), que no migra
     expect(resultado.celdas).toBe(3); // MARINO 10+5 y ROJO 3 (los ceros no emiten fila)
     expect(resultado.procesos).toBe(5); // 1 corte + 2 entregas + 1 recibo + 1 estampado
     expect(resultado.reparadas).toBe(0);
@@ -78,19 +90,64 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27)', () => {
     expect(orden.estampadores).toBe('Bordados SA');
   });
 
+  it('rescata la orden de una empresa EXTINTA y guarda de cuál era (§Post-F9.29)', async () => {
+    const { resultado, reporte } = await cargarArchivo();
+
+    const rescatada = await cliente.historicoOrdenV1.findFirstOrThrow({
+      where: { idOrdenV1: '1003' },
+    });
+    // Existe (antes se saltaba), cuelga de la empresa PRINCIPAL y dice de quién era de verdad.
+    expect(rescatada.idEmpresa).toBe(empresa.id);
+    expect(rescatada.empresaV1).toBe('Zipora');
+    expect(resultado.rescatadas).toBe(1);
+
+    // Y no pasa en silencio (plan §7): el reporte dice cuántas y de qué empresa.
+    const renglones = reporte
+      .obtenerSecciones()
+      .filter((s) => s.titulo.includes('rescatadas'))
+      .flatMap((s) => s.renglones);
+    expect(renglones.join(' ')).toContain('Zipora');
+    expect(reporte.obtenerNotas().join(' ')).toMatch(/1 órdenes de las empresas viejas/);
+  });
+
+  it('la orden de una empresa que SÍ mapea se queda en la suya (rescatar no es reasignar)', async () => {
+    await cargarArchivo();
+
+    const propia = await cliente.historicoOrdenV1.findFirstOrThrow({
+      where: { idOrdenV1: '1004' },
+    });
+    expect(propia.idEmpresa).toBe(segundaEmpresa.id);
+    expect(propia.idEmpresa).not.toBe(empresa.id);
+    // `empresaV1` se llena TAMBIÉN aquí: un vacío sería ambiguo (¿activa, o sin nombre en el CSV?).
+    expect(propia.empresaV1).toBe('Marilyn Fitness de Prueba');
+  });
+
+  it('la empresa vieja se puede BUSCAR desde la caja libre', async () => {
+    await cargarArchivo();
+
+    const pagina = await listarHistoricoOrdenes(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['ordenes.ver'] }),
+      { busqueda: 'zipo' },
+      { cliente },
+    );
+    expect(pagina.datos.map((o) => o.numero)).toEqual(['5003']);
+  });
+
   it('re-correrlo NO duplica nada (idempotencia por (idEmpresa, idOrdenV1))', async () => {
     await cargarArchivo();
     const { resultado } = await cargarArchivo();
 
     expect(resultado.ordenes).toBe(0);
-    expect(resultado.existentes).toBe(2);
+    expect(resultado.existentes).toBe(4);
+    // La rescatada ya está cargada: en la segunda corrida no se "rescata" otra vez.
+    expect(resultado.rescatadas).toBe(0);
     expect(resultado.celdas).toBe(0);
     expect(resultado.procesos).toBe(0);
     // …y NADA se cuenta como "reparado". La 1002 tiene renglón en `OrdenesDet` pero TODO en ceros,
     // así que no emite ninguna celda: con la condición vieja ("tiene filas en OrdenesDet") se
     // contaba como reparada en CADA corrida —inflando la nota del reporte— sin insertar una fila.
     expect(resultado.reparadas).toBe(0);
-    expect(await cliente.historicoOrdenV1.count()).toBe(2);
+    expect(await cliente.historicoOrdenV1.count()).toBe(4);
     expect(await cliente.historicoOrdenV1Linea.count()).toBe(3);
     expect(await cliente.historicoOrdenV1Proceso.count()).toBe(5);
   });
@@ -109,7 +166,7 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27)', () => {
     expect(resultado.celdas).toBe(3);
     expect(resultado.procesos).toBe(5);
     // Y no se duplicó nada de lo que sí había quedado.
-    expect(await cliente.historicoOrdenV1.count()).toBe(2);
+    expect(await cliente.historicoOrdenV1.count()).toBe(4);
     expect(await cliente.historicoOrdenV1Linea.count()).toBe(3);
     expect(await cliente.historicoOrdenV1Proceso.count()).toBe(5);
   });

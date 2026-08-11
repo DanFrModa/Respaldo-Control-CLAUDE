@@ -6521,6 +6521,20 @@ model HistoricoOrdenV1 {
   /// no siempre es un entero limpio, y aquí no se numera nada (no hay secuencia, A3 no aplica).
   numero    String
 
+  /// Nombre de la empresa a la que la orden pertenecía en el sistema viejo (`Empresas.Empresa`),
+  /// en TEXTO y ligado a nada (§Post-F9.29).
+  ///
+  /// Daniel (11-ago-2026), sobre las 1,528 órdenes de las 6 empresas que no migran: *"sí, está bien,
+  /// rescata todas y solo pon en algún lugar la empresa a la que correspondía."* `idEmpresa` es FK
+  /// real y solo puede apuntar a una empresa VIVA, así que esas órdenes se cuelgan de la empresa
+  /// principal (FR Moda) para que existan y se puedan consultar (A9: el listado filtra por la empresa
+  /// activa); esta columna conserva de QUIÉN eran de verdad. Mismo criterio que los talleres
+  /// (§Post-F9.27): el dato viejo se guarda escrito, no revive como entidad.
+  ///
+  /// Se llena SIEMPRE, también en las órdenes de las 2 empresas activas: si solo lo trajeran las
+  /// rescatadas, un valor vacío sería ambiguo (¿es de la empresa activa, o el CSV no traía nombre?).
+  empresaV1 String? @map("empresa_v1")
+
   /// Fecha de la orden y fecha de entrega comprometida (solo día).
   fecha        DateTime? @db.Date
   fechaEntrega DateTime? @db.Date
@@ -6578,7 +6592,7 @@ model HistoricoOrdenV1 {
   motivoCancelada String? @map("motivo_cancelada") @db.Text
 
   /// Suma de la matriz color×talla. Se guarda calculada para poder listar y ordenar sin agregar
-  /// 39,866 celdas en cada consulta.
+  /// 39,853 celdas en cada consulta.
   totalPiezas Int @default(0) @map("total_piezas")
 
   lineas   HistoricoOrdenV1Linea[]
@@ -6603,7 +6617,7 @@ model HistoricoOrdenV1Linea {
   idOrden  Int              @map("id_orden")
   orden    HistoricoOrdenV1 @relation(fields: [idOrden], references: [id], onDelete: Cascade)
   /// Color TAL COMO lo escribió el viejo (texto libre, sin normalizar: ver §Post-F9.26 — adivinar
-  /// equivalencias entre 39,866 celdas metería errores silenciosos).
+  /// equivalencias entre casi 40,000 celdas metería errores silenciosos).
   color    String
   /// Etiqueta de talla ya interpretada de la cadena posicional `Ordenes.Tallas` (reusa el lector
   /// de F2, `migracion/comun/tallas-orden.ts`).

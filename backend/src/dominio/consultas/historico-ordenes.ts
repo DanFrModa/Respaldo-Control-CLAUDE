@@ -13,7 +13,10 @@
  * PERMISO: se REUSA `ordenes.ver` — quien puede ver órdenes puede ver las viejas. Cero permisos
  * nuevos, cero seed.
  *
- * A9: todo se filtra por la empresa activa de la sesión.
+ * A9: todo se filtra por la empresa activa de la sesión. Por eso las órdenes de las 6 empresas
+ * viejas que no migran se rescataron colgadas de la empresa PRINCIPAL (§Post-F9.29) y no de una
+ * empresa inventada: colgarlas de otra cosa sería rescatarlas para que nadie las vea. De quién eran
+ * de verdad lo dice `empresaV1`, en texto — se ve en la ficha y se busca desde la caja libre.
  *
  * EL FILTRO DE MAQUILERO MIRA TODOS LOS LADOS. Daniel (§Post-F9.27): *"es importante que vayan
  * todos. Y no solo el primero. Lo mismo para estampadores."* En el viejo, el taller de la cabecera
@@ -131,6 +134,10 @@ function construirWhere(
           { numero: contiene(f.busqueda) },
           { cliente: contiene(f.busqueda) },
           { codigoModeloV1: contiene(f.busqueda) },
+          // §Post-F9.29 — la empresa del viejo. Es la única forma de volver a juntar las órdenes de
+          // una empresa que ya no existe: como se rescataron colgadas de la principal, su
+          // `idEmpresa` ya no las distingue; solo este texto sabe de quién eran.
+          { empresaV1: contiene(f.busqueda) },
           { modelo: { codigo: contiene(f.busqueda) } },
           { modelo: { descripcion: contiene(f.busqueda) } },
         ],
@@ -220,6 +227,7 @@ export async function obtenerHistoricoOrden(
 
   return {
     ...aResumen(orden),
+    empresaV1: orden.empresaV1,
     tela: orden.tela,
     composicion: orden.composicion,
     observaciones: orden.observaciones,

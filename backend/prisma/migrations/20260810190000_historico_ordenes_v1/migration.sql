@@ -15,6 +15,12 @@
 -- al `Modelo` —los modelos SÍ migran completos— y es la que permite filtrar por tipo de prenda y
 -- género sin duplicar esos datos.
 --
+-- La columna `empresa_v1` (§Post-F9.29) guarda, también en TEXTO, la empresa a la que la orden
+-- pertenecía en el viejo. Daniel: *"sí, está bien, rescata todas y solo pon en algún lugar la empresa
+-- a la que correspondía."* Las 1,528 órdenes de las 6 empresas que no migran se cuelgan de la empresa
+-- principal —`id_empresa` es FK real y el listado filtra por la empresa activa (A9)— y esta columna
+-- conserva de quién eran. Se llena en TODAS las órdenes, no solo en las rescatadas.
+--
 -- Las columnas `cortadores` / `maquileros` / `estampadores` (§Post-F9.27) concentran, en TEXTO
 -- abierto y separados por " · ", los nombres DISTINTOS de todos los talleres que trabajaron la
 -- orden. Daniel: *"es importante que vayan todos. Y no solo el primero… pero lo puedes poner en un
@@ -33,6 +39,7 @@ CREATE TABLE "historico_orden_v1" (
     "id_empresa" INTEGER NOT NULL,
     "id_orden_v1" TEXT NOT NULL,
     "numero" TEXT NOT NULL,
+    "empresa_v1" TEXT,
     "fecha" DATE,
     "fechaEntrega" DATE,
     "id_modelo" INTEGER,

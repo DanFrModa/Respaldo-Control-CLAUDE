@@ -4,9 +4,15 @@
  * Daniel (10-ago-2026): *"me gustaría tenerlas también como archivo histórico de órdenes… para poder
  * buscar por cliente, número de modelo, tipo de prenda, fecha de producción, maquilero, etc."*
  *
- * Carga **TODAS** las órdenes del viejo (5,451) con su matriz color×talla y sus movimientos de
- * producción, como un archivo PLANO de solo consulta. Es lo único del ETL que ignora a propósito la
- * ventana de 2025-2026 (§Post-F9.24): existe justamente para guardar lo que la ventana deja fuera.
+ * Carga **TODAS** las órdenes del viejo (5,451) con su matriz color×talla (39,853 celdas) y sus
+ * movimientos de producción (35,296) — 80,600 renglones —, como un archivo PLANO de solo consulta.
+ * Es lo único del ETL que ignora a propósito la ventana de 2025-2026 (§Post-F9.24): existe justamente
+ * para guardar lo que la ventana deja fuera.
+ *
+ * "TODAS" es literal desde §Post-F9.29 (antes eran 3,923): las 1,528 órdenes de las 6 empresas
+ * viejas que no migran se **rescatan** colgándolas de la empresa principal y conservando en
+ * `empresaV1` el nombre de la empresa a la que pertenecían. Daniel: *"sí, está bien, rescata todas y
+ * solo pon en algún lugar la empresa a la que correspondía."*
  *
  * SE CORRE DESPUÉS de `etl-catalogos` (necesita los mapeos de Empresa y Modelo):
  *
@@ -34,7 +40,9 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
 
   console.log('ETL del archivo histórico de órdenes (§Post-F9.26) — inicio');
-  console.log('  (carga TODAS las órdenes del viejo: es el archivo de consulta, no lo operativo)');
+  console.log(
+    '  (carga TODAS las órdenes del viejo —las 5,451—: es el archivo de consulta, no lo operativo)',
+  );
 
   const r = await cargarHistoricoOrdenes(cliente, reporte);
 
@@ -42,8 +50,11 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   console.log(`  Ya existían (idempotencia):    ${String(r.existentes)}`);
   console.log(`  Celdas color×talla:           ${String(r.celdas)}`);
   console.log(`  Movimientos de producción:    ${String(r.procesos)}`);
-  if (r.sinEmpresa > 0) {
-    console.log(`  Sin empresa mapeada (omitidas): ${String(r.sinEmpresa)}`);
+  if (r.rescatadas > 0) {
+    console.log(
+      `  De empresas que NO migran, rescatadas en la principal: ${String(r.rescatadas)} ` +
+        `(conservan su empresa en "empresaV1"; el desglose por empresa está en el reporte)`,
+    );
   }
   if (r.sinModelo > 0) {
     console.log(`  Sin modelo ligado (con código en texto): ${String(r.sinModelo)}`);
