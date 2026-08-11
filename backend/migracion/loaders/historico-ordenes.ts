@@ -303,9 +303,27 @@ export async function cargarHistoricoOrdenes(
     reparadas: 0,
   };
 
+  // ⚠️ EL ORDEN IMPORTA, Y DESDE §Post-F9.29 IMPORTA MÁS: este ETL va DESPUÉS de `etl-catalogos`.
+  //
+  // Sin mapeos de empresa, `mapaEmpresa` queda VACÍO (`cargarMapaNumerico` no falla: devuelve un Map
+  // vacío), y como el rescate ya no salta nada, las 5,451 órdenes se cargarían como "rescatadas"
+  // colgadas de la principal —incluidas las que tenían su propia empresa— y todas con `idModelo`
+  // nulo. Y **re-correrlo NO lo repara**: la idempotencia da por cargada toda orden que ya existe y
+  // solo le completa celdas y procesos; la cabecera no se vuelve a escribir nunca. Habría que
+  // vaciar las tres tablas a mano.
+  //
+  // Antes del rescate este error era inocuo (se saltaban todas y no se escribía nada): la protección
+  // era un accidente del filtro que se quitó, así que aquí va explícita.
+  if (mapaEmpresa.size === 0) {
+    throw new Error(
+      'No hay mapeos de empresa: corre `etl-catalogos` antes que el archivo histórico. Si no, ' +
+        'TODAS las órdenes se cargarían como rescatadas (colgadas de una sola empresa) y sin ' +
+        'modelo ligado — y re-correr el ETL no lo repara: habría que vaciar las tablas del archivo.',
+    );
+  }
   // De aquí cuelgan las órdenes de las empresas que no migran (§Post-F9.29). Sin ella no hay dónde
   // colgar NADA (el archivo entero necesita una empresa viva), así que se aborta con un mensaje
-  // claro en vez de perder 1,528 órdenes en silencio: falta correr `etl-catalogos` antes.
+  // claro en vez de perder 1,528 órdenes en silencio.
   const principal = await resolverEmpresaPrincipal(cli, mapaEmpresa);
   if (principal === null) {
     throw new Error(
@@ -551,7 +569,13 @@ export async function cargarHistoricoOrdenes(
     reporte.nota(
       `Histórico: ${String(resultado.rescatadas)} órdenes de las empresas viejas que no migran se ` +
         `RESCATARON colgándolas de la empresa principal (${principal.criterio}); conservan su empresa ` +
-        `original en el campo "empresaV1" y se pueden buscar por ella (§Post-F9.29).`,
+        `original en el campo "empresaV1" y se pueden buscar por ella (§Post-F9.29). ` +
+        // Una empresa que SÍ vive en v2 no debería aparecer en esa lista: si sale, lo que falló es
+        // el mapeo de `etl-catalogos` (parcial), no el archivo — y sus órdenes quedaron colgadas de
+        // la principal en vez de la suya. Se dice aquí porque el reporte es lo único que lo delata.
+        `REVISA LA LISTA: si en ella aparece una empresa que SÍ existe en v2 (Marilyn Fitness o ` +
+        `FR Moda), su mapeo quedó incompleto en "etl-catalogos" — esas órdenes debieron quedarse en ` +
+        `su propia empresa. Se corrige re-corriendo etl-catalogos y vaciando las tablas del archivo.`,
     );
   }
   if (resultado.sinModelo > 0) {

@@ -122,6 +122,16 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27/29)', () => {
     expect(propia.empresaV1).toBe('Marilyn Fitness de Prueba');
   });
 
+  it('SIN mapeos de empresa se niega a correr (el orden con `etl-catalogos` importa)', async () => {
+    // Correrlo antes de `etl-catalogos` cargaría LAS 5,451 como rescatadas —colgadas de una sola
+    // empresa y sin modelo— y re-correrlo NO lo repararía (la idempotencia nunca reescribe la
+    // cabecera). Antes del rescate el error era inocuo porque se saltaban todas; ahora hay guarda.
+    await cliente.mapeoMigracion.deleteMany({ where: { entidad: ENTIDAD_MAPEO.empresa } });
+
+    await expect(cargarArchivo()).rejects.toThrow(/etl-catalogos/);
+    expect(await cliente.historicoOrdenV1.count()).toBe(0);
+  });
+
   it('la empresa vieja se puede BUSCAR desde la caja libre', async () => {
     await cargarArchivo();
 

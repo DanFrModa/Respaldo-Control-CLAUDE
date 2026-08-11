@@ -8,7 +8,9 @@
  *
  * SOLO LECTURA, y a propósito: este módulo no exporta ni una función que escriba. El archivo se
  * llena UNA vez con el ETL (`migracion/loaders/historico-ordenes.ts`) y desde ahí es de consulta.
- * Son las ~5,200 órdenes que la ventana de 2025-2026 (§Post-F9.24) deja fuera de lo operativo.
+ * Son **las 5,451 órdenes** del sistema viejo: las ~5,200 que la ventana de 2025-2026 (§Post-F9.24)
+ * deja fuera de lo operativo, más las 262 que sí migran —el archivo no tiene ventana de años— y las
+ * 1,528 de las empresas que ya no existen, rescatadas en §Post-F9.29.
  *
  * PERMISO: se REUSA `ordenes.ver` — quien puede ver órdenes puede ver las viejas. Cero permisos
  * nuevos, cero seed.

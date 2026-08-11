@@ -127,6 +127,16 @@ Nunca con `npm run etl:*` (esos no cargan `.env` a propósito, para no romper el
 **Se corre A MANO después del deploy**: no hay nada automático que lo dispare. Ignora a propósito la
 ventana `ETL_DESDE` de §Post-F9.24 — existe justamente para guardar lo que la ventana deja fuera.
 
+**⚠️ EL ORDEN CON `etl-catalogos` NO ES NEGOCIABLE, y desde el rescate importa más.** Sin los mapeos
+de empresa, **todas** las órdenes se cargarían como "rescatadas" —bajo una sola empresa, incluidas las
+que tenían la suya— y con `idModelo` nulo; y **re-correr NO lo repara**, porque la idempotencia da por
+cargada toda orden que ya existe y solo le completa celdas y procesos: la cabecera no se reescribe
+nunca (habría que vaciar las tres tablas). Antes del rescate ese error era **inocuo** (se saltaban
+todas y no se escribía nada): el filtro protegía de casualidad. Al quitarlo, la protección se volvió
+explícita — **el loader se niega a arrancar si `MapeoMigracion` no tiene empresas** (fijado en el int
+test). Es el mismo motivo por el que `resolverEmpresaPrincipal` avisa en el reporte: si en la lista de
+rescatadas aparece una empresa que **sí** existe en v2, el mapeo quedó **parcial**.
+
 **Idempotente en los DOS sentidos** (`migracion/loaders/historico-ordenes.ts`):
 
 - **No duplica**: la llave es `(idEmpresa, idOrdenV1)` para el archivo y `(fuente, idViejo)` para la

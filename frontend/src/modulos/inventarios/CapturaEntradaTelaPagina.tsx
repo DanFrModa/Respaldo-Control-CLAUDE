@@ -166,8 +166,15 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   function quitarFacturaLeida(): void {
     setPropuesta(null);
     setXmlCfdi(null);
+    // EL MENSAJE DEPENDE DE DÓNDE SE SUELTA. Al EDITAR un borrador que YA venía sellado, quitar el
+    // XML recién leído no deja la entrada "sin CFDI": el PUT no manda `uuidCfdi`, así que el sello
+    // guardado se conserva (§Post-F9.21 — un dato fiscal no se pierde por editar). Decir lo
+    // contrario sería mentirle a quien captura.
     toast.info(
-      'Factura soltada: la entrada se captura sin CFDI (queda como remisión o factura a mano).',
+      existente.data?.uuidCfdi == null
+        ? 'Factura soltada: la entrada se captura sin CFDI (queda como remisión o factura a mano).'
+        : 'Se soltó la factura que acabas de leer. La entrada CONSERVA la factura con la que se ' +
+            'capturó: para cambiarla, sube el XML nuevo.',
     );
   }
 
