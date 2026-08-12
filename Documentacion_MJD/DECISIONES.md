@@ -1430,3 +1430,40 @@ O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIE
 
 - **Aplica en:** NADA todavía — es decisión de rumbo. Al construirse tocará `Modelo` (marca de origen + código de desarrollo), `Cliente` (abreviatura), el catálogo/galería de modelos y el editor de desarrollo. **Requiere migración** cuando se construya; permisos y seed, no.
 - **Fecha:** 2026-08-12.
+
+#### (Post-F9.35) — El ARTE deja de ser catálogo y se maneja DENTRO del modelo (DANIEL, 12-ago-2026)
+
+> Daniel, al repasar por qué existía el catálogo de bordados:
+>
+> *"Honestamente me parece que no tiene mucho sentido que viva en un catálogo. Originalmente cuando pensé en el sistema anterior, supuse que había artes que se iban a ocupar en más de un modelo. Por eso definí un catálogo. Pero en la práctica, cada arte va pegado siempre a un solo modelo. Entonces creo que sería más fácil manejar el arte (o varios) dentro del modelo. Ahí mismo establecer su precio, el proveedor, etc."*
+>
+> Y sobre el precio: *"Es importante que tenga su precio, que es el que va a viajar hasta la OP."*
+
+**Los datos del sistema viejo le dan la razón** (medidos el 12-ago-2026 sobre `Respaldo CLAUDE/TABLAS/Bordados.csv` y `ModelosBor.csv`, rama `fuente-sistema-viejo`):
+
+| | |
+|---|---|
+| Artes en el catálogo | **2,964** |
+| **Nunca usados en ningún modelo** | **898** (30 % del catálogo) |
+| Usados en **UN solo** modelo | **1,899** — el **92 %** de los usados |
+| Usados en varios | 167 (8 %), casi todos en 2 o 3 |
+
+Y el remate: **los artes están nombrados con el número del modelo** (los más compartidos se llaman `51901`, `25214`, `81561`, `55129-2`). Ni siquiera los compartidos son artes reutilizables: son el arte de un modelo que se resurtió o tuvo variante. **El catálogo nunca funcionó como catálogo.**
+
+**Qué se decidió.**
+
+1. **El arte se va DENTRO del modelo.** Cada modelo lleva su arte o sus artes con: nombre, tipo (bordado / estampado), puntadas, **precio**, **proveedor** (⚠️ NUEVO — hoy `Bordado` no tiene proveedor) y su foto. El catálogo global `Bordado` **desaparece como catálogo**.
+2. **Los 167 compartidos se DUPLICAN al migrar**: cada modelo se queda con su copia. Son unos cientos de renglones. Para no perder la comodidad, un botón **«copiar arte de otro modelo»** trae el arte ya lleno y se ajusta — la conveniencia sin reinventar el catálogo.
+3. **Los 898 nunca usados NO se migran.** Es la depuración que Daniel pedía, gratis.
+4. **La galería de arte SOBREVIVE**, pero armada desde los modelos: sigue sirviendo para buscar visualmente *"ese bordado que hicimos"*, y ahora cada foto dice de qué modelo es.
+
+**⚠️ INVARIANTE QUE NO SE PUEDE ROMPER: el precio del arte viaja hasta la OP.** Ya funciona hoy y el refactor debe preservarlo: `dominio/costos/costo-orden.ts` calcula `procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ bordados`, tomando `ModeloBordado.precio` y cayendo al `Bordado.precio` del catálogo si el renglón viene vacío. El arte entra **UNA vez por modelo, SIN multiplicar por cantidad** (así está testeado en `costo-orden.test.ts`).
+
+Al mover el arte al modelo **esto se simplifica**: desaparece el precio del catálogo y queda **un solo precio —el del arte en ese modelo—**, que es el que viaja a la OP. Se acaba la ambigüedad de cuál de los dos precios aplicó. El cálculo debe seguir dando **exactamente lo mismo** para los datos existentes.
+
+**Alcance del cambio (no es un cambio de menú).** Toca: el esquema (`Bordado` → arte hijo de `Modelo`; `PrecostoLinea.idBordado`), el costeo (`costo-orden.ts`), el precosteo de F8, la galería, las pantallas de modelo y el ETL. **Requiere migración.** Es una **etapa propia**.
+
+**Cuándo:** sin fase asignada. Salió del repaso del flujo real que Daniel pidió (12-ago-2026); el orden se decide **al terminar ese repaso**, por si aparecen otros cambios del mismo tipo que convenga hacer juntos.
+
+- **Aplica en:** NADA todavía — decisión de rumbo. **Requiere migración** cuando se construya; permisos y seed, no.
+- **Fecha:** 2026-08-12.
