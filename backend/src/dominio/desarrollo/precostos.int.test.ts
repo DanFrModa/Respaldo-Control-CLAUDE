@@ -21,6 +21,7 @@ import type {
   Tela,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { redondear2 } from '../costos/decimales.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearDesarrollo } from './desarrollos.js';
 import { obtenerProyecto, crearProyecto } from './proyectos.js';
@@ -214,6 +215,46 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     expect(linea?.importe).toBe(30); // 3 × 10 (referencia, sin amarre)
   });
 
+  it('el PROMEDIO por talla NO TERMINANTE se guarda redondeado a 4 y el importe sale de ESE número', async () => {
+    // Mismo defecto que el del precio, un campo más allá: `consumo` es `Decimal(12,4)`, pero el
+    // promedio de R18 no tiene por qué caber ahí ((1+1+2)/3 = 1.33333…). Si se guardara redondeado
+    // por Postgres (que redondea, NO trunca) pero el importe se calculara con el crudo,
+    // (1.3333) y el importe se calculara con el promedio completo, la fila rompería la invariante
+    // `importe = redondear2(consumo × precio)`: con un avío de $50 daría 66.67 cuando el consumo
+    // guardado × el precio da 66.66.
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'APL', descripcion: 'Aplicación bordada', precioReferencia: 50 },
+    });
+    const tallas: Talla[] = [];
+    for (const [i, etiqueta] of ['CH', 'M', 'G'].entries()) {
+      tallas.push(await cliente.talla.create({ data: { etiqueta, orden: i + 1 } }));
+    }
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'PROMEDIO-INFINITO',
+        maquilaBase: 0,
+        avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 1, consumoPorTalla: true }] },
+      },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avio.id, idTalla: tallas[0]!.id, consumo: 1 },
+        { idModelo: modelo.id, idAvio: avio.id, idTalla: tallas[1]!.id, consumo: 1 },
+        { idModelo: modelo.id, idAvio: avio.id, idTalla: tallas[2]!.id, consumo: 2 },
+      ],
+    });
+
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
+    expect(linea?.consumo).toBe(1.3333); // (1+1+2)/3 = 1.33333… → 4 decimales, la escala de la columna
+    expect(linea?.importe).toBe(66.66); // 1.3333 × 50 — NO 66.67 (que sale del promedio crudo)
+    // La invariante, explícita: lo que se guarda y lo que multiplica son EL MISMO número.
+    expect(linea?.importe).toBe(redondear2((linea?.consumo ?? 0) * (linea?.precioUnit ?? 0)));
+  });
+
   it('consumoPorTalla=true SIN medidas capturadas cae a consumoPorPrenda (sin división por cero)', async () => {
     const avio: Avio = await cliente.avio.create({
       data: { clave: 'ELA', descripcion: 'Elástico', precioReferencia: 5 },
@@ -270,6 +311,36 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     expect(linea?.importe).toBe(6.27); // 1 × 6.27
     expect(linea?.idAvioProveedor).toBeNull(); // el precio salió de las medidas, no de un proveedor
   });
+
+  it('el avío con FACTOR DE CONVERSIÓN no descuadra precio e importe (la cascada DIVIDE)', async () => {
+    // R1: el avío se compra por caja/rollo y se consume por pieza → la cascada hace `precio ÷ factor`
+    // y devuelve decimales infinitos ($100 la caja de 144 = 0.694444…). El precio se guarda en
+    // `Decimal(12,2)` (0.69), así que el importe TIENE que calcularse con ese 0.69: si se calculara
+    // con el crudo daría 4.17 y la fila mostraría 0.69 × 6 = 4.14 al lado. Tres centavos, y ese
+    // importe entra al `costoTotal` que se persiste al congelar.
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'BOT-CAJA', descripcion: 'Botón por caja' },
+    });
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Botones por caja' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avio.id, idProveedor: proveedor.id, precio: 100, factorConversion: 144 },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'FACTOR',
+        maquilaBase: 0,
+        avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 6 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
+    expect(linea?.precioUnit).toBe(0.69); // 100 ÷ 144 = 0.694444… → 0.69
+    expect(linea?.importe).toBe(4.14); // 6 × 0.69 — NO 4.17 (que sale del precio crudo)
+    expect(linea?.importe).toBe(redondear2((linea?.consumo ?? 0) * (linea?.precioUnit ?? 0)));
+  });
 });
 
 describe('un solo borrador por desarrollo + versiones', () => {
@@ -291,6 +362,157 @@ describe('un solo borrador por desarrollo + versiones', () => {
     const historial = await listarPrecostosDeDesarrollo(sesion(), desarrollo.id, bd());
     expect(historial.map((p) => p.version)).toEqual([2, 1]); // más nuevo primero
     expect(historial.find((p) => p.version === 1)?.congelado).toBe(true);
+  });
+});
+
+describe('renglón manual LIGADO a un avío del catálogo (Daniel, ago-2026)', () => {
+  /** Modelo pelón + su precosto borrador (sin BOM: sólo corte + maquila). */
+  async function borradorPelon(codigo: string): Promise<number> {
+    const modelo = await cliente.modelo.create({ data: { codigo, maquilaBase: 5 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    return precosto.id;
+  }
+
+  async function conceptoAvios(): Promise<number> {
+    const c = await cliente.conceptoCosto.findFirstOrThrow({ where: { codigo: 'avios' } });
+    return c.id;
+  }
+
+  it('resuelve descripción y PRECIO del catálogo (más barato) y deja el renglón LIGADO al avío', async () => {
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'BOT', descripcion: 'Botón 4 hoyos', precioReferencia: 9 },
+    });
+    const caro = await cliente.proveedor.create({ data: { nombre: 'Caros' } });
+    const barato = await cliente.proveedor.create({ data: { nombre: 'Baratos' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avio.id, idProveedor: caro.id, precio: 5 },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avio.id, idProveedor: barato.id, precio: 2 },
+    });
+
+    const idPrecosto = await borradorPelon('AVIO-CAT');
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: await conceptoAvios(), idAvio: avio.id, consumo: 3 },
+      bd(),
+    );
+
+    const linea = precosto.lineas.find((l) => l.idAvio === avio.id)!;
+    // La MISMA cascada del BOM: sin amarre gana el más barato (2), no la referencia (9).
+    expect(linea.precioUnit).toBe(2);
+    expect(linea.importe).toBe(6); // 3 × 2
+    expect(linea.descripcion).toBe('BOT — Botón 4 hoyos');
+    // LIGADO (no sólo el nombre copiado) + traza del proveedor cuyo precio se usó.
+    expect(linea.idAvioProveedor).toBe(barato.id);
+    // Sigue siendo MANUAL: sobrevive al recalcular y se puede quitar.
+    expect(linea.origen).toBe('manual');
+    expect(linea.eliminable).toBe(true);
+  });
+
+  it('el precio TECLEADO manda sobre el del catálogo, y el renglón queda editable después', async () => {
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'ELA', descripcion: 'Elástico', precioReferencia: 7 },
+    });
+    const idPrecosto = await borradorPelon('AVIO-PRECIO');
+    let precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: await conceptoAvios(), idAvio: avio.id, precioUnit: 1.25 },
+      bd(),
+    );
+    let linea = precosto.lineas.find((l) => l.idAvio === avio.id)!;
+    expect(linea.precioUnit).toBe(1.25);
+
+    // El precio RESUELTO no queda fijo: se edita como cualquier renglón manual.
+    precosto = await editarLinea(sesion(), idPrecosto, linea.id, { precioUnit: 4 }, bd());
+    linea = precosto.lineas.find((l) => l.idAvio === avio.id)!;
+    expect(linea.precioUnit).toBe(4);
+    expect(linea.idAvio).toBe(avio.id); // la liga se conserva
+  });
+
+  it('el renglón NUNCA queda con precio e importe descuadrados por el redondeo (1.005)', async () => {
+    // La columna es `Decimal(12,2)` y Postgres redondea half-up al guardar (1.005 → 1.01), mientras
+    // que en JS `redondear2(1.005)` da 1.00 (1.005×100 = 100.4999…). Si el importe se calculara con
+    // el precio CRUDO, la misma fila mostraría precio 1.01 e importe 1.00 — y ese importe entra al
+    // `costoTotal` que se persiste al congelar. Se fija en el ALTA y en la EDICIÓN, que es
+    // justamente lo que se hace al ajustar un precio a mano.
+    const idPrecosto = await borradorPelon('CENTAVO');
+    const idConcepto = await conceptoAvios();
+
+    let precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: idConcepto, descripcion: 'Cinta', precioUnit: 1.005 },
+      bd(),
+    );
+    let linea = precosto.lineas.find((l) => l.descripcion === 'Cinta')!;
+    expect(linea.importe).toBe(linea.precioUnit);
+
+    // EDICIÓN (el hueco que quedaba): precio con 3 decimales + consumo.
+    precosto = await editarLinea(
+      sesion(),
+      idPrecosto,
+      linea.id,
+      { precioUnit: 1.005, consumo: 2 },
+      bd(),
+    );
+    linea = precosto.lineas.find((l) => l.id === linea.id)!;
+    // El precio guardado es el redondeado a 2 y el importe se calcula con ESE mismo precio.
+    expect(linea.precioUnit).toBe(1);
+    expect(linea.importe).toBe(2);
+  });
+
+  it('un avío POR MEDIDA se valúa con el PROMEDIO de sus medidas activas (misma regla del BOM, B11)', async () => {
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'CIN', descripcion: 'Cinta', precioReferencia: 50 },
+    });
+    await cliente.avioMedida.createMany({
+      data: [
+        { idAvio: avio.id, medida: 'S', precio: 2 },
+        { idAvio: avio.id, medida: 'M', precio: 4 },
+        { idAvio: avio.id, medida: 'XL', precio: 99, activo: false },
+      ],
+    });
+
+    const idPrecosto = await borradorPelon('AVIO-MEDIDA');
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: await conceptoAvios(), idAvio: avio.id },
+      bd(),
+    );
+    const linea = precosto.lineas.find((l) => l.idAvio === avio.id)!;
+    expect(linea.precioUnit).toBe(3); // (2+4)/2, la inactiva NO cuenta
+    expect(linea.idAvioProveedor).toBeNull(); // el precio no salió de un proveedor
+  });
+
+  it('rechaza un avío inexistente o DESACTIVADO', async () => {
+    const idPrecosto = await borradorPelon('AVIO-MALO');
+    const idConcepto = await conceptoAvios();
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: idConcepto, idAvio: 99999 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+
+    const apagado: Avio = await cliente.avio.create({
+      data: { clave: 'OFF', descripcion: 'Retirado', precioReferencia: 1, activo: false },
+    });
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: idConcepto, idAvio: apagado.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 });
 

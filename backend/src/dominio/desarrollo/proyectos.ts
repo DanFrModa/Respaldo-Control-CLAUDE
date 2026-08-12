@@ -47,6 +47,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import {
   aDesarrolloSalida,
   calcularEstadoDesarrollo,
+  incluirClienteDeProyecto,
   incluirEstadoDesarrollo,
 } from './desarrollos.js';
 
@@ -103,6 +104,9 @@ const incluirProyectoDetalle = {
     orderBy: { id: 'asc' },
     include: {
       modelo: { select: { codigo: true, descripcion: true } },
+      // Cliente/departamento del proyecto: los proyecta `aDesarrolloSalida` (el desarrollo NO
+      // guarda cliente propio, lo hereda de su proyecto).
+      ...incluirClienteDeProyecto,
       ...incluirEstadoDesarrollo,
     },
   },

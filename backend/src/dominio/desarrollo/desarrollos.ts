@@ -96,9 +96,26 @@ export function calcularEstadoDesarrollo(desarrollo: DesarrolloParaEstado): Esta
 
 // ── Include + proyección ───────────────────────────────────────────────────────────
 
-/** `include` para traer un desarrollo con su modelo y las relaciones del estado derivado. */
+/**
+ * `include` del CLIENTE + DEPARTAMENTO del desarrollo, leídos de su PROYECTO (su dueño natural: el
+ * desarrollo NO guarda cliente propio). Se exporta para que cualquier lectura que proyecte con
+ * {@link aDesarrolloSalida} (p. ej. el detalle del proyecto) traiga los mismos campos.
+ */
+export const incluirClienteDeProyecto = {
+  proyecto: {
+    select: {
+      idCliente: true,
+      idClienteDepartamento: true,
+      cliente: { select: { nombre: true } },
+      clienteDepartamento: { select: { nombre: true } },
+    },
+  },
+} satisfies Prisma.DesarrolloInclude;
+
+/** `include` para traer un desarrollo con su modelo, su cliente y las relaciones del estado derivado. */
 const incluirDesarrollo = {
   modelo: { select: { codigo: true, descripcion: true } },
+  ...incluirClienteDeProyecto,
   ...incluirEstadoDesarrollo,
 } satisfies Prisma.DesarrolloInclude;
 
@@ -112,6 +129,11 @@ export function aDesarrolloSalida(desarrollo: DesarrolloConDetalle): DesarrolloS
   return {
     id: desarrollo.id,
     idProyecto: desarrollo.idProyecto,
+    // Cliente/departamento HEREDADOS del proyecto (no se duplican en la tabla `Desarrollo`).
+    idCliente: desarrollo.proyecto.idCliente,
+    cliente: desarrollo.proyecto.cliente.nombre,
+    idClienteDepartamento: desarrollo.proyecto.idClienteDepartamento,
+    departamento: desarrollo.proyecto.clienteDepartamento.nombre,
     idModelo: desarrollo.idModelo,
     codigoModelo: desarrollo.modelo.codigo,
     descripcionModelo: desarrollo.modelo.descripcion,

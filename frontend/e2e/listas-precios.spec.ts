@@ -59,7 +59,12 @@ test.describe('Listas de precios (F8-E4)', () => {
     await page.getByTestId('fila-proyecto').filter({ hasText: nombreProyecto }).first().click();
     await detalleProyecto.getByTestId('agregar-desarrollo').click();
     const dialogoDesarrollo = page.getByRole('dialog');
-    await dialogoDesarrollo.getByLabel('Modelo del catálogo').selectOption({ label: codigoModelo });
+    await dialogoDesarrollo.getByTestId('desarrollo-modelo-busqueda').fill(codigoModelo);
+    await page
+      .getByTestId('desarrollo-modelo-opcion')
+      .filter({ hasText: codigoModelo })
+      .first()
+      .click();
     await page.getByTestId('guardar-desarrollo').click();
     await expect(page.getByText('Desarrollo agregado.')).toBeVisible();
 

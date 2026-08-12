@@ -90,7 +90,12 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
     for (const modelo of modelos) {
       await detalleProyecto.getByTestId('agregar-desarrollo').click();
       const dialogoDes = page.getByRole('dialog');
-      await dialogoDes.getByLabel('Modelo del catálogo').selectOption({ label: modelo.codigo });
+      await dialogoDes.getByTestId('desarrollo-modelo-busqueda').fill(modelo.codigo);
+      await page
+        .getByTestId('desarrollo-modelo-opcion')
+        .filter({ hasText: modelo.codigo })
+        .first()
+        .click();
       if (modelo.numCliente !== '') {
         await dialogoDes.getByLabel('Número del cliente').fill(modelo.numCliente);
       }

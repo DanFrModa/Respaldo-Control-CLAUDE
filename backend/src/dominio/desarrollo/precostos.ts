@@ -45,7 +45,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull, redondear2 } from '../costos/decimales.js';
+import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
 import { resolverPrecioAvio, resolverPrecioTela } from '../costos/resolucion-precios.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
@@ -135,6 +135,63 @@ function promedioSimple(valores: number[]): number {
   return valores.reduce((s, v) => s + v, 0) / valores.length;
 }
 
+/**
+ * Forma MÍNIMA de un avío del catálogo para valuarlo (la comparten el renglón del BOM y el renglón
+ * MANUAL ligado a un avío). Es justo lo que selecciona {@link incluirBomModelo} para el avío.
+ */
+interface AvioParaValuar {
+  precioReferencia: Prisma.Decimal | null;
+  factorConversion: Prisma.Decimal | null;
+  proveedores: {
+    idProveedor: number;
+    precio: Prisma.Decimal | null;
+    factorConversion: Prisma.Decimal | null;
+  }[];
+  /** Medidas ACTIVAS del avío "por medida" (R5, B11). */
+  medidas: { precio: Prisma.Decimal }[];
+}
+
+/**
+ * Precio de un AVÍO del catálogo, con la ÚNICA regla del precosto (no se duplica en ningún lado):
+ *  • avío "por medida" (≥1 medida activa, R5/B11) → PROMEDIO SIMPLE de los precios de sus medidas,
+ *    SIN proveedor de traza (el precio no salió de un proveedor);
+ *  • si no, la cascada amarrada de E1 (`resolverPrecioAvio`: amarre → más barato → referencia),
+ *    que además dice QUÉ proveedor se usó.
+ * La usan `lineasBomDesdeModelo` (renglones del BOM) y `agregarLineaManual` (renglón manual ligado
+ * a un avío, Daniel ago-2026).
+ */
+function precioAvioDeCatalogo(
+  avio: AvioParaValuar,
+  idAvioProveedor: number | null,
+): { precio: number | null; idProveedor: number | null } {
+  if (avio.medidas.length > 0) {
+    return {
+      precio: redondear2(promedioSimple(avio.medidas.map((m) => num(m.precio)))),
+      idProveedor: null,
+    };
+  }
+  const resuelto = resolverPrecioAvio({
+    precioReferencia: numOrNull(avio.precioReferencia),
+    factorConversionAvio: numOrNull(avio.factorConversion),
+    idAvioProveedor,
+    proveedores: avio.proveedores.map((p) => ({
+      idProveedor: p.idProveedor,
+      precio: numOrNull(p.precio),
+      factorConversion: numOrNull(p.factorConversion),
+    })),
+  });
+  // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. La cascada
+  // DIVIDE (`precio ÷ factorConversion`, R1: el avío comprado por caja/rollo), así que devuelve
+  // decimales infinitos: $100 la caja de 144 → 0.694444… Si ese número saliera de aquí, se guardaría
+  // en `Decimal(12,2)` como 0.69 mientras el importe se calcularía con 0.694444… → con consumo 6, la
+  // fila mostraría 4.17 en vez de 4.14, y ese importe entra al `costoTotal` que se persiste al
+  // congelar y de ahí al precio del cliente.
+  return {
+    precio: resuelto.precio === null ? null : redondear2(resuelto.precio),
+    idProveedor: resuelto.idProveedor,
+  };
+}
+
 /** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
 const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_bordado'] as const;
 
@@ -179,7 +236,9 @@ function lineasBomDesdeModelo(
   // precio SALIÓ del amarre (`amarre`/`amarre-color`); si cayó a color-referencia/sugerido, es null
   // (no mentimos "salió de este proveedor" cuando en realidad salió del sugerido genérico).
   for (const t of modelo.telas) {
-    const consumo = num(t.consumoPorPrenda);
+    // `ModeloTela.consumoPorPrenda` ya es `Decimal(12,4)`, así que aquí redondear es un no-op; se
+    // deja para que TODO consumo que se guarde pase por la misma regla (ver el avío por talla).
+    const consumo = redondear4(num(t.consumoPorPrenda));
     const resuelto = resolverPrecioTela({
       precioSugerido: numOrNull(t.tela.precioSugerido),
       amarre:
@@ -190,7 +249,11 @@ function lineasBomDesdeModelo(
             }
           : null,
     });
-    const precioUnit = resuelto.precio ?? 0;
+    // Redondeado a 2 = la misma regla de todos los renglones (el importe se calcula con ESTE
+    // número, no con uno más fino que la columna `Decimal(12,2)` no puede guardar). Hoy es un
+    // no-op —la cascada de tela no divide y sus columnas ya son de 2 decimales—, pero deja la
+    // invariante en un solo lugar por si mañana alguna gana precisión.
+    const precioUnit = redondear2(resuelto.precio ?? 0);
     const desdeAmarre = resuelto.origen === 'amarre' || resuelto.origen === 'amarre-color';
     lineas.push({
       idConceptoCosto: conceptos.tela,
@@ -207,29 +270,19 @@ function lineasBomDesdeModelo(
 
   // AVÍO: consumo (o PROMEDIO por talla) × precio resuelto. Traza: idAvio + proveedor REALMENTE usado.
   for (const a of modelo.avios) {
-    const consumo =
+    // El PROMEDIO por talla (R18) es el único punto que CREA precisión nueva en el consumo: las
+    // medidas capturadas son `Decimal(12,4)`, pero su media no tiene por qué serlo ((1+2)/3 = 0.666…).
+    // Se redondea a 4 —la escala de la columna— por la misma razón que el precio a 2: lo que se
+    // guarda y lo que multiplica al importe tienen que ser EL MISMO número, o la fila muestra un
+    // consumo y un importe que no cuadran entre sí.
+    const consumo = redondear4(
       a.consumoPorTalla && a.tallas.length > 0
         ? promedioSimple(a.tallas.map((x) => num(x.consumo)))
-        : num(a.consumoPorPrenda);
-    // R5, B11: avío "por medida" (con ≥1 medida activa) → el precio = PROMEDIO SIMPLE de los precios
-    // de las medidas (protege el costo sin desglosar; el desglose real vive en la compra/MRP). La
-    // traza de proveedor queda en null (el precio NO salió de un proveedor sino del promedio de medidas).
-    const porMedida = a.avio.medidas.length > 0;
-    const resuelto = porMedida
-      ? {
-          precio: redondear2(promedioSimple(a.avio.medidas.map((m) => num(m.precio)))),
-          idProveedor: null,
-        }
-      : resolverPrecioAvio({
-          precioReferencia: numOrNull(a.avio.precioReferencia),
-          factorConversionAvio: numOrNull(a.avio.factorConversion),
-          idAvioProveedor: a.idAvioProveedor,
-          proveedores: a.avio.proveedores.map((p) => ({
-            idProveedor: p.idProveedor,
-            precio: numOrNull(p.precio),
-            factorConversion: numOrNull(p.factorConversion),
-          })),
-        });
+        : num(a.consumoPorPrenda),
+    );
+    // R5, B11: avío "por medida" → PROMEDIO de sus medidas; si no, la cascada amarrada de E1. La
+    // regla vive en `precioAvioDeCatalogo` (la comparte el renglón MANUAL ligado a un avío).
+    const resuelto = precioAvioDeCatalogo(a.avio, a.idAvioProveedor);
     const precioUnit = resuelto.precio ?? 0;
     lineas.push({
       idConceptoCosto: conceptos.avios,
@@ -644,6 +697,13 @@ export async function recalcularDesdeBom(
  * mano — incluidos tela/avíos como renglón de la calculadora de negociación (R5, B12): un manual bajo
  * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
  * (`eliminable = !esAncla`), así que no queda atrapado como antes.
+ *
+ * Petición de Daniel (ago-2026): el renglón se puede LIGAR A UN AVÍO DEL CATÁLOGO (`idAvio`) en
+ * vez de teclear su nombre. Entonces el DOMINIO (A1, nunca la ruta ni el frontend) resuelve la
+ * descripción (`clave — descripción`) y el PRECIO con la MISMA cascada del BOM
+ * ({@link precioAvioDeCatalogo}), y guarda la traza `idAvio`/`idAvioProveedor` (el renglón queda
+ * LIGADO, no sólo con el nombre copiado). Un `precioUnit` explícito MANDA sobre el del catálogo, y
+ * el renglón se sigue pudiendo editar después (`editarLinea`) — el precio resuelto no queda fijo.
  */
 export async function agregarLineaManual(
   sesion: SesionUsuario,
@@ -680,19 +740,70 @@ export async function agregarLineaManual(
       );
     }
 
-    const consumo = datos.consumo ?? null;
-    const importe =
-      consumo === null ? redondear2(datos.precioUnit) : redondear2(consumo * datos.precioUnit);
+    // Renglón LIGADO a un avío del catálogo: el dominio resuelve descripción y precio (cascada de E1).
+    let avio: {
+      id: number;
+      etiqueta: string;
+      precio: number | null;
+      idProveedor: number | null;
+    } | null = null;
+    if (datos.idAvio !== undefined) {
+      const delCatalogo = await tx.avio.findUnique({
+        where: { id: datos.idAvio },
+        select: {
+          id: true,
+          clave: true,
+          descripcion: true,
+          activo: true,
+          precioReferencia: true,
+          factorConversion: true,
+          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          medidas: { where: { activo: true }, select: { precio: true } },
+        },
+      });
+      if (delCatalogo === null) {
+        throw new ErrorNoEncontrado('Avío', datos.idAvio);
+      }
+      if (!delCatalogo.activo) {
+        throw new ErrorConflicto(
+          `El avío "${delCatalogo.clave}" está desactivado; no se puede precostear.`,
+        );
+      }
+      // Sin amarre por Desarrollo (esto no viene del BOM): la cascada cae a "más barato"/referencia.
+      const resuelto = precioAvioDeCatalogo(delCatalogo, null);
+      avio = {
+        id: delCatalogo.id,
+        etiqueta: `${delCatalogo.clave} — ${delCatalogo.descripcion}`,
+        precio: resuelto.precio,
+        idProveedor: resuelto.idProveedor,
+      };
+    }
+
+    // El consumo TECLEADO también se redondea a la escala de su columna (`Decimal(12,4)`): el input
+    // es texto libre, así que puede llegar con más decimales de los que se pueden guardar.
+    const consumo = datos.consumo == null ? null : redondear4(datos.consumo);
+    // El precio TECLEADO manda; si no vino, el del catálogo del avío. Si el avío no tiene NINGÚN
+    // precio en la cascada (sin proveedores, sin `precioReferencia` y sin medidas activas) el
+    // renglón entra en CERO — mismo criterio que el renglón del BOM, que también valúa 0. Ese cero
+    // NO se le avisa al usuario en pantalla (lo ve en la columna Precio y lo puede editar); lo
+    // único que queda es la marca `sinPrecioCatalogo` en la bitácora de abajo, para poder
+    // rastrearlo después. El esquema ya exige que venga el precio o el avío.
+    const sinPrecioCatalogo = datos.precioUnit === undefined && (avio?.precio ?? null) === null;
+    const precioUnit = redondear2(datos.precioUnit ?? avio?.precio ?? 0);
+    const importe = consumo === null ? precioUnit : redondear2(consumo * precioUnit);
 
     const linea = await tx.precostoLinea.create({
       data: {
         idPrecosto,
         idConceptoCosto: concepto.id,
         origen: 'manual',
-        descripcion: datos.descripcion ?? concepto.nombre,
+        descripcion: datos.descripcion ?? avio?.etiqueta ?? concepto.nombre,
         consumo,
-        precioUnit: datos.precioUnit,
+        precioUnit,
         importe,
+        // Traza: el renglón queda LIGADO al avío (y al proveedor cuyo precio se usó), no sólo con
+        // su nombre copiado.
+        ...(avio === null ? {} : { idAvio: avio.id, idAvioProveedor: avio.idProveedor }),
         ...(datos.notas === undefined ? {} : { notas: datos.notas }),
         ...datosCreacion(sesion),
       },
@@ -704,7 +815,15 @@ export async function agregarLineaManual(
       entidad: 'Precosto',
       idEntidad: idPrecosto,
       accion: 'MODIFICAR',
-      datos: { operacion: 'agregar-linea', idLinea: linea.id, idConcepto: concepto.id },
+      datos: {
+        operacion: 'agregar-linea',
+        idLinea: linea.id,
+        idConcepto: concepto.id,
+        ...(avio === null ? {} : { idAvio: avio.id }),
+        // El avío no tenía precio en NINGÚN escalón de la cascada y el renglón entró en $0: queda
+        // la marca aquí (es lo único que lo delata; en pantalla sólo se ve el 0).
+        ...(sinPrecioCatalogo ? { sinPrecioCatalogo: true } : {}),
+      },
     });
   }, bd);
 
@@ -744,10 +863,19 @@ export async function editarLinea(
     }
 
     const descripcion = datos.descripcion ?? linea.descripcion;
-    const consumo = datos.consumo === undefined ? numOrNull(linea.consumo) : datos.consumo;
-    const precioUnit =
-      datos.precioUnit === undefined ? linea.precioUnit.toNumber() : datos.precioUnit;
-    const importe = consumo === null ? redondear2(precioUnit) : redondear2(consumo * precioUnit);
+    // Mismo redondeo a 4 que en el alta: el consumo tecleado puede traer más decimales de los que
+    // la columna guarda, y el importe se calcula con ESTE número.
+    const consumoCrudo = datos.consumo === undefined ? numOrNull(linea.consumo) : datos.consumo;
+    const consumo = consumoCrudo === null ? null : redondear4(consumoCrudo);
+    // El precio se REDONDEA A 2 antes de guardarlo y de calcular el importe (misma regla que el
+    // alta). Sin esto, precio e importe de la MISMA fila podían descuadrarse un centavo: la columna
+    // es `Decimal(12,2)` y Postgres redondea half-up al guardar (1.005 → 1.01), mientras que
+    // `redondear2(1.005)` en JS da 1.00 (artefacto binario: 1.005×100 = 100.4999…). El importe
+    // descuadrado entraba al `costoTotal` que se persiste al congelar.
+    const precioUnit = redondear2(
+      datos.precioUnit === undefined ? linea.precioUnit.toNumber() : datos.precioUnit,
+    );
+    const importe = consumo === null ? precioUnit : redondear2(consumo * precioUnit);
     // Editar un renglón de origen BOM lo marca AJUSTADO (B12): recalcular ya no lo pisa.
     const esBom = (ORIGENES_BOM as readonly string[]).includes(linea.origen);
 

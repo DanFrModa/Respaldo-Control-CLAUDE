@@ -2,6 +2,7 @@ import { Loader2Icon, PlusIcon, RefreshCwIcon, SnowflakeIcon, Trash2Icon } from 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import type { Avio } from '@/api/avios';
 import { useConceptosCosto } from '@/api/conceptos-costo';
 import type { Desarrollo } from '@/api/desarrollos';
 import {
@@ -28,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import {
@@ -40,6 +41,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { moneda } from '@/modulos/costos/comun';
+import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { useSesion } from '@/sesion/useSesion';
 
 import { TechPackDesarrollo } from './TechPackDesarrollo';
@@ -150,6 +152,16 @@ export function DialogoPrecosto({
         <DialogHeader>
           <DialogTitle>Precosto — {desarrollo?.codigoModelo ?? ''}</DialogTitle>
           <DialogDescription>
+            {/* El precosteo va DIRIGIDO a un cliente (petición de Daniel, ago-2026): el cliente y
+                su departamento se HEREDAN del proyecto y se muestran aquí, en la pantalla donde se
+                cotiza. No se capturan ni se pueden cambiar desde el precosto. */}
+            {desarrollo === undefined ? null : (
+              <span className="mb-1 block text-foreground" data-testid="precosto-cliente">
+                Cliente <span className="font-semibold">{desarrollo.cliente}</span>
+                <span className="text-muted-foreground"> / {desarrollo.departamento}</span>
+                {desarrollo.numeroCliente === null ? '' : ` · su nº ${desarrollo.numeroCliente}`}
+              </span>
+            )}
             Precosto persistido del desarrollo, versionable por congelado. Cada versión se calcula
             desde el BOM del modelo con los precios amarrados; la maquila y los conceptos manuales
             se editan a mano.
@@ -633,15 +645,30 @@ function RenglonPrecosto({
   );
 }
 
-/** Formulario de alta de un renglón MANUAL (concepto + descripción + consumo + precio). */
+/**
+ * Formulario de alta de un renglón MANUAL (concepto + avío del catálogo + descripción + consumo +
+ * precio). El insumo se puede ELEGIR DEL CATÁLOGO DE AVÍOS con búsqueda server-side (Daniel,
+ * ago-2026: antes sólo se podía teclear el nombre y el precio a mano). Al elegir un avío, el PRECIO lo
+ * resuelve el BACKEND con la cascada amarrada (A1: la cascada NO se replica aquí) y el renglón
+ * queda LIGADO al avío; si se teclea un precio, ese manda. Sin avío, todo sigue como antes (texto
+ * libre + precio obligatorio) — hay conceptos que no son avíos.
+ */
 function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.Element {
   const conceptos = useConceptosCosto(QUERY_CONCEPTOS);
   const agregar = useAgregarLinea();
 
   const [idConcepto, setIdConcepto] = useState('');
+  const [avio, setAvio] = useState<Avio | null>(null);
   const [descripcion, setDescripcion] = useState('');
   const [consumo, setConsumo] = useState('');
   const [precio, setPrecio] = useState('');
+
+  function limpiar(): void {
+    setAvio(null);
+    setDescripcion('');
+    setConsumo('');
+    setPrecio('');
+  }
 
   function agregarLinea(): void {
     if (idConcepto === '') {
@@ -649,7 +676,13 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
       return;
     }
     const precioNum = Number(precio);
-    if (precio.trim() === '' || Number.isNaN(precioNum) || precioNum < 0) {
+    const precioVacio = precio.trim() === '';
+    // Con avío elegido el precio puede ir en blanco: lo resuelve el catálogo (en el servidor).
+    if (precioVacio && avio === null) {
+      toast.error('Teclea el precio o elige un avío del catálogo.');
+      return;
+    }
+    if (!precioVacio && (Number.isNaN(precioNum) || precioNum < 0)) {
       toast.error('El precio debe ser un número ≥ 0.');
       return;
     }
@@ -663,17 +696,16 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
         id: idPrecosto,
         cuerpo: {
           idConceptoCosto: Number(idConcepto),
+          ...(avio === null ? {} : { idAvio: avio.id }),
           ...(descripcion.trim() === '' ? {} : { descripcion: descripcion.trim() }),
           consumo: consumoNum,
-          precioUnit: precioNum,
+          ...(precioVacio ? {} : { precioUnit: precioNum }),
         },
       },
       {
         onSuccess: () => {
           toast.success('Renglón agregado.');
-          setDescripcion('');
-          setConsumo('');
-          setPrecio('');
+          limpiar();
         },
         onError: (error) => toast.error(error.message),
       },
@@ -683,7 +715,7 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
   return (
     <div className="rounded-lg border bg-muted/30 p-3" data-testid="form-agregar-manual">
       <p className="mb-2 text-sm font-semibold">Agregar renglón manual</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
         <Field>
           <FieldLabel htmlFor="manual-concepto">Concepto</FieldLabel>
           <SelectNativo
@@ -705,12 +737,25 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
           </SelectNativo>
         </Field>
         <Field>
+          <FieldLabel htmlFor="manual-avio">Avío del catálogo</FieldLabel>
+          <SelectorAvio
+            idSeleccionado={avio?.id}
+            alSeleccionar={(elegido) => setAvio(elegido)}
+            alLimpiar={() => setAvio(null)}
+            idInput="manual-avio"
+            testid="agregar-linea-avio"
+          />
+          <FieldDescription>
+            Opcional: el precio y la descripción salen del catálogo (y quedan editables).
+          </FieldDescription>
+        </Field>
+        <Field>
           <FieldLabel htmlFor="manual-descripcion">Descripción</FieldLabel>
           <Input
             id="manual-descripcion"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="(opcional)"
+            placeholder={avio === null ? '(opcional)' : `${avio.clave} — ${avio.descripcion}`}
           />
         </Field>
         <Field>
@@ -730,22 +775,25 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
             className="text-right"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
+            placeholder={avio === null ? '' : 'del catálogo'}
             data-testid="agregar-linea-precio"
           />
         </Field>
-        <Button
-          type="button"
-          onClick={agregarLinea}
-          disabled={agregar.isPending}
-          data-testid="agregar-linea"
-        >
-          {agregar.isPending ? (
-            <Loader2Icon className="animate-spin" aria-hidden />
-          ) : (
-            <PlusIcon aria-hidden />
-          )}
-          Agregar
-        </Button>
+        <div className="flex items-end">
+          <Button
+            type="button"
+            onClick={agregarLinea}
+            disabled={agregar.isPending}
+            data-testid="agregar-linea"
+          >
+            {agregar.isPending ? (
+              <Loader2Icon className="animate-spin" aria-hidden />
+            ) : (
+              <PlusIcon aria-hidden />
+            )}
+            Agregar
+          </Button>
+        </div>
       </div>
     </div>
   );

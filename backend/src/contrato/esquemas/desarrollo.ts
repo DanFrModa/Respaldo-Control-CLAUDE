@@ -117,6 +117,13 @@ export const esquemaDesarrolloSalida = z
   .object({
     id: z.number().int().describe('Id del desarrollo.'),
     idProyecto: z.number().int().describe('Proyecto al que pertenece.'),
+    // El CLIENTE del desarrollo NO se captura ni se guarda aquí: se LEE del proyecto (su dueño
+    // natural, Cliente + Departamento). Viaja en la salida porque el precosteo va DIRIGIDO a un
+    // cliente y la ficha/pantalla del precosto tienen que decir a cuál (petición de Daniel).
+    idCliente: z.number().int().describe('Cliente del proyecto (heredado, no se captura aquí).'),
+    cliente: z.string().describe('Nombre del cliente del proyecto (para la UI).'),
+    idClienteDepartamento: z.number().int().describe('Departamento del cliente (del proyecto).'),
+    departamento: z.string().describe('Nombre del departamento del cliente (para la UI).'),
     idModelo: z.number().int().describe('Modelo del catálogo (nuestro número).'),
     codigoModelo: z.string().describe('Código del modelo (nuestro número, para la UI).'),
     descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),

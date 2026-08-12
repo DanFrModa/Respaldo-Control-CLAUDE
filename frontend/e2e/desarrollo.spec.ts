@@ -67,7 +67,14 @@ test.describe('Desarrollo (F8-E2)', () => {
     await expect(
       dialogoDesarrollo.getByRole('heading', { name: 'Agregar desarrollo' }),
     ).toBeVisible();
-    await dialogoDesarrollo.getByLabel('Modelo del catálogo').selectOption({ label: codigoModelo });
+    // R9 + petición de Daniel (ago-2026): el modelo se elige en un COMBOBOX con búsqueda server-side (el catálogo tiene
+    // miles de modelos); la lista de opciones vive en un portal, fuera del diálogo.
+    await dialogoDesarrollo.getByTestId('desarrollo-modelo-busqueda').fill(codigoModelo);
+    await page
+      .getByTestId('desarrollo-modelo-opcion')
+      .filter({ hasText: codigoModelo })
+      .first()
+      .click();
     await page.getByTestId('guardar-desarrollo').click();
     await expect(page.getByText('Desarrollo agregado.')).toBeVisible();
 

@@ -58,8 +58,12 @@ function claveLista(query: ListasQuery): readonly unknown[] {
 function claveDetalle(id: number): readonly unknown[] {
   return [...CLAVE_LISTAS, 'detalle', id];
 }
-function claveCandidatos(idCliente: number, idClienteDepartamento: number): readonly unknown[] {
-  return [...CLAVE_LISTAS, 'candidatos', idCliente, idClienteDepartamento];
+function claveCandidatos(
+  idCliente: number,
+  idClienteDepartamento: number,
+  idProyecto: number,
+): readonly unknown[] {
+  return [...CLAVE_LISTAS, 'candidatos', idCliente, idClienteDepartamento, idProyecto];
 }
 
 // ── Funciones del API ──────────────────────────────────────────────────────────
@@ -79,9 +83,16 @@ async function obtener(id: number): Promise<ListaDetalle> {
 async function obtenerCandidatos(
   idCliente: number,
   idClienteDepartamento: number,
+  idProyecto: number | undefined,
 ): Promise<CandidatoLista[]> {
   const { data, error } = await api.GET('/api/listas-precios/candidatos', {
-    params: { query: { idCliente, idClienteDepartamento } },
+    params: {
+      query: {
+        idCliente,
+        idClienteDepartamento,
+        ...(idProyecto === undefined ? {} : { idProyecto }),
+      },
+    },
   });
   if (!data) throw new ErrorDeApi(error);
   return data.datos;
@@ -158,14 +169,20 @@ export function useDesgloseCostoLinea(
   });
 }
 
-/** Candidatos de un cliente+departamento; deshabilitada hasta que ambos estén elegidos. */
+/**
+ * Candidatos de un cliente+departamento; deshabilitada hasta que ambos estén elegidos. Con
+ * `idProyecto` (Daniel, ago-2026) el servidor los acota a ESE proyecto — es lo que pide el botón
+ * «Generar lista de precios» desde la página del proyecto.
+ */
 export function useCandidatosLista(
   idCliente: number | undefined,
   idClienteDepartamento: number | undefined,
+  idProyecto?: number,
 ): UseQueryResult<CandidatoLista[], ErrorDeApi> {
   return useQuery({
-    queryKey: claveCandidatos(idCliente ?? 0, idClienteDepartamento ?? 0),
-    queryFn: () => obtenerCandidatos(idCliente as number, idClienteDepartamento as number),
+    queryKey: claveCandidatos(idCliente ?? 0, idClienteDepartamento ?? 0, idProyecto ?? 0),
+    queryFn: () =>
+      obtenerCandidatos(idCliente as number, idClienteDepartamento as number, idProyecto),
     enabled: idCliente !== undefined && idClienteDepartamento !== undefined,
   });
 }

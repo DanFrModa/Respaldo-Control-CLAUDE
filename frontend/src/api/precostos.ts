@@ -8,6 +8,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import { CLAVE_LISTAS } from './listas-precios';
 import { CLAVE_PROYECTOS } from './proyectos';
 import type { paths } from './esquema.gen';
 
@@ -137,12 +138,24 @@ async function congelar(id: number): Promise<Precosto> {
   return data;
 }
 
-/** Invalida precostos + proyectos (el estado derivado del desarrollo depende del precosto). */
+/**
+ * Invalida precostos + proyectos + LISTAS (el estado derivado del desarrollo depende del precosto).
+ *
+ * Por qué también LISTAS: bajo `CLAVE_LISTAS` vive la consulta de CANDIDATOS, y congelar una versión
+ * es justo lo que convierte un desarrollo en candidato. Esa consulta ya no vive sólo dentro del
+ * diálogo de crear lista (que refetcheaba al montarse): la página del proyecto la usa para decidir
+ * si el botón «Generar lista de precios» va habilitado, y esa página NO se desmonta al congelar.
+ * Sin esta invalidación —y con `refetchOnWindowFocus: false`— el usuario congelaba obedeciendo al
+ * mensaje, veía el badge pasar a "Cotizado" y el botón seguía gris diciéndole que congelara: un
+ * candado cerrado, porque lo único que refrescaba la cache era abrir el diálogo que el botón
+ * deshabilitado impedía.
+ */
 function useInvalidar(): () => void {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: CLAVE_PRECOSTOS });
     void queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS });
+    void queryClient.invalidateQueries({ queryKey: CLAVE_LISTAS });
   };
 }
 

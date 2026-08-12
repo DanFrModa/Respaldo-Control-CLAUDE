@@ -60,7 +60,12 @@ test.describe('Precosto (F8-E3)', () => {
 
     await detalle.getByTestId('agregar-desarrollo').click();
     const dialogoDesarrollo = page.getByRole('dialog');
-    await dialogoDesarrollo.getByLabel('Modelo del catálogo').selectOption({ label: codigoModelo });
+    await dialogoDesarrollo.getByTestId('desarrollo-modelo-busqueda').fill(codigoModelo);
+    await page
+      .getByTestId('desarrollo-modelo-opcion')
+      .filter({ hasText: codigoModelo })
+      .first()
+      .click();
     await page.getByTestId('guardar-desarrollo').click();
     await expect(page.getByText('Desarrollo agregado.')).toBeVisible();
 

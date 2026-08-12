@@ -66,10 +66,12 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.getByTestId('fila-proyecto').filter({ hasText: nombreProyecto }).first().click();
     const detalleProyecto = page.getByTestId('detalle-proyecto');
     await detalleProyecto.getByTestId('agregar-desarrollo').click();
+    await page.getByRole('dialog').getByTestId('desarrollo-modelo-busqueda').fill(codigoModelo);
     await page
-      .getByRole('dialog')
-      .getByLabel('Modelo del catálogo')
-      .selectOption({ label: codigoModelo });
+      .getByTestId('desarrollo-modelo-opcion')
+      .filter({ hasText: codigoModelo })
+      .first()
+      .click();
     await page.getByTestId('guardar-desarrollo').click();
     await expect(page.getByText('Desarrollo agregado.')).toBeVisible();
 
