@@ -1399,7 +1399,13 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. Para entonces ese código ya anda en correos, cotizaciones y en la lista de precios del cliente, y renumerarlo rompería la trazabilidad de la negociación. La **fecha real de entrega** vive en su campo y esa sí se actualiza: el año del código es el que se pretendía al nacer, no una promesa de cuándo se entrega.
 
-**Decisión de diseño del lead, sujeta a corrección de Daniel** (dicha en el chat, sin respuesta en contra al cierre de esta entrada): **el consecutivo corre por cliente + año**, sin importar el tipo de prenda (el `001` es el primer desarrollo de ese cliente para ese año, sea jogger o sudadera).
+**El consecutivo corre por cliente + año + tipo de prenda — CONFIRMADO POR DANIEL.**
+
+> Preguntado si el consecutivo corría por cliente y año sin importar el tipo de prenda, Daniel: *"También por tipo de prenda."*
+
+O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIENTE-AÑO-CONCEPTO+GÉNERO` lleva su propia serie, que reinicia cada año. `CYA-26-71-001` es el primer jogger de caballero desarrollado para C&A con entrega en 2026; el primer jogger de dama de ese mismo cliente y año es `CYA-26-72-001`, no el `002`.
+
+*(Lectura del lead sobre un punto que Daniel no detalló: «tipo de prenda» se toma como **los dos dígitos juntos** —concepto Y género—, porque son un solo segmento del código; si el contador debiera correr solo por el concepto, los números saldrían con huecos entre géneros. Confirmar al construir.)*
 
 **Qué se decidió construir.**
 
@@ -1423,4 +1429,54 @@ Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. P
    **El código de DESARROLLO sí lo arma el sistema**, porque es mecánico y no tiene criterio de negocio: cliente + año de entrega + los dos dígitos + el consecutivo que sigue. *(Daniel acotó su corrección a los modelos de producción; si también quiere capturar a mano el de desarrollo, se ajusta.)*
 
 - **Aplica en:** NADA todavía — es decisión de rumbo. Al construirse tocará `Modelo` (marca de origen + código de desarrollo), `Cliente` (abreviatura), el catálogo/galería de modelos y el editor de desarrollo. **Requiere migración** cuando se construya; permisos y seed, no.
+- **Fecha:** 2026-08-12.
+
+#### (Post-F9.35) — El ARTE deja de ser catálogo y se maneja DENTRO del modelo (DANIEL, 12-ago-2026)
+
+> Daniel, al repasar por qué existía el catálogo de bordados:
+>
+> *"Honestamente me parece que no tiene mucho sentido que viva en un catálogo. Originalmente cuando pensé en el sistema anterior, supuse que había artes que se iban a ocupar en más de un modelo. Por eso definí un catálogo. Pero en la práctica, cada arte va pegado siempre a un solo modelo. Entonces creo que sería más fácil manejar el arte (o varios) dentro del modelo. Ahí mismo establecer su precio, el proveedor, etc."*
+>
+> Y sobre el precio: *"Es importante que tenga su precio, que es el que va a viajar hasta la OP."*
+
+**Los datos del sistema viejo le dan la razón** (medidos el 12-ago-2026 sobre `Respaldo CLAUDE/TABLAS/Bordados.csv` y `ModelosBor.csv`, rama `fuente-sistema-viejo`):
+
+| | |
+|---|---|
+| Artes en el catálogo | **2,964** |
+| **Nunca usados en ningún modelo** | **898** (30 % del catálogo) |
+| Usados en **UN solo** modelo | **1,899** — el **92 %** de los usados |
+| Usados en varios | 167 (8 %), casi todos en 2 o 3 |
+
+Y el remate: **los artes están nombrados con el número del modelo** (los más compartidos se llaman `51901`, `25214`, `81561`, `55129-2`). Ni siquiera los compartidos son artes reutilizables: son el arte de un modelo que se resurtió o tuvo variante. **El catálogo nunca funcionó como catálogo.**
+
+**Qué se decidió.**
+
+1. **El arte se va DENTRO del modelo.** Cada modelo lleva su arte o sus artes con: nombre, tipo (bordado / estampado), puntadas, **precio**, **proveedor** (⚠️ NUEVO — hoy `Bordado` no tiene proveedor) y su foto. El catálogo global `Bordado` **desaparece como catálogo**.
+2. **Los 167 compartidos se DUPLICAN al migrar**: cada modelo se queda con su copia. Son unos cientos de renglones. Para no perder la comodidad, un botón **«copiar arte de otro modelo»** trae el arte ya lleno y se ajusta — la conveniencia sin reinventar el catálogo.
+3. **Los 898 nunca usados NO se migran.** Es la depuración que Daniel pedía, gratis.
+4. **La galería de arte SOBREVIVE**, pero armada desde los modelos: sigue sirviendo para buscar visualmente *"ese bordado que hicimos"*, y ahora cada foto dice de qué modelo es.
+
+**⚠️ INVARIANTE QUE NO SE PUEDE ROMPER: el precio del arte viaja hasta la OP.** Ya funciona hoy y el refactor debe preservarlo: `dominio/costos/costo-orden.ts` calcula `procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ bordados`, tomando `ModeloBordado.precio` y cayendo al `Bordado.precio` del catálogo si el renglón viene vacío. El arte entra **UNA vez por modelo, SIN multiplicar por cantidad** (así está testeado en `costo-orden.test.ts`).
+
+Al mover el arte al modelo **esto se simplifica**: desaparece el precio del catálogo y queda **un solo precio del modelo**. El cálculo debe seguir dando **exactamente lo mismo** para los datos existentes.
+
+**⚠️ HUECO QUE ESTA ETAPA DEBE CERRAR: el precio del modelo es de REFERENCIA; el REAL se define en la OP.**
+
+> Daniel: *"Al final el precio que viaja a la OP es un precio de referencia. El precio real se define en la OP (en ocasiones puede moverse para arriba o para abajo por alguna variable en producción)."*
+
+**Hoy NO se puede** (verificado en `schema.prisma`, modelo `Orden`): la orden tiene `maquilaOrd` y `aplicacionOrd` —overrides a nivel orden para la maquila y la aplicación— pero **no existe ningún override para el precio del arte**. `costo-orden.ts` lo toma fijo del modelo (`ModeloBordado.precio ?? Bordado.precio`), sin manera de ajustarlo en la OP. Es un hueco, no una decisión: el mismo sistema ya reconoce que maquila y aplicación se mueven en producción, y el arte se mueve igual.
+
+**Qué hay que construir:**
+
+1. **Precio de arte POR ORDEN**, con el mismo patrón que ya existe: `precioEnLaOrden ?? precioDelModelo`. Como un modelo puede llevar **varios** artes, el override es **por arte y por orden** (no un campo suelto en `Orden`, que solo serviría si hubiera uno).
+2. **El precio del modelo se rotula como REFERENCIA** en la interfaz, y el de la OP como el que manda. Quien mire la OP tiene que ver cuál se aplicó y, si se movió, que se movió.
+3. **El costo real de la orden usa el de la OP.** Y como el arte ahora lleva **proveedor**, ese precio es además lo que se le paga: la liga con la cuenta corriente del proveedor debe leer el mismo número, no el de referencia.
+4. **Cambiar el precio en la OP NO toca el modelo.** El de referencia se queda como está para las siguientes órdenes; mover uno no debe reescribir el otro en ninguna dirección.
+
+**Alcance del cambio (no es un cambio de menú).** Toca: el esquema (`Bordado` → arte hijo de `Modelo`; `PrecostoLinea.idBordado`), el costeo (`costo-orden.ts`), el precosteo de F8, la galería, las pantallas de modelo y el ETL. **Requiere migración.** Es una **etapa propia**.
+
+**Cuándo:** sin fase asignada. Salió del repaso del flujo real que Daniel pidió (12-ago-2026); el orden se decide **al terminar ese repaso**, por si aparecen otros cambios del mismo tipo que convenga hacer juntos.
+
+- **Aplica en:** NADA todavía — decisión de rumbo. **Requiere migración** cuando se construya; permisos y seed, no.
 - **Fecha:** 2026-08-12.
