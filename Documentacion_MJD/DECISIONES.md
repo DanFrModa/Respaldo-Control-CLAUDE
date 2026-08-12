@@ -1480,3 +1480,82 @@ Al mover el arte al modelo **esto se simplifica**: desaparece el precio del cat�
 
 - **Aplica en:** NADA todavía — decisión de rumbo. **Requiere migración** cuando se construya; permisos y seed, no.
 - **Fecha:** 2026-08-12.
+
+#### (Post-F9.36) — Las SEIS decisiones que definen la PRIMERA VERSIÓN (DANIEL, 13-ago-2026)
+
+> Tras leer `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`, Daniel cerró las decisiones que estaban frenando
+> el arranque. *"Ya quiero sacar la primera versión. Ya se fue mucho tiempo con esto."*
+
+**1. RUTA CRÍTICA: APAGADA en la v1.**
+
+> Daniel: *"Sí podemos arrancar sin ruta crítica. Hoy honestamente no lo estamos ocupando en Control.
+> Podríamos empezar sin eso sin problema. Y lo vamos construyendo."*
+
+Se apaga para el arranque y se construye después. **Esto retira CINCO bloqueantes** del diagnóstico:
+no hay que correr el ETL de F5 (plantillas), ni asignar `UsuarioRol` a los 23 usuarios, ni cargar los
+festivos de FR Moda, ni resolver que el admin vea pendientes ajenos, ni las alarmas falsas del día 1.
+
+**Pendiente al construir la v2 de RC** — Daniel lo pidió en la misma vuelta: *"como administrador me
+gustaría ver el estatus de pendientes por persona"*. Hoy existe a medias (hay selector "Viendo
+pendientes de:" para `rc.programar`) pero **no hay concentrado por persona**: el admin ve todo
+revuelto en una sola lista como si fuera suya (`bandeja.ts:183-192`). La vista de supervisor —cuánto
+trae cada quien, cuánto vencido, y de ahí al detalle— es parte del alcance cuando RC se encienda.
+
+⚠️ **Apagarla NO es no hacer nada.** `rcAutomatica.ts` genera la ruta de toda orden nueva y no hay
+interruptor: hay que quitar `rc.ruta-ver` de los roles de la v1 (apaga menú, campana y pantalla de un
+golpe) **y** decidir si además se suspende la generación automática, para no acumular ~26 procesos
+por orden que nadie va a capturar.
+
+**2. Producción: UNA SOLA pantalla por acto.** *(Daniel: "Ok. Una sola pantalla está bien.")*
+Se queda el **panel de avance** del Centro de Órdenes y se le agrega lo que hoy solo tienen las
+viejas (**imprimir** y **capturar segundas**); `/produccion/corte`, `/produccion/envios` y
+`/produccion/recibos` se retiran. Hoy conviven las cuatro y **ninguna es completa**.
+
+**3. `noProducir`: mostrarlo y ya.** *(Daniel: "Ok. No es relevante. Casi no hay órdenes así.")*
+Se hace visible y editable el campo, que hoy bloquea "Generar OP" sin aparecer en ninguna pantalla.
+Sin más alcance.
+
+**4. ⭐ SE ARRANCA SIN CONTEO FÍSICO. El inventario se carga sobre la marcha.**
+
+> Daniel: *"Si son muchos está bien el Excel. Pero creo que también podríamos arrancar sin conteo
+> físico. ¿Será viable? Quiero ir implementando lo antes posible y el conteo físico nos llevará
+> tiempo. ¿Podemos ir metiendo sobre la marcha la información? ¿Podríamos meter las telas con las
+> que estamos trabajando y más adelante cargar todo lo demás?"*
+
+**Sí es viable.** Verificado antes de responder:
+
+- **El costeo NO se distorsiona.** El costo real de una orden sale de las **órdenes de compra**, y lo
+  que no tiene compra propia se valúa al **último precio de compra** de ese material
+  (`costo-real-compras.ts`, §Post-F9.5). Como la migración trae las compras de 2025-2026, casi toda
+  la tela ya tiene historial de precio: **tela que entre por ajuste no ensucia el costo**.
+- **El riesgo real es el MRP**: netea contra existencias, así que **lo que no esté cargado lo manda a
+  comprar** (`mrp.ts`). Con el almacén en cero, la primera explosión de cada orden pide todo aunque
+  esté en bodega.
+- **La mitigación es la que propuso Daniel**: cargar las telas y avíos **con los que se está
+  trabajando**. Con eso la explosión de las órdenes vivas sale bien y el resto se carga cuando se
+  necesite.
+- **La regla práctica**: un color se captura **la primera vez que se va a usar**. Si se intenta
+  descargar tela no cargada, el sistema la rechaza — ese es el recordatorio. La pantalla ya existe
+  (*Ajuste de telas por color*, construida justo para "arranque desde cero").
+
+**Consecuencia de calendario:** el **importador Excel de conteo físico deja de ser bloqueante** — era
+el mayor consumidor de tiempo humano del go-live y el mayor riesgo de fecha. Se construye después,
+con calma, para cargar el resto del almacén.
+
+**5. Numeración: CONTINÚA, pero saltando al siguiente ESCALÓN.**
+
+> Daniel: *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón.
+> Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP
+> y OC también."*
+
+Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**,
+cuando se conozca el máximo real migrado (si la última OP fuera 5,847 → arrancar en 6,000). Requiere
+que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`.
+⚠️ **Es irreversible una vez arrancado.**
+
+**6. El comprobante de entrega actual BASTA.** *(Daniel: "Con la que hay está bien. Por ahora nada
+específico para nadie.")* No se construye remisión ni packing list por cliente.
+
+- **Aplica en:** decisiones de rumbo + alcance de la v1. La 2, la 3 y la 5 requieren construcción; la
+  1 requiere quitar permisos y decidir la generación automática; la 4 y la 6 **no requieren nada**.
+- **Fecha:** 2026-08-13.
