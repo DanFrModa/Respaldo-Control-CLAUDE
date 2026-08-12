@@ -1443,8 +1443,9 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
     ],
   },
   {
-    // 4 hojas planas (Daniel): cada una a su pantalla principal; sus kardex/movimientos/
-    // traspasos/catálogos salen del riel (viven en su pantalla + ⌘K).
+    // 4 entradas (Daniel): PT y Avíos como hojas planas a su pantalla principal; Telas y Compras
+    // como desplegables con hijos curados (ver sus comentarios). Lo demás —kardex, movimientos,
+    // traspasos, sub-vistas legadas— sale del riel (vive en su pantalla + ⌘K).
     grupo: 'inventarios',
     entradas: [
       {
@@ -1455,7 +1456,8 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
       },
       {
         // Telas es PADRE desplegable (pedido de Daniel, 6-ago-2026): como hoja colapsada el
-        // «Catálogo de telas» quedaba invisible (solo ⌘K/URL, y en el celular ni eso). Hijos
+        // «Catálogo de telas» quedaba invisible (solo ⌘K/URL; la paleta SÍ se abre en el celular,
+        // con la lupa de la topbar — `CascaronSistema`, `abrir-paleta-movil`). Hijos
         // CURADOS para no saturar: la nueva Existencias por color (principal), el catálogo, la
         // ENTRADA por factura (B1 — es la puerta diaria del inventario junto con la recepción de
         // compra: sin riel sólo se alcanzaría por ⌘K), la salida a orden y el ajuste; el resto
@@ -1476,7 +1478,25 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         ruta: '/inventarios/avios/existencias',
         permisos: ['inventario-avios.ver'],
       },
-      { tipo: 'colapsar', clave: 'compras', ruta: '/compras/ordenes', permisos: ['compras.ver'] },
+      {
+        // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un
+        // submenú de Recepción de compras»): como hoja colapsada solo navegaba a las Órdenes de
+        // compra y las otras tres pantallas se quedaban sin ENTRADA EN EL MENÚ y sin enlace
+        // estable — solo ⌘K/URL (la Recepción tenía además el deep-link CONDICIONAL del botón
+        // «Registrar» de Mis pendientes de RC, `ruta-critica/piezas.tsx` → `recepcionTela`, que
+        // solo aparece si la orden trae ese proceso; el semáforo y la explosión, nada). Hijos
+        // CURADOS para no saturar: las órdenes de compra (principal), la recepción —la puerta
+        // diaria del material, junto con la entrada de telas por factura—, el semáforo «qué tengo
+        // / qué falta» y la explosión; el resto (autorización, compras por orden) sigue por ⌘K.
+        tipo: 'padre',
+        clave: 'compras',
+        hijos: [
+          'ordenes-compra',
+          'recepcion-compras',
+          'estatus-materiales',
+          'explosion-materiales',
+        ],
+      },
     ],
   },
   {

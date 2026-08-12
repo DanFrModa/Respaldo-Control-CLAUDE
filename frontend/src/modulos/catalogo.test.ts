@@ -92,6 +92,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     expect(primerHijo('calidad')).toBe('calidad-consulta-auditorias');
     expect(primerHijo('inventarios')).toBe('inventario-existencias');
     expect(primerHijo('telas')).toBe('inventario-telas-existencias');
+    expect(primerHijo('compras')).toBe('ordenes-compra');
     expect(primerHijo('catalogos')).toBe('colores');
   });
 
@@ -252,7 +253,21 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           ],
         },
         { clave: 'avios', padre: false },
-        { clave: 'compras', padre: false },
+        {
+          // Daniel, 11-ago-2026: Compras pasó a DESPLEGABLE — como hoja colapsada, Recepción /
+          // Estatus / Explosión no tenían ENTRADA EN EL MENÚ ni enlace estable (solo ⌘K/URL; la
+          // Recepción, además, el deep-link condicional de Mis pendientes de RC). Hijos
+          // curados: órdenes de compra (principal) + recepción + semáforo + explosión; la
+          // autorización y «compras por orden» siguen por ⌘K.
+          clave: 'compras',
+          padre: true,
+          hijos: [
+            'ordenes-compra',
+            'recepcion-compras',
+            'estatus-materiales',
+            'explosion-materiales',
+          ],
+        },
       ],
     },
     {
@@ -322,19 +337,37 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     });
   });
 
-  it('el riel tiene 6 padres y marca SOLO la Ruta Crítica como destacada', () => {
+  it('el riel tiene 7 padres y marca SOLO la Ruta Crítica como destacada', () => {
     const padres = RIEL_GRUPOS.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres.map((p) => p.clave)).toEqual([
       'g-desarrollo',
       'produccion',
       'calidad',
       'telas', // A2: desplegable (el catálogo de telas tenía que verse en el menú)
+      'compras', // 11-ago-2026: desplegable (Recepción/Estatus/Explosión no tenían enlace alguno)
       'clientes',
       'catalogos',
     ]);
     const destacadas = RIEL_GRUPOS.flatMap((g) => g.entradas).filter((e) => e.destacado);
     expect(destacadas).toHaveLength(1);
     expect(destacadas[0]?.clave).toBe('ruta-critica');
+  });
+
+  it('«Compras» es desplegable y lleva a Recepción de compras (Daniel, 11-ago-2026)', () => {
+    // Regresión del defecto reportado por Daniel: con Compras como hoja colapsada a
+    // /compras/ordenes, las pantallas de Recepción, Estatus y Explosión de materiales no tenían
+    // ENTRADA EN EL MENÚ ni enlace estable — solo ⌘K/URL (la Recepción tenía además el deep-link
+    // condicional de «Registrar» en Mis pendientes de RC). El riel debe desplegarlas.
+    const compras = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === 'compras');
+    expect(compras?.hijos, 'Compras debe ser padre desplegable en el riel').toBeDefined();
+    const recepcion = compras?.hijos?.find((h) => h.clave === 'recepcion-compras');
+    expect(recepcion, 'Recepción de compras debe estar en el riel').toBeDefined();
+    expect(recepcion?.ruta).toBe('/compras/recepcion');
+    expect(recepcion?.permisos).toEqual(['compras.recibir']); // gate heredado del catálogo (A4)
+    // Las otras dos pantallas huérfanas también entran, con su ruta real.
+    const porClave = new Map(compras?.hijos?.map((h) => [h.clave, h.ruta]));
+    expect(porClave.get('estatus-materiales')).toBe('/compras/estatus-materiales');
+    expect(porClave.get('explosion-materiales')).toBe('/compras/explosion');
   });
 
   it('las hojas colapsadas navegan a su pantalla principal con el gate correcto', () => {
@@ -346,8 +379,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     const casos: ReadonlyArray<[string, string, readonly ClavePermiso[]]> = [
       ['inventarios', '/inventarios/existencias', ['inventario-pt.ver']],
       // «telas» ya NO es hoja colapsada: pasó a padre desplegable en A2 (ver el test del riel).
+      // «compras» tampoco: pasó a padre desplegable el 11-ago-2026 (mismo motivo — sus pantallas
+      // de recepción/estatus/explosión no tenían ningún enlace).
       ['avios', '/inventarios/avios/existencias', ['inventario-avios.ver']],
-      ['compras', '/compras/ordenes', ['compras.ver']],
       ['costos', '/costos', ['costos.ver', 'precostos.consultar']],
       ['edr', '/edr', ['edr.ver', 'edr.capturar']],
       ['esma', '/esma', ['esma.ver-pagos', 'esma.cargo-validar', 'esma.modificar']],
@@ -428,7 +462,10 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       'inventario-movimientos',
       // 'catalogo-telas' ya NO está aquí: en A2 entró al riel como hijo del padre «Telas»
       // (pedido de Daniel, 6-ago-2026 — el catálogo tenía que verse en el menú).
-      'ordenes-compra',
+      // 'ordenes-compra' tampoco: el 11-ago-2026 entró al riel como hijo del padre «Compras»
+      // (junto con recepción/estatus/explosión). Lo que sigue fuera del riel en Compras:
+      'compras-por-orden',
+      'autorizacion-compras',
       'costos-margenes',
       'edr-por-anio',
       'esma-pagos',
@@ -445,7 +482,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     // FINANZAS: sin permisos, el grupo entero desaparece — CxC (gate `cxc.ver`, F9-E4), CxP (gate
     // `cxp.ver`, F9-E2) y EsMa (gate) están todos gateados; no queda ninguna hoja "autenticado".
     expect(porClave.get('finanzas')).toBeUndefined();
-    // INVENTARIOS: las 3 hojas colapsadas tienen gate y desaparecen; el padre «Telas» (A2)
+    // INVENTARIOS: las 2 hojas colapsadas (PT, Avíos) tienen gate y desaparecen, y el padre
+    // «Compras» también — porque sus 4 hijos están gateados (`compras.ver` / `compras.recibir`),
+    // y un padre sin hijos visibles no se pinta; el padre «Telas» (A2)
     // SOBREVIVE con su único hijo "autenticado" — el Catálogo de telas (pedido de Daniel: que
     // siempre se vea en el menú, como los demás catálogos de uso general).
     const inventarios = porClave.get('inventarios');
