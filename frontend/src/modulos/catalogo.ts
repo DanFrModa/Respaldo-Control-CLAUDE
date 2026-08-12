@@ -605,7 +605,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-telas.ver'],
             subVista: true,
           },
-          // El catálogo de telas (antes bajo el hub Catálogos) conserva su gate "autenticado".
+          // El catálogo de telas (antes bajo el hub Catálogos) conserva su gate "autenticado", como
+          // TODA la familia de catálogos de uso general (colores, tallas, temporadas, almacenes,
+          // clientes, proveedores, etiquetas de marca, bordados, avíos): es el pedido de Daniel en
+          // A2 — «que el catálogo de telas siempre se vea en el menú, como los demás catálogos de
+          // uso general». El backend sí exige `telas.ver` en `GET /telas`, así que a un rol sin ese
+          // permiso la entrada le aparece y le da 403; ese desajuste es de la FAMILIA COMPLETA
+          // (8 de 10 hojas están igual, 4 de ellas dentro del padre «Catálogos base» del riel) y se
+          // arregla parejo o no se arregla — con decisión de Daniel de por medio. Deuda anotada en
+          // `HOJA-DE-RUTA.md` §4. Alinear solo telas/avíos sería una excepción sin razón.
           {
             clave: 'catalogo-telas',
             titulo: 'Catálogo de telas',
@@ -720,6 +728,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-avios.ver'],
             subVista: true,
           },
+          // Mismo criterio que el catálogo de telas: "autenticado" como toda la familia de
+          // catálogos de uso general (ver el comentario allá arriba y la deuda de `HOJA-DE-RUTA.md`
+          // §4). El backend exige `avios.ver` en `GET /avios`; el desajuste es de la familia entera.
           {
             clave: 'catalogo-avios',
             titulo: 'Catálogo de avíos',
@@ -1443,16 +1454,28 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
     ],
   },
   {
-    // 4 entradas (Daniel): PT y Avíos como hojas planas a su pantalla principal; Telas y Compras
-    // como desplegables con hijos curados (ver sus comentarios). Lo demás —kardex, movimientos,
-    // traspasos, sub-vistas legadas— sale del riel (vive en su pantalla + ⌘K).
+    // 4 entradas (Daniel), las CUATRO desplegables desde el 12-ago-2026 («destapa las cosas de una
+    // vez, para no dejar pendientes»): ya no queda ninguna hoja colapsada en el grupo. Cada padre
+    // lleva sus hijos (curados solo en Telas y Compras); lo único que sigue fuera del riel son las
+    // dos vistas LEGADAS de telas por lote (existencias y salida a orden, que ya no operan) y las
+    // sub-vistas de compras (autorización, compras por orden), vivas en su pantalla + ⌘K.
     grupo: 'inventarios',
     entradas: [
       {
-        tipo: 'colapsar',
+        // Inventario PT es PADRE desplegable (Daniel, 12-ago-2026): como hoja colapsada solo
+        // navegaba a Existencias y sus otras tres pantallas no tenían ENTRADA EN EL MENÚ — se
+        // alcanzaban por ⌘K/URL o desde la propia pantalla de Existencias (las pestañas
+        // Movimientos/Traspasos de `PestanasInventarioPt`, que solo salen con `inventario-pt.mover`,
+        // y el botón «Kardex»). Van sus CUATRO hijos, que son todos los que tiene el padre: nada
+        // que curar y nada que se quede sin menú.
+        tipo: 'padre',
         clave: 'inventarios',
-        ruta: '/inventarios/existencias',
-        permisos: ['inventario-pt.ver'],
+        hijos: [
+          'inventario-existencias',
+          'inventario-movimientos',
+          'inventario-traspasos',
+          'inventario-kardex',
+        ],
       },
       {
         // Telas es PADRE desplegable (pedido de Daniel, 6-ago-2026): como hoja colapsada el
@@ -1460,8 +1483,28 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         // con la lupa de la topbar — `CascaronSistema`, `abrir-paleta-movil`). Hijos
         // CURADOS para no saturar: la nueva Existencias por color (principal), el catálogo, la
         // ENTRADA por factura (B1 — es la puerta diaria del inventario junto con la recepción de
-        // compra: sin riel sólo se alcanzaría por ⌘K), la salida a orden y el ajuste; el resto
-        // (traspaso, kardex, vistas por lote legadas) sigue vivo como sub-vista por ⌘K.
+        // compra: sin riel sólo se alcanzaría por ⌘K), la salida a orden, el ajuste y el TRASPASO,
+        // los cinco POR COLOR; solo las vistas por lote LEGADAS quedan fuera del riel (vivas por ⌘K).
+        //
+        // El traspaso POR COLOR entró el 12-ago-2026 y NO es opcional: lo dictó Daniel («El
+        // traspaso se hace por color. No siempre hay un lote completo para traspasar» —
+        // `DECISIONES.md §Post-F9.32`, que continúa el pedido de §Post-F9.13) y, además, el de lote
+        // ya NO opera — graba sus renglones con `id_tela_color = NULL` y la vista
+        // `existencia_tela_color` los excluye (`WHERE d."id_tela_color" IS NOT NULL`, migración
+        // 20260806130000_a2_partidas_telas), así que traspasar por lote deja «Existencias de telas»
+        // —el primer hijo de este mismo menú— sin moverse. Ofrecer solo el de lote era mandar al
+        // usuario al flujo muerto.
+        //
+        // + las TRES vistas de «materiales» (12-ago-2026), AL FINAL porque son las de lote/avíos.
+        // Sirven para telas Y avíos a la vez (su gate es `inventario-telas.* | inventario-avios.*`),
+        // pero en el catálogo cuelgan del padre «Telas» y `resolverEntradaRiel` solo admite hijos
+        // del MISMO padre: NO se pueden colgar de Avíos. Si no entraran aquí, «Avíos» quedaría
+        // destapado a medias —con Existencias y Catálogo, pero sin su kardex, traspasos ni
+        // ajustes—, que es justo el defecto que se está cerrando. Hasta hoy no tenían ENTRADA EN EL
+        // MENÚ ni enlace estable: solo ⌘K/URL o el hub `/inventarios` (`InventariosPagina`), que
+        // tampoco es entrada del riel. OJO al leer el menú: para TELAS el traspaso vigente es el de
+        // color; «Traspaso de materiales» está por los AVÍOS (su pata de tela es la legada por
+        // lote) — así lo fijó `DECISIONES.md §Post-F9.32`.
         tipo: 'padre',
         clave: 'telas',
         hijos: [
@@ -1470,13 +1513,23 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
           'inventario-telas-entradas',
           'inventario-telas-salida-orden',
           'inventario-telas-ajuste',
+          'inventario-telas-traspaso',
+          'inventario-materiales-kardex',
+          'inventario-materiales-traspasos',
+          'inventario-materiales-ajustes',
         ],
       },
       {
-        tipo: 'colapsar',
+        // Avíos es PADRE desplegable (Daniel, 12-ago-2026): como hoja colapsada solo navegaba a
+        // Existencias y el «Catálogo de avíos» se quedaba sin ENTRADA EN EL MENÚ —igual que le pasó
+        // al de telas en A2—; su único enlace era la tarjeta del hub `/catalogos`, que tampoco es
+        // entrada del riel. Van sus DOS hijos, que son todos los que tiene el padre. El
+        // kardex/traspaso/ajuste de avíos vive en las vistas de «materiales», que cuelgan del padre
+        // «Telas» (ver el comentario de arriba); no hay pantalla de "movimientos de avíos" — los
+        // movimientos de avío se capturan justamente por esos ajustes y traspasos.
+        tipo: 'padre',
         clave: 'avios',
-        ruta: '/inventarios/avios/existencias',
-        permisos: ['inventario-avios.ver'],
+        hijos: ['inventario-avios-existencias', 'catalogo-avios'],
       },
       {
         // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un

@@ -71,13 +71,14 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
 
-    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 7 padres desplegables
-    // (Desarrollo, Producción, Calidad, Telas, Compras / MRP, Clientes, Catálogos base), ni uno más.
-    // «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel, 6-ago-2026: el catálogo de
-    // telas tenía que verse en el menú) y «Compras / MRP» el 11-ago-2026 (mismo motivo: la
-    // recepción de compras no tenía ningún enlace).
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 9 padres desplegables
+    // (Desarrollo, Producción, Calidad, Inventario PT, Telas, Avíos, Compras / MRP, Clientes,
+    // Catálogos base), ni uno más. «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel,
+    // 6-ago-2026: el catálogo de telas tenía que verse en el menú), «Compras / MRP» el
+    // 11-ago-2026 (mismo motivo: la recepción de compras no tenía entrada en el menú) y
+    // «Inventario PT» + «Avíos» el 12-ago-2026 («destapa las cosas de una vez»).
     const padres = navegacion.getByRole('button');
-    expect(await padres.count()).toBe(7);
+    expect(await padres.count()).toBe(9);
     // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
     // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
     // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
@@ -91,10 +92,23 @@ test.describe('Inicio de sesión', () => {
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
-    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 5 hijos curados — la nueva
-    // Existencias por color (principal), el Catálogo de telas (el pedido de Daniel), las entradas
-    // por factura (B1), la salida a orden y el ajuste por color. El resto (traspaso/kardex/vistas
-    // por lote) va por ⌘K.
+    // «Inventario PT» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 4 hijos (todos los
+    // del catálogo). Antes era hoja plana a Existencias y Movimientos / Traspasos / Kardex PT no
+    // tenían ENTRADA EN EL MENÚ (sí enlace desde Existencias PT: las pestañas de captura y el
+    // botón «Kardex»).
+    await expect(navegacion.getByRole('link', { name: 'Movimientos PT' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Inventario PT' }).click();
+    for (const hijoPt of ['Existencias PT', 'Movimientos PT', 'Traspasos PT', 'Kardex PT']) {
+      await expect(navegacion.getByRole('link', { name: hijoPt, exact: true })).toBeVisible();
+    }
+    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 9 hijos — los seis flujos POR COLOR
+    // (Existencias principal, el Catálogo de telas —el pedido de Daniel—, las entradas por factura
+    // de B1, la salida a orden, el ajuste y el TRASPASO) y, al final, las TRES vistas de
+    // «materiales» (12-ago-2026: sirven para telas por lote Y avíos, pero cuelgan de este padre en
+    // el catálogo, así que no pueden ir bajo Avíos). El traspaso POR COLOR es el flujo vigente
+    // («El traspaso se hace por color», Daniel — `DECISIONES.md §Post-F9.32`): el de lote graba
+    // `id_tela_color = NULL` y no mueve las existencias del primer hijo, así que el menú no puede
+    // ofrecer sólo aquél.
     await expect(navegacion.getByRole('link', { name: 'Existencias de telas' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Telas' }).click();
     for (const hijoTelas of [
@@ -103,12 +117,25 @@ test.describe('Inicio de sesión', () => {
       'Entradas de tela por factura',
       'Salida de tela a orden',
       'Ajuste de telas por color',
+      'Traspaso de telas por color',
+      'Kardex de materiales',
+      'Traspaso de materiales',
+      'Ajuste de materiales',
     ]) {
       await expect(navegacion.getByRole('link', { name: hijoTelas, exact: true })).toBeVisible();
     }
-    await expect(navegacion.getByRole('link', { name: 'Traspaso de telas por color' })).toHaveCount(
-      0,
-    );
+    // Lo único de Telas que sigue FUERA del riel: las dos vistas por lote LEGADAS (ya no operan).
+    for (const legada of ['Existencias por lote (legado)', 'Salida a orden por lote (legado)']) {
+      await expect(navegacion.getByRole('link', { name: legada, exact: true })).toHaveCount(0);
+    }
+    // «Avíos» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 2 hijos. Antes era hoja
+    // plana a Existencias y el «Catálogo de avíos» no tenía ENTRADA EN EL MENÚ — su único enlace
+    // era la tarjeta del hub /catalogos, que tampoco es entrada del riel.
+    await expect(navegacion.getByRole('link', { name: 'Catálogo de avíos' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Avíos' }).click();
+    for (const hijoAvios of ['Existencias de avíos', 'Catálogo de avíos']) {
+      await expect(navegacion.getByRole('link', { name: hijoAvios, exact: true })).toBeVisible();
+    }
     // «Compras / MRP» (11-ago-2026) también arranca CERRADA: al desplegarla se ven sus 4 hijos
     // curados. Antes era hoja plana a las Órdenes de compra y la Recepción / el semáforo / la
     // explosión no tenían ENTRADA EN EL MENÚ ni enlace estable (solo ⌘K/URL; la Recepción,

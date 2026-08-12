@@ -1311,3 +1311,48 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 - **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es ETL (`loaders/esma-cargos.ts`) + documentación.
 - **Fecha:** 2026-08-11.
+
+#### (Post-F9.32) — El traspaso de telas se hace POR COLOR; el de lote solo sigue vivo por los avíos (DANIEL, 12-ago-2026)
+
+> Al destapar el menú de Inventarios, sobre cuál de los dos traspasos de tela debía ofrecer el riel:
+>
+> Daniel: *"El traspaso se hace por color. No siempre hay un lote completo para traspasar. De hecho no tengo muy claro cómo funcionan los lotes. En el sistema anterior todo era por color."*
+
+**Qué se decidió.** El traspaso de telas **vigente es el POR COLOR** (*Inventarios › Telas › Traspaso de telas por color*, la pantalla que nació en A2). Entra al **riel** como hijo del padre «Telas», junto a los demás flujos por color. El **traspaso por LOTE** (*Traspaso de materiales*) **se queda en el menú, pero por los AVÍOS**: es la única pantalla que los mueve entre almacenes. Su pata de tela queda como legado, igual que las otras dos vistas por lote (*Existencias por lote* y *Salida a orden por lote*), que siguen fuera del riel y solo se alcanzan por ⌘K/URL.
+
+**Por qué no es cosmético — la razón técnica, verificable.** El traspaso por lote graba sus renglones con **`id_tela_color = NULL`**, y la vista de existencias por color los **excluye**: `WHERE d."id_tela_color" IS NOT NULL` (`backend/prisma/migrations/20260806130000_a2_partidas_telas/migration.sql:137`). Es decir, **traspasar por lote NO mueve las existencias por color**: el usuario capturaría el movimiento y *Existencias de telas* —el primer hijo de ese mismo menú— seguiría igual, sin decirle nada. Ofrecer en la navegación primaria únicamente el traspaso por lote era mandar al usuario al flujo muerto. *(Es coherente con §Post-F9.11 punto 5: el inventario de telas arranca desde cero por color, así que ya no hay lotes históricos que mover.)*
+
+**Ya se había pedido, y esta es la misma pantalla.** En §Post-F9.13 Daniel pidió *"una pantalla de traspaso de telas entre almacenes"* para mandar tela al cortador, y la respuesta fue exactamente esta: la de A2, a la que se le corrigió el selector de almacenes y a la que apunta el botón **"Mandar tela al cortador"** del avance de producción. Lo que faltaba —y cierra esta decisión— era que **se viera en el menú** sin depender de ese botón ni de ⌘K.
+
+- **Aplica en:** `frontend/src/modulos/catalogo.ts` (`ESPEC_RIEL`, hijos del padre «Telas»). **SIN migración de BD, SIN permisos nuevos, SIN seed** — es una entrada de menú a una pantalla que ya existía, y el gate lo hereda del catálogo (`inventario-telas.mover`).
+- **Fecha:** 2026-08-12.
+
+#### (Post-F9.33) — Telas y avíos NO se separan: se separan sus PANTALLAS. Los avíos por tamaño quedan para una segunda etapa (DANIEL, 12-ago-2026)
+
+> Daniel, al ver que el menú le ofrecía pantallas que mezclaban telas y avíos:
+>
+> *"No sé si está bien la idea de que sea el mismo inventario los avíos y telas. Tengo mis dudas. Creo que para las telas hay cosas muy específicas como el cardigan (dos campos en el mismo color) que no funciona igual para avíos. Y en avíos hay cosas como llevar inventarios por tamaño o talla que no viene en telas. Sé que está muy avanzado todo para hacer un cambio tan grande, pero no sé si sea funcional tener todo en el mismo inventario. Más bien revísalo bien y hazme una propuesta."*
+>
+> Y tras la propuesta: *"Está bien dejar para una segunda etapa los avíos por tamaño."*
+
+**Qué se decidió.**
+
+1. **El inventario NO se parte.** Telas y avíos siguen compartiendo el **motor de kardex** (ADR-0010) y el **encabezado `Movimiento`**. Lo que se separa son las **pantallas**.
+2. **Avíos por tamaño/medida: SEGUNDA ETAPA.** No entra al arranque de producción.
+
+**Por qué NO se parte — los hechos que sostienen la decisión.** La preocupación de Daniel era razonable pero el diseño ya la había resuelto:
+
+- **No comparten tablas de detalle.** Hay una por tipo: `MovimientoDetTela`, `MovimientoDetAvio`, `MovimientoDetPt` (ADR-0010 §2, que rechaza explícitamente *"una tabla de detalle gorda con columnas de dimensión nullable"*). Ni una columna de tela vive NULL en un renglón de avío.
+- **El cardigan no toca a los avíos.** `cantidadComplemento`/`costoUnitComplemento` existen **solo** en `MovimientoDetTela`; `MovimientoDetAvio` tiene 7 columnas y ninguna es de complemento.
+- **Lo verdaderamente común son 51 de 5,630 líneas** del dominio de inventarios (`tipos-movimiento.ts`). El resto ya es código separado que solo *se parece*. Los permisos (`inventario-telas.*` / `inventario-avios.*`), los endpoints (`api/inventarios/avios.rutas.ts`, aislado) y las vistas de existencia (`existencia_tela_color`, `existencia_avio`) **ya estaban separados**.
+- **Las existencias tampoco se mezclan:** hay una vista por dimensión, ninguna compartida.
+
+**Lo que SÍ estaba mal, y es lo que Daniel percibió.** Las tres pantallas de *materiales* (**Ajuste**, **Traspaso** y **Kardex de materiales**) mezclan tela y avío con una pestaña, **y su pata de tela usa el flujo LEGADO por lote** — el que ya no opera (§Post-F9.32). Al mirarlas, Daniel estaba viendo el residuo de F4, no el diseño vigente: las telas ya tienen sus pantallas propias por color desde A2. **El problema era de interfaz, no de modelo de datos.**
+
+**Lo que queda pendiente (segunda etapa, sin fase asignada).**
+
+1. **Pantallas propias de avíos** — ajuste, traspaso y kardex **de avíos**, con los campos de avío y nada más; y retirar las tres mixtas, que dejan de tener razón de existir. Es lo que hace que el sistema *se sienta* separado, que es lo que Daniel pedía.
+2. **Existencia de avíos por medida/tamaño** — **HOY NO EXISTE**. El dato vive en el catálogo (`AvioMedida`, con precio por medida) y el amarre talla→medida en el BOM (`ModeloAvioTalla.idAvioMedida`), pero **el inventario, el MRP, la recepción de compra y las notas de salida son planos por avío**: `MovimientoDetAvio` no tiene columna de medida ni de talla, y `existencia_avio` agrupa solo por avío×almacén×empresa. Que el sistema sepa que la talla M lleva cierre de 18 cm pero al contarlos los sume todos juntos es una **funcionalidad faltante**, no una consecuencia de compartir motor con telas: agregarla es **aditivo sobre una tabla que ya es exclusiva de avíos** (+ su llave de lock, la suma de existencia, la vista, y propagarla por `RequerimientoOrden`, `NotaSalidaLinea` y `RecepcionCompraLinea`).
+
+- **Aplica en:** nada todavía — es una decisión de rumbo. **SIN migración, SIN permisos, SIN seed.** Los dos pendientes se planean como etapa propia después del arranque.
+- **Fecha:** 2026-08-12.
