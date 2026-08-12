@@ -8,8 +8,7 @@
 > contra el código: que existan las pantallas, que exista **el botón** que lleva al paso siguiente,
 > qué falta, qué sobra y qué no tiene sentido.
 
-**Estado de la revisión:** 6 de 7 tramos cerrados. El tramo de **compras y recepción de material**
-quedó en revisión al cierre de este documento; se agrega cuando termine.
+**Estado de la revisión:** **los 7 tramos cerrados** (compras cerró el 13-ago; su tramo está en §2.7).
 
 **Todo lo de abajo está verificado en el código.** Lo que no se pudo verificar va marcado como tal.
 
@@ -134,6 +133,37 @@ Si **sí** se usa en v1, tres prerrequisitos duros: correr el ETL de F5 (plantil
 | B23 | **Solo 2 de 6 plantillas de ruta en el seed, sin fallback por familia.** Programar con los artículos 2/6–5/6 **truena** si no corrió el ETL de F5. | `seed-ruta-critica-plantillas.ts:138-140`, `:242` |
 | B24 | **Prerrequisitos de despliegue** sin los cuales Finanzas no existe: `SEED_ON_START=true` (sin él **el riel Finanzas no aparece**), RFC de FR Moda, R2 en producción (`R2_SUBIDA_LOCAL` **rehúsa arrancar** en production). | `seed.ts:170-183` · `cfdi-comun.ts:14` |
 
+### 2.7 Compras: la cadena entera está muerta para cualquier orden nueva ⭐
+
+> **Este es el bloqueo #1 del sistema.** Y con la decisión de **arrancar sin conteo físico**
+> (§Post-F9.36) se vuelve **más grave**, no menos: si el stock ya no nace de un conteo, **la única
+> forma de que aparezca inventario es recibiéndolo** — y las dos puertas de recepción cuelgan de la
+> autorización.
+
+| # | Hallazgo | Evidencia |
+|---|---|---|
+| B25 | **Ninguna orden de compra nueva se puede autorizar.** El estatus `pendiente_autorizacion` **nada en el sistema lo escribe jamás**: `crearOC` → `borrador` (`ordenes-compra.ts:726`), `duplicarOC` → `borrador` (`:991`), `generarOCDesdeExplosion` reusa `crearOC` (`mrp.ts:858`), y el ETL solo produce `cancelada > autorizada > borrador`. Pero el frontend **solo ofrece autorizar desde ese estatus** (`OrdenesCompraPagina.tsx:629`) y la bandeja lo usa de filtro (`BandejaAutorizacionPagina.tsx:32`) → **vacía para siempre**. El backend **sí aceptaría `borrador`** (`ordenes-compra.ts:854`): falta el disparador en la UI. | grep exhaustivo: el literal solo vive en el enum, el filtro y comentarios |
+| — | **La cascada:** sin `autorizada` no se recibe por ninguna puerta (`recepciones.ts:106`, `:506`, `:1218`), y el botón "Dar entrada a la tela" se esconde diciendo *"La orden todavía no está autorizada: primero autorízala"* — **el sistema manda al usuario a un botón que no existe** (`OrdenesCompraPagina.tsx:224-227`). | |
+| — | ⚠️ **Por qué no se ve al probar:** el ETL deja las OC históricas en `autorizada`, así que sobre datos migrados la recepción **sí funciona**. El bloqueo solo aparece al crear una OC **nueva** — que es exactamente lo que se hará el día 1. El test unitario usa `pendiente_autorizacion` como fixture, por eso el CI tampoco lo ve (`OrdenesCompraPagina.test.tsx:42`). | |
+| B26 | **"Nueva nota de telas" está cableada al motor LEGADO por lote.** Llama a `/telas/salidas-orden` (por lote) en vez de `/telas/color/salidas-orden`, y su captura filtra `idLote !== null` — como el inventario vivo entra por partidas/color, **el selector sale vacío**. Encima el aviso **miente**: *"Nota de tela registrada (folio #N)"* es el folio del **movimiento de kardex**, no de una nota; **no se crea ninguna nota**. | `NotasSalidaPagina.tsx:191-199` · `api/inventario-materiales.ts:65` · `CapturaRenglonesTela.tsx:59` · `DialogoNotaTela.tsx:100` |
+| B27 | **El renglón de TELA de una nota de salida es incapturable** en el modelo vigente: el dominio exige lote (`notas-salida.ts:246`) y el selector lee un kardex que **excluye** el modelo por color (`telas.ts:751`). → **la nota de salida solo documenta avíos**; la tela que sale a la orden no queda documentada en ninguna nota. | |
+| B28 | **"Ajuste de materiales" abre por defecto en la pestaña TELAS** = motor legado por lote (`AjusteMaterialesPagina.tsx:57`), y vive en el riel junto a "Ajuste de telas por color". **Lo capturado ahí no aparece en Existencias de telas.** | |
+
+**La salida de emergencia que conviene conocer:** la **entrada de tela sin OC**
+(`/inventarios/telas/entradas/nueva`, tela suelta) **no exige orden de compra** —
+`idOrdenCompraLinea` es opcional (`entradas-tela.ts:992`). Se puede cargar tela y operar el
+inventario **saltándose la OC**. Funciona, pero deja la OC en borrador para siempre y el tablero
+"qué tengo / qué falta" mostrando todo pendiente. **Es un parche, no un flujo.**
+
+**Lo que duele en este tramo:** el Centro de Órdenes **no lleva** ni a la explosión ni al semáforo de
+materiales, y Explosión, Estatus y Recepción son pantallas **terminales** (ninguna enlaza a la
+siguiente) — con la RC apagada, el riel queda como único acceso. La recepción de **avíos precarga el
+100 % de lo pedido** ignorando lo ya recibido y **admite recibir tres veces** sin aviso ni acumulado
+visible (`RecepcionComprasPagina.tsx:110` · `recepciones.ts:517-524`). **La explosión ESCRIBE al
+mirarla** (va dentro de un `useQuery` y reescribe el snapshot en cada llamada), y por eso sus badges
+de "Nuevo / Cantidad cambiada" **se autoconsumen**. Y **"Generar OC" con nada seleccionado genera
+TODO**, sin contador ni confirmación (`mrp.ts:753`, `:825`).
+
 ---
 
 ## 3. Lo que duele (selección — el detalle por tramo abajo)
@@ -169,18 +199,22 @@ Si **sí** se usa en v1, tres prerrequisitos duros: correr el ETL de F5 (plantil
 
 En este orden. El tramo de compras, cuando cierre, se suma al punto 4.
 
-1. **Los cuatro arreglos del precosteo** — en curso: buscador de modelos, cliente visible, elegir
+1. **Los cuatro arreglos del precosteo** — en revisión: buscador de modelos, cliente visible, elegir
    avío del catálogo, botón para generar la lista. *Es lo que desbloquea a Daniel para seguir
    probando.*
-2. **Cerrar el ciclo de producción** — destapar el menú de Producción y de Calidad, meter la entrega
-   al cliente en el panel de avance, y **verificar B3 en vivo**.
-3. **Las defensas contra daño callado** — doble importación, congelar en cero, resurtido, renglón de
+2. **⭐ DESTAPAR LA CADENA DE COMPRAS (B25–B28)** — que una OC se pueda autorizar, arreglar la nota de
+   telas y el ajuste de materiales cableados al motor legado, y capturar las direcciones de entrega.
+   **Subió al primer lugar de construcción**: sin esto no entra material al inventario, y con el
+   arranque sin conteo físico **esa es la única vía**.
+3. **Cerrar el ciclo de producción** — destapar el menú de Producción y de Calidad, meter la entrega
+   al cliente en el panel de avance, una sola pantalla por acto (§Post-F9.36 punto 2), y arreglar B3.
+4. **Las defensas contra daño callado** — doble importación, congelar en cero, resurtido, renglón de
    lista atrapado. *Todo esto corrompe datos sin avisar, que es lo peor que puede pasar en producción.*
-4. **Lo que hace que los números sean tuyos** — el amarre proveedor↔insumo (sin él el precosteo usa
+5. **Lo que hace que los números sean tuyos** — el amarre proveedor↔insumo (sin él el precosteo usa
    precios genéricos) y el factor de conversión (B10).
-5. **Preparar el arranque** — permisos de los roles de RC, guard anti-lockout, respaldos automáticos,
+6. **Preparar el arranque** — permisos de los roles de RC, guard anti-lockout, respaldos automáticos,
    cabeceras de seguridad; y decidir si el conteo físico se teclea o se construye un importador.
-6. **El ensayo completo** — vaciar `prueba`, correr toda la migración cronometrada, y la prueba reina
+7. **El ensayo completo** — vaciar `prueba`, correr toda la migración cronometrada, y la prueba reina
    de punta a punta cuadrando cada número a mano con Daniel.
 
 ---
