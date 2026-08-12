@@ -1592,3 +1592,41 @@ sistema (D3: nada se borra).
 - **Aplica en:** la 7 y la 8 **no requieren construcción** (son confirmaciones del estado actual); la
   9 sí. SIN migración, SIN permisos nuevos, SIN seed.
 - **Fecha:** 2026-08-13.
+
+#### (Post-F9.38) — La salida de tela A UNA ORDEN no lleva nota; el TRASPASO entre almacenes SÍ (DANIEL, 13-ago-2026)
+
+> Preguntado si la salida de tela hacia una orden debía seguir generando un documento «nota de
+> salida» como en el sistema viejo, o bastaba el movimiento de kardex:
+>
+> Daniel: *"Está bien el movimiento de tela sin la nota de salida cuando sea para consumo de una
+> orden. Vamos a necesitar notas cuando se mueva entre almacenes (si le mando tela a un cortador, si
+> necesito una nota de salida)."*
+
+**Qué se decidió.** Son **dos actos distintos** y llevan documento distinto:
+
+| Acto | Documento |
+|---|---|
+| **Salida de tela a una orden** (consumo) | **NINGUNO.** Basta el movimiento de kardex. Cierra el hueco que el diagnóstico reportó como "el renglón de tela de la nota de salida es incapturable": **no hay que arreglarlo, hay que retirarlo.** |
+| **Traspaso de tela entre almacenes** (p. ej. mandarla a un cortador) | **SÍ lleva nota**, porque la tela **sale físicamente** y el papel va con ella. |
+
+**Estado hoy (verificado 13-ago-2026):** el traspaso **no genera ningún documento**. El único impreso
+del inventario de telas es el listado de existencias (`dominio/inventarios/impresos/impreso-inventario-telas.ts`);
+no hay impreso de traspaso en `api/inventarios/telas.rutas.ts`. **Falta construirlo.**
+
+**Contexto que lo hace natural:** el cortador ya está modelado como un **almacén**
+(`Almacen.idCortador`), y §Post-F9.13 dejó el botón *"Mandar tela al cortador"* apuntando al
+traspaso por color. Lo que falta es el papel.
+
+**Recomendación de diseño del lead (sujeta a confirmación de Daniel):** **no** crear un registro
+`NotaSalida` paralelo. El traspaso **ya tiene folio propio y sus renglones**; lo que necesita es su
+**impreso** — con folio, fecha, almacén origen y destino, el tercero (cortador) y el detalle por
+color con ambos componentes. Y **reimprimible desde el historial**, no solo en el momento de
+guardar: el diagnóstico encontró que en producción los PDF solo se ofrecen para el movimiento recién
+guardado, y no se debe repetir ese defecto. Razón de la recomendación: una `NotaSalida` paralela
+sería una **segunda fuente de verdad** del mismo hecho físico, y el saldo ya se deriva del kardex
+(D3).
+
+- **Aplica en:** construir el impreso del traspaso de tela por color + su reimpresión. Retirar el
+  renglón de tela de la nota de salida (queda solo para avíos). **SIN migración, SIN permisos nuevos,
+  SIN seed.** Va en **V1-E3** (donde ya se agrupa el trabajo de impresión y reimpresión).
+- **Fecha:** 2026-08-13.

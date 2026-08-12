@@ -79,11 +79,16 @@ existencias — sin tocar la base de datos a mano.
    `/produccion/{corte,envios,recibos}`.
 4. **Reimpresión**: los PDF hoy solo se ofrecen para el movimiento recién guardado. Si se cierra la
    pantalla, la hoja de envío del bulto ya no se recupera.
-5. **El PT etiquetado por orden se puede mover** (movimientos manuales y traspasos validan contra el
+5. **La nota del TRASPASO de tela** (§Post-F9.38): mandar tela a un cortador **saca la tela
+   físicamente** y el papel va con ella — hoy el traspaso **no genera ningún documento**. Impreso con
+   folio, origen, destino, tercero y detalle por color, **reimprimible desde el historial**. Y
+   **retirar el renglón de tela de la nota de salida**: la salida a una orden **no lleva nota**
+   (basta el kardex), así que ese renglón no hay que arreglarlo — hay que quitarlo.
+6. **El PT etiquetado por orden se puede mover** (movimientos manuales y traspasos validan contra el
    bucket «sin orden» mientras el recibo etiqueta con la orden: **son dos saldos que no se hablan**;
    la pantalla muestra existencia que el sistema rechaza mover). ⚠️ **Confirmado leyendo el código,
    no ejecutado** — verificar en vivo antes de tocar.
-6. **`noProducir` visible y editable** (§Post-F9.36 punto 3).
+7. **`noProducir` visible y editable** (§Post-F9.36 punto 3).
 
 **Qué NO entra:** la RC (apagada en v1), la programación de órdenes a maquileros, el estado final de
 la orden ("Cortada" para siempre) salvo que salga barato al tocar lo demás.
@@ -187,8 +192,12 @@ con sus dos roles → capturar direcciones de entrega, RFC y las telas con las q
 - **Remisión / packing list** — el comprobante de entrega actual basta (§Post-F9.36 punto 6).
 - **Timbrado (R14)** — la factura se sigue haciendo en SINUBE.
 
-## Pregunta abierta
+## Preguntas abiertas
 
-**¿La salida de tela a una orden debe generar un documento «nota de salida»** como en el sistema
-viejo, o basta el movimiento de kardex? Hoy la nota solo puede documentar avíos. La respuesta decide
-si V1-E2 o una etapa posterior tiene que rehacer ese renglón contra el modelo por color.
+**Ninguna de producto.** La última —si la salida de tela debía generar «nota de salida»— la cerró
+Daniel el 13-ago (§Post-F9.38): **la salida a una orden no lleva nota**, el **traspaso entre
+almacenes sí**. Ambas cosas entran en V1-E3.
+
+Queda **una de diseño**, para confirmar al construir: que la nota del traspaso sea el **impreso del
+propio traspaso** (que ya tiene folio y renglones) y **no** un registro `NotaSalida` paralelo, que
+sería una segunda fuente de verdad del mismo hecho físico.
