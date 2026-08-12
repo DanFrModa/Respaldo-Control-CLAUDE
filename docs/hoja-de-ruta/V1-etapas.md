@@ -192,6 +192,60 @@ anotado en el código con el arreglo correcto.
 
 ---
 
+## V1-E3c · El editor de la receta del modelo (PROPUESTA — 13-ago-2026)
+
+Salió de Daniel usando el editor de BOM en `prueba`. Seis observaciones suyas, **todas verificadas
+contra el código**. Se agrupan porque tocan los mismos archivos (`EditorBom.tsx`,
+`EditorMedidasAvio.tsx`, el contrato del modelo y el BOM del dominio).
+
+**Sube de prioridad:** sin poder capturar el consumo por talla ni el proveedor amarrado, **el
+precosteo no da los números reales** — cae siempre al fallback.
+
+1. **⭐ El consumo por talla está roto EN CÍRCULO.** `EditorMedidasAvio` solo sabe **editar renglones
+   que ya existen** y **nada en el sistema los crea**: no hay botón de agregar, ni selector de talla,
+   ni deriva la curva del modelo. Nunca habrá filas, porque la única forma de crearlas es un PUT que
+   la UI no puede componer. **Y el mensaje MIENTE**: dice *"El modelo no tiene curva de tallas"* pero
+   el código **nunca mira la curva** (`medidas-avio-talla.ts:105-130` hace un solo `findMany` sobre
+   `ModeloAvioTalla`). Sale igual con curva capturada. Agravante: la ficha del modelo **ni siquiera
+   proyecta las tallas de la curva** (`modelos.ts:58,91` trae solo `curvaTalla.nombre`), así que hoy
+   el frontend tampoco tiene con qué armar la lista.
+2. **Tres columnas de AMARRE DE PRECIO sin escritor.** `ModeloAvio.idAvioProveedor`,
+   `ModeloTela.idTelaProveedor` y `ModeloAvioTalla.idAvioMedida`: las **leen** el pre-costo (F7), el
+   precosteo (F8), la cascada de resolución de precios y el MRP — y **nada las escribe** (no están en
+   el contrato de captura ni en `sincronizarAvios`/`copiarBom`; los únicos que las asignan son tests
+   de integración, con Prisma directo). **Toda la cascada de "precio amarrado" de D13/R17 está inerte
+   en producción.** Es la promesa central del módulo de Desarrollo.
+3. **La receta no muestra proveedor ni precio** del componente: la etiqueta es solo
+   `clave — descripción` (`EditorBom.tsx:86,202,387-390`). Por eso Daniel "no lo ve": no está.
+4. **Los selectores del BOM son `<select>` nativos con tope de 100.** El catálogo tiene **~877
+   telas**: **777 son inalcanzables** desde ahí. Y el "buscar tecleando" de un `<select>` es el
+   typeahead del navegador, que solo hace match **por prefijo** — de ahí *"solo encuentra por orden
+   alfabético"*. ⚠️ **El backend YA busca bien**: `contains` insensitive sobre nombre, proveedor,
+   color y pantone (`telas.ts:1575-1582`). El defecto es de pantalla, y son **4 sitios** con la misma
+   forma: BOM, encabezado de orden, notas de salida y órdenes de compra. **El patrón correcto ya
+   existe y está en producción**: `SelectorTela` (debounce + `busqueda` server-side + `ComboboxBuscable`).
+5. **Quitar las tres banderas** `paraPreCosto`/`paraProduccion`/`paraCosto` (Daniel: *"esto está
+   obsoleto… yo creo que lo quitaría"*). Las leen **9 sitios**: MRP, habilitación, "orden completa",
+   impreso de la orden, el `_count` del listado, el costo teórico y el costo real —cuya
+   **arquitectura de reconciliación existe PORQUE las dos recetas pueden diferir**—.
+   ⚠️ **TRAMPA:** el ETL **no heredó el default `true`**: `parsearBandera` devuelve **`false`** con
+   celda vacía. Si solo se quitan las casillas de la UI, al guardar cualquier receta esos renglones
+   migrados **se encenderían solos, en silencio** (`bom-modelo.ts:378-389`, `:437-448` actualizan las
+   tres en cada update). **PRERREQUISITO: contar en `prueba`** —`GROUP BY para_pre_costo,
+   para_produccion, para_costo` sobre `modelo_tela` y `modelo_avio`— antes de decidir. Se puede por
+   etapas (UI → backend → `DROP COLUMN`); el precedente del repo para campo legado es **conservar la
+   columna** con su default server-side.
+6. **La lista es demasiado alta.** Cada renglón son ~110-150 px (tarjeta con borde + dos filas); **8
+   avíos ≈ 1,150 px**. El `<fieldset>` de las tres casillas son **35 líneas de JSX** y el ~60 % del
+   bulto: sin él, el renglón cabe en **una línea de ~44 px** y los 8 avíos bajan a ~400 px. El patrón
+   a copiar ya está en el repo: `TablaDensa` (30+ pantallas) y la fila-compacta-con-panel-expandible
+   de `AviosPagina`.
+
+**Criterio de cierre:** capturar un avío por talla con su consumo, amarrarle proveedor y precio, y
+que el precosto salga con **esos** números y no con el fallback.
+
+---
+
 ## V1-E4 · Las defensas contra el daño callado
 
 Lo peor que puede pasar en producción no es que algo truene: es que corrompa datos sin avisar.
