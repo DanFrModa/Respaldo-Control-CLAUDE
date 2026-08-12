@@ -2400,3 +2400,78 @@ confirmar que los roles que reciben material sí lo traigan.
   `colapsar` a `padre`) · `src/modulos/catalogo.test.ts` (estructura del riel + prueba de regresión
   dedicada) · `e2e/login.spec.ts` (7 padres y el despliegue de Compras).
 - **Backend:** ninguno.
+
+## Inventario PT y Avíos, destapados — y el traspaso de telas correcto en el menú (12-ago-2026)
+
+Daniel, al ver el arreglo del menú de Compras: *"destapa las cosas de una vez, para no dejar
+pendientes"*. Era el **tercer** reporte del mismo defecto (Telas el 6-ago, Compras el 11-ago), así
+que esta vez se cerró el grupo **Inventarios** completo: sus **cuatro** entradas son ahora
+desplegables y ya no queda ninguna hoja plana escondiendo pantallas.
+
+**Inventario PT** se despliega con sus cuatro pantallas —**Existencias PT** (la principal),
+**Movimientos PT**, **Traspasos PT** y **Kardex PT**—. Antes era una hoja plana a Existencias: las
+otras tres no tenían **entrada en el menú**, aunque sí se alcanzaban desde la propia pantalla de
+Existencias (las pestañas de captura y el botón *Kardex*).
+
+**Avíos** se despliega con **Existencias de avíos** y **Catálogo de avíos**. Ese catálogo no tenía
+ninguna entrada de menú: su único enlace era una tarjeta del hub `/catalogos`, que tampoco aparece
+en el riel. Es exactamente lo que había pasado con el catálogo de telas en agosto.
+
+**Telas** suma cuatro hijos y queda con nueve. Tres son las vistas de **materiales** —*Kardex de
+materiales*, *Traspaso de materiales* y *Ajuste de materiales*—, que sirven para telas **y avíos a
+la vez**; se cuelgan de Telas porque así están en el catálogo de pantallas, y sin ellas *Avíos*
+habría quedado destapado a medias: con sus existencias y su catálogo, pero sin kardex, traspasos ni
+ajustes.
+
+### Por qué el traspaso **por color** y no el de lote
+
+El cuarto hijo nuevo de Telas es **Traspaso de telas por color**, y no es un detalle de acomodo.
+Daniel: *"El traspaso se hace por color. No siempre hay un lote completo para traspasar. De hecho no
+tengo muy claro cómo funcionan los lotes. En el sistema anterior todo era por color."*
+
+Hay además una razón técnica que lo vuelve obligatorio: el traspaso **por lote** graba sus renglones
+sin color, y la vista de existencias por color **los ignora**. O sea que traspasar por lote **no
+mueve** las existencias que se ven en *Existencias de telas* — el primer hijo de ese mismo menú. Si
+el riel hubiera ofrecido solo el de lote, habría mandado al usuario a un flujo que parece funcionar
+y no mueve nada. Queda registrado en `DECISIONES.md §Post-F9.32`, junto con el pedido previo de
+Daniel de mandar tela al cortador (§Post-F9.13), que se resuelve con esta misma pantalla.
+
+*Traspaso de materiales* **se queda** en el menú, pero por los **avíos**: es la única pantalla que
+los mueve entre almacenes. Su parte de telas es la legada.
+
+### Lo que queda fuera del riel, a propósito
+
+Las dos vistas de telas **por lote** que ya no operan (*Existencias por lote* y *Salida a orden por
+lote*) y, en Compras, *Autorización de compras* y *Compras por orden*. Todas siguen vivas por ⌘K y
+por su URL; ninguna pantalla se perdió.
+
+### Una pregunta abierta para Daniel
+
+Los **hubs** `/catalogos` e `/inventarios` —esas portadas con mosaico de tarjetas— siguen **sin
+entrada en el menú**: **solo se llega a ellas escribiendo la URL** — ni siquiera por ⌘K, porque la
+paleta solo lista hojas e hijos de un desplegable, y esos dos hubs no son ninguna de las dos cosas.
+O sea que hoy, para un usuario normal, son inalcanzables. Ahora que los catálogos de telas y
+avíos ya se ven directo en el riel, el hub de Catálogos pierde parte de su razón de ser. ¿Se les
+pone entrada, se dejan como atajo, o se retiran?
+
+### Nota de despliegue (para Gabriel)
+
+**Solo pantallas.** Sin migración, **cero permisos nuevos**, sin cambios de seed → **no** hace falta
+`SEED_ON_START`. Nada que correr a mano. Todas las entradas nuevas heredan el permiso que ya tenía
+su pantalla, así que a nadie se le abre ni se le cierra ningún acceso: lo único que cambia es que
+ahora se ven en el menú.
+
+Para verificar en `prueba`: el grupo *Inventarios* debe mostrar cuatro flechitas (Inventario PT,
+Telas, Avíos, Compras / MRP) y ninguna entrada que navegue directo. Al abrir *Telas* deben salir sus
+nueve hijos, con **Traspaso de telas por color** entre ellos.
+
+### Archivos principales
+
+- **Frontend:** `src/modulos/catalogo.ts` (`ESPEC_RIEL`, grupo `inventarios`: `inventarios` y
+  `avios` pasan de `colapsar` a `padre`; `telas` suma el traspaso por color y las 3 vistas de
+  materiales) · `src/modulos/catalogo.test.ts` (estructura del riel + prueba de regresión dedicada)
+  · `e2e/login.spec.ts` (9 padres y el despliegue de PT, Telas y Avíos).
+- **Backend:** ninguno.
+- **Documentación:** `Documentacion_MJD/DECISIONES.md` §Post-F9.32 (el traspaso por color) ·
+  `HOJA-DE-RUTA.md` §4 (deuda anotada: los 10 catálogos de uso general se ven en el menú aunque el
+  backend los gatee — se resuelve parejo o no se resuelve, y la decisión es de Daniel).
