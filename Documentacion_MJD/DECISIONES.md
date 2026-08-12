@@ -1399,7 +1399,13 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. Para entonces ese código ya anda en correos, cotizaciones y en la lista de precios del cliente, y renumerarlo rompería la trazabilidad de la negociación. La **fecha real de entrega** vive en su campo y esa sí se actualiza: el año del código es el que se pretendía al nacer, no una promesa de cuándo se entrega.
 
-**Decisión de diseño del lead, sujeta a corrección de Daniel** (dicha en el chat, sin respuesta en contra al cierre de esta entrada): **el consecutivo corre por cliente + año**, sin importar el tipo de prenda (el `001` es el primer desarrollo de ese cliente para ese año, sea jogger o sudadera).
+**El consecutivo corre por cliente + año + tipo de prenda — CONFIRMADO POR DANIEL.**
+
+> Preguntado si el consecutivo corría por cliente y año sin importar el tipo de prenda, Daniel: *"También por tipo de prenda."*
+
+O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIENTE-AÑO-CONCEPTO+GÉNERO` lleva su propia serie, que reinicia cada año. `CYA-26-71-001` es el primer jogger de caballero desarrollado para C&A con entrega en 2026; el primer jogger de dama de ese mismo cliente y año es `CYA-26-72-001`, no el `002`.
+
+*(Lectura del lead sobre un punto que Daniel no detalló: «tipo de prenda» se toma como **los dos dígitos juntos** —concepto Y género—, porque son un solo segmento del código; si el contador debiera correr solo por el concepto, los números saldrían con huecos entre géneros. Confirmar al construir.)*
 
 **Qué se decidió construir.**
 
