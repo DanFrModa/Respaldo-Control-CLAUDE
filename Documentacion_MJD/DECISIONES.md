@@ -1459,7 +1459,20 @@ Y el remate: **los artes están nombrados con el número del modelo** (los más 
 
 **⚠️ INVARIANTE QUE NO SE PUEDE ROMPER: el precio del arte viaja hasta la OP.** Ya funciona hoy y el refactor debe preservarlo: `dominio/costos/costo-orden.ts` calcula `procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ bordados`, tomando `ModeloBordado.precio` y cayendo al `Bordado.precio` del catálogo si el renglón viene vacío. El arte entra **UNA vez por modelo, SIN multiplicar por cantidad** (así está testeado en `costo-orden.test.ts`).
 
-Al mover el arte al modelo **esto se simplifica**: desaparece el precio del catálogo y queda **un solo precio —el del arte en ese modelo—**, que es el que viaja a la OP. Se acaba la ambigüedad de cuál de los dos precios aplicó. El cálculo debe seguir dando **exactamente lo mismo** para los datos existentes.
+Al mover el arte al modelo **esto se simplifica**: desaparece el precio del catálogo y queda **un solo precio del modelo**. El cálculo debe seguir dando **exactamente lo mismo** para los datos existentes.
+
+**⚠️ HUECO QUE ESTA ETAPA DEBE CERRAR: el precio del modelo es de REFERENCIA; el REAL se define en la OP.**
+
+> Daniel: *"Al final el precio que viaja a la OP es un precio de referencia. El precio real se define en la OP (en ocasiones puede moverse para arriba o para abajo por alguna variable en producción)."*
+
+**Hoy NO se puede** (verificado en `schema.prisma`, modelo `Orden`): la orden tiene `maquilaOrd` y `aplicacionOrd` —overrides a nivel orden para la maquila y la aplicación— pero **no existe ningún override para el precio del arte**. `costo-orden.ts` lo toma fijo del modelo (`ModeloBordado.precio ?? Bordado.precio`), sin manera de ajustarlo en la OP. Es un hueco, no una decisión: el mismo sistema ya reconoce que maquila y aplicación se mueven en producción, y el arte se mueve igual.
+
+**Qué hay que construir:**
+
+1. **Precio de arte POR ORDEN**, con el mismo patrón que ya existe: `precioEnLaOrden ?? precioDelModelo`. Como un modelo puede llevar **varios** artes, el override es **por arte y por orden** (no un campo suelto en `Orden`, que solo serviría si hubiera uno).
+2. **El precio del modelo se rotula como REFERENCIA** en la interfaz, y el de la OP como el que manda. Quien mire la OP tiene que ver cuál se aplicó y, si se movió, que se movió.
+3. **El costo real de la orden usa el de la OP.** Y como el arte ahora lleva **proveedor**, ese precio es además lo que se le paga: la liga con la cuenta corriente del proveedor debe leer el mismo número, no el de referencia.
+4. **Cambiar el precio en la OP NO toca el modelo.** El de referencia se queda como está para las siguientes órdenes; mover uno no debe reescribir el otro en ninguna dirección.
 
 **Alcance del cambio (no es un cambio de menú).** Toca: el esquema (`Bordado` → arte hijo de `Modelo`; `PrecostoLinea.idBordado`), el costeo (`costo-orden.ts`), el precosteo de F8, la galería, las pantallas de modelo y el ETL. **Requiere migración.** Es una **etapa propia**.
 
