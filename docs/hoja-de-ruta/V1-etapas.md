@@ -104,6 +104,11 @@ estorba, se agrega después una marca de "en captura".
 
 ## V1-E3 · Cerrar el ciclo de producción
 
+> **Partida en dos** (13-ago-2026): **E3a** el menú y las pantallas (✅ hecha), **E3b** los papeles y
+> el arreglo del inventario de PT (pendiente). El corte se hizo porque la etapa juntaba demasiado y
+> el árbol de trabajo solo admite un coder a la vez (`CLAUDE.md` §7.4).
+
+
 **Qué entrega**
 
 1. **Destapar el menú de Producción** (15 de 17 pantallas están fuera del riel) y **el hub de
@@ -131,6 +136,59 @@ la orden ("Cortada" para siempre) salvo que salga barato al tocar lo demás.
 
 **Criterio de cierre:** cortar, enviar a maquila, recibir con segundas, imprimir el papel del bulto y
 entregar al cliente — todo desde el menú, sin escribir una URL.
+
+### E3a — ✅ HECHA (13-ago-2026): el menú y las pantallas
+
+Entregó los puntos 1, 2, 3, 4 y 7. **El punto 6 —el PT que no se puede mover— NO entró**: va en E3b (§Post-F9.40). El menú de Producción pasó de 2 a **6 hijos** (Centro de
+Órdenes, Entrega a cliente, Tablero WIP, En poder del maquilero, **Consulta de órdenes** y Notas de
+salida); `/produccion` dejó de pintar *"Próximamente"* y ahora es un **hub** que indexa las **14
+sub-vistas** del módulo —las 6 del riel más las 7 que quedaron fuera, y «Tipos de proceso», que
+cuelga de Catálogos—; *(«Documental» no aparece ahí: su ruta es `/documental`, así que vive solo en
+⌘K)*; **Calidad pasó a hoja colapsada** y sus 4 catálogos huérfanos dejaron de
+ser inalcanzables; la **entrega a cliente es la 6ª etapa del stepper** y el KPI «Por entregar» del WIP
+lleva a entregar esa orden; se retiraron `/produccion/{corte,envios,recibos}` (con **redirección**,
+no borradas, por los marcadores y los deep-links de RC).
+
+**Lo que se migró ANTES de retirar** — sin esto se perdía funcionalidad: capturar **segundas**,
+**los 4 impresos**, y —esto no estaba en el encargo, lo encontró el coder— el **precio pactado** y la
+**fecha compromiso**. Sin el precio, el cargo EsMa nace vacío.
+
+**Lo que la revisión encontró y no se habría visto probando a mano:**
+- **Las decisiones (f) y (g) quedaron invertidas en la percepción**: el **sobre-corte, que SÍ se
+  permite**, se pintaba en rojo como error; el **sobre-envío, que NO se permite**, no se frenaba y el
+  usuario se comía un 400 con toda la matriz tecleada.
+- Y una rama peor: **se podía enviar a maquila una orden con CERO cortado**. El panel derivaba bien la
+  referencia y luego la **tiraba** cuando daba cero, creyendo que "sin base no hay contra qué
+  comparar". Sí la había: cero cortado significa que no se puede enviar nada.
+- **Un envío cancelado seguía imprimible** desde la barra del recién guardado — rompiendo la regla que
+  el propio código declara (*"su papel no debe volver a salir con un bulto"*).
+- **El comprobante de entrega** se ofrecía a quien el backend le devuelve 403.
+- **El tablero WIP se quedó sin ninguna puerta para capturar** producción, con un comentario que
+  afirmaba lo contrario.
+
+**Decisiones del lead en esta etapa:** §Post-F9.41 (el precio pactado **se teclea sin permiso
+especial**; solo su lectura se redacta) y §Post-F9.42 («Consulta de órdenes» entra al riel porque
+**imprimir en lote es capacidad propia**, no una consulta duplicada).
+
+**Deuda anotada, no arreglada:** `procesoCostura` toma **el primero** de los procesos con
+`generaEntradaPt`, y al retirar las pantallas se perdió el escape de elegirlo a mano. Hoy no muerde
+(el seed trae exactamente uno), pero hay que resolverlo **antes** de dar de alta un segundo. Está
+anotado en el código con el arreglo correcto.
+
+**Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
+`SEED_ON_START`.
+
+### E3b — pendiente: los papeles y el inventario de PT
+
+1. **El impreso del traspaso de tela** (§Post-F9.38): mandar tela a un cortador la saca físicamente y
+   el papel va con ella. **Un solo folio, el del traspaso** — sin registro paralelo ni secuencia nueva
+   (Daniel: *"no debe de generar otro folio de nada"*). Reimprimible desde el historial.
+2. **Retirar el renglón de tela de la nota de salida**: la salida a una orden **no lleva nota**, así
+   que ese renglón —hoy incapturable— no hay que arreglarlo, hay que **quitarlo**. La nota queda solo
+   para avíos.
+3. **El PT etiquetado por orden se puede mover** (§Post-F9.40): al mover a mano **se elige de qué
+   orden** salen las piezas, entre las que tienen existencia real de ese artículo en ese almacén.
+   ⚠️ Confirmado leyendo el código, **no ejecutado** — verificar en vivo antes de tocar.
 
 ---
 

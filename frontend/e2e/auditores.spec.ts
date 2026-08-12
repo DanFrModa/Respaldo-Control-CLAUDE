@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD del catálogo de Auditores (rediseño R9) contra el stack real, en la estructura
@@ -17,14 +17,20 @@ test.describe('CRUD de Auditores (Calidad, R9)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Operación · Calidad -> Auditores (descubrible por clic, no solo por URL).
-    await abrirDesplegableMenu(page, 'Calidad');
+    // Navega Operación · Calidad -> (portada-hub) -> Auditores, descubrible por CLIC y no solo por
+    // URL. Desde V1-E3a «Calidad» es una HOJA del riel que navega a su portada: como desplegable,
+    // `PadreNav` NO navegaba (era un `<button>` que solo expandía) y de sus 7 pantallas el riel solo
+    // ofrecía dos — las otras cinco eran inalcanzables desde toda la app. Este camino es justo el
+    // que se destapó.
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Auditores', exact: true })
+      .getByRole('link', { name: 'Calidad', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'Auditores' })).toBeVisible();
+    // La portada lista sus 7 tarjetas; la de Auditores es la que antes no tenía camino.
+    await expect(page.getByTestId('calidad-auditores')).toBeVisible();
+    await page.getByTestId('calidad-auditores').click();
+    await expect(page.getByRole('heading', { name: 'Auditores', exact: true })).toBeVisible();
 
     // ── Crear ─────────────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-auditor').click();

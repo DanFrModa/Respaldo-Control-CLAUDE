@@ -1,4 +1,4 @@
-import { Layers, Plus, Search } from 'lucide-react';
+import { Layers, Search, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -66,7 +66,7 @@ function fmt(n: number): string {
 export function TableroWipPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
-  const puedeCortar = tienePermiso('produccion.corte');
+  const puedeEntregar = tienePermiso('produccion.entrega');
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
@@ -157,14 +157,20 @@ export function TableroWipPagina(): React.JSX.Element {
             Trabajo en proceso por etapa · tiempo real (derivado de los movimientos)
           </p>
         </div>
-        {puedeCortar ? (
+        {/* El tablero muestra el KPI «Por entregar» y su único botón llevaba a CORTAR —el primer
+            paso, no el que el tablero está señalando— y a una pantalla que además se retiró en
+            V1-E3a. Ahora lleva a ENTREGAR, que es la acción que cierra el ciclo y la que el KPI
+            está pidiendo. El corte, el envío y el recibo se capturan en el PANEL DE AVANCE de cada
+            orden: se abre con el botón «Registrar avance» del detalle de la fila, que lleva al
+            Centro de Órdenes con esa orden y el panel ya abierto (`state.abrirAvance`). */}
+        {puedeEntregar ? (
           <Button
             size="sm"
-            onClick={() => void navigate('/produccion/corte')}
-            data-testid="wip-ir-corte"
+            onClick={() => void navigate('/produccion/entregas')}
+            data-testid="wip-ir-entregas"
           >
-            <Plus aria-hidden />
-            Registrar corte
+            <Truck aria-hidden />
+            Entregar a cliente
           </Button>
         ) : null}
       </header>
@@ -423,6 +429,15 @@ function DrillDownOrden({
 }): React.JSX.Element {
   const consulta = useWipOrden(idOrden);
   const detalle = consulta.data;
+  const navigate = useNavigate();
+  const { tienePermiso } = useSesion();
+  const puedeEntregar = tienePermiso('produccion.entrega');
+  // El panel de avance captura corte, envío y recibo: basta poder capturar UNO para que el atajo
+  // sirva (el propio panel esconde después lo que la sesión no puede, A4; el servidor decide, A1).
+  const puedeCapturarAvance =
+    tienePermiso('produccion.corte') ||
+    tienePermiso('produccion.envio') ||
+    tienePermiso('produccion.recibo');
 
   return (
     <Dialog open={idOrden !== undefined} onOpenChange={(abierto) => (!abierto ? alCerrar() : null)}>
@@ -445,7 +460,46 @@ function DrillDownOrden({
         ) : consulta.isPending || detalle === undefined ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : (
-          <DetalleAvance detalle={detalle} />
+          <>
+            <DetalleAvance detalle={detalle} />
+            {/* Las DOS puertas del drill-down a la ACCIÓN, con la orden ya puesta (V1-E3a): era
+                terminal y no llevaba a ningún lado.
+                 • «Registrar avance» → Centro de Órdenes con ESA orden y el panel de avance ABIERTO
+                   (`state.abrirAvance`, el mismo mecanismo que usa la bandeja de la Ruta Crítica):
+                   es donde se capturan el corte, el envío y el recibo desde que se retiraron las
+                   tres pantallas sueltas. Sin esto, el tablero mostraba "por cortar 500" y no había
+                   UN clic para capturar ese corte (había que ir al riel y teclear el folio).
+                 • «Entregar…» → la entrega a cliente, que es lo que pide el KPI «Por entregar». */}
+            <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+              {puedeCapturarAvance ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void navigate('/produccion/ordenes', {
+                      state: { idOrden: detalle.idOrden, abrirAvance: true },
+                    })
+                  }
+                  data-testid="wip-drill-avance"
+                >
+                  <Layers className="size-4" aria-hidden />
+                  Registrar avance (corte / maquila / recibo)
+                </Button>
+              ) : null}
+              {puedeEntregar && detalle.porEntregar > 0 ? (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    void navigate('/produccion/entregas', { state: { idOrden: detalle.idOrden } })
+                  }
+                  data-testid="wip-drill-entregar"
+                >
+                  <Truck aria-hidden />
+                  Entregar {detalle.porEntregar.toLocaleString('es-MX')} pza(s) al cliente
+                </Button>
+              ) : null}
+            </div>
+          </>
         )}
       </DialogContent>
     </Dialog>

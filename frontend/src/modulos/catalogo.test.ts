@@ -58,13 +58,15 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 108 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
-    // (108 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
+    // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
-    // el archivo histórico de órdenes; +1 en §Post-F9.28: el directorio histórico de terceros).
-    // Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(108);
+    // el archivo histórico de órdenes; +1 en §Post-F9.28: el directorio histórico de terceros;
+    // −3 en V1-E3a: se RETIRARON «Captura de corte», «Envío a maquila» y «Recibo de maquila», las
+    // tres pantallas del mismo acto que ya vive en el panel de avance — una sola pantalla por acto,
+    // §Post-F9.36 punto 2). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(105);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -188,12 +190,13 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     expect(inventarios).toHaveLength(15);
   });
 
-  it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
+  it('busca por clave: hojas, padres (ruta legada /compras) e inexistentes', () => {
     expect(buscarModuloPorClave('rc-procesos-responsables')?.titulo).toBe(
       'Procesos y responsables',
     );
-    // Los padres se encuentran porque /produccion y /compras siguen cayendo en la página
-    // comodín (no tienen pantalla propia) y esta debe poder presentarlos.
+    // Los padres se encuentran porque /compras sigue cayendo en la página comodín (no tiene
+    // pantalla propia) y esta debe poder presentarlo. (`/produccion` ya tiene portada-hub desde
+    // V1-E3a, pero su padre debe seguir siendo localizable por clave.)
     const produccion = buscarModuloPorClave('produccion');
     expect(produccion?.titulo).toBe('Producción');
     expect(produccion?.hijos).toBeDefined();
@@ -235,9 +238,34 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       entradas: [
         { clave: 'g-desarrollo', padre: true, hijos: ['modelos', 'desarrollo', 'listas-precios'] },
         { clave: 'pedidos', padre: false },
-        { clave: 'produccion', padre: true, hijos: ['ordenes', 'notas-salida'] },
+        {
+          // V1-E3a (13-ago-2026): Producción DESTAPADA. Tenía 2 hijos de 17 y el resto no tenía
+          // ENTRADA EN EL MENÚ — lo mismo que ya se destapó en Compras/Inventario PT/Telas/Avíos.
+          // Hijos curados: el Centro de Órdenes (desde su panel de avance se capturan corte, envío
+          // y recibo), la ENTREGA A CLIENTE (que antes no la enlazaba NADA), los dos tableros de la
+          // operación diaria, la consulta de órdenes (por su impresión EN LOTE, ver abajo) y las
+          // notas de salida. Las consultas restantes —archivo histórico, corte/recibos semanales,
+          // incompletas, pedidos por mes y las dos de notas— siguen en ⌘K y en la portada-hub
+          // `/produccion`.
+          clave: 'produccion',
+          padre: true,
+          hijos: [
+            'ordenes',
+            'entregas',
+            'wip',
+            'existencias-maquilero',
+            // +«Consulta de órdenes» (decisión del lead, V1-E3a): NO es una consulta duplicada —
+            // es la única pantalla que IMPRIME ÓRDENES EN LOTE (el Centro imprime de a una), así
+            // que esa capacidad no puede vivir solo en ⌘K.
+            'consulta-ordenes',
+            'notas-salida',
+          ],
+        },
         { clave: 'ruta-critica', padre: false },
-        { clave: 'calidad', padre: true, hijos: ['calidad-consulta-auditorias', 'auditores'] },
+        // V1-E3a: Calidad pasó de PADRE (con 2 de sus 7 hijos) a HOJA COLAPSADA a su hub. Como
+        // padre, `PadreNav` no navega → defectos, tipos de producto, planes AQL y auditorías por
+        // maquilero eran INALCANZABLES desde toda la app y `/calidad` no la enlazaba nadie.
+        { clave: 'calidad', padre: false },
       ],
     },
     {
@@ -379,12 +407,13 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     });
   });
 
-  it('el riel tiene 9 padres y marca SOLO la Ruta Crítica como destacada', () => {
+  it('el riel tiene 8 padres y marca SOLO la Ruta Crítica como destacada', () => {
     const padres = RIEL_GRUPOS.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres.map((p) => p.clave)).toEqual([
       'g-desarrollo',
       'produccion',
-      'calidad',
+      // 'calidad' ya NO es padre: en V1-E3a pasó a hoja colapsada a su hub (`PadreNav` no navega y
+      // sus 5 hijos restantes eran inalcanzables desde toda la app).
       'inventarios', // 12-ago-2026: desplegable (Movimientos/Traspasos/Kardex PT sin entrada de menú)
       'telas', // A2: desplegable (el catálogo de telas tenía que verse en el menú)
       'avios', // 12-ago-2026: desplegable (el catálogo de avíos tampoco tenía entrada de menú)
@@ -487,6 +516,65 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     }
   });
 
+  it('«Producción» destapa la captura diaria y la ENTREGA A CLIENTE (V1-E3a)', () => {
+    // Regresión del hallazgo B5/B1 del diagnóstico del 13-ago-2026: el padre «Producción» mostraba
+    // 2 de sus 17 sub-vistas y las otras 15 no tenían ENTRADA EN EL MENÚ. La peor consecuencia era
+    // B1: la ENTREGA A CLIENTE —el cierre del ciclo— existía, funcionaba y NO LA ENLAZABA NADA (ni
+    // el riel, ni el panel de avance, ni el tablero WIP), así que el producto entraba a PT y no
+    // salía nunca.
+    const produccion = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === 'produccion');
+    expect(produccion?.hijos, 'Producción debe seguir siendo padre desplegable').toBeDefined();
+    expect(produccion?.hijos?.map((h) => [h.clave, h.ruta])).toEqual([
+      ['ordenes', '/produccion/ordenes'],
+      ['entregas', '/produccion/entregas'],
+      ['wip', '/produccion/wip'],
+      ['existencias-maquilero', '/produccion/existencias-maquilero'],
+      // La impresión EN LOTE de órdenes solo existe aquí: es capacidad propia, no consulta duplicada.
+      ['consulta-ordenes', '/produccion/consulta'],
+      ['notas-salida', '/produccion/notas-salida'],
+    ]);
+    // Gates HEREDADOS del catálogo, sin ensancharlos (A4).
+    expect(produccion?.hijos?.map((h) => h.permisos)).toEqual([
+      ['ordenes.ver'],
+      ['produccion.entrega'],
+      ['produccion.wip-ver'],
+      ['produccion.wip-ver'],
+      ['ordenes.ver'],
+      ['notas.ver'],
+    ]);
+    // Las TRES pantallas del mismo acto se retiraron del catálogo entero (una sola pantalla por
+    // acto, §Post-F9.36 punto 2): ni riel, ni ⌘K, ni hub — el corte/envío/recibo se capturan en el
+    // panel de avance del Centro de Órdenes.
+    for (const clave of ['corte', 'envios', 'recibos']) {
+      expect(
+        buscarModuloPorClave(clave),
+        `${clave} debe estar retirado del catálogo`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('«Calidad» navega a su hub: sus 7 tarjetas dejan de ser inalcanzables (V1-E3a)', () => {
+    // Regresión del hallazgo B6: en el riel «Calidad» era PADRE con solo 2 hijos y `PadreNav` NO
+    // NAVEGA (es un `<button>` que solo expande) → defectos, tipos de producto, planes AQL y
+    // auditorías por maquilero eran inalcanzables desde TODA la app, y `CalidadPagina` —que tiene
+    // las 7 tarjetas— no la enlazaba nadie.
+    const calidad = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === 'calidad');
+    expect(
+      calidad?.hijos,
+      'Calidad ya NO debe ser desplegable (su padre no navegaba)',
+    ).toBeUndefined();
+    expect(calidad?.hijos === undefined ? calidad?.ruta : undefined).toBe('/calidad');
+    // Y las hojas que estaban atrapadas siguen en el catálogo (⌘K) y en las tarjetas del hub.
+    for (const clave of [
+      'calidad-defectos',
+      'calidad-tipos-producto',
+      'calidad-planes-aql',
+      'calidad-historial-maquilero',
+    ]) {
+      expect(buscarModuloPorClave(clave), clave).toBeDefined();
+    }
+  });
+
   it('las hojas colapsadas navegan a su pantalla principal con el gate correcto', () => {
     const hojaRiel = (clave: string): ModuloMenu | undefined => {
       const entrada = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === clave);
@@ -497,6 +585,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       // El grupo Inventarios ya NO tiene ninguna hoja colapsada: «telas» pasó a padre desplegable
       // en A2, «compras» el 11-ago-2026 y «inventarios» (PT) + «avios» el 12-ago-2026 (Daniel:
       // «destapa las cosas de una vez»). Ver el test del riel y el de regresión de más abajo.
+      // V1-E3a: Calidad al hub que YA tenía las 7 tarjetas, con la unión de los permisos de sus
+      // hijos (el patrón de Costos/EDR/Indicadores/EsMa/Administración).
+      ['calidad', '/calidad', ['calidad.ver', 'calidad.generar-auditorias']],
       ['costos', '/costos', ['costos.ver', 'precostos.consultar']],
       ['edr', '/edr', ['edr.ver', 'edr.capturar']],
       ['esma', '/esma', ['esma.ver-pagos', 'esma.cargo-validar', 'esma.modificar']],
@@ -529,7 +620,16 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     // aparece a TODOS los que veían el padre antes (sin regresión de menú) y el hub muestra solo lo
     // accesible. El grupo Inventarios ya no aporta ninguna hoja colapsada (sus 4 entradas son
     // desplegables desde el 12-ago-2026), así que la lista son puros hubs.
-    const HUBS = ['costos', 'edr', 'indicadores', 'esma', 'g-rc-config', 'administracion'];
+    const HUBS = [
+      // +'calidad' en V1-E3a: es el caso que MOTIVÓ el arreglo (sus 4 catálogos eran inalcanzables).
+      'calidad',
+      'costos',
+      'edr',
+      'indicadores',
+      'esma',
+      'g-rc-config',
+      'administracion',
+    ];
     const hojaRiel = (clave: string): ModuloMenu | undefined => {
       const entrada = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === clave);
       return entrada !== undefined && entrada.hijos === undefined ? entrada : undefined;
@@ -560,14 +660,19 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
   it('lo legado sale del RIEL pero sigue en el CATÁLOGO (⌘K no pierde nada)', () => {
     const clavesRiel = new Set(hojasDe(RIEL_GRUPOS));
     const clavesCatalogo = new Set(hojasDe(filtrarCatalogoVisible(todosLosPermisos())));
-    // Muestra representativa de lo que R2–R4 sacó del riel (corte/envíos/recibos/WIP, el
-    // concentrado, galerías, catálogos de referencia, sub-vistas de compras/costos/edr/esma).
+    // Muestra representativa de lo que R2–R4 sacó del riel (el concentrado, galerías, catálogos de
+    // referencia, sub-vistas de compras/costos/edr/esma).
+    //
+    // 'corte' / 'envios' / 'recibos' ya NO están aquí: en V1-E3a se retiraron del CATÁLOGO entero
+    // (una sola pantalla por acto). Y 'entregas' / 'wip' tampoco: ese mismo día ENTRARON al riel
+    // como hijos del padre «Producción» — la entrega a cliente no la enlazaba nada.
     for (const clave of [
-      'corte',
-      'envios',
-      'recibos',
-      'entregas',
-      'wip',
+      // Consultas de Producción que siguen fuera del riel (vivas por ⌘K y en el hub /produccion).
+      // 'consulta-ordenes' ya NO está aquí: entró al riel por su impresión EN LOTE.
+      'ordenes-incompletas',
+      'corte-semanal',
+      'recibos-semanales',
+      'archivo-ordenes',
       'rc-concentrado',
       'galeria-modelos',
       'bordados',

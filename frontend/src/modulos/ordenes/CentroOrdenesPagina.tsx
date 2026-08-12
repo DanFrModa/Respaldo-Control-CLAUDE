@@ -45,6 +45,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { AvanceProduccion } from '@/modulos/produccion/AvanceProduccion';
+import { esClaveEtapaAvance, type ClaveEtapaAvance } from '@/modulos/produccion/etapas-avance';
 import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacionOrden';
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
@@ -106,6 +107,33 @@ function leerIdOrdenState(state: unknown): number | null {
   }
   const id = state.idOrden;
   return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Lee `state.abrirAvance` del deep-link (V1-E3a): quien manda a capturar corte / envío / recibo
+ * —hoy la bandeja de la Ruta Crítica— quiere el PANEL DE AVANCE de esa orden abierto, no solo la
+ * fila seleccionada. Es la contrapartida de haber retirado las tres pantallas sueltas.
+ */
+function leerAbrirAvanceState(state: unknown): boolean {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    'abrirAvance' in state &&
+    state.abrirAvance === true
+  );
+}
+
+/**
+ * Lee `state.etapaAvance`: la ETAPA del stepper en la que debe abrir el panel. Un pendiente de RC
+ * de «recibo de estampado» tiene que aterrizar en esa etapa, no en Corte. Se valida contra las
+ * claves reales del panel (`esClaveEtapa`) para no confiar en un `state` arbitrario.
+ */
+function leerEtapaAvanceState(state: unknown): ClaveEtapaAvance | undefined {
+  if (typeof state !== 'object' || state === null || !('etapaAvance' in state)) {
+    return undefined;
+  }
+  const etapa = (state as Record<string, unknown>).etapaAvance;
+  return esClaveEtapaAvance(etapa) ? etapa : undefined;
 }
 
 /** Capitaliza el nombre corto del mes de entrega de una fila. */
@@ -174,6 +202,14 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   const [idDeepLinkPendiente, setIdDeepLinkPendiente] = useState<number | null>(null);
 
   const idDeepLink = leerIdOrdenState(location.state);
+  // Se lee en el MISMO render que `idDeepLink` (el efecto de abajo limpia el `state` en cuanto lo
+  // atiende, así que después ya no estaría).
+  const [avanceDeepLink, setAvanceDeepLink] = useState<{
+    idOrden: number;
+    etapa: ClaveEtapaAvance | undefined;
+  } | null>(null);
+  const abrirAvanceDeepLink = idDeepLink !== null && leerAbrirAvanceState(location.state);
+  const etapaAvanceDeepLink = leerEtapaAvanceState(location.state);
   useEffect(() => {
     if (idDeepLink !== null) {
       setIdSeleccionada(idDeepLink);
@@ -182,9 +218,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
       if (window.innerWidth < 1024) {
         setCajonAbierto(true);
       }
+      if (abrirAvanceDeepLink) {
+        setAvanceDeepLink({ idOrden: idDeepLink, etapa: etapaAvanceDeepLink });
+      }
       void navigate(location.pathname, { replace: true, state: null });
     }
-  }, [idDeepLink, location.pathname, navigate]);
+  }, [idDeepLink, abrirAvanceDeepLink, etapaAvanceDeepLink, location.pathname, navigate]);
 
   // Si la fila del deep-link NO está en la página visible, se pone el BUSCADOR al folio de la orden
   // y se resetean los demás filtros/página para que el listado la traiga y se pinte seleccionada
@@ -245,18 +284,48 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   const filaSeleccionada = filas.find((f) => f.id === idSeleccionada);
 
   // ── Avance de producción (doble clic / botón) ──────────────────────────────
-  const [avanceDe, setAvanceDe] = useState<{ id: number; folioPedido: number | null } | null>(null);
+  const [avanceDe, setAvanceDe] = useState<{
+    id: number;
+    folioPedido: number | null;
+    etapaInicial?: ClaveEtapaAvance;
+  } | null>(null);
   // ── Editar la orden (mosaico "Modificar" → diálogo, antes página `/captura`) ─
   const [idAModificar, setIdAModificar] = useState<number | null>(null);
 
-  function abrirAvance(fila: { id: number; folioPedido: number | null }): void {
-    setAvanceDe({ id: fila.id, folioPedido: fila.folioPedido });
+  function abrirAvance(
+    fila: { id: number; folioPedido: number | null },
+    etapaInicial?: ClaveEtapaAvance,
+  ): void {
+    setAvanceDe({
+      id: fila.id,
+      folioPedido: fila.folioPedido,
+      ...(etapaInicial === undefined ? {} : { etapaInicial }),
+    });
     // En móvil el detalle vive en el cajón (Sheet PORTALIZADO al body, por encima del panel de
     // avance, que se pinta en línea): sin cerrarlo, el botón "no hacía nada" porque el panel abría
     // DEBAJO del cajón (reporte de Daniel, jul-2026). Mismo motivo que `alModificar`. Va aquí y no
     // en el llamador para cubrir TODAS las entradas (botón del detalle + doble clic de la lista).
     setCajonAbierto(false);
   }
+
+  /**
+   * Deep-link con `abrirAvance` (V1-E3a): abre el panel de avance de la orden pedida. Se hace en un
+   * efecto propio —y no en el efecto del deep-link— porque `abrirAvance` se declara más abajo.
+   *
+   * El `folioPedido` va en `null` porque quien manda el deep-link (el tablero WIP, la bandeja de RC)
+   * no lo conoce: el panel NO lo resuelve, simplemente OMITE ese rótulo del encabezado
+   * («· Pedido interno N-F»). Todo lo demás del panel es igual. Se atiende UNA vez: el id se limpia
+   * al aplicarlo.
+   */
+  useEffect(() => {
+    if (avanceDeepLink === null) {
+      return;
+    }
+    setAvanceDeepLink(null);
+    // `abrirAvance` solo llama setters (estable en la práctica) y no entra a las dependencias: se
+    // recrea en cada render y re-dispararía el efecto sin parar.
+    abrirAvance({ id: avanceDeepLink.idOrden, folioPedido: null }, avanceDeepLink.etapa);
+  }, [avanceDeepLink]);
 
   function alClicFila(fila: OrdenCentro): void {
     setIdSeleccionada(fila.id);
@@ -896,6 +965,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         <AvanceProduccion
           idOrden={avanceDe.id}
           folioPedido={avanceDe.folioPedido}
+          {...(avanceDe.etapaInicial === undefined ? {} : { etapaInicial: avanceDe.etapaInicial })}
           alCerrar={() => setAvanceDe(null)}
         />
       ) : null}

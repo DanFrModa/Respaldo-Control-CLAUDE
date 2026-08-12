@@ -1685,3 +1685,104 @@ re-discutirlas.
 - **Aplica en:** V1-E1 y V1-E2, ya construidas. **SIN migración, SIN permisos nuevos, SIN seed** →
   el deploy a `prueba` **no** requiere `SEED_ON_START`.
 - **Fecha:** 2026-08-13.
+
+#### (Post-F9.40) — Al mover producto terminado a mano SE ELIGE DE QUÉ ORDEN salen las piezas (DANIEL, 13-ago-2026)
+
+> Planteado el defecto —el PT que produce la fábrica **no se puede traspasar ni sacar a mano**— y las
+> dos salidas posibles, Daniel eligió: ***"La uno."***
+
+**El defecto (confirmado en código, §Post-F9.x / diagnóstico B3).** El recibo de maquila etiqueta cada
+pieza que entra a PT con **la orden de la que salió** (`recibos.ts`, *"PT por orden (F6-E2)"*), y la
+existencia se valida **por orden** (`kardex.ts`, `d."id_orden" IS NOT DISTINCT FROM $idOrden`). Pero
+los **movimientos manuales y los traspasos** escriben y validan contra el bucket **«sin orden»**
+(`movimientos-pt.ts`, que pasa `null` explícito). **Son dos saldos que no se hablan:** lo que produce
+la fábrica solo puede salir por la **entrega a cliente de esa misma orden** — no se traspasa entre
+almacenes, no sale por movimiento manual (muestras, mermas, ajuste de conteo). Y la pantalla de
+existencias **sí muestra ese stock, con su orden**, así que el usuario ve piezas que el sistema le
+rechaza mover con un *"no hay existencia suficiente"* incomprensible.
+
+**Qué se decidió — OPCIÓN 1: elegir la orden.** Al capturar un movimiento manual o un traspaso de PT,
+el usuario **elige de qué orden** salen las piezas, entre las que tienen existencia de ese
+modelo × color × talla en ese almacén (incluido el bucket **«sin orden»**, que es donde cae lo
+capturado a mano y lo migrado).
+
+**Por qué esta y no sumar el saldo entre órdenes** (la opción 2, descartada): sumar era más simple de
+usar pero **perdía el rastro** — una pieza salía del almacén y ya no se sabía de qué producción era.
+En un negocio donde **el costo se calcula por orden**, perder esa liga al sacar piezas desordena el
+costeo. Y el dato ya existe: la pantalla de existencias ya muestra la orden de cada renglón, así que
+enseñarla y luego no dejar usarla era la incoherencia.
+
+**Consecuencias para quien lo construya:**
+- El movimiento manual y el traspaso dejan de pasar `null` fijo: reciben la orden (o `null`
+  explícito) **por renglón**, y validan el no-negativo contra **ese** bucket bajo el mismo lock.
+- La UI necesita ofrecer las órdenes **con existencia real** de ese artículo en ese almacén — no el
+  catálogo entero de órdenes.
+- **NO se toca la invariante D3**: la existencia sigue siendo Σ movimientos y la cancelación sigue
+  siendo un inverso auditado.
+- El inventario **capturado a mano** en el arranque (§Post-F9.36 punto 4) cae en «sin orden» y se
+  mueve con libertad: esta decisión **no** complica el arranque sin conteo físico.
+
+- **Aplica en:** **V1-E3b**. Toca `dominio/inventarios/movimientos-pt.ts`, el contrato de esos
+  movimientos y sus pantallas. ⚠️ **Verificar en vivo antes de tocar**: el defecto está confirmado
+  leyendo las tres piezas juntas, pero no ejecutado. **SIN migración** (la columna `idOrden` ya existe
+  en el detalle del kardex).
+- **Fecha:** 2026-08-13.
+
+#### (Post-F9.41) — El precio pactado de maquila se TECLEA sin permiso especial; solo su LECTURA se redacta (V1-E3a, 13-ago-2026)
+
+**Decisión del lead**, tomada al retirar las tres pantallas de captura de producción (§Post-F9.36
+punto 2). Se registra porque cambia quién puede hacer qué, y quedó a un paso de irse como efecto
+colateral tácito.
+
+**Qué pasó.** Al migrar el campo `precioPactado` al panel de avance, la primera versión lo puso
+detrás de `ordenes.ver-precio-real-maquila`. **Ese gate no existía en las pantallas retiradas**: se
+mostraba a cualquiera con `produccion.envio` / `produccion.recibo`.
+
+**Por qué se desgateó.** El permiso se corta en **Logística hacia abajo** (`prisma/seed.ts:236`),
+mientras `produccion.envio`/`.recibo` **no se cortan en ninguna parte** — o sea, gatearlo se lo
+quitaba justo a **los roles que capturan la maquila todos los días**. Y como `esma/cargos.ts:69-74`
+cae al `precioPactado` del recibo cuando la OP no trae `maquilaOrd`/`aplicacionOrd`, el resultado era
+que **el cargo al maquilero nacía SIN PRECIO** y alguien lo tecleaba aparte: exactamente la doble
+captura que v2 vino a eliminar (`03-Produccion.md`, "punto de integración central").
+
+**La regla que queda, que ya era la del backend:**
+
+> **Se TECLEA el precio que el maquilero cotizó hoy. NO se VE el precio real que capturó otro.**
+
+El backend **nunca** gateó la escritura: solo **redacta en la lectura y en la cancelación**
+(`etapas.ts:387-388`, `recibos.ts:423-424`), y su propio test lo dice — *"la respuesta de la
+CANCELACIÓN redacta precioPactado sin ver-precio-real; **la captura no**"* (`recibos.int.test.ts:803`).
+La UI ahora coincide con esa regla en vez de inventar una más estricta.
+
+**La redacción de lectura NO se tocó.** Quien no tiene el permiso sigue sin ver los precios
+capturados por otros.
+
+- **Aplica en:** `AvanceProduccion.tsx` (campo sin gate; `precioApi` sin filtro). **SIN migración, SIN
+  permisos nuevos, SIN seed.** Prueba que lo fija: sesión **sin** `ordenes.ver-precio-real-maquila` y
+  **con** `produccion.envio` manda `precioPactado`.
+- **Fecha:** 2026-08-13.
+
+#### (Post-F9.42) — «Consulta de órdenes» entra al riel: imprimir EN LOTE es capacidad propia, no una consulta duplicada (V1-E3a, 13-ago-2026)
+
+**Decisión del lead.** Al destapar el menú de Producción se curó la lista y ocho pantallas quedaron
+fuera del riel con el argumento de que *"son consultas que duplican lo que ya hacen el Centro de
+Órdenes o Pedidos"*. El reviewer **comprobó que el argumento era falso para dos**:
+
+- **«Consulta de órdenes»** es la **única pantalla que imprime órdenes EN LOTE**
+  (`ConsultaOrdenesPagina.tsx:135-143`); el Centro de Órdenes imprime **de a una**
+  (`CentroOrdenesPagina.tsx:1356`). Eso es una **capacidad propia**, no un corte de otra pantalla.
+  → **ENTRA al riel.**
+- **«Archivo de órdenes»** es la producción del **sistema anterior**, que el Centro no lista.
+  → **Queda fuera, pero por ser histórico**, no por duplicada. El comentario se corrigió para que
+  diga la verdad.
+
+Las otras seis **sí** son cortes de lo que ya resuelven el Centro o Pedidos, y siguen alcanzables por
+⌘K **y por el hub `/produccion`** que esta etapa construyó.
+
+**La lección, que aplica a toda curación futura del menú:** una pantalla no se saca del riel por
+*parecer* una consulta. Se saca cuando **no aporta una capacidad que las demás no tengan** — y eso se
+verifica leyendo qué hace, no por su nombre.
+
+- **Aplica en:** `frontend/src/modulos/catalogo.ts` (`ESPEC_RIEL`, hijos de `produccion`), con
+  `catalogo.test.ts` y `e2e/login.spec.ts` actualizados. **SIN migración, SIN permisos, SIN seed.**
+- **Fecha:** 2026-08-13.

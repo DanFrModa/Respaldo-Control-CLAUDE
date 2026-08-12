@@ -32,7 +32,7 @@ export const esquemaRenglonFormulario = z.object({
 /** Datos de captura de un renglón. */
 export type DatosRenglonFormulario = z.infer<typeof esquemaRenglonFormulario>;
 
-/** Formulario del pedido: cliente + fechas + renglones. */
+/** Formulario del pedido: cliente + fechas + bandera "no producir" + renglones. */
 export const esquemaPedidoFormulario = z.object({
   idCliente: z.string().min(1, { error: 'Elige un cliente' }),
   fechaPedido: z.string(),
@@ -40,6 +40,13 @@ export const esquemaPedidoFormulario = z.object({
   fechaHasta: z.string(),
   fechaTela: z.string(),
   fechaElaboracion: z.string(),
+  /**
+   * NO PRODUCIR (V1-E3a, §Post-F9.36 punto 3): el backend RECHAZA "Generar OP" de un pedido con esta
+   * bandera (`dominio/produccion/ordenes.ts`), y hasta hoy el campo no aparecía en NINGUNA pantalla
+   * — los pedidos migrados de Access la traen, así que el bloqueo no tenía salida. Ahora se ve y se
+   * puede quitar (y poner).
+   */
+  noProducir: z.boolean(),
   renglones: z.array(esquemaRenglonFormulario),
 });
 

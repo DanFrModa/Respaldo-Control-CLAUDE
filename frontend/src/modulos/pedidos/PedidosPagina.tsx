@@ -1,4 +1,5 @@
 import {
+  Ban,
   Calendar,
   CopyIcon,
   ListOrdered,
@@ -187,7 +188,19 @@ export function PedidosPagina(): React.JSX.Element {
           toast.info('Un pedido cancelado no se reactiva; crea uno nuevo o cópialo.')
         }
         renderAvatarDetalle={(p) => <Avatar nombre={p.cliente} tono="neutro" tamano="lg" />}
-        renderMeta={(p) => (p.pedCancelado ? <Badge variant="destructive">Cancelado</Badge> : null)}
+        renderMeta={(p) => (
+          <>
+            {p.pedCancelado ? <Badge variant="destructive">Cancelado</Badge> : null}
+            {/* «No producir» a la vista (V1-E3a, §Post-F9.36 punto 3): es la bandera que hace que
+                "Generar OP" sea rechazado por el servidor; sin verla, el bloqueo no tenía
+                explicación. Se edita en el diálogo del pedido. */}
+            {p.noProducir ? (
+              <Badge variant="secondary" data-testid="pedido-badge-no-producir">
+                No producir
+              </Badge>
+            ) : null}
+          </>
+        )}
         accionesExtra={(p) =>
           p.pedCancelado ? null : (
             <Button
@@ -278,6 +291,13 @@ function DetallePedido({
           </CampoDetalle>
           <CampoDetalle icono={Calendar} etiqueta="Fecha de elaboración">
             {fechaCorta(pedido.fechaElaboracion)}
+          </CampoDetalle>
+          <CampoDetalle icono={Ban} etiqueta="No producir">
+            {pedido.noProducir ? (
+              <span className="text-warn">Sí — no se le pueden generar órdenes de producción</span>
+            ) : (
+              'No'
+            )}
           </CampoDetalle>
           <CampoDetalle icono={PackageCheck} etiqueta="Total de piezas">
             {pedido.totalPiezas.toLocaleString('es-MX')}

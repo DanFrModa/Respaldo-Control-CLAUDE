@@ -19,12 +19,7 @@ import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
 import { PanelRutaOrden, type EncabezadoRutaOrden } from './PanelRutaOrden';
-import {
-  EVENTO_RC_DESCRIPCION,
-  RUTA_PANTALLA_EVENTO,
-  esProcesoAutomatico,
-  fechaRc,
-} from './piezas';
+import { EVENTO_RC_DESCRIPCION, PANTALLA_EVENTO, esProcesoAutomatico, fechaRc } from './piezas';
 
 /**
  * MIS PENDIENTES (rediseño R4 — proto §4.9, la pantalla que pidió Daniel): la GUÍA DIARIA de la
@@ -402,7 +397,10 @@ function FilaPendiente({
   const navigate = useNavigate();
   const capturar = useCapturarCumplimientoRc();
   const esAuto = esProcesoAutomatico(tarea.tipoEvento);
-  const rutaEvento = RUTA_PANTALLA_EVENTO[tarea.tipoEvento];
+  // A dónde lleva «Registrar» y con qué contexto (ruta + orden + etapa del avance). La ruta se
+  // extrae a su propia const para que el tipo se estreche dentro del `onClick` (`To` no admite null).
+  const destino = PANTALLA_EVENTO[tarea.tipoEvento];
+  const rutaEvento = destino.ruta;
 
   function marcarHecho(): void {
     capturar.mutate(
@@ -458,7 +456,22 @@ function FilaPendiente({
           size="sm"
           onClick={(e) => {
             e.stopPropagation();
-            void navigate(rutaEvento);
+            // Las pantallas de producción entienden `state.idOrden`; el Centro de Órdenes abre
+            // además el panel de avance EN LA ETAPA del pendiente. Así se llega al paso exacto de
+            // LA orden, no a una lista de cientos ni a la etapa equivocada.
+            void navigate(
+              rutaEvento,
+              destino.conOrden === true
+                ? {
+                    state: {
+                      idOrden: tarea.idOrden,
+                      ...(destino.etapaAvance === undefined
+                        ? {}
+                        : { abrirAvance: true, etapaAvance: destino.etapaAvance }),
+                    },
+                  }
+                : {},
+            );
           }}
           title={`Se marca sola al registrar ${EVENTO_RC_DESCRIPCION[tarea.tipoEvento]}; aquí vas a la pantalla`}
           data-testid="pendientes-registrar"

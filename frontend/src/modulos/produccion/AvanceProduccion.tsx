@@ -1,10 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Ban, Loader2, Plus, Route, Scissors, X } from 'lucide-react';
+import { Ban, FileText, Loader2, Plus, Printer, Route, Scissors, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
+import {
+  CLAVE_ENTREGAS,
+  useCancelarEntrega,
+  useCrearEntrega,
+  useEntregasOrden,
+  useSeguimientoEntrega,
+  urlComprobanteEntrega,
+} from '@/api/entregas-cliente';
 import {
   CLAVE_ETAPAS,
   useCancelarCorte,
@@ -12,13 +20,15 @@ import {
   useCrearCorte,
   useCrearEnvio,
   useEtapasOrden,
+  urlFichaEstampado,
+  urlImpresoEnvio,
 } from '@/api/etapas';
 import { useOrden } from '@/api/ordenes';
 import { CLAVE_ORDENES_CENTRO } from '@/api/ordenes-centro';
 import { useProveedores, useRolesProveedor } from '@/api/proveedores';
-import { CLAVE_RECIBOS, useCancelarRecibo, useCrearRecibo } from '@/api/recibos';
+import { CLAVE_RECIBOS, useCancelarRecibo, useCrearRecibo, urlImpresoRecibo } from '@/api/recibos';
 import { useTiposProceso } from '@/api/tipos-proceso';
-import type { EtapaHistorial, TipoProceso, WipOrden } from '@/api/tipos';
+import type { EntregaHistorial, EtapaHistorial, TipoProceso, WipOrden } from '@/api/tipos';
 import { CLAVE_WIP, useWipOrden } from '@/api/wip';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
@@ -38,7 +48,8 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
-import { piezasPorRecibir } from './matriz-orden';
+import { type ClaveEtapaAvance } from './etapas-avance';
+import { ejesDeOrden, piezasPorRecibir } from './matriz-orden';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -47,26 +58,34 @@ import { useSesion } from '@/sesion/useSesion';
  * AVANCE DE PRODUCCIÓN (rediseño R2, §4.3 — el form "Proceso" del Access, reconstruido): panel de
  * pantalla completa que se abre con DOBLE CLIC en una orden (o el botón "Registrar avance").
  *
- *  - Stepper de 5 ETAPAS (Corte / Entrega a maquila / Recibo de maquila / Entrega de Arte /
- *    Recibo de Arte) con su avance `x/total` y color de estado. Los totales salen DERIVADOS del
- *    servidor (`wipDeOrden`, F3-E5): aquí solo se combinan (costura = procesos que meten a PT).
+ *  - Stepper de 6 ETAPAS (Corte / Entrega a maquila / Recibo de maquila / Entrega de Arte /
+ *    Recibo de Arte / Entrega a cliente) con su avance `x/total` y color de estado. Los totales
+ *    salen DERIVADOS del servidor (`wipDeOrden`, F3-E5): aquí solo se combinan (costura = procesos
+ *    que meten a PT).
  *  - Cada etapa es una LISTA de movimientos (multi-proveedor, §4.3): proveedor + fecha + desglose
- *    color×talla + "capturado por · fecha" (§4.4.4) + cancelar con motivo (suave, D3).
+ *    color×talla + "capturado por · fecha" (§4.4.4) + REIMPRESIÓN del PDF + cancelar con motivo
+ *    (suave, D3).
  *  - CAPTURA con candado: la matriz usa SOLO los colores/tallas de la orden (D4); pega directo a
- *    los endpoints F3 (corte/envíos/recibos) — la lógica vive en el backend (A1).
+ *    los endpoints F3 (corte/envíos/recibos/entregas) — la lógica vive en el backend (A1).
  *  - Al registrar: toast con la nota de que la Ruta Crítica se marca sola (auto-avance F3→F5).
  *  - Resumen abajo en DOS bloques: Costura y Estampado/Bordado (proto `.proc-summary`).
+ *
+ * ⚠️ ES LA ÚNICA PANTALLA DE CAPTURA del corte, el envío y el recibo (Daniel, `DECISIONES.md
+ * §Post-F9.36 punto 2`: *"Ok. Una sola pantalla está bien."*). En V1-E3a se retiraron
+ * `/produccion/{corte,envios,recibos}` DESPUÉS de migrarle aquí lo que solo ellas tenían: las
+ * SEGUNDAS del recibo, los IMPRESOS (hoja de envío / ficha de arte / recibo), el PRECIO PACTADO y la
+ * FECHA COMPROMISO. Y en la misma etapa entró la ENTREGA A CLIENTE, que cierra el ciclo (antes el
+ * stepper terminaba en "Recibo de Arte" y el producto entraba a PT sin salir nunca).
+ *
+ * ⚠️ "Entrega" significa TRES cosas distintas en este módulo y las tres viven en el stepper: a
+ * MAQUILA (sale material a costura), de ARTE (sale material a estampado/bordado) y a CLIENTE (sale
+ * producto terminado del almacén de PT). Las etiquetas nunca dicen "Entrega" a secas.
  */
 
-/** Clave de cada etapa del stepper. */
-type ClaveEtapa =
-  | 'corte'
-  | 'entrega-maquila'
-  | 'recibo-maquila'
-  | 'entrega-aplicacion'
-  | 'recibo-aplicacion';
+/** Clave de cada etapa del stepper (las claves viven en `etapas-avance.ts`, como datos). */
+type ClaveEtapa = ClaveEtapaAvance;
 
-/** Definición visual de las 5 etapas (orden del proto). */
+/** Definición visual de las 6 etapas (orden del proto + el cierre del ciclo). */
 const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor: string }[] = [
   { clave: 'corte', etiqueta: 'Corte', etiquetaProveedor: 'Cortador' },
   { clave: 'entrega-maquila', etiqueta: 'Entrega a maquila', etiquetaProveedor: 'Maquilero' },
@@ -76,6 +95,9 @@ const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor:
   // los subtipos Bordado/Estampado siguen existiendo); lo que cambia es lo que el usuario lee.
   { clave: 'entrega-aplicacion', etiqueta: 'Entrega de Arte', etiquetaProveedor: 'Prov. de Arte' },
   { clave: 'recibo-aplicacion', etiqueta: 'Recibo de Arte', etiquetaProveedor: 'Prov. de Arte' },
+  // El CIERRE del ciclo (V1-E3a): saca producto terminado del almacén de PT hacia el cliente. No
+  // tiene "proveedor" — el destinatario es el cliente de la orden.
+  { clave: 'entrega-cliente', etiqueta: 'Entrega a cliente', etiquetaProveedor: 'Cliente' },
 ];
 
 /** Fecha de hoy (YYYY-MM-DD) para el default de captura. */
@@ -100,7 +122,12 @@ function rolDelProceso(codigoProceso: string): string {
   return codigoProceso === 'costura' ? 'maquila-costura' : codigoProceso;
 }
 
-/** A qué etapa del stepper pertenece un movimiento (costura vs aplicación por `generaEntradaPt`). */
+/**
+ * A qué etapa del stepper pertenece un movimiento (costura vs aplicación por `generaEntradaPt`).
+ * Devuelve `null` para la entrega a cliente: NO viaja en este historial (`listarEtapasOrden` solo
+ * trae cortes, envíos y recibos), sino en el suyo (`GET /ordenes/{id}/entregas`), que la etapa
+ * «Entrega a cliente» del stepper consulta aparte.
+ */
 export function claveEtapaDeMovimiento(
   movimiento: Pick<EtapaHistorial, 'tipo' | 'idTipoProceso'>,
   esCostura: (idTipoProceso: number) => boolean,
@@ -150,6 +177,13 @@ export function pasosDesdeWip(wip: WipOrden): PasoEtapa[] {
       hecho: recibidoAplicacion,
       total: wip.pedido,
     },
+    // El cierre del ciclo (V1-E3a): Σ de entregas VIVAS a cliente, derivado en servidor.
+    {
+      clave: 'entrega-cliente',
+      etiqueta: 'Entrega a cliente',
+      hecho: wip.entregado,
+      total: wip.pedido,
+    },
   ];
 }
 
@@ -158,6 +192,12 @@ export interface PropsAvanceProduccion {
   idOrden: number;
   /** Folio del pedido interno (el `-F`), si el llamador lo conoce (encabezado). */
   folioPedido?: number | null;
+  /**
+   * Etapa en la que abre el stepper (default `corte`). La usa quien manda al usuario a registrar UN
+   * paso concreto —hoy la bandeja de la Ruta Crítica, vía `state.etapaAvance`—: un pendiente de
+   * «recibo de estampado» debe aterrizar en esa etapa, no en Corte (V1-E3a).
+   */
+  etapaInicial?: ClaveEtapa;
   alCerrar: () => void;
 }
 
@@ -169,6 +209,7 @@ export interface PropsAvanceProduccion {
 export function AvanceProduccion({
   idOrden,
   folioPedido,
+  etapaInicial = 'corte',
   alCerrar,
 }: PropsAvanceProduccion): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -187,9 +228,16 @@ export function AvanceProduccion({
     direccion: 'asc',
   });
 
-  const [etapaActiva, setEtapaActiva] = useState<ClaveEtapa>('corte');
+  const [etapaActiva, setEtapaActiva] = useState<ClaveEtapa>(etapaInicial);
   const [capturaAbierta, setCapturaAbierta] = useState(false);
-  const [aCancelar, setACancelar] = useState<EtapaHistorial | null>(null);
+  const [aCancelar, setACancelar] = useState<MovimientoACancelar | null>(null);
+  /**
+   * Movimiento RECIÉN guardado en esta sesión del panel (V1-E3a): la barra que aparece bajo el
+   * encabezado de la etapa ofrece su PDF en el momento — es el papel que va con el bulto al
+   * maquilero. No sustituye a la reimpresión de la lista (que sirve para siempre): esto es para no
+   * tener que buscarlo justo después de capturarlo, como hacían las pantallas viejas.
+   */
+  const [recienGuardado, setRecienGuardado] = useState<MovimientoImpreso | null>(null);
   /**
    * Proveedor elegido DENTRO de la captura abierta, levantado hasta aquí (§Post-F9.13): los puentes
    * a inventario ("descargar tela" / "mandar tela al cortador") viven en esta barra, arriba de la
@@ -202,6 +250,11 @@ export function AvanceProduccion({
       setProveedorEnCaptura(null);
     }
   }, [capturaAbierta, etapaActiva]);
+  // La barra del "recién guardado" pertenece a SU etapa: al cambiar de etapa se limpia para no
+  // ofrecer el PDF de un envío estando parado en el recibo.
+  useEffect(() => {
+    setRecienGuardado(null);
+  }, [etapaActiva]);
 
   // Esc cierra el panel — pero NO mientras el diálogo de cancelación está abierto: su propio Esc
   // lo cierra (Radix) y si este listener también corriera, tiraría el panel entero y se perdería
@@ -241,6 +294,11 @@ export function AvanceProduccion({
     [etapas.data, etapaActiva, procesosPorId],
   );
 
+  // Entregas a cliente: viven en SU historial (otro endpoint), así que solo se consultan estando
+  // parado en esa etapa — el total del stepper ya lo trae el WIP (`entregado`).
+  const esEtapaEntrega = etapaActiva === 'entrega-cliente';
+  const entregas = useEntregasOrden(idOrden, esEtapaEntrega);
+
   const pasos = wip.data === undefined ? null : pasosDesdeWip(wip.data);
   const definicion = ETAPAS.find((e) => e.clave === etapaActiva) ?? {
     clave: 'corte' as const,
@@ -252,6 +310,7 @@ export function AvanceProduccion({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
       queryClient.invalidateQueries({ queryKey: CLAVE_RECIBOS }),
+      queryClient.invalidateQueries({ queryKey: CLAVE_ENTREGAS }),
       queryClient.invalidateQueries({ queryKey: CLAVE_WIP }),
       queryClient.invalidateQueries({ queryKey: CLAVE_ORDENES_CENTRO }),
     ]);
@@ -313,6 +372,7 @@ export function AvanceProduccion({
               onCambiar={(clave) => {
                 setEtapaActiva(clave as ClaveEtapa);
                 setCapturaAbierta(false);
+                setRecienGuardado(null);
               }}
               testid="avance-stepper"
             />
@@ -416,30 +476,72 @@ export function AvanceProduccion({
               ) : null}
             </div>
 
-            {capturaAbierta && orden.data !== undefined && wip.data !== undefined ? (
-              <CapturaMovimiento
-                etapa={etapaActiva}
-                orden={orden.data}
-                wip={wip.data}
-                procesos={procesos.data?.datos ?? []}
-                alElegirProveedor={setProveedorEnCaptura}
-                alRegistrado={() => {
-                  setCapturaAbierta(false);
-                  void refrescarTodo();
-                }}
-                alCancelar={() => setCapturaAbierta(false)}
-              />
+            {/* Barra del movimiento RECIÉN guardado: su PDF, en el momento (V1-E3a). Solo aparece
+                si hay algo que imprimir — el CORTE no tiene impreso propio, y una barra sin acción
+                no aporta nada sobre el aviso y el renglón que ya salieron en la lista. */}
+            {recienGuardado !== null && recienGuardado.impresos.length > 0 ? (
+              <div
+                className="flex flex-wrap items-center gap-3 border-b bg-panel-2 px-4 py-2.5"
+                data-testid="avance-recien-guardado"
+              >
+                <span className="text-sm font-medium">
+                  {recienGuardado.etiqueta} #{recienGuardado.folio} guardado
+                </span>
+                <BotonesImpresos movimiento={recienGuardado} />
+              </div>
             ) : null}
 
-            <ListaMovimientos
-              movimientos={movimientos}
-              etiquetaProveedor={definicion.etiquetaProveedor}
-              conTipo={etapaActiva === 'entrega-aplicacion' || etapaActiva === 'recibo-aplicacion'}
-              cargando={etapas.isPending}
-              etiquetaEtapa={definicion.etiqueta}
-              puedeCancelar={tienePermiso('produccion.cancelar')}
-              alCancelar={setACancelar}
-            />
+            {capturaAbierta && orden.data !== undefined && wip.data !== undefined ? (
+              esEtapaEntrega ? (
+                <CapturaEntregaCliente
+                  orden={orden.data}
+                  alRegistrado={(guardado) => {
+                    setCapturaAbierta(false);
+                    setRecienGuardado(guardado);
+                    void refrescarTodo();
+                  }}
+                  alCancelar={() => setCapturaAbierta(false)}
+                />
+              ) : (
+                <CapturaMovimiento
+                  etapa={etapaActiva}
+                  orden={orden.data}
+                  wip={wip.data}
+                  procesos={procesos.data?.datos ?? []}
+                  procesosConError={procesos.isError}
+                  alReintentarProcesos={() => void procesos.refetch()}
+                  alElegirProveedor={setProveedorEnCaptura}
+                  alRegistrado={(guardado) => {
+                    setCapturaAbierta(false);
+                    setRecienGuardado(guardado);
+                    void refrescarTodo();
+                  }}
+                  alCancelar={() => setCapturaAbierta(false)}
+                />
+              )
+            ) : null}
+
+            {esEtapaEntrega ? (
+              <ListaEntregas
+                entregas={entregas.data?.entregas ?? []}
+                cargando={entregas.isPending}
+                puedeImprimir={tienePermiso('produccion.entrega')}
+                puedeCancelar={tienePermiso('produccion.cancelar')}
+                alCancelar={setACancelar}
+              />
+            ) : (
+              <ListaMovimientos
+                movimientos={movimientos}
+                etiquetaProveedor={definicion.etiquetaProveedor}
+                conTipo={
+                  etapaActiva === 'entrega-aplicacion' || etapaActiva === 'recibo-aplicacion'
+                }
+                cargando={etapas.isPending}
+                etiquetaEtapa={definicion.etiqueta}
+                puedeCancelar={tienePermiso('produccion.cancelar')}
+                alCancelar={setACancelar}
+              />
+            )}
           </section>
 
           {/* ── Resumen en dos bloques (proto `.proc-summary`) ────────────── */}
@@ -452,25 +554,127 @@ export function AvanceProduccion({
       <DialogoCancelarMovimiento
         movimiento={aCancelar}
         alCerrar={() => setACancelar(null)}
-        alCancelado={() => void refrescarTodo()}
+        alCancelado={(cancelado) => {
+          // Si lo que se acaba de cancelar es EL movimiento de la barra del "recién guardado", la
+          // barra se va con él: si no, seguiría ofreciendo el PDF de un movimiento cancelado — justo
+          // lo que la lista evita a propósito («su papel no debe volver a salir con un bulto»).
+          setRecienGuardado((actual) =>
+            actual !== null && actual.id === cancelado.id ? null : actual,
+          );
+          void refrescarTodo();
+        }}
       />
     </div>
   );
 }
 
-/** ¿La sesión puede capturar la etapa activa? (la pantalla esconde; el servidor decide, A1). */
+/**
+ * ¿La sesión puede capturar la etapa activa? (la pantalla esconde; el servidor decide, A1). Los
+ * permisos son los MISMOS que exigía cada pantalla retirada, sin ensancharlos (A4).
+ */
 function puedeCapturar(
   etapa: ClaveEtapa,
-  tienePermiso: (clave: 'produccion.corte' | 'produccion.envio' | 'produccion.recibo') => boolean,
+  tienePermiso: (
+    clave: 'produccion.corte' | 'produccion.envio' | 'produccion.recibo' | 'produccion.entrega',
+  ) => boolean,
 ): boolean {
   if (etapa === 'corte') return tienePermiso('produccion.corte');
   if (etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion') {
     return tienePermiso('produccion.envio');
   }
+  if (etapa === 'entrega-cliente') return tienePermiso('produccion.entrega');
   return tienePermiso('produccion.recibo');
 }
 
-/** Lista de MOVIMIENTOS de una etapa (proveedor + fecha + total + capturó + cancelación). */
+/** Un movimiento con PDF: lo que la barra del "recién guardado" y la lista necesitan para imprimir. */
+interface MovimientoImpreso {
+  id: number;
+  folio: number;
+  /** Cómo se nombra en el aviso ("Envío", "Recibo", "Corte", "Entrega"). */
+  etiqueta: string;
+  /** Qué impresos ofrece: el corte no tiene ninguno. */
+  impresos: readonly { clave: string; etiqueta: string; url: string; icono: 'pdf' | 'ficha' }[];
+}
+
+/** Movimiento a cancelar (etapa o entrega): el diálogo despacha por `tipo`. */
+interface MovimientoACancelar {
+  id: number;
+  folio: number;
+  tipo: EtapaHistorial['tipo'];
+}
+
+/**
+ * Impresos de un ENVÍO: la hoja que va con el bulto y, si es de arte, su ficha. `conFicha` la pide
+ * solo en las etapas de ARTE — en costura la ficha de estampado no dice nada.
+ */
+function impresosDeEnvio(id: number, conFicha: boolean): MovimientoImpreso['impresos'] {
+  const hoja = {
+    clave: 'envio',
+    etiqueta: 'Hoja de envío',
+    url: urlImpresoEnvio(id),
+    icono: 'pdf' as const,
+  };
+  return conFicha
+    ? [
+        hoja,
+        { clave: 'ficha', etiqueta: 'Ficha de arte', url: urlFichaEstampado(id), icono: 'ficha' },
+      ]
+    : [hoja];
+}
+
+/** Botones de descarga de los impresos de un movimiento (se abren en otra pestaña). */
+function BotonesImpresos({
+  movimiento,
+  compactos = false,
+}: {
+  movimiento: MovimientoImpreso;
+  compactos?: boolean;
+}): React.JSX.Element | null {
+  if (movimiento.impresos.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {movimiento.impresos.map((impreso) => {
+        const Icono = impreso.icono === 'ficha' ? FileText : Printer;
+        return compactos ? (
+          <Button
+            key={impreso.clave}
+            variant="ghost"
+            size="icon"
+            onClick={() => window.open(impreso.url, '_blank', 'noopener')}
+            aria-label={`${impreso.etiqueta} del movimiento ${movimiento.folio}`}
+            title={impreso.etiqueta}
+            data-testid={`avance-imprimir-${impreso.clave}`}
+          >
+            <Icono className="size-4" aria-hidden />
+          </Button>
+        ) : (
+          <Button
+            key={impreso.clave}
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(impreso.url, '_blank', 'noopener')}
+            data-testid={`avance-imprimir-${impreso.clave}`}
+          >
+            <Icono className="size-4" aria-hidden />
+            {impreso.etiqueta}
+          </Button>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * Lista de MOVIMIENTOS de una etapa (proveedor + fecha + total + capturó + REIMPRESIÓN +
+ * cancelación).
+ *
+ * La REIMPRESIÓN (V1-E3a) es la única vía de recuperar el papel de un movimiento viejo: antes los
+ * PDF solo se ofrecían para el movimiento "recién guardado", así que al cerrar la pantalla la hoja
+ * de envío del bulto ya no se recuperaba desde la app. Los movimientos CANCELADOS no se imprimen a
+ * propósito: su papel no debe volver a salir con un bulto.
+ */
 function ListaMovimientos({
   movimientos,
   etiquetaProveedor,
@@ -486,7 +690,7 @@ function ListaMovimientos({
   cargando: boolean;
   etiquetaEtapa: string;
   puedeCancelar: boolean;
-  alCancelar: (movimiento: EtapaHistorial) => void;
+  alCancelar: (movimiento: MovimientoACancelar) => void;
 }): React.JSX.Element {
   if (cargando) {
     return <p className="px-4 py-6 text-sm text-muted-foreground">Cargando movimientos…</p>;
@@ -509,7 +713,7 @@ function ListaMovimientos({
             <th className="px-3 py-1.5 text-right">Cantidad</th>
             <th className="px-3 py-1.5 text-left">Capturó</th>
             <th className="px-3 py-1.5 text-left">Observaciones</th>
-            <th className="w-10" aria-hidden />
+            <th className="px-3 py-1.5 text-right">Imprimir / cancelar</th>
           </tr>
         </thead>
         <tbody>
@@ -544,12 +748,15 @@ function ListaMovimientos({
                   (m.observaciones ?? '—')
                 )}
               </td>
-              <td className="px-2 py-1.5 text-right">
+              <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                {m.cancelado ? null : (
+                  <BotonesImpresos movimiento={impresoDeMovimiento(m, conTipo)} compactos />
+                )}
                 {puedeCancelar && !m.cancelado ? (
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => alCancelar(m)}
+                    onClick={() => alCancelar({ id: m.id, folio: m.folio, tipo: m.tipo })}
                     aria-label={`Cancelar el movimiento ${m.folio}`}
                     data-testid="avance-cancelar-movimiento"
                   >
@@ -565,12 +772,180 @@ function ListaMovimientos({
   );
 }
 
+/**
+ * AVISO REINTENTABLE de los catálogos de la captura (V1-E3a). Las tres pantallas retiradas lo
+ * tenían y el panel no: si fallaba la lectura de procesos / roles / proveedores / almacenes, el
+ * combobox se quedaba vacío diciendo *"Sin coincidencias"* —que es MENTIRA: no es que no haya, es
+ * que no se pudo leer— y sin forma de reintentar salvo recargar. Mismo criterio que ya se fijó en
+ * compras (§V1-E2): un error de lectura se DICE, no se disfraza.
+ */
+function AvisoCatalogos({
+  hayError,
+  alReintentar,
+  que,
+}: {
+  hayError: boolean;
+  alReintentar: () => void;
+  /** Qué catálogos cubre el aviso (para nombrarlos en el mensaje). */
+  que: string;
+}): React.JSX.Element | null {
+  if (!hayError) {
+    return null;
+  }
+  return (
+    <div
+      className="flex flex-wrap items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+      role="alert"
+      data-testid="avance-error-catalogo"
+    >
+      <p className="text-sm text-destructive">
+        No se pudieron cargar los catálogos de la captura ({que}). Las listas pueden verse vacías:
+        no es que no haya datos, es que no se pudieron leer.
+      </p>
+      <Button variant="outline" size="sm" onClick={alReintentar} data-testid="avance-reintentar">
+        Reintentar
+      </Button>
+    </div>
+  );
+}
+
+/** Impresos de un movimiento del historial de etapas (el CORTE no tiene impreso propio). */
+function impresoDeMovimiento(m: EtapaHistorial, esArte: boolean): MovimientoImpreso {
+  if (m.tipo === 'envio_maquila') {
+    return { id: m.id, folio: m.folio, etiqueta: 'Envío', impresos: impresosDeEnvio(m.id, esArte) };
+  }
+  if (m.tipo === 'recibo_maquila') {
+    return {
+      id: m.id,
+      folio: m.folio,
+      etiqueta: 'Recibo',
+      impresos: [
+        { clave: 'recibo', etiqueta: 'PDF del recibo', url: urlImpresoRecibo(m.id), icono: 'pdf' },
+      ],
+    };
+  }
+  return { id: m.id, folio: m.folio, etiqueta: 'Corte', impresos: [] };
+}
+
+/**
+ * Lista de ENTREGAS A CLIENTE de la orden (V1-E3a): cierre del ciclo. Vivas y canceladas (las
+ * canceladas se conservan, D3), con su comprobante PDF reimprimible y la cancelación con motivo
+ * (el backend revierte la salida de PT con un movimiento inverso).
+ */
+function ListaEntregas({
+  entregas,
+  cargando,
+  puedeImprimir,
+  puedeCancelar,
+  alCancelar,
+}: {
+  entregas: readonly EntregaHistorial[];
+  cargando: boolean;
+  /**
+   * El comprobante de la entrega exige `produccion.entrega` en el SERVIDOR (a diferencia de los
+   * otros tres impresos, que van con `produccion.wip-ver` como esta lista). Sin este gate, quien
+   * solo consulta veía la impresora y el clic le abría una pestaña con un 403.
+   */
+  puedeImprimir: boolean;
+  puedeCancelar: boolean;
+  alCancelar: (movimiento: MovimientoACancelar) => void;
+}): React.JSX.Element {
+  if (cargando) {
+    return <p className="px-4 py-6 text-sm text-muted-foreground">Cargando entregas…</p>;
+  }
+  if (entregas.length === 0) {
+    return (
+      <p className="px-4 py-6 text-sm text-muted-foreground" data-testid="avance-etapa-vacia">
+        Aún no se entrega nada al cliente de esta orden.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-secondary text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <th className="px-3 py-1.5 text-left">Fecha</th>
+            <th className="px-3 py-1.5 text-left">Cliente</th>
+            <th className="px-3 py-1.5 text-left">Almacén de salida</th>
+            <th className="px-3 py-1.5 text-right">Cantidad</th>
+            <th className="px-3 py-1.5 text-left">Observaciones</th>
+            <th className="px-3 py-1.5 text-right">Imprimir / cancelar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entregas.map((e) => (
+            <tr
+              key={e.id}
+              className={cn('border-b', e.cancelado && 'opacity-55')}
+              data-testid="avance-entrega"
+            >
+              <td className="num px-3 py-1.5 whitespace-nowrap">{fechaCorta(e.fecha)}</td>
+              <td className="px-3 py-1.5 font-medium">{e.cliente ?? '—'}</td>
+              <td className="px-3 py-1.5 text-muted-foreground">{e.almacen ?? '—'}</td>
+              <td className="num px-3 py-1.5 text-right font-semibold">
+                {e.totalPiezas.toLocaleString('es-MX')}
+              </td>
+              <td className="max-w-48 truncate px-3 py-1.5 text-xs text-muted-foreground">
+                {e.cancelado ? (
+                  <span className="text-crit">
+                    Cancelada: {e.motivoCancelacion ?? 'sin motivo'}
+                  </span>
+                ) : (
+                  (e.observaciones ?? '—')
+                )}
+              </td>
+              <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                {e.cancelado || !puedeImprimir ? null : (
+                  <BotonesImpresos movimiento={impresoDeEntrega(e.id, e.folio)} compactos />
+                )}
+                {puedeCancelar && !e.cancelado ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      alCancelar({ id: e.id, folio: e.folio, tipo: 'entrega_cliente' })
+                    }
+                    aria-label={`Cancelar la entrega ${e.folio}`}
+                    data-testid="avance-cancelar-entrega"
+                  >
+                    <Ban className="size-4" aria-hidden />
+                  </Button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Impreso de una entrega a cliente: su comprobante (el que firma quien recibe). */
+function impresoDeEntrega(id: number, folio: number): MovimientoImpreso {
+  return {
+    id,
+    folio,
+    etiqueta: 'Entrega',
+    impresos: [
+      {
+        clave: 'entrega',
+        etiqueta: 'Comprobante de entrega',
+        url: urlComprobanteEntrega(id),
+        icono: 'pdf',
+      },
+    ],
+  };
+}
+
 /** Captura de un movimiento nuevo de la etapa activa (matriz con candado + proveedor + fecha). */
 function CapturaMovimiento({
   etapa,
   orden,
   wip,
   procesos,
+  procesosConError,
+  alReintentarProcesos,
   alElegirProveedor,
   alRegistrado,
   alCancelar,
@@ -579,12 +954,17 @@ function CapturaMovimiento({
   orden: NonNullable<ReturnType<typeof useOrden>['data']>;
   wip: WipOrden;
   procesos: readonly TipoProceso[];
+  /** ¿Falló la lectura del catálogo de procesos? (lo consulta el panel, no esta captura). */
+  procesosConError: boolean;
+  /** Reintenta la lectura de procesos del panel (se une al Reintentar del aviso). */
+  alReintentarProcesos: () => void;
   /**
    * Avisa al panel qué proveedor está elegido (§Post-F9.13): los puentes a inventario viven en la
    * barra de arriba y necesitan el cortador para llevarse SU almacén.
    */
   alElegirProveedor: (id: number | null) => void;
-  alRegistrado: () => void;
+  /** Avisa qué se guardó, para ofrecer su impreso en el momento. */
+  alRegistrado: (guardado: MovimientoImpreso) => void;
   /** Cierra la captura sin guardar (botón "Cancelar" del proto). */
   alCancelar: () => void;
 }): React.JSX.Element {
@@ -606,6 +986,17 @@ function CapturaMovimiento({
   const [valores, setValores] = useState<Record<string, number>>({});
   const [idAlmacenPrimeras, setIdAlmacenPrimeras] = useState<string>('');
   const [idAlmacenSegundas, setIdAlmacenSegundas] = useState<string>('');
+  /**
+   * PRECIO PACTADO y FECHA COMPROMISO (migrados de las pantallas retiradas en V1-E3a): el precio de
+   * maquila de ESTE movimiento — sin él el cargo EsMa nace sin precio y hay que teclearlo aparte, la
+   * doble captura que v2 elimina. El campo se esconde sin `ordenes.ver-precio-real-maquila` porque
+   * es el precio real de maquila (R2 §4.4.3, mismo gate con el que el backend REDACTA el dato).
+   */
+  const [precioPactado, setPrecioPactado] = useState('');
+  const [fechaCompromiso, setFechaCompromiso] = useState('');
+  /** SEGUNDAS del recibo (migradas de `/produccion/recibos`): por celda, primeras = total − segundas. */
+  const [capturarSegundas, setCapturarSegundas] = useState(false);
+  const [segundas, setSegundas] = useState<Record<string, number>>({});
   // El typeahead busca EN SERVIDOR (hay >1,700 maquileros reales; la página local de 100 no basta).
   const [textoProveedor, setTextoProveedor] = useState('');
   const busquedaProveedor = useDebounce(textoProveedor.trim(), 250);
@@ -619,6 +1010,18 @@ function CapturaMovimiento({
 
   // Procesos de APLICACIÓN (estampado/bordado/…): los que NO meten a PT. El de COSTURA es el que sí.
   const procesosAplicacion = procesos.filter((p) => !p.generaEntradaPt && p.activo);
+  /**
+   * ⚠️ LIMITACIÓN CONOCIDA (anotada en V1-E3a): las etapas de COSTURA no ofrecen selector de
+   * proceso — toman **el primer** TipoProceso activo con `generaEntradaPt`. El modelo de datos
+   * admite VARIOS (la bandera es una columna de `TipoProceso`, no un único registro), así que con
+   * dos procesos que metan a PT el panel los confundiría en una sola etapa. Antes existía escape:
+   * `/produccion/{envios,recibos}` tenían un `<select>` de proceso y se elegía a mano; al retirarlas
+   * (una sola pantalla por acto) ese escape desapareció. Hoy NO afecta —el seed y el ETL dejan un
+   * solo proceso `generaEntradaPt` (costura)— y por eso no se resuelve aquí; el arreglo correcto es
+   * un selector de proceso en las etapas de costura, como el que ya tienen las de Arte. Si algún día
+   * se da de alta un segundo proceso que meta a PT, esto hay que hacerlo ANTES.
+   * (`porRecibir` sí desambigua por orden ya usada: ver `procesoParaGuardar`.)
+   */
   const procesoCostura = procesos.find((p) => p.generaEntradaPt && p.activo);
   const procesoElegido = esAplicacion
     ? procesos.find((p) => String(p.id) === idProcesoAplicacion)
@@ -697,27 +1100,35 @@ function CapturaMovimiento({
   const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
   const requiereAlmacen = etapa === 'recibo-maquila';
 
-  // Matriz de la orden (candado D4): filas/columnas fijas.
-  const tallas = useMemo(() => {
-    const vistas = new Map<number, { idTalla: number; etiqueta: string }>();
-    for (const linea of orden.lineas) {
-      for (const t of linea.tallas) {
-        if (!vistas.has(t.idTalla))
-          vistas.set(t.idTalla, { idTalla: t.idTalla, etiqueta: t.etiquetaTalla });
-      }
+  // Aviso REINTENTABLE de los catálogos de la captura (ver `AvisoCatalogos`). `proveedores` solo
+  // cuenta cuando de verdad se consulta (en el recibo la lista sale del WIP y va deshabilitada).
+  const catalogoConError =
+    procesosConError || roles.isError || (!esRecibo && proveedores.isError) || almacenes.isError;
+  function reintentarCatalogos(): void {
+    alReintentarProcesos();
+    void roles.refetch();
+    if (!esRecibo) {
+      void proveedores.refetch();
     }
-    return [...vistas.values()];
-  }, [orden]);
-  const colores = useMemo(
-    () => orden.lineas.map((l) => ({ idColor: l.idColor, nombre: l.color })),
-    [orden],
-  );
+    void almacenes.refetch();
+  }
 
-  // Referencia (pendiente) por celda de la etapa activa, DERIVADA del WIP del servidor. `null` =
-  // sin referencia (estado NEUTRO en la matriz): el WIP solo enumera procesos YA usados, así que
-  // el PRIMER movimiento de un proceso no debe validarse contra un 0 falso ("Sobran N", hallazgo
-  // del reviewer). Para el primer ENVÍO el disponible real sí es derivable: lo CORTADO por celda
-  // (matriz de la orden − porCortar); para el primer RECIBO no hay envío contra qué validar.
+  // Matriz de la orden (candado D4): filas/columnas fijas.
+  const { tallas, colores } = useMemo(() => ejesDeOrden(orden), [orden]);
+
+  // Referencia (pendiente) por celda de la etapa activa, DERIVADA del WIP del servidor.
+  //
+  // `null` = sin referencia (estado NEUTRO en la matriz). Se usa SOLO en el RECIBO: el WIP enumera
+  // en `porRecibir` únicamente los procesos YA USADOS, así que del primer recibo de un proceso —o
+  // de un maquilero sin entrega viva— no hay NADA contra qué comparar, y validar contra un 0 sería
+  // inventarse un tope ("Sobran N" falso, hallazgo del reviewer).
+  //
+  // En el ENVÍO NUNCA es null: el disponible real siempre es derivable —lo CORTADO por celda
+  // (matriz de la orden − `porCortar`)— y `porCortar` sí trae TODAS las celdas de la orden, con
+  // ceros incluidos (`wip.ts` lo arma sobre pedido ∪ cortado sin filtrarlos). Con la orden sin
+  // cortar, la referencia legítima es 0 en cada celda: no se puede enviar a maquila lo que no se ha
+  // cortado (decisión (g), que el servidor rechaza bajo lock). Descartar ese mapa dejaba pasar la
+  // captura entera para que el 400 llegara después, con la matriz ya tecleada.
   const referencia = useMemo<Map<string, number> | null>(() => {
     const mapa = new Map<string, number>();
     if (etapa === 'corte') {
@@ -734,20 +1145,19 @@ function CapturaMovimiento({
         for (const c of entrada.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
         return mapa;
       }
-      // Primer envío a este proceso: disponible = cortado por celda (pedido − porCortar).
+      // Primer envío a este proceso: disponible = cortado por celda (pedido − porCortar). Se
+      // devuelve SIEMPRE, incluso todo en cero: cero cortado es un tope real, no una ausencia de
+      // dato (ver el comentario de arriba).
       const porCortar = new Map(
         wip.porCortar.map((c) => [claveCelda(c.idColor, c.idTalla), c.cantidad] as const),
       );
-      let hayCortado = false;
       for (const linea of orden.lineas) {
         for (const t of linea.tallas) {
           const clave = claveCelda(linea.idColor, t.idTalla);
-          const cortado = t.cantidad - (porCortar.get(clave) ?? t.cantidad);
-          if (cortado > 0) hayCortado = true;
-          mapa.set(clave, cortado);
+          mapa.set(clave, t.cantidad - (porCortar.get(clave) ?? t.cantidad));
         }
       }
-      return hayCortado ? mapa : null;
+      return mapa;
     }
     const entrada = wip.porRecibir.find((p) =>
       etapa === 'recibo-maquila'
@@ -787,13 +1197,49 @@ function CapturaMovimiento({
         ) ?? procesoCostura)
       : undefined;
 
+  // ── SEGUNDAS (calidad): en alguna celda no pueden superar el total capturado ────────────────
+  // Si las segundas exceden el total, las primeras quedarían NEGATIVAS. El servidor lo rechaza
+  // (`primeras + segundas === cantidad`); aquí se avisa y se bloquea el botón para no cosechar 400s.
+  const totalSegundas = capturarSegundas
+    ? Object.entries(segundas).reduce(
+        (s, [clave, v]) => (valores[clave] === undefined ? s : s + v),
+        0,
+      )
+    : 0;
+  const segundasInvalidas =
+    capturarSegundas &&
+    Object.entries(segundas).some(([clave, seg]) => seg > 0 && seg > (valores[clave] ?? 0));
+
+  /**
+   * EXCESO sobre el pendiente de la etapa, celda por celda. Las dos reglas de F3-E2 NO son iguales
+   * y aquí se distinguen (antes el panel no miraba el exceso en absoluto y las pantallas viejas sí):
+   *  • decisión (f) SOBRE-CORTE **LIBRE**: el servidor lo acepta. Solo se AVISA, en ámbar, diciendo
+   *    que se permite (la matriz lo pinta rojo "Sobran N", que sin este aviso se lee como error).
+   *  • decisión (g) SOBRE-ENVÍO / SOBRE-RECIBO **ESTRICTOS** (`etapas.ts` / `recibos.ts` los
+   *    rechazan bajo lock): se bloquea el botón, para no mandar al usuario a comerse un 400.
+   * Sin referencia (`null` = primer movimiento de un proceso, sin base contra qué comparar) no se
+   * inventa un tope de 0: el exceso es 0 y decide el servidor.
+   */
+  const excede =
+    referencia === null
+      ? 0
+      : Object.entries(valores).reduce((suma, [clave, cantidad]) => {
+          const pendiente = Math.max(0, referencia.get(clave) ?? 0);
+          return cantidad > pendiente ? suma + (cantidad - pendiente) : suma;
+        }, 0);
+
   const puedeGuardar =
     !ocupado &&
     total > 0 &&
     idProveedor !== null &&
     fecha !== '' &&
     (etapa === 'corte' || procesoParaGuardar !== undefined) &&
-    (!requiereAlmacen || idAlmacenPrimeras !== '');
+    (!requiereAlmacen || idAlmacenPrimeras !== '') &&
+    // Con segundas que entran a PT hay que decir a qué almacén van (igual que la pantalla vieja).
+    (!requiereAlmacen || !capturarSegundas || totalSegundas === 0 || idAlmacenSegundas !== '') &&
+    !segundasInvalidas &&
+    // El sobre-corte SÍ se guarda (decisión (f)); el sobre-envío y el sobre-recibo, NO (decisión (g)).
+    (etapa === 'corte' || excede === 0);
 
   /** Convierte la captura al cuerpo `lineas` del API (descarta ceros). */
   function lineasApi(): { idColor: number; tallas: { idTalla: number; cantidad: number }[] }[] {
@@ -810,9 +1256,69 @@ function CapturaMovimiento({
       .filter((l) => l.tallas.length > 0);
   }
 
-  function alExito(folio: number, etiqueta: string): void {
-    toast.success(`${etiqueta} #${folio} registrado · la Ruta Crítica se marca sola ✓`);
-    alRegistrado();
+  /**
+   * Igual que {@link lineasApi} pero con el DESGLOSE DE CALIDAD por celda (recibo): primeras =
+   * total − segundas. Sin el interruptor no se manda desglose y el backend lo lee como "todo
+   * primeras" — que es exactamente lo que hacía el panel ANTES de V1-E3a, y por eso las segundas
+   * eran incapturables por el camino principal.
+   */
+  function lineasReciboApi(): {
+    idColor: number;
+    tallas: {
+      idTalla: number;
+      cantidad: number;
+      cantidadPrimeras?: number;
+      cantidadSegundas?: number;
+    }[];
+  }[] {
+    if (!capturarSegundas) {
+      return lineasApi();
+    }
+    return colores
+      .map((color) => ({
+        idColor: color.idColor,
+        tallas: tallas
+          .map((t) => {
+            const clave = claveCelda(color.idColor, t.idTalla);
+            const cantidad = valores[clave] ?? 0;
+            const seg = segundas[clave] ?? 0;
+            return {
+              idTalla: t.idTalla,
+              cantidad,
+              cantidadPrimeras: cantidad - seg,
+              cantidadSegundas: seg,
+            };
+          })
+          .filter((t) => t.cantidad > 0),
+      }))
+      .filter((l) => l.tallas.length > 0);
+  }
+
+  function alExito(guardado: MovimientoImpreso): void {
+    toast.success(
+      `${guardado.etiqueta} #${guardado.folio} registrado · la Ruta Crítica se marca sola ✓`,
+    );
+    alRegistrado(guardado);
+  }
+
+  /**
+   * Precio pactado del movimiento, si se capturó.
+   *
+   * ⚠️ NO se gatea con `ordenes.ver-precio-real-maquila`: ese permiso gobierna la LECTURA (el
+   * backend REDACTA el campo a `null` al devolver etapas y recibos — `etapas.ts`/`recibos.ts`),
+   * **no la captura** (así lo fija `recibos.int.test.ts`: *"la captura no"*). Y el seed corta ese
+   * permiso de Logística hacia abajo, mientras `produccion.envio`/`.recibo` no se cortan en ninguna
+   * parte: gatear el campo dejaría SIN precio justo a los roles que capturan la maquila diaria y,
+   * como el cargo EsMa cae al `precioPactado` del recibo cuando la OP no trae precio
+   * (`esma/cargos.ts`), el cargo nacería sin precio — la doble captura que v2 elimina.
+   * La regla es: se puede TECLEAR el precio que se pactó hoy; NO se puede VER el que capturó otro.
+   */
+  function precioApi(): { precioPactado?: number } {
+    if (precioPactado.trim() === '') {
+      return {};
+    }
+    const valor = Number(precioPactado);
+    return Number.isFinite(valor) && valor >= 0 ? { precioPactado: valor } : {};
   }
 
   function guardar(): void {
@@ -827,7 +1333,7 @@ function CapturaMovimiento({
       crearCorte.mutate(
         { ...comunes, idCortador: idProveedor },
         {
-          onSuccess: (e) => alExito(e.folio, 'Corte'),
+          onSuccess: (e) => alExito({ id: e.id, folio: e.folio, etiqueta: 'Corte', impresos: [] }),
           onError: (error) => toast.error(error.message),
         },
       );
@@ -838,8 +1344,10 @@ function CapturaMovimiento({
       crearRecibo.mutate(
         {
           ...comunes,
+          lineas: lineasReciboApi(),
           idTipoProceso: procesoParaGuardar.id,
           idMaquilero: idProveedor,
+          ...precioApi(),
           ...(requiereAlmacen && idAlmacenPrimeras !== ''
             ? { idAlmacenPrimeras: Number(idAlmacenPrimeras) }
             : {}),
@@ -848,16 +1356,41 @@ function CapturaMovimiento({
             : {}),
         },
         {
-          onSuccess: (r) => alExito(r.folio, 'Recibo'),
+          onSuccess: (r) =>
+            alExito({
+              id: r.id,
+              folio: r.folio,
+              etiqueta: 'Recibo',
+              impresos: [
+                {
+                  clave: 'recibo',
+                  etiqueta: 'PDF del recibo',
+                  url: urlImpresoRecibo(r.id),
+                  icono: 'pdf',
+                },
+              ],
+            }),
           onError: (error) => toast.error(error.message),
         },
       );
       return;
     }
     crearEnvio.mutate(
-      { ...comunes, idTipoProceso: procesoParaGuardar.id, idMaquilero: idProveedor },
       {
-        onSuccess: (e) => alExito(e.folio, 'Envío'),
+        ...comunes,
+        idTipoProceso: procesoParaGuardar.id,
+        idMaquilero: idProveedor,
+        ...precioApi(),
+        ...(fechaCompromiso === '' ? {} : { fechaCompromiso }),
+      },
+      {
+        onSuccess: (e) =>
+          alExito({
+            id: e.id,
+            folio: e.folio,
+            etiqueta: 'Envío',
+            impresos: impresosDeEnvio(e.id, esAplicacion),
+          }),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -867,6 +1400,11 @@ function CapturaMovimiento({
 
   return (
     <div className="space-y-3 border-b bg-panel-2 px-4 py-3" data-testid="avance-captura">
+      <AvisoCatalogos
+        hayError={catalogoConError}
+        alReintentar={reintentarCatalogos}
+        que={etapa === 'corte' ? 'cortadores' : 'procesos, proveedores o almacenes'}
+      />
       <div className={cn('grid gap-3', esAplicacion ? 'sm:grid-cols-4' : 'sm:grid-cols-3')}>
         <Field>
           <FieldLabel htmlFor="avance-fecha">Fecha</FieldLabel>
@@ -971,6 +1509,41 @@ function CapturaMovimiento({
         </Field>
       </div>
 
+      {/* PRECIO PACTADO (envío y recibo) + FECHA COMPROMISO (envío): migrados de las pantallas
+          retiradas en V1-E3a. Sin el precio, el cargo EsMa del recibo nace SIN precio y hay que
+          teclearlo aparte en su módulo (la doble captura que v2 elimina). */}
+      {etapa !== 'corte' ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* El precio se CAPTURA sin permiso extra: `ordenes.ver-precio-real-maquila` gobierna la
+              LECTURA (el backend redacta el campo al devolverlo), no la escritura — ver `precioApi`. */}
+          <Field>
+            <FieldLabel htmlFor="avance-precio">Precio pactado por prenda</FieldLabel>
+            <Input
+              id="avance-precio"
+              type="number"
+              min={0}
+              step="0.01"
+              value={precioPactado}
+              onChange={(e) => setPrecioPactado(e.target.value)}
+              placeholder="Opcional"
+              data-testid="avance-precio"
+            />
+          </Field>
+          {!esRecibo ? (
+            <Field>
+              <FieldLabel htmlFor="avance-fecha-compromiso">Fecha compromiso</FieldLabel>
+              <Input
+                id="avance-fecha-compromiso"
+                type="date"
+                value={fechaCompromiso}
+                onChange={(e) => setFechaCompromiso(e.target.value)}
+                data-testid="avance-fecha-compromiso"
+              />
+            </Field>
+          ) : null}
+        </div>
+      ) : null}
+
       {requiereAlmacen ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
@@ -989,24 +1562,26 @@ function CapturaMovimiento({
               ))}
             </SelectNativo>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="avance-almacen-segundas">
-              Almacén de segundas (opcional)
-            </FieldLabel>
-            <SelectNativo
-              id="avance-almacen-segundas"
-              value={idAlmacenSegundas}
-              onChange={(e) => setIdAlmacenSegundas(e.target.value)}
-              data-testid="avance-almacen-segundas"
-            >
-              <option value="">Sin segundas</option>
-              {almacenesPt.map((a) => (
-                <option key={a.id} value={String(a.id)}>
-                  {a.nombre}
-                </option>
-              ))}
-            </SelectNativo>
-          </Field>
+          {/* El almacén de segundas solo se pide cuando SÍ se van a capturar segundas: antes se
+              ofrecía siempre, en un camino que jamás podía mandar una (V1-E3a). */}
+          {capturarSegundas ? (
+            <Field>
+              <FieldLabel htmlFor="avance-almacen-segundas">Almacén de segundas</FieldLabel>
+              <SelectNativo
+                id="avance-almacen-segundas"
+                value={idAlmacenSegundas}
+                onChange={(e) => setIdAlmacenSegundas(e.target.value)}
+                data-testid="avance-almacen-segundas"
+              >
+                <option value="">Elige el almacén…</option>
+                {almacenesPt.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+            </Field>
+          ) : null}
         </div>
       ) : null}
 
@@ -1022,6 +1597,86 @@ function CapturaMovimiento({
         etiquetaReferencia="pendiente de la etapa"
         testid="avance-matriz"
       />
+
+      {/* ── SEGUNDAS del recibo (migradas de `/produccion/recibos`, V1-E3a) ─────────────────── */}
+      {esRecibo ? (
+        <>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={capturarSegundas}
+              onChange={(e) => {
+                setCapturarSegundas(e.target.checked);
+                if (!e.target.checked) {
+                  // Al apagar el interruptor no queda un desglose fantasma: todo vuelve a primeras.
+                  setSegundas({});
+                  setIdAlmacenSegundas('');
+                }
+              }}
+              className="size-4 rounded border-input"
+              data-testid="avance-toggle-segundas"
+            />
+            Capturar piezas de segunda (calidad) por celda
+          </label>
+          {capturarSegundas ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Piezas de SEGUNDA por celda · no pueden exceder el total recibido (las primeras se
+                calculan como total − segundas).
+              </p>
+              <MatrizColorTalla
+                tallas={tallas}
+                colores={colores}
+                valores={segundas}
+                onCambiar={(idColor, idTalla, cantidad) =>
+                  setSegundas((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+                }
+                // La referencia de las segundas es el TOTAL capturado por celda: el tope real.
+                referencia={new Map(Object.entries(valores).filter(([, v]) => v > 0))}
+                totalReferencia={total}
+                etiquetaReferencia="total recibido"
+                testid="avance-matriz-segundas"
+              />
+            </div>
+          ) : null}
+          {segundasInvalidas ? (
+            <p
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="avance-aviso-segundas"
+            >
+              En alguna celda las piezas de segunda superan el total recibido. Las primeras no
+              pueden quedar negativas.
+            </p>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* ── Las DOS reglas del exceso, cada una con su tono (V1-E3a) ────────────────────────── */}
+      {excede > 0 && etapa === 'corte' ? (
+        // Decisión (f): el SOBRE-CORTE se permite. La matriz lo pinta rojo ("Sobran N pzas sobre el
+        // pendiente"), que sin este aviso se lee como un error que hay que corregir.
+        <p
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+          data-testid="avance-aviso-sobrecorte"
+        >
+          Estás cortando {excede.toLocaleString('es-MX')} pieza(s) por encima de lo pendiente de la
+          orden. <b>Se permite</b> (solo es un aviso): el sobre-corte queda registrado tal cual.
+        </p>
+      ) : null}
+      {excede > 0 && etapa !== 'corte' ? (
+        // Decisión (g): el sobre-envío y el sobre-recibo son ESTRICTOS en el servidor (bajo lock).
+        // Se bloquea aquí para no mandar al usuario a comerse un 400 con la matriz ya tecleada.
+        <p
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+          data-testid="avance-aviso-exceso"
+        >
+          Estás {esRecibo ? 'recibiendo' : 'enviando'} {excede.toLocaleString('es-MX')} pieza(s) por
+          encima de lo pendiente de esta etapa. Ajusta las cantidades: el servidor no lo permitirá.
+        </p>
+      ) : null}
 
       {/* Pie del form (proto `.pc-actions`): quién captura + Cancelar + total + guardar. */}
       <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
@@ -1039,6 +1694,236 @@ function CapturaMovimiento({
         <Button onClick={guardar} disabled={!puedeGuardar} data-testid="avance-guardar">
           {ocupado ? <Loader2 className="animate-spin" aria-hidden /> : null}
           Guardar movimiento
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CAPTURA DE LA ENTREGA A CLIENTE (V1-E3a): el CIERRE del ciclo, dentro del panel de avance. Saca
+ * producto terminado del almacén de PT elegido hacia el cliente de la orden.
+ *
+ * NO reimplementa nada: pega a los MISMOS endpoints que `EntregaClientePagina` —el dominio
+ * `entregas-cliente.ts` es la autoridad (A1)— y acota la matriz con el `seguimiento-entrega` que
+ * DERIVA el servidor (pedido − entregado, y el `disponible` del almacén elegido). El servidor
+ * re-valida: no deja entregar más que la existencia (no-negativo estricto bajo lock, D3).
+ */
+function CapturaEntregaCliente({
+  orden,
+  alRegistrado,
+  alCancelar,
+}: {
+  orden: NonNullable<ReturnType<typeof useOrden>['data']>;
+  alRegistrado: (guardado: MovimientoImpreso) => void;
+  alCancelar: () => void;
+}): React.JSX.Element {
+  const { sesion } = useSesion();
+  const [fecha, setFecha] = useState(hoy());
+  const [idAlmacen, setIdAlmacen] = useState<string>('');
+  const [observaciones, setObservaciones] = useState('');
+  const [valores, setValores] = useState<Record<string, number>>({});
+
+  const crear = useCrearEntrega();
+  // Solo almacenes de PT: el producto terminado no sale de una bodega de tela ni de avíos.
+  const almacenes = useAlmacenes({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+  });
+  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
+
+  // Seguimiento DERIVADO (pedido − entregado) + `disponible` del almacén elegido, para acotar.
+  const seguimiento = useSeguimientoEntrega(
+    orden.id,
+    idAlmacen === '' ? {} : { idAlmacen: Number(idAlmacen) },
+  );
+
+  const { tallas, colores } = useMemo(() => ejesDeOrden(orden), [orden]);
+
+  /** Aviso reintentable: sin almacenes la captura no arranca, y sin seguimiento no hay tope. */
+  function reintentarCatalogos(): void {
+    void almacenes.refetch();
+    void seguimiento.refetch();
+  }
+
+  /**
+   * Referencia por celda = lo DISPONIBLE en el almacén elegido (que es el tope real de la salida).
+   * Sin almacén no hay referencia: la matriz queda en estado NEUTRO en vez de fingir un tope de 0.
+   */
+  const referencia = useMemo<Map<string, number> | null>(() => {
+    if (idAlmacen === '' || seguimiento.data === undefined) {
+      return null;
+    }
+    const mapa = new Map<string, number>();
+    for (const c of seguimiento.data.celdas) {
+      mapa.set(claveCelda(c.idColor, c.idTalla), c.disponible);
+    }
+    return mapa;
+  }, [idAlmacen, seguimiento.data]);
+  const totalReferencia =
+    referencia === null
+      ? undefined
+      : [...referencia.values()].reduce((s, v) => s + Math.max(0, v), 0);
+
+  const total = Object.values(valores).reduce((s, v) => s + v, 0);
+  // Exceso sobre el disponible: el servidor lo rechaza (no-negativo estricto); aquí se avisa en vivo.
+  const excede =
+    referencia === null
+      ? 0
+      : Object.entries(valores).reduce((s, [clave, cantidad]) => {
+          const disponible = Math.max(0, referencia.get(clave) ?? 0);
+          return cantidad > disponible ? s + (cantidad - disponible) : s;
+        }, 0);
+
+  const puedeGuardar = !crear.isPending && total > 0 && idAlmacen !== '' && excede === 0;
+
+  function guardar(): void {
+    if (idAlmacen === '') return;
+    crear.mutate(
+      {
+        idOrden: orden.id,
+        idAlmacen: Number(idAlmacen),
+        fecha,
+        ...(observaciones.trim() === '' ? {} : { observaciones: observaciones.trim() }),
+        lineas: colores
+          .map((color) => ({
+            idColor: color.idColor,
+            tallas: tallas
+              .map((t) => ({
+                idTalla: t.idTalla,
+                cantidad: valores[claveCelda(color.idColor, t.idTalla)] ?? 0,
+              }))
+              .filter((t) => t.cantidad > 0),
+          }))
+          .filter((l) => l.tallas.length > 0),
+      },
+      {
+        onSuccess: (entrega) => {
+          toast.success(
+            `Entrega #${entrega.folio} a ${entrega.cliente ?? 'cliente'} registrada (${entrega.totalPiezas.toLocaleString('es-MX')} pzas) · la Ruta Crítica se marca sola ✓`,
+          );
+          alRegistrado(impresoDeEntrega(entrega.id, entrega.folio));
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <div className="space-y-3 border-b bg-panel-2 px-4 py-3" data-testid="avance-captura">
+      <AvisoCatalogos
+        hayError={almacenes.isError || seguimiento.isError}
+        alReintentar={reintentarCatalogos}
+        que="almacenes o el seguimiento del pedido"
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field>
+          <FieldLabel htmlFor="avance-entrega-fecha">Fecha de entrega</FieldLabel>
+          <Input
+            id="avance-entrega-fecha"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            data-testid="avance-entrega-fecha"
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="avance-entrega-almacen">Almacén de salida</FieldLabel>
+          <SelectNativo
+            id="avance-entrega-almacen"
+            value={idAlmacen}
+            onChange={(e) => setIdAlmacen(e.target.value)}
+            data-testid="avance-entrega-almacen"
+          >
+            <option value="">Elige el almacén…</option>
+            {almacenesPt.map((a) => (
+              <option key={a.id} value={String(a.id)}>
+                {a.nombre}
+              </option>
+            ))}
+          </SelectNativo>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="avance-entrega-obs">
+            Observaciones / referencia del pedido
+          </FieldLabel>
+          <Input
+            id="avance-entrega-obs"
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            placeholder="Opcional (p. ej. nº de pedido del cliente)"
+            data-testid="avance-entrega-observaciones"
+          />
+        </Field>
+      </div>
+
+      {seguimiento.data !== undefined ? (
+        <div
+          className="grid gap-3 rounded-md border bg-card px-3 py-2 text-sm sm:grid-cols-3"
+          data-testid="avance-entrega-seguimiento"
+        >
+          <span>
+            Pedido: <b className="num">{seguimiento.data.totalPedido.toLocaleString('es-MX')}</b>
+          </span>
+          <span>
+            Entregado:{' '}
+            <b className="num">{seguimiento.data.totalEntregado.toLocaleString('es-MX')}</b>
+          </span>
+          <span>
+            Faltante:{' '}
+            <b className="num">{seguimiento.data.totalFaltante.toLocaleString('es-MX')}</b>
+          </span>
+        </div>
+      ) : null}
+
+      <MatrizColorTalla
+        tallas={tallas}
+        colores={colores}
+        valores={valores}
+        onCambiar={(idColor, idTalla, cantidad) =>
+          setValores((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+        }
+        {...(referencia === null ? {} : { referencia })}
+        {...(totalReferencia === undefined ? {} : { totalReferencia })}
+        etiquetaReferencia="disponible en el almacén"
+        deshabilitada={idAlmacen === ''}
+        testid="avance-entrega-matriz"
+      />
+
+      {idAlmacen === '' ? (
+        <p className="text-sm text-muted-foreground">
+          Elige el almacén de salida para ver la existencia disponible y capturar la entrega.
+        </p>
+      ) : null}
+
+      {excede > 0 ? (
+        <p
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+          data-testid="avance-entrega-aviso-exceso"
+        >
+          Estás entregando {excede.toLocaleString('es-MX')} pieza(s) por encima de la existencia de
+          esta orden en el almacén. Ajusta las cantidades: el servidor no lo permitirá.
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        <span className="mr-auto flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+          <span>
+            Captura: <b className="text-foreground">{sesion?.nombre ?? '—'}</b>
+          </span>
+          <span>
+            Total a entregar: <b className="num text-foreground">{total.toLocaleString('es-MX')}</b>
+          </span>
+        </span>
+        <Button variant="ghost" onClick={alCancelar} data-testid="avance-cancelar-captura">
+          Cancelar
+        </Button>
+        <Button onClick={guardar} disabled={!puedeGuardar} data-testid="avance-guardar">
+          {crear.isPending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+          Guardar entrega
         </Button>
       </div>
     </div>
@@ -1097,6 +1982,22 @@ function ResumenAvance({
           />
         </div>
       </div>
+      {/* CIERRE del ciclo (V1-E3a): lo que ya salió al cliente y lo que le falta salir. Todo
+          DERIVADO en servidor (`entregado` / `porEntregar` = recibido de costura − entregado). */}
+      <div>
+        <h4 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Resumen · entrega al cliente
+        </h4>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <TarjetaResumen etiqueta="Ordenada" valor={n(wip.pedido)} />
+          <TarjetaResumen etiqueta="Entregada al cliente" valor={n(wip.entregado)} />
+          <TarjetaResumen
+            etiqueta="Lista por entregar"
+            valor={n(Math.max(0, wip.porEntregar))}
+            tono={wip.porEntregar > 0 ? 'warn' : 'ok'}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1130,19 +2031,25 @@ function TarjetaResumen({
   );
 }
 
-/** Diálogo de cancelación SUAVE de un movimiento (corte/envío/recibo) con motivo obligatorio. */
+/**
+ * Diálogo de cancelación SUAVE de un movimiento (corte / envío / recibo / entrega a cliente) con
+ * motivo obligatorio. El backend conserva el movimiento como historial (D3) y, cuando movió
+ * inventario (recibo y entrega), registra su INVERSO — nunca edita ni borra.
+ */
 function DialogoCancelarMovimiento({
   movimiento,
   alCerrar,
   alCancelado,
 }: {
-  movimiento: EtapaHistorial | null;
+  movimiento: MovimientoACancelar | null;
   alCerrar: () => void;
-  alCancelado: () => void;
+  /** Avisa QUÉ se canceló (el panel retira su barra de impresos si era ese movimiento). */
+  alCancelado: (cancelado: MovimientoACancelar) => void;
 }): React.JSX.Element {
   const cancelarCorte = useCancelarCorte();
   const cancelarEnvio = useCancelarEnvio();
   const cancelarRecibo = useCancelarRecibo();
+  const cancelarEntrega = useCancelarEntrega();
   const [motivo, setMotivo] = useState('');
 
   useEffect(() => {
@@ -1150,9 +2057,22 @@ function DialogoCancelarMovimiento({
   }, [movimiento]);
 
   const tipo = movimiento?.tipo;
-  const etiqueta = tipo === 'corte' ? 'corte' : tipo === 'recibo_maquila' ? 'recibo' : 'envío';
+  const etiqueta =
+    tipo === 'corte'
+      ? 'corte'
+      : tipo === 'recibo_maquila'
+        ? 'recibo'
+        : tipo === 'entrega_cliente'
+          ? 'entrega'
+          : 'envío';
   const mutacion =
-    tipo === 'corte' ? cancelarCorte : tipo === 'recibo_maquila' ? cancelarRecibo : cancelarEnvio;
+    tipo === 'corte'
+      ? cancelarCorte
+      : tipo === 'recibo_maquila'
+        ? cancelarRecibo
+        : tipo === 'entrega_cliente'
+          ? cancelarEntrega
+          : cancelarEnvio;
   const sinMotivo = motivo.trim().length < 3;
 
   function confirmar(): void {
@@ -1163,7 +2083,7 @@ function DialogoCancelarMovimiento({
         onSuccess: () => {
           toast.success(`Movimiento #${movimiento.folio} cancelado (se conserva como historial).`);
           alCerrar();
-          alCancelado();
+          alCancelado(movimiento);
         },
         onError: (error) => toast.error(error.message),
       },

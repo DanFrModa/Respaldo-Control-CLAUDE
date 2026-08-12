@@ -71,22 +71,41 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
 
-    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 9 padres desplegables
-    // (Desarrollo, Producción, Calidad, Inventario PT, Telas, Avíos, Compras / MRP, Clientes,
-    // Catálogos base), ni uno más. «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel,
-    // 6-ago-2026: el catálogo de telas tenía que verse en el menú), «Compras / MRP» el
-    // 11-ago-2026 (mismo motivo: la recepción de compras no tenía entrada en el menú) y
-    // «Inventario PT» + «Avíos» el 12-ago-2026 («destapa las cosas de una vez»).
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 8 padres desplegables
+    // (Desarrollo, Producción, Inventario PT, Telas, Avíos, Compras / MRP, Clientes, Catálogos
+    // base), ni uno más. «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel, 6-ago-2026:
+    // el catálogo de telas tenía que verse en el menú), «Compras / MRP» el 11-ago-2026 (mismo
+    // motivo: la recepción de compras no tenía entrada en el menú) e «Inventario PT» + «Avíos» el
+    // 12-ago-2026 («destapa las cosas de una vez»). «Calidad» DEJÓ de ser padre el 13-ago-2026
+    // (V1-E3a): como desplegable, `PadreNav` no navega y sus catálogos (defectos, tipos de
+    // producto, planes AQL, auditorías por maquilero) eran inalcanzables desde toda la app → ahora
+    // es HOJA a su portada-hub `/calidad`, que tiene las 7 tarjetas.
     const padres = navegacion.getByRole('button');
-    expect(await padres.count()).toBe(9);
-    // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
-    // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
-    // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
-    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
-    await expect(
-      navegacion.getByRole('link', { name: 'Notas de salida', exact: true }),
-    ).toBeVisible();
-    await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toHaveCount(0);
+    expect(await padres.count()).toBe(8);
+    await expect(navegacion.getByRole('link', { name: 'Calidad', exact: true })).toBeVisible();
+    // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo): sus SEIS hijos
+    // curados se ven SIN clic (V1-E3a: antes eran solo dos y las otras 15 sub-vistas no tenían
+    // entrada de menú — la ENTREGA A CLIENTE, el cierre del ciclo, no la enlazaba nada). Las demás
+    // CONSULTAS siguen fuera del riel, en ⌘K y en la portada-hub /produccion.
+    for (const hijoProd of [
+      'Órdenes (OP)',
+      'Entrega a cliente',
+      'Tablero WIP',
+      'En poder del maquilero',
+      // «Consulta de órdenes» entra por su IMPRESIÓN EN LOTE (capacidad que no está en el Centro).
+      'Consulta de órdenes',
+      'Notas de salida',
+    ]) {
+      await expect(navegacion.getByRole('link', { name: hijoProd, exact: true })).toBeVisible();
+    }
+    // Las consultas que SÍ duplican lo que ya hacen el Centro o Pedidos siguen fuera del riel.
+    await expect(navegacion.getByRole('link', { name: 'Órdenes incompletas' })).toHaveCount(0);
+    await expect(navegacion.getByRole('link', { name: 'Corte semanal' })).toHaveCount(0);
+    // Las tres pantallas del MISMO acto (corte/envío/recibo) se retiraron: se capturan en el panel
+    // de avance del Centro de Órdenes (§Post-F9.36 punto 2).
+    for (const retirada of ['Captura de corte', 'Envío a maquila', 'Recibo de maquila']) {
+      await expect(navegacion.getByRole('link', { name: retirada, exact: true })).toHaveCount(0);
+    }
     // El padre sigue siendo desplegable: un clic la cierra y otro la reabre.
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);

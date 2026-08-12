@@ -21,6 +21,7 @@ type EstadoConsulta = {
 };
 const usePedidos = vi.fn<(query: unknown) => EstadoConsulta>();
 const cancelarMutate = vi.fn();
+const actualizarMutate = vi.fn();
 let ultimaQuery: Record<string, unknown> | undefined;
 
 vi.mock('@/api/pedidos', () => ({
@@ -29,7 +30,7 @@ vi.mock('@/api/pedidos', () => ({
     return usePedidos(query);
   },
   useCrearPedido: () => ({ mutate: vi.fn(), isPending: false }),
-  useActualizarPedido: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarPedido: () => ({ mutate: actualizarMutate, isPending: false }),
   useCopiarPedido: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarPedido: () => ({ mutate: cancelarMutate, isPending: false }),
   // Panel de pedidos reales (detalle): inerte.
@@ -39,12 +40,18 @@ vi.mock('@/api/pedidos', () => ({
   useActualizarSeguimiento: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-// Selectores del diálogo (clientes/modelos): inertes (no se abren en estas pruebas).
+// Selectores del diálogo (clientes/modelos): traen SOLO las opciones que usan los pedidos de
+// ejemplo (cliente 3 y el modelo del renglón), para que al abrir el diálogo de edición los
+// `<select>` conserven el valor del `reset` y el formulario pueda enviarse. Con las listas vacías,
+// el select caía a "" y la validación de captura bloqueaba el submit.
 vi.mock('@/api/clientes', () => ({
-  useClientes: () => ({ data: { datos: [] }, isPending: false }),
+  useClientes: () => ({ data: { datos: [{ id: 3, nombre: 'Liverpool' }] }, isPending: false }),
 }));
 vi.mock('@/api/modelos', () => ({
-  useModelos: () => ({ data: { datos: [] }, isPending: false }),
+  useModelos: () => ({
+    data: { datos: [{ id: 1060, codigo: 'A-100', descripcion: null }] },
+    isPending: false,
+  }),
 }));
 
 /** Un renglón de ejemplo. */
@@ -70,7 +77,7 @@ function pedido(
   id: number,
   folio: number,
   cliente: string,
-  opciones: { cancelado?: boolean; precio?: number | null } = {},
+  opciones: { cancelado?: boolean; precio?: number | null; noProducir?: boolean } = {},
 ): Pedido {
   const precio = opciones.precio === undefined ? 50 : opciones.precio;
   return {
@@ -85,7 +92,7 @@ function pedido(
     fechaTela: '2026-06-20',
     fechaElaboracion: '2026-06-22',
     entregadoTienda: false,
-    noProducir: false,
+    noProducir: opciones.noProducir ?? false,
     pedCancelado: opciones.cancelado ?? false,
     ocCliente: null,
     idOrdCompraV1: null,
@@ -125,6 +132,7 @@ describe('<PedidosPagina>', () => {
   beforeEach(() => {
     usePedidos.mockReset();
     cancelarMutate.mockReset();
+    actualizarMutate.mockReset();
     ultimaQuery = undefined;
   });
 
@@ -237,6 +245,54 @@ describe('<PedidosPagina>', () => {
     const detalle = screen.getByTestId('detalle-pedido');
     expect(within(detalle).getByText('Cancelado')).toBeInTheDocument();
     expect(screen.queryByTestId('copiar-pedido')).not.toBeInTheDocument();
+  });
+
+  it('«No producir» se VE en el detalle y con su badge (V1-E3a, §Post-F9.36 punto 3)', () => {
+    // La bandera hace que el servidor RECHACE "Generar OP" (`dominio/produccion/ordenes.ts`) y hasta
+    // V1-E3a no aparecía en NINGUNA pantalla: los pedidos migrados de Access la traen, así que el
+    // bloqueo no tenía salida ni explicación.
+    usePedidos.mockReturnValue(
+      consultaConDatos([pedido(4, 104, 'Liverpool', { noProducir: true })]),
+    );
+    renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+    const detalle = screen.getByTestId('detalle-pedido');
+    expect(within(detalle).getByTestId('pedido-badge-no-producir')).toBeInTheDocument();
+    // Dos apariciones: el badge del encabezado y la etiqueta del campo del detalle.
+    expect(within(detalle).getAllByText('No producir')).toHaveLength(2);
+    expect(
+      within(detalle).getByText(/no se le pueden generar órdenes de producción/),
+    ).toBeInTheDocument();
+  });
+
+  it('un pedido normal NO trae el badge de «No producir»', () => {
+    usePedidos.mockReturnValue(consultaConDatos([pedido(5, 105, 'Liverpool')]));
+    renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+    expect(screen.queryByTestId('pedido-badge-no-producir')).not.toBeInTheDocument();
+  });
+
+  it('el diálogo de edición trae la casilla «No producir» marcada y editable', async () => {
+    const usuario = userEvent.setup();
+    usePedidos.mockReturnValue(
+      consultaConDatos([pedido(6, 106, 'Liverpool', { noProducir: true })]),
+    );
+    renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+    await usuario.click(screen.getByTestId('editar-pedido'));
+    const dialogo = await screen.findByRole('dialog');
+    const casilla = within(dialogo).getByTestId('pedido-no-producir');
+    expect(casilla).toBeChecked();
+    // Y se puede DESMARCAR: es la salida que el bloqueo no tenía. Se guarda y el PATCH lleva la
+    // bandera en `false` — sin esto el pedido quedaría atrapado sin poder generar OP nunca.
+    await usuario.click(casilla);
+    expect(casilla).not.toBeChecked();
+    await usuario.click(screen.getByTestId('guardar-pedido'));
+    await vi.waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    expect(actualizarMutate.mock.calls[0]?.[0]).toMatchObject({
+      id: 6,
+      cuerpo: { noProducir: false },
+    });
   });
 
   it('la búsqueda se refleja en la consulta del API', async () => {

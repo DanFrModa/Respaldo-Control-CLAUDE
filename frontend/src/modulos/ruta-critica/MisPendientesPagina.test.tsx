@@ -17,6 +17,7 @@ const useBandejaRc = vi.fn();
 const useResumenPendientesRc = vi.fn();
 const useResponsablesRc = vi.fn();
 const capturarMutate = vi.fn();
+const navegar = vi.fn();
 
 vi.mock('@/api/ruta-critica-programacion', () => ({
   useBandejaRc: (query: unknown) => useBandejaRc(query) as unknown,
@@ -27,6 +28,10 @@ vi.mock('@/api/ruta-critica-programacion', () => ({
   useRutaOrden: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useElegirSecuenciaEstampado: () => ({ mutate: vi.fn(), isPending: false }),
   urlPlanImpresoRc: (idOrden: number) => `/api/ruta-critica/ordenes/${idOrden}/plan-impreso`,
+}));
+vi.mock('react-router-dom', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useNavigate: () => navegar,
 }));
 
 function tarea(id: number, extra: Partial<TareaRc> = {}): TareaRc {
@@ -105,6 +110,7 @@ beforeEach(() => {
   useResumenPendientesRc.mockReset();
   useResponsablesRc.mockReset();
   capturarMutate.mockReset();
+  navegar.mockReset();
   useResumenPendientesRc.mockReturnValue({ data: resumen(), isPending: false });
   useResponsablesRc.mockReturnValue({ data: [], isPending: false });
 });
@@ -179,6 +185,61 @@ describe('<MisPendientesPagina>', () => {
       expect.objectContaining({ idRuta: 2, cumplido: true }),
       expect.anything(),
     );
+  });
+
+  it('«Registrar» de un evento de producción lleva a LA orden y a SU etapa del avance', async () => {
+    // V1-E3a: al retirarse `/produccion/{corte,envios,recibos}`, el botón lleva al PANEL DE AVANCE
+    // del Centro de Órdenes. Sin `state` el usuario aterrizaba en una lista de cientos de órdenes;
+    // sin `etapaAvance`, en la etapa «Corte» aunque su pendiente fuera un recibo de estampado.
+    const usuario = userEvent.setup();
+    useBandejaRc.mockReturnValue(
+      consulta([
+        tarea(1, {
+          urgencia: 'hoy',
+          tipoEvento: 'reciboEstampado',
+          nombreProceso: 'Recibo de estampado',
+        }),
+      ]),
+    );
+    renderConProveedores(<MisPendientesPagina />, {
+      sesion: estadoSesionDePrueba(['rc.ruta-ver']),
+    });
+
+    await usuario.click(screen.getByTestId('pendientes-registrar'));
+    expect(navegar).toHaveBeenCalledWith('/produccion/ordenes', {
+      state: { idOrden: 101, abrirAvance: true, etapaAvance: 'recibo-aplicacion' },
+    });
+  });
+
+  it('«Registrar» de la entrega a cliente lleva la orden, pero NO abre el panel de avance', async () => {
+    const usuario = userEvent.setup();
+    useBandejaRc.mockReturnValue(
+      consulta([
+        tarea(1, { urgencia: 'hoy', tipoEvento: 'entregaCliente', nombreProceso: 'Entrega' }),
+      ]),
+    );
+    renderConProveedores(<MisPendientesPagina />, {
+      sesion: estadoSesionDePrueba(['rc.ruta-ver']),
+    });
+
+    await usuario.click(screen.getByTestId('pendientes-registrar'));
+    // La entrega tiene su propia pantalla: solo necesita la orden.
+    expect(navegar).toHaveBeenCalledWith('/produccion/entregas', { state: { idOrden: 101 } });
+  });
+
+  it('«Registrar» de un evento SIN deep-link navega sin `state` (la pantalla no lo lee)', async () => {
+    const usuario = userEvent.setup();
+    useBandejaRc.mockReturnValue(
+      consulta([
+        tarea(1, { urgencia: 'hoy', tipoEvento: 'recepcionTela', nombreProceso: 'Recepción' }),
+      ]),
+    );
+    renderConProveedores(<MisPendientesPagina />, {
+      sesion: estadoSesionDePrueba(['rc.ruta-ver']),
+    });
+
+    await usuario.click(screen.getByTestId('pendientes-registrar'));
+    expect(navegar).toHaveBeenCalledWith('/compras/recepcion', {});
   });
 
   it('sin rc.capturar no ofrece "Marcar hecho"; sin rc.programar no hay selector de persona', () => {
