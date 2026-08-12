@@ -12,7 +12,6 @@ import { ErrorDeApi } from './errores';
 import type {
   AjusteAvioCrear,
   AjusteTelaColorCrear,
-  AjusteTelaCrear,
   ExistenciasAvio,
   ExistenciasAvioQuery,
   ExistenciasTela,
@@ -54,12 +53,6 @@ import type {
 export const CLAVE_INVENTARIO_MATERIALES = ['inventario-materiales'] as const;
 
 // ── Llamadas: TELAS ────────────────────────────────────────────────────────────
-
-async function ajustarTela(cuerpo: AjusteTelaCrear): Promise<MovimientoTela> {
-  const { data, error } = await api.POST('/api/inventarios/telas/ajustes', { body: cuerpo });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
 
 async function salidaTelaAOrden(cuerpo: SalidaTelaCrear): Promise<MovimientoTela> {
   const { data, error } = await api.POST('/api/inventarios/telas/salidas-orden', { body: cuerpo });
@@ -303,15 +296,6 @@ export function useKardexAvio(
 }
 
 // ── Hooks de mutación: TELAS ───────────────────────────────────────────────────
-
-/** Registra un ajuste de tela e invalida existencias/kardex. */
-export function useAjustarTela(): UseMutationResult<MovimientoTela, ErrorDeApi, AjusteTelaCrear> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ajustarTela,
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
-  });
-}
 
 /** Registra una salida de tela a orden e invalida existencias/kardex. */
 export function useSalidaTelaAOrden(): UseMutationResult<

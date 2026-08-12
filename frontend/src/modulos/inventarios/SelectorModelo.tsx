@@ -15,12 +15,15 @@ export function SelectorModelo({
   idSeleccionado,
   alSeleccionar,
   alLimpiar,
+  idInput,
   testid = 'selector-modelo',
 }: {
   idSeleccionado: number | undefined;
   alSeleccionar: (modelo: Modelo) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
   alLimpiar?: () => void;
+  /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
+  idInput?: string | undefined;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -64,6 +67,7 @@ export function SelectorModelo({
       textoVacio="No hay modelos que coincidan."
       testid={testid}
       testidInput={`${testid}-busqueda`}
+      idInput={idInput}
     />
   );
 }

@@ -11,6 +11,8 @@
  *  • `POST /ordenes-compra/:idOrdenCompra/recepciones`   — recibir (parcial o total) → **201** con la
  *    recepción creada.
  *  • `GET  /ordenes-compra/:idOrdenCompra/recepciones`   — historial de recepciones de la OC (200).
+ *  • `GET  /ordenes-compra/:idOrdenCompra/lineas-pendientes` — pendiente por recibir de cada
+ *    renglón de la OC (200): lo que precarga la captura de la recepción.
  *  • `GET  /recepciones-compra/:id`                       — obtener una recepción (200).
  *  • `POST /recepciones-compra/:id/reversar`             — reverso suave, motivo obligatorio (200).
  *
@@ -34,6 +36,7 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  lineasPendientesDeOC,
   lineasTelaPendientesDeProveedor,
   listarRecepcionesDeOC,
   obtenerRecepcionCompra,
@@ -188,6 +191,50 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarRecepcionesDeOC(sesion, request.params.idOrdenCompra);
+    },
+  });
+
+  // Pendiente por recibir de CADA renglón de una OC: la captura de la recepción precarga lo que
+  // FALTA (no lo pedido completo) y muestra lo ya recibido. El cálculo lo hace el dominio (A1).
+  app.route({
+    method: 'GET',
+    url: '/ordenes-compra/:idOrdenCompra/lineas-pendientes',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Pendiente por recibir de cada renglón de una orden de compra',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdOC,
+      response: {
+        200: z
+          .object({
+            datos: z.array(
+              z.object({
+                idOrdenCompraLinea: z.number().int(),
+                tipo: z.enum(['tela', 'avio', 'libre']).describe('Tipo del renglón de la OC.'),
+                cantidad: z.number().describe('Cantidad pedida en la OC.'),
+                recibido: z.number().describe('Ya recibido (recepciones activas).'),
+                pendiente: z
+                  .number()
+                  .describe('Lo que falta del CUERPO (0 dentro de la banda, §Post-F9.19).'),
+                cantidadComplemento: z
+                  .number()
+                  .nullable()
+                  .describe('Complemento que pidió la OC, o null si no lleva.'),
+                recibidoComplemento: z.number().describe('Complemento ya recibido.'),
+                pendienteComplemento: z.number().describe('Complemento que falta por recibir.'),
+                surtido: z.boolean().describe('¿El renglón ya quedó surtido?'),
+              }),
+            ),
+          })
+          .describe('Pendiente por recibir de los renglones de la OC.'),
+        ...respuestasError,
+      },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await lineasPendientesDeOC(sesion, request.params.idOrdenCompra);
+      return { datos };
     },
   });
 

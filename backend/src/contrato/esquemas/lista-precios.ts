@@ -237,6 +237,15 @@ export type CandidatosLista = z.infer<typeof esquemaCandidatosLista>;
 export const esquemaCandidatosQuery = z.object({
   idCliente: z.coerce.number().int().positive().describe('Cliente.'),
   idClienteDepartamento: z.coerce.number().int().positive().describe('Departamento del cliente.'),
+  // Daniel (ago-2026): acota los candidatos a UN proyecto (el botón «Generar lista de precios»
+  // desde el proyecto ofrece SOLO sus modelos). Omitir = todos los del cliente+departamento (el
+  // diálogo general de Cotizaciones).
+  idProyecto: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Acota los candidatos a un proyecto (opcional).'),
 });
 
 /** Parámetros de los candidatos. */

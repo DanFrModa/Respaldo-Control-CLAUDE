@@ -28,18 +28,40 @@ const QUERY_CLIENTES = {
 } as const;
 
 /**
+ * Contexto de un PROYECTO desde el que se genera la lista (Daniel, ago-2026): fija cliente +
+ * departamento
+ * (ya se conocen) y acota los candidatos a ESE proyecto.
+ */
+export interface ContextoProyectoLista {
+  id: number;
+  folio: number;
+  nombre: string;
+  idCliente: number;
+  cliente: string;
+  idClienteDepartamento: number;
+  departamento: string;
+}
+
+/**
  * Diálogo para CREAR una lista de precios (F8-E4): elige cliente + departamento → carga los desarrollos
  * CANDIDATOS (cotizados, sin renglón en otra lista) → seleccionar → crear. Los candidatos sin precosto
  * congelado no aparecen; si el backend rechaza alguno (carrera), su mensaje se muestra en un toast.
+ *
+ * Con `proyecto` (Daniel, ago-2026) el diálogo llega PRECARGADO desde la página del proyecto:
+ * cliente y
+ * departamento fijos (los selectores quedan deshabilitados) y candidatos SÓLO de ese proyecto.
  */
 export function DialogoCrearLista({
   abierto,
   alCambiarAbierto,
   alCreada,
+  proyecto,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
   alCreada?: (idLista: number) => void;
+  /** Proyecto de origen: precarga cliente/departamento y acota los candidatos (opcional). */
+  proyecto?: ContextoProyectoLista | undefined;
 }): React.JSX.Element {
   const [idCliente, setIdCliente] = useState('');
   const [idDepartamento, setIdDepartamento] = useState('');
@@ -51,18 +73,24 @@ export function DialogoCrearLista({
   const candidatos = useCandidatosLista(
     idCliente === '' ? undefined : Number(idCliente),
     idDepartamento === '' ? undefined : Number(idDepartamento),
+    proyecto?.id,
   );
   const crear = useCrearLista();
 
-  // Reinicia todo al abrir/cerrar.
+  // Reinicia al cerrar; al abrir DESDE UN PROYECTO precarga su cliente + departamento.
   useEffect(() => {
     if (!abierto) {
       setIdCliente('');
       setIdDepartamento('');
       setFecha('');
       setSeleccion(new Set());
+      return;
     }
-  }, [abierto]);
+    if (proyecto !== undefined) {
+      setIdCliente(String(proyecto.idCliente));
+      setIdDepartamento(String(proyecto.idClienteDepartamento));
+    }
+  }, [abierto, proyecto]);
 
   // Al cambiar cliente/departamento, limpia la selección (los candidatos cambian).
   function cambiarCliente(valor: string): void {
@@ -117,46 +145,61 @@ export function DialogoCrearLista({
         <DialogHeader>
           <DialogTitle>Nueva lista de precios</DialogTitle>
           <DialogDescription>
-            Elige el cliente y el departamento; se listan los desarrollos cotizados que aún no están
-            en una lista.
+            {proyecto === undefined
+              ? 'Elige el cliente y el departamento; se listan los desarrollos cotizados que aún no están en una lista.'
+              : `Del proyecto #${String(proyecto.folio)} · ${proyecto.nombre} (${proyecto.cliente} / ${proyecto.departamento}): se listan sus modelos cotizados que aún no están en una lista.`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto py-2">
-          <Field>
-            <FieldLabel htmlFor="crear-lista-cliente">Cliente</FieldLabel>
-            <SelectNativo
-              id="crear-lista-cliente"
-              value={idCliente}
-              onChange={(e) => cambiarCliente(e.target.value)}
-            >
-              <option value="">Elige un cliente…</option>
-              {(clientes.data?.datos ?? []).map((c) => (
-                <option key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </option>
-              ))}
-            </SelectNativo>
-          </Field>
+          {/* Desde un PROYECTO el cliente y el departamento ya se conocen: se muestran fijos (no
+              hay nada que elegir ni forma de equivocarse). Desde Cotizaciones, se eligen. */}
+          {proyecto === undefined ? (
+            <>
+              <Field>
+                <FieldLabel htmlFor="crear-lista-cliente">Cliente</FieldLabel>
+                <SelectNativo
+                  id="crear-lista-cliente"
+                  value={idCliente}
+                  onChange={(e) => cambiarCliente(e.target.value)}
+                >
+                  <option value="">Elige un cliente…</option>
+                  {(clientes.data?.datos ?? []).map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </SelectNativo>
+              </Field>
 
-          <Field>
-            <FieldLabel htmlFor="crear-lista-departamento">Departamento</FieldLabel>
-            <SelectNativo
-              id="crear-lista-departamento"
-              value={idDepartamento}
-              disabled={idCliente === ''}
-              onChange={(e) => cambiarDepartamento(e.target.value)}
+              <Field>
+                <FieldLabel htmlFor="crear-lista-departamento">Departamento</FieldLabel>
+                <SelectNativo
+                  id="crear-lista-departamento"
+                  value={idDepartamento}
+                  disabled={idCliente === ''}
+                  onChange={(e) => cambiarDepartamento(e.target.value)}
+                >
+                  <option value="">Elige un departamento…</option>
+                  {(departamentos.data ?? [])
+                    .filter((d) => d.activo)
+                    .map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.nombre}
+                      </option>
+                    ))}
+                </SelectNativo>
+              </Field>
+            </>
+          ) : (
+            <p
+              className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+              data-testid="crear-lista-contexto-proyecto"
             >
-              <option value="">Elige un departamento…</option>
-              {(departamentos.data ?? [])
-                .filter((d) => d.activo)
-                .map((d) => (
-                  <option key={d.id} value={String(d.id)}>
-                    {d.nombre}
-                  </option>
-                ))}
-            </SelectNativo>
-          </Field>
+              Cliente <span className="font-semibold">{proyecto.cliente}</span>
+              <span className="text-muted-foreground"> / {proyecto.departamento}</span>
+            </p>
+          )}
 
           <Field>
             <FieldLabel htmlFor="crear-lista-fecha">Fecha (opcional)</FieldLabel>
@@ -175,7 +218,9 @@ export function DialogoCrearLista({
                 <p className="text-sm text-muted-foreground">Cargando desarrollos…</p>
               ) : listaCandidatos.length === 0 ? (
                 <p className="text-sm text-muted-foreground" data-testid="candidatos-vacio">
-                  No hay desarrollos cotizados disponibles para este departamento.
+                  {proyecto === undefined
+                    ? 'No hay desarrollos cotizados disponibles para este departamento.'
+                    : 'Este proyecto no tiene modelos con un precosto CONGELADO libre: congela el precosto (Precosto → Congelar versión) o el modelo ya está en otra lista.'}
                 </p>
               ) : (
                 <ul className="space-y-1.5">

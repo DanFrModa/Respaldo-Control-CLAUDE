@@ -497,6 +497,32 @@ describe('candidatosParaLista', () => {
     expect(despues.map((c) => c.idDesarrollo)).not.toContain(id);
   });
 
+  it('con idProyecto acota los candidatos a ESE proyecto (Daniel, ago-2026)', async () => {
+    await sembrarFactores();
+    // Dos proyectos del MISMO cliente+departamento, cada uno con su modelo cotizado.
+    const idA = await desarrolloConPrecosto('MOD-PROY-A');
+    const idB = await desarrolloConPrecosto('MOD-PROY-B');
+    const a = await obtenerDesarrollo(sesion(), idA, bd());
+
+    const todos = await candidatosParaLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(todos.map((c) => c.idDesarrollo)).toEqual(expect.arrayContaining([idA, idB]));
+
+    const soloA = await candidatosParaLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idProyecto: a.idProyecto,
+      },
+      bd(),
+    );
+    expect(soloA.map((c) => c.idDesarrollo)).toEqual([idA]);
+  });
+
   it('un desarrollo SIN precosto congelado no es candidato', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-NOCAND', false);

@@ -20,6 +20,12 @@ vi.mock('@/api/mrp', () => ({
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => useConsultaOrdenesMock() as unknown,
 }));
+// El catálogo de direcciones de entrega decide si la OC se puede generar (§Post-F9.18): sin
+// dirección el dominio la RECHAZA, así que la pantalla tiene que decirlo antes de intentarlo.
+const useDireccionesMock = vi.fn();
+vi.mock('@/api/direcciones-entrega', () => ({
+  useDireccionesEntregaActivas: () => useDireccionesMock() as unknown,
+}));
 
 /** Explosión de prueba: un botón comprable (con proveedor) + felpa sin proveedor + genérico cubierto. */
 function explosionDePrueba() {
@@ -105,6 +111,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     useExplosionMock.mockReset();
     useGenerarOcMock.mockReset();
     useConsultaOrdenesMock.mockReset();
+    useDireccionesMock.mockReset();
     mutateMock.mockReset();
     imprimirExplosionMock.mockReset();
 
@@ -123,6 +130,11 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
       data: explosionDePrueba(),
       isPending: false,
       isError: false,
+    });
+    // Caso normal: hay catálogo y una dirección FAVORITA (la que el servidor usaría por default).
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
     });
     useGenerarOcMock.mockReturnValue({
       mutate: mutateMock,
@@ -165,7 +177,11 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
       { idOrden: number; cuerpo: { idsRequerimiento: number[] } },
       { onSuccess?: unknown },
     ];
-    expect(args).toEqual({ idOrden: 50, cuerpo: { idsRequerimiento: [] } });
+    // La dirección FAVORITA viaja explícita: el servidor no tiene que adivinarla.
+    expect(args).toEqual({
+      idOrden: 50,
+      cuerpo: { idsRequerimiento: [], idDireccionEntrega: 7 },
+    });
     expect(typeof opciones.onSuccess).toBe('function');
   });
 
@@ -212,5 +228,109 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
     expect(screen.getByTestId('exp-avisos')).toBeInTheDocument();
     expect(screen.getByTestId('exp-aviso')).toHaveTextContent('amarrada multi-color');
+  });
+
+  /**
+   * §Post-F9.16 — el catálogo de direcciones nace VACÍO y sin dirección el dominio rechaza la
+   * generación. Antes el botón se veía habilitado y el error llegaba del servidor, sin decir a
+   * dónde ir: ahora se explica y se enlaza el catálogo.
+   */
+  it('SIN direcciones de entrega explica por qué no se puede y enlaza el catálogo', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('catálogo de direcciones de entrega está vacío');
+    expect(screen.getByRole('link', { name: /catálogo de direcciones/i })).toHaveAttribute(
+      'href',
+      '/catalogos/direcciones-entrega',
+    );
+    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
+  });
+
+  it('CON direcciones pero ninguna favorita, dice que hay que elegir una', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveTextContent('favorita');
+
+    // Al elegirla en el selector, el aviso desaparece y ya se puede generar.
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    expect(screen.queryByTestId('exp-falta-direccion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
+  });
+
+  /**
+   * Si el catálogo NO se pudo consultar, decir "está vacío" sería mentir con el catálogo lleno (el
+   * usuario abre el enlace, ve sus 5 direcciones y vuelve bloqueado sin causa). Se avisa del ERROR
+   * y NO se bloquea: por una lectura fallida no se le cierra la puerta — decide el servidor al
+   * guardar.
+   */
+  it('si FALLA la consulta del catálogo: lo dice tal cual y NO bloquea', async () => {
+    const refetchDirecciones = vi.fn();
+    useDireccionesMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch: refetchDirecciones,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('No se pudo consultar el catálogo');
+    // NO dice "está vacío" (sería falso) ni bloquea por un error de lectura.
+    expect(aviso).not.toHaveTextContent('está vacío');
+    expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
+    await usuario.click(screen.getByTestId('exp-reintentar-direcciones'));
+    expect(refetchDirecciones).toHaveBeenCalled();
+  });
+
+  /**
+   * ORDEN DE LAS RAMAS: un refetch que falla NO borra los datos previos de la cache. Si el usuario
+   * ya eligió su dirección, decirle "no sabemos cuál usar" sería falso — se pregunta primero si ya
+   * hay dirección y solo después si hubo error.
+   */
+  it('con la dirección YA ELEGIDA, un refetch fallido no inventa que falta', async () => {
+    // Datos previos en cache + isError (lo que deja React Query tras un refetch fallido).
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      isPending: false,
+      isError: true,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    // Sin elegir nada (y sin favorita) sí avisa del error.
+    expect(screen.getByTestId('exp-falta-direccion')).toBeInTheDocument();
+
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    expect(screen.queryByTestId('exp-falta-direccion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
+  });
+
+  it('con una dirección FAVORITA no estorba con avisos', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    expect(screen.queryByTestId('exp-falta-direccion')).not.toBeInTheDocument();
   });
 });

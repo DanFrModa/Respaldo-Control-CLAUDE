@@ -115,6 +115,7 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
       const datos = await candidatosParaLista(sesion, {
         idCliente: request.query.idCliente,
         idClienteDepartamento: request.query.idClienteDepartamento,
+        ...(request.query.idProyecto === undefined ? {} : { idProyecto: request.query.idProyecto }),
       });
       return { datos };
     },

@@ -38,9 +38,13 @@ vi.mock('react-router-dom', async () => {
 vi.mock('./DialogoEditarOc', () => ({ DialogoEditarOc: () => null }));
 vi.mock('./DialogoCancelarOc', () => ({ DialogoCancelarOc: () => null }));
 
-function paginaConUna(
-  estatus: ReturnType<typeof ocDePrueba>['estatus'] = 'pendiente_autorizacion',
-) {
+/**
+ * Una OC en la lista. El default es **borrador**: es el estatus con el que nacen TODAS las OC
+ * (alta, duplicado y explosión MRP). El fixture decía `pendiente_autorizacion` — un estatus que
+ * NADA escribe jamás — y por eso estas pruebas nunca vieron que ninguna OC nueva se podía
+ * autorizar.
+ */
+function paginaConUna(estatus: ReturnType<typeof ocDePrueba>['estatus'] = 'borrador') {
   useOrdenesCompraMock.mockReturnValue({
     data: {
       datos: [ocDePrueba({ estatus })],
@@ -126,7 +130,25 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     expect(screen.queryByTestId('nuevo-oc')).not.toBeInTheDocument();
   });
 
-  it('el botón Autorizar SOLO aparece con compras.autorizar y estatus pendiente', () => {
+  /**
+   * LA PRUEBA QUE FIJA EL FLUJO: una OC recién creada (borrador) se puede autorizar. Es el bloqueo
+   * que tuvo muerta la cadena de compras — `crearOC`/`duplicarOC`/la explosión MRP dejan la OC en
+   * `borrador` y la pantalla sólo ofrecía autorizar desde `pendiente_autorizacion`, que nada
+   * escribe. Si alguien vuelve a atar el botón a ese estatus, esto se pone rojo.
+   */
+  it('una OC recién creada (BORRADOR) SÍ se puede autorizar y dispara la mutación', () => {
+    paginaConUna('borrador');
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'compras.autorizar']),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    const boton = within(screen.getByTestId('detalle-oc')).getByTestId('autorizar-oc');
+    fireEvent.click(boton);
+    expect(autorizarMutate).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it('el botón Autorizar SOLO aparece con compras.autorizar (borrador y pendiente)', () => {
+    // Sigue apareciendo en `pendiente_autorizacion` por si algún dato migrado quedara ahí.
     paginaConUna('pendiente_autorizacion');
     const { unmount } = renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'compras.autorizar']),
@@ -137,10 +159,19 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     expect(within(detalle).getByTestId('autorizar-oc')).toBeInTheDocument();
     unmount();
 
-    // Sin el permiso de autorizar, no aparece.
-    paginaConUna('pendiente_autorizacion');
-    renderConProveedores(<OrdenesCompraPagina />, {
+    // Sin el permiso de autorizar, no aparece (A4).
+    paginaConUna('borrador');
+    const segunda = renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    expect(screen.queryByTestId('autorizar-oc')).not.toBeInTheDocument();
+    segunda.unmount();
+
+    // Y en una OC ya AUTORIZADA no se ofrece de nuevo.
+    paginaConUna('autorizada');
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'compras.autorizar']),
     });
     fireEvent.click(screen.getByTestId('fila-oc'));
     expect(screen.queryByTestId('autorizar-oc')).not.toBeInTheDocument();
@@ -189,7 +220,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     });
 
     it('en una OC sin autorizar NO aparece, pero DICE por qué (§Post-F9.16)', () => {
-      paginaConUna('pendiente_autorizacion');
+      paginaConUna('borrador');
       renderConProveedores(<OrdenesCompraPagina />, {
         sesion: estadoSesionDePrueba(['compras.ver', 'inventario-telas.mover']),
       });

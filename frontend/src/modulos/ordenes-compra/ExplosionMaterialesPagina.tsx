@@ -1,5 +1,6 @@
 import { Info, Printer, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
@@ -49,6 +50,45 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
   const direccionEfectiva =
     idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? null;
+  /**
+   * §Post-F9.16 — NO ESCONDER, EXPLICAR (y ofrecer el camino). Sin dirección de entrega el dominio
+   * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el botón se veía
+   * habilitado y el error llegaba del servidor, sin decir a dónde ir. Se dice qué falta y se enlaza
+   * el catálogo. `null` = no hay nada que avisar.
+   *
+   * `bloquea` distingue el AVISO del BLOQUEO: si la consulta del catálogo FALLA no sabemos si hay
+   * direcciones o no —decir "está vacío" sería mentir con el catálogo lleno—, así que se avisa del
+   * error pero NO se bloquea: que decida el servidor al guardar (nunca se bloquea por un error de
+   * LECTURA).
+   *
+   * ORDEN DE LAS RAMAS: "ya hay dirección" se pregunta ANTES que el error. Un refetch que falla con
+   * datos previos en cache no borra la que el usuario ya eligió en el select — avisar ahí que "no
+   * sabemos cuál usar" sería falso.
+   */
+  const avisoDireccion: { texto: string; bloquea: boolean; enlace: boolean } | null =
+    direcciones.isPending || direccionEfectiva !== null
+      ? null
+      : direcciones.isError
+        ? {
+            texto:
+              'No se pudo consultar el catálogo de direcciones de entrega, así que no sabemos cuál usar. ' +
+              'Reintenta; si generas de todos modos, el servidor decide (y dirá si falta la dirección).',
+            bloquea: false,
+            enlace: false,
+          }
+        : listaDirecciones.length === 0
+          ? {
+              texto:
+                'El catálogo de direcciones de entrega está vacío, y toda orden de compra necesita una.',
+              bloquea: true,
+              enlace: true,
+            }
+          : {
+              texto:
+                'Ninguna dirección está marcada como favorita: elige una arriba (o marca la de siempre en el catálogo).',
+              bloquea: true,
+              enlace: true,
+            };
 
   function elegirOrden(id: number): void {
     setIdOrden(id);
@@ -193,9 +233,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     data-testid="exp-direccion-entrega"
                   >
                     <option value="">
-                      {listaDirecciones.length === 0
-                        ? 'Sin direcciones dadas de alta'
-                        : 'La de siempre'}
+                      {direcciones.isError
+                        ? 'No se pudo consultar el catálogo'
+                        : listaDirecciones.length === 0
+                          ? 'Sin direcciones dadas de alta'
+                          : 'La de siempre'}
                     </option>
                     {listaDirecciones.map((d) => (
                       <option key={d.id} value={String(d.id)}>
@@ -207,13 +249,45 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 <Button
                   size="sm"
                   onClick={generarOc}
-                  disabled={generar.isPending || comprables.length === 0}
+                  disabled={
+                    generar.isPending ||
+                    comprables.length === 0 ||
+                    (avisoDireccion?.bloquea ?? false)
+                  }
                   data-testid="exp-generar-oc"
                 >
                   Generar OC desde la explosión
                 </Button>
               </div>
             </div>
+
+            {/* El "por qué no se puede" va a la vista, con el enlace al catálogo (§Post-F9.16).
+                Cuando el catálogo no se pudo consultar, el aviso lo dice tal cual —no inventa que
+                está vacío— y ofrece reintentar en vez de bloquear. */}
+            {avisoDireccion !== null ? (
+              <p
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                data-testid="exp-falta-direccion"
+              >
+                {avisoDireccion.bloquea ? <b>No se pueden generar las OC todavía: </b> : null}
+                {avisoDireccion.texto}{' '}
+                {avisoDireccion.enlace ? (
+                  <Link className="underline" to="/catalogos/direcciones-entrega">
+                    Abrir el catálogo de direcciones de entrega
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => void direcciones.refetch()}
+                    data-testid="exp-reintentar-direcciones"
+                  >
+                    Reintentar
+                  </button>
+                )}
+                .
+              </p>
+            ) : null}
 
             {comprables.length > 0 ? (
               <div

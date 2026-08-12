@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  ListPlus,
   Pencil,
   Plus,
   PowerIcon,
@@ -10,11 +11,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useClientes, useDepartamentosCliente } from '@/api/clientes';
 import { useReactivarDesarrollo, type Desarrollo, type EstadoDesarrollo } from '@/api/desarrollos';
 import { useTableroDesarrollos } from '@/api/liga-orden';
+import { useCandidatosLista } from '@/api/listas-precios';
 import {
   useArchivarProyecto,
   useDesarchivarProyecto,
@@ -42,6 +45,7 @@ import { useDebounce } from '@/lib/useDebounce';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { Historial } from '@/modulos/detalle';
+import { DialogoCrearLista } from '@/modulos/listas-precios/DialogoCrearLista';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoApagarDesarrollo } from './DialogoApagarDesarrollo';
@@ -79,6 +83,46 @@ const TONO_ESTADO: Record<EstadoDesarrollo, TonoEstado> = {
   apagado: 'neutro',
 };
 
+/**
+ * ¿Por qué NO se puede generar la lista de precios de este proyecto? Devuelve el motivo EN TEXTO
+ * (o `null` si sí se puede). Regla §Post-F9.16: un botón que no se puede usar NO se esconde — se
+ * explica.
+ *
+ * QUIÉN MANDA (corrección de la revisión): el habilitado lo decide `hayCandidatos`, que sale de la
+ * CONSULTA DE CANDIDATOS del servidor (la misma que abre el diálogo, ya acotada por `idProyecto`),
+ * NUNCA el estado derivado del desarrollo. El estado NO sirve para eso porque va por PRECEDENCIA y
+ * `ligado-produccion` PISA a `en-lista`/`cotizado`: un modelo con precosto congelado, ligado a una
+ * orden y SIN renglón de lista es candidato para el backend (`candidatosParaLista` filtra
+ * `listaLineas: none` y nunca mira las órdenes) y aquí se veía bloqueado con un motivo FALSO.
+ *
+ * El estado sólo se usa para AFINAR el texto cuando ya se sabe que no hay candidatos, y sólo en lo
+ * que es verdad con certeza: `en-desarrollo` es el default de la precedencia, así que si TODOS los
+ * activos están ahí, ninguno tiene precosto congelado. En cualquier otra mezcla no se puede separar
+ * "ya está en una lista" de "le falta congelar" sin mentir, y el texto lo dice como disyunción.
+ */
+function motivoSinCandidatosLista(
+  desarrollos: Desarrollo[],
+  hayCandidatos: boolean,
+): string | null {
+  if (hayCandidatos) {
+    return null;
+  }
+  const activos = desarrollos.filter((d) => !d.apagado);
+  if (activos.length === 0) {
+    // Sin modelos ACTIVOS hay dos situaciones distintas y el remedio NO es el mismo: un proyecto
+    // vacío se arregla agregando; uno con todos los modelos apagados se arregla REACTIVANDO (y
+    // decirle "no tiene modelos" sería falso: a un centímetro se está pintando el control
+    // «Mostrar apagados (N)» que prueba lo contrario).
+    return desarrollos.length === 0
+      ? 'Este proyecto todavía no tiene modelos: agrega uno y congela su precosto para poder generar la lista.'
+      : 'Todos los modelos de este proyecto están apagados: reactiva el que quieras cotizar (con «Mostrar apagados») y congela su precosto.';
+  }
+  if (activos.every((d) => d.estado === 'en-desarrollo')) {
+    return 'Ninguno de los desarrollos tiene un precosto CONGELADO; ábrelo en «Precosto» y congela la versión para poder incluirlo en la lista.';
+  }
+  return 'Ningún modelo de este proyecto está disponible: los que ya están en una lista de precios no se vuelven a incluir, y a los demás les falta congelar su precosto («Precosto» → «Congelar versión»).';
+}
+
 /** Chip del estado derivado de un desarrollo (tonos del kit, proto `.badge`). */
 function BadgeEstado({ estado }: { estado: EstadoDesarrollo }): React.JSX.Element {
   return <ChipEstado tono={TONO_ESTADO[estado]}>{ETIQUETA_ESTADO[estado]}</ChipEstado>;
@@ -91,10 +135,13 @@ function BadgeEstado({ estado }: { estado: EstadoDesarrollo }): React.JSX.Elemen
  * cliente/departamento/temporada, buscador, conteo) y, al hacer clic, el proyecto se abre a PÁGINA
  * COMPLETA (drill-in) con sus DESARROLLOS como TARJETAS (`.pc-card`) + tarjeta punteada de agregar.
  *
- * FIDELIDAD vs proto: la columna «Avance» (% por proyecto) y el botón «Generar lista de precios»
- * desde el proyecto no existen en el API → se omiten (huecos reportados); las tarjetas no muestran
- * tela/costo/maquilero porque el listado de desarrollos no trae el precosto (vive en su diálogo).
- * `desarrollo.ver` gobierna el acceso; `desarrollo.administrar` las acciones (el backend decide, A1).
+ * FIDELIDAD vs proto: la columna «Avance» (% por proyecto) no existe en el API → se omite (hueco
+ * reportado); las tarjetas no muestran tela/costo/maquilero porque el listado de desarrollos no trae
+ * el precosto (vive en su diálogo). El botón «Generar lista de precios» del proyecto YA existe
+ * (Daniel, ago-2026): abre el diálogo de la lista con cliente + departamento precargados y los
+ * candidatos de ESE proyecto; si no hay ninguno NO se esconde — se explica por qué (§Post-F9.16).
+ * `desarrollo.ver` gobierna el acceso; `desarrollo.administrar` las acciones y `listas.administrar`
+ * la generación de la lista (el backend decide, A1/A4).
  */
 export function ProyectosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -516,16 +563,44 @@ function PaginaProyecto({
   // Trae el detalle completo (con sus desarrollos), como el panel anterior.
   const consulta = useProyecto(proyecto.id);
   const reactivar = useReactivarDesarrollo();
+  const navegar = useNavigate();
+  const { tienePermiso } = useSesion();
+  // Crear una lista exige AMBOS permisos en el servidor (la ruta encadena `listas.administrar` +
+  // `listas.ver`), y la consulta de candidatos de aquí abajo exige `listas.ver`: se piden los dos
+  // para no ofrecer un botón que terminaría en 403 ni disparar una consulta sin permiso.
+  const puedeGenerarLista = tienePermiso('listas.administrar') && tienePermiso('listas.ver');
 
   const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [aApagar, setAApagar] = useState<Desarrollo | null>(null);
   const [aPrecostear, setAPrecostear] = useState<Desarrollo | null>(null);
   const [mostrarApagados, setMostrarApagados] = useState(false);
+  const [crearListaAbierto, setCrearListaAbierto] = useState(false);
 
   const detalle = consulta.data;
   const desarrollos = detalle?.desarrollos ?? [];
   const activos = desarrollos.filter((d) => !d.apagado);
   const apagados = desarrollos.filter((d) => d.apagado);
+
+  // ── ¿Se puede generar la lista? Lo dice el SERVIDOR, no el estado derivado ──────────
+  // Los candidatos REALES de este proyecto (misma consulta que carga el diálogo, así que la
+  // respuesta se comparte por cache y no se pide dos veces). Vive en el DRILL-IN, no en la tabla de
+  // proyectos: es UNA llamada por proyecto abierto, no una por tarjeta. Sin permiso se pasa
+  // `undefined` y la consulta queda deshabilitada.
+  const candidatos = useCandidatosLista(
+    puedeGenerarLista ? proyecto.idCliente : undefined,
+    puedeGenerarLista ? proyecto.idClienteDepartamento : undefined,
+    proyecto.id,
+  );
+  // Sigue cargando alguna de las dos consultas de las que depende el botón (el detalle trae los
+  // desarrollos que afinan el texto; los candidatos deciden el habilitado).
+  const cargandoParaLista = consulta.isPending || (puedeGenerarLista && candidatos.isPending);
+  // Por qué NO se podría generar la lista (null = sí se puede). Mientras carga no se afirma nada:
+  // el botón espera DESHABILITADO sin inventar un motivo (y sin habilitarse un instante en falso).
+  const motivoSinLista = cargandoParaLista
+    ? null
+    : candidatos.isError
+      ? `No se pudieron consultar los modelos disponibles: ${candidatos.error.message}`
+      : motivoSinCandidatosLista(desarrollos, (candidatos.data ?? []).length > 0);
 
   function alReactivar(desarrollo: Desarrollo): void {
     reactivar.mutate(desarrollo.id, {
@@ -608,6 +683,28 @@ function PaginaProyecto({
               <Plus aria-hidden />
               Agregar modelo
             </Button>
+          </div>
+        ) : null}
+        {/* Generar la lista de precios SIN salir del proyecto (Daniel, ago-2026): llega con cliente y
+            departamento precargados y con los candidatos de ESTE proyecto. Si no hay candidatos el
+            botón se deshabilita pero NO se esconde: al lado va el motivo (§Post-F9.16). */}
+        {puedeGenerarLista ? (
+          <div className="flex flex-col items-start gap-1 sm:w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCrearListaAbierto(true)}
+              disabled={cargandoParaLista || motivoSinLista !== null}
+              data-testid="generar-lista-proyecto"
+            >
+              <ListPlus aria-hidden />
+              Generar lista de precios
+            </Button>
+            {motivoSinLista === null ? null : (
+              <p className="text-xs text-muted-foreground" data-testid="motivo-sin-lista">
+                {motivoSinLista}
+              </p>
+            )}
           </div>
         ) : null}
       </header>
@@ -734,6 +831,24 @@ function PaginaProyecto({
         }}
         desarrollo={aPrecostear ?? undefined}
       />
+      <DialogoCrearLista
+        abierto={crearListaAbierto}
+        alCambiarAbierto={setCrearListaAbierto}
+        proyecto={{
+          id: proyecto.id,
+          folio: proyecto.folio,
+          nombre: proyecto.nombre,
+          idCliente: proyecto.idCliente,
+          cliente: proyecto.cliente,
+          idClienteDepartamento: proyecto.idClienteDepartamento,
+          departamento: proyecto.departamento,
+        }}
+        // La lista nueva vive en Cotizaciones: se lleva ahí al usuario para seguir el flujo
+        // (aprobar renglones / negociar), en vez de dejarlo en el proyecto sin señal.
+        alCreada={() => {
+          void navegar('/listas-precios');
+        }}
+      />
     </div>
   );
 }
@@ -766,7 +881,11 @@ function TarjetaDesarrollo({
           </div>
           <div className="num truncate text-xs text-muted-foreground">
             Nuestro {d.codigoModelo}
-            {d.numeroCliente === null ? '' : ` · Cliente ${d.numeroCliente}`}
+            {d.numeroCliente === null ? '' : ` · Nº cliente ${d.numeroCliente}`}
+          </div>
+          {/* El precosteo va DIRIGIDO a un cliente: la ficha lo dice (heredado del proyecto). */}
+          <div className="truncate text-xs text-faint" data-testid="desarrollo-cliente">
+            {d.cliente} / {d.departamento}
           </div>
         </div>
         <BadgeEstado estado={d.estado} />

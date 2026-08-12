@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { useCrearDesarrollo } from '@/api/desarrollos';
-import { useCrearModelo, useModelos } from '@/api/modelos';
+import { useCrearModelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,17 +24,9 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 import { esquemaDesarrolloFormulario, type DatosDesarrolloFormulario } from './esquemas';
-
-/** Tope alto: trae los modelos activos para el selector. */
-const QUERY_MODELOS = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'codigo',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /** Valores por defecto (liga un modelo existente por defecto). */
 const VALORES_INICIALES: DatosDesarrolloFormulario = {
@@ -65,7 +57,6 @@ export function DialogoDesarrollo({
 }): React.JSX.Element {
   const crearDesarrollo = useCrearDesarrollo();
   const crearModelo = useCrearModelo();
-  const modelos = useModelos(QUERY_MODELOS);
   const guardando = crearDesarrollo.isPending || crearModelo.isPending;
 
   const formulario = useForm<DatosDesarrolloFormulario>({
@@ -80,6 +71,7 @@ export function DialogoDesarrollo({
   }, [abierto, formulario]);
 
   const modo = formulario.watch('modo');
+  const idModeloElegido = formulario.watch('idModelo');
 
   const enviar = formulario.handleSubmit((datos) => {
     void (async () => {
@@ -148,20 +140,22 @@ export function DialogoDesarrollo({
                 <FieldLabel htmlFor="desarrollo-modelo" required>
                   Modelo del catálogo
                 </FieldLabel>
-                <SelectNativo
-                  id="desarrollo-modelo"
-                  disabled={guardando}
-                  aria-invalid={Boolean(errors.idModelo)}
-                  {...registrar('idModelo')}
-                >
-                  <option value="">Elige un modelo…</option>
-                  {(modelos.data?.datos ?? []).map((m) => (
-                    <option key={m.id} value={String(m.id)}>
-                      {m.codigo}
-                      {m.descripcion ? ` — ${m.descripcion}` : ''}
-                    </option>
-                  ))}
-                </SelectNativo>
+                {/* Buscador SERVER-SIDE (Daniel, ago-2026): el catálogo tiene ~5,000 modelos, y un
+                    `<select>` con la primera página (tope 100) sólo enseñaba el 2% y el modelo recién
+                    dado de alta no aparecía. El {@link SelectorModelo} busca por código o descripción
+                    en el servidor y sin teclear nada ya ofrece los primeros del catálogo. */}
+                <SelectorModelo
+                  idSeleccionado={idModeloElegido === '' ? undefined : Number(idModeloElegido)}
+                  alSeleccionar={(m) =>
+                    formulario.setValue('idModelo', String(m.id), { shouldValidate: true })
+                  }
+                  alLimpiar={() => formulario.setValue('idModelo', '', { shouldValidate: true })}
+                  idInput="desarrollo-modelo"
+                  testid="desarrollo-modelo"
+                />
+                <FieldDescription>
+                  Busca por código o descripción (el catálogo completo, no sólo los primeros).
+                </FieldDescription>
                 <FieldError errors={[errors.idModelo]} />
               </Field>
             ) : (

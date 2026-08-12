@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,6 +36,19 @@ vi.mock('@/api/precostos', () => ({
   useRestaurarLinea: () => ({ mutate: restaurarMutate, isPending: false }),
 }));
 
+vi.mock('@/api/avios', () => ({
+  useAvios: () => ({
+    data: {
+      datos: [
+        { id: 77, clave: 'BOT-4H', descripcion: 'Botón 4 hoyos', esGenerico: false },
+        { id: 78, clave: 'ELAS-2', descripcion: 'Elástico 2cm', esGenerico: true },
+      ],
+    },
+    isPending: false,
+    isError: false,
+  }),
+}));
+
 vi.mock('@/api/conceptos-costo', () => ({
   useConceptosCosto: () => ({
     data: {
@@ -54,6 +67,10 @@ function desarrollo(): Desarrollo {
   return {
     id: 1,
     idProyecto: 1,
+    idCliente: 3,
+    cliente: 'C&A',
+    idClienteDepartamento: 5,
+    departamento: 'NIÑOS',
     idModelo: 10,
     codigoModelo: 'A-100',
     descripcionModelo: null,
@@ -306,5 +323,78 @@ describe('<DialogoPrecosto>', () => {
     expect(screen.getByTestId('recalcular-precosto')).toBeInTheDocument();
     expect(screen.queryByTestId('editar-linea')).not.toBeInTheDocument();
     expect(screen.queryByTestId('form-agregar-manual')).not.toBeInTheDocument();
+  });
+  it('muestra el CLIENTE y el departamento del proyecto (el precosteo va dirigido a un cliente)', () => {
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({ lineas: [linea({ id: 1, conceptoCodigo: 'tela' })] }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    const encabezado = screen.getByTestId('precosto-cliente');
+    expect(encabezado).toHaveTextContent('C&A');
+    expect(encabezado).toHaveTextContent('NIÑOS');
+  });
+
+  it('el alta manual permite ELEGIR un avío del catálogo y deja que el servidor resuelva su precio', async () => {
+    const usuario = userEvent.setup();
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false })],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    await usuario.selectOptions(screen.getByTestId('agregar-linea-concepto'), '5');
+    // Enfocar el combobox abre la lista con el catálogo (sin teclear nada ya hay opciones).
+    await usuario.click(screen.getByTestId('agregar-linea-avio-busqueda'));
+    const opciones = await screen.findAllByTestId('agregar-linea-avio-opcion');
+    // `fireEvent`: la lista vive en un PORTAL fuera del diálogo y en jsdom (sin CSS) hereda el
+    // `pointer-events:none` que radix pone en el body; el combobox elige en `mousedown`.
+    fireEvent.mouseDown(opciones[0] as HTMLElement);
+
+    // Precio EN BLANCO: no se manda `precioUnit` — la cascada la resuelve el backend (A1).
+    await usuario.click(screen.getByTestId('agregar-linea'));
+    expect(agregarMutate).toHaveBeenCalledWith(
+      {
+        id: 11,
+        cuerpo: { idConceptoCosto: 5, idAvio: 77, consumo: null },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('sin avío el precio sigue siendo obligatorio (no se manda una alta sin precio)', async () => {
+    const usuario = userEvent.setup();
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false })],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    await usuario.selectOptions(screen.getByTestId('agregar-linea-concepto'), '5');
+    await usuario.click(screen.getByTestId('agregar-linea'));
+    expect(agregarMutate).not.toHaveBeenCalled();
   });
 });

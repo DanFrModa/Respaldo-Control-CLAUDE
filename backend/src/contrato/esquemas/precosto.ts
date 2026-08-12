@@ -55,32 +55,57 @@ const notasLinea = z
 /**
  * Alta de un renglón MANUAL (estampado, otros procesos, otros…): contra un `ConceptoCosto` existente
  * y activo. El importe lo arma el dominio: `consumo × precioUnit` si hay consumo, o `precioUnit` a
- * secas (monto directo). El precio se teclea a mano (decisión "ambos": del catálogo o a mano; en E3
- * la captura es a mano — no hay catálogo de precio para conceptos abiertos).
+ * secas (monto directo).
+ *
+ * El insumo se puede ELEGIR DEL CATÁLOGO DE AVÍOS (`idAvio`, petición de Daniel ago-2026: los
+ * avíos del precosteo no se podían elegir): con `idAvio` el DOMINIO resuelve descripción y PRECIO
+ * con la MISMA cascada amarrada del BOM (`resolverPrecioAvio` / promedio de medidas) y deja el
+ * renglón LIGADO al avío (traza `idAvio`/`idAvioProveedor`). El texto libre se conserva como opción
+ * (hay conceptos que no son avíos: maquila extra, fletes, muestras…).
+ *
+ * Por eso `precioUnit` es OPCIONAL **sólo** cuando viene `idAvio` (el catálogo lo resuelve y el
+ * usuario lo puede editar después); sin avío el precio se teclea y es OBLIGATORIO. Si viene el
+ * precio, MANDA sobre el del catálogo (queda editable de entrada).
  */
-export const esquemaPrecostoLineaManualCrear = z.object({
-  idConceptoCosto: z
-    .number({ error: 'El concepto de costo es obligatorio' })
-    .int({ error: 'El id del concepto debe ser entero' })
-    .positive({ error: 'El id del concepto debe ser positivo' })
-    .describe('Concepto de costo (ConceptoCosto.id) del renglón manual.'),
-  descripcion: descripcionLinea
-    .optional()
-    .describe('Descripción del renglón (por default el nombre del concepto).'),
-  consumo: z
-    .number({ error: 'El consumo debe ser un número' })
-    .nonnegative({ error: 'El consumo no puede ser negativo' })
-    .nullable()
-    .optional()
-    .describe(
-      'Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit.',
-    ),
-  precioUnit: z
-    .number({ error: 'El precio es obligatorio' })
-    .nonnegative({ error: 'El precio no puede ser negativo' })
-    .describe('Precio unitario (o monto directo si no hay consumo).'),
-  notas: notasLinea.nullable().optional().describe('Notas del renglón (opcional).'),
-});
+export const esquemaPrecostoLineaManualCrear = z
+  .object({
+    idConceptoCosto: z
+      .number({ error: 'El concepto de costo es obligatorio' })
+      .int({ error: 'El id del concepto debe ser entero' })
+      .positive({ error: 'El id del concepto debe ser positivo' })
+      .describe('Concepto de costo (ConceptoCosto.id) del renglón manual.'),
+    idAvio: z
+      .number({ error: 'El id del avío debe ser un número' })
+      .int({ error: 'El id del avío debe ser entero' })
+      .positive({ error: 'El id del avío debe ser positivo' })
+      .optional()
+      .describe(
+        'Avío del catálogo (Avio.id) al que se liga el renglón. Con él, el dominio resuelve descripción y precio.',
+      ),
+    descripcion: descripcionLinea
+      .optional()
+      .describe('Descripción del renglón (por default el avío elegido, o el nombre del concepto).'),
+    consumo: z
+      .number({ error: 'El consumo debe ser un número' })
+      .nonnegative({ error: 'El consumo no puede ser negativo' })
+      .nullable()
+      .optional()
+      .describe(
+        'Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit.',
+      ),
+    precioUnit: z
+      .number({ error: 'El precio debe ser un número' })
+      .nonnegative({ error: 'El precio no puede ser negativo' })
+      .optional()
+      .describe(
+        'Precio unitario (o monto directo si no hay consumo). Obligatorio salvo que venga `idAvio`.',
+      ),
+    notas: notasLinea.nullable().optional().describe('Notas del renglón (opcional).'),
+  })
+  .refine((datos) => datos.precioUnit !== undefined || datos.idAvio !== undefined, {
+    error: 'El precio es obligatorio (o elige un avío del catálogo para tomar el suyo)',
+    path: ['precioUnit'],
+  });
 
 /** Datos validados de alta de un renglón manual. */
 export type DatosPrecostoLineaManualCrear = z.infer<typeof esquemaPrecostoLineaManualCrear>;

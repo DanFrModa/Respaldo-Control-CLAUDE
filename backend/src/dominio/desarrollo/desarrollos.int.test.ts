@@ -168,6 +168,30 @@ describe('Desarrollos (F8-E2)', () => {
       });
     });
 
+    it('la salida trae el CLIENTE y el departamento HEREDADOS del proyecto', async () => {
+      const idProyecto = await proyectoNuevo();
+      const d = await crearDesarrollo(
+        sesion(PERM_TODOS),
+        idProyecto,
+        { idModelo: modeloA.id },
+        bd(),
+      );
+      // El desarrollo NO guarda cliente propio: se lee del proyecto (su dueño natural).
+      expect(d).toMatchObject({
+        idCliente: clienteNegocio.id,
+        cliente: 'C&A',
+        idClienteDepartamento: departamento.id,
+        departamento: 'NIÑOS',
+      });
+      // Y también viaja al leerlo suelto y dentro del detalle del proyecto.
+      await expect(obtenerDesarrollo(sesion(PERM_TODOS), d.id, bd())).resolves.toMatchObject({
+        cliente: 'C&A',
+        departamento: 'NIÑOS',
+      });
+      const proyecto = await obtenerProyecto(sesion(PERM_TODOS), idProyecto, bd());
+      expect(proyecto.desarrollos[0]).toMatchObject({ cliente: 'C&A', departamento: 'NIÑOS' });
+    });
+
     it('rechaza repetir el MISMO modelo en el mismo proyecto → ErrorConflicto (unique)', async () => {
       const idProyecto = await proyectoNuevo();
       await crearDesarrollo(sesion(PERM_TODOS), idProyecto, { idModelo: modeloA.id }, bd());

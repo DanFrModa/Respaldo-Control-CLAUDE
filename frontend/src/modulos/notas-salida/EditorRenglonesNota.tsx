@@ -19,8 +19,9 @@ export interface ExistenciaAvioNota {
 /**
  * EDITOR DE RENGLONES de una nota de salida (F4-E5; rediseño R6 §4.6). Este constructor es
  * **SOLO-AVÍOS** (§4.6 dec. 2): al armar/editar un borrador solo se AGREGAN renglones de AVÍO (del
- * catálogo + cantidad/unidad); para enviar TELA a una orden está la "Nueva nota de telas" (reusa la
- * salida-a-orden de F4). Por eso ya NO hay selector "Tipo de material". Los renglones de TELA solo
+ * catálogo + cantidad/unidad); para enviar TELA a una orden está la pantalla «Salida de tela a
+ * orden» (por color, `/inventarios/telas/salida-orden`). Por eso ya NO hay selector "Tipo de
+ * material". Los renglones de TELA solo
  * aparecen en notas legacy/migradas (E6) y se renderizan en **SOLO LECTURA** (no editables) para no
  * romperlas. Rediseño R6: el renglón de AVÍO marca si el avío está **✓ en la receta de la orden** / **⚠
  * fuera de la receta — se enviará igual** (la nota PROPONE, no LIMITA) y muestra la **existencia
@@ -91,8 +92,8 @@ export function EditorRenglonesNota({
               </div>
 
               {/* Orden destino. Las notas de avíos NO llevan selector de tipo (solo-avíos, §4.6 dec. 2);
-                  para una tela usa la "Nueva nota de telas". El renglón de tela solo aparece en notas
-                  legacy/migradas y se muestra en SOLO LECTURA (su orden queda fija). */}
+                  la tela se registra en «Salida de tela a orden» (por color). El renglón de tela solo
+                  aparece en notas legacy/migradas y se muestra en SOLO LECTURA (su orden queda fija). */}
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="text-xs text-muted-foreground">
                   Orden destino (R7)

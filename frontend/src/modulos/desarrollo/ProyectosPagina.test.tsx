@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
 import type { Desarrollo, EstadoDesarrollo } from '@/api/desarrollos';
+import type { CandidatoLista } from '@/api/listas-precios';
 import type { Proyecto, ProyectoDetalle, ProyectosPagina as TipoPagina } from '@/api/proyectos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
@@ -62,6 +63,34 @@ vi.mock('@/api/modelos', () => ({
   useModelos: () => ({ data: { datos: [] }, isPending: false }),
   useCrearModelo: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
+// Candidatos a la lista: es la FUENTE DE VERDAD del botón «Generar lista de precios» (la misma
+// consulta que abre el diálogo). Se controla por prueba para cubrir los dos lados.
+let candidatos: {
+  data: CandidatoLista[] | undefined;
+  isPending: boolean;
+  isError: boolean;
+  error: ErrorDeApi | null;
+};
+vi.mock('@/api/listas-precios', () => ({
+  useCandidatosLista: () => candidatos,
+  useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+/** Un candidato de ejemplo (el backend ya aplicó "congelado + sin renglón de lista"). */
+function candidato(idDesarrollo: number, codigoModelo: string): CandidatoLista {
+  return {
+    idDesarrollo,
+    idProyecto: 1,
+    folioProyecto: 101,
+    nombreProyecto: 'Joggers',
+    codigoModelo,
+    descripcionModelo: null,
+    numeroCliente: null,
+    idPrecosto: 500 + idDesarrollo,
+    versionPrecosto: 1,
+    costoTotal: 40,
+  };
+}
 
 /** Un desarrollo de ejemplo. */
 function desarrollo(id: number, codigo: string, estado: EstadoDesarrollo): Desarrollo {
@@ -69,6 +98,10 @@ function desarrollo(id: number, codigo: string, estado: EstadoDesarrollo): Desar
   return {
     id,
     idProyecto: 1,
+    idCliente: 3,
+    cliente: 'C&A',
+    idClienteDepartamento: 5,
+    departamento: 'NIÑOS',
     idModelo: id * 10,
     codigoModelo: codigo,
     descripcionModelo: null,
@@ -131,13 +164,21 @@ function consultaConDatos(datos: Proyecto[]): EstadoConsulta {
   };
 }
 
-const PERM_TODOS = ['desarrollo.ver', 'desarrollo.administrar'] as const;
+// Generar la lista exige AMBOS permisos de listas (la ruta del backend los encadena).
+const PERM_TODOS = [
+  'desarrollo.ver',
+  'desarrollo.administrar',
+  'listas.administrar',
+  'listas.ver',
+] as const;
 
 describe('<ProyectosPagina>', () => {
   beforeEach(() => {
     useProyectos.mockReset();
     archivarMutate.mockReset();
     ultimaQuery = undefined;
+    // Por default: sin candidatos (el proyecto de `detalle` sólo tiene un modelo en desarrollo).
+    candidatos = { data: [], isPending: false, isError: false, error: null };
     detalle = {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [desarrollo(1, 'A-100', 'en-desarrollo')],
@@ -221,5 +262,159 @@ describe('<ProyectosPagina>', () => {
     expect(ultimaQuery?.busqueda).toBeUndefined();
     await usuario.type(screen.getByTestId('buscar-proyecto'), 'joggers');
     await vi.waitFor(() => expect(ultimaQuery?.busqueda).toBe('joggers'));
+  });
+  it('el botón «Generar lista de precios» se DESHABILITA con su motivo cuando no hay precosto congelado', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    // El único modelo está "en-desarrollo": todavía NO hay precosto congelado → 0 candidatos.
+    detalle = {
+      ...proyecto(1, 101, 'Joggers'),
+      desarrollos: [desarrollo(1, 'A-100', 'en-desarrollo')],
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    // Regla §Post-F9.16: el botón NO se esconde — se ve deshabilitado y CON la explicación.
+    expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(/precosto CONGELADO/i);
+  });
+
+  it('con candidatos del servidor el botón se habilita y abre el diálogo con el cliente del proyecto', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    detalle = {
+      ...proyecto(1, 101, 'Joggers'),
+      desarrollos: [desarrollo(1, 'A-100', 'cotizado')],
+    };
+    candidatos = {
+      data: [candidato(1, 'A-100')],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.queryByTestId('motivo-sin-lista')).not.toBeInTheDocument();
+    const boton = screen.getByTestId('generar-lista-proyecto');
+    expect(boton).toBeEnabled();
+
+    await usuario.click(boton);
+    // Llega precargado: cliente + departamento del proyecto, sin selectores que elegir.
+    const contexto = await screen.findByTestId('crear-lista-contexto-proyecto');
+    expect(contexto).toHaveTextContent('C&A');
+    expect(contexto).toHaveTextContent('NIÑOS');
+  });
+
+  it('REGRESIÓN: un modelo LIGADO A PRODUCCIÓN que el servidor devuelve como candidato NO se bloquea', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    // `ligado-produccion` PISA a `en-lista`/`cotizado` en la precedencia del estado derivado: por el
+    // estado no se puede saber si está o no en una lista. El backend sí lo devuelve como candidato
+    // (filtra `listaLineas: none`, nunca las órdenes) → el botón tiene que quedar HABILITADO. Antes
+    // se bloqueaba con el motivo FALSO "ya están en una lista de precios".
+    detalle = {
+      ...proyecto(1, 101, 'Joggers'),
+      desarrollos: [desarrollo(1, 'A-100', 'ligado-produccion')],
+    };
+    candidatos = {
+      data: [candidato(1, 'A-100')],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.getByTestId('generar-lista-proyecto')).toBeEnabled();
+    expect(screen.queryByTestId('motivo-sin-lista')).not.toBeInTheDocument();
+  });
+
+  it('sin candidatos y con modelos ya avanzados, el motivo NO afirma que todos estén en una lista', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    // Mezcla en la que no se puede separar "ya está en lista" de "le falta congelar": el texto lo
+    // dice como disyunción, sin inventar una causa.
+    detalle = {
+      ...proyecto(1, 101, 'Joggers'),
+      desarrollos: [
+        desarrollo(1, 'A-100', 'ligado-produccion'),
+        desarrollo(2, 'B-200', 'en-desarrollo'),
+      ],
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
+    const motivo = screen.getByTestId('motivo-sin-lista');
+    expect(motivo).toHaveTextContent(/no se vuelven a incluir/i);
+    expect(motivo).toHaveTextContent(/falta congelar/i);
+  });
+
+  it('con TODOS los modelos apagados el motivo dice eso (no "no tiene modelos") y manda reactivar', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    // Sin modelos ACTIVOS, pero el proyecto SÍ tiene modelos: a un centímetro se pinta el control
+    // «Mostrar apagados (1)», así que decir "todavía no tiene modelos" sería falso — y el remedio
+    // que corresponde es REACTIVAR, no agregar.
+    detalle = {
+      ...proyecto(1, 101, 'Joggers'),
+      desarrollos: [desarrollo(1, 'A-100', 'apagado')],
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.getByTestId('mostrar-apagados-desarrollos')).toBeInTheDocument();
+    const motivo = screen.getByTestId('motivo-sin-lista');
+    expect(motivo).toHaveTextContent(/apagados/i);
+    expect(motivo).toHaveTextContent(/reactiva/i);
+    expect(motivo).not.toHaveTextContent(/todavía no tiene modelos/i);
+  });
+
+  it('si la consulta de candidatos FALLA, lo dice en vez de inventar un motivo', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    candidatos = {
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ErrorDeApi({ codigo: 'SERVIDOR', mensaje: 'Se cayó el servidor.' }),
+    };
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent('Se cayó el servidor.');
+  });
+
+  it('sin permiso de listas no ofrece generar la lista', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    renderConProveedores(<ProyectosPagina />, {
+      sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']),
+    });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.queryByTestId('generar-lista-proyecto')).not.toBeInTheDocument();
+  });
+
+  it('con listas.administrar pero SIN listas.ver tampoco se ofrece (el backend exige los dos)', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    renderConProveedores(<ProyectosPagina />, {
+      sesion: estadoSesionDePrueba(['desarrollo.ver', 'listas.administrar']),
+    });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.queryByTestId('generar-lista-proyecto')).not.toBeInTheDocument();
+  });
+
+  it('la ficha del desarrollo muestra el cliente y el departamento (heredados del proyecto)', async () => {
+    const usuario = userEvent.setup();
+    useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+    renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
+    expect(screen.getByTestId('desarrollo-cliente')).toHaveTextContent('C&A / NIÑOS');
   });
 });

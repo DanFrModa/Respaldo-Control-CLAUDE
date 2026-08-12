@@ -27,7 +27,11 @@ function hoy(): string {
  * renglón (folio propio por empresa + lote del proveedor opcional + factura del encabezado); una
  * SALIDA valida no-negativo de AMBOS componentes bajo lock (el backend es la autoridad). El
  * cuerpo y el complemento se capturan JUNTOS en el mismo renglón. Permiso
- * `inventario-telas.mover`. El ajuste del flujo viejo por lote sigue en "Ajuste de materiales".
+ * `inventario-telas.mover`. Es la ÚNICA pantalla que ajusta tela: el ajuste del flujo viejo POR
+ * LOTE se quedó sin UI el 13-ago-2026 (vivía como pestaña de «Ajuste de materiales», hoy «Ajuste de
+ * avíos» y solo-avíos) — grababa `id_tela_color = NULL` y la vista `existencia_tela_color` lo
+ * excluye, así que ni movía las existencias que se ven aquí. El endpoint legado sigue vivo en el
+ * backend; para tocarlo hay que llamarlo a mano.
  */
 export function AjusteTelaColorPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();

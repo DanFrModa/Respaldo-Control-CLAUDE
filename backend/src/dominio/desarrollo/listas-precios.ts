@@ -651,11 +651,14 @@ export async function obtenerLista(
 /**
  * CANDIDATOS para una lista: desarrollos "cotizados" (≥1 precosto congelado) de ese cliente+
  * departamento de la empresa activa (A9), NO apagados y SIN renglón en ninguna lista. Para el diálogo
- * de crear. Requiere `listas.ver`.
+ * de crear. Con `idProyecto` (Daniel, ago-2026) se acotan a UN proyecto: es lo que ofrece el
+ * botón
+ * «Generar lista de precios» desde la página del proyecto, que ya conoce cliente y departamento.
+ * Requiere `listas.ver`.
  */
 export async function candidatosParaLista(
   sesion: SesionUsuario,
-  parametros: { idCliente: number; idClienteDepartamento: number },
+  parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
   bd?: ContextoBd,
 ): Promise<CandidatoLista[]> {
   verificarPermiso(sesion, 'listas.ver');
@@ -664,6 +667,7 @@ export async function candidatosParaLista(
   const desarrollos = await clienteLectura(bd).desarrollo.findMany({
     where: {
       apagado: false,
+      ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
       proyecto: {
         idEmpresa: sesion.idEmpresaActiva,
         idCliente: parametros.idCliente,
