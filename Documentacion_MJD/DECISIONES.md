@@ -1409,7 +1409,18 @@ Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. P
 4. **Acción «pasar a producción»**: asigna el código de 5 dígitos y saca el modelo del filtro de desarrollo. **Los dos primeros dígitos ya vienen decididos** desde el `71` del código de desarrollo, así que solo se asigna el consecutivo — el paso deja de ser una decisión y se vuelve un trámite.
 5. **NADA se borra (D3).** El modelo promovido **conserva su número de desarrollo** junto al de producción; ambos son buscables. Lo que cuelga del desarrollo —precosteo con sus versiones, negociación con sus acuerdos, tech pack, fotos de muestra, el número del cliente— **no se toca**: sigue ligado y consultable.
 6. **El número del cliente NO se normaliza.** `Desarrollo.numeroCliente` ya existe: ahí va tal cual lo que mande el cliente, aunque cada vez venga distinto. *(Daniel: "normalmente le ponen letras que salen del cliente, y la verdad es que cada vez lo hacen diferente".)*
-7. **El sistema PROPONE el código** (de desarrollo y de producción): el usuario elige prenda y género y el sistema arma el número con el siguiente consecutivo libre. En v2 el tipo de prenda y el género **ya son campos propios** del modelo (`idTipoProducto`, `idGenero`), así que el código se deriva de ellos en vez de capturarse a mano. *(La forma exacta de la UI quedó sin confirmar: Daniel cerró el cuadro de opciones sin elegir.)*
+7. **El código de PRODUCCIÓN lo define DANIEL, no el sistema.**
+
+   > Daniel: *"Normalmente yo defino los modelos de producción, no el sistema."*
+
+   El sistema **no impone** el número: Daniel lo captura. Lo que el sistema hace es **asistir y verificar**, nunca decidir:
+   - **Muestra** cuál es el siguiente consecutivo libre de esa combinación, como dato a la vista — no como valor precargado que haya que borrar.
+   - **Valida** que el código no esté repetido y que los dos primeros dígitos correspondan al tipo de prenda y al género elegidos (en v2 ambos ya son campos propios del modelo: `idTipoProducto`, `idGenero`), avisando si no cuadran. **Avisa, no bloquea** — si Daniel quiere una excepción, la excepción es suya.
+   - **Advierte** cuando la combinación se acerque al tope de 999.
+
+   Esto es lo contrario de lo que se había anotado en la primera versión de esta entrada (*"el sistema propone el código"*), y Daniel lo corrigió: automatizar la asignación le quitaría una decisión que él toma a propósito.
+
+   **El código de DESARROLLO sí lo arma el sistema**, porque es mecánico y no tiene criterio de negocio: cliente + año de entrega + los dos dígitos + el consecutivo que sigue. *(Daniel acotó su corrección a los modelos de producción; si también quiere capturar a mano el de desarrollo, se ajusta.)*
 
 - **Aplica en:** NADA todavía — es decisión de rumbo. Al construirse tocará `Modelo` (marca de origen + código de desarrollo), `Cliente` (abreviatura), el catálogo/galería de modelos y el editor de desarrollo. **Requiere migración** cuando se construya; permisos y seed, no.
 - **Fecha:** 2026-08-12.
