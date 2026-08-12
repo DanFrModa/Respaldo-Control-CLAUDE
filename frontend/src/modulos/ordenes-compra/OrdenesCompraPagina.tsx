@@ -222,9 +222,14 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       return 'sin-permiso';
     }
     if (oc.estatus !== 'autorizada' && oc.estatus !== 'recibida_parcial') {
-      return oc.estatus === 'cancelada'
-        ? 'La orden está cancelada.'
-        : 'La orden todavía no está autorizada: primero autorízala.';
+      if (oc.estatus === 'cancelada') {
+        return 'La orden está cancelada.';
+      }
+      // El mensaje tiene que ser CIERTO: manda al botón «Autorizar» sólo a quien lo tiene enfrente
+      // (permiso `compras.autorizar`); a los demás les dice a quién pedírselo.
+      return puedeAutorizar
+        ? 'La orden todavía no está autorizada: autorízala con el botón «Autorizar» de este mismo panel.'
+        : 'La orden todavía no está autorizada: pídele que la autorice a quien tenga el permiso de autorizar compras.';
     }
     if (!oc.lineas.some((l) => l.idTela !== null)) {
       return oc.lineas.some((l) => l.idAvio !== null)
@@ -626,7 +631,14 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   {motivoNoRecibirTela(seleccion)}
                 </p>
               )}
-              {puedeAutorizar && seleccion.estatus === 'pendiente_autorizacion' ? (
+              {/* AUTORIZAR desde BORRADOR: es el estatus con el que nacen TODAS las OC (`crearOC`,
+                  `duplicarOC` y la explosión MRP) y el dominio lo acepta desde siempre
+                  (`ESTATUS_EDITABLES_NORMAL`). Pedir `pendiente_autorizacion` —que nada escribe
+                  jamás— dejaba sin autorizar a toda OC nueva. Se sigue ofreciendo en
+                  `pendiente_autorizacion` por si algún dato migrado quedara ahí. */}
+              {puedeAutorizar &&
+              (seleccion.estatus === 'borrador' ||
+                seleccion.estatus === 'pendiente_autorizacion') ? (
                 <Button
                   size="sm"
                   onClick={() => autorizarOc(seleccion)}

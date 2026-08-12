@@ -20,18 +20,35 @@ es "menor" (§7.3).
 
 ---
 
-## V1-E1 · Los cuatro arreglos del precosteo — ✅ construida, en revisión
+## V1-E1 · Los cuatro arreglos del precosteo — ✅ HECHA (13-ago-2026)
 
 Buscador en el selector de modelos · el cliente visible en el precosteo y en la ficha del desarrollo
 · elegir un avío del catálogo en el renglón manual (con el precio resuelto por el dominio) · botón
 «Generar lista de precios» desde el proyecto, **con motivo visible cuando no se puede usar**.
+
+**Nota de cierre.** Cuatro rondas de revisión. Lo que el reviewer encontró y no se habría visto
+probando a mano:
+- **El botón de generar lista bloqueaba con un motivo FALSO** cuando el modelo ya había salido a
+  producción (decía *"todos ya están en una lista"* estando en ninguna) — porque el habilitado se
+  derivaba del estado, y `ligado-produccion` pisa a `en-lista`. Ahora **manda la consulta de
+  candidatos del servidor**.
+- **Y volvía a trabarse justo después de obedecer el mensaje**: congelabas el precosto, el badge
+  pasaba a «Cotizado» y el botón seguía gris — faltaba invalidar la cache de candidatos. Candado
+  cerrado: lo único que la refrescaba era abrir el diálogo, que el botón deshabilitado impedía.
+- **Tres caminos escribían `precioUnit` sin redondear** mientras el importe se calculaba con el
+  número completo. El peor no necesitaba que nadie tecleara nada raro: bastaba un avío comprado por
+  caja (100/144 → se guardaba 0.69, el importe salía 4.17 en vez de 4.14). **Tres centavos que
+  entraban al costo congelado y de ahí al precio del cliente.**
+- El mismo defecto **un campo más allá**, en el promedio del consumo por talla. Se cerró con
+  `redondear4` en `decimales.ts` y se aplicó también a los dos campos donde el consumo **se teclea**
+  (inputs de texto libre, sin límite de decimales).
 
 **Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
 `SEED_ON_START`.
 
 ---
 
-## V1-E2 · Destapar la cadena de compras ⭐ — 🔨 en construcción
+## V1-E2 · Destapar la cadena de compras ⭐ — ✅ HECHA (13-ago-2026)
 
 **El bloqueo #1 del sistema.** Sin esto no entra material al inventario — y con el arranque **sin
 conteo físico** (§Post-F9.36 punto 4) esa es **la única vía**.
@@ -63,6 +80,25 @@ escriba al mirarla, y el renglón de tela de la nota de salida (pregunta de prod
 
 **Criterio de cierre:** capturar una OC nueva, autorizarla, recibir su material y verlo en
 existencias — sin tocar la base de datos a mano.
+
+**Nota de cierre.** Tres rondas. **El bloqueo era 100 % de pantalla**: `autorizarOC` aceptaba
+`borrador` desde siempre, así que **no se tocó una sola línea del dominio** — el reviewer lo verificó
+en las tres rondas. Lo que faltaba era el botón.
+
+Lo que el reviewer encontró en la corrección y sí cambiaba comportamiento:
+- **El camino de error reintroducía el doble conteo.** Si la consulta de "cuánto llevas recibido"
+  fallaba —y el cliente tiene `retry: false`—, la pantalla precargaba **lo pedido completo** y
+  quitaba el letrero de Recibido/Falta, en silencio y **sin recuperarse en toda la sesión**. Ahora
+  **no precarga nada**, lo dice con un aviso fijo y ofrece reintentar.
+- **El aviso de direcciones mentía al fallar**: decía *"el catálogo está vacío"* y bloqueaba generar
+  la OC **con el catálogo lleno**. Ahora tiene rama propia de error y **no bloquea por un error de
+  lectura** (el servidor sí para la OC sin dirección).
+- **«Ajuste de avíos» quedó colgando del padre «Telas»** tras el renombre — se movió a «Avíos».
+
+**Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
+`SEED_ON_START`. ⚠️ **Para Daniel:** la bandeja de autorización lista **todos los borradores**,
+incluidos los que estés armando a medias — es consecuencia directa de autorizar desde borrador. Si
+estorba, se agrega después una marca de "en captura".
 
 ---
 

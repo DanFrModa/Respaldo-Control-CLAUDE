@@ -19,7 +19,8 @@ vi.mock('@/api/ordenes-compra', () => ({
 function unaPendiente() {
   useOrdenesCompraMock.mockReturnValue({
     data: {
-      datos: [ocDePrueba({ estatus: 'pendiente_autorizacion' })],
+      // BORRADOR: el estatus con el que nacen todas las OC y desde el que se autoriza.
+      datos: [ocDePrueba({ estatus: 'borrador' })],
       total: 1,
       pagina: 1,
       porPagina: 20,
@@ -51,6 +52,20 @@ describe('BandejaAutorizacionPagina (F4-E2)', () => {
     });
     expect(screen.getByText('OC 1001')).toBeInTheDocument();
     expect(screen.getByTestId('tarjeta-oc-bandeja')).toBeInTheDocument();
+  });
+
+  /**
+   * La bandeja pide BORRADORES. Filtraba por `pendiente_autorizacion` —un estatus que nada escribe
+   * jamás—, así que salía vacía para siempre por más OC nuevas que hubiera.
+   */
+  it('consulta las OC en BORRADOR (lo que de verdad espera autorización)', () => {
+    unaPendiente();
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    expect(useOrdenesCompraMock).toHaveBeenCalledWith(
+      expect.objectContaining({ estatus: 'borrador' }),
+    );
   });
 
   it('autorizar dispara la mutación con el id de la OC', async () => {

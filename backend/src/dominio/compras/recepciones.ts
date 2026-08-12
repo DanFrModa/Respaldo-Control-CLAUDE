@@ -1288,3 +1288,117 @@ export async function lineasTelaPendientesDeProveedor(
       .filter((l) => l.pendiente > 0 || l.pendienteComplemento > 0)
   );
 }
+
+/** Lo pendiente de UN renglón de OC (lo pedido, lo ya recibido y lo que falta). */
+export interface LineaPendienteOC {
+  idOrdenCompraLinea: number;
+  /** Tipo del renglón: `tela` (se recibe por factura, B1), `avio` o `libre`. */
+  tipo: 'tela' | 'avio' | 'libre';
+  /** Cantidad pedida del CUERPO en la OC. */
+  cantidad: number;
+  /** Σ recibido del cuerpo en recepciones ACTIVAS (no reversadas). */
+  recibido: number;
+  /** Lo que falta del cuerpo (0 dentro de la banda de tolerancia, §Post-F9.19). */
+  pendiente: number;
+  /** Complemento que pidió la OC (Cardigan), o null si el renglón no lo lleva. */
+  cantidadComplemento: number | null;
+  /** Σ recibido del complemento. */
+  recibidoComplemento: number;
+  /** Lo que falta del complemento. */
+  pendienteComplemento: number;
+  /** ¿El renglón ya quedó surtido (dentro de la banda de su tipo)? */
+  surtido: boolean;
+}
+
+/**
+ * Pendiente por recibir de TODOS los renglones de UNA orden de compra.
+ *
+ * POR QUÉ EXISTE: la pantalla de recepción de AVÍOS precargaba lo PEDIDO COMPLETO en cada renglón,
+ * ignorando lo ya recibido — y como `recibirCompra` solo impide repetir un renglón *dentro de la
+ * misma* recepción, recibir tres veces el 100 % era válido y silencioso. Ahora la captura precarga
+ * lo que FALTA y muestra lo ya recibido, igual que la puerta de tela (que se apoya en
+ * {@link lineasTelaPendientesDeProveedor}). El cálculo del pendiente vive AQUÍ, en el dominio (A1):
+ * la pantalla NO resta cantidades: nada más pinta lo que este servicio le da.
+ *
+ * MISMO criterio que el estatus y que el pendiente de tela (`faltantePorRecibir`, §Post-F9.19):
+ * cuerpo y complemento contra lo que la OC pidió, con la banda de tolerancia de su tipo de material.
+ * Se devuelven TODOS los renglones (no solo los pendientes): la pantalla los lista completos y
+ * necesita saber cuáles ya están surtidos para decirlo. Lectura pura, sin locks: es una ayuda de
+ * captura — quien manda es la validación del confirmar. La OC debe ser de la empresa activa (A9).
+ * Permiso `compras.ver`.
+ */
+export async function lineasPendientesDeOC(
+  sesion: SesionUsuario,
+  idOrdenCompra: number,
+  bd?: ContextoBd,
+): Promise<LineaPendienteOC[]> {
+  verificarPermiso(sesion, 'compras.ver');
+  const cliente = clienteLectura(bd);
+
+  const oc = await cliente.ordenCompra.findFirst({
+    where: { id: idOrdenCompra, idEmpresa: sesion.idEmpresaActiva },
+    select: {
+      lineas: {
+        select: {
+          id: true,
+          idTela: true,
+          idAvio: true,
+          cantidad: true,
+          cantidadComplemento: true,
+        },
+        orderBy: { id: 'asc' },
+      },
+    },
+  });
+  if (oc === null) {
+    throw new ErrorNoEncontrado('OrdenCompra', idOrdenCompra);
+  }
+  if (oc.lineas.length === 0) {
+    return [];
+  }
+
+  const sumas = await cliente.recepcionCompraLinea.groupBy({
+    by: ['idOrdenCompraLinea'],
+    where: {
+      idOrdenCompraLinea: { in: oc.lineas.map((l) => l.id) },
+      recepcionCompra: { reversadaEn: null },
+    },
+    _sum: { cantidadRecibida: true, cantidadComplemento: true },
+  });
+  const recibidoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0)]),
+  );
+  const recibidoComplementoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadComplemento ?? 0)]),
+  );
+
+  return oc.lineas.map((l) => {
+    const tipo = l.idTela !== null ? 'tela' : l.idAvio !== null ? 'avio' : 'libre';
+    // Los renglones LIBRES usan la banda de los avíos (mismo criterio que el estatus).
+    const tipoBanda: TipoRenglonCompra = tipo === 'tela' ? 'tela' : 'avio';
+    const cantidad = Number(l.cantidad);
+    const cantidadComplemento =
+      l.cantidadComplemento === null ? null : Number(l.cantidadComplemento);
+    const recibido = recibidoPorLinea.get(l.id) ?? 0;
+    const recibidoComplemento = recibidoComplementoPorLinea.get(l.id) ?? 0;
+    const renglon = {
+      pedido: cantidad,
+      recibido,
+      pedidoComplemento: cantidadComplemento,
+      recibidoComplemento,
+      tipo: tipoBanda,
+    };
+    const falta = faltantePorRecibir(renglon);
+    return {
+      idOrdenCompraLinea: l.id,
+      tipo,
+      cantidad,
+      recibido,
+      pendiente: falta.cuerpo,
+      cantidadComplemento,
+      recibidoComplemento,
+      pendienteComplemento: falta.complemento,
+      surtido: renglonSurtido(renglon),
+    };
+  });
+}

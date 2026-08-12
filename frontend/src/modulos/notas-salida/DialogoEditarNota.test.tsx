@@ -107,7 +107,7 @@ describe('DialogoEditarNota (F4-E5)', () => {
       { sesion: estadoSesionDePrueba(['notas.administrar']) },
     );
     // No hay selector de "Tipo de material" ni forma de armar un renglón de tela desde aquí:
-    // las telas se envían con la "Nueva nota de telas".
+    // la tela se registra en «Salida de tela a orden» (por color).
     expect(screen.queryByTestId('tipo-material-nota')).toBeNull();
     expect(screen.queryByTestId('selector-tela-nota')).toBeNull();
     // El único selector de material del renglón es el de avío.

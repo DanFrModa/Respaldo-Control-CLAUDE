@@ -69355,6 +69355,265 @@
         }
       }
     },
+    "/api/ordenes-compra/{idOrdenCompra}/lineas-pendientes": {
+      "get": {
+        "summary": "Pendiente por recibir de cada renglón de una orden de compra",
+        "tags": [
+          "compras"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idOrdenCompra",
+            "required": true,
+            "description": "Id de la orden de compra."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pendiente por recibir de los renglones de la OC.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompraLinea": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio",
+                              "libre"
+                            ],
+                            "description": "Tipo del renglón de la OC."
+                          },
+                          "cantidad": {
+                            "type": "number",
+                            "description": "Cantidad pedida en la OC."
+                          },
+                          "recibido": {
+                            "type": "number",
+                            "description": "Ya recibido (recepciones activas)."
+                          },
+                          "pendiente": {
+                            "type": "number",
+                            "description": "Lo que falta del CUERPO (0 dentro de la banda, §Post-F9.19)."
+                          },
+                          "cantidadComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Complemento que pidió la OC, o null si no lleva."
+                          },
+                          "recibidoComplemento": {
+                            "type": "number",
+                            "description": "Complemento ya recibido."
+                          },
+                          "pendienteComplemento": {
+                            "type": "number",
+                            "description": "Complemento que falta por recibir."
+                          },
+                          "surtido": {
+                            "type": "boolean",
+                            "description": "¿El renglón ya quedó surtido?"
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompraLinea",
+                          "tipo",
+                          "cantidad",
+                          "recibido",
+                          "pendiente",
+                          "cantidadComplemento",
+                          "recibidoComplemento",
+                          "pendienteComplemento",
+                          "surtido"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Pendiente por recibir de los renglones de la OC."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/recepciones-compra/{id}": {
       "get": {
         "summary": "Obtener una recepción de compra",
@@ -185587,6 +185846,26 @@
                             "maximum": 9007199254740991,
                             "description": "Proyecto al que pertenece."
                           },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente del proyecto (para la UI)."
+                          },
+                          "idClienteDepartamento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Departamento del cliente (del proyecto)."
+                          },
+                          "departamento": {
+                            "type": "string",
+                            "description": "Nombre del departamento del cliente (para la UI)."
+                          },
                           "idModelo": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -185718,6 +185997,10 @@
                         "required": [
                           "id",
                           "idProyecto",
+                          "idCliente",
+                          "cliente",
+                          "idClienteDepartamento",
+                          "departamento",
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
@@ -186128,6 +186411,26 @@
                             "maximum": 9007199254740991,
                             "description": "Proyecto al que pertenece."
                           },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente del proyecto (para la UI)."
+                          },
+                          "idClienteDepartamento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Departamento del cliente (del proyecto)."
+                          },
+                          "departamento": {
+                            "type": "string",
+                            "description": "Nombre del departamento del cliente (para la UI)."
+                          },
                           "idModelo": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -186259,6 +186562,10 @@
                         "required": [
                           "id",
                           "idProyecto",
+                          "idCliente",
+                          "cliente",
+                          "idClienteDepartamento",
+                          "departamento",
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
@@ -186716,6 +187023,26 @@
                             "maximum": 9007199254740991,
                             "description": "Proyecto al que pertenece."
                           },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente del proyecto (para la UI)."
+                          },
+                          "idClienteDepartamento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Departamento del cliente (del proyecto)."
+                          },
+                          "departamento": {
+                            "type": "string",
+                            "description": "Nombre del departamento del cliente (para la UI)."
+                          },
                           "idModelo": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -186847,6 +187174,10 @@
                         "required": [
                           "id",
                           "idProyecto",
+                          "idCliente",
+                          "cliente",
+                          "idClienteDepartamento",
+                          "departamento",
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
@@ -187257,6 +187588,26 @@
                             "maximum": 9007199254740991,
                             "description": "Proyecto al que pertenece."
                           },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente del proyecto (para la UI)."
+                          },
+                          "idClienteDepartamento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Departamento del cliente (del proyecto)."
+                          },
+                          "departamento": {
+                            "type": "string",
+                            "description": "Nombre del departamento del cliente (para la UI)."
+                          },
                           "idModelo": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -187388,6 +187739,10 @@
                         "required": [
                           "id",
                           "idProyecto",
+                          "idCliente",
+                          "cliente",
+                          "idClienteDepartamento",
+                          "departamento",
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
@@ -187798,6 +188153,26 @@
                             "maximum": 9007199254740991,
                             "description": "Proyecto al que pertenece."
                           },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente del proyecto (para la UI)."
+                          },
+                          "idClienteDepartamento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Departamento del cliente (del proyecto)."
+                          },
+                          "departamento": {
+                            "type": "string",
+                            "description": "Nombre del departamento del cliente (para la UI)."
+                          },
                           "idModelo": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -187929,6 +188304,10 @@
                         "required": [
                           "id",
                           "idProyecto",
+                          "idCliente",
+                          "cliente",
+                          "idClienteDepartamento",
+                          "departamento",
                           "idModelo",
                           "codigoModelo",
                           "descripcionModelo",
@@ -188199,6 +188578,26 @@
                       "maximum": 9007199254740991,
                       "description": "Proyecto al que pertenece."
                     },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
                     "idModelo": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -188330,6 +188729,10 @@
                   "required": [
                     "id",
                     "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
@@ -188543,6 +188946,26 @@
                       "maximum": 9007199254740991,
                       "description": "Proyecto al que pertenece."
                     },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
                     "idModelo": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -188674,6 +189097,10 @@
                   "required": [
                     "id",
                     "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
@@ -188921,6 +189348,26 @@
                       "maximum": 9007199254740991,
                       "description": "Proyecto al que pertenece."
                     },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
                     "idModelo": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -189052,6 +189499,10 @@
                   "required": [
                     "id",
                     "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
@@ -189286,6 +189737,26 @@
                       "maximum": 9007199254740991,
                       "description": "Proyecto al que pertenece."
                     },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
                     "idModelo": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -189417,6 +189888,10 @@
                   "required": [
                     "id",
                     "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
@@ -189630,6 +190105,26 @@
                       "maximum": 9007199254740991,
                       "description": "Proyecto al que pertenece."
                     },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
                     "idModelo": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -189761,6 +190256,10 @@
                   "required": [
                     "id",
                     "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
                     "idModelo",
                     "codigoModelo",
                     "descripcionModelo",
@@ -191710,8 +192209,14 @@
                     "maximum": 9007199254740991,
                     "description": "Concepto de costo (ConceptoCosto.id) del renglón manual."
                   },
+                  "idAvio": {
+                    "description": "Avío del catálogo (Avio.id) al que se liga el renglón. Con él, el dominio resuelve descripción y precio.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "descripcion": {
-                    "description": "Descripción del renglón (por default el nombre del concepto).",
+                    "description": "Descripción del renglón (por default el avío elegido, o el nombre del concepto).",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
@@ -191729,9 +192234,9 @@
                     ]
                   },
                   "precioUnit": {
+                    "description": "Precio unitario (o monto directo si no hay consumo). Obligatorio salvo que venga `idAvio`.",
                     "type": "number",
-                    "minimum": 0,
-                    "description": "Precio unitario (o monto directo si no hay consumo)."
+                    "minimum": 0
                   },
                   "notas": {
                     "description": "Notas del renglón (opcional).",
@@ -191747,8 +192252,7 @@
                   }
                 },
                 "required": [
-                  "idConceptoCosto",
-                  "precioUnit"
+                  "idConceptoCosto"
                 ]
               }
             }
@@ -195896,6 +196400,17 @@
             "name": "idClienteDepartamento",
             "required": true,
             "description": "Departamento del cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idProyecto",
+            "required": false,
+            "description": "Acota los candidatos a un proyecto (opcional)."
           }
         ],
         "security": [

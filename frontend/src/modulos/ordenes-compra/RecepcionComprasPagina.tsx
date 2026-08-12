@@ -1,10 +1,15 @@
 import { RotateCcw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useOrdenesCompra } from '@/api/ordenes-compra';
-import { useRecepcionesDeOc, useRecibir, useReversarRecepcion } from '@/api/recepciones';
+import {
+  useLineasPendientesDeOc,
+  useRecepcionesDeOc,
+  useRecibir,
+  useReversarRecepcion,
+} from '@/api/recepciones';
 import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -94,20 +99,44 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     direccion: 'asc',
   });
   const recepciones = useRecepcionesDeOc(ocSeleccionada?.id);
+  /**
+   * Pendiente por recibir de CADA renglón (lo calcula el dominio, A1). Antes la captura precargaba
+   * lo PEDIDO COMPLETO ignorando lo ya recibido, y como el backend solo impide repetir un renglón
+   * dentro de la MISMA recepción, recibir tres veces el 100 % pasaba en silencio. Ahora se precarga
+   * lo que FALTA y se muestra lo ya recibido: la sobre-recepción sigue permitida (puede ser
+   * legítima), pero el usuario la VE.
+   */
+  const pendientes = useLineasPendientesDeOc(ocSeleccionada?.id);
+  const pendientePorLinea = useMemo(
+    () => new Map((pendientes.data ?? []).map((p) => [p.idOrdenCompraLinea, p])),
+    [pendientes.data],
+  );
   const recibir = useRecibir();
   const reversar = useReversarRecepcion();
+
+  /**
+   * Marca de la última precarga aplicada (`idOc:intento`): la cantidad pendiente llega DESPUÉS de
+   * elegir la OC (otra consulta), así que la precarga se aplica en un efecto — una sola vez por
+   * selección, para no pisar lo que el usuario ya esté capturando.
+   */
+  const precargaAplicada = useRef<string>('');
+  const [intentoPrecarga, setIntentoPrecarga] = useState(0);
 
   /** Reinicia la captura al elegir una OC (un renglón por línea, telas con su componente base). */
   function elegirOc(valor: string): void {
     setIdOc(valor);
     setCaptura({});
+    setIntentoPrecarga((n) => n + 1);
     const oc = ocsRecibibles.find((o) => String(o.id) === valor);
     if (oc === undefined) return;
     const inicial: Record<number, CapturaRenglon> = {};
     for (const linea of oc.lineas) {
       inicial[linea.id] = {
         incluir: false,
-        cantidad: String(linea.cantidad),
+        // Arranca en blanco: la cantidad real (lo que FALTA) la pone la precarga en cuanto el
+        // servidor dice cuánto se ha recibido. Poner aquí lo pedido volvería a invitar al doble
+        // conteo durante ese parpadeo.
+        cantidad: '',
         idTelaColor: '',
         cantidadComplemento: '',
         precioComplemento: '',
@@ -116,6 +145,45 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     }
     setCaptura(inicial);
   }
+
+  /**
+   * Precarga de cantidades = lo PENDIENTE (pedido − recibido, con la banda de tolerancia del
+   * dominio). Se espera a que la consulta termine (`isFetching`) para no fijar valores viejos tras
+   * recibir, y se marca el intento para no re-pisar la captura en cada refetch de fondo.
+   *
+   * SI LA CONSULTA FALLA **no se precarga nada**: los renglones se quedan EN BLANCO y la pantalla
+   * lo dice con un aviso fijo (abajo). Caer a "lo pedido" sería reintroducir justo el defecto que
+   * esta pantalla vino a matar — con `retry: false` en el QueryClient (`App.tsx`), un solo 500
+   * dejaría precargado el 100 % de una OC que ya trae 40 recibidos, sin decir nada, y confirmar
+   * metería el doble al kardex.
+   */
+  useEffect(() => {
+    if (ocSeleccionada === undefined || pendientes.isFetching || pendientes.data === undefined) {
+      return;
+    }
+    const marca = `${String(ocSeleccionada.id)}:${String(intentoPrecarga)}`;
+    if (precargaAplicada.current === marca) return;
+    precargaAplicada.current = marca;
+    const porLinea = new Map(pendientes.data.map((p) => [p.idOrdenCompraLinea, p]));
+    setCaptura((prev) => {
+      const siguiente: Record<number, CapturaRenglon> = {};
+      for (const linea of ocSeleccionada.lineas) {
+        const base = prev[linea.id];
+        const pendiente = porLinea.get(linea.id);
+        siguiente[linea.id] = {
+          incluir: base?.incluir ?? false,
+          // Sin dato del renglón (no debería pasar: el servidor devuelve TODOS), en blanco: la
+          // cantidad la teclea quien recibe, nunca la adivina la pantalla.
+          cantidad: pendiente === undefined ? '' : String(pendiente.pendiente),
+          idTelaColor: base?.idTelaColor ?? '',
+          cantidadComplemento: base?.cantidadComplemento ?? '',
+          precioComplemento: base?.precioComplemento ?? '',
+          loteProveedor: base?.loteProveedor ?? '',
+        };
+      }
+      return siguiente;
+    });
+  }, [ocSeleccionada, pendientes.data, pendientes.isFetching, intentoPrecarga]);
 
   function actualizar(idLinea: number, cambios: Partial<CapturaRenglon>): void {
     setCaptura((prev) => {
@@ -344,6 +412,32 @@ export function RecepcionComprasPagina(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Sin orden seleccionada.</p>
             ) : (
               <>
+                {/* Si no se pudo saber lo YA RECIBIDO, se dice FUERTE y FIJO (no un toast que se
+                    va): las cantidades quedan en blanco y hay que teclearlas mirando la orden. El
+                    QueryClient no reintenta ni refresca al volver al foco, así que el botón de
+                    reintentar es la única salida sin recargar la página. */}
+                {pendientes.isError ? (
+                  <div
+                    className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+                    role="alert"
+                    data-testid="rec-error-pendientes"
+                  >
+                    <p>
+                      <b>No se pudo consultar lo ya recibido de esta orden.</b> Las cantidades NO se
+                      precargaron (en blanco a propósito: precargar lo pedido invitaría a recibir
+                      dos veces lo mismo). Captura a mano lo que llegó, o reintenta.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void pendientes.refetch()}
+                      data-testid="rec-reintentar-pendientes"
+                    >
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : null}
+
                 <ul className="space-y-3">
                   {ocSeleccionada.lineas.map((linea) => {
                     const r = captura[linea.id];
@@ -354,6 +448,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                     // renglón a su renglón de OC. El renglón se muestra (para ver qué falta) pero
                     // NO se puede marcar, y se dice a dónde ir. El servidor lo rechaza igual (A1).
                     const esTela = tipo === 'tela';
+                    const pendiente = pendientePorLinea.get(linea.id);
                     return (
                       <li key={linea.id} className="rounded-lg border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -370,9 +465,28 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                               {tipo}
                             </ChipEstado>
                           </label>
-                          <span className="text-xs text-muted-foreground">
+                          {/* Lo pedido, lo YA RECIBIDO y lo que falta — a la vista, para que la
+                              sobre-recepción (que sigue permitida) nunca sea accidental. */}
+                          <span
+                            className="text-xs text-muted-foreground"
+                            data-testid={`rec-pendiente-${linea.id}`}
+                          >
                             Pedido: {Number(linea.cantidad).toLocaleString('es-MX')}{' '}
                             {linea.unidad ?? ''}
+                            {pendiente !== undefined ? (
+                              <>
+                                {' · '}
+                                Recibido: {pendiente.recibido.toLocaleString('es-MX')}
+                                {' · '}
+                                {pendiente.surtido ? (
+                                  <b className="text-ok">Ya surtido</b>
+                                ) : (
+                                  <>
+                                    Falta: <b>{pendiente.pendiente.toLocaleString('es-MX')}</b>
+                                  </>
+                                )}
+                              </>
+                            ) : null}
                           </span>
                         </div>
                         {esTela ? (

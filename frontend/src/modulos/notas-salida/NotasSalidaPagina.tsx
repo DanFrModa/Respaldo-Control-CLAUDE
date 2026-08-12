@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useEmpresas } from '@/api/empresas';
@@ -42,7 +43,6 @@ import { useSesion } from '@/sesion/useSesion';
 import { TarjetaNota } from './TarjetaNota';
 import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
-import { DialogoNotaTela } from './DialogoNotaTela';
 import {
   TONO_ESTATUS_NOTA as TONO_NOTA,
   descripcionMaterialNota,
@@ -75,7 +75,8 @@ export function NotasSalidaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('notas.administrar');
   const puedeCancelar = tienePermiso('notas.cancelar');
-  // La nota de TELAS reusa el motor F4 (salida de tela a orden) → permiso propio (§4.6 dec. 2).
+  // El enlace a «Salida de tela a orden» solo se ofrece a quien puede mover tela (A4: mismo gate
+  // que la pantalla destino; el backend lo re-verifica ahí).
   const puedeMoverTela = tienePermiso('inventario-telas.mover');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
@@ -150,7 +151,6 @@ export function NotasSalidaPagina(): React.JSX.Element {
   // ── Diálogos ───────────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ nota?: NotaSalida; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<NotaSalida | null>(null);
-  const [notaTelaAbierta, setNotaTelaAbierta] = useState(false);
 
   function alGuardada(idNueva: number): void {
     // La nota recién guardada queda a la vista (folio desc → página 1) y abierta en el cajón.
@@ -181,21 +181,24 @@ export function NotasSalidaPagina(): React.JSX.Element {
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Notas de salida
           </h1>
-          <p className="truncate text-[12.5px] text-muted-foreground">
-            Envío de material (telas y avíos) a maquileros · descuenta el inventario · por orden de
-            producción
+          <p className="text-[12.5px] text-muted-foreground">
+            Envío de <b>avíos</b> a maquileros · descuenta el inventario · por orden de producción.
+            La <b>tela</b> se registra en «Salida de tela a orden» (por color).
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* La SALIDA DE TELA no se captura aquí: se registra POR COLOR en su propia pantalla
+              («una sola pantalla por acto», Daniel). El botón que vivía aquí abría un diálogo
+              atado al motor LEGADO por lote: su selector salía vacío (el inventario vivo entra
+              por partidas/color) y el aviso mentía —«nota de tela registrada»— cuando lo único
+              que se creaba era un movimiento de kardex, nunca una nota. En su lugar va el enlace
+              a la pantalla que SÍ opera. */}
           {puedeMoverTela ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setNotaTelaAbierta(true)}
-              data-testid="nueva-nota-tela"
-            >
-              <Layers aria-hidden />
-              Nueva nota de telas
+            <Button variant="outline" size="sm" asChild data-testid="ir-salida-tela">
+              <Link to="/inventarios/telas/salida-orden">
+                <Layers aria-hidden />
+                Salida de tela a orden
+              </Link>
             </Button>
           ) : null}
           {puedeAdministrar ? (
@@ -205,7 +208,7 @@ export function NotasSalidaPagina(): React.JSX.Element {
               data-testid="nuevo-nota"
             >
               <Plus aria-hidden />
-              Nueva nota
+              Nueva nota de avíos
             </Button>
           ) : null}
         </div>
@@ -481,12 +484,6 @@ export function NotasSalidaPagina(): React.JSX.Element {
           }
         }}
         nota={aCancelar ?? undefined}
-      />
-
-      <DialogoNotaTela
-        abierto={notaTelaAbierta}
-        alCambiarAbierto={setNotaTelaAbierta}
-        alGuardada={() => void consulta.refetch()}
       />
     </div>
   );

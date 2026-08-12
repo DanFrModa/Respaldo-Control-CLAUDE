@@ -682,8 +682,10 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-telas.mover'],
             subVista: true,
           },
-          // Las vistas de "materiales" (telas + avíos juntos) cuelgan aquí: el flujo de telas es
-          // el dominante y duplicarlas bajo Avíos ensuciaría el menú (decisión del lead, R1).
+          // Las vistas de "materiales" que sirven a las DOS dimensiones (telas por lote + avíos)
+          // cuelgan aquí: el flujo de telas es el dominante y duplicarlas bajo Avíos ensuciaría el
+          // menú (decisión del lead, R1). Ya solo son DOS: el ajuste se volvió solo-avíos el
+          // 13-ago-2026 y se mudó al grupo «Avíos».
           {
             clave: 'inventario-materiales-kardex',
             titulo: 'Kardex de materiales',
@@ -698,15 +700,6 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             titulo: 'Traspaso de materiales',
             descripcion: 'Mueve tela (por lote) o avío entre almacenes en una sola operación',
             ruta: '/inventarios/materiales/traspasos',
-            icono: 'paquete',
-            permisos: ['inventario-telas.mover', 'inventario-avios.mover'],
-            subVista: true,
-          },
-          {
-            clave: 'inventario-materiales-ajustes',
-            titulo: 'Ajuste de materiales',
-            descripcion: 'Ajuste / inventario físico de telas (lote 1..N componentes) y avíos',
-            ruta: '/inventarios/materiales/ajustes',
             icono: 'paquete',
             permisos: ['inventario-telas.mover', 'inventario-avios.mover'],
             subVista: true,
@@ -738,6 +731,24 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             ruta: '/catalogos/avios',
             icono: 'tijeras',
             permisos: 'autenticado',
+            subVista: true,
+          },
+          {
+            // AQUÍ, bajo Avíos, desde el 13-ago-2026. Vivía bajo «Telas» como «Ajuste de
+            // materiales» porque servía a las dos dimensiones, pero su pestaña de TELAS estaba
+            // atada al motor LEGADO por lote —y la pantalla ARRANCABA en ella—, así que lo
+            // capturado ahí no aparecía en «Existencias de telas» (la vista `existencia_tela_color`
+            // excluye los renglones con `id_tela_color = NULL`). Al quedarse SOLO con avíos, dejarla
+            // colgando de «Telas» escondía la pantalla justo de quien la busca: se desplegaba
+            // «Avíos» y no estaba. El ajuste de TELA es «Ajuste de telas por color», hijo de
+            // «Telas». Su gate se estrechó al permiso que de verdad usa (A4).
+            clave: 'inventario-materiales-ajustes',
+            titulo: 'Ajuste de avíos',
+            descripcion:
+              'Ajuste / inventario físico de avíos (entrada o salida, motivo obligatorio)',
+            ruta: '/inventarios/materiales/ajustes',
+            icono: 'paquete',
+            permisos: ['inventario-avios.mover'],
             subVista: true,
           },
         ],
@@ -790,7 +801,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'autorizacion-compras',
             titulo: 'Autorización de compras',
-            descripcion: 'Bandeja de órdenes de compra pendientes de autorizar (desde el móvil)',
+            descripcion: 'Bandeja de órdenes de compra en borrador, por autorizar (desde el móvil)',
             ruta: '/compras/autorizacion',
             icono: 'lista-tareas',
             permisos: ['compras.autorizar'],
@@ -1495,16 +1506,16 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         // —el primer hijo de este mismo menú— sin moverse. Ofrecer solo el de lote era mandar al
         // usuario al flujo muerto.
         //
-        // + las TRES vistas de «materiales» (12-ago-2026), AL FINAL porque son las de lote/avíos.
-        // Sirven para telas Y avíos a la vez (su gate es `inventario-telas.* | inventario-avios.*`),
-        // pero en el catálogo cuelgan del padre «Telas» y `resolverEntradaRiel` solo admite hijos
-        // del MISMO padre: NO se pueden colgar de Avíos. Si no entraran aquí, «Avíos» quedaría
-        // destapado a medias —con Existencias y Catálogo, pero sin su kardex, traspasos ni
-        // ajustes—, que es justo el defecto que se está cerrando. Hasta hoy no tenían ENTRADA EN EL
-        // MENÚ ni enlace estable: solo ⌘K/URL o el hub `/inventarios` (`InventariosPagina`), que
-        // tampoco es entrada del riel. OJO al leer el menú: para TELAS el traspaso vigente es el de
-        // color; «Traspaso de materiales» está por los AVÍOS (su pata de tela es la legada por
-        // lote) — así lo fijó `DECISIONES.md §Post-F9.32`.
+        // + las DOS vistas de «materiales» que SÍ sirven a las dos dimensiones (12-ago-2026), AL
+        // FINAL porque son las de lote/avíos: kardex y traspaso (su gate es `inventario-telas.* |
+        // inventario-avios.*`). Cuelgan del padre «Telas» en el catálogo y `resolverEntradaRiel`
+        // solo admite hijos del MISMO padre, así que no se pueden colgar de Avíos. Hasta el
+        // 12-ago-2026 no tenían ENTRADA EN EL MENÚ ni enlace estable: solo ⌘K/URL o el hub
+        // `/inventarios` (`InventariosPagina`), que tampoco es entrada del riel. OJO al leer el
+        // menú: para TELAS el traspaso vigente es el de color; «Traspaso de materiales» está por
+        // los AVÍOS (su pata de tela es la legada por lote) — así lo fijó `DECISIONES.md
+        // §Post-F9.32`. La TERCERA vista de «materiales», el ajuste, se fue al padre «Avíos» el
+        // 13-ago-2026: ya es solo-avíos («Ajuste de avíos») y aquí no la encontraba quien la busca.
         tipo: 'padre',
         clave: 'telas',
         hijos: [
@@ -1516,20 +1527,21 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
           'inventario-telas-traspaso',
           'inventario-materiales-kardex',
           'inventario-materiales-traspasos',
-          'inventario-materiales-ajustes',
         ],
       },
       {
         // Avíos es PADRE desplegable (Daniel, 12-ago-2026): como hoja colapsada solo navegaba a
         // Existencias y el «Catálogo de avíos» se quedaba sin ENTRADA EN EL MENÚ —igual que le pasó
         // al de telas en A2—; su único enlace era la tarjeta del hub `/catalogos`, que tampoco es
-        // entrada del riel. Van sus DOS hijos, que son todos los que tiene el padre. El
-        // kardex/traspaso/ajuste de avíos vive en las vistas de «materiales», que cuelgan del padre
-        // «Telas» (ver el comentario de arriba); no hay pantalla de "movimientos de avíos" — los
-        // movimientos de avío se capturan justamente por esos ajustes y traspasos.
+        // entrada del riel. Van sus TRES hijos, que son todos los que tiene el padre: +«Ajuste de
+        // avíos» el 13-ago-2026, que colgaba de «Telas» cuando todavía servía a las dos dimensiones
+        // —al quedarse solo-avíos, ahí se escondía justo de quien la busca—. El KARDEX y el TRASPASO
+        // de avíos siguen en las vistas de «materiales» bajo el padre «Telas» (sirven a las dos
+        // dimensiones y `resolverEntradaRiel` solo admite hijos del MISMO padre); no hay pantalla de
+        // "movimientos de avíos" — los movimientos de avío se capturan por ese ajuste y ese traspaso.
         tipo: 'padre',
         clave: 'avios',
-        hijos: ['inventario-avios-existencias', 'catalogo-avios'],
+        hijos: ['inventario-avios-existencias', 'catalogo-avios', 'inventario-materiales-ajustes'],
       },
       {
         // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un

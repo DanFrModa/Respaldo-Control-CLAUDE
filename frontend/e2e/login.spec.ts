@@ -101,14 +101,15 @@ test.describe('Inicio de sesión', () => {
     for (const hijoPt of ['Existencias PT', 'Movimientos PT', 'Traspasos PT', 'Kardex PT']) {
       await expect(navegacion.getByRole('link', { name: hijoPt, exact: true })).toBeVisible();
     }
-    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 9 hijos — los seis flujos POR COLOR
+    // «Telas» (A2) arranca CERRADA: al desplegarla se ven sus 8 hijos — los seis flujos POR COLOR
     // (Existencias principal, el Catálogo de telas —el pedido de Daniel—, las entradas por factura
-    // de B1, la salida a orden, el ajuste y el TRASPASO) y, al final, las TRES vistas de
-    // «materiales» (12-ago-2026: sirven para telas por lote Y avíos, pero cuelgan de este padre en
-    // el catálogo, así que no pueden ir bajo Avíos). El traspaso POR COLOR es el flujo vigente
-    // («El traspaso se hace por color», Daniel — `DECISIONES.md §Post-F9.32`): el de lote graba
-    // `id_tela_color = NULL` y no mueve las existencias del primer hijo, así que el menú no puede
-    // ofrecer sólo aquél.
+    // de B1, la salida a orden, el ajuste y el TRASPASO) y, al final, las DOS vistas de
+    // «materiales» que sirven a las dos dimensiones (kardex y traspaso: telas por lote Y avíos,
+    // pero cuelgan de este padre en el catálogo, así que no pueden ir bajo Avíos). El AJUSTE de
+    // materiales se fue a «Avíos» el 13-ago-2026 al volverse solo-avíos. El traspaso POR COLOR es
+    // el flujo vigente («El traspaso se hace por color», Daniel — `DECISIONES.md §Post-F9.32`): el
+    // de lote graba `id_tela_color = NULL` y no mueve las existencias del primer hijo, así que el
+    // menú no puede ofrecer sólo aquél.
     await expect(navegacion.getByRole('link', { name: 'Existencias de telas' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Telas' }).click();
     for (const hijoTelas of [
@@ -120,20 +121,22 @@ test.describe('Inicio de sesión', () => {
       'Traspaso de telas por color',
       'Kardex de materiales',
       'Traspaso de materiales',
-      'Ajuste de materiales',
     ]) {
       await expect(navegacion.getByRole('link', { name: hijoTelas, exact: true })).toBeVisible();
     }
+    // El ajuste ya NO cuelga de Telas (se volvió solo-avíos y se mudó al padre «Avíos»).
+    await expect(navegacion.getByRole('link', { name: 'Ajuste de avíos' })).toHaveCount(0);
     // Lo único de Telas que sigue FUERA del riel: las dos vistas por lote LEGADAS (ya no operan).
     for (const legada of ['Existencias por lote (legado)', 'Salida a orden por lote (legado)']) {
       await expect(navegacion.getByRole('link', { name: legada, exact: true })).toHaveCount(0);
     }
-    // «Avíos» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 2 hijos. Antes era hoja
+    // «Avíos» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 3 hijos. Antes era hoja
     // plana a Existencias y el «Catálogo de avíos» no tenía ENTRADA EN EL MENÚ — su único enlace
-    // era la tarjeta del hub /catalogos, que tampoco es entrada del riel.
+    // era la tarjeta del hub /catalogos, que tampoco es entrada del riel. El tercero, «Ajuste de
+    // avíos», llegó el 13-ago-2026 desde el padre «Telas» (ya no toca tela).
     await expect(navegacion.getByRole('link', { name: 'Catálogo de avíos' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Avíos' }).click();
-    for (const hijoAvios of ['Existencias de avíos', 'Catálogo de avíos']) {
+    for (const hijoAvios of ['Existencias de avíos', 'Catálogo de avíos', 'Ajuste de avíos']) {
       await expect(navegacion.getByRole('link', { name: hijoAvios, exact: true })).toBeVisible();
     }
     // «Compras / MRP» (11-ago-2026) también arranca CERRADA: al desplegarla se ven sus 4 hijos

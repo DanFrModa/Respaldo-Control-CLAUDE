@@ -1009,9 +1009,6 @@ export type KardexPtQuery = NonNullable<
 /** Un movimiento de inventario de tela tal como lo devuelve el API. */
 export type MovimientoTela =
   paths['/api/inventarios/telas/ajustes']['post']['responses']['201']['content']['application/json'];
-/** Cuerpo de un ajuste de tela (`POST /api/inventarios/telas/ajustes`). */
-export type AjusteTelaCrear =
-  paths['/api/inventarios/telas/ajustes']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de una salida de tela a orden (`POST /api/inventarios/telas/salidas-orden`). */
 export type SalidaTelaCrear =
   paths['/api/inventarios/telas/salidas-orden']['post']['requestBody']['content']['application/json'];

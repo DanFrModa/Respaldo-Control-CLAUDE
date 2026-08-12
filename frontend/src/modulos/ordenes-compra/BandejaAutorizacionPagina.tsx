@@ -16,10 +16,15 @@ import { fechaCortaOc } from './piezas';
 const POR_PAGINA = 20;
 
 /**
- * Bandeja de AUTORIZACIÓN de órdenes de compra (F4-E2): lista las OC pendientes de autorizar y
+ * Bandeja de AUTORIZACIÓN de órdenes de compra (F4-E2): lista las OC que esperan autorización y
  * permite autorizarlas con un botón. Pensada para usarse EN CELULAR (PLANMAESTRO §Acceso: las
  * autorizaciones se hacen desde el móvil), así que el layout es de TARJETAS responsivas (1 columna en
  * móvil, 2 en escritorio). Requiere `compras.autorizar`; el backend re-verifica el permiso (A1).
+ *
+ * QUÉ LISTA: las OC en **borrador**, que es el estatus con el que nacen TODAS (alta manual,
+ * duplicado y explosión MRP) y desde el que el dominio autoriza (`ESTATUS_EDITABLES_NORMAL`). Antes
+ * filtraba por `pendiente_autorizacion` — un estatus que NADA escribe jamás —, así que la bandeja
+ * salía vacía para siempre y ninguna OC nueva se podía autorizar.
  */
 export function BandejaAutorizacionPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -29,7 +34,7 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
   const consulta = useOrdenesCompra({
     pagina,
     porPagina: POR_PAGINA,
-    estatus: 'pendiente_autorizacion',
+    estatus: 'borrador',
     ordenarPor: 'fecha',
     direccion: 'asc',
   });
@@ -54,12 +59,12 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
             Autorización de compras
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Órdenes de compra pendientes de autorizar
+            Órdenes de compra en borrador, esperando autorización
           </p>
         </div>
         {datos ? (
           <span className="text-sm text-muted-foreground" data-testid="resumen-bandeja-oc">
-            {datos.total} pendientes
+            {datos.total} por autorizar
           </span>
         ) : null}
       </div>
@@ -88,7 +93,7 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
             className="py-10 text-center text-sm text-muted-foreground"
             data-testid="bandeja-vacia"
           >
-            No hay órdenes de compra pendientes de autorizar.
+            No hay órdenes de compra en borrador esperando autorización.
           </p>
         ) : (
           <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">

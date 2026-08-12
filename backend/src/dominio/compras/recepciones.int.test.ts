@@ -16,7 +16,12 @@ import type {
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { autorizarOC, cancelarOC, crearOC, resumenOC } from './ordenes-compra.js';
-import { listarRecepcionesDeOC, recibirCompra, reversarRecepcion } from './recepciones.js';
+import {
+  lineasPendientesDeOC,
+  listarRecepcionesDeOC,
+  recibirCompra,
+  reversarRecepcion,
+} from './recepciones.js';
 
 /**
  * Integración del dominio de RECEPCIÓN de compras (F4-E3) contra Postgres efímero (testcontainers).
@@ -676,5 +681,86 @@ describe('Recepción (§Post-F9.19) — en AVÍOS también se admite diferencia'
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_total',
     );
+  });
+});
+
+describe('Recepción — pendiente por renglón (lo que precarga la captura)', () => {
+  /**
+   * El pendiente lo calcula el DOMINIO (A1). La pantalla de recepción precargaba lo PEDIDO
+   * COMPLETO ignorando lo ya recibido, y como `recibirCompra` solo impide repetir un renglón
+   * DENTRO de la misma recepción, recibir tres veces el 100 % pasaba en silencio.
+   */
+  it('descuenta lo ya recibido y llega a 0 (surtido) cuando la orden se completa', async () => {
+    const oc = await ocAvioAutorizada(100, 2);
+    const idLinea = oc.lineas[0]!.id;
+
+    const [inicial] = await lineasPendientesDeOC(sesion(PERM), oc.id, bd());
+    expect(inicial).toMatchObject({
+      idOrdenCompraLinea: idLinea,
+      tipo: 'avio',
+      cantidad: 100,
+      recibido: 0,
+      pendiente: 100,
+      surtido: false,
+    });
+
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: idLinea, cantidad: 40 }],
+      },
+      bd(),
+    );
+    const [parcial] = await lineasPendientesDeOC(sesion(PERM), oc.id, bd());
+    expect(parcial).toMatchObject({ recibido: 40, pendiente: 60, surtido: false });
+
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idOrdenCompraLinea: idLinea, cantidad: 60 }],
+      },
+      bd(),
+    );
+    const [completo] = await lineasPendientesDeOC(sesion(PERM), oc.id, bd());
+    expect(completo).toMatchObject({ recibido: 100, pendiente: 0, surtido: true });
+  });
+
+  it('una recepción REVERSADA deja de contar (D3: el pendiente vuelve)', async () => {
+    const oc = await ocAvioAutorizada(100, 2);
+    const idLinea = oc.lineas[0]!.id;
+    const recepcion = await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: idLinea, cantidad: 100 }],
+      },
+      bd(),
+    );
+    await reversarRecepcion(sesion(PERM), recepcion.id, { motivo: 'llegó equivocado' }, bd());
+
+    const [tras] = await lineasPendientesDeOC(sesion(PERM), oc.id, bd());
+    expect(tras).toMatchObject({ recibido: 0, pendiente: 100, surtido: false });
+  });
+
+  it('una OC de otra empresa (o inexistente) → ErrorNoEncontrado (A9)', async () => {
+    await expect(lineasPendientesDeOC(sesion(PERM), 999_999, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+
+    // Lo que A9 protege de verdad: la OC EXISTE, pero es de otra empresa → para esta sesión no
+    // existe (ni siquiera se filtra a vacío: se niega).
+    const oc = await ocAvioAutorizada(100, 2);
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    await expect(
+      lineasPendientesDeOC(sesion(PERM, otraEmpresa.id), oc.id, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

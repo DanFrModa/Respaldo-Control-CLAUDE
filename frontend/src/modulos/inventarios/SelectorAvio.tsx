@@ -16,12 +16,15 @@ export function SelectorAvio({
   idSeleccionado,
   alSeleccionar,
   alLimpiar,
+  idInput,
   testid = 'selector-avio',
 }: {
   idSeleccionado: number | undefined;
   alSeleccionar: (avio: Avio) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
   alLimpiar?: () => void;
+  /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
+  idInput?: string | undefined;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -77,6 +80,7 @@ export function SelectorAvio({
       textoVacio="No hay avíos que coincidan."
       testid={testid}
       testidInput={`${testid}-busqueda`}
+      idInput={idInput}
     />
   );
 }

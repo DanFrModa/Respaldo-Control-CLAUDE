@@ -28290,6 +28290,148 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes-compra/{idOrdenCompra}/lineas-pendientes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Pendiente por recibir de cada renglón de una orden de compra */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de compra. */
+          idOrdenCompra: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Pendiente por recibir de los renglones de la OC. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                idOrdenCompraLinea: number;
+                /**
+                 * @description Tipo del renglón de la OC.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'libre';
+                /** @description Cantidad pedida en la OC. */
+                cantidad: number;
+                /** @description Ya recibido (recepciones activas). */
+                recibido: number;
+                /** @description Lo que falta del CUERPO (0 dentro de la banda, §Post-F9.19). */
+                pendiente: number;
+                /** @description Complemento que pidió la OC, o null si no lleva. */
+                cantidadComplemento: number | null;
+                /** @description Complemento ya recibido. */
+                recibidoComplemento: number;
+                /** @description Complemento que falta por recibir. */
+                pendienteComplemento: number;
+                /** @description ¿El renglón ya quedó surtido? */
+                surtido: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/recepciones-compra/{id}': {
     parameters: {
       query?: never;
@@ -78629,6 +78771,14 @@ export interface paths {
                 id: number;
                 /** @description Proyecto al que pertenece. */
                 idProyecto: number;
+                /** @description Cliente del proyecto (heredado, no se captura aquí). */
+                idCliente: number;
+                /** @description Nombre del cliente del proyecto (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente (del proyecto). */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento del cliente (para la UI). */
+                departamento: string;
                 /** @description Modelo del catálogo (nuestro número). */
                 idModelo: number;
                 /** @description Código del modelo (nuestro número, para la UI). */
@@ -78844,6 +78994,14 @@ export interface paths {
                 id: number;
                 /** @description Proyecto al que pertenece. */
                 idProyecto: number;
+                /** @description Cliente del proyecto (heredado, no se captura aquí). */
+                idCliente: number;
+                /** @description Nombre del cliente del proyecto (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente (del proyecto). */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento del cliente (para la UI). */
+                departamento: string;
                 /** @description Modelo del catálogo (nuestro número). */
                 idModelo: number;
                 /** @description Código del modelo (nuestro número, para la UI). */
@@ -79064,6 +79222,14 @@ export interface paths {
                 id: number;
                 /** @description Proyecto al que pertenece. */
                 idProyecto: number;
+                /** @description Cliente del proyecto (heredado, no se captura aquí). */
+                idCliente: number;
+                /** @description Nombre del cliente del proyecto (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente (del proyecto). */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento del cliente (para la UI). */
+                departamento: string;
                 /** @description Modelo del catálogo (nuestro número). */
                 idModelo: number;
                 /** @description Código del modelo (nuestro número, para la UI). */
@@ -79277,6 +79443,14 @@ export interface paths {
                 id: number;
                 /** @description Proyecto al que pertenece. */
                 idProyecto: number;
+                /** @description Cliente del proyecto (heredado, no se captura aquí). */
+                idCliente: number;
+                /** @description Nombre del cliente del proyecto (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente (del proyecto). */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento del cliente (para la UI). */
+                departamento: string;
                 /** @description Modelo del catálogo (nuestro número). */
                 idModelo: number;
                 /** @description Código del modelo (nuestro número, para la UI). */
@@ -79494,6 +79668,14 @@ export interface paths {
                 id: number;
                 /** @description Proyecto al que pertenece. */
                 idProyecto: number;
+                /** @description Cliente del proyecto (heredado, no se captura aquí). */
+                idCliente: number;
+                /** @description Nombre del cliente del proyecto (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente (del proyecto). */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento del cliente (para la UI). */
+                departamento: string;
                 /** @description Modelo del catálogo (nuestro número). */
                 idModelo: number;
                 /** @description Código del modelo (nuestro número, para la UI). */
@@ -79667,6 +79849,14 @@ export interface paths {
               id: number;
               /** @description Proyecto al que pertenece. */
               idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
               /** @description Modelo del catálogo (nuestro número). */
               idModelo: number;
               /** @description Código del modelo (nuestro número, para la UI). */
@@ -79826,6 +80016,14 @@ export interface paths {
               id: number;
               /** @description Proyecto al que pertenece. */
               idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
               /** @description Modelo del catálogo (nuestro número). */
               idModelo: number;
               /** @description Código del modelo (nuestro número, para la UI). */
@@ -79986,6 +80184,14 @@ export interface paths {
               id: number;
               /** @description Proyecto al que pertenece. */
               idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
               /** @description Modelo del catálogo (nuestro número). */
               idModelo: number;
               /** @description Código del modelo (nuestro número, para la UI). */
@@ -80150,6 +80356,14 @@ export interface paths {
               id: number;
               /** @description Proyecto al que pertenece. */
               idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
               /** @description Modelo del catálogo (nuestro número). */
               idModelo: number;
               /** @description Código del modelo (nuestro número, para la UI). */
@@ -80311,6 +80525,14 @@ export interface paths {
               id: number;
               /** @description Proyecto al que pertenece. */
               idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
               /** @description Modelo del catálogo (nuestro número). */
               idModelo: number;
               /** @description Código del modelo (nuestro número, para la UI). */
@@ -81187,12 +81409,14 @@ export interface paths {
           'application/json': {
             /** @description Concepto de costo (ConceptoCosto.id) del renglón manual. */
             idConceptoCosto: number;
-            /** @description Descripción del renglón (por default el nombre del concepto). */
+            /** @description Avío del catálogo (Avio.id) al que se liga el renglón. Con él, el dominio resuelve descripción y precio. */
+            idAvio?: number;
+            /** @description Descripción del renglón (por default el avío elegido, o el nombre del concepto). */
             descripcion?: string;
             /** @description Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit. */
             consumo?: number | null;
-            /** @description Precio unitario (o monto directo si no hay consumo). */
-            precioUnit: number;
+            /** @description Precio unitario (o monto directo si no hay consumo). Obligatorio salvo que venga `idAvio`. */
+            precioUnit?: number;
             /** @description Notas del renglón (opcional). */
             notas?: string | null;
           };
@@ -82974,6 +83198,8 @@ export interface paths {
           idCliente: number;
           /** @description Departamento del cliente. */
           idClienteDepartamento: number;
+          /** @description Acota los candidatos a un proyecto (opcional). */
+          idProyecto?: number;
         };
         header?: never;
         path?: never;

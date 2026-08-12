@@ -30,7 +30,6 @@ vi.mock('@/api/empresas', () => ({
 // El detalle abre estos diálogos (montados solo al usarse): se simplifican.
 vi.mock('./DialogoEditarNota', () => ({ DialogoEditarNota: () => null }));
 vi.mock('./DialogoCancelarNota', () => ({ DialogoCancelarNota: () => null }));
-vi.mock('./DialogoNotaTela', () => ({ DialogoNotaTela: () => null }));
 
 function paginaConUna(estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'borrador') {
   useNotasSalidaMock.mockReturnValue({
@@ -129,12 +128,39 @@ describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
     expect(screen.getByText('Falló la consulta')).toBeInTheDocument();
   });
 
-  it('SIN notas.administrar oculta el botón "Nueva nota"', () => {
+  it('SIN notas.administrar oculta el botón "Nueva nota de avíos"', () => {
     paginaConUna();
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver']),
     });
     expect(screen.queryByTestId('nuevo-nota')).not.toBeInTheDocument();
+  });
+
+  /**
+   * La salida de TELA ya no se captura aquí: el diálogo que vivía en esta pantalla hablaba con el
+   * motor LEGADO por lote (selector vacío) y decía «nota de tela registrada» sin crear ninguna
+   * nota. Queda un ENLACE a la pantalla que sí opera, por color.
+   */
+  it('la salida de TELA es un ENLACE a la pantalla por color, no un diálogo', () => {
+    paginaConUna();
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar', 'inventario-telas.mover']),
+    });
+    expect(screen.queryByTestId('nueva-nota-tela')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ir-salida-tela')).toHaveAttribute(
+      'href',
+      '/inventarios/telas/salida-orden',
+    );
+    // El botón que queda dice claramente que es de AVÍOS (no quedan dos botones ambiguos).
+    expect(screen.getByTestId('nuevo-nota')).toHaveTextContent('Nueva nota de avíos');
+  });
+
+  it('SIN inventario-telas.mover no se ofrece el enlace de salida de tela (A4)', () => {
+    paginaConUna();
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
+    });
+    expect(screen.queryByTestId('ir-salida-tela')).not.toBeInTheDocument();
   });
 
   it('el botón Confirmar SOLO aparece con notas.administrar y estatus borrador', async () => {

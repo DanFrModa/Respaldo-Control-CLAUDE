@@ -153,4 +153,21 @@ describe('faltantePorRecibir', () => {
     expect(falta.cuerpo).toBe(80);
     expect(falta.complemento).toBe(0);
   });
+
+  /**
+   * El faltante se PRECARGA en el input de la recepción: `100.5 − 30.2` en coma flotante da
+   * `70.30000000000001` y el capturista lo veía tal cual. Se recorta a los 4 decimales que guarda
+   * la columna `Decimal(14,4)`.
+   */
+  it('sin ruido de coma flotante: recorta a los 4 decimales de la columna', () => {
+    const falta = faltantePorRecibir({
+      pedido: 100.5,
+      recibido: 30.2,
+      pedidoComplemento: 10.3,
+      recibidoComplemento: 1.1,
+      tipo: 'avio',
+    });
+    expect(falta.cuerpo).toBe(70.3);
+    expect(falta.complemento).toBe(9.2);
+  });
 });

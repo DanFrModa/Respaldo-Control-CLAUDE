@@ -1637,3 +1637,51 @@ siempre con uno de los dos mintiendo.
   renglón de tela de la nota de salida (queda solo para avíos). **SIN migración, SIN permisos nuevos,
   SIN seed.** Va en **V1-E3** (donde ya se agrupa el trabajo de impresión y reimpresión).
 - **Fecha:** 2026-08-13.
+
+#### (Post-F9.39) — Reglas nuevas del precosteo y de la autorización de compras (V1-E1 y V1-E2, 13-ago-2026)
+
+Registro de las reglas que nacieron al construir las dos primeras etapas de la primera versión. No
+son decisiones de Daniel: son **decisiones de diseño del lead** que quedan escritas para no
+re-discutirlas.
+
+**Del precosteo (V1-E1):**
+
+1. **El cliente se PROPAGA desde el proyecto.** El desarrollo **no** tiene cliente propio ni columna
+   nueva: se lee del `Proyecto` (que es Cliente + Departamento) y se muestra en el precosto y en la
+   ficha. Sin migración.
+2. **El renglón manual puede LIGARSE a un avío del catálogo** (`idAvio` opcional). Cuando viene, el
+   **dominio** resuelve descripción y precio con la cascada que ya existe —extraída a
+   `precioAvioDeCatalogo` para no duplicarla— y el precio queda **editable**. Un `precioUnit`
+   explícito manda sobre el del catálogo. El texto libre se conserva para conceptos que no son avíos.
+3. **Los candidatos a lista se pueden acotar por proyecto** (`idProyecto` opcional), y **el
+   habilitado del botón sale de esa consulta**, nunca del estado derivado: `ligado-produccion` pisa a
+   `en-lista` y oculta justo lo que hace falta saber.
+4. **INVARIANTE DE REDONDEO — lo que se guarda y lo que se deriva son el MISMO número.** Todo valor
+   que se persiste en una columna `Decimal` se redondea **a la escala de esa columna antes** de
+   guardarlo y de calcular cualquier derivado: `redondear2` para importes/precios (`Decimal(12,2)`) y
+   `redondear4` para consumos/cantidades (`Decimal(12,4)`), ambas en `dominio/costos/decimales.ts`.
+   El redondeo vive **en la función que produce el valor**, no en cada consumidor, para que no nazca
+   un camino nuevo mañana. *(Postgres **redondea** —half away from zero—, no trunca: por eso un valor
+   crudo y su derivado se separan.)*
+
+**De compras (V1-E2):**
+
+5. **Una OC se autoriza desde `borrador`** y la **Bandeja de autorización lista los borradores**. El
+   estatus `pendiente_autorizacion` **no lo escribía nada** en el sistema y era el único desde el que
+   la pantalla ofrecía autorizar → la bandeja estaba vacía para siempre y **ninguna OC nueva se podía
+   autorizar**. El dominio **siempre** lo aceptó (`ESTATUS_EDITABLES_NORMAL`): el bloqueo era 100 %
+   de frontend. El valor se queda en el enum (retirarlo pediría migración); solo se dejó de depender
+   de él. ⚠️ **Consecuencia para el usuario:** la bandeja muestra también las OC a medio armar.
+6. **Un error de LECTURA no bloquea ni rellena.** Si no se puede saber lo ya recibido, la recepción
+   **no precarga nada** (blanco, nunca "lo pedido") y lo dice con aviso fijo + reintentar; si no se
+   puede leer el catálogo de direcciones, **no se bloquea** generar la OC — el servidor la para si de
+   verdad falta. Regla general: **un dato vacío se nota, uno equivocado no.**
+7. **La salida de tela por LOTE se quedó sin UI.** El motor legado nunca escribe `idTelaColor` y la
+   vista `existencia_tela_color` lo excluye, así que lo capturado por ahí **no movía las existencias
+   que la propia pantalla muestra**. Se retiraron el diálogo de «Nueva nota de telas» y la pestaña de
+   telas del ajuste de materiales (hoy **«Ajuste de avíos»**, bajo el padre «Avíos»). El endpoint
+   sigue vivo en el backend, sin consumidor.
+
+- **Aplica en:** V1-E1 y V1-E2, ya construidas. **SIN migración, SIN permisos nuevos, SIN seed** →
+  el deploy a `prueba` **no** requiere `SEED_ON_START`.
+- **Fecha:** 2026-08-13.

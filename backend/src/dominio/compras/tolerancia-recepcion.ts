@@ -92,9 +92,24 @@ export function renglonSurtido(renglon: RenglonSurtido): boolean {
 }
 
 /**
+ * DECIMALES de una cantidad de inventario: los mismos que guarda la columna (`Decimal(14,4)`).
+ * Restar en `number` arrastra ruido binario —`100.5 − 30.2` da `70.30000000000001`— y ese ruido
+ * termina PRECARGADO en el input de la recepción, donde el capturista lo ve tal cual. Se recorta al
+ * salir del cálculo, nunca antes (la comparación con la banda sí usa el número completo).
+ */
+const DECIMALES_CANTIDAD = 4;
+
+/** Recorta una cantidad a los decimales que la BD guarda (mata el ruido de coma flotante). */
+function aCantidad(valor: number): number {
+  return Number(valor.toFixed(DECIMALES_CANTIDAD));
+}
+
+/**
  * Cuánto FALTA por recibir de un renglón (cuerpo + complemento), en unidades. Cero cuando el renglón
  * ya quedó surtido — dentro de la banda lo que falte deja de contar como faltante, que es justo lo
- * que Daniel pidió: *"la cantidad que se recibe nunca va a coincidir exacto con la OC"*.
+ * que Daniel pidió: *"la cantidad que se recibe nunca va a coincidir exacto con la OC"*. El
+ * resultado sale redondeado a 4 decimales (ver {@link DECIMALES_CANTIDAD}): lo consumen la
+ * precarga de la recepción de avíos, la de la factura de tela y el importe por recibir del resumen.
  */
 export function faltantePorRecibir(renglon: RenglonSurtido): {
   cuerpo: number;
@@ -105,7 +120,7 @@ export function faltantePorRecibir(renglon: RenglonSurtido): {
   }
   const pedidoComplemento = renglon.pedidoComplemento ?? 0;
   return {
-    cuerpo: Math.max(0, renglon.pedido - renglon.recibido),
-    complemento: Math.max(0, pedidoComplemento - (renglon.recibidoComplemento ?? 0)),
+    cuerpo: aCantidad(Math.max(0, renglon.pedido - renglon.recibido)),
+    complemento: aCantidad(Math.max(0, pedidoComplemento - (renglon.recibidoComplemento ?? 0))),
   };
 }
