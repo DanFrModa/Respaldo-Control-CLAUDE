@@ -1373,7 +1373,18 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 | 2 | **Género** | 1 Caballero · 2 Dama · 3 Niño Juvenil · 4 Niño Infantil · 5 Caballero · 6 Niña Infantil · 7 Niña Juvenil · 9 Bebas · 0 Bebos |
 | 3, 4, 5 | **Consecutivo** | 001–999 |
 
-⚠️ **Sin confirmar por Daniel (preguntado, aún sin respuesta):** el concepto **empieza en 2** (no se sabe qué es el 1, o si se perdió al convertir el .doc); en género **«Caballero» aparece dos veces** (1 y 5) y **no hay 8**; y el consecutivo de 3 dígitos **topa en 999 por combinación** — no se sabe si alguna va llena. Resolver antes de construir el generador.
+**Las rarezas de la tabla, aclaradas por Daniel (12-ago-2026):**
+
+> Daniel: *"El 1 no es nada. Caballero que aparece en dos es porque se usa mucho caballero y en algún momento quise poner más modelos de caballeros. No pasa nada."*
+
+- **Concepto: el 1 no se usa.** No es un valor perdido en la conversión del .doc: simplemente no significa nada. El concepto arranca en 2.
+- **Género: el 1 y el 5 son AMBOS «Caballero», a propósito.** No es una errata. Es una **ampliación de capacidad**: caballero es lo que más se produce, se llenó el consecutivo de 999 de la serie `x1` y Daniel abrió la serie `x5` para seguir numerando. El **8 no se usa**.
+
+⚠️ **Consecuencia para el generador de códigos, que hay que respetar al construirlo:** el tope de 999 por combinación **NO es teórico — ya se alcanzó** en caballero, y la salida fue duplicar el dígito de género. Por lo tanto:
+
+1. Al proponer el siguiente consecutivo para **Caballero**, el generador debe tratar `x1` y `x5` como **el mismo género**: llenar primero la serie `1` y, agotada, continuar en la `5`. Su espacio real es de 1,998 por concepto, no 999.
+2. El generador debe **avisar cuando una combinación se acerque al tope**, en vez de fallar al llegar. Cualquier otra combinación puede llenarse igual, y ahí ya no habrá un dígito libre que duplicar.
+3. **Por confirmar al construir (no bloquea hoy):** en *concepto*, «Vestido» también aparece dos veces (4 = Vestido, 5 = Playera, Vestido). Puede ser el mismo truco de capacidad o coincidencia de nombre; si es lo primero, aplica la misma regla de continuidad.
 
 **La nomenclatura de DESARROLLO (definida por Daniel el 12-ago-2026).** Formato **`CYA-26-71-001`**:
 
