@@ -1356,3 +1356,49 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 - **Aplica en:** nada todavía — es una decisión de rumbo. **SIN migración, SIN permisos, SIN seed.** Los dos pendientes se planean como etapa propia después del arranque.
 - **Fecha:** 2026-08-12.
+
+#### (Post-F9.34) — Nomenclatura: el catálogo de modelos separa DESARROLLO de PRODUCCIÓN, y el modelo conserva sus dos números (DANIEL, 12-ago-2026)
+
+> Daniel: *"Me parece que en algún momento definimos que hay modelos de desarrollo y modelos de producción. Los modelos de producción tienen una razón de ser, tienen una nomenclatura. Y los modelos de desarrollo podrían tener algo distinto… ya que hay muchos modelos de desarrollo que no salen a producción. No quiero llenar de basura el catálogo."*
+>
+> Y sobre conservar la historia: *"Me gusta la lógica… solo que entonces me gustaría mantener en algún lado el modelo de desarrollo cuando salga a producción. Que no se borre."*
+
+**El estado del que se parte (verificado en código, 12-ago-2026).** NO existía tal separación: `Desarrollo.idModelo` es NOT NULL y `crearDesarrollo` **exige un `Modelo` que ya exista y esté activo** (`backend/src/dominio/desarrollo/desarrollos.ts`, `exigirModeloActivo`). Es decir, **todo** desarrollo obliga a dar de alta un modelo en el catálogo, con la misma serie única de códigos que los de producción. Lo que D13 sí había definido era que *"un desarrollo que no llega a producción se apaga (archivado)"* — pero eso apaga el **desarrollo**, no el **modelo**: el modelo se quedaba en el catálogo. `Modelo.activo` es "descontinuado", no "es de desarrollo".
+
+**La nomenclatura de PRODUCCIÓN (documento «Estructura de modelos FR Moda», 03-03-2014, entregado por Daniel).** Cinco dígitos, cada uno con significado:
+
+| Posición | Significado | Valores |
+|---|---|---|
+| 1 | **Concepto** (tipo de prenda) | 2 Conjunto · 3 Bermuda, Falda · 4 Vestido · 5 Playera, Vestido · 6 Sudadera (medio cierre, capucha o c. redondo) · 7 Pantalón, Jogger, Leggings · 8 Chamarra, Chaleco con cierre · 9 Gorra, Polos, batas |
+| 2 | **Género** | 1 Caballero · 2 Dama · 3 Niño Juvenil · 4 Niño Infantil · 5 Caballero · 6 Niña Infantil · 7 Niña Juvenil · 9 Bebas · 0 Bebos |
+| 3, 4, 5 | **Consecutivo** | 001–999 |
+
+⚠️ **Sin confirmar por Daniel (preguntado, aún sin respuesta):** el concepto **empieza en 2** (no se sabe qué es el 1, o si se perdió al convertir el .doc); en género **«Caballero» aparece dos veces** (1 y 5) y **no hay 8**; y el consecutivo de 3 dígitos **topa en 999 por combinación** — no se sabe si alguna va llena. Resolver antes de construir el generador.
+
+**La nomenclatura de DESARROLLO (definida por Daniel el 12-ago-2026).** Formato **`CYA-26-71-001`**:
+
+- **`CYA`** — abreviatura del **cliente**. Campo NUEVO en el catálogo de clientes, único entre clientes. *(Daniel: "está bien hacer el campo de abreviatura en el cliente".)*
+- **`26`** — **año de ENTREGA** del modelo, no el de creación. *(Daniel: "el año es para el año que se va a entregar el modelo".)*
+- **`71`** — los **dos dígitos de la nomenclatura de producción**: concepto + género (aquí 7 = Pantalón/Jogger/Leggings, 1 = Caballero).
+- **`001`** — consecutivo que **se reinicia cada año**. *(Daniel: "se reinicia cada año el contador".)*
+
+**El código se CONGELA al crearse — CONFIRMADO POR DANIEL.**
+
+> Daniel: *"Está bien como lo planteas. Se queda con el número que se hizo aunque después cambien de año."*
+
+Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. Para entonces ese código ya anda en correos, cotizaciones y en la lista de precios del cliente, y renumerarlo rompería la trazabilidad de la negociación. La **fecha real de entrega** vive en su campo y esa sí se actualiza: el año del código es el que se pretendía al nacer, no una promesa de cuándo se entrega.
+
+**Decisión de diseño del lead, sujeta a corrección de Daniel** (dicha en el chat, sin respuesta en contra al cierre de esta entrada): **el consecutivo corre por cliente + año**, sin importar el tipo de prenda (el `001` es el primer desarrollo de ese cliente para ese año, sea jogger o sudadera).
+
+**Qué se decidió construir.**
+
+1. **NO se separa la tabla `Modelo`.** Un modelo de desarrollo necesita exactamente lo mismo que uno de producción (BOM, telas, avíos, fotos, tech pack, precosteo), y todo eso ya cuelga de `Modelo`; duplicar la entidad duplicaría el BOM, las fotos, el precosteo y las listas de precios. Se separan la **marca** y la **numeración**, no la entidad.
+2. **Marca de origen en el modelo** + el catálogo y la galería mostrando **producción por defecto**, con los de desarrollo detrás de un filtro.
+3. **Serie propia de desarrollo** (`CYA-26-71-001`), que **no consume** consecutivo de la serie de producción. Con solo 999 por combinación, quemar números en modelos que quizá nunca se fabrican es caro.
+4. **Acción «pasar a producción»**: asigna el código de 5 dígitos y saca el modelo del filtro de desarrollo. **Los dos primeros dígitos ya vienen decididos** desde el `71` del código de desarrollo, así que solo se asigna el consecutivo — el paso deja de ser una decisión y se vuelve un trámite.
+5. **NADA se borra (D3).** El modelo promovido **conserva su número de desarrollo** junto al de producción; ambos son buscables. Lo que cuelga del desarrollo —precosteo con sus versiones, negociación con sus acuerdos, tech pack, fotos de muestra, el número del cliente— **no se toca**: sigue ligado y consultable.
+6. **El número del cliente NO se normaliza.** `Desarrollo.numeroCliente` ya existe: ahí va tal cual lo que mande el cliente, aunque cada vez venga distinto. *(Daniel: "normalmente le ponen letras que salen del cliente, y la verdad es que cada vez lo hacen diferente".)*
+7. **El sistema PROPONE el código** (de desarrollo y de producción): el usuario elige prenda y género y el sistema arma el número con el siguiente consecutivo libre. En v2 el tipo de prenda y el género **ya son campos propios** del modelo (`idTipoProducto`, `idGenero`), así que el código se deriva de ellos en vez de capturarse a mano. *(La forma exacta de la UI quedó sin confirmar: Daniel cerró el cuadro de opciones sin elegir.)*
+
+- **Aplica en:** NADA todavía — es decisión de rumbo. Al construirse tocará `Modelo` (marca de origen + código de desarrollo), `Cliente` (abreviatura), el catálogo/galería de modelos y el editor de desarrollo. **Requiere migración** cuando se construya; permisos y seed, no.
+- **Fecha:** 2026-08-12.
