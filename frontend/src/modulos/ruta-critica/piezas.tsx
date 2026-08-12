@@ -1,4 +1,5 @@
 import type { SemaforoRc, TipoEventoProceso } from '@/api/tipos';
+import type { ClaveEtapaAvance } from '@/modulos/produccion/etapas-avance';
 
 /**
  * Piezas compartidas (COMPONENTES) de las vistas del MOTOR de la Ruta Crítica (F5-E5; R4): el
@@ -116,28 +117,55 @@ export const EVENTO_RC_DESCRIPCION: Record<TipoEventoProceso, string> = {
 };
 
 /**
- * Pantalla del sistema donde se REGISTRA el evento de cada proceso (el botón "Registrar" de Mis
- * pendientes navega ahí). `null` = sin pantalla propia todavía → la UI ofrece "Marcar hecho".
+ * A DÓNDE lleva el botón "Registrar" de Mis pendientes para cada evento, en UNA sola tabla (V1-E3a:
+ * antes eran dos —ruta y extras del deep-link— y podían desincronizarse).
+ *
+ *  • `ruta: null`  → no hay pantalla donde registrarlo: la UI ofrece "Marcar hecho".
+ *  • `conOrden`    → esa pantalla ENTIENDE `state.idOrden`, así que se llega a LA orden del
+ *                    pendiente y no a una lista de cientos (Centro de Órdenes y entrega a cliente).
+ *  • `etapaAvance` → además abre el PANEL DE AVANCE de esa orden EN SU ETAPA. El corte, el envío y
+ *                    el recibo se capturan ahí desde que se retiraron las tres pantallas sueltas
+ *                    (una sola pantalla por acto, §Post-F9.36 punto 2); sin la etapa, un pendiente
+ *                    de "recibo de estampado" aterrizaba en «Corte» y había que buscar el paso.
+ *                    El tipo se DERIVA de `ClaveEtapaAvance` (menos «entrega-cliente», que tiene su
+ *                    propia pantalla y no se captura en el panel): si alguien renombra una clave en
+ *                    `etapas-avance.ts`, esto deja de compilar en vez de caer en silencio a «Corte»
+ *                    (que es lo que haría `esClaveEtapaAvance` al rechazar la clave vieja).
  */
-export const RUTA_PANTALLA_EVENTO: Record<TipoEventoProceso, string | null> = {
-  recepcionTela: '/compras/recepcion',
-  corte: '/produccion/corte',
-  envioCostura: '/produccion/envios',
-  reciboCostura: '/produccion/recibos',
-  envioEstampado: '/produccion/envios',
-  reciboEstampado: '/produccion/recibos',
-  auditoria: '/calidad/auditorias/nueva',
-  autorizacionArte: null,
-  entregaCliente: '/produccion/entregas',
-  manual: null,
+export const PANTALLA_EVENTO: Record<
+  TipoEventoProceso,
+  {
+    readonly ruta: string | null;
+    readonly conOrden?: true;
+    readonly etapaAvance?: Exclude<ClaveEtapaAvance, 'entrega-cliente'>;
+  }
+> = {
+  recepcionTela: { ruta: '/compras/recepcion' },
+  corte: { ruta: '/produccion/ordenes', conOrden: true, etapaAvance: 'corte' },
+  envioCostura: { ruta: '/produccion/ordenes', conOrden: true, etapaAvance: 'entrega-maquila' },
+  reciboCostura: { ruta: '/produccion/ordenes', conOrden: true, etapaAvance: 'recibo-maquila' },
+  envioEstampado: {
+    ruta: '/produccion/ordenes',
+    conOrden: true,
+    etapaAvance: 'entrega-aplicacion',
+  },
+  reciboEstampado: {
+    ruta: '/produccion/ordenes',
+    conOrden: true,
+    etapaAvance: 'recibo-aplicacion',
+  },
+  auditoria: { ruta: '/calidad/auditorias/nueva' },
+  autorizacionArte: { ruta: null },
+  entregaCliente: { ruta: '/produccion/entregas', conOrden: true },
+  manual: { ruta: null },
   // Hitos de la orden (post-F9): se registran en el detalle de la orden (sin pantalla propia estática
   // → "Marcar hecho"); compra de tela / surtido de avíos / auditoría de corte sí tienen su pantalla.
-  revisionOp: null,
-  autorizacionFit: null,
-  autorizacionTono: null,
-  autorizacionAvios: null,
-  compraTela: '/compras/autorizacion',
-  surtidoAvios: '/produccion/notas-salida',
-  auditoriaCorte: '/calidad/auditorias/nueva',
-  empaque: null,
+  revisionOp: { ruta: null },
+  autorizacionFit: { ruta: null },
+  autorizacionTono: { ruta: null },
+  autorizacionAvios: { ruta: null },
+  compraTela: { ruta: '/compras/autorizacion' },
+  surtidoAvios: { ruta: '/produccion/notas-salida' },
+  auditoriaCorte: { ruta: '/calidad/auditorias/nueva' },
+  empaque: { ruta: null },
 };

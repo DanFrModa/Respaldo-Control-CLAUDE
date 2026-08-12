@@ -90,12 +90,10 @@ import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { VentasPagina } from '@/modulos/ventas/VentasPagina';
 import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
 import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
-import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
 import { EntregaClientePagina } from '@/modulos/produccion/EntregaClientePagina';
-import { EnvioMaquilaPagina } from '@/modulos/produccion/EnvioMaquilaPagina';
 import { ExistenciasMaquileroPagina } from '@/modulos/produccion/ExistenciasMaquileroPagina';
-import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
+import { ProduccionPagina } from '@/modulos/produccion/ProduccionPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
@@ -193,14 +191,32 @@ const router = createBrowserRouter([
           { path: 'desarrollo', element: <DesarrolloPagina /> },
           // Listas de precios (Módulo 15, F8-E4): lista + detalle con la vista de aprobación del dueño.
           { path: 'listas-precios', element: <ListasPreciosPagina /> },
+          // Portada-hub del módulo Producción (V1-E3a): antes `/produccion` caía en el comodín
+          // `:modulo` y anunciaba "Próximamente" un módulo terminado. Ruta ESTÁTICA antes del
+          // catch-all; es también el índice de las sub-vistas que el riel deja fuera.
+          { path: 'produccion', element: <ProduccionPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
           // Rediseño R2: el CENTRO DE COMANDO es la pantalla principal de órdenes; la captura/
           // edición completa (F2-E3) se abre en el diálogo `DialogoOrden` con el mosaico "Modificar"
           // (antes era la página `/produccion/ordenes/captura`, ya retirada).
           { path: 'produccion/ordenes', element: <CentroOrdenesPagina /> },
-          { path: 'produccion/corte', element: <CapturaCortePagina /> },
-          { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
-          { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },
+          // UNA SOLA PANTALLA POR ACTO (Daniel, `DECISIONES.md §Post-F9.36 punto 2`): el corte, el
+          // envío a maquila y el recibo se capturan en el panel de AVANCE DE PRODUCCIÓN del Centro
+          // de Órdenes. Las tres pantallas viejas se retiraron en V1-E3a (antes se le migró al
+          // panel lo que solo ellas tenían: segundas, impresos, precio pactado y fecha compromiso).
+          // Sus rutas sobreviven como REDIRECCIÓN para no romper marcadores ni enlaces guardados.
+          {
+            path: 'produccion/corte',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
+          {
+            path: 'produccion/envios',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
+          {
+            path: 'produccion/recibos',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
           { path: 'produccion/recibos-semanales', element: <RecibosSemanalesPagina /> },
           { path: 'produccion/entregas', element: <EntregaClientePagina /> },
           { path: 'produccion/wip', element: <TableroWipPagina /> },

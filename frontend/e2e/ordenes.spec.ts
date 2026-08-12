@@ -299,13 +299,16 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(panel.getByTestId('traza-op')).toContainText(folio);
     await expect(panel.getByTestId('traza-pedido')).toBeEnabled();
 
-    // ── Doble clic → AVANCE DE PRODUCCIÓN (stepper de 5 etapas) ────────────────
+    // ── Doble clic → AVANCE DE PRODUCCIÓN (stepper de 6 etapas) ────────────────
     await fila.dblclick();
     const avance = page.getByTestId('avance-produccion');
     await expect(avance).toBeVisible();
     await expect(avance.getByText(`Avance de producción · OP ${folio}`)).toBeVisible();
     await expect(avance.getByTestId('avance-stepper-corte')).toContainText('0/20');
     await expect(avance.getByTestId('avance-stepper-recibo-aplicacion')).toBeVisible();
+    // V1-E3a: la ENTREGA A CLIENTE es la 6ª etapa (cierra el ciclo). Antes el stepper terminaba en
+    // "Recibo de Arte" y la entrega no la enlazaba NADA: el producto entraba a PT y no salía nunca.
+    await expect(avance.getByTestId('avance-stepper-entrega-cliente')).toContainText('0/20');
 
     // ── Registrar un CORTE real: combobox con búsqueda (homónimos) + candado ────
     await avance.getByTestId('avance-abrir-captura').click();

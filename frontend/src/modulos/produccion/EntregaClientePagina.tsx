@@ -1,5 +1,6 @@
 import { Ban, Loader2Icon, Printer, Truck } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -41,12 +42,26 @@ function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Lee un id entero positivo del `state` del deep-link, o null (mismo patrón que la salida de tela). */
+function leerIdDeepLink(state: unknown, clave: string): number | null {
+  if (typeof state !== 'object' || state === null || !(clave in state)) {
+    return null;
+  }
+  const id = (state as Record<string, unknown>)[clave];
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
 /**
  * ENTREGA A CLIENTE (F3-E5, doc 03-Produccion "Entrega"): CIERRE del ciclo de la orden. Saca el
  * producto terminado del almacén PT elegido hacia el cliente (salida de kardex) y deja el
  * seguimiento del pedido (entregado/faltante) DERIVADO. La matriz se acota a lo DISPONIBLE en el
  * almacén (existencia) y a lo FALTANTE del pedido; el servidor es la verdad: no deja entregar más
  * de la existencia (no-negativo estricto) ni de lo no producido.
+ *
+ * Acepta el DEEP-LINK `state.idOrden` (V1-E3a): el tablero WIP —que es donde se ve el KPI «Por
+ * entregar»— y la bandeja de la Ruta Crítica llegan con la orden ya puesta, para no volver a
+ * buscarla. El mismo acto también se captura DENTRO del panel de avance de la orden (etapa «Entrega
+ * a cliente»); esta pantalla es la puerta del menú, cuando se entrega sin venir de una orden.
  *
  * `produccion.entrega` gobierna la captura; `produccion.cancelar` cancela una entrega (inverso de
  * kardex que devuelve la existencia y el pendiente).
@@ -72,6 +87,13 @@ export function EntregaClientePagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
+  /**
+   * Solo almacenes de PT y ACTIVOS: el producto terminado no sale de una bodega de tela ni de avíos.
+   * El MISMO filtro que la etapa «Entrega a cliente» del panel de avance (V1-E3a) — antes esta
+   * pantalla listaba TODOS, así que un almacén de PT mal tipificado se podía elegir aquí y no allá
+   * (y al revés): dos puertas al mismo acto ofreciendo destinos distintos.
+   */
+  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
 
   // Seguimiento del pedido (pedido − entregado) con el disponible del almacén elegido (si hay).
   const seguimiento = useSeguimientoEntrega(
@@ -86,6 +108,36 @@ export function EntregaClientePagina(): React.JSX.Element {
     setLineas(lineasVaciasDeOrden(o));
     setUltimaEntrega(null);
   }
+
+  // ── DEEP-LINK `state.idOrden` (tablero WIP / bandeja de RC) ────────────────────────────────────
+  // Se lee UNA vez al montar y se consume el `state` en cuanto se resuelve, para que un refresh o
+  // un "atrás" no lo vuelvan a aplicar (mismo patrón que `SalidaTelaColorOrdenPagina`).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [idDeepLink] = useState<number | null>(() => leerIdDeepLink(location.state, 'idOrden'));
+  const ordenDeepLink = useOrden(idDeepLink ?? undefined);
+  const ordenDeepLinkData = ordenDeepLink.data;
+  // Se atiende UNA sola vez (ref, no dependencia): si el usuario cambia de orden, no se le repone.
+  const deepLinkAtendido = useRef(false);
+  useEffect(() => {
+    if (idDeepLink === null || deepLinkAtendido.current) {
+      return;
+    }
+    // Se aplica solo si el usuario aún no eligió una orden a mano: nunca le pisa su elección.
+    if (ordenDeepLinkData !== undefined) {
+      deepLinkAtendido.current = true;
+      if (idOrden === undefined) {
+        alElegirOrden(ordenDeepLinkData);
+      }
+    } else if (!ordenDeepLink.isError) {
+      return; // la orden sigue en vuelo: se decide cuando llegue.
+    } else {
+      deepLinkAtendido.current = true; // 404 / sin permiso: se deja de esperar.
+    }
+    // Se limpia el state (aunque la orden falle): el deep-link ya se atendió.
+    void navigate(location.pathname, { replace: true, state: null });
+    // El candado real de "una sola vez" es `deepLinkAtendido` (ref), no las dependencias.
+  }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate, idOrden]);
 
   // Disponible por celda (color:talla → existencia en el almacén elegido) para acotar la captura en UI.
   const disponible = useMemo(() => {
@@ -220,7 +272,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                       data-testid="entrega-almacen"
                     >
                       <option value="">Elige un almacén…</option>
-                      {(almacenes.data?.datos ?? []).map((a) => (
+                      {almacenesPt.map((a) => (
                         <option key={a.id} value={String(a.id)}>
                           {a.nombre}
                         </option>

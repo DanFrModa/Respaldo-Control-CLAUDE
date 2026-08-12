@@ -305,34 +305,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             subVista: true,
           },
           // ── Legados re-colgados (la operación diaria de F2–F4) ──
-          {
-            clave: 'corte',
-            titulo: 'Captura de corte',
-            descripcion: 'Registra el corte de una orden por color × talla',
-            ruta: '/produccion/corte',
-            icono: 'fabrica',
-            permisos: ['produccion.corte'],
-            subVista: true,
-          },
-          {
-            clave: 'envios',
-            titulo: 'Envío a maquila',
-            descripcion: 'Envía a costura, arte o lavado desde una sola pantalla',
-            ruta: '/produccion/envios',
-            icono: 'paquete',
-            permisos: ['produccion.envio'],
-            subVista: true,
-          },
-          {
-            clave: 'recibos',
-            titulo: 'Recibo de maquila',
-            descripcion:
-              'Recibe prenda terminada de costura/arte y mete a inventario lo de costura',
-            ruta: '/produccion/recibos',
-            icono: 'paquete',
-            permisos: ['produccion.recibo'],
-            subVista: true,
-          },
+          //
+          // ⚠️ «Captura de corte», «Envío a maquila» y «Recibo de maquila» YA NO SON HOJAS
+          // (V1-E3a, 13-ago-2026): eran TRES pantallas del MISMO acto que ya vive en el panel de
+          // AVANCE DE PRODUCCIÓN del Centro de Órdenes, y ninguna de las dos mitades era completa
+          // (las viejas imprimían y capturaban segundas; el panel tenía el default de maquilero y
+          // el typeahead). Daniel lo cerró en `DECISIONES.md §Post-F9.36 punto 2`: *"Ok. Una sola
+          // pantalla está bien."* → se retiraron del catálogo (y por tanto de ⌘K) tras migrarle al
+          // panel lo que solo ellas tenían. Sus rutas `/produccion/{corte,envios,recibos}` siguen
+          // vivas como REDIRECCIÓN a `/produccion/ordenes` (`App.tsx`), para no romper marcadores.
           {
             clave: 'entregas',
             titulo: 'Entrega a cliente',
@@ -1459,9 +1440,61 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
     entradas: [
       { tipo: 'padre', clave: 'g-desarrollo', hijos: ['modelos', 'desarrollo', 'listas-precios'] },
       { tipo: 'hoja', clave: 'pedidos' },
-      { tipo: 'padre', clave: 'produccion', hijos: ['ordenes', 'notas-salida'] },
+      {
+        // Producción DESTAPADA (V1-E3a, 13-ago-2026): hasta hoy el padre solo mostraba «Órdenes
+        // (OP)» y «Notas de salida», y las OTRAS 15 sub-vistas no tenían ENTRADA EN EL MENÚ —
+        // exactamente lo que ya se destapó el 11/12-ago en Compras, Inventario PT, Telas y Avíos,
+        // pero a Producción nunca se le hizo. La peor consecuencia: la ENTREGA A CLIENTE —el cierre
+        // del ciclo— no la enlazaba NADA (ni el riel, ni el panel de avance, ni el tablero WIP), así
+        // que el producto entraba a PT y no salía nunca.
+        //
+        // Hijos CURADOS con el mismo criterio que Telas/Compras (lo de captura diaria + los
+        // tableros que se consultan seguido + lo que tiene una CAPACIDAD PROPIA; el resto vive en
+        // ⌘K y en la portada-hub `/produccion`):
+        //  • `ordenes`   — el principal: desde su panel de AVANCE se capturan corte, envío y recibo
+        //                  (una sola pantalla por acto, §Post-F9.36 punto 2).
+        //  • `entregas`  — la captura diaria que CIERRA el ciclo (antes inalcanzable).
+        //  • `wip` + `existencias-maquilero` — los dos tableros de la operación diaria (qué falta
+        //                  por etapa; qué le debe cada maquilero).
+        //  • `consulta-ordenes` — NO es una consulta duplicada: es la única que IMPRIME EN LOTE
+        //                  (el Centro de Órdenes imprime de a una). Esa capacidad no está en
+        //                  ninguna otra pantalla, así que no puede vivir solo en ⌘K.
+        //  • `notas-salida` — la salida de material contra la orden.
+        //
+        // Quedan FUERA del riel, vivas en ⌘K y en el hub `/produccion`:
+        //  • `archivo-ordenes` — NO la duplica el Centro (es la producción del sistema ANTERIOR, que
+        //    el Centro no lista); queda fuera por ser solo-consulta de histórico, no por duplicada.
+        //  • `corte-semanal`, `recibos-semanales`, `ordenes-incompletas`, `pedidos-por-mes`,
+        //    `notas-salida-consulta`, `notas-salida-por-orden` — SÍ son cortes/vistas de lo que ya
+        //    resuelven el Centro de Órdenes (filtros + semáforo) o Pedidos por mes.
+        // Y «Documental», que sigue siendo un «Próximamente»: vive SOLO en ⌘K, ni en el riel ni en
+        // el hub — su ruta es `/documental` y el hub lista lo que cuelga de `/produccion/`.
+        tipo: 'padre',
+        clave: 'produccion',
+        hijos: [
+          'ordenes',
+          'entregas',
+          'wip',
+          'existencias-maquilero',
+          'consulta-ordenes',
+          'notas-salida',
+        ],
+      },
       { tipo: 'hoja', clave: 'ruta-critica' },
-      { tipo: 'padre', clave: 'calidad', hijos: ['calidad-consulta-auditorias', 'auditores'] },
+      {
+        // Calidad pasó de PADRE desplegable a HOJA COLAPSADA a su hub (V1-E3a, 13-ago-2026). Como
+        // padre solo listaba 2 de sus 7 hijos y `PadreNav` NO NAVEGA (es un `<button>` que solo
+        // expande): defectos, tipos de producto, planes AQL y auditorías por maquilero eran
+        // INALCANZABLES desde toda la app, y `CalidadPagina` —que tiene las 7 tarjetas— no la
+        // enlazaba nadie. Se resuelve con el patrón que el riel YA usa para los hubs que
+        // auto-filtran sus tarjetas (Costos, EDR, Indicadores, EsMa, Administración): hoja directa
+        // al hub + gate = UNIÓN de los permisos de sus hijos, para que la entrada aparezca a
+        // EXACTAMENTE quien veía el padre antes.
+        tipo: 'colapsar',
+        clave: 'calidad',
+        ruta: '/calidad',
+        permisos: ['calidad.ver', 'calidad.generar-auditorias'],
+      },
     ],
   },
   {
@@ -1784,9 +1817,9 @@ export function filtrarCatalogoVisible(permisos: ReadonlySet<ClavePermiso>): rea
 
 /**
  * Busca una entrada por su clave en el CATÁLOGO COMPLETO: primero las hojas,
- * luego los padres. Los padres entran porque las rutas legadas `/produccion` y
- * `/compras` (hoy sin pantalla propia) siguen cayendo en la página comodín, que
- * los presenta.
+ * luego los padres. Los padres entran porque la ruta legada `/compras` (sin
+ * pantalla propia) sigue cayendo en la página comodín, que la presenta.
+ * (`/produccion` ya NO: tiene su portada-hub `ProduccionPagina` desde V1-E3a.)
  */
 export function buscarModuloPorClave(clave: string): EntradaMenu | undefined {
   return (
@@ -1812,9 +1845,11 @@ const TITULO_PORTADAS: readonly (readonly [ruta: `/${string}`, titulo: string])[
   ['/catalogos', 'Catálogos'],
   // `/administracion` NO va aquí: SÍ tiene hoja propia en el catálogo
   // ('administracion-panel' → "Panel de administración"), que siempre gana.
-  // Rutas legadas sin pantalla propia: caen en la página comodín, que presenta
-  // al PADRE del catálogo — el breadcrumb usa ese mismo nombre.
+  // `/produccion` SÍ tiene portada-hub desde V1-E3a (`ProduccionPagina`): antes caía en el
+  // comodín y anunciaba "Próximamente" un módulo terminado.
   ['/produccion', 'Producción'],
+  // Ruta legada sin pantalla propia: cae en la página comodín, que presenta al PADRE del
+  // catálogo — el breadcrumb usa ese mismo nombre.
   ['/compras', 'Compras / MRP'],
 ];
 

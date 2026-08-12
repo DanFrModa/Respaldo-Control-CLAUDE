@@ -26,8 +26,8 @@ const wipBase: WipOrden = {
   enviado: 2500, // 1726 costura + 774 aplicación
   recibido: 1900, // 1500 costura + 400 aplicación
   recibidoCostura: 1500,
-  entregado: 0,
-  porEntregar: 1500,
+  entregado: 900,
+  porEntregar: 600, // recibidoCostura 1500 − entregado 900
   porCortar: [],
   cortadoPorEnviar: [],
   porRecibir: [
@@ -65,6 +65,19 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
     expect(pasos.every((p) => p.total === 1726)).toBe(true);
   });
 
+  it('la 6ª etapa es la ENTREGA A CLIENTE y sale del `entregado` del servidor (V1-E3a)', () => {
+    // Antes el stepper terminaba en "Recibo de Arte": el ciclo de la OP no cerraba visualmente y la
+    // entrega —que existe y funciona— no la enlazaba nada.
+    const pasos = pasosDesdeWip(wipBase);
+    expect(pasos).toHaveLength(6);
+    expect(pasos[5]).toEqual({
+      clave: 'entrega-cliente',
+      etiqueta: 'Entrega a cliente',
+      hecho: 900,
+      total: 1726,
+    });
+  });
+
   it('una orden sin movimientos queda toda en cero (etapas vacías)', () => {
     const pasos = pasosDesdeWip({
       ...wipBase,
@@ -72,6 +85,8 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
       enviado: 0,
       recibido: 0,
       recibidoCostura: 0,
+      entregado: 0,
+      porEntregar: 0,
       porRecibir: [],
     });
     expect(pasos.every((p) => p.hecho === 0)).toBe(true);
@@ -103,7 +118,11 @@ describe('claveEtapaDeMovimiento (costura vs aplicación por generaEntradaPt)', 
     );
   });
 
-  it('la entrega a cliente NO pertenece al stepper (null)', () => {
+  it('la entrega a cliente NO viaja en ESTE historial (null): tiene el suyo', () => {
+    // Sí es una etapa del stepper desde V1-E3a, pero `listarEtapasOrden` solo devuelve cortes,
+    // envíos y recibos: las entregas se leen de `GET /ordenes/{id}/entregas`. Si algún día el
+    // historial de etapas las incluyera, este clasificador las mandaría a `null` (fuera de toda
+    // etapa) y desaparecerían de la lista — de ahí la prueba.
     expect(
       claveEtapaDeMovimiento({ tipo: 'entrega_cliente', idTipoProceso: null }, esCostura),
     ).toBe(null);

@@ -52,6 +52,7 @@ const VALORES_INICIALES: DatosPedidoFormulario = {
   fechaHasta: '',
   fechaTela: '',
   fechaElaboracion: '',
+  noProducir: false,
   renglones: [],
 };
 
@@ -115,6 +116,7 @@ export function DialogoPedido({
             fechaHasta: pedido.fechaHasta ?? '',
             fechaTela: pedido.fechaTela ?? '',
             fechaElaboracion: pedido.fechaElaboracion ?? '',
+            noProducir: pedido.noProducir,
             renglones: pedido.lineas.map((l) => ({
               id: l.id,
               idModelo: String(l.idModelo),
@@ -138,6 +140,7 @@ export function DialogoPedido({
         fechaHasta: fechaACuerpoEditar(datos.fechaHasta),
         fechaTela: fechaACuerpoEditar(datos.fechaTela),
         fechaElaboracion: fechaACuerpoEditar(datos.fechaElaboracion),
+        noProducir: datos.noProducir,
         lineas,
       };
       actualizar.mutate(
@@ -155,6 +158,8 @@ export function DialogoPedido({
     const cuerpo: PedidoCrear = {
       idCliente: Number(datos.idCliente),
       lineas,
+      // El alta solo lo manda cuando está marcado: el default del contrato ya es `false`.
+      ...(datos.noProducir ? { noProducir: true } : {}),
     };
     const fp = fechaACuerpo(datos.fechaPedido);
     if (fp !== undefined) cuerpo.fechaPedido = fp;
@@ -261,6 +266,30 @@ export function DialogoPedido({
                 <FieldDescription>Inicio planeado.</FieldDescription>
               </Field>
             </div>
+
+            {/* NO PRODUCIR (§Post-F9.36 punto 3): el backend RECHAZA "Generar OP" de un pedido
+                marcado así, y hasta V1-E3a la bandera no aparecía en NINGUNA pantalla — los pedidos
+                migrados de Access la traen, así que el bloqueo no tenía salida. Aquí se ve y se
+                quita. Alcance mínimo a propósito (Daniel: *"no es relevante, casi no hay órdenes
+                así"*). */}
+            <Field>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  disabled={guardando}
+                  className="mt-0.5 size-4 rounded border-input"
+                  data-testid="pedido-no-producir"
+                  {...registrar('noProducir')}
+                />
+                <span>
+                  <b>No producir</b>
+                  <FieldDescription>
+                    Marcado, el pedido se conserva pero NO se le pueden generar órdenes de
+                    producción (el servidor lo rechaza). Desmárcalo para poder generar sus OP.
+                  </FieldDescription>
+                </span>
+              </label>
+            </Field>
 
             <EditorRenglones
               control={formulario.control}
