@@ -198,6 +198,6 @@ con sus dos roles → capturar direcciones de entrega, RFC y las telas con las q
 Daniel el 13-ago (§Post-F9.38): **la salida a una orden no lleva nota**, el **traspaso entre
 almacenes sí**. Ambas cosas entran en V1-E3.
 
-Queda **una de diseño**, para confirmar al construir: que la nota del traspaso sea el **impreso del
-propio traspaso** (que ya tiene folio y renglones) y **no** un registro `NotaSalida` paralelo, que
-sería una segunda fuente de verdad del mismo hecho físico.
+**Ninguna de diseño tampoco.** Daniel confirmó que la nota del traspaso **no genera folio nuevo**:
+es la **impresión del folio que ya existe** (*"no debe de generar otro folio de nada"*). Sin registro
+`NotaSalida` paralelo y sin secuencia nueva.

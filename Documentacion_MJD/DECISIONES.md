@@ -1617,14 +1617,21 @@ no hay impreso de traspaso en `api/inventarios/telas.rutas.ts`. **Falta construi
 (`Almacen.idCortador`), y §Post-F9.13 dejó el botón *"Mandar tela al cortador"* apuntando al
 traspaso por color. Lo que falta es el papel.
 
-**Recomendación de diseño del lead (sujeta a confirmación de Daniel):** **no** crear un registro
-`NotaSalida` paralelo. El traspaso **ya tiene folio propio y sus renglones**; lo que necesita es su
-**impreso** — con folio, fecha, almacén origen y destino, el tercero (cortador) y el detalle por
-color con ambos componentes. Y **reimprimible desde el historial**, no solo en el momento de
-guardar: el diagnóstico encontró que en producción los PDF solo se ofrecen para el movimiento recién
-guardado, y no se debe repetir ese defecto. Razón de la recomendación: una `NotaSalida` paralela
-sería una **segunda fuente de verdad** del mismo hecho físico, y el saldo ya se deriva del kardex
-(D3).
+**CONFIRMADO POR DANIEL — la nota del traspaso NO genera folio nuevo: es la IMPRESIÓN del que ya existe.**
+
+> Daniel: *"De acuerdo con lo de la nota de salida así como lo comentas. **No debe de generar otro
+> folio de nada.** Me refiero a solo la impresión del folio que ya existe."*
+
+Es decir: **no** se crea un registro `NotaSalida` paralelo, **ni una secuencia nueva**. El traspaso
+**ya tiene folio propio y sus renglones**; lo único que falta es su **impreso** — con ese mismo
+folio, fecha, almacén origen y destino, el tercero (cortador) y el detalle por color con ambos
+componentes. Y **reimprimible desde el historial**, no solo al momento de guardar: el diagnóstico
+encontró que en producción los PDF solo se ofrecen para el movimiento recién guardado, y ese defecto
+no se repite.
+
+Razón de fondo, ya confirmada: una `NotaSalida` paralela sería una **segunda fuente de verdad** del
+mismo hecho físico, y el saldo ya se deriva del kardex (D3). Dos folios para un movimiento acaban
+siempre con uno de los dos mintiendo.
 
 - **Aplica en:** construir el impreso del traspaso de tela por color + su reimpresión. Retirar el
   renglón de tela de la nota de salida (queda solo para avíos). **SIN migración, SIN permisos nuevos,
