@@ -1480,3 +1480,153 @@ Al mover el arte al modelo **esto se simplifica**: desaparece el precio del cat�
 
 - **Aplica en:** NADA todavía — decisión de rumbo. **Requiere migración** cuando se construya; permisos y seed, no.
 - **Fecha:** 2026-08-12.
+
+#### (Post-F9.36) — Las SEIS decisiones que definen la PRIMERA VERSIÓN (DANIEL, 13-ago-2026)
+
+> Tras leer `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`, Daniel cerró las decisiones que estaban frenando
+> el arranque. *"Ya quiero sacar la primera versión. Ya se fue mucho tiempo con esto."*
+
+**1. RUTA CRÍTICA: APAGADA en la v1.**
+
+> Daniel: *"Sí podemos arrancar sin ruta crítica. Hoy honestamente no lo estamos ocupando en Control.
+> Podríamos empezar sin eso sin problema. Y lo vamos construyendo."*
+
+Se apaga para el arranque y se construye después. **Esto retira CINCO bloqueantes** del diagnóstico:
+no hay que correr el ETL de F5 (plantillas), ni asignar `UsuarioRol` a los 23 usuarios, ni cargar los
+festivos de FR Moda, ni resolver que el admin vea pendientes ajenos, ni las alarmas falsas del día 1.
+
+**Pendiente al construir la v2 de RC** — Daniel lo pidió en la misma vuelta: *"como administrador me
+gustaría ver el estatus de pendientes por persona"*. Hoy existe a medias (hay selector "Viendo
+pendientes de:" para `rc.programar`) pero **no hay concentrado por persona**: el admin ve todo
+revuelto en una sola lista como si fuera suya (`bandeja.ts:183-192`). La vista de supervisor —cuánto
+trae cada quien, cuánto vencido, y de ahí al detalle— es parte del alcance cuando RC se encienda.
+
+⚠️ **Apagarla NO es no hacer nada.** `rcAutomatica.ts` genera la ruta de toda orden nueva y no hay
+interruptor: hay que quitar `rc.ruta-ver` de los roles de la v1 (apaga menú, campana y pantalla de un
+golpe) **y** decidir si además se suspende la generación automática, para no acumular ~26 procesos
+por orden que nadie va a capturar.
+
+**2. Producción: UNA SOLA pantalla por acto.** *(Daniel: "Ok. Una sola pantalla está bien.")*
+Se queda el **panel de avance** del Centro de Órdenes y se le agrega lo que hoy solo tienen las
+viejas (**imprimir** y **capturar segundas**); `/produccion/corte`, `/produccion/envios` y
+`/produccion/recibos` se retiran. Hoy conviven las cuatro y **ninguna es completa**.
+
+**3. `noProducir`: mostrarlo y ya.** *(Daniel: "Ok. No es relevante. Casi no hay órdenes así.")*
+Se hace visible y editable el campo, que hoy bloquea "Generar OP" sin aparecer en ninguna pantalla.
+Sin más alcance.
+
+**4. ⭐ SE ARRANCA SIN CONTEO FÍSICO. El inventario se carga sobre la marcha.**
+
+> Daniel: *"Si son muchos está bien el Excel. Pero creo que también podríamos arrancar sin conteo
+> físico. ¿Será viable? Quiero ir implementando lo antes posible y el conteo físico nos llevará
+> tiempo. ¿Podemos ir metiendo sobre la marcha la información? ¿Podríamos meter las telas con las
+> que estamos trabajando y más adelante cargar todo lo demás?"*
+
+**Sí es viable.** Verificado antes de responder:
+
+- **El costeo NO se distorsiona.** El costo real de una orden sale de las **órdenes de compra**, y lo
+  que no tiene compra propia se valúa al **último precio de compra** de ese material
+  (`costo-real-compras.ts`, §Post-F9.5). Como la migración trae las compras de 2025-2026, casi toda
+  la tela ya tiene historial de precio: **tela que entre por ajuste no ensucia el costo**.
+- **El riesgo real es el MRP**: netea contra existencias, así que **lo que no esté cargado lo manda a
+  comprar** (`mrp.ts`). Con el almacén en cero, la primera explosión de cada orden pide todo aunque
+  esté en bodega.
+- **La mitigación es la que propuso Daniel**: cargar las telas y avíos **con los que se está
+  trabajando**. Con eso la explosión de las órdenes vivas sale bien y el resto se carga cuando se
+  necesite.
+- **La regla práctica**: un color se captura **la primera vez que se va a usar**. Si se intenta
+  descargar tela no cargada, el sistema la rechaza — ese es el recordatorio. La pantalla ya existe
+  (*Ajuste de telas por color*, construida justo para "arranque desde cero").
+
+**Consecuencia de calendario:** el **importador Excel de conteo físico deja de ser bloqueante** — era
+el mayor consumidor de tiempo humano del go-live y el mayor riesgo de fecha. Se construye después,
+con calma, para cargar el resto del almacén.
+
+**5. Numeración: CONTINÚA, pero saltando al siguiente ESCALÓN.**
+
+> Daniel: *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón.
+> Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP
+> y OC también."*
+
+Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**,
+cuando se conozca el máximo real migrado (si la última OP fuera 5,847 → arrancar en 6,000). Requiere
+que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`.
+⚠️ **Es irreversible una vez arrancado.**
+
+**6. El comprobante de entrega actual BASTA.** *(Daniel: "Con la que hay está bien. Por ahora nada
+específico para nadie.")* No se construye remisión ni packing list por cliente.
+
+- **Aplica en:** decisiones de rumbo + alcance de la v1. La 2, la 3 y la 5 requieren construcción; la
+  1 requiere quitar permisos y decidir la generación automática; la 4 y la 6 **no requieren nada**.
+- **Fecha:** 2026-08-13.
+
+#### (Post-F9.37) — Empresas viejas, quién ve la cobranza y cancelar el Pedido Real (DANIEL, 13-ago-2026)
+
+Cierra las tres decisiones que quedaban del diagnóstico.
+
+**7. Las 6 empresas viejas NO existen como empresa operativa. Solo FR Moda activa.**
+
+> Daniel: *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."*
+
+Sus 1,528 órdenes ya viven en el **archivo histórico** (§Post-F9.29), rescatadas bajo la empresa
+principal y conservando en `empresaV1` de quién eran. Eso basta para consultarlas; **no se crean
+como `Empresa`**. Consecuencia técnica útil: la deuda de **membresía usuario↔empresa**
+(`HOJA-DE-RUTA.md` §4) **queda dormida** — hoy `resolverEmpresaActiva` acepta cualquier empresa
+activa por header, lo que sería un salto de tenant en cuanto hubiera una segunda. Con una sola
+empresa activa no muerde. **Si algún día se activa otra, esa deuda pasa a BLOQUEANTE.**
+
+**8. La cobranza la ven SOLO administración y Daniel. Ventas NO.**
+
+> Daniel: *"No tiene caso. Cobranza por ahora solo la ve administración y yo."*
+
+**El seed se queda como está** (`prisma/seed.ts:216-225` le quita a Ventas `cxc.ver`/`cxp.ver`/
+`terceros.ver`). Esto **cierra en contra** la pregunta que quedó abierta al cerrar F9-E4 y la
+recomendación del lead en el diagnóstico: *"quien vende no ve si le pagaron"* es **deliberado**, no
+un olvido. Queda escrito para que nadie lo "arregle" en una revisión futura.
+
+**9. El Pedido Real SÍ se puede cancelar.** *(Daniel: "Sí.")*
+Cierra el TODO que estaba abierto desde F2-E1 (`dominio/pedidos/pedidos-reales.ts:321-323`,
+*"pendiente de decisión de Daniel"*). Cancelación **suave con motivo**, como todo lo demás del
+sistema (D3: nada se borra).
+
+- **Aplica en:** la 7 y la 8 **no requieren construcción** (son confirmaciones del estado actual); la
+  9 sí. SIN migración, SIN permisos nuevos, SIN seed.
+- **Fecha:** 2026-08-13.
+
+#### (Post-F9.38) — La salida de tela A UNA ORDEN no lleva nota; el TRASPASO entre almacenes SÍ (DANIEL, 13-ago-2026)
+
+> Preguntado si la salida de tela hacia una orden debía seguir generando un documento «nota de
+> salida» como en el sistema viejo, o bastaba el movimiento de kardex:
+>
+> Daniel: *"Está bien el movimiento de tela sin la nota de salida cuando sea para consumo de una
+> orden. Vamos a necesitar notas cuando se mueva entre almacenes (si le mando tela a un cortador, si
+> necesito una nota de salida)."*
+
+**Qué se decidió.** Son **dos actos distintos** y llevan documento distinto:
+
+| Acto | Documento |
+|---|---|
+| **Salida de tela a una orden** (consumo) | **NINGUNO.** Basta el movimiento de kardex. Cierra el hueco que el diagnóstico reportó como "el renglón de tela de la nota de salida es incapturable": **no hay que arreglarlo, hay que retirarlo.** |
+| **Traspaso de tela entre almacenes** (p. ej. mandarla a un cortador) | **SÍ lleva nota**, porque la tela **sale físicamente** y el papel va con ella. |
+
+**Estado hoy (verificado 13-ago-2026):** el traspaso **no genera ningún documento**. El único impreso
+del inventario de telas es el listado de existencias (`dominio/inventarios/impresos/impreso-inventario-telas.ts`);
+no hay impreso de traspaso en `api/inventarios/telas.rutas.ts`. **Falta construirlo.**
+
+**Contexto que lo hace natural:** el cortador ya está modelado como un **almacén**
+(`Almacen.idCortador`), y §Post-F9.13 dejó el botón *"Mandar tela al cortador"* apuntando al
+traspaso por color. Lo que falta es el papel.
+
+**Recomendación de diseño del lead (sujeta a confirmación de Daniel):** **no** crear un registro
+`NotaSalida` paralelo. El traspaso **ya tiene folio propio y sus renglones**; lo que necesita es su
+**impreso** — con folio, fecha, almacén origen y destino, el tercero (cortador) y el detalle por
+color con ambos componentes. Y **reimprimible desde el historial**, no solo en el momento de
+guardar: el diagnóstico encontró que en producción los PDF solo se ofrecen para el movimiento recién
+guardado, y no se debe repetir ese defecto. Razón de la recomendación: una `NotaSalida` paralela
+sería una **segunda fuente de verdad** del mismo hecho físico, y el saldo ya se deriva del kardex
+(D3).
+
+- **Aplica en:** construir el impreso del traspaso de tela por color + su reimpresión. Retirar el
+  renglón de tela de la nota de salida (queda solo para avíos). **SIN migración, SIN permisos nuevos,
+  SIN seed.** Va en **V1-E3** (donde ya se agrupa el trabajo de impresión y reimpresión).
+- **Fecha:** 2026-08-13.

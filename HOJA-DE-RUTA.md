@@ -323,8 +323,28 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **D2** — detalles de por qué Costos/EDR no se usa hoy | antes de abrir **F7** (sesión durante F5/F6) |
 | **D8** — ubicación final de Control de Calidad (¿proceso de la RC?) | al cerrar **F5** |
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
-| **Nº interno de producción (rediseño R3, 7-jul-2026)** — Daniel dictó que desarrollo y producción son bases distintas y el nº de producción se mintea al salir a producción (`Modelo.numeroProduccion`, secuencia propia). Quedó arrancando en **1** y se mintea también para modelos legado (que ya traían su numeración histórica en `codigo`); el ETL NO puebla numeración vieja. ¿Arranca en 1, se siembra la secuencia más arriba, o se rescata numeración histórica? La respuesta va a `DECISIONES.md`. | antes del go-live **F10** (hasta entonces es cosmético) |
-| **Historia de las 6 empresas viejas INACTIVAS** (MJD, Zipora, Skintex, Free Ride, Corporativo MJD, Marilyn — **444 pedidos / ~1,528 órdenes**, casi todo **2005–2012**) — ¿migrar a v2 y a qué empresa? **POR AHORA NO SE MIGRA** (decisión Gabriel 17-jun-2026; el ETL F2-E5 las omite y las lista en el reporte de cuadre). Solo se migró el negocio reciente (Marilyn Fitness + FR Moda, 2012→2026). MJD/Corporativo/Marilyn son el linaje viejo de FR Moda (candidatos a folder ahí); Zipora/Skintex/Free Ride eran empresas aparte. **✅ CONSULTARLAS YA ESTÁ RESUELTO (11-ago-2026, §Post-F9.29):** Daniel mandó rescatar esas 1,528 órdenes en el **archivo histórico**, colgadas de la empresa principal y con su empresa original escrita en `empresaV1` (*"rescata todas y solo pon en algún lugar la empresa a la que correspondía"*). Lo que sigue abierto es solo lo **OPERATIVO**: si esas 6 empresas llegan a existir como `Empresa` en v2 (y sus 444 pedidos con ellas). **⚠️ Antes de activar una 2ª empresa falta la membresía usuario↔empresa** (nota del code review). | revisar con Daniel **antes de F10** (el ETL se re-corre al corte; ahí se decide si se rescata esa historia) |
+| **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
+| **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
+
+### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)
+
+Daniel cerró **nueve** decisiones de una sentada para desbloquear la primera versión. Están en
+`DECISIONES.md` **§Post-F9.36** y **§Post-F9.37**; aquí solo el titular:
+
+| # | Decisión | Efecto en el plan |
+|---|---|---|
+| 1 | **Ruta Crítica APAGADA en la v1** (*"hoy honestamente no lo estamos ocupando"*) | **Retira 5 bloqueantes**: sin ETL de F5, sin `UsuarioRol` de los 23, sin festivos, sin el admin viendo pendientes ajenos, sin alarmas falsas |
+| 2 | **Una sola pantalla por acto en Producción** | Se queda el panel de avance (+ imprimir y segundas); se retiran `/produccion/{corte,envios,recibos}` |
+| 3 | **`noProducir`: solo hacerlo visible** | Alcance mínimo |
+| 4 | ⭐ **SE ARRANCA SIN CONTEO FÍSICO**, cargando el inventario sobre la marcha | **El importador Excel deja de ser bloqueante** — era el mayor riesgo de fecha. ⚠️ Vuelve **más grave** el bloqueo de autorización de OC: si el stock no nace de un conteo, la única vía es recibirlo |
+| 5 | **Numeración: continúa saltando al escalón** (OP y OC) | Ver la fila de arriba |
+| 6 | **El comprobante de entrega actual basta** | No se construye remisión ni packing list |
+| 7 | **Solo FR Moda activa** | Ver la fila de arriba |
+| 8 | **La cobranza la ven solo administración y Daniel** | El seed **se queda como está**; cierra EN CONTRA la pregunta abierta de F9-E4. **Deliberado, no olvido** |
+| 9 | **El Pedido Real sí se puede cancelar** | Cierra el TODO abierto desde F2-E1 |
+
+**Sigue abierta:** si la **salida de tela a una orden** debe generar un documento «nota de salida»
+como en el viejo, o basta el movimiento de kardex (hoy la nota solo puede documentar avíos).
 
 ## 7. ¿Cuánto tarda? (gruesa, honesta)
 
