@@ -71,12 +71,13 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
 
-    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 6 padres desplegables
-    // (Desarrollo, Producción, Calidad, Telas, Clientes, Catálogos base), ni uno más.
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 7 padres desplegables
+    // (Desarrollo, Producción, Calidad, Telas, Compras / MRP, Clientes, Catálogos base), ni uno más.
     // «Telas» pasó a desplegable en la etapa A2 (pedido de Daniel, 6-ago-2026: el catálogo de
-    // telas tenía que verse en el menú).
+    // telas tenía que verse en el menú) y «Compras / MRP» el 11-ago-2026 (mismo motivo: la
+    // recepción de compras no tenía ningún enlace).
     const padres = navegacion.getByRole('button');
-    expect(await padres.count()).toBe(6);
+    expect(await padres.count()).toBe(7);
     // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
     // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
     // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
@@ -108,6 +109,22 @@ test.describe('Inicio de sesión', () => {
     await expect(navegacion.getByRole('link', { name: 'Traspaso de telas por color' })).toHaveCount(
       0,
     );
+    // «Compras / MRP» (11-ago-2026) también arranca CERRADA: al desplegarla se ven sus 4 hijos
+    // curados. Antes era hoja plana a las Órdenes de compra y la Recepción / el semáforo / la
+    // explosión no tenían ENTRADA EN EL MENÚ ni enlace estable (solo ⌘K/URL; la Recepción,
+    // además, el deep-link condicional de Mis pendientes de RC). La autorización de compras y
+    // «Compras por orden» siguen fuera del riel.
+    await expect(navegacion.getByRole('link', { name: 'Recepción de compras' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Compras / MRP' }).click();
+    for (const hijoCompras of [
+      'Órdenes de compra',
+      'Recepción de compras',
+      'Qué tengo / qué falta',
+      'Explosión de materiales',
+    ]) {
+      await expect(navegacion.getByRole('link', { name: hijoCompras, exact: true })).toBeVisible();
+    }
+    await expect(navegacion.getByRole('link', { name: 'Autorización de compras' })).toHaveCount(0);
     // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
     await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
     // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su

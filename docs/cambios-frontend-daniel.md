@@ -2354,3 +2354,49 @@ Ahora la pantalla dice la ruta que sí sirve:
 - Y hay un botón **"Quitar la factura leída"**: si prefieres capturar esa entrada sin factura, lo
   aprietas y sigues — **los renglones que ya capturaste se conservan**. Antes, una vez leído el XML
   la única salida era recargar la pantalla y perder el trabajo.
+
+## El menú de Compras, destapado (11-ago-2026)
+
+Daniel, buscando dónde se registran las entradas de material contra las órdenes de compra vigentes:
+*"En Compras, no hay un submenú de Recepción de compras"*. Tenía razón, y era un hueco real.
+
+El menú lateral (el "riel") es una **proyección podada** del catálogo de pantallas, y `Compras / MRP`
+estaba ahí como **hoja plana** que navegaba directo a las Órdenes de compra. Las otras tres pantallas
+del módulo existían y funcionaban, pero se quedaban sin **entrada en el menú** y sin enlace estable:
+solo se alcanzaban por ⌘K o escribiendo la URL. (La Recepción tenía además un deep-link condicional
+—el botón "Registrar" de *Mis pendientes* de la Ruta Crítica—, que solo aparece si esa orden trae ese
+proceso; el semáforo y la explosión, nada.)
+
+Ahora `Compras / MRP` **se despliega**, con cuatro hijos curados:
+
+1. **Órdenes de compra** (la principal, va primero)
+2. **Recepción de compras** — la que faltaba: recibe material contra una OC autorizada o recibida
+   parcial, crea el lote y da entrada al inventario (tela **y** avíos)
+3. **Qué tengo / qué falta** — el semáforo de materiales por orden
+4. **Explosión de materiales** (MRP)
+
+*Autorización de compras* y *Compras por orden* se quedan fuera del riel a propósito, para no
+saturarlo; siguen vivas por ⌘K, como antes.
+
+Es el mismo remedio que ya se le aplicó a **Telas** el 6-ago por el mismo motivo (ver *"El menú de
+Telas, destapado"*). Quedan con la forma vieja **Inventario PT** y **Avíos**, que siguen como hoja
+plana a Existencias y esconden sus movimientos, traspasos y kardex: mismo defecto, todavía sin
+reportar.
+
+### Nota de despliegue (para Gabriel)
+
+**Solo pantallas.** Sin migración, **cero permisos nuevos**, sin cambios de seed → **no** hace falta
+`SEED_ON_START`. Nada que correr a mano.
+
+Un punto que **sí conviene verificar en `prueba`**: *Recepción de compras* se gatea con
+`compras.recibir`, distinto del `compras.ver` de las otras tres pantallas del grupo. Es lo correcto
+(A4: quien no puede recibir no debe ver la opción), pero significa que **un rol de almacén sin
+`compras.recibir` seguirá sin ver la entrada** aunque el menú ya esté arreglado. Vale la pena
+confirmar que los roles que reciben material sí lo traigan.
+
+### Archivos principales
+
+- **Frontend:** `src/modulos/catalogo.ts` (`ESPEC_RIEL`, grupo `inventarios`: `compras` pasa de
+  `colapsar` a `padre`) · `src/modulos/catalogo.test.ts` (estructura del riel + prueba de regresión
+  dedicada) · `e2e/login.spec.ts` (7 padres y el despliegue de Compras).
+- **Backend:** ninguno.
