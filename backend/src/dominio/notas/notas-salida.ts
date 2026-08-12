@@ -15,6 +15,21 @@
  *    como documento de envío y NO genera segundo movimiento de kardex (DECISIÓN (e) de Daniel,
  *    `DECISIONES.md`). El renglón guarda `idMovimientoSalidaTela` — la base del ANTI-DOBLE-DESCUENTO.
  *
+ * ⚠️ §Post-F9.38 (V1-E3b) — LA NOTA QUEDÓ **SOLO PARA AVÍOS**, con una asimetría deliberada entre
+ * el ALTA y la EDICIÓN. Daniel cerró que la salida de tela a una orden NO lleva nota (basta el
+ * movimiento de kardex); el papel lo lleva el TRASPASO entre almacenes, que se imprime desde el
+ * propio traspaso con su folio. Entonces:
+ *
+ *  • **Al CREAR se RECHAZA** todo renglón de tela ({@link rechazarTelaEnAlta}): una nota NUEVA de
+ *    tela ya no puede nacer, ni por API. La captura también se retiró de la UI (además era
+ *    incapturable: aquí se exige `idLote` y las salidas nuevas van por COLOR, sin lote).
+ *  • **Al EDITAR se sigue aceptando**, porque editar REEMPLAZA EL SET COMPLETO de renglones: un
+ *    borrador viejo con renglones de tela (su captura existió hasta el rediseño R6) los perdería
+ *    EN SILENCIO al guardarse —o quedaría inguardable— si la edición también los rechazara. La
+ *    lectura del histórico, por lo mismo, sigue proyectándolos.
+ *
+ * No es una inconsistencia: es la única forma de cerrar la puerta sin mutilar lo que ya existe.
+ *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo; las rutas son delgadas.
  *  • A2 — encabezado + renglones (alta/edición) y confirmar/cancelar van en UNA transacción
@@ -354,6 +369,32 @@ async function exigirTodosExisten(
   }
 }
 
+/**
+ * RECHAZA renglones de TELA en el ALTA de una nota (§Post-F9.38 — decisión de Daniel: *"Está bien el
+ * movimiento de tela sin la nota de salida cuando sea para consumo de una orden"*). Una nota NUEVA
+ * es de AVÍOS: la tela que se consume en una orden sale por su movimiento de kardex y NO lleva nota;
+ * lo que sí lleva papel es el TRASPASO entre almacenes, que se imprime desde el propio traspaso con
+ * su folio.
+ *
+ * ⚠️ ASIMETRÍA DELIBERADA — esta puerta se cierra solo al CREAR, NO al EDITAR. Editar una nota
+ * REEMPLAZA EL SET COMPLETO de renglones: si la edición también rechazara la tela, un borrador
+ * viejo que la trae (su captura existió hasta el rediseño R6) la perdería EN SILENCIO al guardarse,
+ * o quedaría inguardable. No es una inconsistencia: es la única forma de cerrar la puerta sin
+ * mutilar lo que ya existe. Lo que NO puede pasar es que nazca una nota de tela nueva — y eso es
+ * exactamente lo que impide esta función.
+ */
+function rechazarTelaEnAlta(lineas: DatosNotaSalidaLineaEntrada[]): void {
+  for (const [indice, linea] of lineas.entries()) {
+    if (linea.idTela != null || linea.idLote != null || linea.idMovimientoSalidaTela != null) {
+      throw new ErrorValidacion(
+        `El renglón ${indice + 1} es de tela: una nota de salida NUEVA es de AVÍOS. La salida de ` +
+          `tela a una orden no lleva nota (basta su movimiento de inventario); si la tela se manda ` +
+          `a otro almacén, usa el traspaso de tela y su hoja.`,
+      );
+    }
+  }
+}
+
 /** Crea los renglones de una nota desde cero (alta o reemplazo). Asume que no tiene renglones aún. */
 async function crearRenglones(
   tx: Tx,
@@ -402,7 +443,13 @@ type NotaConDetalle = Prisma.NotaSalidaGetPayload<{ include: typeof incluirDetal
 /** Proyecta una nota (con detalle) a la forma JSON del contrato. */
 function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
   const lineas: NotaSalidaLineaSalida[] = n.lineas.map((l) => {
-    const tipo: 'avio' | 'tela' = l.idAvio !== null ? 'avio' : 'tela';
+    // Tres formas de renglón (V1-E3b): avío (lo único que se captura), tela (histórico de notas
+    // viejas) y MIGRADO — sin avío ni tela, solo `descripcionLegacy` (el viejo guardaba texto
+    // libre; ver `notas/migracion.ts`). Antes se derivaba `idAvio !== null ? 'avio' : 'tela'`, así
+    // que TODO renglón migrado salía etiquetado 'tela' con material vacío: una etiqueta falsa que
+    // en el go-live habría parecido pérdida de datos de la migración.
+    const tipo: 'avio' | 'tela' | 'historico' =
+      l.idAvio !== null ? 'avio' : l.idTela !== null ? 'tela' : 'historico';
     return {
       id: l.id,
       idOrden: l.idOrden,
@@ -492,6 +539,11 @@ export async function crearNotaSalida(
   verificarPermiso(sesion, 'notas.administrar');
   const datos = validarEntrada(esquemaNotaSalidaCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // §Post-F9.38 — una nota NUEVA es de AVÍOS (la tela no lleva nota). Solo al CREAR: el porqué de la
+  // asimetría con la edición está en `rechazarTelaEnAlta`. Va ANTES de abrir la transacción: es una
+  // regla sobre la ENTRADA, no necesita la BD, y así no se toma folio ni se escribe nada.
+  rechazarTelaEnAlta(datos.lineas);
 
   const idNota = await enTransaccion(async (tx) => {
     await exigirMaquileroExiste(tx, datos.idMaquilero);

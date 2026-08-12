@@ -37,6 +37,9 @@ const REGISTRO_PDF = {
   'inventario-telas': async () =>
     (await import('../dominio/inventarios/impresos/impreso-inventario-telas.js'))
       .generarPdfInventarioTelas,
+  'traspaso-tela': async () =>
+    (await import('../dominio/inventarios/impresos/impreso-traspaso-tela.js'))
+      .generarPdfTraspasoTela,
 
   // ── Producción / WIP ─────────────────────────────────────────────────────────
   orden: async () =>

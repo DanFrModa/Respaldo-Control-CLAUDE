@@ -11,11 +11,19 @@ import { z } from 'zod';
  *  • TELA (`idTela` + `idLote` + `idMovimientoSalidaTela`): la tela YA se descontó UNA sola vez con
  *    `registrarSalidaTelaAOrden` (E1). La nota solo REFERENCIA ese movimiento `salida-tela-orden` y
  *    NO genera segundo movimiento (DECISIÓN (e) de Daniel — anti-doble-descuento).
+ *    ⚠️ §Post-F9.38 (V1-E3b): este renglón YA NO SE CAPTURA. La forma sigue en el contrato, pero el
+ *    DOMINIO lo trata distinto según la operación (asimetría deliberada, no un descuido):
+ *      – **ALTA (`esquemaNotaSalidaCrear`): RECHAZADO.** Una nota nueva es de AVÍOS; la salida de
+ *        tela a una orden no lleva nota (basta su movimiento de kardex) y el traspaso entre
+ *        almacenes lleva SU propia hoja, con su propio folio.
+ *      – **EDICIÓN (`esquemaNotaSalidaEditarCuerpo`): ACEPTADO.** Editar reemplaza el SET COMPLETO
+ *        de renglones: sin esta rama, guardar un borrador viejo con tela lo borraría sin avisar.
  *
  * Captura por RENGLÓN: cada renglón liga una orden de producción destino (`idOrden`) y un material
  * (avío XOR tela) con su `cantidad`. La empresa la toma el dominio de la sesión activa (A9); el
  * folio `numNota` lo asigna la secuencia atómica por empresa (A3). `descripcionLegacy` NO se captura
- * (es solo para el texto libre que migrará E6).
+ * (es solo para el texto libre que migró E6; los renglones que solo lo traen se reportan con
+ * `tipo: 'historico'`).
  */
 
 const idPositivo = (campo: string) =>
@@ -66,6 +74,10 @@ export type DatosNotaSalidaLineaEntrada = z.infer<typeof esquemaNotaSalidaLineaE
  * obligatoria; `fechaEnvio` opcional (cuando salga el envío). `lineas` = al menos un renglón. La
  * empresa y el folio los pone el dominio (A9/A3). El descuento de avíos sucede al CONFIRMAR, no al
  * crear.
+ *
+ * §Post-F9.38 — SOLO AVÍOS: el dominio RECHAZA un renglón de tela en el alta (la salida de tela a
+ * una orden no lleva nota). La forma sigue admitiéndolo porque la EDICIÓN sí lo acepta, para no
+ * mutilar los borradores viejos.
  */
 export const esquemaNotaSalidaCrear = z
   .object({
@@ -82,9 +94,7 @@ export const esquemaNotaSalidaCrear = z
     lineas: z
       .array(esquemaNotaSalidaLineaEntrada)
       .min(1, { error: 'Captura al menos un renglón' })
-      .describe(
-        'Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden).',
-      ),
+      .describe('Renglones de AVÍO de la nota (la tela se rechaza en el alta — §Post-F9.38).'),
   })
   .describe('Alta de una nota de salida en borrador.');
 
@@ -113,7 +123,10 @@ export const esquemaNotaSalidaEditarCuerpo = z
       .array(esquemaNotaSalidaLineaEntrada)
       .min(1, { error: 'Captura al menos un renglón' })
       .optional()
-      .describe('Si viene, REEMPLAZA todo el set de renglones de la nota.'),
+      .describe(
+        'Si viene, REEMPLAZA todo el set de renglones de la nota. Aquí SÍ se admiten los renglones ' +
+          'de tela de notas viejas (§Post-F9.38): sin eso, guardar un borrador viejo los borraría.',
+      ),
   })
   .describe('Edición del cuerpo de una nota de salida en borrador.');
 
@@ -145,7 +158,18 @@ export const esquemaNotaSalidaLineaSalida = z
     id: z.number().int().describe('Id del renglón.'),
     idOrden: z.number().int().describe('Orden de producción destino.'),
     folioOrden: z.number().int().nullable().describe('Folio de la orden destino, o null.'),
-    tipo: z.enum(['avio', 'tela']).describe('Tipo del material del renglón.'),
+    /**
+     * Qué es el renglón: `avio` (el único que se captura hoy), `tela` (histórico de notas viejas —
+     * su captura se retiró, §Post-F9.38) o `historico`: un renglón MIGRADO del sistema anterior,
+     * que no apunta a ningún catálogo y lleva su texto en `descripcionLegacy` (el viejo guardaba
+     * los renglones como TEXTO LIBRE). Antes de V1-E3b estos últimos se reportaban como `tela` —
+     * una etiqueta FALSA: se pintaban con badge "Tela" y material en blanco.
+     */
+    tipo: z
+      .enum(['avio', 'tela', 'historico'])
+      .describe(
+        'Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.',
+      ),
     idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
     avio: z.string().nullable().describe('Clave/descripción del avío, o null.'),
     idTela: z.number().int().nullable().describe('Tela del catálogo, o null.'),

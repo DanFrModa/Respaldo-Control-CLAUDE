@@ -140,6 +140,7 @@ vi.mock('@/api/inventario-materiales', () => ({
     isError: false,
   }),
   useCancelarTelaColor: () => ({ mutate: cancelarMutate, isPending: false }),
+  urlImpresoTraspasoTela: (id: number) => `/api/inventarios/telas/traspasos/${String(id)}/impreso`,
 }));
 // `etiquetaUnidadTela` salió de la pantalla a `@/api/telas` para que todas escriban igual la
 // unidad (kg/m) — el mock la incluye porque la tabla la usa en cada renglón.
@@ -248,6 +249,64 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
     expect(screen.queryByTestId('kardex-color-cancelar-1')).not.toBeInTheDocument();
+  });
+
+  // ── §Post-F9.38: la hoja del traspaso se REIMPRIME desde el historial ───────
+  it('el kardex ofrece REIMPRIMIR la hoja de un traspaso (solo con `.ver`, sin `.mover`)', () => {
+    const conTraspaso: KardexTelaColor = {
+      ...kardex,
+      renglones: [
+        ...kardex.renglones,
+        {
+          ...(kardex.renglones[0] as KardexTelaColor['renglones'][number]),
+          idMovimiento: 2,
+          folio: 2,
+          tipoMov: 'Transferencia entre Almacenes (Salida)',
+          direccion: 'salida',
+          entradaCuerpo: 0,
+          salidaCuerpo: 20,
+          origenTipo: 'traspaso',
+        },
+      ],
+    };
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: conTraspaso, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+
+    // El traspaso sí ofrece su hoja; un movimiento manual no (no hay bulto que acompañar).
+    expect(screen.getByTestId('kardex-color-imprimir-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('kardex-color-imprimir-1')).not.toBeInTheDocument();
+  });
+
+  it('un traspaso CANCELADO no se puede reimprimir (su papel no vuelve a salir con un bulto)', () => {
+    const cancelado: KardexTelaColor = {
+      ...kardex,
+      renglones: [
+        {
+          ...(kardex.renglones[0] as KardexTelaColor['renglones'][number]),
+          idMovimiento: 3,
+          folio: 3,
+          origenTipo: 'traspaso',
+          cancelado: true,
+        },
+      ],
+    };
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: cancelado, isPending: false, isError: false },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    expect(screen.queryByTestId('kardex-color-imprimir-3')).not.toBeInTheDocument();
   });
 
   it('el doble clic en el renglón del color también abre el kardex', () => {

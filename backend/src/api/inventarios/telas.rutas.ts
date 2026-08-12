@@ -22,6 +22,7 @@
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
  *  • `GET  /inventarios/telas/color/kardex`          (`inventario-telas.ver`)   → kardex por color (2 componentes).
  *  • `GET  /inventarios/telas/partidas`              (`inventario-telas.ver`)   → búsqueda de partidas.
+ *  • `GET  /inventarios/telas/traspasos/:id/impreso` (`inventario-telas.ver`)   → hoja del traspaso (PDF).
  *
  * NINGÚN endpoint edita/borra existencias (D3). Los importes de telas se omiten server-side a quien
  * no tenga `telas.ver-totales` (ex-acceso #7) — la decisión es del dominio, no de la UI.
@@ -56,6 +57,7 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import { impresoInventarioTelas } from '../../dominio/inventarios/impresos/impreso-inventario-telas.js';
+import { impresoTraspasoTela } from '../../dominio/inventarios/impresos/impreso-traspaso-tela.js';
 import {
   ajustarInventarioTela,
   cancelarMovimientoTela,
@@ -342,6 +344,32 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarPartidasTela(sesion, request.query);
+    },
+  });
+
+  // ── Impreso PDF 'Traspaso de tela entre almacenes' (V1-E3b, §Post-F9.38) ─────
+  // La hoja que ACOMPAÑA la tela que sale a otro almacén (p. ej. al cortador). NO genera folio ni
+  // documento nuevo: IMPRIME el traspaso que ya existe, por el id de CUALQUIERA de sus dos patas
+  // (así se reimprime desde el historial del kardex). Un traspaso cancelado NO se imprime (400).
+  // Respuesta BINARIA (application/pdf): no se declara `response` 200.
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/traspasos/:id/impreso',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Hoja del traspaso de tela entre almacenes (PDF del folio que ya existe)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdMaterial,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folio } = await impresoTraspasoTela(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="traspaso-tela-${String(folio)}.pdf"`);
+      return reply.send(buffer as unknown as never);
     },
   });
 

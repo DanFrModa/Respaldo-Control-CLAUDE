@@ -9,7 +9,6 @@ import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { useProveedores } from '@/api/proveedores';
-import { useTelas } from '@/api/telas';
 import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -61,7 +60,8 @@ export interface PrefillNota {
  * edita; si recibe `prefill`, da de alta PRE-CARGADO (desde "Pasar a nota de salida" de la
  * habilitación); si no, alta vacía. Encabezado (maquilero, almacén origen [decisión g], fechas,
  * observaciones) + **"Traer avíos de la orden"** (carga la receta con su cantidad sugerida, PROPONE
- * no LIMITA) + renglones (editor avío/tela con flag de receta ✓/⚠ y existencia). Una nota
+ * no LIMITA) + renglones de AVÍO (con flag de receta ✓/⚠ y existencia; la tela ya no se captura
+ * aquí — §Post-F9.38: la salida de tela a una orden NO lleva nota). Una nota
  * confirmada/cancelada va en `soloLectura`. Acciones gobernadas por `notas.administrar`; el backend
  * es la autoridad (A1).
  */
@@ -93,7 +93,6 @@ export function DialogoEditarNota({
   const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const almacenes = useAlmacenes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const avios = useAvios({ pagina: 1, porPagina: 100 });
-  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
@@ -161,10 +160,13 @@ export function DialogoEditarNota({
           idOrden: r.idOrden,
           idAvio: r.idAvio,
           idTela: null,
+          telaNombre: null,
           idLote: null,
+          loteClave: null,
           idMovimientoSalidaTela: null,
           cantidad: String(r.cantidad),
           unidad: r.unidad ?? '',
+          descripcionLegacy: null,
         })),
       );
       setRecetas(prefill.recetaPorOrden ?? {});
@@ -197,10 +199,13 @@ export function DialogoEditarNota({
       idOrden: data.idOrden,
       idAvio: a.idAvio,
       idTela: null,
+      telaNombre: null,
       idLote: null,
+      loteClave: null,
       idMovimientoSalidaTela: null,
       cantidad: String(a.requerido),
       unidad: a.unidad ?? '',
+      descripcionLegacy: null,
     }));
     // Conserva los renglones ya capturados (descarta los vacíos, como en el proto).
     setRenglones((prev) => {
@@ -428,7 +433,6 @@ export function DialogoEditarNota({
               renglones={renglones}
               alCambiar={setRenglones}
               avios={avios.data?.datos ?? []}
-              telas={telas.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
               recetaPorOrden={recetaPorOrden}
               existenciaPorAvio={existenciaPorAvio}

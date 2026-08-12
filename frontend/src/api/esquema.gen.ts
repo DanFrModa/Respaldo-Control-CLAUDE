@@ -29655,10 +29655,10 @@ export interface paths {
                   /** @description Folio de la orden destino, o null. */
                   folioOrden: number | null;
                   /**
-                   * @description Tipo del material del renglón.
+                   * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                    * @enum {string}
                    */
-                  tipo: 'avio' | 'tela';
+                  tipo: 'avio' | 'tela' | 'historico';
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
                   /** @description Clave/descripción del avío, o null. */
@@ -29813,7 +29813,7 @@ export interface paths {
             fechaElaboracion: string;
             fechaEnvio?: string | null;
             observaciones?: string | null;
-            /** @description Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden). */
+            /** @description Renglones de AVÍO de la nota (la tela se rechaza en el alta — §Post-F9.38). */
             lineas: {
               idOrden: number;
               idAvio?: number;
@@ -29883,10 +29883,10 @@ export interface paths {
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
                 /**
-                 * @description Tipo del material del renglón.
+                 * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
                  */
-                tipo: 'avio' | 'tela';
+                tipo: 'avio' | 'tela' | 'historico';
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -30225,10 +30225,10 @@ export interface paths {
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
                 /**
-                 * @description Tipo del material del renglón.
+                 * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
                  */
-                tipo: 'avio' | 'tela';
+                tipo: 'avio' | 'tela' | 'historico';
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -30381,7 +30381,7 @@ export interface paths {
             fechaElaboracion?: string;
             fechaEnvio?: string | null;
             observaciones?: string | null;
-            /** @description Si viene, REEMPLAZA todo el set de renglones de la nota. */
+            /** @description Si viene, REEMPLAZA todo el set de renglones de la nota. Aquí SÍ se admiten los renglones de tela de notas viejas (§Post-F9.38): sin eso, guardar un borrador viejo los borraría. */
             lineas?: {
               idOrden: number;
               idAvio?: number;
@@ -30451,10 +30451,10 @@ export interface paths {
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
                 /**
-                 * @description Tipo del material del renglón.
+                 * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
                  */
-                tipo: 'avio' | 'tela';
+                tipo: 'avio' | 'tela' | 'historico';
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -30769,10 +30769,10 @@ export interface paths {
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
                 /**
-                 * @description Tipo del material del renglón.
+                 * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
                  */
-                tipo: 'avio' | 'tela';
+                tipo: 'avio' | 'tela' | 'historico';
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -30989,10 +30989,10 @@ export interface paths {
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
                 /**
-                 * @description Tipo del material del renglón.
+                 * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
                  */
-                tipo: 'avio' | 'tela';
+                tipo: 'avio' | 'tela' | 'historico';
                 /** @description Avío del catálogo, o null. */
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
@@ -31976,6 +31976,8 @@ export interface paths {
             /** @description Matriz color×talla del movimiento (D4). */
             lineas: {
               idColor: number;
+              /** @description Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden». */
+              idOrden?: number | null;
               /** @description Cantidades por talla de este color. */
               tallas: {
                 idTalla: number;
@@ -32034,6 +32036,10 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden). */
+                idOrden: number | null;
+                /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
+                folioOrden: number | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -32182,6 +32188,8 @@ export interface paths {
             /** @description Matriz color×talla del movimiento (D4). */
             lineas: {
               idColor: number;
+              /** @description Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden». */
+              idOrden?: number | null;
               /** @description Cantidades por talla de este color. */
               tallas: {
                 idTalla: number;
@@ -32242,6 +32250,10 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden). */
+                  idOrden: number | null;
+                  /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
+                  folioOrden: number | null;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -32305,6 +32317,10 @@ export interface paths {
                   idColor: number;
                   /** @description Nombre del color. */
                   color: string;
+                  /** @description Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden). */
+                  idOrden: number | null;
+                  /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
+                  folioOrden: number | null;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -32493,6 +32509,10 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden). */
+                idOrden: number | null;
+                /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
+                folioOrden: number | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -33025,6 +33045,10 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden). */
+                idOrden: number | null;
+                /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
+                folioOrden: number | null;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -35401,6 +35425,116 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/traspasos/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Hoja del traspaso de tela entre almacenes (PDF del folio que ya existe) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento de material. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {

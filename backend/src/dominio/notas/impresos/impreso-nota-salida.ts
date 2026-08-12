@@ -56,9 +56,16 @@ import { obtenerNotaSalida } from '../notas-salida.js';
 export interface LineaImpresoNotaSalida {
   /** Folio de la orden de producción destino, o null. */
   folioOrden: number | null;
-  /** Tipo del renglón (avío o tela). */
-  tipo: 'avio' | 'tela';
-  /** Texto del material: clave/descripción del avío, o nombre de la tela. */
+  /**
+   * Qué es el renglón: avío (lo único que se captura), tela (histórico de notas viejas) o
+   * `historico` = renglón MIGRADO del sistema anterior, que solo tiene texto libre (V1-E3b).
+   */
+  tipo: 'avio' | 'tela' | 'historico';
+  /**
+   * Texto del material: clave/descripción del avío, nombre de la tela o —en un renglón migrado— el
+   * TEXTO LIBRE que traía el sistema viejo (`descripcionLegacy`): es lo único que ese renglón tiene,
+   * y sin él la hoja salía con el material en blanco.
+   */
   material: string;
   /** Clave del lote de la tela (solo renglones de tela), o null. */
   lote: string | null;
@@ -126,7 +133,12 @@ export async function armarDatosImpresoNotaSalida(
     lineas: nota.lineas.map((l) => ({
       folioOrden: l.folioOrden,
       tipo: l.tipo,
-      material: l.tipo === 'avio' ? (l.avio ?? '—') : (l.tela ?? '—'),
+      material:
+        l.tipo === 'avio'
+          ? (l.avio ?? '—')
+          : l.tipo === 'tela'
+            ? (l.tela ?? '—')
+            : (l.descripcionLegacy ?? '—'),
       lote: l.loteClave,
       cantidad: l.cantidad,
       unidad: l.unidad,
@@ -204,7 +216,7 @@ function tablaLineas(datos: DatosImpresoNotaSalida): ReactElement {
       h(
         Text,
         { style: [estilosDoc.celda, estilos.celdaTipo] },
-        l.tipo === 'avio' ? 'Avío' : 'Tela',
+        l.tipo === 'avio' ? 'Avío' : l.tipo === 'tela' ? 'Tela' : 'Migrado',
       ),
       h(Text, { style: [estilosDoc.celda, estilos.celdaMaterial] }, l.material),
       h(Text, { style: [estilosDoc.celda, estilos.celdaLote] }, l.lote ?? '—'),

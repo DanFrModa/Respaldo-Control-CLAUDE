@@ -11,10 +11,43 @@ import { MovimientosPtPagina } from './MovimientosPtPagina';
 const crearMutate = vi.fn();
 // Configurable: se re-programa por test para probar el aviso de error de catálogo.
 const useTiposMovimientoMock = vi.fn<() => Record<string, unknown>>();
+// §Post-F9.40 — existencias del modelo en el almacén: de ahí salen las ÓRDENES del selector.
+const useExistenciasPtMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/inventarios', () => ({
   useCrearMovimientoPt: () => ({ mutate: crearMutate, isPending: false }),
   useTiposMovimiento: () => useTiposMovimientoMock(),
+  useExistenciasPt: () => useExistenciasPtMock(),
 }));
+
+/** Existencias del modelo A-100 en el almacén 3: 20 pzas de la orden 55 y 6 «sin orden». */
+const EXISTENCIAS_OK = {
+  data: {
+    filas: [
+      {
+        idModelo: 1,
+        idColor: 7,
+        idTalla: 11,
+        idAlmacen: 3,
+        idOrden: 55,
+        folioOrden: 9001,
+        existencia: 20,
+      },
+      {
+        idModelo: 1,
+        idColor: 7,
+        idTalla: 11,
+        idAlmacen: 3,
+        idOrden: null,
+        folioOrden: null,
+        existencia: 6,
+      },
+    ],
+    totalExistencia: 26,
+  },
+  isPending: false,
+  isError: false,
+  refetch: vi.fn(),
+};
 
 const TIPOS_MOV_OK = {
   data: {
@@ -71,6 +104,8 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     crearMutate.mockReset();
     useTiposMovimientoMock.mockReset();
     useTiposMovimientoMock.mockReturnValue(TIPOS_MOV_OK);
+    useExistenciasPtMock.mockReset();
+    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_OK);
   });
 
   it('avisa (reintentable) si falla un catálogo de la captura', () => {
@@ -117,5 +152,72 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(cuerpo.idTipoMov).toBe(1);
     expect(cuerpo.idAlmacen).toBe(3);
     expect(cuerpo.idModelo).toBe(1);
+  });
+
+  // ── §Post-F9.40: el PT etiquetado por orden se puede mover ──────────────────
+  it('el selector de ORDEN ofrece solo las órdenes CON EXISTENCIA aquí, más «sin orden»', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+    const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
+    expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
+    expect(opciones[1]?.textContent).toContain('9001'); // el folio, no el id interno
+    expect(opciones[1]?.textContent).toContain('20'); // las piezas de ESE bucket
+  });
+
+  it('manda el idOrden elegido en cada renglón (sale del bucket de esa orden)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+    await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
+    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-color'), '7');
+    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('mov-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '4');
+
+    await usuario.click(screen.getByTestId('mov-guardar'));
+    const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
+    expect(cuerpo.lineas[0]?.idOrden).toBe(55);
+  });
+
+  it('por default el movimiento sale del bucket «sin orden» (no manda idOrden)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-color'), '7');
+    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('mov-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '3');
+
+    await usuario.click(screen.getByTestId('mov-guardar'));
+    const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: Record<string, unknown>[] }];
+    expect(cuerpo.lineas[0]).not.toHaveProperty('idOrden');
+  });
+
+  it('si NO se pueden leer las existencias lo DICE (no inventa órdenes)', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch: vi.fn(),
+    });
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+    expect(screen.getByTestId('mov-orden-error')).toBeInTheDocument();
+    const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
+    expect(opciones.map((o) => o.value)).toEqual(['sin']);
   });
 });

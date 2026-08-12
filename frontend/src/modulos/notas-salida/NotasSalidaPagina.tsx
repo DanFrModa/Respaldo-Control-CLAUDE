@@ -45,6 +45,7 @@ import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
 import {
   TONO_ESTATUS_NOTA as TONO_NOTA,
+  cantidadRenglonNota,
   descripcionMaterialNota,
   fechaCortaNota,
   ordenesDeNota,
@@ -70,6 +71,11 @@ type FiltroEstatus = (typeof FILTROS_ESTATUS)[number]['clave'];
  * estatus). Crear/editar exigen `notas.administrar`; confirmar también; cancelar `notas.cancelar`.
  * Las acciones de escritura se ocultan sin permiso; la decisión real la toma el backend (A1).
  * Reemplaza Notas / NotasSub.
+ *
+ * §Post-F9.38 (V1-E3b) — la nota es **de AVÍOS**: la salida de tela a una orden NO lleva nota
+ * (basta su movimiento de kardex, decisión de Daniel). Lo que SÍ lleva papel es el TRASPASO de tela
+ * entre almacenes, y ese se imprime desde el propio traspaso, con su folio. Los renglones de TELA
+ * que aparecen en notas viejas son histórico: se muestran, no se capturan.
  */
 export function NotasSalidaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -183,7 +189,8 @@ export function NotasSalidaPagina(): React.JSX.Element {
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
             Envío de <b>avíos</b> a maquileros · descuenta el inventario · por orden de producción.
-            La <b>tela</b> se registra en «Salida de tela a orden» (por color).
+            La <b>tela</b> que se consume en una orden no lleva nota: se registra en «Salida de tela
+            a orden» (por color).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -674,7 +681,7 @@ function GrupoOrden({
             <span className="num block text-[11px] text-faint">{trazaRenglon(linea)}</span>
           </span>
           <span className="num shrink-0 text-xs font-semibold">
-            {linea.cantidad.toLocaleString('es-MX')}
+            {cantidadRenglonNota(linea)}
             {linea.unidad !== null ? ` ${linea.unidad}` : ''}
           </span>
         </div>
@@ -683,12 +690,19 @@ function GrupoOrden({
   );
 }
 
-/** Traza al kardex de un renglón (descuento de avío / salida-a-orden de tela). */
+/**
+ * Traza al kardex de un renglón (descuento de avío / salida-a-orden de tela). El renglón MIGRADO no
+ * tiene traza y NO es un hueco: el ETL carga las notas viejas como documento histórico, sin tocar
+ * inventario (`dominio/notas/migracion.ts`).
+ */
 function trazaRenglon(linea: NotaSalida['lineas'][number]): string {
   if (linea.tipo === 'avio') {
     return linea.folioMovimientoAvio === null
       ? 'Avío · sin descontar (borrador)'
       : `Avío · descuento #${String(linea.folioMovimientoAvio)}`;
+  }
+  if (linea.tipo === 'historico') {
+    return 'Migrado del sistema anterior · sin movimiento de inventario';
   }
   return linea.folioMovimientoSalidaTela === null
     ? 'Tela · sin salida referenciada'

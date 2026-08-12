@@ -130,6 +130,42 @@ describe('Notas de salida unit — validación de captura (Zod, antes de la BD)'
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  // §Post-F9.38 (V1-E3b) — el ALTA es de AVÍOS: la tela se rechaza ANTES de tocar la BD (sin folio
+  // ni escrituras). La EDICIÓN sí la acepta (asimetría deliberada) y se prueba en el int test.
+  it('crear con un renglón de TELA lanza ErrorValidacion (una nota nueva es de avíos)', async () => {
+    await expect(
+      crearNotaSalida(sesionAdmin(), {
+        idMaquilero: 1,
+        idAlmacen: 1,
+        fechaElaboracion: '2026-08-13',
+        lineas: [
+          {
+            idOrden: 1,
+            idTela: 2,
+            idLote: 3,
+            idMovimientoSalidaTela: 4,
+            cantidad: 10,
+            unidad: 'm',
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('crear con tela MEZCLADA entre avíos también lanza ErrorValidacion', async () => {
+    await expect(
+      crearNotaSalida(sesionAdmin(), {
+        idMaquilero: 1,
+        idAlmacen: 1,
+        fechaElaboracion: '2026-08-13',
+        lineas: [
+          { idOrden: 1, idAvio: 1, cantidad: 5 },
+          { idOrden: 1, idTela: 2, idLote: 3, idMovimientoSalidaTela: 4, cantidad: 10 },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
   it('cancelar sin motivo lanza ErrorValidacion', async () => {
     const cuerpoSinMotivo = {} as unknown as Parameters<typeof cancelarNotaSalida>[2];
     await expect(cancelarNotaSalida(sesionCancelar(), 1, cuerpoSinMotivo)).rejects.toBeInstanceOf(

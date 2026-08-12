@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useColores } from '@/api/colores';
-import { useCrearMovimientoPt, useTiposMovimiento } from '@/api/inventarios';
+import { useCrearMovimientoPt, useExistenciasPt, useTiposMovimiento } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,16 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
-import { aLineasApi, coloresOpciones, tallasColumnas, totalMatriz } from './matriz-inventario';
+import { SelectorOrdenPt } from './SelectorOrdenPt';
+import {
+  SIN_ORDEN,
+  aIdOrden,
+  aLineasApi,
+  coloresOpciones,
+  ordenesConExistencia,
+  tallasColumnas,
+  totalMatriz,
+} from './matriz-inventario';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local), para el default del campo fecha. */
 function hoy(): string {
@@ -33,6 +42,12 @@ function hoy(): string {
  * direcciones entrada/salida (los `traspaso` van por la pantalla de traspaso). Deja operable el
  * va-y-ven de estampado por inventario: los tipos "Salida a Aplicación"/"Entrada de Aplicación" salen
  * solos en el dropdown. El servidor es la autoridad: las salidas no pueden dejar existencia negativa.
+ *
+ * §Post-F9.40 — el movimiento dice de qué ORDEN salen las piezas (la existencia de PT es por
+ * modelo×color×talla×ORDEN×almacén): el selector ofrece las órdenes CON EXISTENCIA REAL de ese
+ * modelo en ese almacén, más el bucket «sin orden» (default; lo capturado a mano y lo migrado).
+ * Antes el movimiento manual solo podía tocar «sin orden», así que lo que producía la fábrica
+ * —etiquetado con su orden por el recibo de maquila— no salía por aquí.
  *
  * `inventario-pt.mover` gobierna la captura.
  */
@@ -48,6 +63,9 @@ export function MovimientosPtPagina(): React.JSX.Element {
   // §Post-F9.25 — nº de la orden del sistema VIEJO que fabricó estas prendas. Es lo que permite ir a
   // consultar la orden en Control viejo: esas órdenes no se migraron (la migración lleva 2025-2026).
   const [numOrdenV1, setNumOrdenV1] = useState('');
+  // §Post-F9.40 — de qué ORDEN de v2 salen (o a cuál entran) las piezas. `SIN_ORDEN` = el bucket
+  // «sin orden», que es el default y donde cae lo capturado a mano y lo migrado.
+  const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
 
@@ -71,6 +89,25 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
 
   const crear = useCrearMovimientoPt();
+
+  // §Post-F9.40 — órdenes CON EXISTENCIA REAL del modelo en el almacén elegido (el bucket del que
+  // se mueve). La query queda apagada hasta tener modelo y almacén: sin ellos no hay qué preguntar.
+  const hayArticulo = modelo !== undefined && idAlmacen !== '';
+  const existencias = useExistenciasPt(
+    hayArticulo
+      ? { idModelo: modelo.id, idAlmacen: Number(idAlmacen) }
+      : { idModelo: modelo?.id ?? 0 },
+    hayArticulo,
+  );
+  const opcionesOrden = useMemo(
+    () => ordenesConExistencia(existencias.data?.filas ?? []),
+    [existencias.data],
+  );
+  // Si cambia el artículo/almacén, el bucket elegido puede ya no existir → vuelve a «sin orden»
+  // (nunca se manda una orden que esta pantalla no ofreció).
+  const bucketValido =
+    ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
+  const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
 
   const coloresDisponibles = useMemo(
     () => coloresOpciones(colores.data?.datos ?? []),
@@ -116,13 +153,14 @@ export function MovimientosPtPagina(): React.JSX.Element {
         idModelo: modelo.id,
         fecha,
         ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
-        lineas: aLineasApi(lineas, numOrdenV1),
+        lineas: aLineasApi(lineas, numOrdenV1, aIdOrden(ordenElegida)),
       },
       {
         onSuccess: (mov) => {
           toast.success(`Movimiento #${mov.folio} guardado (${mov.totalPiezas} pzas).`);
           limpiarMatriz();
           setNumOrdenV1('');
+          void existencias.refetch();
         },
         onError: (error) => toast.error(error.message),
       },
@@ -231,6 +269,27 @@ export function MovimientosPtPagina(): React.JSX.Element {
                     data-testid="mov-fecha"
                   />
                 </Field>
+              </div>
+
+              {/* §Post-F9.40 — de qué ORDEN salen las piezas (el bucket de existencia). Solo las
+                  órdenes con piezas de ESTE modelo en ESTE almacén, más «sin orden». */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectorOrdenPt
+                  id="mov-orden"
+                  opciones={opcionesOrden}
+                  valor={ordenElegida}
+                  alCambiar={setOrdenBucket}
+                  deshabilitado={!puedeMover || !hayArticulo}
+                  cargando={hayArticulo && existencias.isPending}
+                  hayError={existencias.isError}
+                  alReintentar={() => void existencias.refetch()}
+                  ayuda={
+                    hayArticulo
+                      ? undefined
+                      : 'Elige el almacén para ver de qué órdenes hay piezas aquí.'
+                  }
+                  testid="mov-orden"
+                />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">

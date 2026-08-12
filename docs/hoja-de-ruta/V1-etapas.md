@@ -178,17 +178,49 @@ anotado en el código con el arreglo correcto.
 **Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
 `SEED_ON_START`.
 
-### E3b — pendiente: los papeles y el inventario de PT
+### E3b — construida (13-ago-2026): los papeles y el inventario de PT
 
-1. **El impreso del traspaso de tela** (§Post-F9.38): mandar tela a un cortador la saca físicamente y
-   el papel va con ella. **Un solo folio, el del traspaso** — sin registro paralelo ni secuencia nueva
-   (Daniel: *"no debe de generar otro folio de nada"*). Reimprimible desde el historial.
-2. **Retirar el renglón de tela de la nota de salida**: la salida a una orden **no lleva nota**, así
-   que ese renglón —hoy incapturable— no hay que arreglarlo, hay que **quitarlo**. La nota queda solo
-   para avíos.
-3. **El PT etiquetado por orden se puede mover** (§Post-F9.40): al mover a mano **se elige de qué
-   orden** salen las piezas, entre las que tienen existencia real de ese artículo en ese almacén.
-   ⚠️ Confirmado leyendo el código, **no ejecutado** — verificar en vivo antes de tocar.
+> **Estado:** código y doc terminados en la rama de tarea; **revisión independiente en curso** al
+> momento de escribir esta nota. No se abre el PR a `prueba` hasta que el reviewer apruebe.
+
+**1. El impreso del traspaso de tela** (§Post-F9.38). Mandar tela a un cortador la saca físicamente y
+el papel va con ella. Se imprime **el folio que el traspaso ya tiene**: cero registros nuevos, cero
+secuencias (Daniel: *"No debe de generar otro folio de nada. Me refiero a solo A la impresión del
+folio que ya existe"*). El impreso vive en `backend/src/dominio/inventarios/impresos/impreso-traspaso-tela.ts`
+y sale por `GET /inventarios/telas/traspasos/:id/impreso` con `inventario-telas.ver`; se reimprime
+desde el cajón del kardex. Acepta **cualquiera de las dos patas** (el usuario hace clic en la que
+tenga enfrente, entrada o salida) y **se niega** en tres casos: traspaso cancelado, movimiento que no
+es traspaso, y pata huérfana —un renglón cuya contraparte no aparece—, porque un papel a medias es
+peor que ningún papel.
+
+**2. El renglón de tela sale de la nota de salida.** Al decidir Daniel que la tela consumida por una
+orden **no lleva nota**, ese renglón dejó de tener para qué existir: se retiró de la captura. Lo ya
+migrado **no se toca** —`RenglonTelaHistorico` se pinta de solo lectura—, siguiendo D3: no se edita
+ni se borra lo que ya pasó.
+
+**3. El PT etiquetado por orden ya se puede mover** (§Post-F9.40). Al mover a mano se **elige de qué
+orden** salen las piezas: `SelectorOrdenPt` ofrece solo las órdenes con existencia real de ese
+artículo en ese almacén, más «sin orden». Lo importante está abajo: `validarNoNegativo` bloquea y
+suma contra **ese** bucket, no contra el total —si hay 100 piezas repartidas entre dos órdenes, sacar
+80 de una que solo tiene 30 se frena—, y lo hace sumando movimientos bajo lock, nunca leyendo la
+vista (D3). La **pata origen del traspaso valida igual**, y en la pantalla tanto el disponible que se
+muestra como la advertencia de sobre-traspaso siguen el bucket elegido. Se agregó
+`validarOrdenesDeLaEmpresa` (A9) en todos los caminos que aceptan `idOrden`.
+
+**Las dos decisiones que la etapa tuvo que cerrar:**
+
+- **La tela se rechaza al ALTA, no al editar.** El rechazo (`rechazarTelaEnAlta`) corre **antes de
+  abrir la transacción**, para no quemar un folio en una nota que va a fallar. La **edición sigue
+  aceptando tela** a propósito: hay borradores viejos que la traen, y guardarlos los mutilaría en
+  silencio —justo el daño callado que estamos persiguiendo—. La asimetría está documentada en el
+  JSDoc de la función, no en un comentario suelto.
+- **`tipo` pasó de dos valores a tres**: `avio | tela | historico`. Lo migrado dejó de disfrazarse de
+  renglón normal: `descripcionLegacy` **ahora sí se pinta** (antes se guardaba y no se veía), lo que
+  vino con `cantidad = 0` muestra **«—» y no "0"** —un cero es una afirmación, y no sabemos que sea
+  cierta— y lleva badge «Migrado».
+
+**Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
+`SEED_ON_START`.
 
 ---
 

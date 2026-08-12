@@ -1,17 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
 import { renglonVacio, type RenglonNotaCaptura } from './captura';
 
-// El editor lee el kardex de la tela elegida para listar las salidas-a-orden (renglones legacy).
-const useKardexTelaMock = vi.fn();
-vi.mock('@/api/inventario-materiales', () => ({
-  useKardexTela: (q: unknown) => useKardexTelaMock(q) as unknown,
-}));
-
 const AVIOS = [{ id: 3, clave: 'BOT-01', descripcion: 'Botón' }] as never;
-const TELAS = [{ id: 7, nombre: 'Felpa francesa' }] as never;
 const ORDENES = [{ id: 50, folio: 1001, codigoModelo: 'MOD-1', cliente: 'Cliente A' }] as never;
 
 /** Renderiza el editor controlado y devuelve el último estado que emitió. */
@@ -31,7 +24,6 @@ function renderEditor(
       renglones={estado.renglones}
       alCambiar={alCambiar}
       avios={AVIOS}
-      telas={TELAS}
       ordenes={ORDENES}
       recetaPorOrden={extra?.recetaPorOrden}
       existenciaPorAvio={extra?.existenciaPorAvio}
@@ -41,11 +33,6 @@ function renderEditor(
 }
 
 describe('EditorRenglonesNota (F4-E5 · rediseño R6 §4.6 — solo-avíos)', () => {
-  beforeEach(() => {
-    useKardexTelaMock.mockReset();
-    useKardexTelaMock.mockReturnValue({ data: { renglones: [] }, isPending: false });
-  });
-
   it('el constructor es SOLO-AVÍOS: no hay selector de "Tipo de material" y "Agregar" da un avío', () => {
     const { alCambiar } = renderEditor([renglonVacio()]);
 
@@ -94,75 +81,51 @@ describe('EditorRenglonesNota (F4-E5 · rediseño R6 §4.6 — solo-avíos)', ()
     expect(screen.getByTestId('existencia-nota')).toHaveTextContent('Excede');
   });
 
-  it('un renglón de TELA legacy/migrado se lista pero es SOLO LECTURA (no editable)', () => {
-    useKardexTelaMock.mockReturnValue({
-      data: {
-        renglones: [
-          // De la orden 50: válida.
-          {
-            idMovimiento: 300,
-            folio: 300,
-            origenTipo: 'salida-tela-orden',
-            origenId: '50',
-            idLote: 11,
-            loteClave: 'L-09',
-            salida: 30,
-            fecha: '2026-06-19',
-            cancelado: false,
-          },
-          // De OTRA orden: se descarta.
-          {
-            idMovimiento: 301,
-            folio: 301,
-            origenTipo: 'salida-tela-orden',
-            origenId: '99',
-            idLote: 12,
-            loteClave: 'L-10',
-            salida: 5,
-            fecha: '2026-06-19',
-            cancelado: false,
-          },
-          // Cancelada: se descarta.
-          {
-            idMovimiento: 302,
-            folio: 302,
-            origenTipo: 'salida-tela-orden',
-            origenId: '50',
-            idLote: 13,
-            loteClave: 'L-11',
-            salida: 9,
-            fecha: '2026-06-19',
-            cancelado: true,
-          },
-        ],
-      },
-      isPending: false,
-    });
-
+  // §Post-F9.38 — la tela ya no se captura en la nota; los renglones viejos solo se MUESTRAN.
+  it('un renglón de TELA viejo se muestra en SOLO LECTURA, sin selectores que capturar', () => {
     const renglon: RenglonNotaCaptura = {
       ...renglonVacio(),
       tipo: 'tela',
       idOrden: 50,
       idTela: 7,
+      telaNombre: 'Felpa francesa',
       idLote: 11,
+      loteClave: 'L-09',
       idMovimientoSalidaTela: 300,
       cantidad: '30',
+      unidad: 'kg',
     };
     renderEditor([renglon]);
 
-    // Sigue listando solo la salida válida (orden 50, no cancelada) — pero en modo lectura.
-    const selectorSalida = screen.getByTestId('selector-salida-tela-nota');
-    const valores = within(selectorSalida)
-      .getAllByRole('option')
-      .map((o) => (o as HTMLOptionElement).value)
-      .filter((v) => v !== '');
-    expect(valores).toEqual(['300']);
+    // Ya NO hay captura de tela: ni selector de tela ni de salida-a-orden (era incapturable).
+    expect(screen.queryByTestId('selector-tela-nota')).toBeNull();
+    expect(screen.queryByTestId('selector-salida-tela-nota')).toBeNull();
 
-    // TODO editable del renglón de tela queda deshabilitado (no se puede editar desde el constructor).
+    // Pero el renglón se ve tal cual (no se oculta: al guardar se re-envía completo).
+    const historico = screen.getByTestId('renglon-tela-historico');
+    expect(historico).toHaveTextContent('Felpa francesa');
+    expect(historico).toHaveTextContent('L-09');
+    expect(historico).toHaveTextContent('30');
+    // Y su orden destino queda fija (no editable).
     expect(screen.getByTestId('selector-orden-nota')).toBeDisabled();
-    expect(screen.getByTestId('selector-tela-nota')).toBeDisabled();
-    expect(selectorSalida).toBeDisabled();
-    // La cantidad documentada por la salida-a-orden se muestra.
-    expect(screen.getByTestId('cantidad-tela-nota')).toHaveTextContent('30');
+  });
+
+  // §Post-F9.38 / V1-E3b — el renglón MIGRADO (solo texto libre) también se muestra, y no se
+  // disfraza de tela: antes caía en la rama de tela y quedaba en blanco.
+  it('un renglón MIGRADO muestra su texto libre, en solo lectura', () => {
+    const renglon: RenglonNotaCaptura = {
+      ...renglonVacio(),
+      tipo: 'historico',
+      idOrden: 50,
+      cantidad: '0',
+      descripcionLegacy: '3 conos hilo negro y etiquetas',
+    };
+    renderEditor([renglon]);
+
+    const migrado = screen.getByTestId('renglon-migrado');
+    expect(migrado).toHaveTextContent('3 conos hilo negro y etiquetas');
+    expect(migrado).toHaveTextContent('no editable');
+    expect(screen.queryByTestId('selector-avio-nota')).toBeNull();
+    expect(screen.getByTestId('selector-orden-nota')).toBeDisabled();
   });
 });

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { NotasSalidaPagina } from './NotasSalidaPagina';
-import { notaDePrueba } from './fixtures';
+import { notaDePrueba, renglonMigradoDePrueba } from './fixtures';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const confirmarMutate = vi.fn();
@@ -217,5 +217,25 @@ describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
     });
     detalle = await abrirDetalle();
     expect(within(detalle).queryByTestId('cancelar-nota')).not.toBeInTheDocument();
+  });
+
+  // §Post-F9.38 / V1-E3b — el renglón MIGRADO del sistema anterior: antes salía etiquetado "Tela"
+  // con el material EN BLANCO (parecía que la migración había perdido el dato).
+  it('el renglón MIGRADO muestra su texto libre y dice que no tiene movimiento de inventario', async () => {
+    const nota = notaDePrueba({ estatus: 'confirmada', lineas: [renglonMigradoDePrueba()] });
+    useNotasSalidaMock.mockReturnValue({
+      data: { datos: [nota], total: 1, pagina: 1, porPagina: 20, totalPaginas: 1 },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    renderConProveedores(<NotasSalidaPagina />, { sesion: estadoSesionDePrueba(['notas.ver']) });
+
+    const detalle = await abrirDetalle();
+    const renglon = within(detalle).getByTestId('nota-renglon');
+    expect(renglon).toHaveTextContent('3 conos hilo negro y etiquetas');
+    expect(renglon).toHaveTextContent('Migrado del sistema anterior');
+    // La cantidad 0 del viejo NO se pinta como "0" (no se envió cero: no había desglose).
+    expect(renglon).not.toHaveTextContent(/\b0\b/);
   });
 });

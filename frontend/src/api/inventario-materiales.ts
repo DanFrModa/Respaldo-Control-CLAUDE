@@ -204,6 +204,16 @@ export function urlImpresoInventarioTelas(query: ExistenciasTelaQuery = {}): str
   return `/api/inventarios/telas/impreso${qs.length > 0 ? `?${qs}` : ''}`;
 }
 
+/**
+ * URL del PDF de la HOJA DE TRASPASO de tela (V1-E3b, §Post-F9.38): el papel que acompaña la tela
+ * que sale a otro almacén (p. ej. al cortador). NO es un folio nuevo — imprime el traspaso que ya
+ * existe, por el id de CUALQUIERA de sus dos patas (por eso se puede reimprimir desde el kardex).
+ * Un traspaso cancelado no se imprime: el backend lo rechaza.
+ */
+export function urlImpresoTraspasoTela(idMovimiento: number): string {
+  return `/api/inventarios/telas/traspasos/${String(idMovimiento)}/impreso`;
+}
+
 // ── Hooks de consulta: TELAS ───────────────────────────────────────────────────
 
 /** Existencias de tela por tela×lote×almacén (con componentes del lote). */

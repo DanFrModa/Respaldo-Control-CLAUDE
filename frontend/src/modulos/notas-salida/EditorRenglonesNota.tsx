@@ -1,8 +1,6 @@
 import { Trash2Icon } from 'lucide-react';
 
-import { useKardexTela } from '@/api/inventario-materiales';
 import type { Avio } from '@/api/avios';
-import type { Tela } from '@/api/telas';
 import type { OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,22 +15,28 @@ export interface ExistenciaAvioNota {
 }
 
 /**
- * EDITOR DE RENGLONES de una nota de salida (F4-E5; rediseño R6 §4.6). Este constructor es
- * **SOLO-AVÍOS** (§4.6 dec. 2): al armar/editar un borrador solo se AGREGAN renglones de AVÍO (del
- * catálogo + cantidad/unidad); para enviar TELA a una orden está la pantalla «Salida de tela a
- * orden» (por color, `/inventarios/telas/salida-orden`). Por eso ya NO hay selector "Tipo de
- * material". Los renglones de TELA solo
- * aparecen en notas legacy/migradas (E6) y se renderizan en **SOLO LECTURA** (no editables) para no
- * romperlas. Rediseño R6: el renglón de AVÍO marca si el avío está **✓ en la receta de la orden** / **⚠
- * fuera de la receta — se enviará igual** (la nota PROPONE, no LIMITA) y muestra la **existencia
- * disponible** del almacén origen en rojo si la cantidad la excede. Presentación pura (A1): el backend
- * re-valida (XOR avío/tela, liga del renglón de tela, no-negativo del avío al confirmar).
+ * EDITOR DE RENGLONES de una nota de salida (F4-E5; rediseño R6 §4.6). La nota de salida es **DE
+ * AVÍOS**: al armar/editar un borrador solo se AGREGAN renglones de AVÍO (del catálogo +
+ * cantidad/unidad).
+ *
+ * §Post-F9.38 (V1-E3b) — LA TELA NO LLEVA NOTA. Daniel lo cerró: *"Está bien el movimiento de tela
+ * sin la nota de salida cuando sea para consumo de una orden"*. La tela sale a una orden por
+ * «Salida de tela a orden» (por color, `/inventarios/telas/salida-orden`) y basta el movimiento de
+ * kardex; lo que sí lleva papel es el TRASPASO entre almacenes, y ese se imprime desde el propio
+ * traspaso. Por eso aquí se RETIRÓ la captura del renglón de tela —que además era incapturable: el
+ * dominio exige lote y las salidas nuevas por color no lo tienen—. Los renglones de TELA que
+ * quedaron en notas viejas se muestran en **SOLO LECTURA**, sin selectores, para no romperlas ni
+ * perderlas al editar (el editor manda el SET COMPLETO de renglones).
+ *
+ * Rediseño R6: el renglón de AVÍO marca si el avío está **✓ en la receta de la orden** / **⚠ fuera
+ * de la receta — se enviará igual** (la nota PROPONE, no LIMITA) y muestra la **existencia
+ * disponible** del almacén origen en rojo si la cantidad la excede. Presentación pura (A1): el
+ * backend re-valida (no-negativo del avío al confirmar).
  */
 export function EditorRenglonesNota({
   renglones,
   alCambiar,
   avios,
-  telas,
   ordenes,
   recetaPorOrden,
   existenciaPorAvio,
@@ -41,7 +45,6 @@ export function EditorRenglonesNota({
   renglones: RenglonNotaCaptura[];
   alCambiar: (renglones: RenglonNotaCaptura[]) => void;
   avios: readonly Avio[];
-  telas: readonly Tela[];
   ordenes: readonly OrdenLigera[];
   /** Recetas conocidas por orden (idOrden → ids de avío de su receta) para el flag ✓/⚠. */
   recetaPorOrden?: Map<number, Set<number>> | undefined;
@@ -91,16 +94,16 @@ export function EditorRenglonesNota({
                 ) : null}
               </div>
 
-              {/* Orden destino. Las notas de avíos NO llevan selector de tipo (solo-avíos, §4.6 dec. 2);
-                  la tela se registra en «Salida de tela a orden» (por color). El renglón de tela solo
-                  aparece en notas legacy/migradas y se muestra en SOLO LECTURA (su orden queda fija). */}
+              {/* Orden destino. La nota es de AVÍOS y no lleva selector de tipo: la tela se registra
+                  en «Salida de tela a orden» (por color) y NO lleva nota (§Post-F9.38). El renglón
+                  de tela solo aparece en notas viejas y va en SOLO LECTURA (su orden queda fija). */}
               <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="text-xs text-muted-foreground">
                   Orden destino (R7)
                   <SelectNativo
                     className="mt-1"
                     aria-label={`Orden destino del renglón ${indice + 1}`}
-                    disabled={soloLectura || renglon.tipo === 'tela'}
+                    disabled={soloLectura || renglon.tipo !== 'avio'}
                     value={renglon.idOrden === null ? '' : String(renglon.idOrden)}
                     onChange={(e) =>
                       actualizar(renglon.clave, {
@@ -119,7 +122,8 @@ export function EditorRenglonesNota({
                 </label>
               </div>
 
-              {/* Renglón de AVÍO (editable) o de TELA legacy (SOLO LECTURA, no editable). */}
+              {/* AVÍO (editable) · TELA de una nota vieja · renglón MIGRADO del sistema anterior:
+                  los dos últimos van en SOLO LECTURA (ya no se capturan). */}
               {renglon.tipo === 'avio' ? (
                 <RenglonAvio
                   renglon={renglon}
@@ -130,14 +134,10 @@ export function EditorRenglonesNota({
                   soloLectura={soloLectura}
                   actualizar={actualizar}
                 />
+              ) : renglon.tipo === 'tela' ? (
+                <RenglonTelaHistorico renglon={renglon} />
               ) : (
-                <RenglonTela
-                  renglon={renglon}
-                  indice={indice}
-                  telas={telas}
-                  soloLectura
-                  actualizar={actualizar}
-                />
+                <RenglonMigrado renglon={renglon} />
               )}
             </li>
           ))}
@@ -272,124 +272,45 @@ function RenglonAvio({
 }
 
 /**
- * Sub-captura de un renglón de TELA: tela del catálogo + selección de una salida-a-orden YA
- * registrada (E1) de esa orden/tela (decisión e). El selector de salidas-a-orden lee el kardex de la
- * tela elegida y se queda con los movimientos `salida-tela-orden` (no cancelados) de la orden del
- * renglón: cada uno aporta `idLote` + `idMovimientoSalidaTela` + la cantidad enviada (la nota
- * documenta el envío; no descuenta tela).
+ * Un renglón de TELA que quedó en una nota vieja (§Post-F9.38: la tela ya no lleva nota). Se muestra
+ * en SOLO LECTURA —sin selectores y sin consultar el kardex— porque su captura se retiró: el
+ * dominio exige lote y las salidas de tela nuevas van por COLOR, sin lote, así que ese selector
+ * jamás podía ofrecer nada. No se borra ni se oculta: el editor manda el SET COMPLETO de renglones
+ * al guardar, y esconderlo lo borraría de la nota sin decirlo.
  */
-function RenglonTela({
-  renglon,
-  indice,
-  telas,
-  soloLectura,
-  actualizar,
-}: {
-  renglon: RenglonNotaCaptura;
-  indice: number;
-  telas: readonly Tela[];
-  soloLectura: boolean;
-  actualizar: (clave: string, cambios: Partial<RenglonNotaCaptura>) => void;
-}): React.JSX.Element {
-  // Kardex de la tela elegida (solo cuando hay tela): de ahí salen las salidas-a-orden.
-  const kardex = useKardexTela(renglon.idTela === null ? undefined : { idTela: renglon.idTela });
-
-  // Movimientos de salida-a-orden de ESTA orden/tela, no cancelados (decisión e).
-  const salidas =
-    renglon.idOrden === null
-      ? []
-      : (kardex.data?.renglones ?? []).filter(
-          (m) =>
-            m.origenTipo === 'salida-tela-orden' &&
-            m.origenId === String(renglon.idOrden) &&
-            !m.cancelado,
-        );
-
+function RenglonTelaHistorico({ renglon }: { renglon: RenglonNotaCaptura }): React.JSX.Element {
   return (
-    <div className="mt-2 space-y-2">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="text-xs text-muted-foreground">
-          Tela
-          <SelectNativo
-            className="mt-1"
-            aria-label={`Tela del renglón ${indice + 1}`}
-            disabled={soloLectura}
-            value={renglon.idTela === null ? '' : String(renglon.idTela)}
-            onChange={(e) =>
-              actualizar(renglon.clave, {
-                idTela: e.target.value === '' ? null : Number(e.target.value),
-                idLote: null,
-                idMovimientoSalidaTela: null,
-                cantidad: '',
-              })
-            }
-            data-testid="selector-tela-nota"
-          >
-            <option value="">Elige una tela…</option>
-            {telas.map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.nombre}
-              </option>
-            ))}
-          </SelectNativo>
-        </label>
-
-        <label className="text-xs text-muted-foreground">
-          Salida de tela a la orden (decisión e)
-          <SelectNativo
-            className="mt-1"
-            aria-label={`Salida de tela referenciada del renglón ${indice + 1}`}
-            disabled={
-              soloLectura || renglon.idTela === null || renglon.idOrden === null || kardex.isPending
-            }
-            value={
-              renglon.idMovimientoSalidaTela === null ? '' : String(renglon.idMovimientoSalidaTela)
-            }
-            onChange={(e) => {
-              const idMov = e.target.value === '' ? null : Number(e.target.value);
-              const mov = salidas.find((m) => m.idMovimiento === idMov);
-              actualizar(renglon.clave, {
-                idMovimientoSalidaTela: idMov,
-                idLote: mov?.idLote ?? null,
-                cantidad: mov === undefined ? '' : String(mov.salida),
-              });
-            }}
-            data-testid="selector-salida-tela-nota"
-          >
-            <option value="">
-              {renglon.idTela === null || renglon.idOrden === null
-                ? 'Elige tela y orden primero…'
-                : 'Elige la salida-a-orden…'}
-            </option>
-            {salidas.map((m) => (
-              <option key={m.idMovimiento} value={String(m.idMovimiento)}>
-                Folio {m.folio} · lote {m.loteClave ?? '—'} · {m.salida.toLocaleString('es-MX')} ·{' '}
-                {m.fecha}
-              </option>
-            ))}
-          </SelectNativo>
-        </label>
-      </div>
-
-      {/* Cantidad documentada (viene de la salida elegida; no es editable). */}
-      <p className="text-xs text-muted-foreground" data-testid="cantidad-tela-nota">
-        Cantidad enviada (de la salida-a-orden):{' '}
-        <span className="font-medium tabular-nums">
-          {renglon.idMovimientoSalidaTela === null
-            ? '—'
-            : Number(renglon.cantidad).toLocaleString('es-MX')}
-        </span>
+    <div className="mt-2 space-y-1" data-testid="renglon-tela-historico">
+      <p className="text-sm">
+        {renglon.telaNombre ?? 'Tela'}
+        {renglon.loteClave !== null ? ` · lote ${renglon.loteClave}` : ''} ·{' '}
+        <span className="tabular-nums">{Number(renglon.cantidad).toLocaleString('es-MX')}</span>
+        {renglon.unidad !== '' ? ` ${renglon.unidad}` : ''}
       </p>
+      <p className="text-xs text-muted-foreground">
+        Renglón de TELA de una nota anterior (no editable). La salida de tela a una orden ya no
+        lleva nota: basta su movimiento de inventario.
+      </p>
+    </div>
+  );
+}
 
-      {renglon.idTela !== null &&
-      renglon.idOrden !== null &&
-      !kardex.isPending &&
-      salidas.length === 0 ? (
-        <p className="text-xs text-amber-600" data-testid="sin-salidas-tela-nota">
-          No hay salidas de esta tela a esa orden todavía. Registra primero la salida de tela a la
-          orden.
-        </p>
-      ) : null}
+/**
+ * Un renglón MIGRADO del sistema anterior: no apunta a ningún catálogo —el viejo guardaba los
+ * renglones como TEXTO LIBRE— así que lo único que tiene es su `descripcionLegacy`. Antes de V1-E3b
+ * se etiquetaba como "Tela" y se pintaba con el material EN BLANCO: parecía que la migración había
+ * perdido el dato. Aquí se muestra el texto tal cual, en solo lectura.
+ */
+function RenglonMigrado({ renglon }: { renglon: RenglonNotaCaptura }): React.JSX.Element {
+  return (
+    <div className="mt-2 space-y-1" data-testid="renglon-migrado">
+      <p className="text-sm">
+        {renglon.descripcionLegacy ?? 'Sin descripción en el sistema viejo'}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Renglón migrado del sistema anterior (texto libre, no editable). Ese sistema no desglosaba
+        cantidad por renglón.
+      </p>
     </div>
   );
 }

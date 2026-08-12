@@ -1,9 +1,10 @@
-import { Ban, BookOpenText, ChevronRight, Search } from 'lucide-react';
+import { Ban, BookOpenText, ChevronRight, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import {
+  urlImpresoTraspasoTela,
   useCancelarTelaColor,
   useExistenciasTelaColor,
   useKardexTelaColor,
@@ -622,7 +623,9 @@ function CajonKardexTelaColor({
                     <TablaDensaHead numerica>Saldo</TablaDensaHead>
                   </>
                 ) : null}
-                {puedeMover ? <TablaDensaHead className="w-10" /> : null}
+                {/* Acciones: imprimir la hoja del traspaso (§Post-F9.38, con `inventario-telas.ver`)
+                    y cancelar (con `.mover`). */}
+                <TablaDensaHead className="w-16" />
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
@@ -667,9 +670,32 @@ function CajonKardexTelaColor({
                       </TablaDensaCelda>
                     </>
                   ) : null}
-                  {puedeMover ? (
-                    <TablaDensaCelda className="p-0 pr-1 text-right">
-                      {!r.cancelado ? (
+                  <TablaDensaCelda className="p-0 pr-1 text-right">
+                    <span className="flex items-center justify-end">
+                      {/* REIMPRESIÓN de la hoja del traspaso (§Post-F9.38): el papel que se fue con
+                          la tela se recupera desde aquí, no solo al guardarlo. Un traspaso
+                          CANCELADO no se imprime — su papel no vuelve a salir con un bulto (el
+                          backend también lo rechaza; hoy además una pata de traspaso no se puede
+                          anular sola: se revierte con un traspaso inverso, que trae su propia hoja). */}
+                      {r.origenTipo === 'traspaso' && !r.cancelado ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.open(
+                              urlImpresoTraspasoTela(r.idMovimiento),
+                              '_blank',
+                              'noopener',
+                            )
+                          }
+                          className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label={`Hoja del traspaso #${r.folio}`}
+                          title="Hoja del traspaso"
+                          data-testid={`kardex-color-imprimir-${r.idMovimiento}`}
+                        >
+                          <Printer className="size-4" aria-hidden />
+                        </button>
+                      ) : null}
+                      {puedeMover && !r.cancelado ? (
                         <button
                           type="button"
                           onClick={() => setACancelar(r)}
@@ -680,8 +706,8 @@ function CajonKardexTelaColor({
                           <Ban className="size-4" aria-hidden />
                         </button>
                       ) : null}
-                    </TablaDensaCelda>
-                  ) : null}
+                    </span>
+                  </TablaDensaCelda>
                 </TablaDensaFila>
               ))}
             </TablaDensaCuerpo>

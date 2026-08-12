@@ -8,15 +8,34 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import { TraspasosPtPagina } from './TraspasosPtPagina';
 
 const crearMutate = vi.fn();
+// §Post-F9.40 — las existencias del ORIGEN alimentan el selector de orden; configurable por test.
+const useExistenciasPtMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/inventarios', () => ({
   useCrearTraspasoPt: () => ({ mutate: crearMutate, isPending: false }),
-  useExistenciasPt: () => ({
-    data: { filas: [], totalExistencia: 0 },
-    refetch: vi.fn(),
-    isPending: false,
-    isError: false,
-  }),
+  useExistenciasPt: () => useExistenciasPtMock(),
 }));
+
+/** Sin existencias (el caso base de los tests viejos). */
+const EXISTENCIAS_VACIAS = {
+  data: { filas: [], totalExistencia: 0 },
+  refetch: vi.fn(),
+  isPending: false,
+  isError: false,
+};
+
+/** En el origen (almacén 3): 15 pzas de la orden 55 (folio 9001) y 4 «sin orden». */
+const EXISTENCIAS_CON_ORDEN = {
+  data: {
+    filas: [
+      { idColor: 7, idTalla: 11, idAlmacen: 3, idOrden: 55, folioOrden: 9001, existencia: 15 },
+      { idColor: 7, idTalla: 11, idAlmacen: 3, idOrden: null, folioOrden: null, existencia: 4 },
+    ],
+    totalExistencia: 19,
+  },
+  refetch: vi.fn(),
+  isPending: false,
+  isError: false,
+};
 
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => ({
@@ -61,6 +80,8 @@ async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promis
 describe('TraspasosPtPagina (F3-E3)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    useExistenciasPtMock.mockReset();
+    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_VACIAS);
   });
 
   it('avisa y NO permite guardar si origen = destino', async () => {
@@ -95,5 +116,49 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(cuerpo.idAlmacenOrigen).toBe(3);
     expect(cuerpo.idAlmacenDestino).toBe(4);
     expect(cuerpo.idModelo).toBe(1);
+  });
+
+  // ── §Post-F9.40: se traspasa el bucket de una ORDEN, no solo «sin orden» ────
+  it('ofrece las órdenes con existencia en el ORIGEN y traspasa el bucket elegido', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_CON_ORDEN);
+    renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+    await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+    const opciones = [...screen.getByTestId('traspaso-orden').querySelectorAll('option')];
+    expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
+    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('traspaso-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '5');
+
+    await usuario.click(screen.getByTestId('traspaso-guardar'));
+    const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
+    expect(cuerpo.lineas[0]?.idOrden).toBe(55);
+  });
+
+  it('el aviso de sobre-traspaso compara contra el bucket ELEGIDO, no contra el total del modelo', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_CON_ORDEN);
+    renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+    await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('traspaso-matriz-celda');
+    await usuario.clear(celda);
+    // 6 pzas: caben en la orden 55 (15) pero NO en el bucket «sin orden» (4), que es el default.
+    await usuario.type(celda, '6');
+    expect(screen.getByTestId('traspaso-aviso-excede')).toBeInTheDocument();
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
+    expect(screen.queryByTestId('traspaso-aviso-excede')).not.toBeInTheDocument();
   });
 });

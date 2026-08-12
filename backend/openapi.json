@@ -72255,7 +72255,7 @@
                       ],
                       "description": "Renglón de nota de salida: orden destino + material (avío XOR tela) + cantidad."
                     },
-                    "description": "Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden)."
+                    "description": "Renglones de AVÍO de la nota (la tela se rechaza en el alta — §Post-F9.38)."
                   }
                 },
                 "required": [
@@ -72453,9 +72453,10 @@
                             "type": "string",
                             "enum": [
                               "avio",
-                              "tela"
+                              "tela",
+                              "historico"
                             ],
-                            "description": "Tipo del material del renglón."
+                            "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                           },
                           "idAvio": {
                             "anyOf": [
@@ -73146,9 +73147,10 @@
                                   "type": "string",
                                   "enum": [
                                     "avio",
-                                    "tela"
+                                    "tela",
+                                    "historico"
                                   ],
-                                  "description": "Tipo del material del renglón."
+                                  "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                                 },
                                 "idAvio": {
                                   "anyOf": [
@@ -74014,9 +74016,10 @@
                             "type": "string",
                             "enum": [
                               "avio",
-                              "tela"
+                              "tela",
+                              "historico"
                             ],
-                            "description": "Tipo del material del renglón."
+                            "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                           },
                           "idAvio": {
                             "anyOf": [
@@ -74455,7 +74458,7 @@
                     ]
                   },
                   "lineas": {
-                    "description": "Si viene, REEMPLAZA todo el set de renglones de la nota.",
+                    "description": "Si viene, REEMPLAZA todo el set de renglones de la nota. Aquí SÍ se admiten los renglones de tela de notas viejas (§Post-F9.38): sin eso, guardar un borrador viejo los borraría.",
                     "minItems": 1,
                     "type": "array",
                     "items": {
@@ -74714,9 +74717,10 @@
                             "type": "string",
                             "enum": [
                               "avio",
-                              "tela"
+                              "tela",
+                              "historico"
                             ],
-                            "description": "Tipo del material del renglón."
+                            "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                           },
                           "idAvio": {
                             "anyOf": [
@@ -75480,9 +75484,10 @@
                             "type": "string",
                             "enum": [
                               "avio",
-                              "tela"
+                              "tela",
+                              "historico"
                             ],
-                            "description": "Tipo del material del renglón."
+                            "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                           },
                           "idAvio": {
                             "anyOf": [
@@ -76096,9 +76101,10 @@
                             "type": "string",
                             "enum": [
                               "avio",
-                              "tela"
+                              "tela",
+                              "historico"
                             ],
-                            "description": "Tipo del material del renglón."
+                            "description": "Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior."
                           },
                           "idAvio": {
                             "anyOf": [
@@ -78143,6 +78149,19 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "idOrden": {
+                          "description": "Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden».",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -78322,6 +78341,32 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden del renglón, o null si es del bucket sin orden."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -78363,6 +78408,8 @@
                         "required": [
                           "idColor",
                           "color",
+                          "idOrden",
+                          "folioOrden",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -78621,6 +78668,19 @@
                           "exclusiveMinimum": 0,
                           "maximum": 9007199254740991
                         },
+                        "idOrden": {
+                          "description": "Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden».",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "tallas": {
                           "minItems": 1,
                           "type": "array",
@@ -78803,6 +78863,32 @@
                                 "type": "string",
                                 "description": "Nombre del color."
                               },
+                              "idOrden": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden)."
+                              },
+                              "folioOrden": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Folio de la orden del renglón, o null si es del bucket sin orden."
+                              },
                               "tallas": {
                                 "type": "array",
                                 "items": {
@@ -78844,6 +78930,8 @@
                             "required": [
                               "idColor",
                               "color",
+                              "idOrden",
+                              "folioOrden",
                               "tallas",
                               "totalPiezas"
                             ],
@@ -79017,6 +79105,32 @@
                                 "type": "string",
                                 "description": "Nombre del color."
                               },
+                              "idOrden": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden)."
+                              },
+                              "folioOrden": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Folio de la orden del renglón, o null si es del bucket sin orden."
+                              },
                               "tallas": {
                                 "type": "array",
                                 "items": {
@@ -79058,6 +79172,8 @@
                             "required": [
                               "idColor",
                               "color",
+                              "idOrden",
+                              "folioOrden",
                               "tallas",
                               "totalPiezas"
                             ],
@@ -79441,6 +79557,32 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden del renglón, o null si es del bucket sin orden."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -79482,6 +79624,8 @@
                         "required": [
                           "idColor",
                           "color",
+                          "idOrden",
+                          "folioOrden",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -80662,6 +80806,32 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden del renglón, o null si es del bucket sin orden."
+                          },
                           "tallas": {
                             "type": "array",
                             "items": {
@@ -80703,6 +80873,8 @@
                         "required": [
                           "idColor",
                           "color",
+                          "idOrden",
+                          "folioOrden",
                           "tallas",
                           "totalPiezas"
                         ],
@@ -87242,6 +87414,179 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventarios/telas/traspasos/{id}/impreso": {
+      "get": {
+        "summary": "Hoja del traspaso de tela entre almacenes (PDF del folio que ya existe)",
+        "tags": [
+          "inventario-telas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento de material."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {

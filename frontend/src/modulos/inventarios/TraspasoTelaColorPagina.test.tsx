@@ -17,6 +17,7 @@ const almacenesQuery = vi.fn();
 
 vi.mock('@/api/inventario-materiales', () => ({
   useTraspasarTelaColor: () => ({ mutate, isPending: false }),
+  urlImpresoTraspasoTela: (id: number) => `/api/inventarios/telas/traspasos/${String(id)}/impreso`,
 }));
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: (query: unknown) => {
@@ -104,5 +105,33 @@ describe('TraspasoTelaColorPagina (§Post-F9.13)', () => {
       }),
       expect.anything(),
     );
+  });
+
+  // §Post-F9.38 — el papel que va con la tela: se imprime el folio QUE YA EXISTE (el de la pata de
+  // salida), no se genera documento nuevo.
+  it('tras guardar ofrece la HOJA del traspaso, con el folio de la pata de salida', () => {
+    const abrir = vi.spyOn(window, 'open').mockImplementation(() => null);
+    mutate.mockImplementation((_cuerpo: unknown, opciones: { onSuccess: (t: unknown) => void }) => {
+      opciones.onSuccess({
+        salida: { id: 700, folio: 4321 },
+        entrada: { id: 701, folio: 4322 },
+      });
+    });
+    renderConProveedores(<TraspasoTelaColorPagina />, { sesion: SESION() });
+
+    fireEvent.change(screen.getByTestId('traspaso-color-origen'), { target: { value: '5' } });
+    fireEvent.change(screen.getByTestId('traspaso-color-destino'), { target: { value: '8' } });
+    fireEvent.click(screen.getByTestId('captura-color-simulada'));
+    fireEvent.click(screen.getByTestId('traspaso-color-guardar'));
+
+    expect(screen.getByTestId('traspaso-color-guardado')).toHaveTextContent('4321');
+    fireEvent.click(screen.getByTestId('traspaso-color-imprimir'));
+    expect(abrir).toHaveBeenCalledWith(
+      '/api/inventarios/telas/traspasos/700/impreso',
+      '_blank',
+      'noopener',
+    );
+    abrir.mockRestore();
+    mutate.mockReset();
   });
 });

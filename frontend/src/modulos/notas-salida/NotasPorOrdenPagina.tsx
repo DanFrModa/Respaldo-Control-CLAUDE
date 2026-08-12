@@ -12,7 +12,12 @@ import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 
 import { PanelHabilitacionOrden } from './PanelHabilitacionOrden';
-import { TONO_ESTATUS_NOTA, descripcionMaterialNota, fechaCortaNota } from './piezas';
+import {
+  cantidadRenglonNota,
+  TONO_ESTATUS_NOTA,
+  descripcionMaterialNota,
+  fechaCortaNota,
+} from './piezas';
 
 /** Notas por página de la orden elegida. */
 const POR_PAGINA = 10;
@@ -265,7 +270,7 @@ export function NotasPorOrdenPagina(): React.JSX.Element {
                                 {descripcionMaterialNota(linea)}
                               </span>
                               <span className="num shrink-0 text-xs font-semibold">
-                                {linea.cantidad.toLocaleString('es-MX')}
+                                {cantidadRenglonNota(linea)}
                                 {linea.unidad ? ` ${linea.unidad}` : ''}
                               </span>
                             </div>

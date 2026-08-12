@@ -8,7 +8,7 @@ import {
   renglonVacio,
   type RenglonNotaCaptura,
 } from './captura';
-import { notaDePrueba } from './fixtures';
+import { notaDePrueba, renglonMigradoDePrueba } from './fixtures';
 
 /** Renglón de captura base, sobrescribible. */
 function renglon(over: Partial<RenglonNotaCaptura> = {}): RenglonNotaCaptura {
@@ -45,6 +45,22 @@ describe('captura de notas de salida (F4-E5)', () => {
       expect(renglonCompleto({ ...completo, idMovimientoSalidaTela: null })).toBe(false);
       // Sin lote → incompleto.
       expect(renglonCompleto({ ...completo, idLote: null })).toBe(false);
+    });
+
+    // V1-E3b — el renglón MIGRADO no se puede enviar (no tiene avío ni tela: el contrato de
+    // captura lo rechazaría). No es un caso vivo (las notas migradas nacen confirmadas y no se
+    // editan), pero vale más deshabilitar el guardar que comerse un 400.
+    it('un renglón migrado NUNCA está completo (no se puede re-enviar)', () => {
+      expect(
+        renglonCompleto(
+          renglon({
+            tipo: 'historico',
+            idOrden: 50,
+            cantidad: '5',
+            descripcionLegacy: 'texto viejo',
+          }),
+        ),
+      ).toBe(false);
     });
   });
 
@@ -99,6 +115,17 @@ describe('captura de notas de salida (F4-E5)', () => {
         idLote: 11,
         idMovimientoSalidaTela: 300,
         cantidad: '30',
+      });
+      // Los nombres viajan para poder MOSTRAR el renglón viejo sin volver a pedir el catálogo.
+      expect(renglones[1]).toMatchObject({ telaNombre: 'Felpa francesa', loteClave: 'L-2026-09' });
+    });
+
+    it('conserva el texto libre del renglón MIGRADO (es lo único que tiene)', () => {
+      const nota = notaDePrueba({ lineas: [renglonMigradoDePrueba()] });
+      const [renglonUno] = capturaDesdeNota(nota);
+      expect(renglonUno).toMatchObject({
+        tipo: 'historico',
+        descripcionLegacy: '3 conos hilo negro y etiquetas',
       });
     });
   });
