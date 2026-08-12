@@ -1559,3 +1559,36 @@ específico para nadie.")* No se construye remisión ni packing list por cliente
 - **Aplica en:** decisiones de rumbo + alcance de la v1. La 2, la 3 y la 5 requieren construcción; la
   1 requiere quitar permisos y decidir la generación automática; la 4 y la 6 **no requieren nada**.
 - **Fecha:** 2026-08-13.
+
+#### (Post-F9.37) — Empresas viejas, quién ve la cobranza y cancelar el Pedido Real (DANIEL, 13-ago-2026)
+
+Cierra las tres decisiones que quedaban del diagnóstico.
+
+**7. Las 6 empresas viejas NO existen como empresa operativa. Solo FR Moda activa.**
+
+> Daniel: *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."*
+
+Sus 1,528 órdenes ya viven en el **archivo histórico** (§Post-F9.29), rescatadas bajo la empresa
+principal y conservando en `empresaV1` de quién eran. Eso basta para consultarlas; **no se crean
+como `Empresa`**. Consecuencia técnica útil: la deuda de **membresía usuario↔empresa**
+(`HOJA-DE-RUTA.md` §4) **queda dormida** — hoy `resolverEmpresaActiva` acepta cualquier empresa
+activa por header, lo que sería un salto de tenant en cuanto hubiera una segunda. Con una sola
+empresa activa no muerde. **Si algún día se activa otra, esa deuda pasa a BLOQUEANTE.**
+
+**8. La cobranza la ven SOLO administración y Daniel. Ventas NO.**
+
+> Daniel: *"No tiene caso. Cobranza por ahora solo la ve administración y yo."*
+
+**El seed se queda como está** (`prisma/seed.ts:216-225` le quita a Ventas `cxc.ver`/`cxp.ver`/
+`terceros.ver`). Esto **cierra en contra** la pregunta que quedó abierta al cerrar F9-E4 y la
+recomendación del lead en el diagnóstico: *"quien vende no ve si le pagaron"* es **deliberado**, no
+un olvido. Queda escrito para que nadie lo "arregle" en una revisión futura.
+
+**9. El Pedido Real SÍ se puede cancelar.** *(Daniel: "Sí.")*
+Cierra el TODO que estaba abierto desde F2-E1 (`dominio/pedidos/pedidos-reales.ts:321-323`,
+*"pendiente de decisión de Daniel"*). Cancelación **suave con motivo**, como todo lo demás del
+sistema (D3: nada se borra).
+
+- **Aplica en:** la 7 y la 8 **no requieren construcción** (son confirmaciones del estado actual); la
+  9 sí. SIN migración, SIN permisos nuevos, SIN seed.
+- **Fecha:** 2026-08-13.

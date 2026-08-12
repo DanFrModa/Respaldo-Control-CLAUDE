@@ -76,7 +76,18 @@ Si **sí** se usa en v1, tres prerrequisitos duros: correr el ETL de F5 (plantil
 | B3 | **El PT que produce la fábrica no se puede mover.** El recibo etiqueta la entrada con `idOrden` y la existencia se valida **por orden**, pero movimientos manuales y traspasos escriben y validan contra el bucket `idOrden = null`. → las piezas **solo salen por la entrega a cliente de esa orden**: no se traspasan, no salen por movimiento manual (muestras, mermas, ajuste de conteo). Y la pantalla **sí muestra el stock** → el usuario ve existencia que el sistema le rechaza mover. | `recibos.ts:632-650` · `kardex.ts:182` · `movimientos-pt.ts:134-196` |
 | B4 | **Las segundas no se pueden capturar** por el camino principal (manda solo `{idTalla, cantidad}` → el backend lo lee como "todo primeras"). El toggle existe solo en `/produccion/recibos`, **fuera del riel**. | `AvanceProduccion.tsx:1148` · `recibos.ts:194-199` |
 
-> ⚠️ **B3 está razonado del código, no ejecutado.** Verificar en vivo antes de tocar nada.
+> ✅ **B3 CONFIRMADO** (13-ago-2026, leyendo las tres piezas juntas). El recibo etiqueta la entrada
+> con `idOrden: datos.idOrden` (`recibos.ts:637-651`, *"PT por orden (F6-E2): la entrada de PT queda
+> etiquetada con la orden del recibo"*); la existencia se compara con
+> `d."id_orden" IS NOT DISTINCT FROM ${idOrden}` (`kardex.ts:176`); y el movimiento manual pasa
+> `null` **explícito**, con el comentario *"Los movimientos manuales / traspasos NO tienen orden:
+> validan contra el bucket «sin orden»"* (`movimientos-pt.ts:186-196`). **Son dos saldos que no se
+> hablan.**
+>
+> **Matiz que juega a favor del arranque sin conteo (§Post-F9.36 punto 4):** el inventario que se
+> capture a mano cae en el bucket "sin orden", así que **ése sí se mueve con libertad**. El problema
+> aparece solo con lo que se produzca dentro del sistema nuevo — no frena el arranque, pero hay que
+> arreglarlo antes de que se acumule producción.
 
 ### 2.2 El menú sigue tapando módulos terminados
 
