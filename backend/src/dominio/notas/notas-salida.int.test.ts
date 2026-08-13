@@ -43,8 +43,10 @@ import {
  *    (la salida de tela a una orden no lleva nota). Incluye que una nota solo de avíos siga naciendo.
  *  • ANTI-DOBLE-DESCUENTO de TELA (decisión e): registrar una salida-a-orden y luego incluir esa tela
  *    en una nota → la existencia de la tela baja UNA sola vez (la nota REFERENCIA, no descuenta).
- *    Estas pruebas entran ahora por la **EDICIÓN** —el único camino que sigue aceptando tela—, más
- *    la que fija el porqué de la asimetría: re-guardar un borrador con tela NO le borra el renglón.
+ *    Estas pruebas entran por una nota que YA TRAÍA el renglón de tela (sembrado directo en la BD,
+ *    como una nota vieja) y lo RE-GUARDA: es el único camino que sigue vivo. Incluye las dos caras
+ *    de la excepción — re-guardar NO le borra el renglón, y agregar una tela que NO estaba se
+ *    RECHAZA (por ese hueco nacía una nota de tela nueva por la puerta de atrás).
  *  • Consulta "Notas por orden de producción" (listar por idOrden).
  */
 
@@ -579,16 +581,22 @@ describe('Notas de salida (V1-E3b) — el ALTA rechaza la TELA (§Post-F9.38)', 
   });
 });
 
-describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decisión e), por EDICIÓN', () => {
+describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decisión e), por RE-GUARDADO', () => {
   /**
-   * §Post-F9.38 — la asimetría: el ALTA rechaza la tela, la EDICIÓN la acepta. Editar REEMPLAZA el
-   * SET COMPLETO de renglones, así que si la edición también la rechazara, un borrador viejo con
-   * renglones de tela quedaría inguardable (o los perdería en silencio). Por eso estas pruebas —que
-   * fijan las reglas del renglón de tela (decisión e)— entran por la edición: es el único camino
-   * que sigue vivo. Antes de V1-E3b entraban por el alta.
+   * §Post-F9.38 (corregido en la revisión de V1-E3b) — el ALTA rechaza la tela y la EDICIÓN solo
+   * acepta la que YA ESTABA en esa nota. Editar REEMPLAZA el SET COMPLETO de renglones, así que si
+   * la edición la rechazara del todo, un borrador viejo con tela quedaría inguardable (o la
+   * perdería en silencio); pero aceptar tela NUEVA dejaba abierta la puerta de atrás (crear un
+   * borrador con un avío y meterle tela editando → nacía una nota de tela nueva, con folio).
+   *
+   * Por eso estas pruebas —que fijan las reglas del renglón de tela (decisión e)— siembran el
+   * renglón DIRECTAMENTE EN LA BD, como lo trae una nota vieja (su captura existió hasta el
+   * rediseño R6), y luego la RE-GUARDAN: ese es el único camino que sigue vivo. Además cada una
+   * afirma sobre el MENSAJE del error, para que ninguna pueda pasar "por la razón equivocada"
+   * (la del renglón que no estaba en la nota).
    */
 
-  /** Crea el borrador de avíos que luego se edita para meterle el renglón de tela. */
+  /** Crea el borrador de avíos sobre el que se siembra (o no) el renglón de tela. */
   async function borradorDeAvios(): Promise<number> {
     const nota = await crearNotaSalida(
       sesion(PERM_ADMIN),
@@ -601,6 +609,30 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       bd(),
     );
     return nota.id;
+  }
+
+  /**
+   * Siembra un renglón de TELA directo en la BD — así se ve una nota VIEJA que ya lo traía. No pasa
+   * por el dominio a propósito: hoy ningún camino del dominio crea un renglón de tela (esa es
+   * justamente la regla que se está probando).
+   */
+  async function sembrarRenglonTelaLegacy(
+    idNota: number,
+    renglon: { idMovimientoSalidaTela: number | null; cantidad: number },
+  ): Promise<void> {
+    await cliente.notaSalidaLinea.create({
+      data: {
+        idNotaSalida: idNota,
+        idOrden: ordenId,
+        idTela: telaFelpa.id,
+        idLote: loteRojo.id,
+        idMovimientoSalidaTela: renglon.idMovimientoSalidaTela,
+        cantidad: renglon.cantidad,
+        unidad: 'm',
+        creadoPorId: 'usuario-prueba',
+        modificadoPorId: 'usuario-prueba',
+      },
+    });
   }
 
   it('salida-a-orden + nota que la referencia → la tela baja UNA sola vez', async () => {
@@ -620,9 +652,11 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
     );
     expect(await existenciaTela(telaFelpa.id, loteRojo.id)).toBe(300);
 
-    // 2) La nota REFERENCIA esa salida-a-orden (NO debe descontar otra vez). Entra por la EDICIÓN
-    //    de un borrador, que es el camino que quedó vivo (§Post-F9.38).
+    // 2) La nota REFERENCIA esa salida-a-orden (NO debe descontar otra vez). La nota YA traía el
+    //    renglón (sembrado como una nota vieja) y solo se RE-GUARDA: es el camino que quedó vivo
+    //    (§Post-F9.38 — agregar una tela que no estaba se rechaza, y eso se prueba aparte).
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: salida.id, cantidad: 200 });
     const editada = await actualizarNotaSalida(
       sesion(PERM_ADMIN),
       idNota,
@@ -653,7 +687,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
     expect(movsNotaTela).toBe(0);
   });
 
-  it('un borrador con tela se puede RE-GUARDAR sin perder su renglón (la razón de la asimetría)', async () => {
+  it('un borrador VIEJO con tela se puede RE-GUARDAR sin perder su renglón (la razón de la excepción)', async () => {
     await sembrarTela(500);
     const salida = await registrarSalidaTelaAOrden(
       sesion(PERM_TELAS),
@@ -665,7 +699,10 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       },
       bd(),
     );
+    // La nota nace como las de antes del rediseño R6: con su renglón de tela YA persistido (se
+    // siembra directo en la BD porque hoy ningún camino del dominio lo crea — ese es el punto).
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: salida.id, cantidad: 120 });
     const renglonTela = {
       idOrden: ordenId,
       idTela: telaFelpa.id,
@@ -674,7 +711,6 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       cantidad: 120,
       unidad: 'm',
     };
-    await actualizarNotaSalida(sesion(PERM_ADMIN), idNota, { lineas: [renglonTela] }, bd());
 
     // El usuario vuelve a guardar (p. ej. corrigió la fecha) mandando el SET COMPLETO, tela incluida.
     const reguardada = await actualizarNotaSalida(
@@ -694,8 +730,54 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
     expect(reguardada.lineas.map((l) => l.tipo).sort()).toEqual(['avio', 'tela']);
   });
 
+  it('la EDICIÓN RECHAZA una tela que NO estaba en la nota (no nace una nota de tela por la puerta de atrás)', async () => {
+    await sembrarTela(500);
+    // La salida-a-orden es IMPECABLE (viva, de esta orden, de esta tela/lote): lo único que falla es
+    // que ese renglón NO estaba en la nota. Antes de esta corrección, así nacía una nota de tela.
+    const salida = await registrarSalidaTelaAOrden(
+      sesion(PERM_TELAS),
+      {
+        idOrden: ordenId,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idTela: telaFelpa.id, idLote: loteRojo.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+    const idNota = await borradorDeAvios(); // nace SOLO con el avío: no tiene tela ninguna
+
+    await expect(
+      actualizarNotaSalida(
+        sesion(PERM_ADMIN),
+        idNota,
+        {
+          lineas: [
+            {
+              idOrden: ordenId,
+              idTela: telaFelpa.id,
+              idLote: loteRojo.id,
+              idMovimientoSalidaTela: salida.id,
+              cantidad: 100,
+              unidad: 'm',
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/NO estaba en esta nota/);
+
+    // Y la nota quedó INTACTA (A2: la edición se hace en transacción — no perdió su avío).
+    const renglones = await cliente.notaSalidaLinea.findMany({ where: { idNotaSalida: idNota } });
+    expect(renglones).toHaveLength(1);
+    expect(renglones[0]!.idAvio).toBe(avioBoton.id);
+    expect(renglones[0]!.idTela).toBeNull();
+  });
+
   it('renglón de tela SIN movimiento de salida-a-orden referenciado → ErrorValidacion', async () => {
+    // La nota YA traía ese renglón (sin movimiento, como pudo quedar uno viejo): así el rechazo es
+    // por la regla de la decisión (e) y no por "la tela no estaba en la nota".
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: null, cantidad: 10 });
     await expect(
       actualizarNotaSalida(
         sesion(PERM_ADMIN),
@@ -713,7 +795,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/idMovimientoSalidaTela/);
   });
 
   it('renglón de tela que referencia una salida-a-orden YA REVERSADA → ErrorValidacion', async () => {
@@ -731,8 +813,10 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
     // Se reversa la salida-a-orden (el material regresó al inventario).
     await cancelarMovimientoTela(sesion(PERM_TELAS), salida.id, { motivo: 'devuelta' }, bd());
 
-    // Una nota NO puede documentar un envío sobre una salida anulada.
+    // Una nota NO puede documentar un envío sobre una salida anulada — ni siquiera al RE-GUARDAR un
+    // renglón que ya traía (por eso se siembra: el rechazo tiene que ser por la anulación).
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: salida.id, cantidad: 150 });
     await expect(
       actualizarNotaSalida(
         sesion(PERM_ADMIN),
@@ -751,7 +835,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/reversada/);
   });
 
   it('dos renglones de tela que apuntan al MISMO movimiento de salida → ErrorValidacion', async () => {
@@ -766,7 +850,9 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
       },
       bd(),
     );
+    // El renglón YA estaba en la nota (se siembra): lo que se prueba es que DUPLICARLO se rechaza.
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: salida.id, cantidad: 200 });
     await expect(
       actualizarNotaSalida(
         sesion(PERM_ADMIN),
@@ -793,7 +879,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/ya fue referenciado/);
   });
 
   it('renglón de tela que referencia una salida-a-orden de OTRA orden → ErrorValidacion', async () => {
@@ -819,7 +905,10 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
         fechaCompletada: new Date(),
       },
     });
+    // La terna tela/lote/movimiento SÍ estaba en la nota (se siembra); lo que cambia —y lo que se
+    // rechaza— es la orden a la que se le quiere colgar el envío.
     const idNota = await borradorDeAvios();
+    await sembrarRenglonTelaLegacy(idNota, { idMovimientoSalidaTela: salida.id, cantidad: 100 });
     await expect(
       actualizarNotaSalida(
         sesion(PERM_ADMIN),
@@ -838,7 +927,7 @@ describe('Notas de salida (F4-E5/V1-E3b) — ANTI-DOBLE-DESCUENTO de TELA (decis
         },
         bd(),
       ),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+    ).rejects.toThrow(/otra orden/);
   });
 });
 

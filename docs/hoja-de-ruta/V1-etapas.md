@@ -199,8 +199,17 @@ migrado **no se toca** —`RenglonTelaHistorico` se pinta de solo lectura—, si
 ni se borra lo que ya pasó.
 
 **3. El PT etiquetado por orden ya se puede mover** (§Post-F9.40). Al mover a mano se **elige de qué
-orden** salen las piezas: `SelectorOrdenPt` ofrece solo las órdenes con existencia real de ese
-artículo en ese almacén, más «sin orden». Lo importante está abajo: `validarNoNegativo` bloquea y
+orden** salen (o a cuál entran) las piezas, y lo que ofrece `SelectorOrdenPt` **depende de la
+dirección del tipo de movimiento**: en una **salida**, solo las órdenes con existencia real de ese
+artículo en ese almacén —de un bucket vacío no se saca nada—; en una **entrada**, también las órdenes
+del modelo cuyo bucket quedó en **cero**, y sin filtrar por almacén. Esa segunda mitad la trajo la
+revisión: es el va-y-ven de estampado que la pantalla existe para operar —las piezas salen a
+Aplicación (el bucket de la orden queda en 0) y al volver tienen que poder **regresar a su orden**; si
+el cero las excluyera entrarían a «sin orden» y la entrega al cliente de esa orden diría "no hay
+existencia" con la mercancía en el almacén—. En la entrada **no se anuncian piezas** junto a la orden:
+ahí el disponible no es un tope y un "0 pzas" se leería como que no se puede elegir. El **traspaso se
+queda solo con la regla de salida** en sus dos patas: el destino hereda la orden del origen y un
+traspaso no crea piezas. Lo importante está abajo: `validarNoNegativo` bloquea y
 suma contra **ese** bucket, no contra el total —si hay 100 piezas repartidas entre dos órdenes, sacar
 80 de una que solo tiene 30 se frena—, y lo hace sumando movimientos bajo lock, nunca leyendo la
 vista (D3). La **pata origen del traspaso valida igual**, y en la pantalla tanto el disponible que se
@@ -209,11 +218,17 @@ muestra como la advertencia de sobre-traspaso siguen el bucket elegido. Se agreg
 
 **Las dos decisiones que la etapa tuvo que cerrar:**
 
-- **La tela se rechaza al ALTA, no al editar.** El rechazo (`rechazarTelaEnAlta`) corre **antes de
-  abrir la transacción**, para no quemar un folio en una nota que va a fallar. La **edición sigue
-  aceptando tela** a propósito: hay borradores viejos que la traen, y guardarlos los mutilaría en
-  silencio —justo el daño callado que estamos persiguiendo—. La asimetría está documentada en el
-  JSDoc de la función, no en un comentario suelto.
+- **La tela se rechaza al ALTA, y al EDITAR solo pasa la que ya estaba.** El rechazo del alta
+  (`rechazarTelaEnAlta`) corre **antes de abrir la transacción**, para no quemar un folio en una nota
+  que va a fallar. La edición no puede rechazarla del todo —hay borradores viejos que la traen y
+  guardarlos los mutilaría en silencio, justo el daño callado que estamos persiguiendo—, pero la
+  primera versión la aceptaba **entera**, y ahí la puerta no cerraba nada: bastaba crear un borrador
+  con un avío y **editarlo metiéndole tela** para que naciera una nota 100 % de tela, se confirmara y
+  saliera con folio (lo cazó la revisión). Ahora `exigirTelaYaEnLaNota` acepta un renglón de tela
+  **solo si esa misma terna tela/lote/movimiento ya está persistida en esa nota**: se conserva
+  exactamente el caso que justifica la excepción y nada más. Los tests del renglón de tela siembran
+  el renglón **directo en la BD** (como lo trae una nota vieja) y afirman sobre el **mensaje** del
+  error, para que ninguno pueda pasar por la razón equivocada.
 - **`tipo` pasó de dos valores a tres**: `avio | tela | historico`. Lo migrado dejó de disfrazarse de
   renglón normal: `descripcionLegacy` **ahora sí se pinta** (antes se guardaba y no se veía), lo que
   vino con `cantidad = 0` muestra **«—» y no "0"** —un cero es una afirmación, y no sabemos que sea

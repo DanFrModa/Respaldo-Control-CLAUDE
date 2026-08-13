@@ -47,6 +47,11 @@ function hoy(): string {
  * producción son). El disponible que se muestra y el aviso de sobre-traspaso son los de ESE bucket
  * —el mismo saldo que valida el servidor—, no el total del modelo.
  *
+ * El selector es SIEMPRE de salida (descarta buckets en cero) y eso aquí es lo correcto en las DOS
+ * patas: el destino no elige orden —hereda la del origen—, y un bucket sin piezas en el origen no
+ * tiene nada que traspasar. La excepción de «entrada a un bucket en cero» (regresar del estampado)
+ * vive en Movimientos, no aquí: un traspaso no crea piezas.
+ *
  * `inventario-pt.mover` gobierna la captura.
  */
 export function TraspasosPtPagina(): React.JSX.Element {

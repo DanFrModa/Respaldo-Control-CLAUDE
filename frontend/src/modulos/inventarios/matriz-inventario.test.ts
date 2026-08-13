@@ -65,6 +65,24 @@ describe('ordenesConExistencia (§Post-F9.40)', () => {
   it('sin filas no ofrece ninguna orden (la pantalla agrega «sin orden» aparte)', () => {
     expect(ordenesConExistencia([])).toEqual([]);
   });
+
+  it('con `incluirCeros` SÍ ofrece el bucket en cero (volver del estampado a su orden)', () => {
+    // La orden 55 salió completa a Aplicación: su bucket quedó en 0. Al REGRESAR las piezas tiene
+    // que poder elegirse, o entrarían a «sin orden» y la entrega de la orden 55 diría "no hay".
+    expect(
+      ordenesConExistencia(
+        [
+          { idOrden: 55, folioOrden: 9001, existencia: 100 },
+          { idOrden: 55, folioOrden: 9001, existencia: -100 },
+          { idOrden: null, folioOrden: null, existencia: 0 },
+        ],
+        { incluirCeros: true },
+      ),
+    ).toEqual([
+      { idOrden: null, folioOrden: null, existencia: 0 },
+      { idOrden: 55, folioOrden: 9001, existencia: 0 },
+    ]);
+  });
 });
 
 describe('totalMatriz', () => {

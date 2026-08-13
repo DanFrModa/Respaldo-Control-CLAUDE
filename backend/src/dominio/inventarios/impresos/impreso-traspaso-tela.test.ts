@@ -154,6 +154,22 @@ describe('armarDatosImpresoTraspasoTela (V1-E3b, §Post-F9.38)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  it('una pata de ENTRADA HUÉRFANA (sin `origenId`) lo dice con su propio aviso', async () => {
+    // Regresión: `Number(null)` es 0 y `Number.isInteger(0)` es true, así que la huérfana se colaba
+    // con id 0 y moría después con el mensaje genérico de "no se encontró la otra pata".
+    const entradaHuerfana = { ...PATA_ENTRADA, origenId: null };
+    await expect(
+      armarDatosImpresoTraspasoTela(sesionVer(), 101, bdCon({ 101: entradaHuerfana })),
+    ).rejects.toThrow(/no apunta a su pata de salida/);
+  });
+
+  it('una pata de ENTRADA con `origenId` que no es un id lo dice igual', async () => {
+    const entradaRota = { ...PATA_ENTRADA, origenId: 'no-es-un-id' };
+    await expect(
+      armarDatosImpresoTraspasoTela(sesionVer(), 101, bdCon({ 101: entradaRota })),
+    ).rejects.toThrow(/no apunta a su pata de salida/);
+  });
+
   it('sin `inventario-telas.ver` → ErrorPermiso (A4)', async () => {
     await expect(
       armarDatosImpresoTraspasoTela(sesionDePrueba({ permisos: [] }), 100, bdCon({})),

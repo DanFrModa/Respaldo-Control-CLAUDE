@@ -131,7 +131,8 @@ describe('Notas de salida unit — validación de captura (Zod, antes de la BD)'
   });
 
   // §Post-F9.38 (V1-E3b) — el ALTA es de AVÍOS: la tela se rechaza ANTES de tocar la BD (sin folio
-  // ni escrituras). La EDICIÓN sí la acepta (asimetría deliberada) y se prueba en el int test.
+  // ni escrituras). La EDICIÓN solo acepta la tela que YA estaba en la nota (se prueba en el int
+  // test: re-guardar un borrador viejo la conserva, agregar una nueva se rechaza).
   it('crear con un renglón de TELA lanza ErrorValidacion (una nota nueva es de avíos)', async () => {
     await expect(
       crearNotaSalida(sesionAdmin(), {

@@ -64,27 +64,39 @@ export function aIdOrden(valor: string): number | null {
   return valor === SIN_ORDEN ? null : Number(valor);
 }
 
-/** Una orden con existencia real del artículo en el almacén, para el selector de bucket. */
+/** Una orden con movimientos de PT del artículo, para el selector de bucket. */
 export interface OpcionOrdenExistencia {
   /** `null` = bucket «sin orden» (lo capturado a mano en el arranque y lo migrado). */
   idOrden: number | null;
   folioOrden: number | null;
-  /** Piezas disponibles de ese bucket en el almacén (suma de las filas de existencia). */
+  /**
+   * Piezas de ese bucket (suma de las filas de existencia). En el caso ENTRADA puede ser 0 —y NO es
+   * un tope: a una orden vacía sí se le pueden meter piezas—, por eso ahí no se muestra.
+   */
   existencia: number;
 }
 
 /**
- * Deriva las ÓRDENES CON EXISTENCIA REAL de las filas de existencia ya filtradas por modelo y
- * almacén (§Post-F9.40): el selector ofrece SOLO esos buckets —nunca el catálogo entero de
- * órdenes—, incluido el bucket «sin orden». Función PURA (A1): el servidor sigue siendo la
- * autoridad del no-negativo.
+ * Deriva las ÓRDENES de las filas de existencia ya filtradas por modelo (y, en la salida, por
+ * almacén) (§Post-F9.40): el selector ofrece SOLO esos buckets —nunca el catálogo entero de
+ * órdenes—, además del bucket «sin orden». Función PURA (A1): el servidor sigue siendo la autoridad
+ * del no-negativo.
+ *
+ * `incluirCeros` distingue los dos usos de la MISMA pantalla:
+ *  • **salida** (default, `false`): solo buckets con piezas — de un bucket vacío no se puede sacar.
+ *  • **entrada** (`true`): también los buckets en CERO. Es el va-y-ven de estampado: las piezas de
+ *    la orden 55 salieron a Aplicación (bucket 55 = 0) y al volver tienen que poder REGRESAR a la
+ *    orden 55; si se filtrara el cero, entrarían a «sin orden» y la entrega al cliente de esa orden
+ *    diría "no hay existencia" con la mercancía físicamente en el almacén.
  */
 export function ordenesConExistencia(
   filas: readonly { idOrden: number | null; folioOrden: number | null; existencia: number }[],
+  opciones: { incluirCeros?: boolean } = {},
 ): OpcionOrdenExistencia[] {
+  const incluirCeros = opciones.incluirCeros ?? false;
   const porOrden = new Map<string, OpcionOrdenExistencia>();
   for (const f of filas) {
-    if (f.existencia <= 0) continue;
+    if (!incluirCeros && f.existencia <= 0) continue;
     const clave = f.idOrden === null ? 'sin' : String(f.idOrden);
     const acumulado = porOrden.get(clave);
     if (acumulado === undefined) {

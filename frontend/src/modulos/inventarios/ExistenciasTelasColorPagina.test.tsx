@@ -238,6 +238,31 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     );
   });
 
+  it('sin acciones que ofrecer, el kardex NO pinta la columna de acciones (a quien solo consulta)', () => {
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : { data: kardex, isPending: false, isError: false },
+    );
+    // Solo `.ver` y ningún renglón de traspaso: no hay cancelar ni hoja que imprimir.
+    const { unmount } = renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    // 11 columnas de datos (5 + 3 del cuerpo + 3 del complemento), sin la vacía de acciones.
+    const encabezados = () =>
+      screen.getByTestId('kardex-color-tabla').querySelectorAll('thead th').length;
+    expect(encabezados()).toBe(11);
+    unmount();
+
+    // Con `.mover` sí hay algo que ofrecer (cancelar) → la columna vuelve.
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    expect(encabezados()).toBe(12);
+  });
+
   it('sin permiso de mover, el kardex NO ofrece cancelar', () => {
     useKardexTelaColor.mockImplementation((q) =>
       q === undefined

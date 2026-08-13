@@ -11,13 +11,15 @@ import { z } from 'zod';
  *  • TELA (`idTela` + `idLote` + `idMovimientoSalidaTela`): la tela YA se descontó UNA sola vez con
  *    `registrarSalidaTelaAOrden` (E1). La nota solo REFERENCIA ese movimiento `salida-tela-orden` y
  *    NO genera segundo movimiento (DECISIÓN (e) de Daniel — anti-doble-descuento).
- *    ⚠️ §Post-F9.38 (V1-E3b): este renglón YA NO SE CAPTURA. La forma sigue en el contrato, pero el
- *    DOMINIO lo trata distinto según la operación (asimetría deliberada, no un descuido):
+ *    ⚠️ §Post-F9.38 (V1-E3b): este renglón YA NO SE CAPTURA — ninguno NUEVO puede nacer. La forma
+ *    sigue en el contrato (el histórico se lee), pero el DOMINIO la restringe según la operación:
  *      – **ALTA (`esquemaNotaSalidaCrear`): RECHAZADO.** Una nota nueva es de AVÍOS; la salida de
  *        tela a una orden no lleva nota (basta su movimiento de kardex) y el traspaso entre
  *        almacenes lleva SU propia hoja, con su propio folio.
- *      – **EDICIÓN (`esquemaNotaSalidaEditarCuerpo`): ACEPTADO.** Editar reemplaza el SET COMPLETO
- *        de renglones: sin esta rama, guardar un borrador viejo con tela lo borraría sin avisar.
+ *      – **EDICIÓN (`esquemaNotaSalidaEditarCuerpo`): SOLO la tela que YA estaba en esa nota**
+ *        (misma terna tela/lote/movimiento). Editar reemplaza el SET COMPLETO de renglones: sin esa
+ *        excepción, guardar un borrador viejo con tela lo borraría sin avisar; con ella acotada a lo
+ *        ya persistido, tampoco se puede agregar tela nueva por la puerta de atrás.
  *
  * Captura por RENGLÓN: cada renglón liga una orden de producción destino (`idOrden`) y un material
  * (avío XOR tela) con su `cantidad`. La empresa la toma el dominio de la sesión activa (A9); el
