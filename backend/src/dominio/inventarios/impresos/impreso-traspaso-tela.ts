@@ -136,10 +136,12 @@ export async function armarDatosImpresoTraspasoTela(
   // ENTRADA guarda `origenId = id de la salida`. Según qué pata llegue (la dirección de su tipo lo
   // dice), se busca hacia adelante (soy la salida) o hacia atrás (soy la entrada).
   const esSalida = pata.tipoMov.direccion === 'salida';
-  // ⚠️ `Number(null)` es 0 y `Number.isInteger(0)` es `true`: si se convirtiera a ciegas, la pata
-  // HUÉRFANA (entrada sin `origenId`) se colaría como id 0 y este aviso —el que nombra el problema
-  // real— nunca saldría. Por eso el NULL se separa ANTES de convertir.
-  const idGemela = esSalida || pata.origenId === null ? null : Number(pata.origenId);
+  // ⚠️ `Number(null)`, `Number('')` y `Number('  ')` son TODOS 0, y `Number.isInteger(0)` es `true`:
+  // si se convirtiera a ciegas, la pata HUÉRFANA (entrada cuyo `origenId` es NULL o viene vacío) se
+  // colaría como id 0 y este aviso —el que nombra el problema real— nunca saldría; moriría después
+  // con el genérico de "no se encontró la otra pata". Por eso el vacío se separa ANTES de convertir.
+  const referenciaGemela = pata.origenId?.trim() ?? '';
+  const idGemela = esSalida || referenciaGemela === '' ? null : Number(referenciaGemela);
   if (!esSalida && (idGemela === null || !Number.isInteger(idGemela))) {
     throw new ErrorValidacion(
       `La pata de entrada del traspaso ${String(idMovimiento)} no apunta a su pata de salida: no ` +

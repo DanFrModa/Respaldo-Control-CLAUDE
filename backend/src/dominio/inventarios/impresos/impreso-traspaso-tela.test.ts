@@ -163,6 +163,15 @@ describe('armarDatosImpresoTraspasoTela (V1-E3b, §Post-F9.38)', () => {
     ).rejects.toThrow(/no apunta a su pata de salida/);
   });
 
+  it('una pata de ENTRADA con `origenId` VACÍO lo dice con el mismo aviso (no se cuela como id 0)', async () => {
+    // Misma trampa que el NULL: `Number('')` (y `Number('  ')`) también es 0 e `Number.isInteger(0)`
+    // sigue siendo true, así que la cadena vacía se colaba igual hasta el mensaje genérico.
+    const entradaVacia = { ...PATA_ENTRADA, origenId: '' };
+    await expect(
+      armarDatosImpresoTraspasoTela(sesionVer(), 101, bdCon({ 101: entradaVacia })),
+    ).rejects.toThrow(/no apunta a su pata de salida/);
+  });
+
   it('una pata de ENTRADA con `origenId` que no es un id lo dice igual', async () => {
     const entradaRota = { ...PATA_ENTRADA, origenId: 'no-es-un-id' };
     await expect(
