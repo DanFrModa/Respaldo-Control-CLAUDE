@@ -1786,3 +1786,97 @@ verifica leyendo qué hace, no por su nombre.
 - **Aplica en:** `frontend/src/modulos/catalogo.ts` (`ESPEC_RIEL`, hijos de `produccion`), con
   `catalogo.test.ts` y `e2e/login.spec.ts` actualizados. **SIN migración, SIN permisos, SIN seed.**
 - **Fecha:** 2026-08-13.
+
+---
+
+#### (Post-F9.43) — El BOM se CONGELA en la orden de producción; Desarrollo la libera antes de comprar (DANIEL, 14-ago-2026)
+
+**La pregunta con la que empezó.** El lead propuso quitar las tres banderas
+`paraPreCosto`/`paraProduccion`/`paraCosto` del BOM del modelo apoyándose en un comentario de Daniel
+(*"esto está obsoleto… yo creo que lo quitaría"*). **El error fue del lead: proponer quitarlas sin
+preguntar para qué existían.** Daniel explicó su razón de ser, que es real y vigente:
+
+> *"Un modelo se desarrolla a partir de cierta información. Y en ocasiones se negocia con el cliente
+> que ya no lleve alguna cosa (por ejemplo, quitarle una jareta para abaratar el costo). Entonces el
+> modelo original sí lo lleva, pero para producción ya no lo llevaría. En su momento lo resolví de
+> esa manera en Control, pero ahorita me parece que la información de la receta va a quedar grabada
+> en la OP… ¿o dónde va a vivir esa información en producción?"*
+
+Y al confirmar el diagnóstico: **_"Creo que sí es indispensable para la primera versión. De hecho así
+funciona en Control viejo. El BOM debe de vivir en la OP."_**
+
+**(a) LAS BANDERAS NO SE QUITAN.** Son hoy el único mecanismo que existe para "esto va en desarrollo
+pero no en producción". Lo que estaba mal no es que existan: es **dónde viven**. La bandera es del
+**modelo**, no de la orden — apagar la jareta la apaga en TODAS las órdenes de ese modelo, incluidas
+las ya producidas *con* jareta (y el código ya alcanza hacia atrás:
+`recalcularEstadoOrdenesDeModelo`). Después de esta decisión las banderas se quedan con el
+significado limpio: **qué lleva la PLANTILLA** para cada propósito. Lo que cambia por cliente deja de
+ser bandera y pasa a ser un ajuste de esa orden.
+
+**(b) LA RECETA SE CONGELA EN LA OP, con cantidad y PRECIO.** Se copia del modelo **al crear la
+orden** (elección de Daniel sobre la alternativa "al explotar el MRP": así se revisa y ajusta **antes
+de comprar nada**). Se puede quitar, agregar y editar; lo tocado queda marcado para que un cambio
+posterior del modelo no lo pise (mismo patrón `ajustado`/`restaurarLineaBom` que el precosteo de F8
+ya usa). **Incluye TELA**, aunque el viejo no lo hiciera — en v2 la tela tiene consumo por prenda y
+alimenta el MRP.
+
+*Medido sobre el volcado real del viejo (`OrdenesHab`, 5,451 órdenes / 28,432 renglones), porque la
+forma correcta ya estaba probada por 30 años de operación:* **132 de 1,222 órdenes comparables
+(10.8 %) NO coinciden con el BOM de su modelo** (72 quitaron un avío, 100 agregaron, 60 cambiaron
+cantidad); en **2,577 órdenes la receta SOLO existe en la OP** (su modelo no tiene BOM); y **15,255
+de 24,480 renglones (62 %) traen precio distinto al del catálogo** — sistemático (etiqueta de lavado
+catálogo $0.14 / orden $0.15), o sea **la OP guardó el precio del día**: el snapshot sirve tanto para
+la historia como para el override. *(Dos precisiones: el viejo NO congela la tela —`Ordenes.IdTelasDis`,
+una sola en el encabezado— ni hace nada por orden con los bordados.)*
+
+**(c) DESARROLLO LIBERA LA RECETA, y la puerta va antes de COMPRAR.** Daniel: *"la gente de desarrollo
+tendría que tener la responsabilidad de que la OP tenga solo la información correcta… El departamento
+de desarrollo es el responsable de dejar la OP con la información correcta **que se tiene que
+comprar**"*. Cada renglón nace como **propuesta sin revisar**; Desarrollo ajusta, define las
+**medidas por talla** y **libera**. Hasta entonces **no se puede explotar el MRP ni generar OC**.
+**Cortar y producir NO se bloquean**: el piso no se detiene porque Desarrollo no haya terminado de
+revisar; lo único que se frena es **gastar dinero** contra una receta que nadie miró.
+
+⚠️ **NO se fuerza el OK uno por uno** (Daniel lo planteó como opción: *"¿chance que ella vaya
+metiendo una por una? ¿o que vaya dando el OK para cada avío?"*). **El 89 % de las órdenes lleva la
+receta del modelo tal cual**: obligar a 8 clics en cada OP entrena a la gente a clickear sin leer, y
+ahí se pierde el control con la ilusión de tenerlo. En su lugar: **estado por renglón** (*sin revisar
+/ revisado / ajustado*), **un botón de "marcar todo revisado"** para la receta que viene limpia, y el
+renglón que se desvía del modelo **pintado distinto** para que pida atención sola. Permiso REUSADO
+`desarrollo.administrar`.
+
+**(d) LOS DOS AVISOS DE DESALINEACIÓN, partidos por si ya se comprometió dinero** (Daniel):
+
+- **Si la OC NO se ha hecho** → *"debería de indicarle en rojo que el BOM cambió para que lo revise"*.
+  Va en el **lugar de la decisión** (al explotar el MRP / generar la OC), diciendo **qué** cambió
+  (agregado / quitado / cantidad / precio). No necesita notificación: la persona ya está ahí.
+- **Si la OC YA se hizo** → *"el sistema debería de mandar un correo para que sepa que cambió"*.
+
+⭐ **El correo es de una etapa posterior** (Daniel: *"quiero contratar un servicio de envío de correos
+para una siguiente etapa"*), **pero el EVENTO se registra desde ahora**, en el outbox transaccional
+(`comun/eventos-dominio.ts`, misma transacción que el cambio del BOM → no se puede perder). **Razón:**
+si no se anota cuando ocurre, el día que exista el canal **no habrá nada que mandar** — el cambio ya
+pasó y nadie lo escribió, y la notificación llegaría solo para lo futuro. Con el evento anotado, después
+solo se enchufa un consumidor: **cero retrabajo**, y se puede mandar lo acumulado.
+**Pendiente de esa etapa:** a quién le llega (default propuesto: quien hizo la OC + Desarrollo).
+
+**(e) EL HISTÓRICO SE MIGRA, PERO FUERA DEL CATÁLOGO.** Daniel: *"no sé si vale la pena migrar toda la
+info… mucha de esa info no es tan real. No quisiera hacer un catálogo con información no precisa…
+pero no quiero que interfiera con el nuevo catálogo para no meter información basura acumulada de 30
+años"*. Los 28,432 renglones de `OrdenesHab` **hoy no se migran** (ni una mención en `migracion/`: se
+tiran completos). Entran al **archivo histórico** como cuarta tabla junto a
+`HistoricoOrdenV1Linea`/`Proceso`, con **la regla ya establecida en §Post-F9.28**: el avío va como
+**TEXTO**, resuelto una vez al migrar. Con eso **no se crea ni un solo registro en el catálogo de
+avíos**, no aparece en ningún selector de captura, es de solo lectura y **no hay —ni habrá— botón de
+"traer al catálogo"** (ese botón sería la puerta trasera por la que volvería la basura recién
+depurada; por eso tampoco existe en el directorio histórico). Lo que se gana: cuando alguien pregunte
+*"¿qué llevaba de verdad este modelo en 2019 y a qué precio?"*, la respuesta existe.
+
+**(f) SI EL MODELO CAMBIA DESPUÉS DE LIBERAR: la OP queda CONGELADA.** Default del lead, aprobado por
+Daniel. Para eso se congela. Muestra aviso de *"el modelo cambió desde que se liberó"* con opción de
+traer los cambios **a mano** — mismo comportamiento que el precosteo con sus renglones ajustados.
+
+- **Aplica en:** V1-E3d (ficha `docs/hoja-de-ruta/V1-etapas.md`). Receta de la OP + liberación +
+  los cuatro consumidores (MRP, habilitación, costeo real, semáforo "orden completa") + los dos
+  avisos + ETL al archivo histórico. Permiso REUSADO `desarrollo.administrar`.
+- **Fecha:** 2026-08-14.

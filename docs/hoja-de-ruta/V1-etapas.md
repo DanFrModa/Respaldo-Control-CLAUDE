@@ -256,17 +256,17 @@ precosteo no da los números reales** — cae siempre al fallback.
    color y pantone (`telas.ts:1575-1582`). El defecto es de pantalla, y son **4 sitios** con la misma
    forma: BOM, encabezado de orden, notas de salida y órdenes de compra. **El patrón correcto ya
    existe y está en producción**: `SelectorTela` (debounce + `busqueda` server-side + `ComboboxBuscable`).
-5. **Quitar las tres banderas** `paraPreCosto`/`paraProduccion`/`paraCosto` (Daniel: *"esto está
-   obsoleto… yo creo que lo quitaría"*). Las leen **9 sitios**: MRP, habilitación, "orden completa",
-   impreso de la orden, el `_count` del listado, el costo teórico y el costo real —cuya
-   **arquitectura de reconciliación existe PORQUE las dos recetas pueden diferir**—.
-   ⚠️ **TRAMPA:** el ETL **no heredó el default `true`**: `parsearBandera` devuelve **`false`** con
-   celda vacía. Si solo se quitan las casillas de la UI, al guardar cualquier receta esos renglones
-   migrados **se encenderían solos, en silencio** (`bom-modelo.ts:378-389`, `:437-448` actualizan las
-   tres en cada update). **PRERREQUISITO: contar en `prueba`** —`GROUP BY para_pre_costo,
-   para_produccion, para_costo` sobre `modelo_tela` y `modelo_avio`— antes de decidir. Se puede por
-   etapas (UI → backend → `DROP COLUMN`); el precedente del repo para campo legado es **conservar la
-   columna** con su default server-side.
+5. ~~Quitar las tres banderas~~ — ❌ **RETIRADO (14-ago-2026). NO se quitan.** La propuesta nació de
+   un *"esto está obsoleto… yo creo que lo quitaría"* de Daniel, y **el error fue del lead: se
+   propuso quitarlas sin preguntar para qué existían.** Al día siguiente Daniel explicó su razón de
+   ser, que es real y vigente: *"se negocia con el cliente que ya no lleve alguna cosa (por ejemplo,
+   quitarle una jareta para abaratar el costo). El modelo original sí lo lleva, pero para producción
+   ya no."* Las banderas son hoy el **único** mecanismo que existe para eso.
+   **Lo que sí está mal no es que existan, es dónde viven:** la bandera es **del modelo**, no de la
+   orden — apagarla afecta a TODAS las órdenes de ese modelo, incluidas las ya producidas. Eso se
+   resuelve en **V1-E3d** (el BOM se congela en la OP). Después de E3d las banderas se quedan, con el
+   significado limpio: qué lleva la **plantilla** para cada propósito. **No hace falta el conteo en
+   `prueba`** que este punto pedía como prerrequisito.
 6. **La lista es demasiado alta.** Cada renglón son ~110-150 px (tarjeta con borde + dos filas); **8
    avíos ≈ 1,150 px**. El `<fieldset>` de las tres casillas son **35 líneas de JSX** y el ~60 % del
    bulto: sin él, el renglón cabe en **una línea de ~44 px** y los 8 avíos bajan a ~400 px. El patrón
@@ -275,6 +275,100 @@ precosteo no da los números reales** — cae siempre al fallback.
 
 **Criterio de cierre:** capturar un avío por talla con su consumo, amarrarle proveedor y precio, y
 que el precosto salga con **esos** números y no con el fallback.
+
+---
+
+## V1-E3d · El BOM vive en la OP ⭐ (14-ago-2026)
+
+**Indispensable para la primera versión** (Daniel: *"creo que sí es indispensable… De hecho así
+funciona en control viejo. El BOM debe de vivir en la OP"*). Decisiones en `DECISIONES.md`
+**§Post-F9.43**.
+
+### El hueco
+
+Hoy **la receta no se graba en la OP**: no existe ninguna tabla `OrdenTela`/`OrdenAvio`. Todo lo que
+en producción necesita saber qué lleva la prenda va y lee el BOM del **modelo**, en vivo, en el
+momento en que corre — el MRP y la habilitación con `paraProduccion`, el costeo real con `paraCosto`,
+el semáforo de "orden completa" con `paraProduccion`.
+
+Consecuencia: la bandera es del **modelo**, así que apagar la jareta de un cliente la apaga **en
+todas las órdenes de ese modelo**, incluidas las ya producidas *con* jareta. Y no es hipotético — al
+editar el BOM el código ya alcanza hacia atrás (`recalcularEstadoOrdenesDeModelo`). Con un solo
+interruptor por modelo no se pueden tener dos clientes del mismo modelo, uno con jareta y otro sin.
+
+### La evidencia del sistema viejo (medida, no recordada)
+
+`OrdenesHab(IdOrdenes, IdHabilitacion, CantHabOrd, PrecioHabOrd)` — el viejo congela por orden el
+avío, **la cantidad de esa orden y el precio de esa orden**. Sobre el volcado real (5,451 órdenes,
+28,432 renglones):
+
+| Hallazgo | Dato |
+|---|---|
+| Órdenes vivas con receta propia | **3,799** |
+| Comparables contra el BOM de su modelo | 1,222 — de ellas **132 (10.8 %) NO coinciden** |
+| … **quitaron** un avío que el modelo sí lleva | 72 *(el caso de la jareta, literal)* |
+| … **agregaron** uno que el modelo no trae | 100 |
+| … cambiaron una cantidad | 60 |
+| Órdenes cuyo modelo **no tiene BOM**: la receta **solo** existe en la OP | **2,577** (2 de cada 3) |
+| Renglones con **precio distinto** al del catálogo | **15,255 de 24,480 (62 %)** |
+
+El 62 % del precio **no es negociación renglón por renglón**: es que la OP guardó **el precio del
+día** y el catálogo siguió su camino (etiqueta de lavado catálogo $0.14 / orden $0.15; gancho 18"
+catálogo $0.88 / orden $0.85, sistemáticos). O sea: el snapshot es tanto para **la historia** como
+para el override.
+
+**Dos precisiones que la memoria no traía:** el viejo **NO** congela la tela (`Ordenes.IdTelasDis` =
+una sola tela en el encabezado, sin tabla por orden) y **NO** hace nada por orden con los bordados.
+
+### Qué entrega
+
+1. **Receta de la OP** — se copia del modelo **al crear la orden** (decisión de Daniel), con
+   **cantidad y precio** por renglón. Se puede **quitar, agregar y editar**; lo tocado queda marcado
+   para que un cambio posterior del modelo no lo pise. Mismo patrón que el precosteo ya usa
+   (`ajustado` + `restaurarLineaBom`), que es el precedente probado del repo.
+   **Incluye TELA**, aunque el viejo no lo hiciera: en v2 la tela tiene consumo por prenda y alimenta
+   el MRP — dejarla fuera repetiría el hueco que la etapa viene a tapar.
+2. **Liberación por Desarrollo.** Cada renglón nace como **propuesta sin revisar**; Desarrollo ajusta,
+   define las **medidas por talla** y **libera**. Hasta entonces **no se puede explotar el MRP ni
+   generar OC** de esa orden. **Cortar y producir NO se bloquean** (la puerta va antes de *comprar*,
+   que es lo que Daniel pidió: *"la información correcta que se tiene que comprar"*).
+   ⚠️ **NO se fuerza el OK uno por uno:** el 89 % de las órdenes lleva la receta del modelo tal cual;
+   obligar a 8 clics por OP entrena a la gente a clickear sin leer. Estado por renglón
+   (*sin revisar / revisado / ajustado*) + **un botón de "marcar todo revisado"**, y el que se desvía
+   del modelo se pinta distinto. Permiso REUSADO `desarrollo.administrar` (ya existe, seed:245).
+3. **Los cuatro consumidores leen la receta de la ORDEN**, no la del modelo: MRP, habilitación,
+   costeo real y el semáforo de "orden completa" —que pasa de *"¿el modelo tiene avíos?"* a *"¿la
+   receta de la OP está liberada?"*, mismo semáforo diciendo algo verdadero—.
+4. **Los dos avisos de desalineación** (Daniel): al cambiar el BOM de un modelo se detectan las OP
+   vivas desalineadas y se parten en dos.
+   - **Sin OC todavía** → **rojo en el lugar de la decisión**: al explotar el MRP / generar la OC, los
+     renglones que cambiaron salen marcados diciendo *qué* cambió (agregado / quitado / cantidad /
+     precio). No necesita notificación: la persona ya está ahí, a punto de gastar.
+   - **Con OC ya hecha** → **se registra el EVENTO** en el outbox transaccional
+     (`comun/eventos-dominio.ts`, misma tx que el cambio del BOM → no se puede perder) + aviso visible
+     en la orden. ⭐ **El correo es de una etapa posterior** (Daniel quiere contratar un servicio),
+     **pero el evento se registra desde AHORA**: si no, el día que exista el canal no habrá nada que
+     mandar — el cambio ya pasó y nadie lo escribió. Después solo se enchufa un consumidor al mismo
+     evento: **cero retrabajo**, y se puede mandar lo acumulado.
+5. **ETL del histórico, FUERA del catálogo.** Los 28,432 renglones de `OrdenesHab` **hoy no se
+   migran** (ni una mención en `migracion/` — se tiran completos). Entran al **archivo histórico**
+   como cuarta tabla junto a `HistoricoOrdenV1Linea`/`Proceso`, con la **regla ya establecida en
+   §Post-F9.28**: el avío va como **TEXTO**, no como FK. Con eso **no se crea ni un solo registro en
+   el catálogo de avíos**, no sale en ningún selector, es de solo lectura y **no hay botón de "traer
+   al catálogo"** —ese botón sería la puerta trasera por la que volvería la basura de 30 años, y por
+   eso tampoco existe en el directorio histórico—. Es la respuesta literal a la condición de Daniel:
+   *"no quiero que interfiera con el nuevo catálogo"*.
+
+### Decisión pendiente, con default aplicado
+
+Si Desarrollo ya liberó y **después** cambia el BOM del modelo: **la OP queda congelada** (para eso se
+congela), con aviso de *"el modelo cambió desde que se liberó"* y opción de traer los cambios **a
+mano**. Mismo comportamiento que el precosteo con sus renglones ajustados. Daniel lo aprobó.
+
+### Criterio de cierre
+
+Dos órdenes del mismo modelo, una con jareta y otra sin, que compren cosas distintas y cuesten
+distinto — sin que ninguna de las dos altere a la otra ni a las ya producidas.
 
 ---
 
