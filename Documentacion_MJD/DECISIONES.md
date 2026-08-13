@@ -1852,13 +1852,22 @@ renglón que se desvía del modelo **pintado distinto** para que pida atención 
   (agregado / quitado / cantidad / precio). No necesita notificación: la persona ya está ahí.
 - **Si la OC YA se hizo** → *"el sistema debería de mandar un correo para que sepa que cambió"*.
 
-⭐ **El correo es de una etapa posterior** (Daniel: *"quiero contratar un servicio de envío de correos
-para una siguiente etapa"*), **pero el EVENTO se registra desde ahora**, en el outbox transaccional
-(`comun/eventos-dominio.ts`, misma transacción que el cambio del BOM → no se puede perder). **Razón:**
-si no se anota cuando ocurre, el día que exista el canal **no habrá nada que mandar** — el cambio ya
-pasó y nadie lo escribió, y la notificación llegaría solo para lo futuro. Con el evento anotado, después
-solo se enchufa un consumidor: **cero retrabajo**, y se puede mandar lo acumulado.
-**Pendiente de esa etapa:** a quién le llega (default propuesto: quien hizo la OC + Desarrollo).
+⭐ **EL CORREO QUEDA FUERA, y con él el evento** — Daniel lo cerró horas después: *"ya veremos si vale
+la pena lo de los correos o no… no tiene caso ahorita hacer nada de eso"*. El lead había argumentado
+que el **evento** sí debía registrarse desde ahora en el outbox transaccional, porque si no se anota
+cuando ocurre el día que exista el canal no habrá nada que mandar. **Ese argumento solo vale si va a
+haber correo:** lo único que compra el evento es **EMPUJAR** el aviso hacia quien no está mirando, que
+es justamente lo que hace el correo. Sin correo, no compra nada.
+
+**Cómo queda entonces: la desalineación se calcula AL VUELO, sin guardar nada.** La receta de la OP
+está congelada y el BOM del modelo está vivo → la diferencia sale de compararlos cuando alguien abre
+la pantalla. Eso cubre **las dos** necesidades de Daniel (el rojo antes de la OC y el aviso en la
+orden después) **sin evento, sin outbox y sin estado acumulándose**. *Se pierde saber cuándo cambió y
+qué decía antes — irrelevante aquí: lo que se revisa es la diferencia de HOY, que es contra lo que se
+va a comprar; y si el modelo cambia y lo regresan, no hay nada que revisar.* Si el correo llega a
+valer la pena, agregar el evento en ese momento es chico; **el costo aceptado, con los ojos abiertos,
+es que no se podrá mandar lo ocurrido antes.** *(Pendiente de esa hipotética etapa: a quién le llega
+— default propuesto, quien hizo la OC + Desarrollo.)*
 
 **(e) EL HISTÓRICO SE MIGRA, PERO FUERA DEL CATÁLOGO.** Daniel: *"no sé si vale la pena migrar toda la
 info… mucha de esa info no es tan real. No quisiera hacer un catálogo con información no precisa…

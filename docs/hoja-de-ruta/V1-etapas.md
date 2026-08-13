@@ -344,12 +344,16 @@ una sola tela en el encabezado, sin tabla por orden) y **NO** hace nada por orde
    - **Sin OC todavía** → **rojo en el lugar de la decisión**: al explotar el MRP / generar la OC, los
      renglones que cambiaron salen marcados diciendo *qué* cambió (agregado / quitado / cantidad /
      precio). No necesita notificación: la persona ya está ahí, a punto de gastar.
-   - **Con OC ya hecha** → **se registra el EVENTO** en el outbox transaccional
-     (`comun/eventos-dominio.ts`, misma tx que el cambio del BOM → no se puede perder) + aviso visible
-     en la orden. ⭐ **El correo es de una etapa posterior** (Daniel quiere contratar un servicio),
-     **pero el evento se registra desde AHORA**: si no, el día que exista el canal no habrá nada que
-     mandar — el cambio ya pasó y nadie lo escribió. Después solo se enchufa un consumidor al mismo
-     evento: **cero retrabajo**, y se puede mandar lo acumulado.
+   - **Con OC ya hecha** → **aviso visible en la orden**, calculado igual, en el momento de abrirla.
+   ⚠️ **SIN evento, SIN outbox, SIN estado acumulado** (Daniel, 14-ago: *"ya veremos si vale la pena
+   lo de los correos o no… no tiene caso ahorita hacer nada de eso"*). La desalineación **se calcula
+   al vuelo**: la receta de la OP está congelada y el BOM del modelo está vivo, así que la diferencia
+   sale de comparar los dos cuando alguien abre la pantalla. **Lo único que compraba el evento era
+   EMPUJAR** el aviso hacia quien no está mirando — que es exactamente lo que hace el correo; sin
+   correo, no compra nada. *Se pierde saber cuándo cambió y qué decía antes, y no importa: lo que se
+   revisa es la diferencia de HOY, que es contra lo que se va a comprar.* Si el correo llega a valer
+   la pena, agregar el evento entonces es chico; el costo aceptado es que no se podrá mandar lo
+   ocurrido antes.
 5. **ETL del histórico, FUERA del catálogo.** Los 28,432 renglones de `OrdenesHab` **hoy no se
    migran** (ni una mención en `migracion/` — se tiran completos). Entran al **archivo histórico**
    como cuarta tabla junto a `HistoricoOrdenV1Linea`/`Proceso`, con la **regla ya establecida en
