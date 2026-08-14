@@ -388,7 +388,7 @@ describe('Catálogo Bordados/estampados (F1-E3, R2 — global ADR-0007)', () => 
         archivos,
       );
 
-      await quitarFoto(sesion, bordado.id, bd());
+      await quitarFoto(sesion, bordado.id, undefined, bd());
       expect(await cliente.archivo.count()).toBe(0);
       const recargado = await obtenerBordado(sesion, bordado.id, bd());
       expect(recargado.idArchivoFoto).toBeNull();
@@ -397,7 +397,58 @@ describe('Catálogo Bordados/estampados (F1-E3, R2 — global ADR-0007)', () => 
     it('quitar la foto cuando no hay → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
       const bordado = await crearBordado(sesion, { nombre: 'B' }, bd());
-      await expect(quitarFoto(sesion, bordado.id, bd())).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(quitarFoto(sesion, bordado.id, undefined, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+    });
+
+    it('acotado al idArchivo: si la foto vigente ya es OTRA, NO borra nada (ErrorConflicto)', async () => {
+      // El caso real: el PUT a R2 del primer intento falla tarde; entre medias alguien subió una
+      // foto BUENA al mismo arte. La limpieza del intento fallido NO debe llevarse esa foto.
+      const sesion = sesionAdmin();
+      const archivos = archivosFalsos();
+      const bordado = await crearBordado(sesion, { nombre: 'B' }, bd());
+      const primera = await solicitarSubidaFoto(
+        sesion,
+        bordado.id,
+        { nombreOriginal: 'vieja.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+        bd(),
+        archivos,
+      );
+      const segunda = await solicitarSubidaFoto(
+        sesion,
+        bordado.id,
+        { nombreOriginal: 'buena.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+        bd(),
+        archivos,
+      );
+
+      await expect(quitarFoto(sesion, bordado.id, primera.idArchivo, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+
+      const recargado = await obtenerBordado(sesion, bordado.id, bd());
+      expect(recargado.idArchivoFoto).toBe(segunda.idArchivo);
+      expect(await cliente.archivo.count()).toBe(1);
+    });
+
+    it('acotado al idArchivo: si la foto vigente ES esa, la quita', async () => {
+      const sesion = sesionAdmin();
+      const archivos = archivosFalsos();
+      const bordado = await crearBordado(sesion, { nombre: 'B' }, bd());
+      const subida = await solicitarSubidaFoto(
+        sesion,
+        bordado.id,
+        { nombreOriginal: 'logo.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+        bd(),
+        archivos,
+      );
+
+      await quitarFoto(sesion, bordado.id, subida.idArchivo, bd());
+
+      const recargado = await obtenerBordado(sesion, bordado.id, bd());
+      expect(recargado.idArchivoFoto).toBeNull();
+      expect(await cliente.archivo.count()).toBe(0);
     });
 
     it('solicitar subida para un bordado inexistente → ErrorNoEncontrado', async () => {
@@ -441,7 +492,7 @@ describe('Catálogo Bordados/estampados (F1-E3, R2 — global ADR-0007)', () => 
         bd(),
         archivos,
       );
-      await quitarFoto(sesion, bordado.id, bd());
+      await quitarFoto(sesion, bordado.id, undefined, bd());
       expect(await cliente.bordado.count()).toBe(1);
     });
   });

@@ -66,9 +66,12 @@ async function limpiarSinTapar(limpiar: (() => Promise<void>) | undefined): Prom
   }
   try {
     await limpiar();
-  } catch {
-    // Best-effort a propósito: el error que importa es el de la SUBIDA. Si el borrado tampoco
-    // pasa, el registro queda y se puede quitar a mano desde la misma pantalla.
+  } catch (fallo) {
+    // Best-effort a propósito: el error que importa es el de la SUBIDA, y ese es el que se lanza.
+    // Pero tragárselo del todo dejaba a soporte sin pista de que ADEMÁS quedó un registro fantasma
+    // (o de que el borrado no aplicó porque otro ya había reemplazado el archivo). Se deja rastro
+    // en la consola —igual que el backend en sus best-effort—, sin tapar el error de la subida.
+    console.warn('No se pudo limpiar el registro del intento de subida fallido.', fallo);
   }
 }
 

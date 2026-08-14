@@ -13183,7 +13183,10 @@ export interface paths {
     /** Quitar la foto de un bordado */
     delete: {
       parameters: {
-        query?: never;
+        query?: {
+          /** @description Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta. */
+          idArchivo?: string;
+        };
         header?: never;
         path: {
           /** @description Id del bordado. */
