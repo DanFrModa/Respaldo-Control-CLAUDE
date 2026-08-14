@@ -20,7 +20,7 @@ import { moneda } from './comun';
 
 /**
  * PRE-COSTO por modelo (F7-E1; doc 06-Costos-y-EDR §2): busca un modelo y muestra su costo estimado —
- * la receta (telas/avíos/bordados) valuada a precios de catálogo + la maquila base + el precio de
+ * la receta (telas/avíos y el arte del modelo) valuada a precios de catálogo + la maquila base + el precio de
  * venta sugerido. Accesible también desde Modelos (mismo dato). `precostos.consultar`; los importes
  * salen en "—" sin `consultas.ver-importes`. La regalía va sobre la venta (lista de precios), no aquí.
  */

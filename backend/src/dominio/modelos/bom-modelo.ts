@@ -46,7 +46,12 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
-import { leerArtesModelo, type ModeloArteDetalle } from './arte-modelo.js';
+import {
+  borrarArchivoSiQuedoHuerfano,
+  datosArteParaBitacora,
+  leerArtesModelo,
+  type ModeloArteDetalle,
+} from './arte-modelo.js';
 import { exigirModelo, incluirRelacionesModelo, type ModeloConRelaciones } from './modelos.js';
 
 // ── Tipos de entrada (lo que recibe el dominio ANTES de validar: defaults opcionales) ──
@@ -474,6 +479,11 @@ export async function listarAviosBom(
  * desactivados desde entonces: se copian igual (es una copia interna, no una alta nueva).
  * Bitácora con el resumen. Devuelve el BOM resultante del destino.
  *
+ * ⚠️ Al REEMPLAZAR, el arte del destino **se borra de verdad** (ya no es un puente a un catálogo,
+ * V1-E3d): antes de barrerlo se registra ÍNTEGRO en la bitácora —precio, proveedor y foto
+ * incluidos— y sus `Archivo` sin dueño se limpian con la misma regla de foto compartida que usa
+ * `arte-modelo.ts` (D3: nada se borra en silencio).
+ *
  * @example
  * await copiarBom(sesion, idDestino, { idOrigen: idBase, reemplazar: true });
  */
@@ -505,11 +515,43 @@ export async function copiarBom(
       }),
     ]);
 
+    // ⚠️ EL ARTE QUE SE VA AL REEMPLAZAR NO ES UN PUENTE: **ES EL ARTE**. Desde V1-E3d ya no hay
+    // catálogo del que recuperar nombre, puntadas, PRECIO (el que entra al costo de la OP,
+    // `costos/costo-orden.ts`), proveedor ni foto: si esta transacción lo borra sin dejar rastro,
+    // desaparece para siempre. Por eso se LEE ANTES de borrar y cada renglón que se va queda
+    // ÍNTEGRO en la bitácora (D3), igual que en `eliminarArte`.
     if (datos.reemplazar) {
+      const artesBorradas = await tx.modeloArte.findMany({ where: { idModelo: idDestino } });
+
       // Reemplaza: borra todo el BOM del destino y vuelca el del origen.
       await tx.modeloTela.deleteMany({ where: { idModelo: idDestino } });
       await tx.modeloAvio.deleteMany({ where: { idModelo: idDestino } });
       await tx.modeloArte.deleteMany({ where: { idModelo: idDestino } });
+
+      if (artesBorradas.length > 0) {
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Modelo',
+          idEntidad: idDestino,
+          accion: 'MODIFICAR',
+          datos: {
+            bom: 'copiar',
+            operacion: 'arte-reemplazado',
+            idOrigen: datos.idOrigen,
+            // El renglón COMPLETO de cada arte que se fue (precio y proveedor incluidos).
+            artesQueSeFueron: artesBorradas.map(datosArteParaBitacora),
+          },
+        });
+        // Las FOTOS que quedaron sin dueño se limpian con el MISMO cuidado que en `arte-modelo.ts`:
+        // varios artes pueden compartir un `Archivo` (migración + «copiar arte de otro modelo»), así
+        // que solo se borra el que ya no referencia NADIE — si no, se dejarían filas `Archivo`
+        // huérfanas (y borrar a ciegas dejaría a otro arte sin su imagen). Se deduplica porque dos
+        // artes del destino pueden compartir la misma foto.
+        for (const idArchivo of new Set(
+          artesBorradas.flatMap((a) => (a.idArchivoFoto === null ? [] : [a.idArchivoFoto])),
+        )) {
+          await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+        }
+      }
     }
 
     // Componentes que el destino YA tiene (para no pisarlos al fusionar / evitar P2002). El arte

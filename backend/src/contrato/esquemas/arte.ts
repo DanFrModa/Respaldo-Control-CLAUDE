@@ -243,6 +243,9 @@ export const esquemaGaleriaArteItem = z
     id: z.number().int().describe('Id del arte.'),
     nombre: z.string().describe('Nombre del arte.'),
     tipo: z.enum(TIPOS_ARTE).describe('BORDADO real o ESTAMPADO/aplicación.'),
+    // Lo pinta el diálogo «copiar arte de otro modelo» (que consume este mismo endpoint): al
+    // copiar un arte se copia SU PRECIO, así que hay que verlo ANTES de elegirlo. La rejilla de
+    // la galería no lo muestra —ahí sobra—, pero el campo NO es decorativo.
     precio: z.number().nullable().describe('Precio del arte, o null.'),
     idArchivoFoto: z.string().nullable().describe('Id del Archivo de la foto, o null.'),
     idModelo: z.number().int().describe('Id del modelo dueño del arte.'),

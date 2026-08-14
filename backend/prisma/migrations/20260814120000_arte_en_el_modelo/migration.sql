@@ -16,8 +16,10 @@
 --      [Nota: al final `modelo_arte.id_archivo_foto` NO es único justo para permitir esto.]
 --   5. Re-apunta la traza de `precosto_linea` (`id_bordado` → `id_modelo_arte`) por
 --      modelo + nombre del arte.
---   6. REPORTA en el log los artes que NO se migran (los que ningún modelo usa: la depuración
---      que Daniel pedía) — no se tiran en silencio.
+--   6. DEJA CONSTANCIA de los artes que NO se migran (los que ningún modelo usa: la depuración
+--      que Daniel pedía) — no se tiran en silencio. La constancia es una fila por arte en
+--      `mapeo_migracion` (entidad `Bordado:DescartadoSinUso`), consultable DESPUÉS del deploy;
+--      el `RAISE NOTICE` se conserva solo como comodidad de quien corra la migración a mano.
 --   7. Tira `modelo_bordado`, `bordados`, los `archivos` que quedaron huérfanos del catálogo,
 --      el mapeo de migración del catálogo y los permisos `bordados.*` (ya no hay catálogo que
 --      administrar; el arte se gobierna con `modelos.*`).
@@ -113,6 +115,38 @@ ALTER TABLE "precosto_linea" ADD CONSTRAINT "precosto_linea_id_modelo_arte_fkey"
     FOREIGN KEY ("id_modelo_arte") REFERENCES "modelo_arte"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- ── 6. Reporte: qué se migró y qué NO (los artes que ningún modelo usa) ───────
+-- Daniel pidió que la depuración NO se hiciera en silencio. Un `RAISE NOTICE` NO basta como
+-- prueba: `prisma migrate deploy` no propaga los notices del servidor, así que ese renglón puede
+-- no aparecer en ningún log del deploy. Por eso la verdad queda DURABLE en la base —una fila por
+-- arte descartado en `mapeo_migracion`, con sus datos en `datos`— y CONSULTABLE después:
+--
+--   SELECT clave_vieja, datos FROM mapeo_migracion
+--    WHERE entidad = 'Bordado:DescartadoSinUso' ORDER BY datos->>'nombre';
+--
+-- `id_nuevo` = '(descartado)' porque no hay registro nuevo al que apuntar (la columna es NOT NULL).
+-- Ojo: la entidad NO es 'Bordado', así que el `DELETE` del paso 7 —que borra el mapeo del catálogo
+-- viejo por igualdad exacta— no se lleva esta traza.
+INSERT INTO "mapeo_migracion" ("entidad", "clave_vieja", "id_nuevo", "datos", "creado_en", "modificado_en")
+SELECT
+    'Bordado:DescartadoSinUso',
+    b."id"::text,
+    '(descartado)',
+    jsonb_build_object(
+        'motivo', 'ningún modelo lo usaba (depuración §Post-F9.35)',
+        'nombre', b."nombre",
+        'descripcion', b."descripcion",
+        'tipo', b."tipo"::text,
+        'puntadas', b."puntadas",
+        'precio', b."precio",
+        'activo', b."activo",
+        'idArchivoFoto', b."id_archivo_foto"
+    ),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM "bordados" b
+WHERE NOT EXISTS (SELECT 1 FROM "modelo_bordado" mb WHERE mb."id_bordado" = b."id")
+ON CONFLICT ("entidad", "clave_vieja") DO NOTHING;
+
 DO $$
 DECLARE
     v_migrados INTEGER;
@@ -131,7 +165,7 @@ BEGIN
 
     RAISE NOTICE '[arte-en-el-modelo] % artes creados en % modelos, a partir de % del catálogo (% son copias de artes compartidos).',
         v_migrados, v_modelos, v_origen, v_duplicados;
-    RAISE NOTICE '[arte-en-el-modelo] % artes del catálogo NO se migran porque ningún modelo los usa (depuración §Post-F9.35). Se listan abajo:', v_sin_uso;
+    RAISE NOTICE '[arte-en-el-modelo] % artes del catálogo NO se migran porque ningún modelo los usa (depuración §Post-F9.35). Quedan guardados en mapeo_migracion (entidad Bordado:DescartadoSinUso) y se listan abajo:', v_sin_uso;
 
     FOR v_fila IN
         SELECT b."id", b."nombre", b."tipo", b."precio", (b."id_archivo_foto" IS NOT NULL) AS con_foto
@@ -149,6 +183,15 @@ DROP TABLE "modelo_bordado";
 
 -- Los `archivos` de los bordados NO migrados quedan huérfanos: se borran. Los de los migrados
 -- siguen referenciados por `modelo_arte` (la FK del paso 2), así que este DELETE no los toca.
+--
+-- ¿Y si una de esas filas `archivos` fuera además la foto de un modelo o el adjunto de un
+-- proveedor? Esas FKs son `ON DELETE CASCADE`, o sea que este DELETE se llevaría por delante una
+-- `modelo_foto`/`proveedor_archivo` viva. NO PUEDE PASAR con datos creados por la app, y por eso
+-- el filtro se deja acotado a `bordados`: cada subida crea su PROPIA fila `archivos` (con `key`
+-- única, id cuid nuevo) y la liga a UNA entidad; nada en el código reusa un `Archivo` existente
+-- para una entidad distinta, y `bordados.id_archivo_foto` era además @unique (una foto, un
+-- bordado). La única fila compartida que este cambio introduce es entre ARTES (paso 4), y el
+-- `NOT EXISTS` sobre `modelo_arte` ya la protege.
 DELETE FROM "archivos" a
  WHERE EXISTS (SELECT 1 FROM "bordados" b WHERE b."id_archivo_foto" = a."id")
    AND NOT EXISTS (SELECT 1 FROM "modelo_arte" ma WHERE ma."id_archivo_foto" = a."id");

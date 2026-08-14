@@ -342,7 +342,7 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
       // CORS, el navegador lo disfraza de "error de CORS". Firmamos solo lo
       // esencial (host + los query `X-Amz-*`); la integridad se apoya en que la
       // URL es de un solo uso, con UUID en la key y vida corta. El `Content-Type`
-      // del objeto lo fija el header que manda el navegador (ver api/bordados.ts).
+      // del objeto lo fija el header que manda el navegador (ver `frontend/src/api/artes.ts`).
       const urlSubida = await getSignedUrl(
         deps.cliente,
         new PutObjectCommand({ Bucket: deps.bucket, Key: key }),

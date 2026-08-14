@@ -18,7 +18,7 @@
  *    `obtenerOrden`, que filtra por la empresa activa de la sesión (una orden de otra empresa, para
  *    esta sesión, no existe → `ErrorNoEncontrado`/404).
  *  • REUSO — los datos se arman con lo que ya existe: `obtenerOrden` (encabezado + matriz + total),
- *    `leerBom` (telas/avíos/bordados del modelo) y `listarFotos` (fotos del modelo). NO se reinventa.
+ *    `leerBom` (telas/avíos y el ARTE del modelo) y `listarFotos` (fotos del modelo). NO se reinventa.
  *
  * Fotos: se incrustan en el PDF bajando los bytes del objeto R2 (vía la URL GET prefirmada que da
  * `listarFotos`) y degradando con ELEGANCIA: si una foto no se puede obtener, el PDF se renderiza
@@ -334,7 +334,7 @@ export function armarTabla(
 
 /**
  * Resuelve TODOS los datos del impreso de una orden (A9: por la empresa activa de la sesión).
- * Reúsa `obtenerOrden` (encabezado + matriz + total), `leerBom` (telas/avíos/bordados, filtrando
+ * Reúsa `obtenerOrden` (encabezado + matriz + total), `leerBom` (telas/avíos y el ARTE, filtrando
  * `paraProduccion` para telas y habilitación) y `leerFotosModelo` (fotos del modelo, cuyos bytes
  * baja best-effort). Requiere SOLO `ordenes.ver`: las fotos se leen a bajo nivel (sin exigir
  * `modelos.ver`) porque la impresión ya está autorizada y la foto es parte del documento de la

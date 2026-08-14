@@ -359,9 +359,39 @@ borrados de `permisos` **y** de `roles_permisos`.
 
 **Permisos: CERO nuevos** (se quitan 2) → **este deploy NO requiere `SEED_ON_START`**.
 
-**Deuda declarada con razón (no callada):** si dos artes que comparten foto se quitan a la vez, bajo
-READ COMMITTED puede quedar una fila `Archivo` huérfana. Nunca hay doble borrado ni pérdida de imagen,
-y coincide con la deuda ya documentada de R2 sin `DeleteObject`.
+**Ronda de corrección del reviewer (8 hallazgos, todos arreglados — §7.3: un defecto conocido no es
+"menor"):**
+
+- **El arte que se va NO se va en silencio (D3).** «Copiar receta» con *reemplazar* borraba el arte
+  del destino registrando solo **cuántos** se crearon. Antes eso era inocuo (se borraba un puente y
+  el catálogo conservaba los datos); ahora **esa fila ES el arte**. Se lee ANTES de borrar y cada
+  renglón queda ÍNTEGRO en la bitácora (precio, proveedor, foto), y sus `Archivo` sin dueño se
+  limpian con la misma regla de foto compartida.
+- **La "deuda declarada" se cerró, y su enunciado era falso.** No solo quedaba una fila huérfana:
+  copiar un arte y quitar su foto EN PARALELO podía dejar **la copia sin foto y su `Archivo`
+  borrado** (el `count` no veía el INSERT aún sin commitear). Ahora `borrarArchivoSiQuedoHuerfano`
+  toma `SELECT … FOR UPDATE` sobre la fila de `archivos` antes de contar: conflictúa con el
+  `FOR KEY SHARE` del INSERT y serializa los quitados simultáneos. **Una línea, los dos casos.**
+- **La depuración de los 898 descartados ya no depende de un `RAISE NOTICE`** (que
+  `prisma migrate deploy` no propaga): la migración deja una fila por arte descartado en
+  `mapeo_migracion` (entidad **`Bordado:DescartadoSinUso`**, datos completos en `datos`),
+  consultable después del deploy. El `NOTICE` se conserva como comodidad.
+- **El ETL vuelve a escribir POR LOTES** (regla de `CLAUDE.md` §8): el arte se agrupa **por modelo**
+  en una transacción, con su mapeo dentro; el mapeo se precarga de un golpe (se va el N+1 de
+  `leerMapeo`). Medido con 600 artes en 200 modelos: **601 → 201 transacciones**, **603 → 4**
+  consultas al mapeo, −29 % de tiempo. Si un lote truena por data sucia se reintenta renglón por
+  renglón (la tolerancia del ETL no se pierde).
+- **Pruebas de vuelta:** se portó la prueba del hook «quitar foto» (`api/artes.foto.test.ts`,
+  regresión de `d938e92`, un bug que llegó a producción) y se estrenó
+  `dominio/modelos/arte-modelo.int.test.ts` (11 casos: foto compartida, bitácora completa del
+  borrado, copiar arte, galería). Además, en `precostos.int.test.ts`, el arte ajustado que perdió su
+  traza (`idModeloArte = null` por SetNull) **ya no se duplica** al recalcular: se reconoce por
+  nombre (es la identidad del arte dentro del modelo).
+- **Bitácora de `eliminarArte` completa** (faltaban `descripcion`, `orden` e `idArchivoFoto` — la
+  foto es la que importa: sin ella nadie puede volver a nombrar el objeto de R2), comentarios
+  rancios de "telas/avíos/bordados" corregidos, `vi.mock` a un módulo borrado retirado, y el
+  razonamiento de por qué el `DELETE` de `archivos` de la migración no puede arrastrar una
+  `modelo_foto`/`proveedor_archivo` escrito **junto al `DELETE`**.
 
 **Sigue la pieza B:** la receta de la OP congelada + liberación por Desarrollo + el precio del arte
 **por orden** + el ETL del histórico de `OrdenesHab`.
