@@ -293,11 +293,44 @@ que el precosto salga con **esos** números y no con el fallback.
 
 ---
 
-## V1-E3d · El BOM vive en la OP ⭐ (14-ago-2026)
+## V1-E3d · El BOM vive en la OP, y el arte vive en el modelo ⭐ (14-ago-2026)
 
 **Indispensable para la primera versión** (Daniel: *"creo que sí es indispensable… De hecho así
 funciona en control viejo. El BOM debe de vivir en la OP"*). Decisiones en `DECISIONES.md`
-**§Post-F9.43**.
+**§Post-F9.43** y **§Post-F9.35**.
+
+> **⭐ ABSORBE §Post-F9.35 (el arte sale del catálogo y se va al modelo).** Daniel, revisando el
+> modelo en `prueba` el 14-ago: *"habíamos quedado que el arte ya no va a salir de un catálogo, sino
+> que va a vivir en el modelo directamente. No tiene sentido usar un catálogo de artes"*. Estaba
+> decidido con todo detalle el 12-ago pero **sin etapa asignada**, a propósito: *"por si aparecen
+> otros cambios del mismo tipo que convenga hacer juntos"*. Apareció éste, y **son el mismo cambio**:
+>
+> | | Arte (§Post-F9.35) | BOM en la OP (§Post-F9.43) |
+> |---|---|---|
+> | Hoy vive en | un catálogo global | el modelo, en vivo |
+> | Debe vivir en | el modelo, como **plantilla** | la OP, **congelado** |
+> | El precio del modelo es | **referencia** | **referencia** |
+> | El precio real se define en | **la OP** | **la OP** |
+> | El override es | por arte **y por orden** | por renglón **y por orden** |
+>
+> **Daniel: _"Hazlo junto, el arte y el BOM de una vez"_** (14-ago). Razones: **una sola migración**
+> (las dos tocan el mismo territorio), **una sola pantalla** de receta de la OP —donde el arte es un
+> renglón más—, y **`costo-orden.ts` se toca UNA vez** (ahí se suman maquila, aplicación y artes;
+> partirlo obligaría a reabrirlo dos veces). La ficha de E3d ya contemplaba copiar los **artes** a la
+> receta de la OP, así que el arte por orden hacía falta de todos modos.
+>
+> **Lo que §Post-F9.35 ya dejó resuelto y NO se re-abre:** los **167 artes compartidos se duplican**
+> al migrar (cada modelo con su copia + botón «copiar arte de otro modelo»); los **898 nunca usados
+> NO se migran** (la depuración que Daniel quería, gratis); la **galería sobrevive**, armada desde
+> los modelos y diciendo de qué modelo es cada foto.
+>
+> ⚠️ **Invariante que no se puede romper (§Post-F9.35):** el precio del arte **entra UNA vez por
+> modelo, SIN multiplicar por cantidad** (así está testeado en `costo-orden.test.ts`). Al mover el
+> arte al modelo desaparece el precio del catálogo y queda **un solo precio**; el cálculo debe seguir
+> dando **exactamente lo mismo** para los datos existentes.
+>
+> **Se puede partir POR DENTRO** (primero el modelo y su arte, luego la receta de la OP) para poder
+> probar antes — pero con **un solo diseño detrás**, no dos.
 
 ### El hueco
 

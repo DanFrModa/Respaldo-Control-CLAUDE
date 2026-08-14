@@ -1889,3 +1889,99 @@ traer los cambios **a mano** — mismo comportamiento que el precosteo con sus r
   los cuatro consumidores (MRP, habilitación, costeo real, semáforo "orden completa") + los dos
   avisos + ETL al archivo histórico. Permiso REUSADO `desarrollo.administrar`.
 - **Fecha:** 2026-08-14.
+
+---
+
+#### (Post-F9.44) — El arte y el BOM de la OP se hacen JUNTOS; los datos reales se mueven al final (DANIEL, 14-ago-2026)
+
+**(a) EL ARTE SE CONSTRUYE JUNTO CON EL BOM DE LA OP.** Daniel, revisando el modelo en `prueba`:
+
+> *"Habíamos quedado que el arte ya no va a salir de un catálogo, sino que va a vivir en el modelo
+> directamente. No tiene sentido usar un catálogo de artes."*
+
+Tenía razón en el reclamo: **§Post-F9.35 estaba decidido con todo detalle desde el 12-ago pero NO
+construido** — la propia decisión cerraba con *"Aplica en: NADA todavía — decisión de rumbo"* y
+*"sin fase asignada… el orden se decide al terminar ese repaso, por si aparecen otros cambios del
+mismo tipo que convenga hacer juntos"*. Apareció uno: **§Post-F9.43 (el BOM vive en la OP) es el
+mismo cambio con otro contenido** — algo que hoy vive suelto pasa a ser **plantilla en el modelo** y
+**copia congelada en la OP**, donde el precio del modelo es de **referencia** y el real se define en
+la orden. Presentadas las dos formas lado a lado, Daniel: **_"Hazlo junto, el arte y el BOM de una
+vez."_**
+
+**Por qué juntos, en concreto:** **una sola migración** (las dos tocan el mismo territorio y las dos
+la requieren); **una sola pantalla** de receta de la OP, donde el arte es un renglón más —separados
+saldrían dos pantallas parecidas que después habría que unir—; y **`costo-orden.ts` se toca UNA
+vez** (ahí se suman maquila, aplicación y artes). La ficha de E3d ya decía que la receta de la OP
+copia *"telas, avíos, medidas por talla y artes"*, así que el arte por orden hacía falta igual.
+
+**Advertencia dada y aceptada:** juntas son una etapa **grande** (esquema, costeo, precosteo,
+galería, pantallas del modelo, receta de la OP y ETL). Se puede partir **por dentro** —primero el
+modelo y su arte, luego la receta de la OP— para poder probar antes, pero con **un solo diseño**
+detrás, no dos.
+
+**(b) LAS BASES DE DATOS REALES SE MUEVEN AL FINAL.** Daniel: *"Hasta terminar de ver que todo esté
+funcional, movemos las bases de datos."* O sea: primero se verifica el **sistema** con lo que hay en
+`prueba`, y solo después se trae el corte fresco de Access.
+
+⚠️ **Precisión que se le dio y no contradice la decisión:** la verificación **funcional** (pantallas,
+flujos, botones) no necesita datos frescos, pero el **ensayo de migración (V1-E7) SÍ** — se corre
+sobre base vaciada con el corte real. Así que el ensayo queda **al final de la fila**, después de la
+verificación funcional. Con esto, el **Excel definitivo del inventario de telas** (sus tres hojas de
+catálogo) también espera al corte; el borrador de trabajo ya está en manos de Daniel y su columna
+**✔ Revisión** avisará sola si algún nombre cambió entre tanto.
+
+**(c) Contexto: Cloudflare ya lo está revisando Gabriel.** El bloqueo de subida de fotos
+(§Post-F9.45) es configuración —llave S3 sin permiso de escritura o CORS del bucket—, no código.
+
+- **Aplica en:** V1-E3d, que absorbe §Post-F9.35 (ficha `docs/hoja-de-ruta/V1-etapas.md`).
+  **Requiere migración**; permisos y seed, no.
+- **Fecha:** 2026-08-14.
+
+---
+
+#### (Post-F9.45) — El error de subida de archivos mentía y borraba de más (V1, 14-ago-2026)
+
+Daniel intentó subir la foto de un modelo en `prueba` y le salió *"No se pudo subir la imagen.
+Verifica tu conexión e intenta de nuevo"* **con internet perfecto**. Diagnóstico: la **causa raíz no
+es código** sino **configuración de Cloudflare R2** (llave S3 sin permiso de escritura, o CORS del
+bucket) — la trampa ya estaba documentada desde F1 (`docs/hoja-de-ruta/F1-etapas.md:222`). Lo que sí
+era del sistema:
+
+1. **El mensaje mandaba a buscar donde no era.** Un `fetch` del navegador solo lanza por red, DNS o
+   **CORS**, y R2 al rechazar por permisos contesta **sin cabeceras CORS** → el navegador disfraza un
+   403 de falla de red. El texto ahora dice que puede ser configuración del almacenamiento y **no** la
+   conexión; el camino donde R2 sí contesta incluye el **código HTTP** (el dato que le sirve a
+   Gabriel), sin jerga visible para el usuario.
+2. **Cada intento fallido dejaba un fantasma:** el registro se crea ANTES de subir (inherente al
+   flujo prefirmado), así que N intentos dejaban N fotos apuntando a una imagen que nunca llegó.
+   Ahora el fallo limpia en best-effort **sin tapar** el error original.
+3. **Eran OCHO sitios, no cuatro** → se extrajo el helper `frontend/src/api/subida-archivo.ts`. El
+   **logo de empresa va SIN limpieza a propósito**: su flujo tiene un tercer paso de confirmación y
+   su `DELETE` borraría el logo **anterior**, que sigue siendo el bueno.
+
+**Lo que encontraron las dos rondas de revisión — los dos defectos los introdujo el propio arreglo:**
+
+- **El borrado del arte no decía CUÁL foto quitar.** Siete módulos borran el archivo recién creado;
+  bordados borraba *la que estuviera puesta*. Dos personas tocando el mismo arte a la vez → la
+  limpieza del que falla borraba **la imagen buena del otro**, en silencio. Cerrado con `idArchivo`
+  opcional + **compare-and-set** (`updateMany` con el `WHERE` sobre `idArchivoFoto`, que Postgres
+  re-evalúa tras tomar el lock): **sin ventana**, a diferencia del check-then-act.
+- **La corrección rompió el botón «quitar foto».** TanStack Query llama al `mutationFn` con **dos**
+  argumentos, así que al darle un segundo parámetro a `quitarFoto` el contexto interno caía en
+  `idArchivo` y openapi-fetch reventaba antes del DELETE. Barridos los ~160 `mutationFn:` del
+  frontend: era el único con función de más de un parámetro.
+
+**⚠️ LA LECCIÓN DE PROCESO, que vale más que el arreglo:** el lead validó con `npx tsc --noEmit`,
+que **NO** es el comando del proyecto (el del frontend es `tsc -b --noEmit`; sin `-b` no recorre los
+proyectos referenciados y **sale limpio con errores reales adentro**). Reportó "typecheck limpio" en
+el commit y al usuario **estando rojos el typecheck Y el lint**. Lo cazó el reviewer independiente.
+Queda en `CLAUDE.md` §8 con los comandos correctos y el corolario: **el CI es el único juez**.
+
+De oficio y sin callarlas (§7.3): dos carreras **pre-existentes** del mismo molde
+(`solicitarSubidaFoto` y `confirmarFotoBordado`: dos reemplazos concurrentes → P2025 → **500**),
+cerradas con el mismo compare-and-set.
+
+- **Aplica en:** PR #178 (en `prueba`). **SIN migración, SIN permisos, SIN seed.** Cambio de contrato
+  menor y compatible: `idArchivo` opcional en `DELETE /api/bordados/{id}/foto`.
+  ⚠️ **NO arregla la subida** — eso depende de que Gabriel corrija Cloudflare.
+- **Fecha:** 2026-08-14.
