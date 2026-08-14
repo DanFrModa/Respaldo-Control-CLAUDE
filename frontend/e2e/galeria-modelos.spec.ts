@@ -86,8 +86,18 @@ test.describe('Galería de modelos (móvil)', () => {
     await expect(page.getByText('No hay modelos que coincidan con la búsqueda.')).toBeVisible();
 
     // ── Al tocar una tarjeta, abre la ficha (pantalla de Modelos) ───────────────
+    //
+    // ⚠️ NO se ancla en el <h1> de la pantalla de Modelos: el deep-link abre el CAJÓN del modelo,
+    // que es modal (Radix `Dialog` → `hideOthers()`), y todo lo que queda fuera del portal recibe
+    // `aria-hidden="true"`; `getByRole()` lee el árbol de accesibilidad, así que ese encabezado ya
+    // no es alcanzable. Antes esta línea pedía `{ name: 'Modelos' }` SIN `exact` y pasaba en falso:
+    // el matcher es substring e insensible a mayúsculas, así que casaba con el «Galería de modelos»
+    // de la pantalla que estamos ABANDONANDO (React Router 7 navega de forma asíncrona) — nunca
+    // llegaba a comprobar que la ficha se abriera. Se ancla en la URL + el cajón del modelo.
     await page.getByTestId('buscar-galeria-modelo').fill(conFoto);
     await page.getByTestId('celda-galeria-modelo').filter({ hasText: conFoto }).click();
-    await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
+    await expect(page).toHaveURL(/\/modelos$/);
+    await expect(page.getByTestId('detalle-modelo')).toBeVisible();
+    await expect(page.getByRole('heading', { name: conFoto })).toBeVisible();
   });
 });

@@ -455,4 +455,82 @@ describe('<ModelosPagina>', () => {
     fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     expect(screen.getByRole('heading', { name: /501/ })).toBeInTheDocument();
   });
+
+  it('deep-link con la ficha aún en vuelo: el cajón abre CARGANDO, no en blanco', async () => {
+    // El modelo del deep-link no está en la página visible y su ficha todavía viaja.
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501')]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 999
+        ? { data: undefined, isPending: true, isError: false, error: null }
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(modelo(id, '501'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
+    });
+
+    expect(await screen.findByTestId('detalle-modelo-cargando')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Abriendo modelo…' })).toBeInTheDocument();
+  });
+
+  it('deep-link a un modelo que no se pudo traer: el cajón muestra el error del API', async () => {
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501')]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 999
+        ? {
+            data: undefined,
+            isPending: false,
+            isError: true,
+            error: new ErrorDeApi({ codigo: 'NO_ENCONTRADO', mensaje: 'El modelo no existe.' }),
+          }
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(modelo(id, '501'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('El modelo no existe.');
+    expect(screen.queryByTestId('detalle-modelo-cargando')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Ancla del arreglo de `arte.spec.ts` / `galeria-modelos.spec.ts` (CI de V1-E3d): el cajón del
+   * modelo es MODAL (Radix `Dialog` → `hideOthers()`), así que mientras está abierto todo lo que
+   * queda fuera del portal lleva `aria-hidden="true"` y SALE del árbol de accesibilidad. El
+   * `<h1>Modelos</h1>` sigue en el DOM, pero ni `getByRole` de Testing Library ni el de Playwright
+   * lo alcanzan. Es el comportamiento CORRECTO de un modal: por eso los e2e del deep-link se
+   * anclan en la URL y en el cajón, nunca en el encabezado del fondo. Si esta prueba se pone en
+   * rojo es que el cajón dejó de ser modal — y entonces sí se puede volver a anclar en el <h1>.
+   */
+  it('deep-link: con el cajón abierto, el <h1> del fondo sale del árbol de accesibilidad', async () => {
+    const m999 = modelo(999, 'DEEP-999');
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501')]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 999
+        ? fichaCargada(ficha(m999))
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(modelo(id, '501'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
+    });
+
+    await screen.findByTestId('detalle-modelo');
+    // El encabezado SIGUE en el DOM…
+    expect(document.querySelector('h1')).toHaveTextContent('Modelos');
+    // …pero no es consultable por rol mientras el modal esté encima.
+    expect(screen.queryByRole('heading', { name: 'Modelos', exact: true })).not.toBeInTheDocument();
+    // Lo que SÍ es consultable —y en lo que se anclan los e2e— es el cajón con su modelo.
+    expect(screen.getByRole('heading', { name: /DEEP-999/ })).toBeInTheDocument();
+  });
 });

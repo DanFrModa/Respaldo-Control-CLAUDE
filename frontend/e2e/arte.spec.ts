@@ -126,7 +126,17 @@ test.describe('Galería de arte', () => {
     await expect(celda).toContainText(codigo);
 
     // Al tocarla, lleva al MODELO dueño (ahí se edita el arte).
+    //
+    // ⚠️ NO se ancla en el <h1>Modelos</h1> del fondo: el deep-link abre el CAJÓN del modelo, que
+    // es un modal (Radix `Dialog`) y llama a `hideOthers()` → todo lo que queda fuera del portal
+    // recibe `aria-hidden="true"`. `getByRole()` consulta el ÁRBOL DE ACCESIBILIDAD, así que ese
+    // encabezado deja de existir para el localizador mientras el cajón esté abierto (es el
+    // comportamiento CORRECTO de un modal, no un defecto). Se ancla en lo que de verdad prueba el
+    // requisito de Daniel: la URL de Modelos y el cajón abierto CON EL MODELO DUEÑO.
     await celda.click();
-    await expect(page.getByRole('heading', { name: 'Modelos', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/modelos$/);
+    await expect(page.getByTestId('detalle-modelo')).toBeVisible();
+    // El código del modelo dueño va en el título del cajón (los e2e lo buscan ahí).
+    await expect(page.getByRole('heading', { name: codigo })).toBeVisible();
   });
 });
