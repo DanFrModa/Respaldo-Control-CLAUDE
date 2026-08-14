@@ -29,6 +29,15 @@ export const ENTIDAD_MAPEO = {
    * COMPUESTA: `<IdBordados>:<IdModelos>` → `ModeloArte.id`. La usa la carga de fotos de arte.
    */
   modeloArte: 'ModeloArte',
+  /**
+   * V1-E3d: constancia DURABLE de los artes del catálogo viejo que la migración
+   * `20260814120000_arte_en_el_modelo` NO migró porque ningún modelo los usaba (la depuración que
+   * pidió Daniel). No mapea a nada nuevo — `idNuevo` es `'(descartado)'` y el detalle del arte
+   * (nombre, tipo, precio, foto…) vive en `datos`. Se registra aquí para que la clave no se
+   * reinvente y para poder consultarla después del deploy:
+   * `SELECT clave_vieja, datos FROM mapeo_migracion WHERE entidad = 'Bordado:DescartadoSinUso'`.
+   */
+  bordadoDescartadoSinUso: 'Bordado:DescartadoSinUso',
   avio: 'Avio',
   genero: 'Genero',
   temporada: 'Temporada',

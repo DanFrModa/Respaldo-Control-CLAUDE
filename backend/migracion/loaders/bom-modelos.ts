@@ -10,6 +10,13 @@
  * "set-completo" del dominio: el dominio hace el diff (agrega/quita/actualiza) de forma atómica
  * (A2). Re-ejecutar produce el mismo estado.
  *
+ * ⚙️ **Todo se escribe POR LOTES, nunca registro por registro** (regla de Gabriel, `CLAUDE.md` §8):
+ * los tres tipos de renglón se agrupan POR MODELO y cada modelo se resuelve en UNA transacción —
+ * el arte incluido, con su renglón de mapeo dentro de la misma transacción. Los mapeos se cargan
+ * de un golpe con `cargarMapaNumerico` (cero `leerMapeo` por fila). Si un lote de arte truena por
+ * data sucia, se reintenta renglón por renglón: la tolerancia del ETL no se paga con rendimiento
+ * en el caso normal.
+ *
  * ⚠️ **El ARTE ya NO sale de un catálogo** (V1-E3d, §Post-F9.35). `Bordados.csv` se lee aquí
  * como FUENTE de los datos del arte (nombre/tipo/puntadas/precio) y cada renglón de
  * `ModelosBor.csv` crea el arte DENTRO de su modelo — o sea, un arte usado por 3 modelos produce
@@ -33,7 +40,7 @@
 import { reemplazarAviosBom, reemplazarTelasBom } from '../../src/dominio/modelos/bom-modelo.js';
 import { crearArte } from '../../src/dominio/modelos/arte-modelo.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
-import type { ContextoBd } from '../../src/comun/transaccion.js';
+import { enTransaccion, type ContextoBd, type Tx } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
@@ -42,7 +49,6 @@ import {
   ENTIDAD_MAPEO,
   cargarMapaNumerico,
   guardarMapeo,
-  leerMapeo,
   type ClienteMapeo,
 } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
@@ -339,6 +345,14 @@ interface ArteViejo {
   precio: number | undefined;
 }
 
+/** Un arte pendiente de crear en un modelo, ya resuelto contra el catálogo viejo. */
+interface ArtePorCrear {
+  /** Clave COMPUESTA del mapeo: `<IdBordados>:<IdModelos>` (un arte viejo → N artes nuevos). */
+  clave: string;
+  idModeloViejo: string;
+  datos: ArteViejo;
+}
+
 /**
  * Lee `Bordados.csv` a un mapa `IdBordados → datos del arte`. Es la FUENTE de los datos; ya no
  * crea ningún catálogo (V1-E3d). Los que ningún modelo use se quedarán sin migrar y se reportan.
@@ -395,6 +409,14 @@ async function cargarArtesModelos(
   const catalogoViejo = leerCatalogoArteViejo(reporte);
   const filas = leerCsv('ModelosBor.csv');
 
+  // Igual que telas y avíos: el mapeo se carga DE UN GOLPE (no un `leerMapeo` por fila — ese era
+  // justo el N+1 que este loader dice evitar) y los artes se AGRUPAN POR MODELO para escribirlos
+  // por lotes, en una transacción por modelo (regla de Gabriel: los ETL escriben por lotes, NUNCA
+  // registro por registro). ~2,378 renglones pasaban de ~2,378 transacciones a una por modelo.
+  const mapaArte = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.modeloArte);
+
+  const porModelo = new Map<number, ArtePorCrear[]>();
+
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
@@ -443,34 +465,23 @@ async function cargarArtesModelos(
     vistos.add(clave);
 
     // Idempotencia: si ya migramos ESTE par, no se vuelve a crear.
-    if ((await leerMapeo(cliente, ENTIDAD_MAPEO.modeloArte, clave)) !== null) {
+    if (mapaArte.has(clave)) {
       existentes += 1;
       continue;
     }
 
-    const creado = await intentarCrear(reporte, 'ModeloArte', clave, () =>
-      crearArte(
-        sesion,
-        idModelo,
-        {
-          nombre: datos.nombre,
-          tipo: datos.tipo,
-          ...(datos.descripcion === undefined ? {} : { descripcion: datos.descripcion }),
-          ...(datos.puntadas === undefined ? {} : { puntadas: datos.puntadas }),
-          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
-        },
-        bd,
-      ),
-    );
-    if (creado === null) {
-      omitidosValidacion += 1;
-      continue;
+    const pendientes = porModelo.get(idModelo);
+    if (pendientes === undefined) {
+      porModelo.set(idModelo, [{ clave, idModeloViejo, datos }]);
+    } else {
+      pendientes.push({ clave, idModeloViejo, datos });
     }
-    await guardarMapeo(cliente, ENTIDAD_MAPEO.modeloArte, clave, creado.id, {
-      nombre: creado.nombre,
-      idModeloViejo,
-    });
-    creados += 1;
+  }
+
+  for (const [idModelo, artes] of porModelo.entries()) {
+    const resultado = await crearArtesDeUnModelo(sesion, bd, reporte, idModelo, artes);
+    creados += resultado.creados;
+    omitidosValidacion += resultado.omitidosValidacion;
   }
 
   // La DEPURACIÓN que pedía Daniel: el arte que ningún modelo usa no se migra… pero se REPORTA.
@@ -487,4 +498,77 @@ async function cargarArtesModelos(
   }
 
   return { creados, existentes, omitidos, omitidosValidacion };
+}
+
+/**
+ * Crea, EN UN LOTE, todo el arte pendiente de UN modelo: una sola transacción para los k artes
+ * (el dominio se une a ella por `bd.tx`, A2) con su renglón de mapeo dentro de la MISMA
+ * transacción — si algo revienta, no queda ni arte sin mapeo ni mapeo sin arte.
+ *
+ * Si el lote falla (una fila sucia envenena la transacción de Postgres y se lleva a las buenas),
+ * se REINTENTA renglón por renglón, cada uno en su transacción: así se conserva la tolerancia del
+ * ETL (§7: una fila mala nunca aborta la carga) sin pagar una transacción por fila en el caso
+ * normal, que es el de siempre.
+ */
+async function crearArtesDeUnModelo(
+  sesion: SesionUsuario,
+  bd: ContextoBd,
+  reporte: Reporte,
+  idModelo: number,
+  artes: ArtePorCrear[],
+): Promise<{ creados: number; omitidosValidacion: number }> {
+  try {
+    await enTransaccion(async (tx) => {
+      for (const arte of artes) {
+        await crearArteYMapear(sesion, tx, idModelo, arte);
+      }
+    }, bd);
+    return { creados: artes.length, omitidosValidacion: 0 };
+  } catch (error) {
+    reporte.agregar(
+      'Arte: lote del modelo REINTENTADO renglón por renglón (data sucia en el lote)',
+      `idModelo=${String(idModelo)} · artes=${String(artes.length)} · ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  let creados = 0;
+  let omitidosValidacion = 0;
+  for (const arte of artes) {
+    const hecho = await intentarCrear(reporte, 'ModeloArte', arte.clave, () =>
+      enTransaccion((tx) => crearArteYMapear(sesion, tx, idModelo, arte), bd),
+    );
+    if (hecho === null) {
+      omitidosValidacion += 1;
+    } else {
+      creados += 1;
+    }
+  }
+  return { creados, omitidosValidacion };
+}
+
+/** Crea UN arte dentro del modelo y guarda su mapeo, los DOS en la transacción que recibe. */
+async function crearArteYMapear(
+  sesion: SesionUsuario,
+  tx: Tx,
+  idModelo: number,
+  arte: ArtePorCrear,
+): Promise<void> {
+  const creado = await crearArte(
+    sesion,
+    idModelo,
+    {
+      nombre: arte.datos.nombre,
+      tipo: arte.datos.tipo,
+      ...(arte.datos.descripcion === undefined ? {} : { descripcion: arte.datos.descripcion }),
+      ...(arte.datos.puntadas === undefined ? {} : { puntadas: arte.datos.puntadas }),
+      ...(arte.datos.precio === undefined ? {} : { precio: arte.datos.precio }),
+    },
+    { tx },
+  );
+  await guardarMapeo(tx, ENTIDAD_MAPEO.modeloArte, arte.clave, creado.id, {
+    nombre: creado.nombre,
+    idModeloViejo: arte.idModeloViejo,
+  });
 }

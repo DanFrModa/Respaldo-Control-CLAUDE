@@ -398,3 +398,11 @@ Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
 - **Idempotente:** una segunda corrida no duplica (resuelve "ya existe" por `MapeoMigracion` y/o el unique `(idEmpresa, folio)`). Si una corrida se corta a media, re-ejecutar retoma donde quedó.
 - **Re-ejecutable:** el ETL de F2 se vuelve a correr en F10 (al corte de go-live).
 - **Reporte:** `etl-pedidos-ordenes.ts` escribe un `reporte-etl-f2e5-<timestamp>.txt` y `etl-ipt.ts` un `reporte-etl-f3-<timestamp>.txt` (ambos gitignored) con el cuadre y las incidencias a revisar con Daniel.
+- **Arte descartado en la depuración (V1-E3d):** los artes del catálogo viejo que **ningún modelo usaba** no se migran (decisión §Post-F9.35). Por el ETL van al reporte; en una base que YA traía datos, la migración `20260814120000_arte_en_el_modelo` deja la constancia **en la base**, consultable después del deploy (el `RAISE NOTICE` no llega a los logs de `prisma migrate deploy`):
+
+  ```sql
+  SELECT clave_vieja AS id_bordado_viejo, datos
+    FROM mapeo_migracion
+   WHERE entidad = 'Bordado:DescartadoSinUso'
+   ORDER BY datos->>'nombre';
+  ```

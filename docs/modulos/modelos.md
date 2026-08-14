@@ -101,6 +101,15 @@ modelos se duplicó al migrar (§Post-F9.35) y las copias COMPARTEN el mismo `Ar
 R2 se sube una vez; `archivos.key` es único). Por eso quitar la foto de un arte solo borra el
 `Archivo` cuando ningún otro arte lo referencia.
 
+Esa cuenta se hace **con la fila de `archivos` bloqueada** (`SELECT … FOR UPDATE` antes del
+`count`, en `borrarArchivoSiQuedoHuerfano`). No es adorno: sin el candado, copiar un arte y quitar
+su foto en paralelo podían cruzarse y dejar **la copia sin foto y su `Archivo` borrado** (el
+`count` no ve el INSERT que aún no commitea, y el `ON DELETE SET NULL` de la FK hace el resto);
+y dos quitados simultáneos dejaban la fila `Archivo` huérfana. El candado conflictúa con el
+`FOR KEY SHARE` que toma el INSERT y serializa ambos casos. Los tres caminos que borran arte —
+quitar la foto, eliminar el arte y **copiar la receta con reemplazo** (`bom-modelo.ts`)— pasan por
+la misma función.
+
 ### Foto principal y arte principal (Daniel, 25-jul-2026)
 
 El modelo tiene **una foto principal** ("la más importante") y **un arte principal**. La regla es:

@@ -89,9 +89,6 @@ vi.mock('@/api/temporadas', () => ({
 vi.mock('@/api/tallas', () => ({ useCurvas: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/telas', () => ({ useTelas: () => ({ data: { datos: [] }, isPending: false }) }));
 vi.mock('@/api/avios', () => ({ useAvios: () => ({ data: { datos: [] }, isPending: false }) }));
-vi.mock('@/api/bordados', () => ({
-  useBordados: () => ({ data: { datos: [] }, isPending: false }),
-}));
 vi.mock('@/api/calidad', () => ({
   useTiposProductoActivos: () => ({
     data: { datos: [], total: 0, pagina: 1, totalPaginas: 0, porPagina: 100 },

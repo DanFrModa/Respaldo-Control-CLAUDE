@@ -112,7 +112,13 @@ export interface ModeloArteDetalle {
   modificadoPorId: string | null;
 }
 
-/** Celda de la galería de arte: el arte + DE QUÉ MODELO es. */
+/**
+ * Celda de la galería de arte: el arte + DE QUÉ MODELO es.
+ *
+ * El `precio` viaja aunque la REJILLA de la galería no lo pinte: este mismo endpoint alimenta el
+ * diálogo «copiar arte de otro modelo» (`CopiarArteDialogo.tsx`), donde sí se muestra — copiar un
+ * arte copia su precio, así que el usuario tiene que verlo ANTES de elegir cuál copia.
+ */
 export interface GaleriaArteItem {
   id: number;
   nombre: string;
@@ -259,6 +265,38 @@ async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Pro
 async function siguienteOrden(tx: Tx, idModelo: number): Promise<number> {
   const maximo = await tx.modeloArte.aggregate({ where: { idModelo }, _max: { orden: true } });
   return (maximo._max.orden ?? -1) + 1;
+}
+
+/**
+ * Snapshot de **TODO** lo que decía un renglón de arte, para la bitácora de un borrado (D3: nada
+ * se borra en silencio). Vive en un solo lugar porque el arte se borra desde DOS caminos —
+ * {@link eliminarArte} y «copiar receta con reemplazo» (`bom-modelo.ts`)— y los dos deben dejar el
+ * MISMO rastro. Al desaparecer el catálogo, esta fila ES el arte: si no se registra `precio`,
+ * `idProveedor` ni `idArchivoFoto`, no hay de dónde recuperarlos (y el precio entra al costo de la
+ * OP, `costos/costo-orden.ts`).
+ */
+export function datosArteParaBitacora(a: {
+  id: number;
+  nombre: string;
+  tipo: TipoArte;
+  descripcion: string | null;
+  puntadas: number | null;
+  precio: Prisma.Decimal | null;
+  idProveedor: number | null;
+  idArchivoFoto: string | null;
+  orden: number;
+}): Prisma.InputJsonObject {
+  return {
+    id: a.id,
+    nombre: a.nombre,
+    tipo: a.tipo,
+    descripcion: a.descripcion,
+    puntadas: a.puntadas,
+    precio: a.precio === null ? null : a.precio.toNumber(),
+    idProveedor: a.idProveedor,
+    idArchivoFoto: a.idArchivoFoto,
+    orden: a.orden,
+  };
 }
 
 /** Traduce el choque del unique `(idModelo, nombre)` a un 409 con mensaje de negocio. */
@@ -474,21 +512,14 @@ export async function eliminarArte(
 
     await tocarModelo(tx, sesion, idModelo);
     // No hay acción `ELIMINAR` en el enum de bitácora (A7) y el arte no tiene borrado suave: se
-    // registra como MODIFICAR con `operacion: 'quitar'` y TODO lo que decía el renglón, para que
-    // el rastro conserve lo que se fue (D3: nada se borra en silencio).
+    // registra como MODIFICAR con `operacion: 'quitar'` y TODO lo que decía el renglón
+    // ({@link datosArteParaBitacora} — descripción, orden y la FOTO incluidas), para que el rastro
+    // conserve lo que se fue (D3: nada se borra en silencio).
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
       accion: 'MODIFICAR',
-      datos: {
-        operacion: 'quitar',
-        idModelo,
-        nombre: actual.nombre,
-        tipo: actual.tipo,
-        precio: actual.precio === null ? null : actual.precio.toNumber(),
-        idProveedor: actual.idProveedor,
-        puntadas: actual.puntadas,
-      },
+      datos: { operacion: 'quitar', idModelo, ...datosArteParaBitacora(actual) },
     });
   }, bd);
 }
@@ -724,8 +755,37 @@ export interface FotoArteConUrl {
  * puedan COMPARTIR foto (migración de los artes duplicados + «copiar arte de otro modelo»):
  * borrarlo a ciegas dejaría a los demás artes sin su imagen. El objeto en R2 se queda (deuda ya
  * documentada en `comun/archivos.ts`: no hay DeleteObject).
+ *
+ * Se EXPORTA porque el arte se borra desde DOS caminos: {@link eliminarArte} y «copiar receta con
+ * reemplazo» (`bom-modelo.ts`), que barre el arte del destino y debe cuidar sus fotos igual.
+ *
+ * ⚠️ **El `SELECT … FOR UPDATE` de la primera línea NO es decorativo: sin él la cuenta miente.**
+ * Bajo READ COMMITTED, "contar y decidir" es un check-then-act y la foto compartida abre DOS
+ * carreras, una de ellas con PÉRDIDA DE IMAGEN:
+ *
+ *  1. *Copia vs. quitado.* T1 copia el arte 10 a otro modelo (la copia comparte `arch_7`,
+ *     {@link copiarArteDeOtroModelo}); T2 quita la foto del arte 10. Si el `count` de T2 corre
+ *     antes de que el INSERT de T1 sea visible, T2 ve 0 y borra `arch_7`. Ese DELETE se forma
+ *     detrás del `FOR KEY SHARE` que el INSERT de T1 tomó sobre la fila de `archivos`, y al
+ *     commit de T1 el `ON DELETE SET NULL` de la FK deja la copia recién nacida con
+ *     `id_archivo_foto = NULL`: **la copia nace sin foto y su `Archivo` desaparece**, en silencio.
+ *  2. *Dos quitados a la vez.* Dos artes que comparten `arch_7` se quitan en paralelo: los dos
+ *     `count` ven al otro arte todavía apuntando → ninguno borra → la fila `Archivo` queda
+ *     HUÉRFANA (sin objeto R2 recuperable por nombre).
+ *
+ * El candado de la fila de `archivos` cierra las dos: conflictúa con el `FOR KEY SHARE` del
+ * INSERT (caso 1: el quitado espera al commit de la copia, re-cuenta con snapshot nuevo y ya la
+ * ve) y serializa los quitados simultáneos (caso 2: el segundo cuenta 0 y borra). Si el candado
+ * no devuelve fila, el `Archivo` ya lo borró otro camino y aquí no hay nada que hacer (evita un
+ * P2025 → 500 por borrar dos veces).
  */
-async function borrarArchivoSiQuedoHuerfano(tx: Tx, idArchivo: string): Promise<void> {
+export async function borrarArchivoSiQuedoHuerfano(tx: Tx, idArchivo: string): Promise<void> {
+  const bloqueado = await tx.$queryRaw<
+    { id: string }[]
+  >`SELECT "id" FROM "archivos" WHERE "id" = ${idArchivo} FOR UPDATE`;
+  if (bloqueado.length === 0) {
+    return; // ya no existe: otro camino lo borró y su fila está commiteada
+  }
   const enUso = await tx.modeloArte.count({ where: { idArchivoFoto: idArchivo } });
   if (enUso === 0) {
     await tx.archivo.delete({ where: { id: idArchivo } });
