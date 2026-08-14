@@ -1,6 +1,6 @@
 import { ImageIcon } from 'lucide-react';
 
-import { useFotoBordado } from '@/api/bordados';
+import { useFotoArte } from '@/api/artes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -20,27 +20,31 @@ const CLASES_ICONO: Record<TamanoMiniatura, string> = {
 };
 
 /**
- * Miniatura de SOLO LECTURA de la foto de un bordado: pide la URL de descarga
- * prefirmada (`useFotoBordado`) y la muestra; si el bordado no tiene foto (o aun no
- * carga) muestra el placeholder NoFoto. Se usa en la lista, el detalle y la galeria
- * (de ahi los tres tamaños). No edita: subir/quitar vive en `FotoBordado` (dialogo).
+ * Miniatura de SOLO LECTURA de la foto de un ARTE del modelo (V1-E3d): pide la URL de descarga
+ * prefirmada (`useFotoArte`) y la muestra; si el arte no tiene foto (o aún no carga) muestra el
+ * placeholder NoFoto. La usan la galería y el editor de arte del modelo (de ahí los tres tamaños).
+ * No edita: subir/quitar vive en `FotoArte`.
  *
- * La consulta de la foto se cachea por id (TanStack Query), asi que la miniatura de la
- * lista y la del detalle del mismo bordado comparten la misma peticion.
+ * Cuando el arte NO tiene foto (`tieneFoto=false`) ni siquiera se pide la URL: el listado ya trae
+ * `idArchivoFoto`, así que la galería no dispara una petición por celda vacía.
  */
-export function MiniaturaFoto({
-  idBordado,
+export function MiniaturaArte({
+  idModelo,
+  idArte,
   nombre,
+  tieneFoto,
   tamano = 'sm',
 }: {
-  idBordado: number;
+  idModelo: number;
+  idArte: number;
   nombre: string;
+  tieneFoto: boolean;
   tamano?: TamanoMiniatura;
 }): React.JSX.Element {
-  const consulta = useFotoBordado(idBordado);
+  const consulta = useFotoArte(tieneFoto ? idModelo : undefined, tieneFoto ? idArte : undefined);
   const url = consulta.data?.urlDescarga ?? null;
 
-  if (consulta.isPending) {
+  if (tieneFoto && consulta.isPending) {
     return <Skeleton className={cn('shrink-0', CLASES_TAMANO[tamano])} />;
   }
 

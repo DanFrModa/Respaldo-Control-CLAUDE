@@ -2,52 +2,50 @@ import { SearchIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useBordados, type Bordado, type BordadosQuery } from '@/api/bordados';
+import { useGaleriaArte, type GaleriaArteItem, type GaleriaArteQuery } from '@/api/artes';
+import { ETIQUETAS_TIPO_ARTE, TIPOS_ARTE, type TipoArteClave } from '@/modulos/arte/esquemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/useDebounce';
 
-import { MiniaturaFoto } from './MiniaturaFoto';
-import { ETIQUETAS_TIPO_BORDADO, TIPOS_BORDADO, type TipoBordadoClave } from './esquemas';
+import { MiniaturaArte } from './MiniaturaArte';
 
-/** Renglones por pagina de la galeria (grid). */
+/** Renglones por página de la galería (grid). */
 const POR_PAGINA = 24;
 
 /** Valor del filtro de tipo que significa "todos" (sin filtrar). */
 const TIPO_TODOS = 'TODOS';
 
 /**
- * Galeria visual de fotos de bordados (rediseño "Teal fresco"), pensada MOVIL: una
- * rejilla de miniaturas paginada EN SERVIDOR (volumen ~2,964) con busqueda (debounce) y
- * filtro por tipo. Cada celda muestra la foto (o placeholder NoFoto) y el nombre; al
- * tocarla abre la ficha del bordado (`/catalogos/bordados` con el id en el estado de
- * navegacion). Solo lectura: el alta/edicion/foto vive en la pantalla principal.
+ * Galería visual del ARTE, armada DESDE los modelos (V1-E3d, §Post-F9.35 punto 4).
  *
- * `bordados.ver` gobierna el acceso (igual que el CRUD). La decision real la toma el
- * backend en cada ruta (A1).
+ * La galería SOBREVIVIÓ al retiro del catálogo de arte: sigue sirviendo para buscar visualmente
+ * *"ese bordado que hicimos"*, pero ahora cada foto dice **de qué modelo** es y al tocarla lleva a
+ * ese modelo. Rejilla paginada EN SERVIDOR con búsqueda (debounce, por nombre del arte o por
+ * clave/nombre del modelo) y filtro por tipo.
+ *
+ * `modelos.ver` gobierna el acceso. La decisión real la toma el backend en cada ruta (A1).
  */
-export function GaleriaBordados(): React.JSX.Element {
-  // El acceso a la ruta ya lo gobierna `bordados.ver` (App.tsx) y el backend (A1).
+export function GaleriaArte(): React.JSX.Element {
   const navigate = useNavigate();
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [tipoFiltro, setTipoFiltro] = useState<TipoBordadoClave | typeof TIPO_TODOS>(TIPO_TODOS);
+  const [tipoFiltro, setTipoFiltro] = useState<TipoArteClave | typeof TIPO_TODOS>(TIPO_TODOS);
   const [pagina, setPagina] = useState(1);
 
-  const query: BordadosQuery = {
+  const query: GaleriaArteQuery = {
     pagina,
     porPagina: POR_PAGINA,
     ordenarPor: 'nombre',
     direccion: 'asc',
-    incluirInactivos: 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
   };
 
-  const consulta = useBordados(query);
+  const consulta = useGaleriaArte(query);
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
 
@@ -57,14 +55,14 @@ export function GaleriaBordados(): React.JSX.Element {
   }
 
   function alCambiarTipo(valor: string): void {
-    setTipoFiltro(valor as TipoBordadoClave | typeof TIPO_TODOS);
+    setTipoFiltro(valor as TipoArteClave | typeof TIPO_TODOS);
     setPagina(1);
   }
 
-  /** Abre la ficha del bordado en la pantalla principal (lleva el id en el estado). */
-  function abrirFicha(bordado: Bordado): void {
-    // navigate() es asincrono en React Router 7; no necesitamos esperarlo.
-    void navigate('/catalogos/bordados', { state: { idBordado: bordado.id } });
+  /** Abre el MODELO dueño del arte (ahí se edita: el arte ya no tiene pantalla propia). */
+  function abrirModelo(item: GaleriaArteItem): void {
+    // navigate() es asíncrono en React Router 7; no necesitamos esperarlo.
+    void navigate('/modelos', { state: { idModelo: item.idModelo } });
   }
 
   return (
@@ -76,12 +74,12 @@ export function GaleriaBordados(): React.JSX.Element {
             Galería de arte
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
-            Vista visual del arte (bordado y estampado) con foto.
+            Vista visual del arte (bordado y estampado) con el modelo al que pertenece.
           </p>
         </div>
       </div>
 
-      {/* Controles: busqueda + filtro por tipo */}
+      {/* Controles: búsqueda + filtro por tipo */}
       <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <SearchIcon
@@ -90,11 +88,11 @@ export function GaleriaBordados(): React.JSX.Element {
           />
           <Input
             type="search"
-            placeholder="Buscar por nombre…"
+            placeholder="Buscar por arte o por modelo…"
             className="pl-8"
             value={textoBusqueda}
             onChange={(e) => alBuscar(e.target.value)}
-            aria-label="Buscar arte por nombre"
+            aria-label="Buscar arte por nombre o por modelo"
             data-testid="buscar-galeria"
           />
         </div>
@@ -106,9 +104,9 @@ export function GaleriaBordados(): React.JSX.Element {
           className="sm:w-56"
         >
           <option value={TIPO_TODOS}>Todos los tipos</option>
-          {TIPOS_BORDADO.map((tipo) => (
+          {TIPOS_ARTE.map((tipo) => (
             <option key={tipo} value={tipo}>
-              {ETIQUETAS_TIPO_BORDADO[tipo]}
+              {ETIQUETAS_TIPO_ARTE[tipo]}
             </option>
           ))}
         </SelectNativo>
@@ -139,17 +137,32 @@ export function GaleriaBordados(): React.JSX.Element {
             className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
             data-testid="galeria-grid"
           >
-            {(datos?.datos ?? []).map((bordado) => (
-              <li key={bordado.id}>
+            {(datos?.datos ?? []).map((item) => (
+              <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => abrirFicha(bordado)}
+                  onClick={() => abrirModelo(item)}
                   className="group flex w-full flex-col items-center gap-2 rounded-xl border bg-card p-2 text-center transition-all hover:ring-2 hover:ring-primary/40 hover:shadow-sm"
                   data-testid="celda-galeria"
                 >
-                  <MiniaturaFoto idBordado={bordado.id} nombre={bordado.nombre} tamano="grande" />
-                  <span className="line-clamp-2 w-full text-xs font-medium" title={bordado.nombre}>
-                    {bordado.nombre}
+                  <MiniaturaArte
+                    idModelo={item.idModelo}
+                    idArte={item.id}
+                    nombre={item.nombre}
+                    tieneFoto={item.idArchivoFoto !== null}
+                    tamano="grande"
+                  />
+                  <span className="line-clamp-2 w-full text-xs font-medium" title={item.nombre}>
+                    {item.nombre}
+                  </span>
+                  {/* De qué MODELO es (§Post-F9.35: "cada foto dice de qué modelo es"). */}
+                  <span
+                    className="line-clamp-1 w-full text-[11px] text-muted-foreground"
+                    title={item.nombreModelo ?? item.claveModelo}
+                    data-testid="celda-galeria-modelo"
+                  >
+                    {item.claveModelo}
+                    {item.nombreModelo === null ? '' : ` · ${item.nombreModelo}`}
                   </span>
                 </button>
               </li>
@@ -158,7 +171,7 @@ export function GaleriaBordados(): React.JSX.Element {
         )}
       </div>
 
-      {/* Paginacion (servidor) */}
+      {/* Paginación (servidor) */}
       {datos && datos.total > 0 ? (
         <div className="flex items-center justify-between gap-2 border-t p-3 text-xs">
           <span className="text-muted-foreground" data-testid="resumen-galeria">
@@ -188,7 +201,7 @@ export function GaleriaBordados(): React.JSX.Element {
   );
 }
 
-/** Rejilla de carga (skeleton) mientras llega la primera pagina. */
+/** Rejilla de carga (skeleton) mientras llega la primera página. */
 function GaleriaEsqueleto(): React.JSX.Element {
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">

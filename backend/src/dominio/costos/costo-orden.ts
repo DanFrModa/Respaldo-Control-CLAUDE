@@ -105,7 +105,7 @@ const seleccionOrdenCosto = {
           },
         },
       },
-      bordados: { select: { precio: true, bordado: { select: { precio: true } } } },
+      artes: { select: { precio: true } },
     },
   },
   costoOrden: true,
@@ -130,15 +130,15 @@ export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
     (s, a) => s + num(a.consumoPorPrenda) * num(a.avio.precioReferencia),
     0,
   );
-  const bordado = orden.modelo.bordados.reduce(
-    (s, b) => s + (b.precio == null ? num(b.bordado.precio) : b.precio.toNumber()),
-    0,
-  );
-  // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + bordados.
+  // ARTE: desde V1-E3d (§Post-F9.35) el arte vive DENTRO del modelo y tiene UN solo precio — ya no
+  // hay cascada `ModeloBordado.precio ?? Bordado.precio`, porque el catálogo desapareció. La
+  // migración resolvió esa cascada al copiar, así que el resultado es idéntico al de antes.
+  const arte = orden.modelo.artes.reduce((s, a) => s + num(a.precio), 0);
+  // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + arte.
   const maquila =
     orden.maquilaOrd == null ? num(orden.modelo.maquilaBase) : orden.maquilaOrd.toNumber();
   const aplicacion = num(orden.aplicacionOrd);
-  const procesos = maquila + aplicacion + bordado;
+  const procesos = maquila + aplicacion + arte;
   return { tela, avios, procesos };
 }
 

@@ -106,7 +106,7 @@ function linea(
     idTelaProveedor: null,
     idAvio: null,
     idAvioProveedor: null,
-    idBordado: null,
+    idModeloArte: null,
     editable: false,
     eliminable: false,
     ajustado: false,

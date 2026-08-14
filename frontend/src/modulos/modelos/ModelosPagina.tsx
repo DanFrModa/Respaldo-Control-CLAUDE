@@ -783,7 +783,7 @@ function DetalleModelo({
               que se ve SIEMPRE (marcado o no), no solo cuando "hay dato". */}
           <CampoDetalle icono={Palette} etiqueta="Arte">
             {modelo.llevaArte
-              ? ficha.data !== undefined && ficha.data.bordados.length === 0
+              ? ficha.data !== undefined && ficha.data.artes.length === 0
                 ? 'Lleva arte — falta capturarlo'
                 : 'Lleva arte'
               : 'No lleva arte'}

@@ -126,7 +126,7 @@ function definirRoles(): {
   // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
   // los catálogos junto con los de administración del sistema. Los catálogos
   // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) y los de MATERIALES de F1-E3
-  // (telas/avios/bordados) siguen el MISMO reparto.
+  // (telas/avios) siguen el MISMO reparto.
   const directivo = sin(
     todos,
     'usuarios.administrar',
@@ -144,7 +144,6 @@ function definirRoles(): {
     // F1-E3 — catálogos de materiales.
     'telas.administrar',
     'avios.administrar',
-    'bordados.administrar',
     // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
     // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
     'modelos.administrar',

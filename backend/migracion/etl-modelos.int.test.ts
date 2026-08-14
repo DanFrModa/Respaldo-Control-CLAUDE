@@ -110,7 +110,7 @@ async function conteosE7(): Promise<Record<string, number>> {
     modelosActivos: await cliente.modelo.count({ where: { activo: true } }),
     bomTelas: await cliente.modeloTela.count(),
     bomAvios: await cliente.modeloAvio.count(),
-    bomBordados: await cliente.modeloBordado.count(),
+    artes: await cliente.modeloArte.count(),
     fotoModelo: await cliente.modeloFoto.count(),
     mapeos: await cliente.mapeoMigracion.count({ where: { entidad: ENTIDAD_MAPEO.modelo } }),
   };
@@ -134,7 +134,7 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(await conteosE7()).toEqual(tras1);
   }, 120_000);
 
-  it('carga el BOM con renglones de tela/avío/bordado correctamente', async () => {
+  it('carga el BOM con renglones de tela/avío y el ARTE del modelo correctamente', async () => {
     await ejecutarEtlModelos(cliente);
     const tras1 = await conteosE7();
 
@@ -147,8 +147,9 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(tras1.bomAvios).toBe(4);
 
     // ModelosBor.csv: 4 filas. IdModelos=0 omitido, IdModelos=99 omitido.
-    // M001↔bordado1 (1), M002↔bordado2 (1) = 2 renglones válidos.
-    expect(tras1.bomBordados).toBe(2);
+    // M001↔arte1 (1), M002↔arte2 (1) = 2 artes creados DENTRO de su modelo. El 3er arte del
+    // catálogo viejo NO lo usa ningún modelo: no se migra (depuración §Post-F9.35) y va al reporte.
+    expect(tras1.artes).toBe(2);
 
     // 2ª corrida: idempotente.
     await ejecutarEtlModelos(cliente);
@@ -165,8 +166,8 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(bom1.telas.existentes).toBe(0);
     expect(bom1.avios.creados).toBe(4);
     expect(bom1.avios.existentes).toBe(0);
-    expect(bom1.bordados.creados).toBe(2);
-    expect(bom1.bordados.existentes).toBe(0);
+    expect(bom1.artes.creados).toBe(2);
+    expect(bom1.artes.existentes).toBe(0);
 
     // 2ª corrida idempotente: nada nuevo → creados=0, existentes = los mismos N (NO infla).
     const bom2 = await cargarBom(sesionEtl(), cliente, new Reporte());
@@ -174,8 +175,8 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(bom2.telas.existentes).toBe(3);
     expect(bom2.avios.creados).toBe(0);
     expect(bom2.avios.existentes).toBe(4);
-    expect(bom2.bordados.creados).toBe(0);
-    expect(bom2.bordados.existentes).toBe(2);
+    expect(bom2.artes.creados).toBe(0);
+    expect(bom2.artes.existentes).toBe(2);
   }, 120_000);
 
   it('modelo con Activo=0 queda descontinuado (borrado suave)', async () => {

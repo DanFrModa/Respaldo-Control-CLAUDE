@@ -248,24 +248,16 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['modelos.ver'],
             subVista: true,
           },
-          // Bordados/estampados son parte de la receta (BOM) de los modelos → viven con Desarrollo.
-          // Conservan el gate del hub Catálogos que los albergaba ("autenticado").
+          // El ARTE (bordado/estampado) dejó de ser catálogo en V1-E3d (§Post-F9.35): vive DENTRO
+          // del modelo y se captura en su receta. Lo que sobrevive es la GALERÍA, armada desde los
+          // modelos —cada foto dice de qué modelo es— y gobernada por `modelos.ver`.
           {
-            clave: 'bordados',
-            titulo: 'Arte',
-            descripcion: 'Catálogo de arte (bordado y estampado) con su galería de fotos',
-            ruta: '/catalogos/bordados',
-            icono: 'libreria',
-            permisos: 'autenticado',
-            subVista: true,
-          },
-          {
-            clave: 'galeria-bordados',
+            clave: 'galeria-arte',
             titulo: 'Galería de arte',
-            descripcion: 'Vista visual del arte (bordado y estampado) con su foto',
-            ruta: '/catalogos/galeria-bordados',
+            descripcion: 'Vista visual del arte (bordado y estampado) con su modelo',
+            ruta: '/arte/galeria',
             icono: 'imagenes',
-            permisos: 'autenticado',
+            permisos: ['modelos.ver'],
             subVista: true,
           },
         ],

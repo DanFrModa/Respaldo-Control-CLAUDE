@@ -51,9 +51,6 @@ describe('catálogo de permisos', () => {
       // Catálogos de materiales (F1-E3): avíos (R1) + proveedores.
       'avios.administrar',
       'avios.ver',
-      // Catálogos de materiales (F1-E3): bordados/estampados (R2) + foto.
-      'bordados.administrar',
-      'bordados.ver',
       // Calidad — base configurable (Módulo 8, F6-E1): ver + administrar el catálogo de
       // defectos/tipos de producto/planes AQL (nuevos de v2; los `calidad.*-auditorias` LEGADO
       // del núcleo de auditorías tienen origen).

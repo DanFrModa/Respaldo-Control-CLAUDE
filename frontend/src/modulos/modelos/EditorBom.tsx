@@ -1,16 +1,12 @@
-import { Loader2Icon, StarIcon, Trash2Icon } from 'lucide-react';
+import { Loader2Icon, Trash2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
-import { useBordados } from '@/api/bordados';
 import {
-  useMarcarArtePrincipal,
   useReemplazarAviosBom,
-  useReemplazarBordadosBom,
   useReemplazarTelasBom,
   type ModeloAvio,
-  type ModeloBordado,
   type ModeloFicha,
   type ModeloTela,
 } from '@/api/modelos';
@@ -21,6 +17,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { CopiarBomDialogo } from './CopiarBomDialogo';
 import { EditorMedidasAvio } from './EditorMedidasAvio';
+import { SeccionArte } from './SeccionArte';
 
 /** Tope alto: trae los catálogos activos para los selectores de componentes (ordenados por nombre). */
 const QUERY_CATALOGO = {
@@ -40,8 +37,8 @@ const QUERY_CATALOGO_AVIOS = {
   incluirInactivos: 'false',
 } as const;
 
-/** Las tres secciones del BOM. */
-type SeccionBom = 'telas' | 'avios' | 'bordados';
+/** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
+type SeccionBom = 'telas' | 'avios' | 'artes';
 
 /** Renglón de tela/avío en captura: consumo como texto + 3 banderas. */
 interface RenglonComponente {
@@ -53,18 +50,6 @@ interface RenglonComponente {
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
-}
-
-/**
- * Renglón de bordado (ARTE) en captura: precio como texto (sin banderas). Su POSICIÓN es
- * significativa: el arte PRINCIPAL del modelo es el PRIMERO (jul-2026, Daniel).
- */
-interface RenglonBordado {
-  id: number;
-  etiqueta: string;
-  precio: string;
-  /** ¿Ya está guardado en el BOM? Solo esos se pueden marcar como principales. */
-  guardado: boolean;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -91,45 +76,17 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
   };
 }
 
-/** Convierte un renglón de bordado del API a su forma de captura (llega YA ordenado). */
-function aRenglonBordado(b: ModeloBordado): RenglonBordado {
-  return {
-    id: b.idBordado,
-    etiqueta: b.nombre,
-    precio: b.precio === null ? '' : String(b.precio),
-    guardado: true,
-  };
-}
-
 /**
- * FIRMA de una sección para detectar CAPTURA SIN GUARDAR: compara lo que hay en pantalla con lo
- * que vino de la ficha (mismos campos, mismo orden). Se usa para no dejar que "Marcar como
- * principal" —que recarga la ficha y vuelve a sembrar las TRES pestañas— borre lo que el usuario
- * está capturando.
- */
-function firmaComponentes(renglones: RenglonComponente[]): string {
-  return renglones
-    .map(
-      (r) =>
-        `${String(r.id)}|${r.consumo}|${r.paraPreCosto ? 1 : 0}${r.paraProduccion ? 1 : 0}${r.paraCosto ? 1 : 0}`,
-    )
-    .join(';');
-}
-
-/** Firma de la sección de arte (id + precio capturado, en orden). */
-function firmaBordados(renglones: RenglonBordado[]): string {
-  return renglones.map((r) => `${String(r.id)}|${r.precio}`).join(';');
-}
-
-/**
- * Editor de la RECETA/BOM de un modelo (F1-E4): tres pestañas (Telas / Avíos / Bordados).
- * Cada pestaña tiene un buscador de componente para agregar renglones, captura de consumo + 3
- * banderas 🔑 (telas/avíos) o precio (bordados, pre-llenado desde el catálogo), y un botón
- * "Guardar receta" que envía el SET COMPLETO de esa sección (el backend reemplaza en una
- * transacción A2). Además, un botón "Copiar receta de…" clona el BOM de otro modelo.
+ * Editor de la RECETA de un modelo (F1-E4): tres pestañas (Telas / Avíos / Arte).
  *
- * El estado de captura vive aquí (sembrado desde la ficha); el backend valida (componentes
- * activos, sin repetir) y es la autoridad (A1).
+ * Telas y avíos tienen un buscador de componente para agregar renglones, captura de consumo + 3
+ * banderas 🔑 y un botón "Guardar receta" que envía el SET COMPLETO de esa sección (el backend
+ * reemplaza en una transacción A2). El ARTE va aparte (`SeccionArte`): desde V1-E3d es un HIJO del
+ * modelo con su propia ficha y su FOTO, así que se administra RENGLÓN POR RENGLÓN, sin "guardar
+ * receta". Además, un botón "Copiar receta de…" clona el BOM de otro modelo.
+ *
+ * El estado de captura de telas/avíos vive aquí (sembrado desde la ficha); el backend valida
+ * (componentes activos, sin repetir) y es la autoridad (A1).
  */
 export function EditorBom({
   ficha,
@@ -143,31 +100,22 @@ export function EditorBom({
 
   const [telas, setTelas] = useState<RenglonComponente[]>([]);
   const [avios, setAvios] = useState<RenglonComponente[]>([]);
-  const [bordados, setBordados] = useState<RenglonBordado[]>([]);
-  // Ids de bordados con precio vacío al intentar guardar (precio requerido en UI, decisión #2).
-  const [bordadosInvalidos, setBordadosInvalidos] = useState<ReadonlySet<number>>(new Set());
 
   // Sembrar la captura desde la ficha cada vez que cambia (al recargarla tras guardar).
   useEffect(() => {
     setTelas(ficha.telas.map(aRenglonTela));
     setAvios(ficha.avios.map(aRenglonAvio));
-    setBordados(ficha.bordados.map(aRenglonBordado));
-    setBordadosInvalidos(new Set());
   }, [ficha]);
 
   const catalogoTelas = useTelas(QUERY_CATALOGO);
   const catalogoAvios = useAvios(QUERY_CATALOGO_AVIOS);
-  const catalogoBordados = useBordados(QUERY_CATALOGO);
 
   const guardarTelas = useReemplazarTelasBom();
   const guardarAvios = useReemplazarAviosBom();
-  const guardarBordados = useReemplazarBordadosBom();
-  const marcarArtePrincipal = useMarcarArtePrincipal();
 
   // ── Helpers de agregar/quitar/editar renglones ───────────────────────────────
   const idsTela = new Set(telas.map((r) => r.id));
   const idsAvio = new Set(avios.map((r) => r.id));
-  const idsBordado = new Set(bordados.map((r) => r.id));
   // Avíos YA guardados en el BOM: solo ellos pueden tener medidas por talla (R18); el endpoint
   // exige el renglón. Los recién agregados (aún sin guardar) muestran un aviso.
   const idsAviosGuardados = new Set(ficha.avios.map((a) => a.idAvio));
@@ -204,24 +152,6 @@ export function EditorBom({
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
-      },
-    ]);
-  }
-
-  function agregarBordado(id: number): void {
-    const bordado = catalogoBordados.data?.datos.find((b) => b.id === id);
-    if (!bordado || idsBordado.has(id)) {
-      return;
-    }
-    // Pre-llena el precio con el del catálogo (editable). Se agrega AL FINAL: el arte nuevo nunca
-    // desbanca al principal (el backend le asigna el orden siguiente al guardar).
-    setBordados((prev) => [
-      ...prev,
-      {
-        id,
-        etiqueta: bordado.nombre,
-        precio: bordado.precio === null ? '' : String(bordado.precio),
-        guardado: false,
       },
     ]);
   }
@@ -265,58 +195,7 @@ export function EditorBom({
     );
   }
 
-  function guardarSeccionBordados(): void {
-    // Decisión cerrada #2: el precio del bordado es REQUERIDO en la captura por UI (nullable
-    // solo en BD para el ETL). Si algún renglón quedó sin precio, no se guarda: aviso claro y
-    // se marca el campo (`bordadosInvalidos`) sin perder el pre-llenado.
-    const sinPrecio = bordados.filter((r) => r.precio.trim() === '');
-    if (sinPrecio.length > 0) {
-      setBordadosInvalidos(new Set(sinPrecio.map((r) => r.id)));
-      toast.error('Captura el precio de cada arte de la receta.');
-      return;
-    }
-    setBordadosInvalidos(new Set());
-    guardarBordados.mutate(
-      {
-        id: ficha.id,
-        bordados: bordados.map((r) => ({ idBordado: r.id, precio: Number(r.precio) })),
-      },
-      {
-        onSuccess: () => toast.success('Arte de la receta guardado.'),
-        onError: (error) => toast.error(error.message),
-      },
-    );
-  }
-
-  /**
-   * ¿Hay CAPTURA SIN GUARDAR en alguna de las tres pestañas? Marcar el arte principal recarga la
-   * ficha y el efecto de arriba vuelve a sembrar las TRES secciones desde el servidor: si el
-   * usuario tenía un precio o un consumo a medio teclear, lo perdería sin darse cuenta (el toast
-   * diría "éxito"). Con esto, la acción se DESHABILITA mientras haya cambios pendientes y se le
-   * dice al usuario qué hacer, en vez de destruirle la captura.
-   */
-  const hayCambiosSinGuardar =
-    firmaComponentes(telas) !== firmaComponentes(ficha.telas.map(aRenglonTela)) ||
-    firmaComponentes(avios) !== firmaComponentes(ficha.avios.map(aRenglonAvio)) ||
-    firmaBordados(bordados) !== firmaBordados(ficha.bordados.map(aRenglonBordado));
-
-  /**
-   * Marca UN arte como el PRINCIPAL del modelo (jul-2026, Daniel): el backend lo mueve al primer
-   * lugar y reindexa el resto; al invalidarse la ficha, la captura se vuelve a sembrar ya en el
-   * orden nuevo. Solo aplica a los artes YA guardados (los recién agregados aún no existen en BD)
-   * y solo cuando NO hay captura pendiente (ver `hayCambiosSinGuardar`).
-   */
-  function marcarPrincipal(idBordado: number): void {
-    marcarArtePrincipal.mutate(
-      { id: ficha.id, idBordado },
-      {
-        onSuccess: () => toast.success('Arte principal actualizado.'),
-        onError: (error) => toast.error(error.message),
-      },
-    );
-  }
-
-  const guardando = guardarTelas.isPending || guardarAvios.isPending || guardarBordados.isPending;
+  const guardando = guardarTelas.isPending || guardarAvios.isPending;
 
   return (
     <div className="space-y-4" data-testid="editor-bom">
@@ -327,7 +206,7 @@ export function EditorBom({
             [
               ['telas', 'Telas'],
               ['avios', 'Avíos'],
-              ['bordados', 'Arte'],
+              ['artes', 'Arte'],
             ] as const
           ).map(([clave, etiqueta]) => (
             <Button
@@ -408,35 +287,7 @@ export function EditorBom({
           }
         />
       ) : (
-        <SeccionBordados
-          renglones={bordados}
-          alCambiar={setBordados}
-          invalidos={bordadosInvalidos}
-          alEditarPrecio={(id) =>
-            setBordadosInvalidos((prev) => {
-              if (!prev.has(id)) {
-                return prev;
-              }
-              const siguiente = new Set(prev);
-              siguiente.delete(id);
-              return siguiente;
-            })
-          }
-          puedeAdministrar={puedeAdministrar}
-          guardando={guardarBordados.isPending}
-          deshabilitadoGlobal={guardando}
-          catalogo={(catalogoBordados.data?.datos ?? []).map((b) => ({
-            id: b.id,
-            etiqueta: b.nombre,
-          }))}
-          cargandoCatalogo={catalogoBordados.isPending}
-          idsUsados={idsBordado}
-          alAgregar={agregarBordado}
-          alGuardar={guardarSeccionBordados}
-          alMarcarPrincipal={marcarPrincipal}
-          marcandoPrincipal={marcarArtePrincipal.isPending}
-          hayCambiosSinGuardar={hayCambiosSinGuardar}
-        />
+        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeAdministrar} />
       )}
 
       <CopiarBomDialogo
@@ -615,199 +466,6 @@ function SeccionComponentes({
     </div>
   );
 }
-
-/**
- * Sección de bordados/ARTE (precio por renglón REQUERIDO, pre-llenado; sin banderas). El ORDEN de
- * la lista importa: el PRIMER renglón es el arte PRINCIPAL del modelo (jul-2026, Daniel) — lleva
- * estrella + rótulo "Principal" y los demás una acción para tomar su lugar. Esa acción recarga la
- * receta desde el servidor, así que se DESHABILITA (con aviso) mientras haya captura sin guardar.
- */
-function SeccionBordados({
-  renglones,
-  alCambiar,
-  invalidos,
-  alEditarPrecio,
-  puedeAdministrar,
-  guardando,
-  deshabilitadoGlobal,
-  catalogo,
-  cargandoCatalogo,
-  idsUsados,
-  alAgregar,
-  alGuardar,
-  alMarcarPrincipal,
-  marcandoPrincipal,
-  hayCambiosSinGuardar,
-}: {
-  renglones: RenglonBordado[];
-  alCambiar: React.Dispatch<React.SetStateAction<RenglonBordado[]>>;
-  /** Ids de bordados marcados con precio inválido (vacío) al intentar guardar. */
-  invalidos: ReadonlySet<number>;
-  /** Avisa al padre que se editó el precio de un bordado (para limpiar su marca de inválido). */
-  alEditarPrecio: (id: number) => void;
-  puedeAdministrar: boolean;
-  guardando: boolean;
-  deshabilitadoGlobal: boolean;
-  catalogo: readonly OpcionCatalogo[];
-  cargandoCatalogo: boolean;
-  idsUsados: ReadonlySet<number>;
-  alAgregar: (id: number) => void;
-  alGuardar: () => void;
-  /** Marca ese arte como el principal del modelo (endpoint propio, no pasa por "Guardar receta"). */
-  alMarcarPrincipal: (id: number) => void;
-  marcandoPrincipal: boolean;
-  /** Hay captura pendiente en alguna pestaña: marcar principal recargaría la ficha y la borraría. */
-  hayCambiosSinGuardar: boolean;
-}): React.JSX.Element {
-  const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
-
-  function actualizar(id: number, precio: string): void {
-    alCambiar((prev) => prev.map((r) => (r.id === id ? { ...r, precio } : r)));
-    alEditarPrecio(id);
-  }
-  function quitar(id: number): void {
-    alCambiar((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  return (
-    <div className="space-y-3" data-testid="seccion-bom-bordados">
-      {puedeAdministrar ? (
-        <SelectorAgregar
-          etiqueta="Agregar arte…"
-          disponibles={disponibles}
-          cargando={cargandoCatalogo}
-          deshabilitado={deshabilitadoGlobal}
-          alAgregar={alAgregar}
-          testid="agregar-bordado-bom"
-        />
-      ) : null}
-
-      {renglones.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-          La receta no tiene arte.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {renglones.map((r, indice) => (
-            <li
-              key={r.id}
-              className="flex items-center gap-2 rounded-lg border p-3"
-              data-testid={`renglon-bom-bordado-${r.id}`}
-              // El PRIMER arte es el principal del modelo (el backend devuelve el BOM ordenado).
-              data-principal={indice === 0 ? 'si' : 'no'}
-            >
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.etiqueta}</span>
-              {indice === 0 ? (
-                <span
-                  className="flex shrink-0 items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[11px] font-semibold text-primary-foreground"
-                  data-testid={`arte-principal-${r.id}`}
-                >
-                  <StarIcon className="size-3 fill-current" aria-hidden />
-                  Principal
-                </span>
-              ) : puedeAdministrar && r.guardado ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0 text-[11px]"
-                  onClick={() => alMarcarPrincipal(r.id)}
-                  // Con captura sin guardar NO se puede: recargaría la ficha y borraría lo tecleado.
-                  disabled={deshabilitadoGlobal || marcandoPrincipal || hayCambiosSinGuardar}
-                  aria-label={`Marcar ${r.etiqueta} como arte principal`}
-                  aria-describedby={
-                    hayCambiosSinGuardar ? 'aviso-principal-sin-guardar' : undefined
-                  }
-                  data-testid={`marcar-principal-bordado-${r.id}`}
-                >
-                  {marcandoPrincipal ? (
-                    <Loader2Icon className="animate-spin" aria-hidden />
-                  ) : (
-                    <StarIcon aria-hidden />
-                  )}
-                  Marcar como principal
-                </Button>
-              ) : null}
-              <div>
-                <label
-                  htmlFor={`precio-bordado-${r.id}`}
-                  className="sr-only"
-                >{`Precio del arte ${r.etiqueta}`}</label>
-                <Input
-                  id={`precio-bordado-${r.id}`}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  className="w-28"
-                  placeholder="Precio"
-                  required
-                  aria-invalid={invalidos.has(r.id)}
-                  value={r.precio}
-                  disabled={!puedeAdministrar || deshabilitadoGlobal}
-                  onChange={(e) => actualizar(r.id, e.target.value)}
-                  data-testid={`precio-bordado-bom-${r.id}`}
-                />
-                {invalidos.has(r.id) ? (
-                  <p
-                    className="mt-1 text-xs text-destructive"
-                    data-testid={`error-precio-bordado-${r.id}`}
-                  >
-                    Captura el precio.
-                  </p>
-                ) : null}
-              </div>
-              {puedeAdministrar ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => quitar(r.id)}
-                  disabled={deshabilitadoGlobal}
-                  aria-label={`Quitar ${r.etiqueta}`}
-                  data-testid={`quitar-bom-bordado-${r.id}`}
-                >
-                  <Trash2Icon className="text-destructive" aria-hidden />
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <p className="text-xs text-muted-foreground">
-        Precio del arte en este modelo (se pre-llena con el del catálogo). El PRIMER arte es el
-        principal: es el que encabeza el impreso de la orden y nunca se recorta.
-      </p>
-
-      {/* Por qué la estrella está apagada: hay captura pendiente (en ESTA u otra pestaña) y marcar
-          el principal recarga la receta desde el servidor. Se avisa en vez de perder lo tecleado. */}
-      {puedeAdministrar && hayCambiosSinGuardar && renglones.length > 1 ? (
-        <p
-          id="aviso-principal-sin-guardar"
-          className="text-xs text-amber-700 dark:text-amber-500"
-          data-testid="aviso-principal-sin-guardar"
-        >
-          Guarda la receta primero para poder cambiar el arte principal (hay cambios sin guardar).
-        </p>
-      ) : null}
-
-      {puedeAdministrar ? (
-        <Button
-          type="button"
-          size="sm"
-          onClick={alGuardar}
-          disabled={deshabilitadoGlobal}
-          data-testid="guardar-bom-bordados"
-        >
-          {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-          Guardar receta
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
 /** Selector de "agregar un componente" (no repetible). */
 function SelectorAgregar({
   etiqueta,

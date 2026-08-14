@@ -332,6 +332,40 @@ funciona en control viejo. El BOM debe de vivir en la OP"*). Decisiones en `DECI
 > **Se puede partir POR DENTRO** (primero el modelo y su arte, luego la receta de la OP) para poder
 > probar antes — pero con **un solo diseño detrás**, no dos.
 
+### Pieza A — ✅ HECHA (14-ago-2026): el arte se va al modelo
+
+`ModeloArte` (nombre, tipo bordado/estampado, puntadas, **precio**, **proveedor** ⭐nuevo, foto) como
+**hijo del `Modelo`**; el catálogo `Bordado` y el puente `ModeloBordado` **desaparecen**. Con botón
+**«copiar arte de otro modelo»** (la conveniencia del catálogo sin reinventarlo) y la **galería
+armada desde los modelos**, donde cada foto dice de qué modelo es. **85 archivos, +8,792 / −12,982**
+— el saldo es negativo porque se retira más de lo que se agrega.
+
+**Cómo se verificó la invariante del costeo** (que era la línea roja): la prueba de
+`costo-orden.test.ts` **reimplementa la fórmula VIEJA** (`precioRenglon ?? precioCatalogo`), aplica la
+resolución de la migración sobre los mismos datos y exige igualdad — cubriendo renglón-manda,
+renglón-vacío-cae-al-catálogo, ambos nulos, **renglón en 0 que NO cae al catálogo**, y varios artes
+mezclados. Hallazgo fino que lo confirma: el costeo viejo **no filtraba por `bordados.activo`**, así
+que migrar los inactivos-pero-en-uso como artes vivos **preserva el costeo exacto** — es coherente,
+no un descuido.
+
+**La migración se EJECUTÓ, no solo se leyó** (Postgres nativo desechable; sin Docker, sin
+testcontainers, sin `migrate dev`): `prisma migrate diff` → **«No difference detected»** (el DDL a
+mano produce exactamente el schema); un arte de 3 modelos dejó **3 copias** con su foto; los precios
+salieron clavados a la cascada vieja (incluido el **0.00 que NO cae al catálogo**); los nunca usados
+**se reportan con `NOTICE`, no se tiran en silencio**; las 3 copias **comparten el mismo `Archivo`**
+(correcto: `archivos.key` es único y R2 no se clona desde SQL); y la traza del precosto se re-apuntó
+al arte del mismo modelo. Limpieza completa: tablas y enums viejos fuera, `bordados.ver`/`.administrar`
+borrados de `permisos` **y** de `roles_permisos`.
+
+**Permisos: CERO nuevos** (se quitan 2) → **este deploy NO requiere `SEED_ON_START`**.
+
+**Deuda declarada con razón (no callada):** si dos artes que comparten foto se quitan a la vez, bajo
+READ COMMITTED puede quedar una fila `Archivo` huérfana. Nunca hay doble borrado ni pérdida de imagen,
+y coincide con la deuda ya documentada de R2 sin `DeleteObject`.
+
+**Sigue la pieza B:** la receta de la OP congelada + liberación por Desarrollo + el precio del arte
+**por orden** + el ETL del histórico de `OrdenesHab`.
+
 ### El hueco
 
 Hoy **la receta no se graba en la OP**: no existe ninguna tabla `OrdenTela`/`OrdenAvio`. Todo lo que

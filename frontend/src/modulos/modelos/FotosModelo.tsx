@@ -35,8 +35,8 @@ function nombreDescarga(foto: ModeloFoto, codigoModelo: string): string {
 /**
  * Fotos de UN modelo (F1-E4): la GALERÍA de las N fotos del modelo + un control para subir una
  * nueva, conectando los hooks de la foto (presigned PUT/GET/PATCH/DELETE) con el componente
- * REUTILIZABLE `SubidaImagen` (el mismo de E3/bordados). Solo se usa cuando hay id de modelo
- * (en alta no, igual que la foto del bordado). Toasts de éxito/error (sonner).
+ * REUTILIZABLE `SubidaImagen` (el mismo del logo de empresa y de la foto del arte). Solo se usa
+ * cuando hay id de modelo (en alta no, igual que la foto del arte). Toasts de éxito/error (sonner).
  *
  * Cada foto lleva un TIPO (frente/espalda/otra): se elige al SUBIR (selector arriba) y se puede
  * CAMBIAR en una foto existente (selector bajo la miniatura, consume el `PATCH`). Esto cubre el

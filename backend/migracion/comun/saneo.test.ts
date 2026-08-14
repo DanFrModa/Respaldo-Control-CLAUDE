@@ -107,7 +107,7 @@ describe('migración · saneo (robustez de data legacy)', () => {
       expect(LIMITES.color.nombre).toBe(80);
       expect(LIMITES.avio.clave).toBe(50);
       expect(LIMITES.tela.descripcion).toBe(500);
-      expect(LIMITES.bordado.nombre).toBe(150);
+      expect(LIMITES.arte.nombre).toBe(150);
     });
   });
 

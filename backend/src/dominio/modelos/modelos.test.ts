@@ -10,12 +10,8 @@ import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/er
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearModelo } from './modelos.js';
-import {
-  copiarBom,
-  marcarBordadoPrincipal,
-  reemplazarBordadosBom,
-  reemplazarTelasBom,
-} from './bom-modelo.js';
+import { crearArte, marcarArtePrincipal } from './arte-modelo.js';
+import { copiarBom, reemplazarTelasBom } from './bom-modelo.js';
 import { marcarFotoPrincipal, solicitarSubidaFoto } from './fotos-modelo.js';
 
 /**
@@ -80,7 +76,7 @@ describe('dominio Modelos (F1-E4) — permisos (deny-by-default, A4)', () => {
   });
 
   it('marcar arte principal sin permiso administrar → ErrorPermiso', async () => {
-    await expect(marcarBordadoPrincipal(sesionSoloVer(), 1, 2, {})).rejects.toBeInstanceOf(
+    await expect(marcarArtePrincipal(sesionSoloVer(), 1, 2, {})).rejects.toBeInstanceOf(
       ErrorPermiso,
     );
   });
@@ -99,10 +95,16 @@ describe('dominio Modelos (F1-E4) — validación de captura (A1)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
-  it('reemplazar bordados con precio negativo → ErrorValidacion', async () => {
+  it('agregar un arte con precio negativo → ErrorValidacion', async () => {
     await expect(
-      reemplazarBordadosBom(sesionAdmin(), 1, [{ idBordado: 1, precio: -5 }], {}),
+      crearArte(sesionAdmin(), 1, { nombre: 'Logo', precio: -5 }, {}),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('agregar un arte sin nombre → ErrorValidacion', async () => {
+    await expect(crearArte(sesionAdmin(), 1, { nombre: '  ' }, {})).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
   });
 
   it('copiar BOM con origen == destino → ErrorValidacion', async () => {
@@ -251,25 +253,20 @@ function bdConFotos(idModelo: number, fotos: { id: number; orden: number }[]) {
   return { bd: { tx } as ContextoBd, update, bitacora, estado, lock };
 }
 
-/** `tx` falso con el ARTE (BOM) de un modelo en memoria. */
-function bdConArte(
-  idModelo: number,
-  artes: { idBordado: number; orden: number; nombre: string }[],
-) {
+/** `tx` falso con el ARTE de un modelo en memoria. */
+function bdConArte(idModelo: number, artes: { id: number; orden: number; nombre: string }[]) {
   const estado = artes.map((a) => ({ ...a }));
   const ordenadas = () =>
     [...estado].sort(
-      (a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre) || a.idBordado - b.idBordado,
+      (a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre) || a.id - b.id,
     );
-  const update = vi.fn(
-    (args: { where: { idModelo_idBordado: { idBordado: number } }; data: { orden: number } }) => {
-      const arte = estado.find((a) => a.idBordado === args.where.idModelo_idBordado.idBordado);
-      if (arte !== undefined) {
-        arte.orden = args.data.orden;
-      }
-      return Promise.resolve(arte);
-    },
-  );
+  const update = vi.fn((args: { where: { id: number }; data: { orden: number } }) => {
+    const arte = estado.find((a) => a.id === args.where.id);
+    if (arte !== undefined) {
+      arte.orden = args.data.orden;
+    }
+    return Promise.resolve(arte);
+  });
   const bitacora = vi.fn(() => Promise.resolve({}));
   const lock = vi.fn(() => Promise.resolve(1));
   const tx = {
@@ -278,14 +275,26 @@ function bdConArte(
       findUnique: vi.fn(() => Promise.resolve({ id: idModelo })),
       update: vi.fn(() => Promise.resolve({})),
     },
-    modeloBordado: {
+    modeloArte: {
       findMany: vi.fn(() =>
         Promise.resolve(
           ordenadas().map((a) => ({
-            idBordado: a.idBordado,
-            orden: a.orden,
+            id: a.id,
+            idModelo,
+            nombre: a.nombre,
+            descripcion: null,
+            puntadas: null,
             precio: null,
-            bordado: { nombre: a.nombre, tipo: 'BORDADO', archivoFoto: null },
+            tipo: 'BORDADO',
+            idProveedor: null,
+            idArchivoFoto: null,
+            orden: a.orden,
+            creadoEn: new Date('2026-01-01T00:00:00Z'),
+            creadoPorId: null,
+            modificadoEn: new Date('2026-01-01T00:00:00Z'),
+            modificadoPorId: null,
+            proveedor: null,
+            archivoFoto: null,
           })),
         ),
       ),
@@ -349,18 +358,18 @@ describe('dominio Modelos — foto PRINCIPAL del modelo (Daniel, jul-2026)', () 
   });
 });
 
-describe('dominio Modelos — arte PRINCIPAL del BOM (Daniel, jul-2026)', () => {
-  it('mueve el arte elegido al primer lugar y lo devuelve al frente del BOM', async () => {
+describe('dominio Modelos — arte PRINCIPAL del modelo (Daniel, jul-2026)', () => {
+  it('mueve el arte elegido al primer lugar y lo devuelve al frente', async () => {
     const { bd, update, estado, lock } = bdConArte(7, [
-      { idBordado: 10, orden: 0, nombre: 'Aplicación' },
-      { idBordado: 20, orden: 0, nombre: 'Bordado pecho' },
-      { idBordado: 30, orden: 0, nombre: 'Estampa espalda' },
+      { id: 10, orden: 0, nombre: 'Aplicación' },
+      { id: 20, orden: 0, nombre: 'Bordado pecho' },
+      { id: 30, orden: 0, nombre: 'Estampa espalda' },
     ]);
 
-    const artes = await marcarBordadoPrincipal(sesionAdmin(), 7, 30, bd);
+    const artes = await marcarArtePrincipal(sesionAdmin(), 7, 30, bd);
 
-    expect(artes.map((a) => a.idBordado)).toEqual([30, 10, 20]);
-    expect(estado.map((a) => ({ id: a.idBordado, orden: a.orden }))).toEqual([
+    expect(artes.map((a) => a.id)).toEqual([30, 10, 20]);
+    expect(estado.map((a) => ({ id: a.id, orden: a.orden }))).toEqual([
       { id: 10, orden: 1 },
       { id: 20, orden: 2 },
       { id: 30, orden: 0 },
@@ -376,22 +385,22 @@ describe('dominio Modelos — arte PRINCIPAL del BOM (Daniel, jul-2026)', () => 
 
   it('es IDEMPOTENTE: repetir la marca no vuelve a escribir', async () => {
     const { bd, update, bitacora } = bdConArte(7, [
-      { idBordado: 10, orden: 0, nombre: 'Aplicación' },
-      { idBordado: 20, orden: 0, nombre: 'Bordado pecho' },
+      { id: 10, orden: 0, nombre: 'Aplicación' },
+      { id: 20, orden: 0, nombre: 'Bordado pecho' },
     ]);
 
-    await marcarBordadoPrincipal(sesionAdmin(), 7, 20, bd);
+    await marcarArtePrincipal(sesionAdmin(), 7, 20, bd);
     const escriturasPrimera = update.mock.calls.length;
-    const artes = await marcarBordadoPrincipal(sesionAdmin(), 7, 20, bd);
+    const artes = await marcarArtePrincipal(sesionAdmin(), 7, 20, bd);
 
-    expect(artes.map((a) => a.idBordado)).toEqual([20, 10]);
+    expect(artes.map((a) => a.id)).toEqual([20, 10]);
     expect(update.mock.calls.length).toBe(escriturasPrimera);
     expect(bitacora).toHaveBeenCalledTimes(1);
   });
 
-  it('un arte que no está en el BOM del modelo → ErrorNoEncontrado', async () => {
-    const { bd, update } = bdConArte(7, [{ idBordado: 10, orden: 0, nombre: 'Aplicación' }]);
-    await expect(marcarBordadoPrincipal(sesionAdmin(), 7, 99, bd)).rejects.toBeInstanceOf(
+  it('un arte que no es de ese modelo → ErrorNoEncontrado', async () => {
+    const { bd, update } = bdConArte(7, [{ id: 10, orden: 0, nombre: 'Aplicación' }]);
+    await expect(marcarArtePrincipal(sesionAdmin(), 7, 99, bd)).rejects.toBeInstanceOf(
       ErrorNoEncontrado,
     );
     expect(update).not.toHaveBeenCalled();

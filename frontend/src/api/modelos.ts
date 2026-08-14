@@ -14,8 +14,8 @@ import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos del Módulo 2 — Modelos (F1-E4): catálogo de productos, receta/BOM
- * (telas/avíos/bordados) y fotos en R2. Replica el ESTÁNDAR de Almacenes/Bordados
- * (`api/bordados.ts`) + el flujo de archivos presigned. Llama al cliente TIPADO del OpenAPI,
+ * (telas/avíos) y fotos en R2. El ARTE del modelo vive en `api/artes.ts` (V1-E3d: CRUD renglón
+ * por renglón, porque tiene foto). Llama al cliente TIPADO del OpenAPI,
  * normaliza (`data` en éxito, `ErrorDeApi` con el mensaje del backend en fallo) y expone
  * consultas/mutaciones; las mutaciones invalidan la cache. CERO lógica de negocio: el backend
  * valida, autoriza y decide (A1).
@@ -37,8 +37,8 @@ export type ModeloFicha =
 export type ModeloTela = ModeloFicha['telas'][number];
 /** Un renglón de avío del BOM. */
 export type ModeloAvio = ModeloFicha['avios'][number];
-/** Un renglón de bordado del BOM. */
-export type ModeloBordado = ModeloFicha['bordados'][number];
+/** Un ARTE del modelo, tal como viene embebido en la ficha (su CRUD vive en `api/artes.ts`). */
+export type ModeloArte = ModeloFicha['artes'][number];
 /** Cuerpo de alta de modelo (`POST /api/modelos`). */
 export type ModeloCrear =
   paths['/api/modelos']['post']['requestBody']['content']['application/json'];
@@ -56,11 +56,6 @@ export type BomAviosCuerpo =
   paths['/api/modelos/{id}/bom/avios']['put']['requestBody']['content']['application/json'];
 /** Un renglón de avío de entrada del BOM. */
 export type BomAvioEntrada = BomAviosCuerpo['avios'][number];
-/** Cuerpo para reemplazar los bordados del BOM. */
-export type BomBordadosCuerpo =
-  paths['/api/modelos/{id}/bom/bordados']['put']['requestBody']['content']['application/json'];
-/** Un renglón de bordado de entrada del BOM. */
-export type BomBordadoEntrada = BomBordadosCuerpo['bordados'][number];
 /** Cuerpo de copiar BOM (`POST /api/modelos/{id}/copiar-bom`). */
 export type CopiarBomCuerpo =
   paths['/api/modelos/{id}/copiar-bom']['post']['requestBody']['content']['application/json'];
@@ -253,20 +248,6 @@ async function reemplazarAvios(id: number, avios: BomAvioEntrada[]): Promise<Mod
   return data.datos;
 }
 
-async function reemplazarBordados(
-  id: number,
-  bordados: BomBordadoEntrada[],
-): Promise<ModeloBordado[]> {
-  const { data, error } = await api.PUT('/api/modelos/{id}/bom/bordados', {
-    params: { path: { id } },
-    body: { bordados },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data.datos;
-}
-
 async function copiarBom(id: number, cuerpo: CopiarBomCuerpo): Promise<void> {
   const { data, error } = await api.POST('/api/modelos/{id}/copiar-bom', {
     params: { path: { id } },
@@ -285,10 +266,6 @@ export interface ArgsBomTelas {
 export interface ArgsBomAvios {
   id: number;
   avios: BomAvioEntrada[];
-}
-export interface ArgsBomBordados {
-  id: number;
-  bordados: BomBordadoEntrada[];
 }
 export interface ArgsCopiarBom {
   id: number;
@@ -319,57 +296,11 @@ export function useReemplazarAviosBom(): UseMutationResult<ModeloAvio[], ErrorDe
   });
 }
 
-/** Reemplaza el set de bordados del BOM e invalida la ficha. */
-export function useReemplazarBordadosBom(): UseMutationResult<
-  ModeloBordado[],
-  ErrorDeApi,
-  ArgsBomBordados
-> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, bordados }: ArgsBomBordados) => reemplazarBordados(id, bordados),
-    onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
-  });
-}
-
 /** Copia el BOM de otro modelo e invalida la ficha del destino. */
 export function useCopiarBom(): UseMutationResult<void, ErrorDeApi, ArgsCopiarBom> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCopiarBom) => copiarBom(id, cuerpo),
-    onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
-  });
-}
-
-/**
- * Marca un ARTE del BOM como el PRINCIPAL del modelo (jul-2026, Daniel): el backend lo mueve al
- * primer lugar y reindexa el resto. El "principal" es simplemente el PRIMERO de la lista.
- */
-async function marcarArtePrincipal(id: number, idBordado: number): Promise<ModeloBordado[]> {
-  const { data, error } = await api.POST('/api/modelos/{id}/bom/bordados/{idBordado}/principal', {
-    params: { path: { id, idBordado } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data.datos;
-}
-
-/** Argumentos de marcar el arte principal. */
-export interface ArgsArtePrincipal {
-  id: number;
-  idBordado: number;
-}
-
-/** Marca el arte principal del modelo e invalida la ficha (el BOM cambió de orden). */
-export function useMarcarArtePrincipal(): UseMutationResult<
-  ModeloBordado[],
-  ErrorDeApi,
-  ArgsArtePrincipal
-> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, idBordado }: ArgsArtePrincipal) => marcarArtePrincipal(id, idBordado),
     onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
   });
 }

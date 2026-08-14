@@ -1,22 +1,22 @@
 import { z } from 'zod';
 
 /**
- * Esquema y constantes de captura del formulario de Bordados (F1-E3). Viven en el
- * modulo (no en `api/esquemas.ts` compartido) para que esta pieza sea autonoma.
+ * Esquema y constantes de captura del formulario del ARTE del modelo (V1-E3d). Viven en el
+ * módulo (no en `api/esquemas.ts` compartido) para que esta pieza sea autónoma.
  *
- * Refleja las reglas de captura del backend (`backend/src/contrato/esquemas/bordado.ts`),
+ * Refleja las reglas de captura del backend (`backend/src/contrato/esquemas/arte.ts`),
  * pero es SOLO para la experiencia de usuario: el servidor SIEMPRE re-valida y es la
  * autoridad (A1). Los numericos opcionales se capturan como texto (vacio = sin valor) y
  * se convierten a numero al ARMAR EL CUERPO del API (mismo patron `numeroOpcional` que
  * usa `api/esquemas.ts`).
  */
 
-/** Tipos de bordado (espejo del backend). */
-export const TIPOS_BORDADO = ['BORDADO', 'ESTAMPADO'] as const;
-/** Clave de tipo de bordado. */
-export type TipoBordadoClave = (typeof TIPOS_BORDADO)[number];
-/** Etiquetas para UI de cada tipo de bordado. */
-export const ETIQUETAS_TIPO_BORDADO: Record<TipoBordadoClave, string> = {
+/** Tipos de arte (espejo del backend). */
+export const TIPOS_ARTE = ['BORDADO', 'ESTAMPADO'] as const;
+/** Clave de tipo de arte. */
+export type TipoArteClave = (typeof TIPOS_ARTE)[number];
+/** Etiquetas para UI de cada tipo de arte. */
+export const ETIQUETAS_TIPO_ARTE: Record<TipoArteClave, string> = {
   BORDADO: 'Bordado',
   ESTAMPADO: 'Estampado / aplicación',
 };
@@ -61,18 +61,18 @@ export function numeroOpcionalACuerpo(valor: string): number | undefined {
 }
 
 /**
- * Captura del formulario de bordado (alta y edicion comparten forma). El `nombre` es
- * obligatorio; `descripcion` es texto opcional; `puntadas` y `precio` se capturan como
- * texto (vacio = sin valor) y `tipo` siempre se elige. La FOTO no va en el schema: se
- * sube/quita aparte (presigned). Validacion solo de UX: el backend re-valida (A1).
+ * Captura del formulario del ARTE (alta y edición comparten forma). El `nombre` es obligatorio;
+ * `descripcion` es texto opcional; `puntadas`, `precio` e `idProveedor` se capturan como texto
+ * (vacío = sin valor) y `tipo` siempre se elige. La FOTO no va en el schema: se sube/quita aparte
+ * (presigned). Validación solo de UX: el backend re-valida (A1).
  */
-export const esquemaBordadoFormulario = z.object({
+export const esquemaArteFormulario = z.object({
   nombre: z
     .string({ error: 'El nombre es obligatorio' })
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  tipo: z.enum(TIPOS_BORDADO, { error: 'El tipo debe ser BORDADO o ESTAMPADO' }),
+  tipo: z.enum(TIPOS_ARTE, { error: 'El tipo debe ser BORDADO o ESTAMPADO' }),
   descripcion: z
     .string()
     .trim()
@@ -88,8 +88,10 @@ export const esquemaBordadoFormulario = z.object({
     min: 0,
     mensajeNoNumero: 'El precio debe ser un número',
     mensajeMin: 'El precio no puede ser negativo',
-  }).describe('Precio de referencia (vacío = sin valor).'),
+  }).describe('Precio del arte — el que viaja a la OP (vacío = sin valor).'),
+  /** Proveedor que hace el arte (NUEVO en V1-E3d). Vacío = sin proveedor. */
+  idProveedor: z.string(),
 });
 
-/** Datos del formulario de bordado. */
-export type DatosBordadoFormulario = z.infer<typeof esquemaBordadoFormulario>;
+/** Datos del formulario del arte. */
+export type DatosArteFormulario = z.infer<typeof esquemaArteFormulario>;

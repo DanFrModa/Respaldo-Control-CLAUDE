@@ -211,7 +211,7 @@ function txFalsa(conteos: {
   const tx = {
     ordenLinea: { count: vi.fn(() => Promise.resolve(conteos.renglonesMatriz ?? 0)) },
     modeloAvio: { count: vi.fn(() => Promise.resolve(conteos.aviosProduccion ?? 0)) },
-    modeloBordado: { count: vi.fn(() => Promise.resolve(conteos.artesModelo ?? 0)) },
+    modeloArte: { count: vi.fn(() => Promise.resolve(conteos.artesModelo ?? 0)) },
     // La bandera "lleva arte" del modelo; por default `false` en el stub para que los casos que no
     // hablan de arte no arrastren ese requisito.
     modelo: { findUnique: vi.fn(() => Promise.resolve({ llevaArte: conteos.llevaArte ?? false })) },
@@ -338,7 +338,7 @@ function txRealineado(datos: {
     fechaCompletada: Date | null;
     renglonesMatriz: number;
   }[];
-  modelos: { id: number; llevaArte: boolean; avios: number; bordados: number }[];
+  modelos: { id: number; llevaArte: boolean; avios: number; artes: number }[];
   conActividad?: number[];
 }) {
   const espias = {
@@ -370,7 +370,7 @@ function txRealineado(datos: {
           datos.modelos.map((m) => ({
             id: m.id,
             llevaArte: m.llevaArte,
-            _count: { avios: m.avios, bordados: m.bordados },
+            _count: { avios: m.avios, artes: m.artes },
           })),
         ),
       ),
@@ -386,9 +386,9 @@ function txRealineado(datos: {
 }
 
 /** Modelo que cumple (receta de avíos, prenda lisa). */
-const MODELO_OK = { id: 1, llevaArte: false, avios: 2, bordados: 0 };
+const MODELO_OK = { id: 1, llevaArte: false, avios: 2, artes: 0 };
 /** Modelo que LLEVA arte y no lo tiene capturado → sus órdenes no pueden completarse. */
-const MODELO_SIN_ARTE = { id: 2, llevaArte: true, avios: 2, bordados: 0 };
+const MODELO_SIN_ARTE = { id: 2, llevaArte: true, avios: 2, artes: 0 };
 
 describe('realinearEstadoOrdenes (motor del script post-carga)', () => {
   it('degrada la `completa` que ya no cumple y completa la `capturada` que sí', async () => {

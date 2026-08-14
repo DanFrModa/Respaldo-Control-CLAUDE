@@ -122,7 +122,7 @@ export interface AvioImpreso {
 }
 
 /** Un renglón de la sección ARTE (solo nombre/subtipo; SIN precio, decisión del dueño). */
-export interface BordadoImpreso {
+export interface ArteImpreso {
   nombre: string;
   tipo: 'BORDADO' | 'ESTAMPADO';
 }
@@ -167,7 +167,8 @@ export interface DatosImpresoOrden {
   /** Total general de la orden (debe CUADRAR con `OrdenSalida.totalPiezas`). */
   totalPiezas: number;
   telas: TelaImpreso[];
-  bordados: BordadoImpreso[];
+  /** Lista de TEXTO del arte del modelo (nombre + subtipo). Las IMÁGENES van en `artes`. */
+  listaArte: ArteImpreso[];
   habilitacion: AvioImpreso[];
   fotos: FotoImpreso[];
   /**
@@ -374,13 +375,13 @@ export async function armarDatosImpresoOrden(
     );
   }
 
-  // ARTES del MODELO: las fotos de los bordados/estampados del BOM. Presignar es una llamada a R2
+  // ARTES del MODELO: las fotos del arte del modelo. Presignar es una llamada a R2
   // por arte → BEST-EFFORT **POR IMAGEN** (`allSettled`, no `all`): si la key de un arte truena,
   // se pierde ESA imagen y las demás siguen saliendo (mismo criterio que la descarga de bytes).
-  // El BOM llega ORDENADO (`leerBordadosBom`), así que su PRIMER renglón es el arte PRINCIPAL: se
+  // El arte llega ORDENADO (`leerArtesModelo`), así que su PRIMER renglón es el PRINCIPAL: se
   // marca para que el tope de la rejilla jamás lo recorte (Daniel, jul-2026).
-  const artesBom = bom.bordados.flatMap((b, i) =>
-    b.keyFoto === null ? [] : [{ titulo: b.nombre, key: b.keyFoto, principal: i === 0 }],
+  const artesBom = bom.artes.flatMap((a, i) =>
+    a.keyFoto === null ? [] : [{ titulo: a.nombre, key: a.keyFoto, principal: i === 0 }],
   );
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
@@ -474,7 +475,7 @@ export async function armarDatosImpresoOrden(
     telas: bom.telas
       .filter((t) => t.paraProduccion)
       .map((t) => ({ nombre: t.nombre, consumoPorPrenda: t.consumoPorPrenda })),
-    bordados: bom.bordados.map((b) => ({ nombre: b.nombre, tipo: b.tipo })),
+    listaArte: bom.artes.map((a) => ({ nombre: a.nombre, tipo: a.tipo })),
     habilitacion: bom.avios
       .filter((a) => a.paraProduccion)
       .map((a) => ({
@@ -483,7 +484,7 @@ export async function armarDatosImpresoOrden(
         consumoPorPrenda: a.consumoPorPrenda,
       })),
     fotos: fotosImpreso,
-    // Primero el arte del MODELO (fotos de los bordados del BOM), luego el subido a la orden.
+    // Primero el arte del MODELO (sus fotos), luego el subido a la orden.
     artes: [...artesModelo, ...artesImpreso],
   };
 }
@@ -814,8 +815,8 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     // sí se conserva por renglón ("Bordado"/"Estampado").
     seccionLista(
       'Arte',
-      datos.bordados.map(
-        (b) => `${b.nombre} (${b.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
+      datos.listaArte.map(
+        (a) => `${a.nombre} (${a.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
       ),
     ),
     // "Avíos", no "Habilitación" (mismo renombrado de vocabulario de Daniel que ya rige en toda la

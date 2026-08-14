@@ -24,7 +24,7 @@ export async function entrarComoAdmin(page: Page): Promise<void> {
 /**
  * Abre (si hace falta) un DESPLEGABLE del riel (rediseño R1) para poder clickear a sus hijos.
  * IDEMPOTENTE a propósito: el botón de un padre TOGGLEA, y el riel auto-abre al padre cuya ruta
- * está activa (p. ej. tras un `goto` a un hijo suyo, como `/catalogos/bordados` bajo Desarrollo);
+ * está activa (p. ej. tras un `goto` a un hijo suyo, como `/catalogos/telas` bajo Catálogos);
  * un click ciego en ese estado lo CERRARÍA y el hijo desaparecería (causa del timeout de
  * `modelos.spec` en CI, R1). Por eso solo clickea cuando `aria-expanded` no es `true`, y siempre
  * termina verificando que quedó abierto.

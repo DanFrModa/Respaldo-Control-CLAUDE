@@ -7,7 +7,7 @@
  * CATÁLOGOS; la tabla de mapeo es metadato técnico de la migración y la maneja el ETL).
  *
  * Las CLAVES de `entidad` son estables (las consume el ETL y las fases futuras):
- *   Color · Cliente · EtiquetaMarca · Bordado · Avio · Genero · TelaCategoria · Empresa ·
+ *   Color · Cliente · EtiquetaMarca · ModeloArte · Avio · Genero · TelaCategoria · Empresa ·
  *   Tela:IdTelas · Tela:IdTelasDis · Proveedor:IdProveedor · Proveedor:IdMaquileros ·
  *   Proveedor:IdEstampadores · Proveedor:IdCortadores · Almacen:IPT · Almacen:Tela
  * (un sufijo de fuente cuando una entidad nueva absorbe varias tablas viejas).
@@ -23,7 +23,12 @@ export const ENTIDAD_MAPEO = {
   color: 'Color',
   cliente: 'Cliente',
   etiquetaMarca: 'EtiquetaMarca',
-  bordado: 'Bordado',
+  /**
+   * V1-E3d: el arte dejó de ser catálogo y vive DENTRO del modelo (§Post-F9.35). Un `IdBordados`
+   * viejo puede producir VARIOS artes (uno por modelo que lo usaba), así que la clave es
+   * COMPUESTA: `<IdBordados>:<IdModelos>` → `ModeloArte.id`. La usa la carga de fotos de arte.
+   */
+  modeloArte: 'ModeloArte',
   avio: 'Avio',
   genero: 'Genero',
   temporada: 'Temporada',

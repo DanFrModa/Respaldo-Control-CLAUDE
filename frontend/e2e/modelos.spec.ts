@@ -4,9 +4,9 @@ import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, re-vestido R9 a TABLA-FIRST + CAJÓN.
- * Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío, 1 bordado) → crear un
+ * Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío) → crear un
  * modelo → subir una foto (red de R2 mockeada) → armar su receta (1 tela con banderas + 1 avío + 1
- * bordado con precio) → crear un 2º modelo y COPIAR la receta del primero → descontinuar → reactivar
+ * arte con precio) → crear un 2º modelo y COPIAR la receta del primero → descontinuar → reactivar
  * → buscar por código y por descripción. Nombres únicos por corrida. El código y el estado
  * (Activo/Inactivo) viven en el TÍTULO del cajón; fotos, BOM y campos, en su cuerpo — por eso
  * `detalle` apunta al cajón completo.
@@ -34,7 +34,7 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
 }
 
-/** Crea un componente simple desde su catálogo (tela/avío/bordado) y vuelve a Inicio. */
+/** Crea un componente simple desde su catálogo (tela/avío) y vuelve a Inicio. */
 async function crearTela(page: Page, nombre: string, proveedor: string): Promise<void> {
   await page.goto('/catalogos/telas');
   await expect(page.getByRole('heading', { name: 'Telas' })).toBeVisible();
@@ -64,16 +64,6 @@ async function crearAvio(page: Page, clave: string): Promise<void> {
   await expect(page.getByText(`Avío "${clave}" creado.`)).toBeVisible();
 }
 
-async function crearBordado(page: Page, nombre: string): Promise<void> {
-  await page.goto('/catalogos/bordados');
-  await expect(page.getByRole('heading', { name: 'Arte', exact: true })).toBeVisible();
-  await page.getByTestId('nuevo-bordado').click();
-  const dialogo = page.getByRole('dialog');
-  await dialogo.getByLabel('Nombre').fill(nombre);
-  await page.getByTestId('guardar-bordado').click();
-  await expect(page.getByText(`Arte "${nombre}" creado.`)).toBeVisible();
-}
-
 test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
   test('crear modelo, subir foto, armar receta, copiar receta, descontinuar y reactivar', async ({
     page,
@@ -84,7 +74,7 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     const codigoDestino = `DEST-${sufijo}`;
     const tela = `Tela Mod ${sufijo}`;
     const avio = `BTN-${sufijo}`;
-    const bordado = `Bordado Mod ${sufijo}`;
+    const arte = `Arte Mod ${sufijo}`;
     const proveedor = `Prov Mod ${sufijo}`;
 
     await entrarComoAdmin(page);
@@ -93,7 +83,6 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await crearProveedor(page, proveedor);
     await crearTela(page, tela, proveedor);
     await crearAvio(page, avio);
-    await crearBordado(page, bordado);
 
     // ── Navega a Modelos (Operación · Desarrollo, desplegable del rediseño) ────
     await abrirDesplegableMenu(page, 'Desarrollo');
@@ -166,15 +155,17 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await detalle.getByTestId('guardar-bom-avios').click();
     await expect(page.getByText('Avíos de la receta guardados.')).toBeVisible();
 
-    // ── 1 bordado con precio ─────────────────────────────────────────────────────
-    await detalle.getByTestId('tab-bom-bordados').click();
-    await detalle.getByTestId('agregar-bordado-bom').selectOption({ label: bordado });
-    const renglonBordado = detalle
-      .getByTestId('seccion-bom-bordados')
-      .getByTestId(/^renglon-bom-bordado-\d+$/);
-    await renglonBordado.getByRole('spinbutton').fill('45');
-    await detalle.getByTestId('guardar-bom-bordados').click();
-    await expect(page.getByText('Arte de la receta guardado.')).toBeVisible();
+    // ── 1 arte con precio (V1-E3d: el arte es del MODELO, se captura aquí mismo) ──
+    await detalle.getByTestId('tab-bom-artes').click();
+    await detalle.getByTestId('agregar-arte').click();
+    const dialogoArte = page.getByTestId('dialogo-arte');
+    await dialogoArte.getByTestId('arte-nombre').fill(arte);
+    await dialogoArte.getByTestId('arte-precio').fill('45');
+    await page.getByTestId('guardar-arte').click();
+    await expect(page.getByText('Arte agregado.')).toBeVisible();
+    await expect(detalle.getByTestId(/^renglon-arte-\d+$/).filter({ hasText: arte })).toContainText(
+      '$45.00',
+    );
 
     // ── Crear un 2º modelo y COPIAR la receta del primero ───────────────────────
     // El cajón del 1er modelo sigue abierto; ciérralo antes de tocar el botón del fondo

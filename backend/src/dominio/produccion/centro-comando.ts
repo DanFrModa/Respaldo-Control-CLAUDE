@@ -211,7 +211,7 @@ export async function centroComandoOrdenes(
             // arte" + la receta de avíos de producción y el arte del BOM. Dos conteos en la misma
             // consulta, sin traer las recetas.
             llevaArte: true,
-            _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+            _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
           },
         },
         // Renglones de la matriz: el requisito "tallas" es por RENGLONES, no por piezas (una
@@ -356,7 +356,7 @@ export async function centroComandoOrdenes(
           : requisitosOrden({
               renglonesMatriz: fila._count.lineas,
               aviosProduccion: fila.modelo._count.avios,
-              artesModelo: fila.modelo._count.bordados,
+              artesModelo: fila.modelo._count.artes,
               llevaArte: fila.modelo.llevaArte,
             }).faltantes,
     };

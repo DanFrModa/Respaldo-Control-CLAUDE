@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { esquemaArteSalida } from './arte.js';
+
 /**
  * Contrato Zod del Módulo 2 — Modelos (F1-E4): el modelo (ex `Modelos`), su receta/BOM
- * (telas/avíos/bordados) y sus fotos en R2. Una sola definición de las reglas de captura
+ * (telas/avíos/arte) y sus fotos en R2. Una sola definición de las reglas de captura
  * para UI y servidor (fuente del OpenAPI). Doc funcional: `Documentacion_MJD/01-Modelos.md`.
  * Catálogo GLOBAL (ADR-0007): la unicidad de `codigo` es global.
  *
@@ -11,10 +13,9 @@ import { z } from 'zod';
  *    `modelos.ver`); aquí solo su salida. `Modelo.idGenero` es FK nullable (ETL E7).
  *  • BOM telas/avíos: cada renglón con `consumoPorPrenda` + las TRES banderas 🔑
  *    `paraPreCosto`/`paraProduccion`/`paraCosto` (doc 01-Modelos §2 — se conservan).
- *  • BOM bordados: `{ idBordado, precio }` SIN cantidad ni banderas. `precio` es NULLABLE
- *    en el contrato (para que el ETL E7 cargue históricos rellenando desde `Bordado.precio`);
- *    en la captura por UI es REQUERIDO y se pre-llena con `Bordado.precio` (editable). Misma
- *    relajación-para-ETL que `Avio.unidad/presentacion` en E3 (ADR-0009).
+ *  • ARTE (bordados/estampados): desde V1-E3d (§Post-F9.35) NO es un renglón que apunte a un
+ *    catálogo, sino un HIJO del modelo con sus propios datos. Su contrato vive aparte, en
+ *    `esquemas/arte.ts`; aquí solo se embebe su salida en la ficha.
  *
  * Semántica del PATCH parcial (M1, igual que Tela/Avio): omitir un campo (`undefined`) = no
  * tocar; mandar `null`/'' en un opcional de texto = vaciarlo (se guarda `null`, nunca '').
@@ -81,26 +82,6 @@ export const esquemaModeloAvioEntrada = z.object({
 export type DatosModeloAvioEntrada = z.infer<typeof esquemaModeloAvioEntrada>;
 
 /**
- * Renglón de captura del BOM de BORDADOS de un modelo (doc 01-Modelos §2, `ModelosBor`): el
- * bordado del catálogo y su `precio`. SIN cantidad ni banderas (decisión cerrada). `precio`
- * es OPCIONAL en el contrato (nullable en BD para el ETL E7); la UI lo exige y lo pre-llena
- * con `Bordado.precio` (editable).
- */
-export const esquemaModeloBordadoEntrada = z.object({
-  idBordado: z
-    .number({ error: 'El id del bordado es obligatorio' })
-    .int({ error: 'El id del bordado debe ser entero' })
-    .positive({ error: 'El id del bordado debe ser positivo' }),
-  precio: z
-    .number({ error: 'El precio debe ser un número' })
-    .nonnegative({ error: 'El precio no puede ser negativo' })
-    .optional(),
-});
-
-/** Datos validados de un renglón de bordado del BOM. */
-export type DatosModeloBordadoEntrada = z.infer<typeof esquemaModeloBordadoEntrada>;
-
-/**
  * Lista de telas del BOM (sin `idTela` repetido — un componente aparece UNA vez). Puede ir
  * VACÍA (un modelo nuevo puede no tener BOM aún). Lo refina el esquema y lo re-valida el dominio.
  */
@@ -117,14 +98,6 @@ export const esquemaModeloAvios = z
   .max(200, { error: 'Demasiados avíos en el modelo' })
   .refine((items) => new Set(items.map((i) => i.idAvio)).size === items.length, {
     error: 'Hay avíos repetidos en el modelo',
-  });
-
-/** Lista de bordados del BOM (sin `idBordado` repetido; puede ir vacía). */
-export const esquemaModeloBordados = z
-  .array(esquemaModeloBordadoEntrada)
-  .max(100, { error: 'Demasiados bordados en el modelo' })
-  .refine((items) => new Set(items.map((i) => i.idBordado)).size === items.length, {
-    error: 'Hay bordados repetidos en el modelo',
   });
 
 // ── Secuencia de estampado (rediseño R4/R5, B10) ───────────────────────────────
@@ -235,7 +208,7 @@ const camposOpcionalesModelo = {
  * Alta de modelo (catálogo global F1-E4). El `codigo` es la clave de negocio (único global).
  * `maquilaBase` (costo de maquila base, doc 01-Modelos §4) y las FK temporada/curva/género
  * son OPCIONALES (el ETL E7 las poblará). El BOM no va aquí: se captura con los endpoints de
- * BOM tras crear el modelo (igual que la foto del bordado en E3). Nace activo y sin BOM/fotos.
+ * BOM tras crear el modelo (igual que la foto del arte). Nace activo y sin BOM/fotos.
  */
 export const esquemaModeloCrear = z.object({
   codigo: z
@@ -292,7 +265,7 @@ export type DatosModeloCrear = z.infer<typeof esquemaModeloCrear>;
  * Edición de modelo: `id` + todos los campos del alta opcionales (edición parcial) +
  * `activo` para descontinuar/reactivar. Los textos opcionales son nullable (M1: `null`/'' =
  * borrar). Las FK aceptan `null` para QUITAR la relación; omitir = no tocar. El BOM NO se
- * toca aquí (tiene sus propios endpoints, como la foto del bordado en E3).
+ * toca aquí (tiene sus propios endpoints, como la foto del arte).
  */
 export const esquemaModeloEditar = z
   .object({
@@ -393,16 +366,6 @@ export const esquemaModeloAvioSalida = z
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
   })
   .describe('Renglón de avío del BOM del modelo.');
-
-/** Salida de un renglón de bordado del BOM (con el nombre/tipo del bordado embebidos). */
-export const esquemaModeloBordadoSalida = z
-  .object({
-    idBordado: z.number().int().describe('Id del bordado.'),
-    nombre: z.string().describe('Nombre del bordado (para la UI).'),
-    tipo: z.enum(['BORDADO', 'ESTAMPADO']).describe('Tipo del bordado (para la UI).'),
-    precio: z.number().nullable().describe('Precio del bordado en este modelo, o null.'),
-  })
-  .describe('Renglón de bordado del BOM del modelo.');
 
 // ── Salida del modelo (ficha con BOM + conteo de fotos) ────────────────────────
 
@@ -508,7 +471,7 @@ export const esquemaModeloFichaSalida = esquemaModeloSalida
   .extend({
     telas: z.array(esquemaModeloTelaSalida).describe('Telas del BOM.'),
     avios: z.array(esquemaModeloAvioSalida).describe('Avíos del BOM.'),
-    bordados: z.array(esquemaModeloBordadoSalida).describe('Bordados del BOM.'),
+    artes: z.array(esquemaArteSalida).describe('Arte (bordados/estampados) del modelo.'),
   })
   .describe('Ficha de un modelo con su receta (BOM) completa.');
 
@@ -594,14 +557,6 @@ export const esquemaModeloBomAviosCuerpo = z
 /** Datos validados del set de avíos del BOM. */
 export type DatosModeloBomAvios = z.infer<typeof esquemaModeloBomAviosCuerpo>;
 
-/** Cuerpo para reemplazar el set COMPLETO de bordados del BOM (`PUT /api/modelos/:id/bom/bordados`). */
-export const esquemaModeloBomBordadosCuerpo = z
-  .object({ bordados: esquemaModeloBordados })
-  .describe('Set completo de bordados del BOM del modelo.');
-
-/** Datos validados del set de bordados del BOM. */
-export type DatosModeloBomBordados = z.infer<typeof esquemaModeloBomBordadosCuerpo>;
-
 /** Listas sueltas de cada sección del BOM (respuesta de los `GET /api/modelos/:id/bom/*`). */
 export const esquemaModeloBomTelasLista = z
   .object({ datos: z.array(esquemaModeloTelaSalida).describe('Telas del BOM.') })
@@ -613,14 +568,9 @@ export const esquemaModeloBomAviosLista = z
   .describe('Avíos del BOM de un modelo.');
 export type ModeloBomAviosLista = z.infer<typeof esquemaModeloBomAviosLista>;
 
-export const esquemaModeloBomBordadosLista = z
-  .object({ datos: z.array(esquemaModeloBordadoSalida).describe('Bordados del BOM.') })
-  .describe('Bordados del BOM de un modelo.');
-export type ModeloBomBordadosLista = z.infer<typeof esquemaModeloBomBordadosLista>;
-
 /**
  * Cuerpo para COPIAR el BOM de otro modelo (`POST /api/modelos/:id/copiar-bom`). `idOrigen`
- * es el modelo del que se copian telas/avíos/bordados; `reemplazar` decide si se reemplaza
+ * es el modelo del que se copian telas/avíos/arte; `reemplazar` decide si se reemplaza
  * el BOM actual (true, por defecto) o se fusiona conservando lo existente (false). Atómico (A2).
  */
 export const esquemaModeloCopiarBomCuerpo = z

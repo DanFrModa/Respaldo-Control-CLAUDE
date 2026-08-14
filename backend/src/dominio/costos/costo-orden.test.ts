@@ -1,6 +1,6 @@
 /**
  * Tests UNITARIOS de las fórmulas PURAS del costo de orden (F7-E1; D1/D2):
- *  • `teoricoPorPrenda` — receta paraCosto × precios vigentes + procesos (bordado UNA vez, nulos→0).
+ *  • `teoricoPorPrenda` — receta paraCosto × precios vigentes + procesos (arte UNA vez, nulos→0).
  *  • `cantidadDeBase`   — elige la cantidad de la base de prorrateo (cortado/recibido/vendido).
  * El flujo con BD (guardar, rechazo de noCostear, unitario, lista) vive en `costo-orden.int.test.ts`.
  */
@@ -21,7 +21,7 @@ function ordenFake(over: {
   maquilaBase?: Prisma.Decimal | null;
   telas?: { consumoPorPrenda: Prisma.Decimal; precioSugerido: Prisma.Decimal | null }[];
   avios?: { consumoPorPrenda: Prisma.Decimal; precioReferencia: Prisma.Decimal | null }[];
-  bordados?: { precio: Prisma.Decimal | null; catalogo: Prisma.Decimal | null }[];
+  artes?: { precio: Prisma.Decimal | null }[];
 }): OrdenArg {
   return {
     maquilaOrd: over.maquilaOrd ?? null,
@@ -36,16 +36,13 @@ function ordenFake(over: {
         consumoPorPrenda: a.consumoPorPrenda,
         avio: { precioReferencia: a.precioReferencia },
       })),
-      bordados: (over.bordados ?? []).map((b) => ({
-        precio: b.precio,
-        bordado: { precio: b.catalogo },
-      })),
+      artes: (over.artes ?? []).map((a) => ({ precio: a.precio })),
     },
   } as unknown as OrdenArg;
 }
 
 describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
-  it('suma tela/avíos y arma procesos = maquilaOrd + aplicacionOrd + bordados', () => {
+  it('suma tela/avíos y arma procesos = maquilaOrd + aplicacionOrd + arte', () => {
     const orden = ordenFake({
       maquilaOrd: D(10),
       aplicacionOrd: D(2),
@@ -55,10 +52,7 @@ describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
         { consumoPorPrenda: D(0.5), precioSugerido: null }, // precio nulo → 0
       ],
       avios: [{ consumoPorPrenda: D(2), precioReferencia: D(3) }],
-      bordados: [
-        { precio: D(5), catalogo: D(99) },
-        { precio: null, catalogo: D(7) }, // sin precio en el modelo → cae al del catálogo
-      ],
+      artes: [{ precio: D(5) }, { precio: D(7) }],
     });
     const t = teoricoPorPrenda(orden);
     expect(t.tela).toBeCloseTo(30, 6); // 1.5×20 + 0.5×0
@@ -66,10 +60,15 @@ describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
     expect(t.procesos).toBeCloseTo(24, 6); // 10 + 2 + (5 + 7)
   });
 
-  it('el bordado entra UNA vez por modelo, SIN cantidad', () => {
-    const orden = ordenFake({ bordados: [{ precio: D(15), catalogo: D(1) }] });
-    // procesos = 0 (maquila) + 0 (aplicación) + 15 (bordado, sin multiplicar por cantidad).
+  it('el arte entra UNA vez por modelo, SIN cantidad', () => {
+    const orden = ordenFake({ artes: [{ precio: D(15) }] });
+    // procesos = 0 (maquila) + 0 (aplicación) + 15 (arte, sin multiplicar por cantidad).
     expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(15, 6);
+  });
+
+  it('un arte SIN precio (histórico migrado) cuenta 0, no rompe (ceronulo)', () => {
+    const orden = ordenFake({ artes: [{ precio: null }, { precio: D(4) }] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(4, 6);
   });
 
   it('sin maquila de la orden usa la maquila base del modelo', () => {
@@ -80,6 +79,90 @@ describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
   it('todo nulo/vacío ⇒ 0 en los tres componentes (ceronulo)', () => {
     const t = teoricoPorPrenda(ordenFake({}));
     expect(t).toEqual({ tela: 0, avios: 0, procesos: 0 });
+  });
+});
+
+/**
+ * ⚠️ LA INVARIANTE DE V1-E3d (§Post-F9.35): mover el arte al modelo NO puede mover el costeo.
+ *
+ * ANTES el precio del arte se resolvía con una CASCADA de dos niveles —
+ * `ModeloBordado.precio ?? Bordado.precio` (el del renglón del BOM, o el del catálogo si el
+ * renglón venía vacío)—. Al desaparecer el catálogo queda UN solo precio: el que la migración
+ * copió resolviendo esa misma cascada (`COALESCE(mb.precio, b.precio)` en
+ * `20260814120000_arte_en_el_modelo/migration.sql`).
+ *
+ * Esta prueba lo DEMUESTRA en vez de afirmarlo: reimplementa la fórmula VIEJA tal como estaba
+ * escrita, aplica la resolución de la migración sobre los MISMOS datos, y exige que
+ * `teoricoPorPrenda` (que ya lee un solo precio) dé exactamente el mismo número — para todas las
+ * combinaciones de renglón/catálogo que existían, incluidas las de precio nulo.
+ */
+describe('V1-E3d — el costeo NO se mueve al sacar el arte del catálogo', () => {
+  /** Un renglón del BOM viejo: su precio y el del catálogo detrás. */
+  type ArteViejo = { precioRenglon: number | null; precioCatalogo: number | null };
+
+  /** La fórmula VIEJA, tal cual estaba en `costo-orden.ts` antes de V1-E3d. */
+  function arteViejo(artes: ArteViejo[]): number {
+    return artes.reduce(
+      (s, a) => s + (a.precioRenglon === null ? (a.precioCatalogo ?? 0) : a.precioRenglon),
+      0,
+    );
+  }
+
+  /** Lo que hizo la migración con cada renglón: `COALESCE(mb.precio, b.precio)`. */
+  function migrado(a: ArteViejo): { precio: Prisma.Decimal | null } {
+    const resuelto = a.precioRenglon ?? a.precioCatalogo;
+    return { precio: resuelto === null ? null : D(resuelto) };
+  }
+
+  const casos: { titulo: string; artes: ArteViejo[] }[] = [
+    {
+      titulo: 'precio en el renglón (el catálogo no manda)',
+      artes: [{ precioRenglon: 12.5, precioCatalogo: 99 }],
+    },
+    {
+      titulo: 'renglón vacío → caía al catálogo',
+      artes: [{ precioRenglon: null, precioCatalogo: 7.25 }],
+    },
+    {
+      titulo: 'renglón y catálogo vacíos → 0',
+      artes: [{ precioRenglon: null, precioCatalogo: null }],
+    },
+    {
+      titulo: 'renglón en 0 NO cae al catálogo (0 es un precio)',
+      artes: [{ precioRenglon: 0, precioCatalogo: 30 }],
+    },
+    {
+      titulo: 'varios artes del mismo modelo, mezclando los tres casos',
+      artes: [
+        { precioRenglon: 5, precioCatalogo: 99 },
+        { precioRenglon: null, precioCatalogo: 7 },
+        { precioRenglon: null, precioCatalogo: null },
+      ],
+    },
+  ];
+
+  for (const caso of casos) {
+    it(`da el mismo importe que la fórmula vieja: ${caso.titulo}`, () => {
+      const orden = ordenFake({
+        maquilaOrd: D(10),
+        aplicacionOrd: D(2),
+        artes: caso.artes.map(migrado),
+      });
+      const esperadoViejo = 10 + 2 + arteViejo(caso.artes);
+      expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(esperadoViejo, 6);
+    });
+  }
+
+  it('el arte sigue entrando UNA vez por modelo (no se multiplica por cantidad)', () => {
+    // La cantidad de la orden no aparece en la fórmula: 3 artes = Σ de sus 3 precios, punto.
+    const artes: ArteViejo[] = [
+      { precioRenglon: 3, precioCatalogo: null },
+      { precioRenglon: null, precioCatalogo: 4 },
+      { precioRenglon: 5, precioCatalogo: 6 },
+    ];
+    const orden = ordenFake({ artes: artes.map(migrado) });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(arteViejo(artes), 6);
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(12, 6);
   });
 });
 

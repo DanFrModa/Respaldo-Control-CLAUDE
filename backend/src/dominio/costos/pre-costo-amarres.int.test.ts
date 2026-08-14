@@ -64,7 +64,7 @@ describe('calcularPreCosto — no-regresión F7 (modelo SIN amarres)', () => {
     expect(pre.totalTela).toBe(30); // 1.5 × 20 (precioSugerido)
     expect(pre.totalAvios).toBe(6); // 2 × 3 (precioReferencia) — NO el proveedor barato (1)
     expect(pre.maquila).toBe(8);
-    expect(pre.costoTotal).toBe(44); // 30 + 6 + 0 bordado + 8
+    expect(pre.costoTotal).toBe(44); // 30 + 6 + 0 arte + 8
   });
 });
 

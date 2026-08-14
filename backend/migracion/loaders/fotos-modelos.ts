@@ -18,9 +18,9 @@
  *
  * FOTOS DE BORDADOS (~2,686 archivos):
  *  • Directorio configurado por env `ETL_FOTOS_BOR_DIR`.
- *  • Cada bordado tiene un campo `Foto` en `Bordados.csv`; el ETL de catálogos (E6) NO cargó
+ *  • Cada arte viejo tiene un campo `Foto` en `Bordados.csv`; el ETL de catálogos (E6) NO cargó
  *    las fotos.  Aquí se completan (mismo orden R2-primero que las de modelos).
- *  • IDEMPOTENTE: salta si el bordado ya tiene foto (`idArchivoFoto` no null).
+ *  • IDEMPOTENTE: salta los artes que ya tienen foto (`idArchivoFoto` no null).
  *  • Si `ETL_FOTOS_BOR_DIR` NO está seteado, se SALTA limpio con un aviso.
  *
  * REGLA DURA: los tests de CI NO suben archivos reales a R2 ni a ningún directorio — las fotos
@@ -317,9 +317,16 @@ async function procesarFotoModelo(
   }
 }
 
-// ── Fotos de BORDADOS ────────────────────────────────────────────────────────────
+// ── Fotos del ARTE de los modelos (V1-E3d: ya no hay catálogo de arte) ──────────
 
-export async function cargarFotosBordados(
+/**
+ * Sube la foto del arte viejo (`Bordados.csv`, columna `Foto`) y la liga a TODOS los artes que
+ * salieron de él. Un arte compartido por varios modelos se duplicó al migrar (§Post-F9.35), y las
+ * copias COMPARTEN el mismo `Archivo` (el objeto de R2 se sube UNA vez y `archivos.key` es único;
+ * lo mismo hace la migración SQL). Idempotente: salta los artes que ya tienen foto y no vuelve a
+ * subir si ya la tienen todos.
+ */
+export async function cargarFotosArte(
   sesion: SesionUsuario,
   clienteBd: ClienteMapeo,
   reporte: Reporte,
@@ -329,13 +336,13 @@ export async function cargarFotosBordados(
   const dirFotos = process.env.ETL_FOTOS_BOR_DIR?.trim();
   if (!dirFotos) {
     reporte.nota(
-      'ETL_FOTOS_BOR_DIR no configurada: carga de fotos de bordados OMITIDA. ' +
-        'Ejecutar etl:fotos-bordados cuando la carpeta esté disponible.',
+      'ETL_FOTOS_BOR_DIR no configurada: carga de fotos de arte OMITIDA. ' +
+        'Ejecutar etl:fotos-arte cuando la carpeta esté disponible.',
     );
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
   }
   if (!existsSync(dirFotos)) {
-    reporte.nota(`ETL_FOTOS_BOR_DIR="${dirFotos}" no existe en disco: fotos de bordados OMITIDAS.`);
+    reporte.nota(`ETL_FOTOS_BOR_DIR="${dirFotos}" no existe en disco: fotos de arte OMITIDAS.`);
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
   }
 
@@ -350,34 +357,50 @@ export async function cargarFotosBordados(
   const filas = leerCsv('Bordados.csv');
   const bd: ContextoBd = { cliente: clienteBd as PrismaClient };
 
+  // Todos los artes migrados, indexados por el `IdBordados` viejo (clave `<IdBordados>:<IdModelos>`).
+  const artesPorArteViejo = new Map<string, number[]>();
+  const mapeos = await (clienteBd as PrismaClient).mapeoMigracion.findMany({
+    where: { entidad: ENTIDAD_MAPEO.modeloArte },
+    select: { claveVieja: true, idNuevo: true },
+  });
+  for (const m of mapeos) {
+    const idArteViejo = m.claveVieja.split(':')[0] ?? '';
+    const lista = artesPorArteViejo.get(idArteViejo);
+    if (lista === undefined) {
+      artesPorArteViejo.set(idArteViejo, [Number(m.idNuevo)]);
+    } else {
+      lista.push(Number(m.idNuevo));
+    }
+  }
+
   const resultados = await enLotes(
     filas,
     async (fila): Promise<EstadoFoto> => {
       const idViejo = fila.IdBordados?.trim() ?? '';
-      const idBordadoStr = await leerMapeo(clienteBd, ENTIDAD_MAPEO.bordado, idViejo);
-      if (idBordadoStr === null) {
+      const idsArte = artesPorArteViejo.get(idViejo) ?? [];
+      if (idsArte.length === 0) {
+        // Arte que ningún modelo usaba (no migrado, §Post-F9.35) o sin mapeo: nada que ligar.
         return 'omitido';
       }
-      const idBordado = Number(idBordadoStr);
 
       const nombreBase = parsearNombreFoto(fila.Foto);
       if (nombreBase === null) {
         return 'omitido';
       }
 
-      // Idempotencia: ¿ya tiene foto?
-      const bordadoActual = await (clienteBd as PrismaClient).bordado.findUnique({
-        where: { id: idBordado },
-        select: { idArchivoFoto: true },
+      // Idempotencia: solo se atienden los artes que TODAVÍA no tienen foto.
+      const pendientes = await (clienteBd as PrismaClient).modeloArte.findMany({
+        where: { id: { in: idsArte }, idArchivoFoto: null },
+        select: { id: true },
       });
-      if (bordadoActual?.idArchivoFoto !== null && bordadoActual?.idArchivoFoto !== undefined) {
+      if (pendientes.length === 0) {
         return 'existente';
       }
 
       const rutaArchivo = buscarArchivoFoto(dirFotos, nombreBase);
       if (rutaArchivo === null) {
         reporte.agregar(
-          'Fotos bordados: archivo no encontrado',
+          'Fotos de arte: archivo no encontrado',
           `IdBordados=${idViejo}, nombre buscado="${nombreBase}"`,
         );
         return 'omitido';
@@ -388,11 +411,11 @@ export async function cargarFotosBordados(
       const tipoMime = tipoMimePorExtension(ext);
       const contenido = readFileSync(rutaArchivo);
       const tamanoBytes = contenido.length;
-      const key = `bordados/etl-${randomUUID()}/${sanearNombreArchivo(nombreOriginal)}`;
+      const key = `modelo-arte/etl-${randomUUID()}/${sanearNombreArchivo(nombreOriginal)}`;
 
       try {
         // 1. Subir el objeto a R2 PRIMERO. Si la subida falla, no se commitea nada en BD y
-        //    re-correr reintenta limpio (el guard `idArchivoFoto != null` sigue null). Un objeto
+        //    re-correr reintenta limpio (los artes siguen con `idArchivoFoto` null). Un objeto
         //    R2 huérfano de un intento previo es inofensivo: la key lleva `randomUUID`.
         await clienteR2.send(
           new PutObjectCommand({
@@ -404,7 +427,7 @@ export async function cargarFotosBordados(
           }),
         );
 
-        // 2. Solo si la subida fue OK, registrar Archivo + ligar la foto al Bordado (A2).
+        // 2. Solo si la subida fue OK, registrar UN `Archivo` y ligarlo a TODAS las copias (A2).
         await enTransaccion(async (tx) => {
           const archivo = await tx.archivo.create({
             data: {
@@ -416,23 +439,25 @@ export async function cargarFotosBordados(
               subidoPorId: sesion.id,
             },
           });
-          await tx.bordado.update({
-            where: { id: idBordado },
+          await tx.modeloArte.updateMany({
+            where: { id: { in: pendientes.map((p) => p.id) }, idArchivoFoto: null },
             data: { idArchivoFoto: archivo.id, ...datosModificacion(sesion) },
           });
-          await registrarBitacora(tx, sesion, {
-            entidad: 'Bordado',
-            idEntidad: idBordado,
-            accion: 'MODIFICAR',
-            datos: { foto: 'etl-migración', archivo: nombreOriginal },
-          });
+          for (const p of pendientes) {
+            await registrarBitacora(tx, sesion, {
+              entidad: 'ModeloArte',
+              idEntidad: p.id,
+              accion: 'MODIFICAR',
+              datos: { foto: 'etl-migración', archivo: nombreOriginal },
+            });
+          }
         }, bd);
 
         return 'creado';
       } catch (error) {
         const detalle = error instanceof Error ? error.message : String(error);
         reporte.agregar(
-          'Fotos bordados: error al subir',
+          'Fotos de arte: error al subir',
           `IdBordados=${idViejo}, archivo="${nombreOriginal}" · ${detalle}`,
         );
         return 'omitidoValidacion';

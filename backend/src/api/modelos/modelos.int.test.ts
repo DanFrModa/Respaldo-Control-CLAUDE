@@ -1,18 +1,18 @@
 /**
  * Pruebas de integración de las rutas de Modelos (Módulo 2, F1-E4): el API REST de punta a
- * punta, incluido el BOM (telas/avíos/bordados), copiar BOM y el flujo de fotos con el motor
+ * punta, incluido el BOM (telas/avíos), el ARTE del modelo, copiar BOM y el flujo de fotos con el motor
  * de archivos de F0.
  *
  * Levantan una app Fastify con SOLO el plugin de modelos montado bajo `/api`, apuntada al
  * Postgres efímero de testcontainers, con la autenticación real (better-auth) y el seed real
  * (admin `Control.2026!`, 9 roles, FR Moda, géneros sembrados). Se ejercita con `app.inject`
- * (sin abrir puerto). Las telas/avíos/bordados del BOM se crean directo en BD (este test no
+ * (sin abrir puerto). Las telas/avíos del BOM se crean directo en BD (este test no
  * monta sus rutas; el dominio de modelos solo necesita que existan). Cubren:
  *  - deny-by-default: rol `Basico` (sin permisos) → 403; sin sesión → 401;
  *  - alta y aparición en el listado (modo servidor: búsqueda + filtro temporada) + código dup 409;
  *  - PATCH parcial (FK + vaciar con null) + descontinuar/reactivar + filtro incluirInactivos;
  *  - selector de géneros (sembrados);
- *  - BOM: set de telas/avíos (consumo + 3 banderas persistidas), bordados (precio), sin duplicados;
+ *  - BOM: set de telas/avíos (consumo + 3 banderas persistidas), sin duplicados; ARTE por renglón;
  *  - copiar BOM (atómico, reemplazar y fusionar);
  *  - fotos: POST presigned (key por id), GET listar, PATCH metadatos, DELETE quitar.
  *
@@ -154,10 +154,21 @@ async function crearAvio(clave: string): Promise<number> {
   return avio.id;
 }
 
-/** Crea un bordado en BD (con precio de catálogo) y devuelve su id. */
-async function crearBordado(nombre: string, precio: number): Promise<number> {
-  const bordado = await cliente.bordado.create({ data: { nombre, precio } });
-  return bordado.id;
+/** Agrega un ARTE a un modelo por la API (V1-E3d: el arte vive dentro del modelo) y da su id. */
+async function crearArteApi(
+  cookie: string,
+  idModelo: number,
+  nombre: string,
+  precio: number,
+): Promise<number> {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/api/modelos/${String(idModelo)}/artes`,
+    headers: { cookie },
+    payload: { nombre, precio },
+  });
+  expect(res.statusCode).toBe(201);
+  return res.json<{ id: number }>().id;
 }
 
 describe('API de modelos (F1-E4)', () => {
@@ -311,7 +322,7 @@ describe('API de modelos (F1-E4)', () => {
     });
   });
 
-  describe('BOM (telas/avíos/bordados)', () => {
+  describe('BOM (telas/avíos)', () => {
     it('reemplaza el set de telas con consumo + 3 banderas; las persiste y rechaza duplicados', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM1' });
@@ -383,11 +394,10 @@ describe('API de modelos (F1-E4)', () => {
       expect(vacio.json<{ datos: unknown[] }>().datos).toHaveLength(0);
     });
 
-    it('reemplaza avíos y bordados (con precio por renglón)', async () => {
+    it('reemplaza avíos (banderas por renglón)', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM2' });
       const idAvio = await crearAvio('BTN-01');
-      const idBordado = await crearBordado('Logo', 30);
 
       const avios = await app.inject({
         method: 'PUT',
@@ -397,17 +407,6 @@ describe('API de modelos (F1-E4)', () => {
       });
       expect(avios.statusCode).toBe(200);
       expect(avios.json<{ datos: { paraCosto: boolean }[] }>().datos[0]?.paraCosto).toBe(false);
-
-      const bordados = await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${body.id}/bom/bordados`,
-        headers: { cookie },
-        payload: { bordados: [{ idBordado, precio: 45 }] },
-      });
-      expect(bordados.statusCode).toBe(200);
-      expect(
-        bordados.json<{ datos: { idBordado: number; precio: number }[] }>().datos[0],
-      ).toMatchObject({ idBordado, precio: 45 });
     });
 
     it('rechaza meter al BOM una tela desactivada (400)', async () => {
@@ -425,13 +424,13 @@ describe('API de modelos (F1-E4)', () => {
   });
 
   describe('copiar BOM (atómico)', () => {
-    it('copia telas/avíos/bordados de otro modelo (reemplazar) y rechaza origen==destino', async () => {
+    it('copia telas/avíos/arte de otro modelo (reemplazar) y rechaza origen==destino', async () => {
       const cookie = await cookieAdmin();
       const origen = (await crearModeloApi(cookie, { codigo: 'ORIG' })).body;
       const destino = (await crearModeloApi(cookie, { codigo: 'DEST' })).body;
       const idTela = await crearTela('Jersey');
       const idAvio = await crearAvio('ETIQ-1');
-      const idBordado = await crearBordado('Estampa', 12);
+      await crearArteApi(cookie, origen.id, 'Estampa', 12);
 
       // Carga el BOM del origen.
       await app.inject({
@@ -446,13 +445,6 @@ describe('API de modelos (F1-E4)', () => {
         headers: { cookie },
         payload: { avios: [{ idAvio, consumoPorPrenda: 1 }] },
       });
-      await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${origen.id}/bom/bordados`,
-        headers: { cookie },
-        payload: { bordados: [{ idBordado, precio: 12 }] },
-      });
-
       const copia = await app.inject({
         method: 'POST',
         url: `/api/modelos/${destino.id}/copiar-bom`,
@@ -460,10 +452,12 @@ describe('API de modelos (F1-E4)', () => {
         payload: { idOrigen: origen.id, reemplazar: true },
       });
       expect(copia.statusCode).toBe(200);
-      const bom = copia.json<{ telas: unknown[]; avios: unknown[]; bordados: unknown[] }>();
+      const bom = copia.json<{ telas: unknown[]; avios: unknown[]; artes: { nombre: string }[] }>();
       expect(bom.telas).toHaveLength(1);
       expect(bom.avios).toHaveLength(1);
-      expect(bom.bordados).toHaveLength(1);
+      expect(bom.artes).toHaveLength(1);
+      // La copia es un arte PROPIO del destino (no una referencia a un catálogo que ya no existe).
+      expect(bom.artes[0]?.nombre).toBe('Estampa');
 
       // Origen == destino → 400.
       const mismo = await app.inject({
@@ -537,7 +531,6 @@ describe('API de modelos (F1-E4)', () => {
       const cookie = await cookieAdmin();
       const destino = (await crearModeloApi(cookie, { codigo: 'DEST-RB' })).body;
       const idTela = await crearTela('Intacta');
-      const idBordado = await crearBordado('IntactoBordado', 20);
 
       // El destino YA tiene un BOM (la ruta destructiva reemplazar:true borraría esto primero).
       await app.inject({
@@ -546,12 +539,7 @@ describe('API de modelos (F1-E4)', () => {
         headers: { cookie },
         payload: { telas: [{ idTela, consumoPorPrenda: 2 }] },
       });
-      await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${destino.id}/bom/bordados`,
-        headers: { cookie },
-        payload: { bordados: [{ idBordado, precio: 20 }] },
-      });
+      const idArte = await crearArteApi(cookie, destino.id, 'Arte intacto', 20);
 
       // Copiar desde un origen INEXISTENTE (la operación falla dentro de la transacción A2).
       const idOrigenInexistente = 999_999;
@@ -571,12 +559,12 @@ describe('API de modelos (F1-E4)', () => {
       });
       const bom = ficha.json<{
         telas: { idTela: number }[];
-        bordados: { idBordado: number }[];
+        artes: { id: number }[];
       }>();
       expect(bom.telas).toHaveLength(1);
       expect(bom.telas[0]?.idTela).toBe(idTela);
-      expect(bom.bordados).toHaveLength(1);
-      expect(bom.bordados[0]?.idBordado).toBe(idBordado);
+      expect(bom.artes).toHaveLength(1);
+      expect(bom.artes[0]?.id).toBe(idArte);
     });
   });
 
@@ -665,11 +653,11 @@ describe('API de modelos (F1-E4)', () => {
   /**
    * Foto PRINCIPAL y arte PRINCIPAL (jul-2026, petición de Daniel). "Principal" = ser el PRIMERO;
    * marcarlo mueve el renglón al lugar 0 y reindexa el resto. Aquí se verifica contra Postgres
-   * REAL lo que el unit no puede: que la columna `modelo_bordado.orden` (migración
-   * `20260725130000_modelo_bordado_orden`) persiste el orden, que las lecturas salen ordenadas y
+   * REAL lo que el unit no puede: que la columna `modelo_arte.orden` persiste el orden (viene de
+   * `20260725130000_modelo_bordado_orden` y la heredó `modelo_arte`), que las lecturas salen ordenadas y
    * que guardar la receta después NO desbanca al principal.
    */
-  describe('principal (foto del modelo y arte del BOM)', () => {
+  describe('principal (foto del modelo y arte del modelo)', () => {
     /** Sube N fotos por API (quedan en `orden` 0..N-1) y devuelve sus `idFoto` en ese orden. */
     async function subirFotos(
       cookie: string,
@@ -765,56 +753,40 @@ describe('API de modelos (F1-E4)', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('marca el arte principal del BOM y lo persiste en `modelo_bordado.orden`', async () => {
+    it('marca el arte principal del modelo y lo persiste en `modelo_arte.orden`', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'PRIN-ARTE' });
-      const a = await crearBordado('Arte A', 10);
-      const b = await crearBordado('Arte B', 20);
-      const c = await crearBordado('Arte C', 30);
-      // Al guardar la receta, los renglones NUEVOS toman el orden en que vienen en el cuerpo (es
-      // el orden que el usuario ve en la pantalla), no el alfabético.
-      const put = await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${body.id}/bom/bordados`,
+      // Los artes NUEVOS entran AL FINAL, en el orden en que se capturan (no alfabético).
+      const a = await crearArteApi(cookie, body.id, 'Arte A', 10);
+      const b = await crearArteApi(cookie, body.id, 'Arte B', 20);
+      const c = await crearArteApi(cookie, body.id, 'Arte C', 30);
+
+      const lista = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/artes`,
         headers: { cookie },
-        payload: {
-          bordados: [
-            { idBordado: a, precio: 10 },
-            { idBordado: b, precio: 20 },
-            { idBordado: c, precio: 30 },
-          ],
-        },
       });
-      expect(put.statusCode).toBe(200);
-      expect(put.json<{ datos: { idBordado: number }[] }>().datos.map((x) => x.idBordado)).toEqual([
-        a,
-        b,
-        c,
-      ]);
+      expect(lista.json<{ datos: { id: number }[] }>().datos.map((x) => x.id)).toEqual([a, b, c]);
 
       // Marcar C como principal.
       const res = await app.inject({
         method: 'POST',
-        url: `/api/modelos/${body.id}/bom/bordados/${String(c)}/principal`,
+        url: `/api/modelos/${body.id}/artes/${String(c)}/principal`,
         headers: { cookie },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json<{ datos: { idBordado: number }[] }>().datos.map((x) => x.idBordado)).toEqual([
-        c,
-        a,
-        b,
-      ]);
+      expect(res.json<{ datos: { id: number }[] }>().datos.map((x) => x.id)).toEqual([c, a, b]);
 
-      // La columna nueva guarda el orden compacto.
-      const enBd = await cliente.modeloBordado.findMany({
+      // La columna guarda el orden compacto.
+      const enBd = await cliente.modeloArte.findMany({
         where: { idModelo: body.id },
         orderBy: { orden: 'asc' },
-        select: { idBordado: true, orden: true },
+        select: { id: true, orden: true },
       });
       expect(enBd).toEqual([
-        { idBordado: c, orden: 0 },
-        { idBordado: a, orden: 1 },
-        { idBordado: b, orden: 2 },
+        { id: c, orden: 0 },
+        { id: a, orden: 1 },
+        { id: b, orden: 2 },
       ]);
 
       // La FICHA del modelo también trae el arte con el principal al frente.
@@ -823,23 +795,21 @@ describe('API de modelos (F1-E4)', () => {
         url: `/api/modelos/${body.id}`,
         headers: { cookie },
       });
-      expect(
-        ficha.json<{ bordados: { idBordado: number }[] }>().bordados.map((x) => x.idBordado),
-      ).toEqual([c, a, b]);
+      expect(ficha.json<{ artes: { id: number }[] }>().artes.map((x) => x.id)).toEqual([c, a, b]);
     });
 
     it('el HISTÓRICO (todo el arte en `orden` 0) se sigue listando alfabético y se puede marcar', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'PRIN-HIST' });
-      const c = await crearBordado('Zeta', 30);
-      const a = await crearBordado('Alfa', 10);
-      // Datos como quedan tras la migración aditiva: TODOS con el default `orden` 0 (así están los
-      // BOM que ya existían). El desempate por nombre los deja como se listaban antes del cambio.
-      await cliente.modeloBordado.createMany({
-        data: [
-          { idModelo: body.id, idBordado: c, precio: 30 },
-          { idModelo: body.id, idBordado: a, precio: 10 },
-        ],
+      // Datos como los deja la MIGRACIÓN de V1-E3d: todos con el default `orden` 0 (el histórico
+      // migrado). El desempate por nombre los deja como se listaban antes del cambio.
+      const zeta = await cliente.modeloArte.create({
+        data: { idModelo: body.id, nombre: 'Zeta', precio: 30 },
+        select: { id: true },
+      });
+      const alfa = await cliente.modeloArte.create({
+        data: { idModelo: body.id, nombre: 'Alfa', precio: 10 },
+        select: { id: true },
       });
 
       const ficha = await app.inject({
@@ -847,86 +817,70 @@ describe('API de modelos (F1-E4)', () => {
         url: `/api/modelos/${body.id}`,
         headers: { cookie },
       });
-      expect(
-        ficha.json<{ bordados: { idBordado: number }[] }>().bordados.map((x) => x.idBordado),
-      ).toEqual([a, c]);
+      expect(ficha.json<{ artes: { id: number }[] }>().artes.map((x) => x.id)).toEqual([
+        alfa.id,
+        zeta.id,
+      ]);
 
       // Marcar el segundo (Zeta) como principal compacta el orden y lo pone al frente.
       const res = await app.inject({
         method: 'POST',
-        url: `/api/modelos/${body.id}/bom/bordados/${String(c)}/principal`,
+        url: `/api/modelos/${body.id}/artes/${String(zeta.id)}/principal`,
         headers: { cookie },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json<{ datos: { idBordado: number }[] }>().datos.map((x) => x.idBordado)).toEqual([
-        c,
-        a,
+      expect(res.json<{ datos: { id: number }[] }>().datos.map((x) => x.id)).toEqual([
+        zeta.id,
+        alfa.id,
       ]);
-      const enBd = await cliente.modeloBordado.findMany({
+      const enBd = await cliente.modeloArte.findMany({
         where: { idModelo: body.id },
         orderBy: { orden: 'asc' },
-        select: { idBordado: true, orden: true },
+        select: { id: true, orden: true },
       });
       expect(enBd).toEqual([
-        { idBordado: c, orden: 0 },
-        { idBordado: a, orden: 1 },
+        { id: zeta.id, orden: 0 },
+        { id: alfa.id, orden: 1 },
       ]);
     });
 
-    it('guardar la receta después NO desbanca al arte principal (el nuevo entra al final)', async () => {
+    it('agregar arte después NO desbanca al principal (el nuevo entra al final)', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'PRIN-ARTE2' });
-      const a = await crearBordado('Arte A', 10);
-      const b = await crearBordado('Arte B', 20);
-      const nuevo = await crearBordado('Arte AA', 5); // alfabéticamente iría ANTES de "Arte B"
+      const a = await crearArteApi(cookie, body.id, 'Arte A', 10);
+      const b = await crearArteApi(cookie, body.id, 'Arte B', 20);
 
-      await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${body.id}/bom/bordados`,
-        headers: { cookie },
-        payload: {
-          bordados: [
-            { idBordado: a, precio: 10 },
-            { idBordado: b, precio: 20 },
-          ],
-        },
-      });
       // B es el principal.
       await app.inject({
         method: 'POST',
-        url: `/api/modelos/${body.id}/bom/bordados/${String(b)}/principal`,
+        url: `/api/modelos/${body.id}/artes/${String(b)}/principal`,
         headers: { cookie },
       });
 
-      // Se guarda la receta agregando un arte cuyo NOMBRE lo pondría primero por alfabético.
-      const put = await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${body.id}/bom/bordados`,
+      // Se agrega un arte cuyo NOMBRE lo pondría primero por alfabético.
+      const nuevo = await crearArteApi(cookie, body.id, 'Arte AA', 5);
+
+      const lista = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/artes`,
         headers: { cookie },
-        payload: {
-          bordados: [
-            { idBordado: a, precio: 11 },
-            { idBordado: b, precio: 20 },
-            { idBordado: nuevo, precio: 5 },
-          ],
-        },
       });
-      expect(put.statusCode).toBe(200);
       // B sigue siendo el principal y el nuevo quedó AL FINAL (no en `orden` 0).
-      expect(put.json<{ datos: { idBordado: number }[] }>().datos.map((x) => x.idBordado)).toEqual([
+      expect(lista.json<{ datos: { id: number }[] }>().datos.map((x) => x.id)).toEqual([
         b,
         a,
         nuevo,
       ]);
     });
 
-    it('un arte que no está en el BOM del modelo → 404', async () => {
+    it('un arte de OTRO modelo → 404 al marcarlo principal', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'PRIN-ARTE3' });
-      const suelto = await crearBordado('Arte suelto', 9);
+      const otro = (await crearModeloApi(cookie, { codigo: 'PRIN-ARTE3B' })).body;
+      const ajeno = await crearArteApi(cookie, otro.id, 'Arte ajeno', 9);
       const res = await app.inject({
         method: 'POST',
-        url: `/api/modelos/${body.id}/bom/bordados/${String(suelto)}/principal`,
+        url: `/api/modelos/${body.id}/artes/${String(ajeno)}/principal`,
         headers: { cookie },
       });
       expect(res.statusCode).toBe(404);
@@ -936,13 +890,7 @@ describe('API de modelos (F1-E4)', () => {
       const cookieAdministra = await cookieAdmin();
       const { body } = await crearModeloApi(cookieAdministra, { codigo: 'PRIN-403' });
       const [foto] = await subirFotos(cookieAdministra, body.id, 1);
-      const arte = await crearBordado('Arte 403', 3);
-      await app.inject({
-        method: 'PUT',
-        url: `/api/modelos/${body.id}/bom/bordados`,
-        headers: { cookie: cookieAdministra },
-        payload: { bordados: [{ idBordado: arte, precio: 3 }] },
-      });
+      const arte = await crearArteApi(cookieAdministra, body.id, 'Arte 403', 3);
 
       await crearUsuarioBasico('sinpermiso', 'Clave.1234!');
       const sesion = await login('sinpermiso', 'Clave.1234!');
@@ -950,7 +898,7 @@ describe('API de modelos (F1-E4)', () => {
 
       for (const url of [
         `/api/modelos/${body.id}/fotos/${String(foto)}/principal`,
-        `/api/modelos/${body.id}/bom/bordados/${String(arte)}/principal`,
+        `/api/modelos/${body.id}/artes/${String(arte)}/principal`,
       ]) {
         const res = await app.inject({ method: 'POST', url, headers: { cookie } });
         expect(res.statusCode).toBe(403);

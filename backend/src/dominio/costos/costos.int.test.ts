@@ -61,8 +61,6 @@ beforeEach(async () => {
   const avio = await cliente.avio.create({
     data: { clave: 'BOT', descripcion: 'Botón', precioReferencia: 3 },
   });
-  const bordado = await cliente.bordado.create({ data: { nombre: 'Logo', precio: 99 } });
-
   const modelo = await cliente.modelo.create({
     data: {
       codigo: 'MOD-1',
@@ -70,7 +68,8 @@ beforeEach(async () => {
       maquilaBase: 8,
       telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1.5 }] }, // banderas default true
       avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 2 }] },
-      bordados: { create: [{ idBordado: bordado.id, precio: 5 }] },
+      // V1-E3d: el arte es HIJO del modelo, con su propio precio (ya no hay catálogo detrás).
+      artes: { create: [{ nombre: 'Logo', precio: 5 }] },
     },
   });
   idModelo = modelo.id;
@@ -151,7 +150,7 @@ describe('calcularPreCosto', () => {
     const pre = await calcularPreCosto(sesion(), idModelo, bd());
     expect(pre.totalTela).toBe(30); // 1.5 × 20
     expect(pre.totalAvios).toBe(6); // 2 × 3
-    expect(pre.totalBordado).toBe(5); // precio del renglón (no el 99 del catálogo)
+    expect(pre.totalArte).toBe(5); // el precio del arte del modelo
     expect(pre.maquila).toBe(8);
     expect(pre.costoTotal).toBe(49); // 30 + 6 + 5 + 8 (SIN regalías)
     // precio sugerido = ceil( 49 / (1−0.5) / (1−0.1) ) = ceil(108.88) = 109.

@@ -81,9 +81,9 @@ export const MODULOS_PERMISO = {
   tallas: 'Tallas y curvas',
   // ── Catálogos de materiales (F1-E3) ────────────────────────────────────────
   // `telas` ya existe arriba (Inventario de telas): la administración del CATÁLOGO de
-  // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` y `bordados` son nuevos.
+  // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` es nuevo. (`bordados`
+  // existió hasta V1-E3d: el arte dejó de ser catálogo y se gobierna con `modelos.*`.)
   avios: 'Avíos',
-  bordados: 'Arte (bordado y estampado)',
   // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
   modelos: 'Modelos',
   // ── Producción / WIP (Módulo 4, F3) ────────────────────────────────────────
@@ -846,8 +846,8 @@ export const CATALOGO_PERMISOS = [
   },
 
   // ── Catálogos de materiales (F1-E3, globales — ADR-0007/ADR-0009; CRUD patrón Almacenes) ─
-  // Telas unificadas (D5) con sus colores, avíos (R1) con sus proveedores y bordados (R2)
-  // con foto. Como los catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
+  // Telas unificadas (D5) con sus colores y avíos (R1) con sus proveedores. Como los
+  // catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
   // (alta/edición/des-reactivación). Las CATEGORÍAS de tela y los PROVEEDORES de un avío
   // NO tienen permiso propio: se gobiernan con `telas.administrar` / `avios.administrar`
   // (mismo criterio de sub-catálogo embebido sin permiso propio).
@@ -873,27 +873,18 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de avíos y sus proveedores (alta, edición, desactivación)',
   },
-  {
-    clave: 'bordados.ver',
-    modulo: 'bordados',
-    descripcion: 'Consultar el catálogo de arte (bordado y estampado)',
-  },
-  {
-    clave: 'bordados.administrar',
-    modulo: 'bordados',
-    descripcion:
-      'Administrar el catálogo de arte (bordado y estampado), incluida su foto (alta, edición, desactivación)',
-  },
+  // (Los permisos `bordados.*` desaparecieron en V1-E3d con el catálogo de arte —
+  // §Post-F9.35: el arte vive dentro del modelo y se gobierna con `modelos.*`.)
 
   // ── Modelos (Módulo 2, F1-E4, global — ADR-0007; doc 01-Modelos) ────────────
-  // El catálogo de productos con su receta/BOM (telas/avíos/bordados) y sus fotos. Como
+  // El catálogo de productos con su receta/BOM (telas/avíos/arte) y sus fotos. Como
   // los catálogos de F1: `ver` (consulta) y `administrar` (alta/edición/des-reactivación,
   // BOM y fotos). El selector de Género (`GET /api/generos`) se gobierna con `modelos.ver`
   // (no tiene permiso propio: mismo criterio de sub-catálogo selector que RolProveedor).
   {
     clave: 'modelos.ver',
     modulo: 'modelos',
-    descripcion: 'Consultar el catálogo de modelos, su receta (BOM) y sus fotos',
+    descripcion: 'Consultar el catálogo de modelos, su receta (BOM), su arte y sus fotos',
   },
   {
     clave: 'modelos.administrar',

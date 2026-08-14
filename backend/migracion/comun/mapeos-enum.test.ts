@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   mapearRolProveedorComercial,
-  mapearTipoBordado,
+  mapearTipoArte,
   mapearTipoComponente,
   mapearUnidadTela,
   mapearTipoProveedor,
@@ -65,13 +65,13 @@ describe('migración · mapeos de enum (puros)', () => {
     });
   });
 
-  describe('mapearTipoBordado (BorEst)', () => {
+  describe('mapearTipoArte (BorEst)', () => {
     it('0/vacío→BORDADO, distinto de 0→ESTAMPADO', () => {
-      expect(mapearTipoBordado('0')).toBe('BORDADO');
-      expect(mapearTipoBordado('')).toBe('BORDADO');
-      expect(mapearTipoBordado(null)).toBe('BORDADO');
-      expect(mapearTipoBordado('1')).toBe('ESTAMPADO');
-      expect(mapearTipoBordado('-1')).toBe('ESTAMPADO');
+      expect(mapearTipoArte('0')).toBe('BORDADO');
+      expect(mapearTipoArte('')).toBe('BORDADO');
+      expect(mapearTipoArte(null)).toBe('BORDADO');
+      expect(mapearTipoArte('1')).toBe('ESTAMPADO');
+      expect(mapearTipoArte('-1')).toBe('ESTAMPADO');
     });
   });
 

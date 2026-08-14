@@ -95,7 +95,6 @@ async function conteos(): Promise<Record<string, number>> {
     telaCategorias: await cliente.telaCategoria.count(),
     proveedores: await cliente.proveedor.count(),
     almacenes: await cliente.almacen.count(),
-    bordados: await cliente.bordado.count(),
     avios: await cliente.avio.count(),
     colores: await cliente.color.count(),
     telas: await cliente.tela.count(),
@@ -124,7 +123,6 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     // estampador → 1), Carlos Núñez y "Decorador Solo" (maquilero con Proceso=1) = 9.
     expect(tras1.proveedores).toBe(9);
     expect(tras1.almacenes).toBe(4); // 3 PT (IPT) + 1 TELA activo (1 TELA inactivo no migra)
-    expect(tras1.bordados).toBe(3); // incl. el duplicado de nombre desambiguado
     expect(tras1.avios).toBe(3);
     expect(tras1.colores).toBe(6); // Marino, Negro, Negro A, Negro B, Blanco, Rojo
     // Alsatex100 (unificada), Jersey Liso, Chifon Liso, FelpaSuelta (TelaDis sin Tela)

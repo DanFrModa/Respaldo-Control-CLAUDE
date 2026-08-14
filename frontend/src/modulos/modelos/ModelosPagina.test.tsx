@@ -137,7 +137,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
 
 /** Ficha de ejemplo (datos + BOM). */
 function ficha(m: Modelo, extra: Partial<ModeloFicha> = {}): ModeloFicha {
-  return { ...m, telas: [], avios: [], bordados: [], ...extra };
+  return { ...m, telas: [], avios: [], artes: [], ...extra };
 }
 
 function pagina(datos: Modelo[]): TipoPagina {
@@ -255,11 +255,11 @@ describe('<ModelosPagina>', () => {
     // Pestañas presentes; por defecto Telas.
     expect(screen.getByTestId('tab-bom-telas')).toBeInTheDocument();
     expect(screen.getByTestId('tab-bom-avios')).toBeInTheDocument();
-    expect(screen.getByTestId('tab-bom-bordados')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-bom-artes')).toBeInTheDocument();
     expect(screen.getByTestId('seccion-bom-telas')).toBeInTheDocument();
 
-    await usuario.click(screen.getByTestId('tab-bom-bordados'));
-    expect(screen.getByTestId('seccion-bom-bordados')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
   });
 
   it('pinta las columnas Tela principal, Stock PT y Costo con los agregados del listado', () => {

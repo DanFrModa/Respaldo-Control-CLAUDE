@@ -108,13 +108,15 @@ describe('resolución de componentes con mapas en memoria', () => {
     expect(mapa.get('3')).toBeUndefined();
   });
 
-  it('resuelve idBordadoNuevo usando el mapa de Bordado', () => {
+  it('resuelve el arte migrado con la clave COMPUESTA `<IdBordados>:<IdModelos>` (V1-E3d)', () => {
+    // El arte dejó de ser catálogo: un `IdBordados` viejo puede haber producido VARIOS artes (uno
+    // por modelo que lo usaba), así que el mapeo se indexa por el par, no por el id suelto.
     const mapa = new Map<string, number>([
-      ['100', 5],
-      ['200', 6],
+      ['100:1', 5],
+      ['100:2', 6],
     ]);
-    expect(mapa.get('100')).toBe(5);
-    expect(mapa.get('999')).toBeUndefined();
+    expect(mapa.get('100:1')).toBe(5);
+    expect(mapa.get('100:3')).toBeUndefined();
   });
 });
 

@@ -60,7 +60,7 @@ const NAMESPACE_LOCK_PRECOSTO = 20_531;
 
 /**
  * Códigos de concepto BASE que el motor del precosto alimenta directo (NO manuales del usuario): del
- * BOM (tela/avíos/bordado) o los costos fijos por prenda (maquila y —rediseño R5, B8— corte). Los
+ * BOM (tela/avíos/arte) o los costos fijos por prenda (maquila y —rediseño R5, B8— corte). Los
  * siembra el seed con `fijo=true` salvo `bordado`. `corte` es el renglón nuevo de R5 (costo de corte
  * separado de la costura; decisión Daniel).
  */
@@ -116,12 +116,9 @@ const incluirBomModelo = {
       tallas: { select: { consumo: true } },
     },
   },
-  bordados: {
-    select: {
-      idBordado: true,
-      precio: true,
-      bordado: { select: { nombre: true, precio: true } },
-    },
+  artes: {
+    select: { id: true, nombre: true, precio: true },
+    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.ModeloInclude;
 
@@ -193,7 +190,7 @@ function precioAvioDeCatalogo(
 }
 
 /** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
-const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_bordado'] as const;
+const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
 
 /** Códigos de los conceptos ANCLA fijos (rediseño R5): un renglón `manual` por prenda, único, que se
  * EDITA pero NO se elimina ni se agrega dos veces (maquila/costura y corte). */
@@ -213,15 +210,15 @@ function claveBom(l: {
   origen: string | null | undefined;
   idTela?: number | null;
   idAvio?: number | null;
-  idBordado?: number | null;
+  idModeloArte?: number | null;
 }): string {
-  return `${l.origen ?? ''}:${l.idTela ?? ''}:${l.idAvio ?? ''}:${l.idBordado ?? ''}`;
+  return `${l.origen ?? ''}:${l.idTela ?? ''}:${l.idAvio ?? ''}:${l.idModeloArte ?? ''}`;
 }
 
 /**
- * Construye los renglones de ORIGEN BOM (tela/avío/bordado) de un modelo. La tela y el avío se valúan
+ * Construye los renglones de ORIGEN BOM (tela/avío/arte) de un modelo. La tela y el avío se valúan
  * con la CASCADA de precios amarrados de E1 (tela: amarre → sugerido; avío: amarre → más barato →
- * referencia); el avío por talla usa el PROMEDIO de sus medidas (R18). El bordado entra UNA vez, sin
+ * referencia); el avío por talla usa el PROMEDIO de sus medidas (R18). El arte entra UNA vez, sin
  * cantidad. Determinista: mismos datos ⇒ mismos renglones (la usa `generar` y `recalcular`).
  */
 function lineasBomDesdeModelo(
@@ -298,14 +295,14 @@ function lineasBomDesdeModelo(
     });
   }
 
-  // BORDADO/ESTAMPADO: precio del renglón del modelo (o el del catálogo), UNA vez, sin cantidad.
-  for (const b of modelo.bordados) {
-    const precio = redondear2(b.precio === null ? num(b.bordado.precio) : b.precio.toNumber());
+  // ARTE (bordado/estampado): su precio vive DENTRO del modelo (V1-E3d), UNA vez, sin cantidad.
+  for (const a of modelo.artes) {
+    const precio = redondear2(num(a.precio));
     lineas.push({
       idConceptoCosto: conceptos.bordado,
-      origen: 'bom_bordado',
-      idBordado: b.idBordado,
-      descripcion: b.bordado.nombre,
+      origen: 'bom_arte',
+      idModeloArte: a.id,
+      descripcion: a.nombre,
       consumo: null,
       precioUnit: precio,
       importe: precio,
@@ -421,7 +418,7 @@ function aLineaSalida(
     idTelaProveedor: linea.idTelaProveedor,
     idAvio: linea.idAvio,
     idAvioProveedor: linea.idAvioProveedor,
-    idBordado: linea.idBordado,
+    idModeloArte: linea.idModeloArte,
     // R5, B12: en la calculadora de negociación CUALQUIER renglón de un borrador se puede editar
     // (los BOM pasan a `ajustado`). La UI gatea la edición tras `precosto.congelado`.
     editable: true,
@@ -534,7 +531,7 @@ async function bloquearDesarrolloDePrecosto(
 
 /**
  * GENERA un precosto BORRADOR (siguiente versión) desde el BOM del modelo del desarrollo, con los
- * renglones de tela/avío/bordado valuados con los precios amarrados (E1) + la maquila base. A lo más UN
+ * renglones de tela/avío/arte valuados con los precios amarrados (E1) + la maquila base. A lo más UN
  * borrador por desarrollo (serializado con advisory lock, A3). Requiere `desarrollo.precostear`.
  */
 export async function generarPrecosto(
@@ -617,7 +614,7 @@ export async function generarPrecosto(
 }
 
 /**
- * RECALCULA los renglones de origen BOM (tela/avío/bordado) desde el modelo, SIN tocar los MANUALES
+ * RECALCULA los renglones de origen BOM (tela/avío/arte) desde el modelo, SIN tocar los MANUALES
  * (maquila editada y conceptos abiertos sobreviven). Sólo sobre un BORRADOR. Requiere
  * `desarrollo.precostear`.
  */
@@ -654,12 +651,12 @@ export async function recalcularDesdeBom(
 
     // R5, B12: los renglones BOM AJUSTADOS a mano en la negociación se PRESERVAN (no se regeneran).
     // Se borran sólo los BOM no ajustados y se re-generan del modelo, SALTANDO los insumos que ya
-    // tienen un renglón ajustado (evita duplicar la misma tela/avío/bordado). Los quitados a mano SÍ
+    // tienen un renglón ajustado (evita duplicar la misma tela/avío/arte). Los quitados a mano SÍ
     // reaparecen (recalcular = reset explícito al BOM del modelo); para conservar un cambio definitivo
     // se edita el BOM del modelo. Los `manual` (maquila/corte/procesos) nunca los toca este recalcular.
     const ajustadas = await tx.precostoLinea.findMany({
       where: { idPrecosto, ajustado: true, origen: { in: [...ORIGENES_BOM] } },
-      select: { origen: true, idTela: true, idAvio: true, idBordado: true },
+      select: { origen: true, idTela: true, idAvio: true, idModeloArte: true },
     });
     const clavesAjustadas = new Set(ajustadas.map(claveBom));
 
@@ -833,7 +830,7 @@ export async function agregarLineaManual(
 /**
  * Edita CUALQUIER renglón de un borrador (rediseño R5, B12 — calculadora de negociación en vivo):
  * descripción/consumo/precio/notas (PATCH parcial). El importe se recompone. Si el renglón viene del
- * BOM (tela/avío/bordado), al editarlo pasa a `ajustado=true` (traza) para que `recalcularDesdeBom`
+ * BOM (tela/avío/arte), al editarlo pasa a `ajustado=true` (traza) para que `recalcularDesdeBom`
  * NO lo pise; `restaurarLineaBom` lo revierte al valor del BOM. Los manuales se editan igual que
  * antes. Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
  */
@@ -980,7 +977,7 @@ export async function restaurarLineaBom(
         ajustado: true,
         idTela: true,
         idAvio: true,
-        idBordado: true,
+        idModeloArte: true,
       },
     });
     if (linea === null) {

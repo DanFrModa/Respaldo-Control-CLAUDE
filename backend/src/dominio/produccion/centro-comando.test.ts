@@ -30,7 +30,7 @@ function ordenBase() {
     idModelo: 3,
     // `_count`s: insumos de la regla de "orden completa" (`requisitos-orden.ts`). Este modelo NO
     // tiene receta de avíos → la fila reporta `faltantes: ['avios']`.
-    modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 0, bordados: 2 } },
+    modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 0, artes: 2 } },
     _count: { lineas: 3 },
     idMaquilero: 77,
     maquilero: { nombre: 'Asignado SA' },
@@ -168,7 +168,7 @@ describe('centro de comando — proyección de las 13 columnas (agregado por lot
       Promise.resolve([
         {
           ...ordenBase(),
-          modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 4, bordados: 0 } },
+          modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 4, artes: 0 } },
         },
       ]),
     );
