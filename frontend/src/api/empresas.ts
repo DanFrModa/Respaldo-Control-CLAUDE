@@ -10,6 +10,7 @@ import { CLAVE_SESION } from '@/sesion/contexto';
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import { subirArchivoPrefirmado } from './subida-archivo';
 import type {
   Empresa,
   EmpresaConfiguracion,
@@ -253,26 +254,15 @@ async function subirLogo({ idEmpresa, archivo }: ArgsSubirLogo): Promise<void> {
   }
 
   // Paso 2: PUT directo a R2. Solo `Content-Type` (Content-Length lo fija el navegador y la URL
-  // prefirmada no lo firma — ver backend `comun/archivos.ts`).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: { 'Content-Type': archivo.type },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el logo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el logo. Intenta de nuevo.',
-    });
-  }
+  // prefirmada no lo firma — ver backend `comun/archivos.ts`). SIN `limpiar`: aquí el registro del
+  // paso 1 no ensucia nada porque el logo no se vuelve vigente hasta el paso 3, y el DELETE del
+  // logo borraría el ANTERIOR, que sigue siendo el bueno.
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    sustantivo: 'el logo',
+  });
 
   // Paso 3: confirmar. Solo ahora el sistema cambia de logo.
   const confirmacion = await api.POST('/api/empresas/{id}/logo/confirmar', {

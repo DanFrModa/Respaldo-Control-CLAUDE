@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos del Módulo 2 — Modelos (F1-E4): catálogo de productos, receta/BOM
@@ -406,7 +407,10 @@ export interface ArgsSubirFoto {
  *   1) `POST /api/modelos/{id}/fotos` con los metadatos → el backend registra el `Archivo`,
  *      crea el `ModeloFoto` y devuelve una URL PUT prefirmada.
  *   2) El navegador hace `PUT` de la imagen DIRECTO a esa URL (R2) con su `Content-Type`.
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
+ * Si el PUT a R2 falla, se QUITA la foto que el paso 1 ya había creado (si no, cada intento
+ * fallido deja una foto vacía en la galería e infla el conteo) y se propaga como `ErrorDeApi`
+ * para que el toast lo muestre. El detalle del mensaje y de la limpieza vive en
+ * `subida-archivo.ts` (mismo paso 2 para todos los módulos).
  */
 async function subirFoto({ idModelo, archivo, tipo }: ArgsSubirFoto): Promise<void> {
   const { data, error } = await api.POST('/api/modelos/{id}/fotos', {
@@ -423,25 +427,13 @@ async function subirFoto({ idModelo, archivo, tipo }: ArgsSubirFoto): Promise<vo
   }
 
   // Paso 2: PUT directo a R2 (solo Content-Type; Content-Length lo fija el navegador).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: { 'Content-Type': archivo.type },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir la imagen. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó la imagen. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    sustantivo: 'la imagen',
+    limpiar: () => quitarFoto(idModelo, data.idFoto),
+  });
 }
 
 /** Sube una foto (presigned PUT) e invalida las fotos y la lista (para refrescar el conteo). */

@@ -9,6 +9,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos del TECH PACK / ADJUNTOS del DESARROLLO (rediseño R5, B16) — PDFs de referencia y
@@ -56,6 +57,8 @@ export interface ArgsSubirAdjuntoDesarrollo {
 /**
  * Sube un adjunto a R2 en DOS pasos (flujo presigned de F0): POST con metadatos → URL PUT prefirmada,
  * luego PUT directo del archivo a R2 con `Content-Type`/`Content-Length` exactos.
+ * Si el PUT falla, se QUITA el adjunto que el paso 1 ya había registrado (si no, el desarrollo
+ * queda listando un archivo que nunca llegó). Mensaje y limpieza viven en `subida-archivo.ts`.
  */
 async function subir({ idDesarrollo, archivo }: ArgsSubirAdjuntoDesarrollo): Promise<void> {
   const { data, error } = await api.POST('/api/desarrollos/{idDesarrollo}/adjuntos', {
@@ -68,28 +71,14 @@ async function subir({ idDesarrollo, archivo }: ArgsSubirAdjuntoDesarrollo): Pro
   });
   if (!data) throw new ErrorDeApi(error);
 
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type || 'application/octet-stream',
-        'Content-Length': String(archivo.size),
-      },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type || 'application/octet-stream',
+    conContentLength: true,
+    sustantivo: 'el archivo',
+    limpiar: () => quitar({ idDesarrollo, idArchivo: data.idArchivo }),
+  });
 }
 
 /** Sube un adjunto (presigned PUT) e invalida la lista de adjuntos del desarrollo. */

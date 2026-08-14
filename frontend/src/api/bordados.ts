@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos de Bordados/estampados (F1-E3) — replica del ESTANDAR de Almacenes
@@ -220,7 +221,9 @@ export interface ArgsSubirFoto {
  *      navegador los maneja como headers especiales y romperían el SigV4), así que
  *      el PUT cuadra y R2 lo acepta.
  *
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
+ * Si el PUT a R2 falla, se QUITA la foto que el paso 1 ya había ligado al bordado (si no, el
+ * bordado queda apuntando a una imagen que nunca llegó) y se propaga como `ErrorDeApi` para que el
+ * toast lo muestre. El detalle del mensaje y de la limpieza vive en `subida-archivo.ts`.
  * Al terminar invalida la foto del bordado y la lista (para refrescar `idArchivoFoto`).
  */
 async function subirFoto({ idBordado, archivo }: ArgsSubirFoto): Promise<void> {
@@ -236,29 +239,16 @@ async function subirFoto({ idBordado, archivo }: ArgsSubirFoto): Promise<void> {
     throw new ErrorDeApi(error);
   }
 
-  // Paso 2: PUT directo a R2 con los headers EXACTOS (tipo y tamaño firmados).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      // Solo Content-Type (para que R2 etiquete el objeto con su tipo). NO se
-      // manda Content-Length: es un "forbidden header" que el navegador fija solo,
-      // y la URL prefirmada ya no lo firma (ver backend comun/archivos.ts).
-      headers: { 'Content-Type': archivo.type },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir la imagen. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó la imagen. Intenta de nuevo.',
-    });
-  }
+  // Paso 2: PUT directo a R2. Solo Content-Type (para que R2 etiquete el objeto con su tipo). NO
+  // se manda Content-Length: es un "forbidden header" que el navegador fija solo, y la URL
+  // prefirmada ya no lo firma (ver backend comun/archivos.ts).
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    sustantivo: 'la imagen',
+    limpiar: () => quitarFoto(idBordado),
+  });
 }
 
 /** Sube la foto (presigned PUT) e invalida la foto y la lista de bordados. */

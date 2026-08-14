@@ -9,6 +9,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import { subirArchivoPrefirmado } from './subida-archivo';
 import type {
   Proveedor,
   ProveedorAdjunto,
@@ -286,9 +287,10 @@ export interface ArgsSubirAdjunto {
  *   2) El navegador hace `PUT` del archivo DIRECTO a esa URL (R2), con los headers
  *      `Content-Type` y `Content-Length` EXACTOS (la firma solo acepta esos).
  *
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
- * (El `Archivo` registrado quedaría sin objeto en R2; es inofensivo y el usuario
- * puede reintentar.) Al terminar invalida la lista de adjuntos y la de proveedores
+ * Si el PUT a R2 falla, se QUITA el adjunto que el paso 1 ya había registrado (si no, el proveedor
+ * queda listando un archivo que nunca llegó e infla `cantidadAdjuntos`) y se propaga como
+ * `ErrorDeApi` para que el toast lo muestre; el detalle del mensaje y de la limpieza vive en
+ * `subida-archivo.ts`. Al terminar invalida la lista de adjuntos y la de proveedores
  * (para refrescar el conteo `cantidadAdjuntos`).
  */
 async function subirAdjunto({ idProveedor, archivo, tipo }: ArgsSubirAdjunto): Promise<void> {
@@ -306,28 +308,14 @@ async function subirAdjunto({ idProveedor, archivo, tipo }: ArgsSubirAdjunto): P
   }
 
   // Paso 2: PUT directo a R2 con los headers EXACTOS (tipo y tamaño firmados).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type,
-        'Content-Length': String(archivo.size),
-      },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    conContentLength: true,
+    sustantivo: 'el archivo',
+    limpiar: () => quitarAdjunto({ idProveedor, idArchivo: data.idArchivo }),
+  });
 }
 
 /** Sube un adjunto PDF (presigned PUT) e invalida las listas afectadas. */

@@ -9,6 +9,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos de los ADJUNTOS del pedido interno (rediseño R3, B3) — el documento ORIGINAL de la
@@ -59,6 +60,8 @@ export interface ArgsSubirAdjuntoPedido {
 /**
  * Sube un adjunto a R2 en DOS pasos (flujo presigned de F0): registra los metadatos y hace `PUT`
  * del archivo DIRECTO a la URL prefirmada (Content-Type/Length exactos — la firma solo acepta esos).
+ * Si el PUT falla, se QUITA el adjunto que el paso 1 ya había registrado (si no, el pedido queda
+ * listando un archivo que nunca llegó). Mensaje y limpieza viven en `subida-archivo.ts`.
  */
 async function subir({ idPedido, archivo }: ArgsSubirAdjuntoPedido): Promise<void> {
   const { data, error } = await api.POST('/api/pedidos/{idPedido}/adjuntos', {
@@ -71,28 +74,14 @@ async function subir({ idPedido, archivo }: ArgsSubirAdjuntoPedido): Promise<voi
   });
   if (!data) throw new ErrorDeApi(error);
 
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type || 'application/octet-stream',
-        'Content-Length': String(archivo.size),
-      },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type || 'application/octet-stream',
+    conContentLength: true,
+    sustantivo: 'el archivo',
+    limpiar: () => quitar({ idPedido, idArchivo: data.idArchivo }),
+  });
 }
 
 /** Sube un adjunto (presigned PUT) e invalida la lista de adjuntos del pedido. */
