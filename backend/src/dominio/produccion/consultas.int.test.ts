@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -9,6 +6,7 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
 import { consultarIncompletas } from './consultas.js';
+import { realinearEstadoOrdenes } from './requisitos-orden.js';
 
 /**
  * Integración de "ÓRDENES INCOMPLETAS" (`consultarIncompletas`) contra el Postgres efímero (CI).
@@ -19,22 +17,32 @@ import { consultarIncompletas } from './consultas.js';
  *  1. la consulta filtra por el ESTADO GUARDADO (`ordenes.estado = 'capturada'`);
  *  2. una incompleta YA PUEDE TENER MATRIZ (le puede faltar el arte o la receta de avíos), así que
  *     sus piezas se agregan de verdad — antes se proyectaban hardcodeadas en 0;
- *  3. la **migración de datos** `20260726130000_recalculo_estado_ordenes` es la que hace visible el
- *     backlog histórico: aquí se ejecuta EL MISMO SQL que se despliega (leído del archivo, no una
- *     copia) sobre un corpus sembrado a mano, y se comprueba que degrada lo que debe y respeta lo
- *     que no.
+ *  3. la **puesta al día del histórico** es la que hace visible el backlog: aquí se corre la regla
+ *     VIVA (`realinearEstadoOrdenes`, la fuente ÚNICA del dominio) sobre un corpus sembrado a mano,
+ *     y se comprueba que degrada lo que debe, respeta lo que no, y que el resultado ATERRIZA en
+ *     esta consulta — que es donde Daniel trabaja el tema.
+ *
+ * ⚠️ DÓNDE QUEDÓ EL SQL DE LA MIGRACIÓN (cambio del 14-ago-2026, V1-E3d). Hasta esta etapa el
+ * bloque de la puesta al día LEÍA y re-ejecutaba el archivo real
+ * `prisma/migrations/20260726130000_recalculo_estado_ordenes/migration.sql`, para no validar una
+ * copia divergente. Dejó de ser posible cuando el arte se movió al modelo: aquel SQL consulta
+ * `modelo_bordado`, tabla que `20260814120000_arte_en_el_modelo` ELIMINA (sus renglones se pasan
+ * 1:1 a `modelo_arte`, así que el efecto de julio se conserva intacto). La cadena de migraciones
+ * NO está rota —en una base nueva la de julio corre cuando `modelo_bordado` todavía existe— y esa
+ * migración NO se toca: ya corrió en `prueba` y en `main`, es historia inmutable. Lo que dejó de
+ * tener sentido es REPRODUCIR una migración congelada contra el esquema de hoy.
+ *
+ * El espíritu original —validar lo que se despliega, no una copia— se conserva mejor todavía
+ * ejercitando la regla viva: aquel SQL era, por su propia cabecera, una RÉPLICA en SQL de
+ * `requisitos-orden.ts`, y hoy la puesta al día que de verdad corre (en el go-live y tras cada
+ * carga de datos) es el script `migracion/realinear-estado-ordenes.ts`, que delega en
+ * `realinearEstadoOrdenes` — el motor que se usa aquí. El recorrido completo del script
+ * (paginación, transacción por lote, `--dry-run`, `--empresa`) se prueba en
+ * `migracion/realinear-estado-ordenes.int.test.ts`; lo que sigue viviendo AQUÍ es el amarre con la
+ * pantalla. Única aserción que cambió de literal: el `motivo` de la bitácora
+ * (`realineado-post-carga` en vez de `recalculo-estado-automatico`), porque el proceso que la
+ * escribe es otro. Ninguna otra se relajó.
  */
-
-/** El SQL REAL que se despliega (leerlo evita que la prueba valide una copia divergente). */
-const SQL_PUESTA_AL_DIA = readFileSync(
-  fileURLToPath(
-    new URL(
-      '../../../prisma/migrations/20260726130000_recalculo_estado_ordenes/migration.sql',
-      import.meta.url,
-    ),
-  ),
-  'utf8',
-);
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -105,6 +113,22 @@ async function cortar(idOrden: number): Promise<void> {
 async function estadoDe(id: number): Promise<string> {
   const o = await cliente.orden.findUniqueOrThrow({ where: { id }, select: { estado: true } });
   return o.estado;
+}
+
+/**
+ * Corre la PUESTA AL DÍA del histórico igual que el camino que se despliega: el motor de dominio
+ * dentro de la transacción del llamador (A2), que es exactamente como lo invoca
+ * `migracion/realinear-estado-ordenes.ts` en cada lote. Se le pasan TODAS las órdenes del corpus
+ * (el motor ya excluye las `cancelada` por dentro; aquí el corpus cabe de sobra en un lote).
+ */
+async function ponerAlDiaElHistorico(): Promise<void> {
+  const todas = await cliente.orden.findMany({ select: { id: true }, orderBy: { id: 'asc' } });
+  await cliente.$transaction((tx) =>
+    realinearEstadoOrdenes(
+      tx,
+      todas.map((o) => o.id),
+    ),
+  );
 }
 
 beforeAll(() => {
@@ -183,7 +207,7 @@ describe('consultarIncompletas — proyección real (F2-E4 + estado automático)
   });
 });
 
-describe('puesta al día del histórico (migración 20260726130000) → el backlog se vuelve VISIBLE', () => {
+describe('puesta al día del histórico (realineado post-carga) → el backlog se vuelve VISIBLE', () => {
   it('degrada las históricas que ya no cumplen y las muestra en "Órdenes incompletas"', async () => {
     // El corpus migrado: todas venían guardadas como `completa` con su fecha sellada.
     const sello = new Date('2020-05-05T00:00:00.000Z');
@@ -220,7 +244,7 @@ describe('puesta al día del histórico (migración 20260726130000) → el backl
     // Antes de la puesta al día, "Órdenes incompletas" está VACÍA: el backlog es invisible.
     expect((await consultarIncompletas(sesion(), {}, bd())).total).toBe(0);
 
-    await cliente.$executeRawUnsafe(SQL_PUESTA_AL_DIA);
+    await ponerAlDiaElHistorico();
 
     // Degrada: la que lleva arte sin capturar y la que no tiene matriz.
     expect(await estadoDe(sinArte)).toBe('capturada');
@@ -252,19 +276,27 @@ describe('puesta al día del histórico (migración 20260726130000) → el backl
       piezas: 20,
     });
 
-    await cliente.$executeRawUnsafe(SQL_PUESTA_AL_DIA);
+    await ponerAlDiaElHistorico();
 
     const renglones = await cliente.bitacora.findMany({
       where: { entidad: 'Orden', idEntidad: String(sinArte) },
     });
     expect(renglones).toHaveLength(1);
     expect(renglones[0]?.idUsuario).toBeNull(); // proceso de sistema, no una persona
-    expect(renglones[0]?.datos).toMatchObject({ motivo: 'recalculo-estado-automatico' });
+    expect(renglones[0]?.datos).toMatchObject({
+      estado: 'capturada',
+      motivo: 'realineado-post-carga',
+    });
 
-    // Re-correrla no encuentra filas: ni degrada de nuevo ni duplica bitácora.
-    await cliente.$executeRawUnsafe(SQL_PUESTA_AL_DIA);
+    const pantallaTrasLaPrimera = await consultarIncompletas(sesion(), {}, bd());
+    expect(pantallaTrasLaPrimera.total).toBe(1);
+
+    // Re-correrla no encuentra nada que escribir: ni degrada de nuevo, ni duplica bitácora, ni
+    // mueve la pantalla.
+    await ponerAlDiaElHistorico();
     expect(
       await cliente.bitacora.count({ where: { entidad: 'Orden', idEntidad: String(sinArte) } }),
     ).toBe(1);
+    expect((await consultarIncompletas(sesion(), {}, bd())).total).toBe(1);
   });
 });
