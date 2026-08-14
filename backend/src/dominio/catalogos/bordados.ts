@@ -452,13 +452,28 @@ export async function solicitarSubidaFoto(
     });
 
     // Liga la foto nueva al bordado y deja constancia de quién/cuándo (A7).
-    await tx.bordado.update({
-      where: { id: idBordado },
+    //
+    // CAS igual que en `quitarFoto`: el `where` incluye la foto que se LEYÓ arriba, así que el
+    // enlace solo aplica si esa sigue siendo la vigente. Sin él había carrera: dos reemplazos
+    // simultáneos del mismo arte leen la misma foto previa, el segundo se forma detrás del lock de
+    // la fila y luego intenta borrar un `Archivo` que el primero ya borró → P2025 → 500. Postgres
+    // re-evalúa el `WHERE` después de tomar el lock (EPQ), de modo que el perdedor ve `count = 0`
+    // y sale con un 409 claro ("vuelve a intentar") en vez de un error interno. Nada se pierde: la
+    // subida ni siquiera había empezado (esto es el paso 1 del flujo prefirmado) y la transacción
+    // revierte el `Archivo` recién creado.
+    const { count } = await tx.bordado.updateMany({
+      where: { id: idBordado, idArchivoFoto: actual.idArchivoFoto },
       data: { idArchivoFoto: subida.archivo.id, ...datosModificacion(sesion) },
     });
+    if (count === 0) {
+      throw new ErrorConflicto(
+        `Otro usuario acaba de cambiar la foto del arte "${actual.nombre}": vuelve a intentar.`,
+      );
+    }
 
     // Si había una foto previa, su Archivo queda huérfano: bórralo en la MISMA
     // transacción (la FK ya apunta a la nueva, así que SetNull no afecta a la nueva).
+    // El CAS garantiza que ese id es EXACTAMENTE el que acabamos de desligar.
     if (actual.idArchivoFoto !== null) {
       await tx.archivo.delete({ where: { id: actual.idArchivoFoto } });
     }
@@ -508,15 +523,23 @@ export async function confirmarFotoBordado(
       throw new ErrorNoEncontrado('Archivo de la foto', idArchivo);
     }
 
+    // Mismo CAS que en `solicitarSubidaFoto`/`quitarFoto`: solo re-enlaza si la foto vigente sigue
+    // siendo la que se leyó, para no borrar un `Archivo` que otra transacción ya se llevó (P2025 →
+    // 500) ni desplazar una foto que no vimos.
     const anterior = actual.idArchivoFoto;
-    const bordado = await tx.bordado.update({
-      where: { id: idBordado },
+    const { count } = await tx.bordado.updateMany({
+      where: { id: idBordado, idArchivoFoto: anterior },
       data: { idArchivoFoto: idArchivo, ...datosModificacion(sesion) },
     });
+    if (count === 0) {
+      throw new ErrorConflicto(
+        `Otro usuario acaba de cambiar la foto del arte "${actual.nombre}": vuelve a intentar.`,
+      );
+    }
     if (anterior !== null) {
       await tx.archivo.delete({ where: { id: anterior } });
     }
-    return bordado;
+    return exigirBordado(tx, idBordado);
   }, bd);
 }
 

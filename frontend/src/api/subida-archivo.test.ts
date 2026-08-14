@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 /**
  * Qué pasa cuando el `PUT` a R2 falla, en TODOS los módulos que suben archivos.
@@ -223,8 +223,14 @@ function borradoEsperado(caso: Caso): { ruta: string; params: unknown; query: un
   ];
 }
 
-/** Espía de `console.warn` (la pista que la limpieza best-effort deja para soporte). */
-let avisos: ReturnType<typeof vi.spyOn>;
+/**
+ * Espía de `console.warn` (la pista que la limpieza best-effort deja para soporte).
+ *
+ * Va tipado a mano: `ReturnType<typeof vi.spyOn>` deja los genéricos sin resolver y colapsa a
+ * `any`, así que leer `avisos.mock.calls` era acceso a un `any` (error de lint) y, peor, cualquier
+ * aserción sobre el mensaje pasaba el typecheck aunque la forma del espía cambiara.
+ */
+let avisos: MockInstance<(...datos: unknown[]) => void>;
 
 // El espía de consola se restaura entre pruebas: si no, sus llamadas se van acumulando y los
 // conteos de una prueba arrastran los de las anteriores.

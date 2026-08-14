@@ -290,11 +290,19 @@ async function quitarFoto(idBordado: number, idArchivo?: string): Promise<void> 
   }
 }
 
-/** Quita la foto e invalida la foto y la lista de bordados. */
+/**
+ * Quita la foto e invalida la foto y la lista de bordados.
+ *
+ * El `mutationFn` va ENVUELTO en una flecha de UN argumento a propósito (mismo patrón que
+ * `useQuitarFotoModelo` en `api/modelos.ts`): TanStack Query llama al `mutationFn` con DOS
+ * argumentos (`variables` y un contexto `{ client, meta, mutationKey }`), así que pasar la
+ * referencia pelada a `quitarFoto` le metería ese contexto en `idArchivo` — la querystring
+ * saldría con un objeto anidado y la llamada reventaría ANTES de emitir el DELETE.
+ */
 export function useQuitarFotoBordado(): UseMutationResult<void, ErrorDeApi, number> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: quitarFoto,
+    mutationFn: (idBordado: number) => quitarFoto(idBordado),
     onSuccess: (_resultado, idBordado) => {
       void queryClient.invalidateQueries({ queryKey: claveFoto(idBordado) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_BORDADOS });
