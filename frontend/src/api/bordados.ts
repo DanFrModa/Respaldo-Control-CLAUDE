@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos de Bordados/estampados (F1-E3) — replica del ESTANDAR de Almacenes
@@ -220,7 +221,16 @@ export interface ArgsSubirFoto {
  *      navegador los maneja como headers especiales y romperían el SigV4), así que
  *      el PUT cuadra y R2 lo acepta.
  *
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
+ * Si el PUT a R2 falla, se QUITA la foto que el paso 1 ya había ligado al bordado (si no, el
+ * bordado queda apuntando a una imagen que nunca llegó) y se propaga como `ErrorDeApi` para que el
+ * toast lo muestre. El detalle del mensaje y de la limpieza vive en `subida-archivo.ts`.
+ *
+ * Esa limpieza manda el `idArchivo` de ESTA subida, y el backend solo borra si la foto vigente
+ * sigue siendo esa (borrado ACOTADO, ver `quitarFoto` más abajo). Sin acotar sería una pérdida
+ * silenciosa de datos: como el arte tiene UNA sola foto, entre el POST y el fallo del PUT otro
+ * usuario puede haber subido una imagen buena al mismo arte, y un borrado "de la foto que haya" se
+ * llevaría LA SUYA — dejando el arte sin imagen y sin más señal que el error de subida del primero.
+ *
  * Al terminar invalida la foto del bordado y la lista (para refrescar `idArchivoFoto`).
  */
 async function subirFoto({ idBordado, archivo }: ArgsSubirFoto): Promise<void> {
@@ -236,29 +246,16 @@ async function subirFoto({ idBordado, archivo }: ArgsSubirFoto): Promise<void> {
     throw new ErrorDeApi(error);
   }
 
-  // Paso 2: PUT directo a R2 con los headers EXACTOS (tipo y tamaño firmados).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      // Solo Content-Type (para que R2 etiquete el objeto con su tipo). NO se
-      // manda Content-Length: es un "forbidden header" que el navegador fija solo,
-      // y la URL prefirmada ya no lo firma (ver backend comun/archivos.ts).
-      headers: { 'Content-Type': archivo.type },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir la imagen. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó la imagen. Intenta de nuevo.',
-    });
-  }
+  // Paso 2: PUT directo a R2. Solo Content-Type (para que R2 etiquete el objeto con su tipo). NO
+  // se manda Content-Length: es un "forbidden header" que el navegador fija solo, y la URL
+  // prefirmada ya no lo firma (ver backend comun/archivos.ts).
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    sustantivo: 'la imagen',
+    limpiar: () => quitarFoto(idBordado, data.idArchivo),
+  });
 }
 
 /** Sube la foto (presigned PUT) e invalida la foto y la lista de bordados. */
@@ -273,10 +270,19 @@ export function useSubirFotoBordado(): UseMutationResult<void, ErrorDeApi, ArgsS
   });
 }
 
-/** Quita la foto de un bordado (`DELETE /api/bordados/{id}/foto`). */
-async function quitarFoto(idBordado: number): Promise<void> {
+/**
+ * Quita la foto de un bordado (`DELETE /api/bordados/{id}/foto`).
+ *
+ * `idArchivo` es OPCIONAL y acota el borrado a esa foto: el backend solo la quita si la vigente
+ * sigue siendo exactamente esa, y si no, contesta 409 sin borrar nada. Sin `idArchivo` quita la
+ * vigente, sea cual sea — que es lo que quiere el botón "quitar foto" de la pantalla.
+ */
+async function quitarFoto(idBordado: number, idArchivo?: string): Promise<void> {
   const { error, response } = await api.DELETE('/api/bordados/{id}/foto', {
-    params: { path: { id: idBordado } },
+    params: {
+      path: { id: idBordado },
+      query: idArchivo === undefined ? {} : { idArchivo },
+    },
   });
   // 204 No Content: éxito sin cuerpo; cualquier !ok es error.
   if (!response.ok) {
@@ -284,11 +290,19 @@ async function quitarFoto(idBordado: number): Promise<void> {
   }
 }
 
-/** Quita la foto e invalida la foto y la lista de bordados. */
+/**
+ * Quita la foto e invalida la foto y la lista de bordados.
+ *
+ * El `mutationFn` va ENVUELTO en una flecha de UN argumento a propósito (mismo patrón que
+ * `useQuitarFotoModelo` en `api/modelos.ts`): TanStack Query llama al `mutationFn` con DOS
+ * argumentos (`variables` y un contexto `{ client, meta, mutationKey }`), así que pasar la
+ * referencia pelada a `quitarFoto` le metería ese contexto en `idArchivo` — la querystring
+ * saldría con un objeto anidado y la llamada reventaría ANTES de emitir el DELETE.
+ */
 export function useQuitarFotoBordado(): UseMutationResult<void, ErrorDeApi, number> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: quitarFoto,
+    mutationFn: (idBordado: number) => quitarFoto(idBordado),
     onSuccess: (_resultado, idBordado) => {
       void queryClient.invalidateQueries({ queryKey: claveFoto(idBordado) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_BORDADOS });

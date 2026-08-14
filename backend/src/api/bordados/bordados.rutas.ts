@@ -10,7 +10,8 @@
  *
  * La FOTO se gestiona con el motor de archivos de F0 (presigned PUT/GET) bajo
  * `/bordados/:id/foto`: POST prepara la subida (URL PUT prefirmada), GET devuelve la
- * URL de descarga (o vacío si no hay foto), DELETE la quita (transacción A2).
+ * URL de descarga (o vacío si no hay foto), DELETE la quita (transacción A2) —opcionalmente
+ * ACOTADO al `idArchivo` que traiga el querystring, para no llevarse una foto que no es la suya—.
  *
  * CERO lógica de negocio o acceso a datos aquí. Los errores de dominio los traduce el
  * error handler global (`src/api/errores.ts`).
@@ -25,6 +26,7 @@ import { esquemaErrorApi } from '../../contrato/esquemas/error.js';
 import {
   esquemaBordadoCrear,
   esquemaBordadoFotoCrear,
+  esquemaBordadoFotoQuitarQuery,
   esquemaBordadoFotoSalida,
   esquemaBordadoFotoSubida,
   esquemaBordadoPatchCuerpo,
@@ -254,7 +256,8 @@ export const rutasBordados: FastifyPluginCallbackZod = (app, _opciones, done) =>
     },
   });
 
-  // Quitar la foto (transacción A2).
+  // Quitar la foto (transacción A2). El `idArchivo` OPCIONAL del querystring acota el borrado a
+  // esa foto: si la vigente ya es otra, no borra nada y contesta 409 (ver el esquema del contrato).
   app.route({
     method: 'DELETE',
     url: '/bordados/:id/foto',
@@ -264,11 +267,12 @@ export const rutasBordados: FastifyPluginCallbackZod = (app, _opciones, done) =>
       summary: 'Quitar la foto de un bordado',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
+      querystring: esquemaBordadoFotoQuitarQuery,
       response: { 204: z.null(), ...respuestasError },
     },
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      await quitarFoto(sesion, request.params.id);
+      await quitarFoto(sesion, request.params.id, request.query.idArchivo);
       return reply.code(204).send(null);
     },
   });

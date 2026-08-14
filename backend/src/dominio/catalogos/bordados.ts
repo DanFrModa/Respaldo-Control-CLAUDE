@@ -16,7 +16,9 @@
  *    y devuelve la URL PUT prefirmada para que el navegador suba DIRECTO a R2 (todo en
  *    UNA transacción, A2; si ya había foto, la reemplaza borrando la anterior).
  *  • `urlFoto` devuelve la URL GET prefirmada para verla (o `null` si no hay foto).
- *  • `quitarFoto` borra el `Archivo` y pone `idArchivoFoto=null` en UNA transacción (A2).
+ *  • `quitarFoto` pone `idArchivoFoto=null` y borra el `Archivo` en UNA transacción (A2);
+ *    admite acotar el borrado a UNA foto concreta (`idArchivoEsperado`) para que la limpieza
+ *    de una subida fallida nunca se lleve la foto que otro usuario subió mientras tanto.
  * El servicio de archivos se INYECTA (default `servicioArchivos()` lazy) para poder
  * pasar un fake en tests sin R2 real (igual que `ProveedorArchivo` en F1-E1B).
  *
@@ -450,13 +452,28 @@ export async function solicitarSubidaFoto(
     });
 
     // Liga la foto nueva al bordado y deja constancia de quién/cuándo (A7).
-    await tx.bordado.update({
-      where: { id: idBordado },
+    //
+    // CAS igual que en `quitarFoto`: el `where` incluye la foto que se LEYÓ arriba, así que el
+    // enlace solo aplica si esa sigue siendo la vigente. Sin él había carrera: dos reemplazos
+    // simultáneos del mismo arte leen la misma foto previa, el segundo se forma detrás del lock de
+    // la fila y luego intenta borrar un `Archivo` que el primero ya borró → P2025 → 500. Postgres
+    // re-evalúa el `WHERE` después de tomar el lock (EPQ), de modo que el perdedor ve `count = 0`
+    // y sale con un 409 claro ("vuelve a intentar") en vez de un error interno. Nada se pierde: la
+    // subida ni siquiera había empezado (esto es el paso 1 del flujo prefirmado) y la transacción
+    // revierte el `Archivo` recién creado.
+    const { count } = await tx.bordado.updateMany({
+      where: { id: idBordado, idArchivoFoto: actual.idArchivoFoto },
       data: { idArchivoFoto: subida.archivo.id, ...datosModificacion(sesion) },
     });
+    if (count === 0) {
+      throw new ErrorConflicto(
+        `Otro usuario acaba de cambiar la foto del arte "${actual.nombre}": vuelve a intentar.`,
+      );
+    }
 
     // Si había una foto previa, su Archivo queda huérfano: bórralo en la MISMA
     // transacción (la FK ya apunta a la nueva, así que SetNull no afecta a la nueva).
+    // El CAS garantiza que ese id es EXACTAMENTE el que acabamos de desligar.
     if (actual.idArchivoFoto !== null) {
       await tx.archivo.delete({ where: { id: actual.idArchivoFoto } });
     }
@@ -506,15 +523,23 @@ export async function confirmarFotoBordado(
       throw new ErrorNoEncontrado('Archivo de la foto', idArchivo);
     }
 
+    // Mismo CAS que en `solicitarSubidaFoto`/`quitarFoto`: solo re-enlaza si la foto vigente sigue
+    // siendo la que se leyó, para no borrar un `Archivo` que otra transacción ya se llevó (P2025 →
+    // 500) ni desplazar una foto que no vimos.
     const anterior = actual.idArchivoFoto;
-    const bordado = await tx.bordado.update({
-      where: { id: idBordado },
+    const { count } = await tx.bordado.updateMany({
+      where: { id: idBordado, idArchivoFoto: anterior },
       data: { idArchivoFoto: idArchivo, ...datosModificacion(sesion) },
     });
+    if (count === 0) {
+      throw new ErrorConflicto(
+        `Otro usuario acaba de cambiar la foto del arte "${actual.nombre}": vuelve a intentar.`,
+      );
+    }
     if (anterior !== null) {
       await tx.archivo.delete({ where: { id: anterior } });
     }
-    return bordado;
+    return exigirBordado(tx, idBordado);
   }, bd);
 }
 
@@ -565,16 +590,27 @@ export async function urlFoto(
 }
 
 /**
- * Quita la FOTO de un bordado (R2) en UNA transacción (A2): borra el `Archivo` y pone
- * `idArchivoFoto=null`. El `onDelete SetNull` de la FK pone `idArchivoFoto` a null al
- * borrar el `Archivo`; hacerlo así (borrar el archivo) en un solo paso evita un
- * huérfano. El objeto R2 huérfano es inofensivo (lo documenta `comun/archivos.ts`).
- * Requiere `bordados.administrar`. Si el bordado no tiene foto → `ErrorConflicto`
- * (la pantalla estaba desactualizada).
+ * Quita la FOTO de un bordado (R2) en UNA transacción (A2): desliga `idArchivoFoto` y borra el
+ * `Archivo`. El objeto R2 huérfano es inofensivo (lo documenta `comun/archivos.ts`). Requiere
+ * `bordados.administrar`. Si el bordado no tiene foto → `ErrorConflicto` (pantalla desactualizada).
+ *
+ * **`idArchivoEsperado` acota el borrado a UNA foto concreta.** Sin él se quita la vigente, sea
+ * cual sea (el botón "quitar foto" de la pantalla quiere justo eso). Con él, si la foto vigente ya
+ * es otra, NO se borra nada y sale `ErrorConflicto` → el llamador distingue "la quité" de "ya no
+ * era la tuya". Lo necesita la LIMPIEZA del flujo presigned del frontend: si el `PUT` a R2 falla y
+ * mientras tanto otro usuario subió una foto buena al mismo arte, un borrado sin acotar destruiría
+ * ESA (pérdida silenciosa de datos).
+ *
+ * El acotamiento NO es un `if` de check-then-act: el desligue se hace con un `updateMany` cuyo
+ * `where` incluye `idArchivoFoto`, o sea un compare-and-set. Postgres re-evalúa ese `WHERE`
+ * después de tomar el lock de la fila (EPQ), así que una transacción concurrente que reemplace la
+ * foto entre la lectura y la escritura deja `count = 0` y aborta el borrado — no hay ventana. El
+ * `Archivo` que se borra es siempre el que quedó desligado por ese CAS, nunca "el que hubiera".
  */
 export async function quitarFoto(
   sesion: SesionUsuario,
   idBordado: number,
+  idArchivoEsperado?: string,
   bd?: ContextoBd,
 ): Promise<void> {
   verificarPermiso(sesion, 'bordados.administrar');
@@ -583,20 +619,28 @@ export async function quitarFoto(
     if (actual.idArchivoFoto === null) {
       throw new ErrorConflicto(`El arte "${actual.nombre}" no tiene foto.`);
     }
+    const idAQuitar = idArchivoEsperado ?? actual.idArchivoFoto;
 
-    // Borrar el Archivo dispara SetNull en idArchivoFoto (FK), dejándolo en null;
-    // se actualiza también la auditoría del bordado en la misma transacción.
-    await tx.archivo.delete({ where: { id: actual.idArchivoFoto } });
-    await tx.bordado.update({
-      where: { id: idBordado },
-      data: { ...datosModificacion(sesion) },
+    // CAS: solo desliga si la foto vigente SIGUE siendo `idAQuitar` (ver nota de arriba).
+    const { count } = await tx.bordado.updateMany({
+      where: { id: idBordado, idArchivoFoto: idAQuitar },
+      data: { idArchivoFoto: null, ...datosModificacion(sesion) },
     });
+    if (count === 0) {
+      throw new ErrorConflicto(
+        `La foto del arte "${actual.nombre}" ya no es la que se iba a quitar (alguien la ` +
+          `reemplazó): no se quitó nada.`,
+      );
+    }
+
+    // Ya desligada: el Archivo queda huérfano y se borra en la MISMA transacción.
+    await tx.archivo.delete({ where: { id: idAQuitar } });
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Bordado',
       idEntidad: idBordado,
       accion: 'MODIFICAR',
-      datos: { foto: 'quitar' },
+      datos: { foto: 'quitar', archivo: idAQuitar },
     });
   }, bd);
 }

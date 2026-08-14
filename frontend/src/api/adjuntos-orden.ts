@@ -9,6 +9,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos de los ADJUNTOS de la orden de producción (F8-E6, R6) — archivos de apoyo
@@ -63,8 +64,9 @@ export interface ArgsSubirAdjuntoOrden {
  *   2) El navegador hace `PUT` del archivo DIRECTO a esa URL (R2) con `Content-Type`/`Content-Length`
  *      exactos (la firma solo acepta esos).
  *
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para el toast. (El `Archivo` registrado quedaría
- * sin objeto en R2; inofensivo y el usuario reintenta.)
+ * Si el PUT a R2 falla, se QUITA el adjunto que el paso 1 ya había registrado (si no, la orden queda
+ * listando un archivo que nunca llegó) y se propaga como `ErrorDeApi` para el toast. El detalle del
+ * mensaje y de la limpieza vive en `subida-archivo.ts`.
  */
 async function subir({ idOrden, archivo }: ArgsSubirAdjuntoOrden): Promise<void> {
   const { data, error } = await api.POST('/api/ordenes/{idOrden}/adjuntos', {
@@ -77,28 +79,14 @@ async function subir({ idOrden, archivo }: ArgsSubirAdjuntoOrden): Promise<void>
   });
   if (!data) throw new ErrorDeApi(error);
 
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type || 'application/octet-stream',
-        'Content-Length': String(archivo.size),
-      },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type || 'application/octet-stream',
+    conContentLength: true,
+    sustantivo: 'el archivo',
+    limpiar: () => quitar({ idOrden, idArchivo: data.idArchivo }),
+  });
 }
 
 /** Sube un adjunto (presigned PUT) e invalida la lista de adjuntos de la orden. */

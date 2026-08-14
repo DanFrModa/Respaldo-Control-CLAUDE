@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { configR2DesdeEnv, crearClienteR2, crearServicioArchivos } from '../../comun/archivos.js';
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearBordado, solicitarSubidaFoto } from './bordados.js';
@@ -32,32 +32,39 @@ function archivosDePrueba() {
 const sesionAdmin = () => sesionDePrueba({ permisos: ['bordados.ver', 'bordados.administrar'] });
 
 /**
- * Stub mínimo de la transacción que usa `solicitarSubidaFoto` con un bordado SIN foto
- * previa: `bordado.findUnique` devuelve el bordado dado, `archivo.create` simula el
- * insert (lo hace el servicio de archivos real), `bordado.update` y `bitacora.create`
- * se registran. `bd` envuelve el `tx` para que `enTransaccion` lo reutilice (no abre
- * una real). Devuelve los spies para verificar.
+ * Stub mínimo de la transacción que usa `solicitarSubidaFoto`: `bordado.findUnique`
+ * devuelve el bordado dado, `archivo.create` simula el insert (lo hace el servicio de
+ * archivos real), `bordado.updateMany` (el compare-and-set que liga la foto nueva) y
+ * `bitacora.create` se registran. `bd` envuelve el `tx` para que `enTransaccion` lo
+ * reutilice (no abre una real). Devuelve los spies para verificar.
+ *
+ * `filasEnlazadas` simula el resultado del CAS: 1 = nadie tocó la foto entre la lectura y
+ * la escritura; 0 = otra transacción la reemplazó primero (la carrera del reemplazo).
  */
-function bdConBordado(bordado: { id: number; nombre: string; idArchivoFoto: string | null }) {
+function bdConBordado(
+  bordado: { id: number; nombre: string; idArchivoFoto: string | null },
+  filasEnlazadas = 1,
+) {
   const archivoCreate = vi.fn(
     (args: { data: Record<string, unknown>; select: Record<string, true> }) =>
       Promise.resolve({ id: 'arch_nuevo', ...args.data }),
   );
-  const bordadoUpdate = vi.fn((args: { data: Record<string, unknown> }) =>
-    Promise.resolve({ ...bordado, ...args.data }),
+  const bordadoUpdateMany = vi.fn(
+    (_args: { where: Record<string, unknown>; data: Record<string, unknown> }) =>
+      Promise.resolve({ count: filasEnlazadas }),
   );
   const archivoDelete = vi.fn((args: { where: { id: string } }) => Promise.resolve(args));
   const bitacoraCreate = vi.fn((args: { data: Record<string, unknown> }) => Promise.resolve(args));
   const tx = {
     bordado: {
       findUnique: vi.fn(() => Promise.resolve(bordado)),
-      update: bordadoUpdate,
+      updateMany: bordadoUpdateMany,
     },
     archivo: { create: archivoCreate, delete: archivoDelete },
     bitacora: { create: bitacoraCreate },
   } as unknown as Tx;
   const bd: ContextoBd = { tx };
-  return { bd, archivoCreate, bordadoUpdate, archivoDelete, bitacoraCreate };
+  return { bd, archivoCreate, bordadoUpdateMany, archivoDelete, bitacoraCreate };
 }
 
 describe('dominio Bordados (F1-E3) — permisos y validación de captura', () => {
@@ -110,7 +117,7 @@ describe('dominio Bordados (F1-E3) — la key de la foto se ordena por id (A5)',
   it('crea el Archivo con key bordados/<id>/... (por id, NO por nombre) y liga la foto', async () => {
     // El bordado se llama distinto de su id a propósito: la key debe usar el id (7),
     // jamás el nombre ("Logo Importante Marilyn").
-    const { bd, archivoCreate, bordadoUpdate, archivoDelete } = bdConBordado({
+    const { bd, archivoCreate, bordadoUpdateMany, archivoDelete } = bdConBordado({
       id: 7,
       nombre: 'Logo Importante Marilyn',
       idArchivoFoto: null,
@@ -133,8 +140,15 @@ describe('dominio Bordados (F1-E3) — la key de la foto se ordena por id (A5)',
     expect(keyCreada).not.toContain('marilyn');
 
     // La foto se liga al bordado (idArchivoFoto) y la URL prefirmada apunta a la key.
-    expect(bordadoUpdate).toHaveBeenCalledTimes(1);
-    expect(bordadoUpdate.mock.calls[0]?.[0]?.data).toMatchObject({ idArchivoFoto: 'arch_nuevo' });
+    expect(bordadoUpdateMany).toHaveBeenCalledTimes(1);
+    expect(bordadoUpdateMany.mock.calls[0]?.[0]?.data).toMatchObject({
+      idArchivoFoto: 'arch_nuevo',
+    });
+    // El enlace es un compare-and-set: el `where` incluye la foto que se leyó (aquí, ninguna).
+    expect(bordadoUpdateMany.mock.calls[0]?.[0]?.where).toMatchObject({
+      id: 7,
+      idArchivoFoto: null,
+    });
     expect(subida.idArchivo).toBe('arch_nuevo');
     expect(new URL(subida.urlSubida).pathname.endsWith(keyCreada)).toBe(true);
 
@@ -143,7 +157,7 @@ describe('dominio Bordados (F1-E3) — la key de la foto se ordena por id (A5)',
   });
 
   it('si ya había foto, la reemplaza: borra el Archivo anterior en la misma transacción', async () => {
-    const { bd, archivoCreate, archivoDelete } = bdConBordado({
+    const { bd, archivoCreate, bordadoUpdateMany, archivoDelete } = bdConBordado({
       id: 3,
       nombre: 'Con foto',
       idArchivoFoto: 'arch_viejo',
@@ -157,9 +171,36 @@ describe('dominio Bordados (F1-E3) — la key de la foto se ordena por id (A5)',
       archivosDePrueba(),
     );
 
+    // El enlace exige que la foto vigente SIGA siendo la que se leyó (compare-and-set).
+    expect(bordadoUpdateMany.mock.calls[0]?.[0]?.where).toMatchObject({
+      id: 3,
+      idArchivoFoto: 'arch_viejo',
+    });
     // Crea la nueva y borra la vieja (reemplazo atómico).
     expect(archivoCreate).toHaveBeenCalledTimes(1);
     expect(archivoDelete).toHaveBeenCalledTimes(1);
     expect(archivoDelete.mock.calls[0]?.[0]).toMatchObject({ where: { id: 'arch_viejo' } });
+  });
+
+  it('si otro reemplazó la foto primero: ErrorConflicto y NO borra el Archivo ajeno', async () => {
+    // El CAS no enlaza ninguna fila (count = 0): entre la lectura y la escritura, otra
+    // transacción cambió la foto del mismo arte y ya se llevó `arch_viejo`. Antes se intentaba
+    // borrar ese id igual → P2025 → 500; ahora sale un conflicto claro y no se borra nada.
+    const { bd, archivoDelete } = bdConBordado(
+      { id: 3, nombre: 'Con foto', idArchivoFoto: 'arch_viejo' },
+      0,
+    );
+
+    await expect(
+      solicitarSubidaFoto(
+        sesionAdmin(),
+        3,
+        { nombreOriginal: 'nueva.png', tipoMime: 'image/png', tamanoBytes: 512 },
+        bd,
+        archivosDePrueba(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    expect(archivoDelete).not.toHaveBeenCalled();
   });
 });

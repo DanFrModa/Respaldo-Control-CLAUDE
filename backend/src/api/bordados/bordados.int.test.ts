@@ -354,6 +354,66 @@ describe('API de bordados (F1-E3, R2)', () => {
       expect(obtenido.json<BordadoApi>().idArchivoFoto).toBeNull();
     });
 
+    it('DELETE /foto?idArchivo= NO borra cuando la foto vigente ya es otra (409)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearBordadoApi(cookie, { nombre: 'B' });
+      const primera = await app.inject({
+        method: 'POST',
+        url: `/api/bordados/${body.id}/foto`,
+        headers: { cookie },
+        payload: { nombreOriginal: 'vieja.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+      });
+      const idVieja = primera.json<{ idArchivo: string }>().idArchivo;
+      // Otro usuario reemplaza la foto mientras el PUT de la primera seguía fallando.
+      const segunda = await app.inject({
+        method: 'POST',
+        url: `/api/bordados/${body.id}/foto`,
+        headers: { cookie },
+        payload: { nombreOriginal: 'buena.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+      });
+      const idBuena = segunda.json<{ idArchivo: string }>().idArchivo;
+
+      const del = await app.inject({
+        method: 'DELETE',
+        url: `/api/bordados/${body.id}/foto?idArchivo=${idVieja}`,
+        headers: { cookie },
+      });
+      expect(del.statusCode).toBe(409);
+
+      const obtenido = await app.inject({
+        method: 'GET',
+        url: `/api/bordados/${body.id}`,
+        headers: { cookie },
+      });
+      expect(obtenido.json<BordadoApi>().idArchivoFoto).toBe(idBuena);
+    });
+
+    it('DELETE /foto?idArchivo= borra cuando ESA es la vigente (204)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearBordadoApi(cookie, { nombre: 'B' });
+      const subida = await app.inject({
+        method: 'POST',
+        url: `/api/bordados/${body.id}/foto`,
+        headers: { cookie },
+        payload: { nombreOriginal: 'logo.jpg', tipoMime: 'image/jpeg', tamanoBytes: 10 },
+      });
+      const idArchivo = subida.json<{ idArchivo: string }>().idArchivo;
+
+      const del = await app.inject({
+        method: 'DELETE',
+        url: `/api/bordados/${body.id}/foto?idArchivo=${idArchivo}`,
+        headers: { cookie },
+      });
+      expect(del.statusCode).toBe(204);
+
+      const obtenido = await app.inject({
+        method: 'GET',
+        url: `/api/bordados/${body.id}`,
+        headers: { cookie },
+      });
+      expect(obtenido.json<BordadoApi>().idArchivoFoto).toBeNull();
+    });
+
     it('rechaza una foto que no es imagen con 400', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearBordadoApi(cookie, { nombre: 'B' });

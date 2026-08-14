@@ -257,3 +257,32 @@ export const esquemaBordadoFotoSalida = z
 
 /** Forma de la foto de un bordado tal como la devuelve la API. */
 export type BordadoFotoSalida = z.infer<typeof esquemaBordadoFotoSalida>;
+
+/**
+ * Querystring OPCIONAL del borrado de la foto (`DELETE /api/bordados/{id}/foto`).
+ *
+ * Sin `idArchivo` el borrado quita la foto VIGENTE, sea cual sea: es el botón "quitar foto" de la
+ * pantalla, que quiere justamente eso. Con `idArchivo` el borrado queda ACOTADO a esa foto: si la
+ * vigente ya es otra (alguien la reemplazó entre medias), NO se borra nada y la operación responde
+ * 409 `CONFLICTO`, para que el llamador distinga "la quité" de "ya no era la tuya".
+ *
+ * Lo usa la LIMPIEZA del flujo presigned del frontend (`api/subida-archivo.ts`): cuando el `PUT` a
+ * R2 falla, quien limpia debe borrar EXCLUSIVAMENTE el registro que su propio intento creó — nunca
+ * la imagen buena que otro usuario subió mientras tanto. Es el mismo borrado acotado por id de
+ * archivo que ya tienen los demás módulos de adjuntos (proveedor, orden, pedido, entrada de tela,
+ * desarrollo, fotos de modelo), donde el id va en la ruta porque son 0..N; aquí la foto es 0..1 y
+ * cuelga del bordado, así que el acotamiento viaja como parámetro opcional de consulta.
+ */
+export const esquemaBordadoFotoQuitarQuery = z
+  .object({
+    idArchivo: z
+      .string({ error: 'El id del archivo debe ser texto' })
+      .trim()
+      .min(1, { error: 'El id del archivo no puede ir vacío' })
+      .optional()
+      .describe('Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta.'),
+  })
+  .describe('Acotamiento opcional del borrado de la foto de un bordado.');
+
+/** Datos validados del querystring del borrado de la foto. */
+export type DatosBordadoFotoQuitarQuery = z.infer<typeof esquemaBordadoFotoQuitarQuery>;

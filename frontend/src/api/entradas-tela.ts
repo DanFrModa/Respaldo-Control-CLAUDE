@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos de la ENTRADA DE TELA por FACTURA/REMISIÓN sin orden de compra (etapa B1 — Daniel
@@ -223,6 +224,8 @@ export interface ArgsSubirAdjuntoEntradaTela {
 /**
  * Sube un adjunto a R2 en DOS pasos (flujo presigned de F0): registra los metadatos y hace `PUT`
  * del archivo DIRECTO a la URL prefirmada (Content-Type/Length exactos — la firma sólo acepta esos).
+ * Si el PUT falla, se QUITA el adjunto que el paso 1 ya había registrado (si no, la entrada queda
+ * listando un PDF que nunca llegó). Mensaje y limpieza viven en `subida-archivo.ts`.
  */
 async function subirAdjunto({ id, archivo }: ArgsSubirAdjuntoEntradaTela): Promise<void> {
   const { data, error } = await api.POST('/api/inventarios/telas/entradas/{id}/adjuntos', {
@@ -235,28 +238,14 @@ async function subirAdjunto({ id, archivo }: ArgsSubirAdjuntoEntradaTela): Promi
   });
   if (!data) throw new ErrorDeApi(error);
 
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type || 'application/octet-stream',
-        'Content-Length': String(archivo.size),
-      },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type || 'application/octet-stream',
+    conContentLength: true,
+    sustantivo: 'el archivo',
+    limpiar: () => quitarAdjunto({ id, idArchivo: data.idArchivo }),
+  });
 }
 
 /** Sube un adjunto (presigned PUT) e invalida la lista de adjuntos. */
