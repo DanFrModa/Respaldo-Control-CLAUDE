@@ -1,9 +1,10 @@
+import { Printer } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useTraspasarTelaColor } from '@/api/inventario-materiales';
+import { urlImpresoTraspasoTela, useTraspasarTelaColor } from '@/api/inventario-materiales';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -30,6 +31,11 @@ function hoy(): string {
  * almacén"*. Por eso: los selectores solo listan almacenes de TELA, cada uno dice de qué cortador
  * es, y acepta el deep-link `state.idCortador` del avance de producción para llegar con el destino
  * ya puesto.
+ *
+ * §Post-F9.38 — al guardar ofrece la HOJA DEL TRASPASO (el papel que acompaña la tela). NO es un
+ * documento nuevo: imprime el folio que el traspaso YA tiene (Daniel: *"no debe de generar otro
+ * folio de nada"*). Y no es la única vía: la REIMPRESIÓN vive en el kardex del color («Existencias
+ * de telas»), para que cerrar esta pantalla no pierda el papel.
  */
 export function TraspasoTelaColorPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -40,6 +46,9 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
   const [fecha, setFecha] = useState(hoy());
   const [observaciones, setObservaciones] = useState('');
   const [renglones, setRenglones] = useState<RenglonTelaColor[]>([]);
+  // §Post-F9.38 — el traspaso recién guardado, para imprimir la hoja que va con la tela. NO es la
+  // única vía: la reimpresión vive en el kardex del color (historial), como en producción (V1-E3a).
+  const [recienGuardado, setRecienGuardado] = useState<{ id: number; folio: number } | null>(null);
 
   // Solo almacenes de TELA: un traspaso de tela nunca sale ni entra a una bodega de PT o de avíos.
   const almacenes = useAlmacenes({
@@ -110,6 +119,8 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
           );
           setRenglones([]);
           setObservaciones('');
+          // El folio del traspaso es el de la pata de SALIDA (no se genera ninguno nuevo).
+          setRecienGuardado({ id: t.salida.id, folio: t.salida.folio });
         },
         onError: (error) => toast.error(error.message),
       },
@@ -129,6 +140,32 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
           </p>
         </div>
       </header>
+
+      {/* Hoja del traspaso RECIÉN guardado (§Post-F9.38): el papel que va con la tela. Se imprime
+          el folio QUE YA EXISTE — no se genera documento nuevo. Si esta pantalla se cierra, la hoja
+          se recupera desde el kardex del color (Existencias de telas → kardex → imprimir). */}
+      {recienGuardado !== null ? (
+        <div
+          className="flex flex-wrap items-center gap-3 rounded-md border bg-primary-soft px-3 py-2"
+          data-testid="traspaso-color-guardado"
+        >
+          <span className="text-sm">
+            Traspaso <b className="num">#{recienGuardado.folio}</b> registrado. Imprime la hoja que
+            va con la tela.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.open(urlImpresoTraspasoTela(recienGuardado.id), '_blank', 'noopener')
+            }
+            data-testid="traspaso-color-imprimir"
+          >
+            <Printer className="size-4" aria-hidden />
+            Hoja del traspaso
+          </Button>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -208,7 +245,12 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
             soloLectura={!puedeMover}
           />
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Dónde se recupera el papel si esta pantalla ya se cerró (§Post-F9.38: reimprimible
+                desde el historial, no solo al guardar). */}
+            <p className="text-xs text-muted-foreground">
+              La hoja del traspaso se reimprime desde «Existencias de telas» → kardex del color.
+            </p>
             <Button onClick={guardar} disabled={!puedeGuardar} data-testid="traspaso-color-guardar">
               {traspasar.isPending ? 'Guardando…' : 'Registrar traspaso'}
             </Button>

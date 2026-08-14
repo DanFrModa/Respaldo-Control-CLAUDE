@@ -195,6 +195,40 @@ describe('armarDatosImpresoNotaSalida', () => {
     expect(esPdf(buffer)).toBe(true);
   });
 
+  // V1-E3b — el renglón MIGRADO (sin avío ni tela) trae su TEXTO LIBRE: antes caía en la rama de
+  // tela y salía impreso con el material EN BLANCO.
+  it('el renglón MIGRADO imprime su descripcionLegacy como material', async () => {
+    const nota = notaSalida({
+      lineas: [
+        {
+          id: 3,
+          idOrden: 50,
+          folioOrden: 1001,
+          tipo: 'historico',
+          idAvio: null,
+          avio: null,
+          idTela: null,
+          tela: null,
+          idLote: null,
+          loteClave: null,
+          idMovimientoSalidaTela: null,
+          folioMovimientoSalidaTela: null,
+          idMovimientoAvio: null,
+          folioMovimientoAvio: null,
+          cantidad: 0,
+          unidad: null,
+          descripcionLegacy: '3 conos hilo negro y etiquetas',
+        },
+      ],
+    });
+    const datos = await armarDatosImpresoNotaSalida(sesionConVer(), 5, undefined, depsCon(nota));
+
+    expect(datos.lineas[0]?.tipo).toBe('historico');
+    expect(datos.lineas[0]?.material).toBe('3 conos hilo negro y etiquetas');
+    const buffer = await generarPdfNotaSalida(datos);
+    expect(esPdf(buffer)).toBe(true);
+  });
+
   it('marca cancelada cuando el estatus es "cancelada"', async () => {
     const nota = notaSalida({ estatus: 'cancelada', motivoCancelacion: 'duplicada' });
     const datos = await armarDatosImpresoNotaSalida(sesionConVer(), 5, undefined, depsCon(nota));

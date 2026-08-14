@@ -42,11 +42,37 @@ export function fechaCortaNota(valor: string | null): string {
   });
 }
 
-/** Descripción legible del material de un renglón (avío o tela + lote). */
+/**
+ * Descripción legible del material de un renglón: avío, tela (+ lote) o —en un renglón MIGRADO del
+ * sistema anterior— su TEXTO LIBRE (`descripcionLegacy`), que es lo único que ese renglón tiene.
+ * Antes esos renglones caían en la rama de tela y salían como "Tela" a secas, con el material en
+ * blanco: parecía que la migración había perdido el dato (V1-E3b).
+ */
 export function descripcionMaterialNota(linea: NotaSalidaLinea): string {
   if (linea.tipo === 'avio') {
     return linea.avio ?? 'Avío sin nombre';
   }
+  if (linea.tipo === 'historico') {
+    return linea.descripcionLegacy ?? 'Renglón migrado sin descripción';
+  }
   const tela = linea.tela ?? 'Tela';
   return linea.loteClave !== null ? `${tela} · lote ${linea.loteClave}` : tela;
+}
+
+/** Etiqueta del badge de tipo de renglón (honesta: «Migrado» no es un material). */
+export function etiquetaTipoRenglonNota(tipo: NotaSalidaLinea['tipo']): string {
+  if (tipo === 'avio') return 'Avío';
+  return tipo === 'tela' ? 'Tela' : 'Migrado';
+}
+
+/**
+ * Cantidad legible de un renglón. Un renglón MIGRADO trae `cantidad = 0` porque el sistema viejo
+ * NO desglosaba cantidad por renglón (`dominio/notas/migracion.ts`) — pintar "0" afirmaría que se
+ * enviaron cero piezas, que es distinto de "no se sabe". Por eso ahí va un guion.
+ */
+export function cantidadRenglonNota(linea: NotaSalidaLinea): string {
+  if (linea.tipo === 'historico' && linea.cantidad === 0) {
+    return '—';
+  }
+  return linea.cantidad.toLocaleString('es-MX');
 }

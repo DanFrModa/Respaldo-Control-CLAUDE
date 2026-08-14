@@ -15,6 +15,24 @@
  *    como documento de envío y NO genera segundo movimiento de kardex (DECISIÓN (e) de Daniel,
  *    `DECISIONES.md`). El renglón guarda `idMovimientoSalidaTela` — la base del ANTI-DOBLE-DESCUENTO.
  *
+ * ⚠️ §Post-F9.38 (V1-E3b) — LA NOTA QUEDÓ **SOLO PARA AVÍOS**: ningún renglón de tela NUEVO puede
+ * nacer, por ningún camino. Daniel cerró que la salida de tela a una orden NO lleva nota (basta el
+ * movimiento de kardex); el papel lo lleva el TRASPASO entre almacenes, que se imprime desde el
+ * propio traspaso con su folio. La puerta tiene DOS hojas, porque el alta no es el único camino:
+ *
+ *  • **Al CREAR se RECHAZA** todo renglón de tela ({@link rechazarTelaEnAlta}). La captura también
+ *    se retiró de la UI (además era incapturable: aquí se exige `idLote` y las salidas nuevas van
+ *    por COLOR, sin lote).
+ *  • **Al EDITAR se acepta la tela SOLO si ya estaba en esa nota** ({@link exigirTelaYaEnLaNota}):
+ *    misma terna tela/lote/movimiento ya persistida. Editar REEMPLAZA EL SET COMPLETO de renglones,
+ *    así que un borrador viejo que trae tela (su captura existió hasta el rediseño R6) tiene que
+ *    poder re-guardarse sin perderla en silencio ni quedar inguardable; pero AGREGAR tela que no
+ *    estaba se rechaza igual que en el alta — por ese hueco nacía la nota de tela nueva (crear con
+ *    un avío + editar metiendo tela). La lectura del histórico sigue proyectando la tela existente.
+ *
+ * No es una inconsistencia: la excepción cubre EXACTAMENTE el caso que la justifica (conservar lo
+ * que ya existe) y nada más.
+ *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo; las rutas son delgadas.
  *  • A2 — encabezado + renglones (alta/edición) y confirmar/cancelar van en UNA transacción
@@ -354,6 +372,84 @@ async function exigirTodosExisten(
   }
 }
 
+/**
+ * RECHAZA renglones de TELA en el ALTA de una nota (§Post-F9.38 — decisión de Daniel: *"Está bien el
+ * movimiento de tela sin la nota de salida cuando sea para consumo de una orden"*). Una nota NUEVA
+ * es de AVÍOS: la tela que se consume en una orden sale por su movimiento de kardex y NO lleva nota;
+ * lo que sí lleva papel es el TRASPASO entre almacenes, que se imprime desde el propio traspaso con
+ * su folio.
+ *
+ * ⚠️ Esta función cubre solo el ALTA. La EDICIÓN tiene su propia puerta —{@link exigirTelaYaEnLaNota}—
+ * porque ahí la regla no puede ser "nada de tela": editar REEMPLAZA EL SET COMPLETO de renglones y un
+ * borrador viejo que trae tela la perdería EN SILENCIO (o quedaría inguardable). Lo que NO puede
+ * pasar, por ninguno de los dos caminos, es que nazca un renglón de tela NUEVO.
+ */
+function rechazarTelaEnAlta(lineas: DatosNotaSalidaLineaEntrada[]): void {
+  for (const [indice, linea] of lineas.entries()) {
+    if (linea.idTela != null || linea.idLote != null || linea.idMovimientoSalidaTela != null) {
+      throw new ErrorValidacion(
+        `El renglón ${indice + 1} es de tela: una nota de salida NUEVA es de AVÍOS. La salida de ` +
+          `tela a una orden no lleva nota (basta su movimiento de inventario); si la tela se manda ` +
+          `a otro almacén, usa el traspaso de tela y su hoja.`,
+      );
+    }
+  }
+}
+
+/** Terna que IDENTIFICA un renglón de tela dentro de una nota (`idMovimientoSalidaTela` es único). */
+function claveRenglonTela(linea: {
+  idTela?: number | null | undefined;
+  idLote?: number | null | undefined;
+  idMovimientoSalidaTela?: number | null | undefined;
+}): string {
+  return `${linea.idTela ?? '-'}|${linea.idLote ?? '-'}|${linea.idMovimientoSalidaTela ?? '-'}`;
+}
+
+/**
+ * En la EDICIÓN, acepta renglones de TELA **solo si ya estaban en ESA nota** (§Post-F9.38, corrección
+ * de la revisión de V1-E3b). Es la otra mitad de {@link rechazarTelaEnAlta}: sin esto, la puerta del
+ * alta no cerraba nada — bastaba crear un borrador con un avío y luego EDITARLO metiéndole un renglón
+ * de tela para que naciera una nota 100 % de tela, se confirmara y saliera con folio.
+ *
+ * La excepción existe por UNA razón concreta y solo la cubre a ella: un borrador viejo que ya trae
+ * tela (su captura existió hasta el rediseño R6) tiene que poder RE-GUARDARSE sin perder ese renglón
+ * —editar reemplaza el SET completo—, así que la tela que YA está persistida se deja pasar tal cual
+ * (su cantidad sí se puede corregir; lo que se compara es la terna tela/lote/movimiento). Una tela
+ * que NO estaba en la nota se rechaza igual que en el alta: por ahí nacía la nota de tela nueva.
+ *
+ * No hace falta contar repeticiones: `validarRenglones` ya prohíbe que dos renglones de la misma nota
+ * referencien el mismo `idMovimientoSalidaTela`, y sin él un renglón de tela ni siquiera es válido.
+ */
+async function exigirTelaYaEnLaNota(
+  tx: Tx,
+  idNota: number,
+  lineas: DatosNotaSalidaLineaEntrada[],
+): Promise<void> {
+  const entrantes = lineas
+    .map((linea, indice) => ({ linea, num: indice + 1 }))
+    .filter(
+      ({ linea }) =>
+        linea.idTela != null || linea.idLote != null || linea.idMovimientoSalidaTela != null,
+    );
+  if (entrantes.length === 0) return;
+
+  const persistidas = await tx.notaSalidaLinea.findMany({
+    where: { idNotaSalida: idNota, NOT: { idTela: null } },
+    select: { idTela: true, idLote: true, idMovimientoSalidaTela: true },
+  });
+  const yaEstaban = new Set(persistidas.map((l) => claveRenglonTela(l)));
+
+  for (const { linea, num } of entrantes) {
+    if (yaEstaban.has(claveRenglonTela(linea))) continue;
+    throw new ErrorValidacion(
+      `El renglón ${num} es de tela y NO estaba en esta nota: una nota de salida es de AVÍOS y no se ` +
+        `le pueden agregar renglones de tela. La salida de tela a una orden no lleva nota (basta su ` +
+        `movimiento de inventario); si la tela se manda a otro almacén, usa el traspaso de tela y su ` +
+        `hoja. Los renglones de tela que la nota YA traía se conservan.`,
+    );
+  }
+}
+
 /** Crea los renglones de una nota desde cero (alta o reemplazo). Asume que no tiene renglones aún. */
 async function crearRenglones(
   tx: Tx,
@@ -402,7 +498,13 @@ type NotaConDetalle = Prisma.NotaSalidaGetPayload<{ include: typeof incluirDetal
 /** Proyecta una nota (con detalle) a la forma JSON del contrato. */
 function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
   const lineas: NotaSalidaLineaSalida[] = n.lineas.map((l) => {
-    const tipo: 'avio' | 'tela' = l.idAvio !== null ? 'avio' : 'tela';
+    // Tres formas de renglón (V1-E3b): avío (lo único que se captura), tela (histórico de notas
+    // viejas) y MIGRADO — sin avío ni tela, solo `descripcionLegacy` (el viejo guardaba texto
+    // libre; ver `notas/migracion.ts`). Antes se derivaba `idAvio !== null ? 'avio' : 'tela'`, así
+    // que TODO renglón migrado salía etiquetado 'tela' con material vacío: una etiqueta falsa que
+    // en el go-live habría parecido pérdida de datos de la migración.
+    const tipo: 'avio' | 'tela' | 'historico' =
+      l.idAvio !== null ? 'avio' : l.idTela !== null ? 'tela' : 'historico';
     return {
       id: l.id,
       idOrden: l.idOrden,
@@ -492,6 +594,11 @@ export async function crearNotaSalida(
   verificarPermiso(sesion, 'notas.administrar');
   const datos = validarEntrada(esquemaNotaSalidaCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // §Post-F9.38 — una nota NUEVA es de AVÍOS (la tela no lleva nota). La edición tiene su propia
+  // puerta (`exigirTelaYaEnLaNota`). Va ANTES de abrir la transacción: es una regla sobre la
+  // ENTRADA, no necesita la BD, y así no se toma folio ni se escribe nada.
+  rechazarTelaEnAlta(datos.lineas);
 
   const idNota = await enTransaccion(async (tx) => {
     await exigirMaquileroExiste(tx, datos.idMaquilero);
@@ -583,6 +690,9 @@ export async function actualizarNotaSalida(
     // reemplazo total es correcto y simple.
     if (datos.lineas !== undefined) {
       await validarRenglones(tx, idEmpresa, datos.lineas);
+      // §Post-F9.38 — la otra mitad de la puerta del alta: aquí la tela solo pasa si YA estaba en
+      // esta nota (si no, se podía crear un borrador de avío y meterle tela por la edición).
+      await exigirTelaYaEnLaNota(tx, id, datos.lineas);
       await tx.notaSalidaLinea.deleteMany({ where: { idNotaSalida: id } });
       await crearRenglones(tx, sesion, id, datos.lineas);
     }

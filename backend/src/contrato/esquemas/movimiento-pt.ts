@@ -33,6 +33,24 @@ const esquemaMovPtLinea = z.object({
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  /**
+   * ORDEN de producción de la que salen (o a la que entran) estas prendas — §Post-F9.40, opción 1
+   * de Daniel. La existencia de PT es por modelo×color×talla×ORDEN×almacén (F6-E2), así que el
+   * movimiento manual y el traspaso tienen que decir de QUÉ bucket mueven: sin esto solo podían
+   * tocar el bucket «sin orden» y lo que produce la fábrica —etiquetado con su orden por el recibo
+   * de maquila— era intocable. `null`/ausente = bucket «SIN ORDEN» (lo capturado a mano en el
+   * arranque y lo migrado), que se mueve con libertad. El dominio valida el no-negativo contra ESE
+   * bucket, bajo lock (D3).
+   */
+  idOrden: z
+    .number({ error: 'El id de la orden debe ser un número' })
+    .int({ error: 'El id de la orden debe ser entero' })
+    .positive({ error: 'El id de la orden debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe(
+      'Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden».',
+    ),
   tallas: z
     .array(esquemaMovPtTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
@@ -163,6 +181,16 @@ const esquemaMovPtTallaSalida = z.object({
 const esquemaMovPtLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  idOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden).'),
+  folioOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Folio de la orden del renglón, o null si es del bucket sin orden.'),
   tallas: z.array(esquemaMovPtTallaSalida).describe('Cantidades por talla.'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
 });

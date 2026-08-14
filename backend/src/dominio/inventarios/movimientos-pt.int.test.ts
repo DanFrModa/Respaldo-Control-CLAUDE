@@ -339,6 +339,201 @@ describe('Concurrencia: existencia nunca negativa (F3-E3)', () => {
   });
 });
 
+describe('PT etiquetado por ORDEN se puede mover (V1-E3b — §Post-F9.40)', () => {
+  /**
+   * Crea una orden mínima de la empresa dada (el recibo de maquila etiqueta el PT con SU orden;
+   * aquí se simula ese etiquetado capturando el movimiento con `idOrden`).
+   */
+  async function crearOrden(folio: bigint, idEmpresa = empresa.id): Promise<number> {
+    const cli = await cliente.cliente.create({ data: { nombre: `Cliente ${String(folio)}` } });
+    const orden = await cliente.orden.create({
+      data: { folio, idEmpresa, idModelo: modelo.id, idCliente: cli.id },
+    });
+    return orden.id;
+  }
+
+  /** Entra `cantidad` de Rojo/CH al almacén, ETIQUETADO con una orden (como lo hace el recibo). */
+  async function entrarConOrden(
+    idAlmacen: number,
+    cantidad: number,
+    idOrden: number | null,
+  ): Promise<number> {
+    const mov = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen,
+        idModelo: modelo.id,
+        fecha: '2026-08-12',
+        lineas: [{ idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+    return mov.id;
+  }
+
+  it('el movimiento manual SACA del bucket de la orden elegida (antes solo tocaba «sin orden»)', async () => {
+    const idOrden = await crearOrden(9001n);
+    await entrarConOrden(almPrimeras.id, 20, idOrden);
+
+    const salida = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntregaCliente.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-08-12',
+        lineas: [
+          { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 8 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(salida.lineas[0]?.idOrden).toBe(idOrden);
+    expect(salida.lineas[0]?.folioOrden).toBe(9001);
+
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    const fila = existencias.filas.find((f) => f.idOrden === idOrden);
+    expect(fila?.existencia).toBe(12);
+  });
+
+  it('no deja sacar de una orden lo que hay en OTRA (los buckets no se suman entre sí)', async () => {
+    const ordenA = await crearOrden(9002n);
+    const ordenB = await crearOrden(9003n);
+    await entrarConOrden(almPrimeras.id, 10, ordenA);
+
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntregaCliente.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-08-12',
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              idOrden: ordenB,
+              tallas: [{ idTalla: tallaCH.id, cantidad: 1 }],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y tampoco desde el bucket «sin orden» (que es donde caía TODO antes de §Post-F9.40).
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntregaCliente.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-08-12',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('el traspaso mueve el bucket de la orden y el DESTINO conserva la orden (no pierde el rastro)', async () => {
+    const idOrden = await crearOrden(9004n);
+    await entrarConOrden(almPrimeras.id, 30, idOrden);
+
+    const traspaso = await registrarTraspasoPt(
+      sesion(),
+      {
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-08-12',
+        lineas: [
+          { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(traspaso.salida.lineas[0]?.idOrden).toBe(idOrden);
+    expect(traspaso.entrada.lineas[0]?.idOrden).toBe(idOrden);
+
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(30); // el total no cambia
+    const origen = existencias.filas.find(
+      (f) => f.idAlmacen === almPrimeras.id && f.idOrden === idOrden,
+    );
+    const destino = existencias.filas.find(
+      (f) => f.idAlmacen === almSegundas.id && f.idOrden === idOrden,
+    );
+    expect(origen?.existencia).toBe(18);
+    expect(destino?.existencia).toBe(12);
+    // Y NO se creó un bucket «sin orden» en el destino (el rastro de producción se conserva).
+    expect(
+      existencias.filas.some((f) => f.idAlmacen === almSegundas.id && f.idOrden === null),
+    ).toBe(false);
+  });
+
+  it('el bucket «SIN ORDEN» sigue moviéndose libre (arranque sin conteo físico, §Post-F9.36 punto 4)', async () => {
+    await entrarConOrden(almPrimeras.id, 25, null);
+    await registrarTraspasoPt(
+      sesion(),
+      {
+        idAlmacenOrigen: almPrimeras.id,
+        idAlmacenDestino: almSegundas.id,
+        idModelo: modelo.id,
+        fecha: '2026-08-12',
+        lineas: [
+          { idColor: colorRojo.id, idOrden: null, tallas: [{ idTalla: tallaCH.id, cantidad: 25 }] },
+        ],
+      },
+      bd(),
+    );
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    const destino = existencias.filas.find((f) => f.idAlmacen === almSegundas.id);
+    expect(destino?.existencia).toBe(25);
+    expect(destino?.idOrden).toBeNull();
+  });
+
+  it('una orden de OTRA empresa → 404 (A9: no se etiqueta PT con la orden ajena)', async () => {
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa SA');
+    const ajena = await crearOrden(9005n, otraEmpresa.id);
+    await expect(
+      registrarMovimientoPt(
+        sesion(),
+        {
+          idTipoMov: tEntradaInicial.id,
+          idAlmacen: almPrimeras.id,
+          idModelo: modelo.id,
+          fecha: '2026-08-12',
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              idOrden: ajena,
+              tallas: [{ idTalla: tallaCH.id, cantidad: 1 }],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('la CANCELACIÓN neutraliza el MISMO bucket de orden (D3: inverso auditado)', async () => {
+    const idOrden = await crearOrden(9006n);
+    const idEntrada = await entrarConOrden(almPrimeras.id, 15, idOrden);
+    await cancelarMovimientoPt(sesion(), idEntrada, { motivo: 'captura equivocada' }, bd());
+
+    const existencias = await consultarExistenciasPt(
+      sesion(),
+      { idModelo: modelo.id, incluirCeros: true },
+      bd(),
+    );
+    const fila = existencias.filas.find((f) => f.idOrden === idOrden);
+    expect(fila?.existencia ?? 0).toBe(0);
+  });
+});
+
 describe('Kardex (F3-E3)', () => {
   it('(h) kardex por modelo lista los movimientos con saldo corrido', async () => {
     await entrar(almPrimeras.id, 30); // saldo 30

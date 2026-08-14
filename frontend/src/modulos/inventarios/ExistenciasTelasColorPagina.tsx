@@ -1,9 +1,10 @@
-import { Ban, BookOpenText, ChevronRight, Search } from 'lucide-react';
+import { Ban, BookOpenText, ChevronRight, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import {
+  urlImpresoTraspasoTela,
   useCancelarTelaColor,
   useExistenciasTelaColor,
   useKardexTelaColor,
@@ -558,6 +559,12 @@ function CajonKardexTelaColor({
     habilitado: idTelaColor !== undefined,
   });
   const kardex = consulta.data;
+  // ¿La columna de acciones tiene algo que ofrecer? Cancelar pide `.mover`; la hoja del traspaso
+  // (§Post-F9.38) basta con `.ver`, pero solo aparece en renglones de traspaso vivos. Sin ninguna
+  // de las dos, la columna NO se pinta: a quien solo consulta no se le muestra una columna vacía.
+  const hayAcciones =
+    puedeMover ||
+    (kardex?.renglones ?? []).some((r) => r.origenTipo === 'traspaso' && !r.cancelado);
   const llevaComplemento = color?.nombreComplemento !== null && color !== undefined;
   const encCuerpo = color?.nombreCuerpo ?? 'Cuerpo';
   const encComplemento = color?.nombreComplemento ?? 'Complemento';
@@ -622,7 +629,9 @@ function CajonKardexTelaColor({
                     <TablaDensaHead numerica>Saldo</TablaDensaHead>
                   </>
                 ) : null}
-                {puedeMover ? <TablaDensaHead className="w-10" /> : null}
+                {/* Acciones: imprimir la hoja del traspaso (§Post-F9.38, con `inventario-telas.ver`)
+                    y cancelar (con `.mover`). Solo si hay alguna que ofrecer. */}
+                {hayAcciones ? <TablaDensaHead className="w-16" /> : null}
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
@@ -667,19 +676,44 @@ function CajonKardexTelaColor({
                       </TablaDensaCelda>
                     </>
                   ) : null}
-                  {puedeMover ? (
+                  {hayAcciones ? (
                     <TablaDensaCelda className="p-0 pr-1 text-right">
-                      {!r.cancelado ? (
-                        <button
-                          type="button"
-                          onClick={() => setACancelar(r)}
-                          className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                          aria-label={`Cancelar movimiento #${r.folio}`}
-                          data-testid={`kardex-color-cancelar-${r.idMovimiento}`}
-                        >
-                          <Ban className="size-4" aria-hidden />
-                        </button>
-                      ) : null}
+                      <span className="flex items-center justify-end">
+                        {/* REIMPRESIÓN de la hoja del traspaso (§Post-F9.38): el papel que se fue
+                            con la tela se recupera desde aquí, no solo al guardarlo. Un traspaso
+                            CANCELADO no se imprime — su papel no vuelve a salir con un bulto (el
+                            backend también lo rechaza; hoy además una pata de traspaso no se puede
+                            anular sola: se revierte con un traspaso inverso, con su propia hoja). */}
+                        {r.origenTipo === 'traspaso' && !r.cancelado ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.open(
+                                urlImpresoTraspasoTela(r.idMovimiento),
+                                '_blank',
+                                'noopener',
+                              )
+                            }
+                            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label={`Hoja del traspaso #${r.folio}`}
+                            title="Hoja del traspaso"
+                            data-testid={`kardex-color-imprimir-${r.idMovimiento}`}
+                          >
+                            <Printer className="size-4" aria-hidden />
+                          </button>
+                        ) : null}
+                        {puedeMover && !r.cancelado ? (
+                          <button
+                            type="button"
+                            onClick={() => setACancelar(r)}
+                            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label={`Cancelar movimiento #${r.folio}`}
+                            data-testid={`kardex-color-cancelar-${r.idMovimiento}`}
+                          >
+                            <Ban className="size-4" aria-hidden />
+                          </button>
+                        ) : null}
+                      </span>
                     </TablaDensaCelda>
                   ) : null}
                 </TablaDensaFila>

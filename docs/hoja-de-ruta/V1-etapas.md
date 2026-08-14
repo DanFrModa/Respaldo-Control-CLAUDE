@@ -178,17 +178,216 @@ anotado en el código con el arreglo correcto.
 **Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
 `SEED_ON_START`.
 
-### E3b — pendiente: los papeles y el inventario de PT
+### E3b — construida (13-ago-2026): los papeles y el inventario de PT
 
-1. **El impreso del traspaso de tela** (§Post-F9.38): mandar tela a un cortador la saca físicamente y
-   el papel va con ella. **Un solo folio, el del traspaso** — sin registro paralelo ni secuencia nueva
-   (Daniel: *"no debe de generar otro folio de nada"*). Reimprimible desde el historial.
-2. **Retirar el renglón de tela de la nota de salida**: la salida a una orden **no lleva nota**, así
-   que ese renglón —hoy incapturable— no hay que arreglarlo, hay que **quitarlo**. La nota queda solo
-   para avíos.
-3. **El PT etiquetado por orden se puede mover** (§Post-F9.40): al mover a mano **se elige de qué
-   orden** salen las piezas, entre las que tienen existencia real de ese artículo en ese almacén.
-   ⚠️ Confirmado leyendo el código, **no ejecutado** — verificar en vivo antes de tocar.
+> **Estado:** código y doc terminados en la rama de tarea; **revisión independiente en curso** al
+> momento de escribir esta nota. No se abre el PR a `prueba` hasta que el reviewer apruebe.
+
+**1. El impreso del traspaso de tela** (§Post-F9.38). Mandar tela a un cortador la saca físicamente y
+el papel va con ella. Se imprime **el folio que el traspaso ya tiene**: cero registros nuevos, cero
+secuencias (Daniel: *"No debe de generar otro folio de nada. Me refiero a solo A la impresión del
+folio que ya existe"*). El impreso vive en `backend/src/dominio/inventarios/impresos/impreso-traspaso-tela.ts`
+y sale por `GET /inventarios/telas/traspasos/:id/impreso` con `inventario-telas.ver`; se reimprime
+desde el cajón del kardex. Acepta **cualquiera de las dos patas** (el usuario hace clic en la que
+tenga enfrente, entrada o salida) y **se niega** en tres casos: traspaso cancelado, movimiento que no
+es traspaso, y pata huérfana —un renglón cuya contraparte no aparece—, porque un papel a medias es
+peor que ningún papel.
+
+**2. El renglón de tela sale de la nota de salida.** Al decidir Daniel que la tela consumida por una
+orden **no lleva nota**, ese renglón dejó de tener para qué existir: se retiró de la captura. Lo ya
+migrado **no se toca** —`RenglonTelaHistorico` se pinta de solo lectura—, siguiendo D3: no se edita
+ni se borra lo que ya pasó.
+
+**3. El PT etiquetado por orden ya se puede mover** (§Post-F9.40). Al mover a mano se **elige de qué
+orden** salen (o a cuál entran) las piezas, y lo que ofrece `SelectorOrdenPt` **depende de la
+dirección del tipo de movimiento**: en una **salida**, solo las órdenes con existencia real de ese
+artículo en ese almacén —de un bucket vacío no se saca nada—; en una **entrada**, también las órdenes
+del modelo cuyo bucket quedó en **cero**, y sin filtrar por almacén. Esa segunda mitad la trajo la
+revisión: es el va-y-ven de estampado que la pantalla existe para operar —las piezas salen a
+Aplicación (el bucket de la orden queda en 0) y al volver tienen que poder **regresar a su orden**; si
+el cero las excluyera entrarían a «sin orden» y la entrega al cliente de esa orden diría "no hay
+existencia" con la mercancía en el almacén—. En la entrada **no se anuncian piezas** junto a la orden:
+ahí el disponible no es un tope y un "0 pzas" se leería como que no se puede elegir. El **traspaso se
+queda solo con la regla de salida** en sus dos patas: el destino hereda la orden del origen y un
+traspaso no crea piezas. Lo importante está abajo: `validarNoNegativo` bloquea y
+suma contra **ese** bucket, no contra el total —si hay 100 piezas repartidas entre dos órdenes, sacar
+80 de una que solo tiene 30 se frena—, y lo hace sumando movimientos bajo lock, nunca leyendo la
+vista (D3). La **pata origen del traspaso valida igual**, y en la pantalla tanto el disponible que se
+muestra como la advertencia de sobre-traspaso siguen el bucket elegido. Se agregó
+`validarOrdenesDeLaEmpresa` (A9) en todos los caminos que aceptan `idOrden`.
+
+**Las dos decisiones que la etapa tuvo que cerrar:**
+
+- **La tela se rechaza al ALTA, y al EDITAR solo pasa la que ya estaba.** El rechazo del alta
+  (`rechazarTelaEnAlta`) corre **antes de abrir la transacción**, para no quemar un folio en una nota
+  que va a fallar. La edición no puede rechazarla del todo —hay borradores viejos que la traen y
+  guardarlos los mutilaría en silencio, justo el daño callado que estamos persiguiendo—, pero la
+  primera versión la aceptaba **entera**, y ahí la puerta no cerraba nada: bastaba crear un borrador
+  con un avío y **editarlo metiéndole tela** para que naciera una nota 100 % de tela, se confirmara y
+  saliera con folio (lo cazó la revisión). Ahora `exigirTelaYaEnLaNota` acepta un renglón de tela
+  **solo si esa misma terna tela/lote/movimiento ya está persistida en esa nota**: se conserva
+  exactamente el caso que justifica la excepción y nada más. Los tests del renglón de tela siembran
+  el renglón **directo en la BD** (como lo trae una nota vieja) y afirman sobre el **mensaje** del
+  error, para que ninguno pueda pasar por la razón equivocada.
+- **`tipo` pasó de dos valores a tres**: `avio | tela | historico`. Lo migrado dejó de disfrazarse de
+  renglón normal: `descripcionLegacy` **ahora sí se pinta** (antes se guardaba y no se veía), lo que
+  vino con `cantidad = 0` muestra **«—» y no "0"** —un cero es una afirmación, y no sabemos que sea
+  cierta— y lleva badge «Migrado».
+
+**Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
+`SEED_ON_START`.
+
+---
+
+## V1-E3c · El editor de la receta del modelo (PROPUESTA — 13-ago-2026)
+
+Salió de Daniel usando el editor de BOM en `prueba`. Seis observaciones suyas, **todas verificadas
+contra el código**. Se agrupan porque tocan los mismos archivos (`EditorBom.tsx`,
+`EditorMedidasAvio.tsx`, el contrato del modelo y el BOM del dominio).
+
+**Sube de prioridad:** sin poder capturar el consumo por talla ni el proveedor amarrado, **el
+precosteo no da los números reales** — cae siempre al fallback.
+
+1. **⭐ El consumo por talla está roto EN CÍRCULO.** `EditorMedidasAvio` solo sabe **editar renglones
+   que ya existen** y **nada en el sistema los crea**: no hay botón de agregar, ni selector de talla,
+   ni deriva la curva del modelo. Nunca habrá filas, porque la única forma de crearlas es un PUT que
+   la UI no puede componer. **Y el mensaje MIENTE**: dice *"El modelo no tiene curva de tallas"* pero
+   el código **nunca mira la curva** (`medidas-avio-talla.ts:105-130` hace un solo `findMany` sobre
+   `ModeloAvioTalla`). Sale igual con curva capturada. Agravante: la ficha del modelo **ni siquiera
+   proyecta las tallas de la curva** (`modelos.ts:58,91` trae solo `curvaTalla.nombre`), así que hoy
+   el frontend tampoco tiene con qué armar la lista.
+2. **Tres columnas de AMARRE DE PRECIO sin escritor.** `ModeloAvio.idAvioProveedor`,
+   `ModeloTela.idTelaProveedor` y `ModeloAvioTalla.idAvioMedida`: las **leen** el pre-costo (F7), el
+   precosteo (F8), la cascada de resolución de precios y el MRP — y **nada las escribe** (no están en
+   el contrato de captura ni en `sincronizarAvios`/`copiarBom`; los únicos que las asignan son tests
+   de integración, con Prisma directo). **Toda la cascada de "precio amarrado" de D13/R17 está inerte
+   en producción.** Es la promesa central del módulo de Desarrollo.
+3. **La receta no muestra proveedor ni precio** del componente: la etiqueta es solo
+   `clave — descripción` (`EditorBom.tsx:86,202,387-390`). Por eso Daniel "no lo ve": no está.
+4. **Los selectores del BOM son `<select>` nativos con tope de 100.** El catálogo tiene **~877
+   telas**: **777 son inalcanzables** desde ahí. Y el "buscar tecleando" de un `<select>` es el
+   typeahead del navegador, que solo hace match **por prefijo** — de ahí *"solo encuentra por orden
+   alfabético"*. ⚠️ **El backend YA busca bien**: `contains` insensitive sobre nombre, proveedor,
+   color y pantone (`telas.ts:1575-1582`). El defecto es de pantalla, y son **4 sitios** con la misma
+   forma: BOM, encabezado de orden, notas de salida y órdenes de compra. **El patrón correcto ya
+   existe y está en producción**: `SelectorTela` (debounce + `busqueda` server-side + `ComboboxBuscable`).
+5. ~~Quitar las tres banderas~~ — ❌ **RETIRADO (14-ago-2026). NO se quitan.** La propuesta nació de
+   un *"esto está obsoleto… yo creo que lo quitaría"* de Daniel, y **el error fue del lead: se
+   propuso quitarlas sin preguntar para qué existían.** Al día siguiente Daniel explicó su razón de
+   ser, que es real y vigente: *"se negocia con el cliente que ya no lleve alguna cosa (por ejemplo,
+   quitarle una jareta para abaratar el costo). El modelo original sí lo lleva, pero para producción
+   ya no."* Las banderas son hoy el **único** mecanismo que existe para eso.
+   **Lo que sí está mal no es que existan, es dónde viven:** la bandera es **del modelo**, no de la
+   orden — apagarla afecta a TODAS las órdenes de ese modelo, incluidas las ya producidas. Eso se
+   resuelve en **V1-E3d** (el BOM se congela en la OP). Después de E3d las banderas se quedan, con el
+   significado limpio: qué lleva la **plantilla** para cada propósito. **No hace falta el conteo en
+   `prueba`** que este punto pedía como prerrequisito.
+6. **La lista es demasiado alta.** Cada renglón son ~110-150 px (tarjeta con borde + dos filas); **8
+   avíos ≈ 1,150 px**. El `<fieldset>` de las tres casillas son **35 líneas de JSX** y el ~60 % del
+   bulto: sin él, el renglón cabe en **una línea de ~44 px** y los 8 avíos bajan a ~400 px. El patrón
+   a copiar ya está en el repo: `TablaDensa` (30+ pantallas) y la fila-compacta-con-panel-expandible
+   de `AviosPagina`.
+
+**Criterio de cierre:** capturar un avío por talla con su consumo, amarrarle proveedor y precio, y
+que el precosto salga con **esos** números y no con el fallback.
+
+---
+
+## V1-E3d · El BOM vive en la OP ⭐ (14-ago-2026)
+
+**Indispensable para la primera versión** (Daniel: *"creo que sí es indispensable… De hecho así
+funciona en control viejo. El BOM debe de vivir en la OP"*). Decisiones en `DECISIONES.md`
+**§Post-F9.43**.
+
+### El hueco
+
+Hoy **la receta no se graba en la OP**: no existe ninguna tabla `OrdenTela`/`OrdenAvio`. Todo lo que
+en producción necesita saber qué lleva la prenda va y lee el BOM del **modelo**, en vivo, en el
+momento en que corre — el MRP y la habilitación con `paraProduccion`, el costeo real con `paraCosto`,
+el semáforo de "orden completa" con `paraProduccion`.
+
+Consecuencia: la bandera es del **modelo**, así que apagar la jareta de un cliente la apaga **en
+todas las órdenes de ese modelo**, incluidas las ya producidas *con* jareta. Y no es hipotético — al
+editar el BOM el código ya alcanza hacia atrás (`recalcularEstadoOrdenesDeModelo`). Con un solo
+interruptor por modelo no se pueden tener dos clientes del mismo modelo, uno con jareta y otro sin.
+
+### La evidencia del sistema viejo (medida, no recordada)
+
+`OrdenesHab(IdOrdenes, IdHabilitacion, CantHabOrd, PrecioHabOrd)` — el viejo congela por orden el
+avío, **la cantidad de esa orden y el precio de esa orden**. Sobre el volcado real (5,451 órdenes,
+28,432 renglones):
+
+| Hallazgo | Dato |
+|---|---|
+| Órdenes vivas con receta propia | **3,799** |
+| Comparables contra el BOM de su modelo | 1,222 — de ellas **132 (10.8 %) NO coinciden** |
+| … **quitaron** un avío que el modelo sí lleva | 72 *(el caso de la jareta, literal)* |
+| … **agregaron** uno que el modelo no trae | 100 |
+| … cambiaron una cantidad | 60 |
+| Órdenes cuyo modelo **no tiene BOM**: la receta **solo** existe en la OP | **2,577** (2 de cada 3) |
+| Renglones con **precio distinto** al del catálogo | **15,255 de 24,480 (62 %)** |
+
+El 62 % del precio **no es negociación renglón por renglón**: es que la OP guardó **el precio del
+día** y el catálogo siguió su camino (etiqueta de lavado catálogo $0.14 / orden $0.15; gancho 18"
+catálogo $0.88 / orden $0.85, sistemáticos). O sea: el snapshot es tanto para **la historia** como
+para el override.
+
+**Dos precisiones que la memoria no traía:** el viejo **NO** congela la tela (`Ordenes.IdTelasDis` =
+una sola tela en el encabezado, sin tabla por orden) y **NO** hace nada por orden con los bordados.
+
+### Qué entrega
+
+1. **Receta de la OP** — se copia del modelo **al crear la orden** (decisión de Daniel), con
+   **cantidad y precio** por renglón. Se puede **quitar, agregar y editar**; lo tocado queda marcado
+   para que un cambio posterior del modelo no lo pise. Mismo patrón que el precosteo ya usa
+   (`ajustado` + `restaurarLineaBom`), que es el precedente probado del repo.
+   **Incluye TELA**, aunque el viejo no lo hiciera: en v2 la tela tiene consumo por prenda y alimenta
+   el MRP — dejarla fuera repetiría el hueco que la etapa viene a tapar.
+2. **Liberación por Desarrollo.** Cada renglón nace como **propuesta sin revisar**; Desarrollo ajusta,
+   define las **medidas por talla** y **libera**. Hasta entonces **no se puede explotar el MRP ni
+   generar OC** de esa orden. **Cortar y producir NO se bloquean** (la puerta va antes de *comprar*,
+   que es lo que Daniel pidió: *"la información correcta que se tiene que comprar"*).
+   ⚠️ **NO se fuerza el OK uno por uno:** el 89 % de las órdenes lleva la receta del modelo tal cual;
+   obligar a 8 clics por OP entrena a la gente a clickear sin leer. Estado por renglón
+   (*sin revisar / revisado / ajustado*) + **un botón de "marcar todo revisado"**, y el que se desvía
+   del modelo se pinta distinto. Permiso REUSADO `desarrollo.administrar` (ya existe, seed:245).
+3. **Los cuatro consumidores leen la receta de la ORDEN**, no la del modelo: MRP, habilitación,
+   costeo real y el semáforo de "orden completa" —que pasa de *"¿el modelo tiene avíos?"* a *"¿la
+   receta de la OP está liberada?"*, mismo semáforo diciendo algo verdadero—.
+4. **Los dos avisos de desalineación** (Daniel): al cambiar el BOM de un modelo se detectan las OP
+   vivas desalineadas y se parten en dos.
+   - **Sin OC todavía** → **rojo en el lugar de la decisión**: al explotar el MRP / generar la OC, los
+     renglones que cambiaron salen marcados diciendo *qué* cambió (agregado / quitado / cantidad /
+     precio). No necesita notificación: la persona ya está ahí, a punto de gastar.
+   - **Con OC ya hecha** → **aviso visible en la orden**, calculado igual, en el momento de abrirla.
+   ⚠️ **SIN evento, SIN outbox, SIN estado acumulado** (Daniel, 14-ago: *"ya veremos si vale la pena
+   lo de los correos o no… no tiene caso ahorita hacer nada de eso"*). La desalineación **se calcula
+   al vuelo**: la receta de la OP está congelada y el BOM del modelo está vivo, así que la diferencia
+   sale de comparar los dos cuando alguien abre la pantalla. **Lo único que compraba el evento era
+   EMPUJAR** el aviso hacia quien no está mirando — que es exactamente lo que hace el correo; sin
+   correo, no compra nada. *Se pierde saber cuándo cambió y qué decía antes, y no importa: lo que se
+   revisa es la diferencia de HOY, que es contra lo que se va a comprar.* Si el correo llega a valer
+   la pena, agregar el evento entonces es chico; el costo aceptado es que no se podrá mandar lo
+   ocurrido antes.
+5. **ETL del histórico, FUERA del catálogo.** Los 28,432 renglones de `OrdenesHab` **hoy no se
+   migran** (ni una mención en `migracion/` — se tiran completos). Entran al **archivo histórico**
+   como cuarta tabla junto a `HistoricoOrdenV1Linea`/`Proceso`, con la **regla ya establecida en
+   §Post-F9.28**: el avío va como **TEXTO**, no como FK. Con eso **no se crea ni un solo registro en
+   el catálogo de avíos**, no sale en ningún selector, es de solo lectura y **no hay botón de "traer
+   al catálogo"** —ese botón sería la puerta trasera por la que volvería la basura de 30 años, y por
+   eso tampoco existe en el directorio histórico—. Es la respuesta literal a la condición de Daniel:
+   *"no quiero que interfiera con el nuevo catálogo"*.
+
+### Decisión pendiente, con default aplicado
+
+Si Desarrollo ya liberó y **después** cambia el BOM del modelo: **la OP queda congelada** (para eso se
+congela), con aviso de *"el modelo cambió desde que se liberó"* y opción de traer los cambios **a
+mano**. Mismo comportamiento que el precosteo con sus renglones ajustados. Daniel lo aprobó.
+
+### Criterio de cierre
+
+Dos órdenes del mismo modelo, una con jareta y otra sin, que compren cosas distintas y cuesten
+distinto — sin que ninguna de las dos altere a la otra ni a las ya producidas.
 
 ---
 

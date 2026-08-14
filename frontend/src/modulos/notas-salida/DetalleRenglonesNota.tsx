@@ -1,13 +1,16 @@
 import type { NotaSalida } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 
-import { descripcionMaterialNota } from './piezas';
+import { cantidadRenglonNota, descripcionMaterialNota, etiquetaTipoRenglonNota } from './piezas';
 
 /**
  * Renglones de una nota de salida en SOLO LECTURA (F4-E5): tabla en pantallas anchas, tarjetas
- * apiladas en móvil (regla 10). Cada renglón muestra la orden destino, el tipo (avío/tela), el
- * material (con lote si es tela), la cantidad/unidad y la traza al movimiento de kardex
- * (descuento de avío o salida-a-orden de tela). Presentación pura (A1).
+ * apiladas en móvil (regla 10). Cada renglón muestra la orden destino, el tipo, el material (con
+ * lote si es tela), la cantidad/unidad y la traza al movimiento de kardex.
+ *
+ * §Post-F9.38 — la nota es de AVÍOS: los renglones de TELA solo existen en notas viejas (su captura
+ * se retiró porque la salida de tela a una orden no lleva nota). Se siguen mostrando: son parte del
+ * documento que ya se emitió. Presentación pura (A1).
  */
 export function DetalleRenglonesNota({ nota }: { nota: NotaSalida }): React.JSX.Element {
   if (nota.lineas.length === 0) {
@@ -39,13 +42,11 @@ export function DetalleRenglonesNota({ nota }: { nota: NotaSalida }): React.JSX.
                 <td className="py-2 pr-3">{linea.folioOrden ?? '—'}</td>
                 <td className="py-2 pr-3">
                   <Badge variant={linea.tipo === 'avio' ? 'secondary' : 'outline'}>
-                    {linea.tipo === 'avio' ? 'Avío' : 'Tela'}
+                    {etiquetaTipoRenglonNota(linea.tipo)}
                   </Badge>
                 </td>
                 <td className="py-2 pr-3">{descripcionMaterialNota(linea)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">
-                  {linea.cantidad.toLocaleString('es-MX')}
-                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">{cantidadRenglonNota(linea)}</td>
                 <td className="py-2 pr-3">{linea.unidad ?? '—'}</td>
                 <td className="py-2 text-xs text-muted-foreground">{trazaKardex(linea)}</td>
               </tr>
@@ -61,11 +62,11 @@ export function DetalleRenglonesNota({ nota }: { nota: NotaSalida }): React.JSX.
             <div className="flex items-start justify-between gap-2">
               <span className="font-medium">{descripcionMaterialNota(linea)}</span>
               <Badge variant={linea.tipo === 'avio' ? 'secondary' : 'outline'}>
-                {linea.tipo === 'avio' ? 'Avío' : 'Tela'}
+                {etiquetaTipoRenglonNota(linea.tipo)}
               </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Orden {linea.folioOrden ?? '—'} · {linea.cantidad.toLocaleString('es-MX')}
+              Orden {linea.folioOrden ?? '—'} · {cantidadRenglonNota(linea)}
               {linea.unidad ? ` ${linea.unidad}` : ''}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{trazaKardex(linea)}</p>
@@ -76,12 +77,20 @@ export function DetalleRenglonesNota({ nota }: { nota: NotaSalida }): React.JSX.
   );
 }
 
-/** Texto de la traza al kardex de un renglón (descuento de avío / salida-a-orden de tela). */
+/**
+ * Texto de la traza al kardex de un renglón (descuento de avío / salida-a-orden de tela). Un
+ * renglón MIGRADO no tiene traza y no es un error: el ETL carga las notas viejas como DOCUMENTO
+ * HISTÓRICO, sin tocar inventario (`dominio/notas/migracion.ts`). Decirlo evita que se lea como
+ * "se perdió el movimiento".
+ */
 function trazaKardex(linea: NotaSalida['lineas'][number]): string {
   if (linea.tipo === 'avio') {
     return linea.folioMovimientoAvio === null
       ? 'Sin descontar (borrador)'
       : `Descuento #${String(linea.folioMovimientoAvio)}`;
+  }
+  if (linea.tipo === 'historico') {
+    return 'Migrado (sin movimiento de inventario)';
   }
   return linea.folioMovimientoSalidaTela === null
     ? 'Sin salida referenciada'

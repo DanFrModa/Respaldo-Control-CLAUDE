@@ -19,7 +19,16 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
-import { aLineasApi, coloresOpciones, tallasColumnas, totalMatriz } from './matriz-inventario';
+import { SelectorOrdenPt } from './SelectorOrdenPt';
+import {
+  SIN_ORDEN,
+  aIdOrden,
+  aLineasApi,
+  coloresOpciones,
+  ordenesConExistencia,
+  tallasColumnas,
+  totalMatriz,
+} from './matriz-inventario';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
@@ -31,6 +40,17 @@ function hoy(): string {
  * modelo de un almacén ORIGEN a uno DESTINO (distintos) por color×talla, en UNA operación (el backend
  * la materializa como salida + entrada atómicas). Muestra la existencia DISPONIBLE en el origen para
  * cada artículo capturado; el servidor es la autoridad (no deja el origen en negativo).
+ *
+ * §Post-F9.40 — el traspaso mueve el bucket de UNA orden (la existencia de PT es por
+ * modelo×color×talla×ORDEN×almacén): se elige entre las órdenes con existencia real en el origen,
+ * más el bucket «sin orden». El destino recibe las piezas con la MISMA orden (no se pierde de qué
+ * producción son). El disponible que se muestra y el aviso de sobre-traspaso son los de ESE bucket
+ * —el mismo saldo que valida el servidor—, no el total del modelo.
+ *
+ * El selector es SIEMPRE de salida (descarta buckets en cero) y eso aquí es lo correcto en las DOS
+ * patas: el destino no elige orden —hereda la del origen—, y un bucket sin piezas en el origen no
+ * tiene nada que traspasar. La excepción de «entrada a un bucket en cero» (regresar del estampado)
+ * vive en Movimientos, no aquí: un traspaso no crea piezas.
  *
  * `inventario-pt.mover` gobierna la captura.
  */
@@ -45,6 +65,8 @@ export function TraspasosPtPagina(): React.JSX.Element {
   const [observaciones, setObservaciones] = useState('');
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
+  // §Post-F9.40 — de qué ORDEN salen las piezas que se traspasan. `SIN_ORDEN` = bucket «sin orden».
+  const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
 
   const almacenes = useAlmacenes({
     pagina: 1,
@@ -72,13 +94,35 @@ export function TraspasosPtPagina(): React.JSX.Element {
       : { idModelo: modelo?.id ?? 0 },
     hayOrigen,
   );
+  // §Post-F9.40 — las órdenes CON EXISTENCIA REAL en el ORIGEN (más el bucket «sin orden»).
+  const opcionesOrden = useMemo(
+    () => ordenesConExistencia(existencias.data?.filas ?? []),
+    [existencias.data],
+  );
+  // Si cambia el modelo/origen, el bucket elegido puede ya no existir → vuelve a «sin orden».
+  const bucketValido =
+    ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
+  const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
+  const idOrdenElegida = aIdOrden(ordenElegida);
+
+  // Disponible por artículo DENTRO del bucket elegido: el aviso de sobre-traspaso tiene que
+  // compararse contra el MISMO saldo que valida el servidor (por orden), no contra el total del
+  // modelo — si no, avisaría que "sí hay" piezas que están en otra orden.
   const disponiblePorArticulo = useMemo(() => {
     const mapa = new Map<string, number>();
     for (const f of existencias.data?.filas ?? []) {
-      mapa.set(`${f.idColor}:${f.idTalla}`, f.existencia);
+      if (f.idOrden !== idOrdenElegida) continue;
+      const clave = `${f.idColor}:${f.idTalla}`;
+      mapa.set(clave, (mapa.get(clave) ?? 0) + f.existencia);
     }
     return mapa;
-  }, [existencias.data]);
+  }, [existencias.data, idOrdenElegida]);
+
+  /** Total disponible en el ORIGEN dentro del bucket elegido (lo que la barra de abajo anuncia). */
+  const totalDisponibleBucket = useMemo(
+    () => [...disponiblePorArticulo.values()].reduce((suma, v) => suma + v, 0),
+    [disponiblePorArticulo],
+  );
 
   const coloresDisponibles = useMemo(
     () => coloresOpciones(colores.data?.datos ?? []),
@@ -125,7 +169,7 @@ export function TraspasosPtPagina(): React.JSX.Element {
         idModelo: modelo.id,
         fecha,
         ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
-        lineas: aLineasApi(lineas),
+        lineas: aLineasApi(lineas, undefined, idOrdenElegida),
       },
       {
         onSuccess: (traspaso) => {
@@ -239,16 +283,36 @@ export function TraspasosPtPagina(): React.JSX.Element {
                 </p>
               ) : null}
 
-              <Field>
-                <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
-                <Input
-                  id="obs"
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Opcional"
-                  disabled={!puedeMover}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* §Post-F9.40 — de qué ORDEN salen las piezas del ORIGEN (el bucket que se mueve;
+                    el destino las recibe con la MISMA orden: no se pierde el rastro). */}
+                <SelectorOrdenPt
+                  id="traspaso-orden"
+                  opciones={opcionesOrden}
+                  valor={ordenElegida}
+                  alCambiar={setOrdenBucket}
+                  deshabilitado={!puedeMover || !hayOrigen}
+                  cargando={hayOrigen && existencias.isPending}
+                  hayError={existencias.isError}
+                  alReintentar={() => void existencias.refetch()}
+                  ayuda={
+                    hayOrigen
+                      ? 'De qué producción salen las piezas; el destino las recibe con esa misma orden.'
+                      : 'Elige el almacén de origen para ver de qué órdenes hay piezas ahí.'
+                  }
+                  testid="traspaso-orden"
                 />
-              </Field>
+                <Field>
+                  <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+                  <Input
+                    id="obs"
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    placeholder="Opcional"
+                    disabled={!puedeMover}
+                  />
+                </Field>
+              </div>
 
               <div>
                 <h3 className="mb-2 text-sm font-medium">Cantidades a traspasar (color × talla)</h3>
@@ -264,11 +328,14 @@ export function TraspasosPtPagina(): React.JSX.Element {
                 />
                 {idAlmacenOrigen !== '' ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Existencia total disponible en el origen:{' '}
-                    <strong>
-                      {(existencias.data?.totalExistencia ?? 0).toLocaleString('es-MX')}
-                    </strong>{' '}
-                    pzas.
+                    Existencia disponible en el origen{' '}
+                    {idOrdenElegida === null
+                      ? '(bucket «sin orden»)'
+                      : `(orden ${String(
+                          opcionesOrden.find((o) => o.idOrden === idOrdenElegida)?.folioOrden ??
+                            idOrdenElegida,
+                        )})`}
+                    : <strong>{totalDisponibleBucket.toLocaleString('es-MX')}</strong> pzas.
                   </p>
                 ) : null}
               </div>
