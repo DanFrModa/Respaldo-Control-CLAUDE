@@ -14,7 +14,7 @@
 | TelaCategoria | `telas_categorias` | `TelasCategorias.csv` | F1-E1 |
 | Proveedor (fusión) | `proveedores`, `proveedor_rol`, `proveedor_archivo` | `Proveedores.csv`+`Cortadores.csv`+`Maquileros.csv`+`Estampadores.csv` | F1-E1B/E2 |
 | Almacen | `almacenes` | `IPT_Almacenes.csv`+`Almacenes.csv` | F1-E2 |
-| Bordado | `bordados`, `archivos` | `Bordados.csv` (fotos: E7) | F1-E3 |
+| ~~Bordado~~ | — | — | **RETIRADO en V1-E3d** (§Post-F9.35): el arte dejó de ser catálogo y vive dentro del modelo (`ModeloArte`, ver `modelos.md`). |
 | Avio (habilitación) | `avios`, `avio_proveedor` | `Habilitacion.csv` | F1-E3 |
 | Color | `colores` | texto libre normalizado de `TelasColores.csv` | F1-E6 |
 | Tela | `telas`, `telas_colores` | `Telas.csv`+`TelasDis.csv` (unificadas, D5) | F1-E3/E6 · reestructura A1 (§Post-F9.11) |
@@ -38,7 +38,7 @@
 | `Color` | texto normalizado → `id` de `Color` |
 | `Cliente` | `IdClientes` → `id` de `Cliente` |
 | `EtiquetaMarca` | `IdEtiquetasM` → `id` |
-| `Bordado` | `IdBordados` → `id` |
+| ~~`Bordado`~~ | Retirado en V1-E3d. Lo sustituye `ModeloArte`, con clave COMPUESTA `<IdBordados>:<IdModelos>` (un arte viejo pudo producir varios artes, uno por modelo). |
 | `Avio` | `IdHabilitacion` → `id` |
 | `Genero` | `IdGeneros` → `id` |
 | `Temporada` | (vacío) |

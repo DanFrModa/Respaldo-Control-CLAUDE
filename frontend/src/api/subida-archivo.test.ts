@@ -37,7 +37,7 @@ vi.mock('./cliente', () => ({
 }));
 
 const { useSubirFotoModelo } = await import('./modelos');
-const { useSubirFotoBordado } = await import('./bordados');
+const { useSubirFotoArte } = await import('./artes');
 const { useSubirAdjuntoEntradaTela } = await import('./entradas-tela');
 const { useSubirAdjuntoDesarrollo } = await import('./adjuntos-desarrollo');
 const { useSubirAdjuntoProveedor } = await import('./proveedores');
@@ -58,7 +58,7 @@ interface Caso {
   /** Parámetros de ruta con los que debe llamarse esa limpieza. */
   paramsLimpieza: Record<string, unknown>;
   /**
-   * Querystring con el que debe llamarse la limpieza. Solo bordados lo usa (su foto es 0..1 y
+   * Querystring con el que debe llamarse la limpieza. Solo el ARTE lo usa (su foto es 0..1 y
    * cuelga del arte, así que el acotamiento por id de archivo no cabe en la ruta); en los demás
    * el id del archivo YA va en la ruta, así que la consulta va vacía.
    */
@@ -88,10 +88,10 @@ const CASOS: Caso[] = [
     sustantivo: 'la imagen',
   },
   {
-    nombre: 'imagen de bordado',
+    nombre: 'imagen del arte del modelo',
     useSubida: () => {
-      const mutacion = useSubirFotoBordado();
-      return (archivo: File) => mutacion.mutateAsync({ idBordado: 9, archivo });
+      const mutacion = useSubirFotoArte();
+      return (archivo: File) => mutacion.mutateAsync({ idModelo: 3, idArte: 9, archivo });
     },
     datosPost: {
       idArchivo: 'arch_2',
@@ -99,8 +99,8 @@ const CASOS: Caso[] = [
       urlSubida: URL_SUBIDA,
       expiraEnSegundos: 900,
     },
-    rutaLimpieza: '/api/bordados/{id}/foto',
-    paramsLimpieza: { id: 9 },
+    rutaLimpieza: '/api/modelos/{id}/artes/{idArte}/foto',
+    paramsLimpieza: { id: 3, idArte: 9 },
     // ACOTADO a la foto de ESTE intento: sin esto, la limpieza borraría "la foto que haya" y se
     // llevaría la que otro usuario haya subido al mismo arte mientras el PUT fallaba.
     queryLimpieza: { idArchivo: 'arch_2' },
@@ -332,12 +332,12 @@ describe.each(CASOS)('subida a R2 — $nombre', (caso) => {
  * ACOTADA al `idArchivo` de SU intento y el backend no borra si la vigente ya es otra (409).
  */
 describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
-  const CASO_BORDADO = CASOS.find((c) => c.nombre === 'imagen de bordado') as Caso;
+  const CASO_ARTE = CASOS.find((c) => c.nombre === 'imagen del arte del modelo') as Caso;
 
   beforeEach(() => {
     post.mockReset();
     del.mockReset();
-    post.mockResolvedValue({ data: CASO_BORDADO.datosPost, error: undefined });
+    post.mockResolvedValue({ data: CASO_ARTE.datosPost, error: undefined });
     avisos = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal(
       'fetch',
@@ -348,10 +348,10 @@ describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
   it('la limpieza acota el borrado al idArchivo de SU intento (nunca a secas)', async () => {
     del.mockResolvedValue({ response: { ok: true }, error: undefined });
 
-    await errorDeSubida(CASO_BORDADO);
+    await errorDeSubida(CASO_ARTE);
 
     const [borrado] = llamadasDeBorrado();
-    expect(borrado?.ruta).toBe('/api/bordados/{id}/foto');
+    expect(borrado?.ruta).toBe('/api/modelos/{id}/artes/{idArte}/foto');
     expect(borrado?.query).toEqual({ idArchivo: 'arch_2' });
     // Sin querystring el backend borraría la foto VIGENTE, sea de quien sea: eso es lo prohibido.
     expect(borrado?.query).not.toEqual({});
@@ -367,7 +367,7 @@ describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
       },
     });
 
-    const fallo = await errorDeSubida(CASO_BORDADO);
+    const fallo = await errorDeSubida(CASO_ARTE);
 
     // El usuario ve SU error de subida; el 409 de la limpieza no lo tapa (solo deja rastro).
     expect(fallo.message).toContain('No se pudo guardar la imagen.');

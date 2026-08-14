@@ -42,7 +42,6 @@ export async function calcularCuadre(cliente: PrismaClient): Promise<RenglonCuad
   const v1Estampadores = contarFilasCsv('Estampadores.csv');
   const v1IptAlm = contarFilasCsv('IPT_Almacenes.csv');
   const v1Almacenes = contarFilasCsv('Almacenes.csv');
-  const v1Bordados = contarFilasCsv('Bordados.csv');
   const v1Habilitacion = contarFilasCsv('Habilitacion.csv');
   const v1Telas = contarFilasCsv('Telas.csv');
   const v1TelasDis = contarFilasCsv('TelasDis.csv');
@@ -59,7 +58,6 @@ export async function calcularCuadre(cliente: PrismaClient): Promise<RenglonCuad
     v2TelaCat,
     v2Proveedores,
     v2Almacenes,
-    v2Bordados,
     v2Avios,
     v2Colores,
     v2Telas,
@@ -75,7 +73,6 @@ export async function calcularCuadre(cliente: PrismaClient): Promise<RenglonCuad
     cliente.telaCategoria.count(),
     cliente.proveedor.count(),
     cliente.almacen.count(),
-    cliente.bordado.count(),
     cliente.avio.count(),
     cliente.color.count(),
     cliente.tela.count(),
@@ -127,12 +124,6 @@ export async function calcularCuadre(cliente: PrismaClient): Promise<RenglonCuad
       v1: v1IptAlm + v1Almacenes,
       v2: v2Almacenes,
       nota: `v1 = IPT(${String(v1IptAlm)}) + Almacenes(${String(v1Almacenes)}, solo activos migran).`,
-    },
-    {
-      entidad: 'Bordados',
-      v1: v1Bordados,
-      v2: v2Bordados,
-      nota: '≈ 1:1 (nombres duplicados desambiguados, no se pierden).',
     },
     {
       entidad: 'Avíos',

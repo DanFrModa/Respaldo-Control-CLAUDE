@@ -15,7 +15,8 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { reemplazarAviosBom, reemplazarBordadosBom } from '../modelos/bom-modelo.js';
+import { crearArte } from '../modelos/arte-modelo.js';
+import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
 import { actualizarModelo } from '../modelos/modelos.js';
 import {
   actualizarOrden,
@@ -430,12 +431,14 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     expect(orden.requisitos).toMatchObject({ tallas: true, avios: true, arte: false });
     expect(orden.requisitos.faltantes).toEqual(['arte']);
 
-    // Capturar el ARTE en el BOM completa la orden sola (recálculo por BOM = solo asciende).
-    const bordado = await cliente.bordado.create({
-      data: { nombre: 'Logo pecho', tipo: 'BORDADO' },
-    });
+    // Capturar el ARTE del modelo completa la orden sola (recálculo por catálogo = solo asciende).
     const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
-    await reemplazarBordadosBom(sAdmin, conArte.id, [{ idBordado: bordado.id, precio: 10 }], bd());
+    await crearArte(
+      sAdmin,
+      conArte.id,
+      { nombre: 'Logo pecho', tipo: 'BORDADO', precio: 10 },
+      bd(),
+    );
 
     const conArteCapturado = await obtenerOrden(s, orden.id, bd());
     expect(conArteCapturado.estado).toBe('completa');

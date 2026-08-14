@@ -7,7 +7,6 @@ import {
   MapPin,
   Palette,
   Ruler,
-  Stamp,
   Tags,
   Truck,
   Warehouse,
@@ -136,21 +135,15 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     icono: Boxes,
     permiso: 'avios.ver',
   },
+  // El ARTE dejó de ser catálogo en V1-E3d (§Post-F9.35): vive dentro del modelo. Sobrevive su
+  // GALERÍA, armada desde los modelos y gobernada por `modelos.ver`.
   {
-    clave: 'bordados',
-    titulo: 'Arte',
-    descripcion: 'Catálogo de arte (bordado y estampado) con su foto.',
-    ruta: '/catalogos/bordados',
-    icono: Stamp,
-    permiso: 'bordados.ver',
-  },
-  {
-    clave: 'galeria-bordados',
+    clave: 'galeria-arte',
     titulo: 'Galería de arte',
-    descripcion: 'Vista visual del arte (bordado y estampado) con foto.',
-    ruta: '/catalogos/galeria-bordados',
+    descripcion: 'Vista visual del arte (bordado y estampado) con su modelo.',
+    ruta: '/arte/galeria',
     icono: Images,
-    permiso: 'bordados.ver',
+    permiso: 'modelos.ver',
   },
 ];
 

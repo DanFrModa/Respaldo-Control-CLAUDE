@@ -163,8 +163,6 @@ export interface paths {
                 | 'telas.administrar'
                 | 'avios.ver'
                 | 'avios.administrar'
-                | 'bordados.ver'
-                | 'bordados.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
                 | 'tipos-proceso.ver'
@@ -12169,1127 +12167,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/bordados': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Listar bordados/estampados */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Página (1-based). */
-          pagina?: number;
-          /** @description Renglones por página (máx 100). */
-          porPagina?: number;
-          /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
-          busqueda?: string;
-          /** @description Filtra por tipo (BORDADO/ESTAMPADO). */
-          tipo?: 'BORDADO' | 'ESTAMPADO';
-          /** @description Incluye los desactivados ("true"/"false"). */
-          incluirInactivos?: string;
-          /** @description Columna de ordenamiento. */
-          ordenarPor?: 'nombre' | 'tipo' | 'creadoEn';
-          /** @description Dirección del orden. */
-          direccion?: 'asc' | 'desc';
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Página de bordados. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Bordados de la página. */
-              datos: {
-                /** @description Id del bordado. */
-                id: number;
-                /** @description Nombre del bordado/estampado. */
-                nombre: string;
-                /** @description Descripción, o null. */
-                descripcion: string | null;
-                /** @description Número de puntadas (informativo), o null. */
-                puntadas: number | null;
-                /** @description Precio de referencia, o null. */
-                precio: number | null;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-                idArchivoFoto: string | null;
-                /** @description Falso si está desactivado (borrado suave). */
-                activo: boolean;
-                /**
-                 * Format: date-time
-                 * @description Fecha de alta (ISO 8601).
-                 */
-                creadoEn: string;
-                /** @description Id del usuario que lo creó. */
-                creadoPorId: string | null;
-                /**
-                 * Format: date-time
-                 * @description Fecha de la última modificación (ISO 8601).
-                 */
-                modificadoEn: string;
-                /** @description Id del último usuario que lo modificó. */
-                modificadoPorId: string | null;
-              }[];
-              /** @description Total de bordados que cumplen el filtro. */
-              total: number;
-              /** @description Página devuelta. */
-              pagina: number;
-              /** @description Renglones por página. */
-              porPagina: number;
-              /** @description Total de páginas. */
-              totalPaginas: number;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Crear un bordado/estampado */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            nombre: string;
-            descripcion?: string;
-            puntadas?: number;
-            precio?: number;
-            /**
-             * @default BORDADO
-             * @enum {string}
-             */
-            tipo?: 'BORDADO' | 'ESTAMPADO';
-          };
-        };
-      };
-      responses: {
-        /** @description Bordado/estampado del catálogo (global, con foto opcional en R2). */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del bordado. */
-              id: number;
-              /** @description Nombre del bordado/estampado. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
-              /** @description Número de puntadas (informativo), o null. */
-              puntadas: number | null;
-              /** @description Precio de referencia, o null. */
-              precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
-              /** @description Falso si está desactivado (borrado suave). */
-              activo: boolean;
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              /** @description Id del usuario que lo creó. */
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Fecha de la última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              /** @description Id del último usuario que lo modificó. */
-              modificadoPorId: string | null;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/bordados/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Obtener un bordado */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Bordado/estampado del catálogo (global, con foto opcional en R2). */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del bordado. */
-              id: number;
-              /** @description Nombre del bordado/estampado. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
-              /** @description Número de puntadas (informativo), o null. */
-              puntadas: number | null;
-              /** @description Precio de referencia, o null. */
-              precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
-              /** @description Falso si está desactivado (borrado suave). */
-              activo: boolean;
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              /** @description Id del usuario que lo creó. */
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Fecha de la última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              /** @description Id del último usuario que lo modificó. */
-              modificadoPorId: string | null;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Desactivar un bordado (borrado suave) */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Bordado/estampado del catálogo (global, con foto opcional en R2). */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del bordado. */
-              id: number;
-              /** @description Nombre del bordado/estampado. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
-              /** @description Número de puntadas (informativo), o null. */
-              puntadas: number | null;
-              /** @description Precio de referencia, o null. */
-              precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
-              /** @description Falso si está desactivado (borrado suave). */
-              activo: boolean;
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              /** @description Id del usuario que lo creó. */
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Fecha de la última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              /** @description Id del último usuario que lo modificó. */
-              modificadoPorId: string | null;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Actualizar un bordado */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            nombre?: string;
-            descripcion?: string | null;
-            puntadas?: number | null;
-            precio?: number | null;
-            /** @enum {string} */
-            tipo?: 'BORDADO' | 'ESTAMPADO';
-            activo?: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description Bordado/estampado del catálogo (global, con foto opcional en R2). */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del bordado. */
-              id: number;
-              /** @description Nombre del bordado/estampado. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
-              /** @description Número de puntadas (informativo), o null. */
-              puntadas: number | null;
-              /** @description Precio de referencia, o null. */
-              precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
-              /** @description Falso si está desactivado (borrado suave). */
-              activo: boolean;
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              /** @description Id del usuario que lo creó. */
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Fecha de la última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              /** @description Id del último usuario que lo modificó. */
-              modificadoPorId: string | null;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/bordados/{id}/foto': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Obtener la URL de la foto de un bordado */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Foto de un bordado (con su URL de descarga) o vacía si no tiene. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del registro Archivo de la foto, o null. */
-              idArchivo: string | null;
-              /** @description Nombre original del archivo, o null. */
-              nombreOriginal: string | null;
-              /** @description Tipo MIME de la imagen, o null. */
-              tipoMime: string | null;
-              /** @description Tamaño en bytes, o null. */
-              tamanoBytes: number | null;
-              /** @description URL GET prefirmada para ver la foto, o null si no tiene foto. */
-              urlDescarga: string | null;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Preparar la subida de la foto de un bordado */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      /** @description Datos para preparar la subida de la foto de un bordado. */
-      requestBody: {
-        content: {
-          'application/json': {
-            /** @description Nombre del archivo tal como lo llama el usuario. */
-            nombreOriginal: string;
-            /** @description Tipo MIME de la imagen (ej. image/jpeg, image/png, image/webp). */
-            tipoMime: string;
-            /** @description Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño). */
-            tamanoBytes: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Resultado de preparar la subida de la foto (URL prefirmada). */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del registro Archivo creado para la foto. */
-              idArchivo: string;
-              /** @description Nombre original del archivo. */
-              nombreOriginal: string;
-              /** @description URL PUT prefirmada: el navegador sube directo a R2. */
-              urlSubida: string;
-              /** @description Vigencia de la URL de subida (segundos). */
-              expiraEnSegundos: number;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    /** Quitar la foto de un bordado */
-    delete: {
-      parameters: {
-        query?: {
-          /** @description Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta. */
-          idArchivo?: string;
-        };
-        header?: never;
-        path: {
-          /** @description Id del bordado. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/generos': {
     parameters: {
       query?: never;
@@ -13943,19 +12820,47 @@ export interface paths {
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
               }[];
-              /** @description Bordados del BOM. */
-              bordados: {
-                /** @description Id del bordado. */
-                idBordado: number;
-                /** @description Nombre del bordado (para la UI). */
+              /** @description Arte (bordados/estampados) del modelo. */
+              artes: {
+                /** @description Id del arte. */
+                id: number;
+                /** @description Id del modelo dueño del arte. */
+                idModelo: number;
+                /** @description Nombre del arte. */
                 nombre: string;
+                /** @description Descripción, o null. */
+                descripcion: string | null;
+                /** @description Número de puntadas (informativo), o null. */
+                puntadas: number | null;
+                /** @description Precio del arte (el que viaja a la OP), o null. */
+                precio: number | null;
                 /**
-                 * @description Tipo del bordado (para la UI).
+                 * @description BORDADO real o ESTAMPADO/aplicación.
                  * @enum {string}
                  */
                 tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Precio del bordado en este modelo, o null. */
-                precio: number | null;
+                /** @description Id del proveedor que lo hace, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor que lo hace, o null. */
+                proveedor: string | null;
+                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+                idArchivoFoto: string | null;
+                /** @description Posición dentro del modelo (0 = arte principal). */
+                orden: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
               }[];
             };
           };
@@ -14960,14 +13865,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/modelos/{id}/bom/bordados': {
+  '/api/modelos/{id}/artes': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Listar los bordados del BOM de un modelo */
+    /** Listar el arte (bordados/estampados) de un modelo */
     get: {
       parameters: {
         query?: never;
@@ -14980,26 +13885,54 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Bordados del BOM de un modelo. */
+        /** @description Artes (bordados/estampados) de un modelo. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Bordados del BOM. */
+              /** @description Artes del modelo, ya ordenados. */
               datos: {
-                /** @description Id del bordado. */
-                idBordado: number;
-                /** @description Nombre del bordado (para la UI). */
+                /** @description Id del arte. */
+                id: number;
+                /** @description Id del modelo dueño del arte. */
+                idModelo: number;
+                /** @description Nombre del arte. */
                 nombre: string;
+                /** @description Descripción, o null. */
+                descripcion: string | null;
+                /** @description Número de puntadas (informativo), o null. */
+                puntadas: number | null;
+                /** @description Precio del arte (el que viaja a la OP), o null. */
+                precio: number | null;
                 /**
-                 * @description Tipo del bordado (para la UI).
+                 * @description BORDADO real o ESTAMPADO/aplicación.
                  * @enum {string}
                  */
                 tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Precio del bordado en este modelo, o null. */
-                precio: number | null;
+                /** @description Id del proveedor que lo hace, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor que lo hace, o null. */
+                proveedor: string | null;
+                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+                idArchivoFoto: string | null;
+                /** @description Posición dentro del modelo (0 = arte principal). */
+                orden: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
               }[];
             };
           };
@@ -15086,8 +14019,9 @@ export interface paths {
         };
       };
     };
-    /** Reemplazar el set completo de bordados del BOM */
-    put: {
+    put?: never;
+    /** Agregar un arte al modelo */
+    post: {
       parameters: {
         query?: never;
         header?: never;
@@ -15097,39 +14031,69 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Set completo de bordados del BOM del modelo. */
       requestBody: {
         content: {
           'application/json': {
-            bordados: {
-              idBordado: number;
-              precio?: number;
-            }[];
+            nombre: string;
+            descripcion?: string;
+            puntadas?: number;
+            precio?: number;
+            /**
+             * @default BORDADO
+             * @enum {string}
+             */
+            tipo?: 'BORDADO' | 'ESTAMPADO';
+            idProveedor?: number;
           };
         };
       };
       responses: {
-        /** @description Bordados del BOM de un modelo. */
-        200: {
+        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        201: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Bordados del BOM. */
-              datos: {
-                /** @description Id del bordado. */
-                idBordado: number;
-                /** @description Nombre del bordado (para la UI). */
-                nombre: string;
-                /**
-                 * @description Tipo del bordado (para la UI).
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Precio del bordado en este modelo, o null. */
-                precio: number | null;
-              }[];
+              /** @description Id del arte. */
+              id: number;
+              /** @description Id del modelo dueño del arte. */
+              idModelo: number;
+              /** @description Nombre del arte. */
+              nombre: string;
+              /** @description Descripción, o null. */
+              descripcion: string | null;
+              /** @description Número de puntadas (informativo), o null. */
+              puntadas: number | null;
+              /** @description Precio del arte (el que viaja a la OP), o null. */
+              precio: number | null;
+              /**
+               * @description BORDADO real o ESTAMPADO/aplicación.
+               * @enum {string}
+               */
+              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del proveedor que lo hace, o null. */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor que lo hace, o null. */
+              proveedor: string | null;
+              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+              idArchivoFoto: string | null;
+              /** @description Posición dentro del modelo (0 = arte principal). */
+              orden: number;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
             };
           };
         };
@@ -15215,14 +14179,13 @@ export interface paths {
         };
       };
     };
-    post?: never;
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/api/modelos/{id}/bom/bordados/{idBordado}/principal': {
+  '/api/modelos/{id}/artes/{idArte}': {
     parameters: {
       query?: never;
       header?: never;
@@ -15231,7 +14194,283 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Marcar un arte del BOM como el principal del modelo */
+    post?: never;
+    /** Quitar un arte del modelo */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Editar un arte del modelo */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre?: string;
+            descripcion?: string | null;
+            puntadas?: number | null;
+            precio?: number | null;
+            /** @enum {string} */
+            tipo?: 'BORDADO' | 'ESTAMPADO';
+            idProveedor?: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del arte. */
+              id: number;
+              /** @description Id del modelo dueño del arte. */
+              idModelo: number;
+              /** @description Nombre del arte. */
+              nombre: string;
+              /** @description Descripción, o null. */
+              descripcion: string | null;
+              /** @description Número de puntadas (informativo), o null. */
+              puntadas: number | null;
+              /** @description Precio del arte (el que viaja a la OP), o null. */
+              precio: number | null;
+              /**
+               * @description BORDADO real o ESTAMPADO/aplicación.
+               * @enum {string}
+               */
+              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del proveedor que lo hace, o null. */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor que lo hace, o null. */
+              proveedor: string | null;
+              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+              idArchivoFoto: string | null;
+              /** @description Posición dentro del modelo (0 = arte principal). */
+              orden: number;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/modelos/{id}/artes/{idArte}/principal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Marcar un arte como el principal del modelo */
     post: {
       parameters: {
         query?: never;
@@ -15239,33 +14478,61 @@ export interface paths {
         path: {
           /** @description Id del modelo. */
           id: number;
-          /** @description Id del arte (bordado/estampado) del BOM. */
-          idBordado: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
         };
         cookie?: never;
       };
       requestBody?: never;
       responses: {
-        /** @description Bordados del BOM de un modelo. */
+        /** @description Artes (bordados/estampados) de un modelo. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Bordados del BOM. */
+              /** @description Artes del modelo, ya ordenados. */
               datos: {
-                /** @description Id del bordado. */
-                idBordado: number;
-                /** @description Nombre del bordado (para la UI). */
+                /** @description Id del arte. */
+                id: number;
+                /** @description Id del modelo dueño del arte. */
+                idModelo: number;
+                /** @description Nombre del arte. */
                 nombre: string;
+                /** @description Descripción, o null. */
+                descripcion: string | null;
+                /** @description Número de puntadas (informativo), o null. */
+                puntadas: number | null;
+                /** @description Precio del arte (el que viaja a la OP), o null. */
+                precio: number | null;
                 /**
-                 * @description Tipo del bordado (para la UI).
+                 * @description BORDADO real o ESTAMPADO/aplicación.
                  * @enum {string}
                  */
                 tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Precio del bordado en este modelo, o null. */
-                precio: number | null;
+                /** @description Id del proveedor que lo hace, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor que lo hace, o null. */
+                proveedor: string | null;
+                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+                idArchivoFoto: string | null;
+                /** @description Posición dentro del modelo (0 = arte principal). */
+                orden: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
               }[];
             };
           };
@@ -15352,6 +14619,699 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/artes/copiar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Copiar a este modelo un arte de otro modelo */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Copiar a este modelo un arte que ya existe en otro. */
+      requestBody: {
+        content: {
+          'application/json': {
+            idArteOrigen: number;
+            nombre?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del arte. */
+              id: number;
+              /** @description Id del modelo dueño del arte. */
+              idModelo: number;
+              /** @description Nombre del arte. */
+              nombre: string;
+              /** @description Descripción, o null. */
+              descripcion: string | null;
+              /** @description Número de puntadas (informativo), o null. */
+              puntadas: number | null;
+              /** @description Precio del arte (el que viaja a la OP), o null. */
+              precio: number | null;
+              /**
+               * @description BORDADO real o ESTAMPADO/aplicación.
+               * @enum {string}
+               */
+              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del proveedor que lo hace, o null. */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor que lo hace, o null. */
+              proveedor: string | null;
+              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+              idArchivoFoto: string | null;
+              /** @description Posición dentro del modelo (0 = arte principal). */
+              orden: number;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/artes/{idArte}/foto': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener la foto de un arte (URL prefirmada de descarga) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Foto de un arte (con su URL de descarga) o vacía si no tiene. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo de la foto, o null. */
+              idArchivo: string | null;
+              /** @description Nombre original del archivo, o null. */
+              nombreOriginal: string | null;
+              /** @description Tipo MIME de la imagen, o null. */
+              tipoMime: string | null;
+              /** @description Tamaño en bytes, o null. */
+              tamanoBytes: number | null;
+              /** @description URL GET prefirmada para ver la foto, o null si no tiene foto. */
+              urlDescarga: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Preparar la subida de la foto de un arte (URL prefirmada) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para preparar la subida de la foto de un arte. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre del archivo tal como lo llama el usuario. */
+            nombreOriginal: string;
+            /** @description Tipo MIME de la imagen (ej. image/jpeg, image/png, image/webp). */
+            tipoMime: string;
+            /** @description Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño). */
+            tamanoBytes: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de preparar la subida de la foto (URL prefirmada). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo creado para la foto. */
+              idArchivo: string;
+              /** @description Nombre original del archivo. */
+              nombreOriginal: string;
+              /** @description URL PUT prefirmada: el navegador sube directo a R2. */
+              urlSubida: string;
+              /** @description Vigencia de la URL de subida (segundos). */
+              expiraEnSegundos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Quitar la foto de un arte */
+    delete: {
+      parameters: {
+        query?: {
+          /** @description Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta. */
+          idArchivo?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+          /** @description Id del arte (bordado/estampado) del modelo. */
+          idArte: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/artes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Galería de arte (armada desde los modelos) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en el nombre del arte o en la clave/nombre del modelo. */
+          busqueda?: string;
+          /** @description Filtra por tipo (BORDADO/ESTAMPADO). */
+          tipo?: 'BORDADO' | 'ESTAMPADO';
+          /** @description Solo el arte que tiene foto ("true"/"false"). */
+          soloConFoto?: string;
+          /** @description Columna de ordenamiento. */
+          ordenarPor?: 'nombre' | 'modelo' | 'tipo' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de la galería de arte. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Arte de la página. */
+              datos: {
+                /** @description Id del arte. */
+                id: number;
+                /** @description Nombre del arte. */
+                nombre: string;
+                /**
+                 * @description BORDADO real o ESTAMPADO/aplicación.
+                 * @enum {string}
+                 */
+                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte, o null. */
+                precio: number | null;
+                /** @description Id del Archivo de la foto, o null. */
+                idArchivoFoto: string | null;
+                /** @description Id del modelo dueño del arte. */
+                idModelo: number;
+                /** @description Clave del modelo dueño (para la UI). */
+                claveModelo: string;
+                /** @description Nombre del modelo dueño, o null. */
+                nombreModelo: string | null;
+              }[];
+              /** @description Total de arte que cumple el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -15428,19 +15388,47 @@ export interface paths {
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
               }[];
-              /** @description Bordados del BOM. */
-              bordados: {
-                /** @description Id del bordado. */
-                idBordado: number;
-                /** @description Nombre del bordado (para la UI). */
+              /** @description Artes del modelo, ya ordenados. */
+              artes: {
+                /** @description Id del arte. */
+                id: number;
+                /** @description Id del modelo dueño del arte. */
+                idModelo: number;
+                /** @description Nombre del arte. */
                 nombre: string;
+                /** @description Descripción, o null. */
+                descripcion: string | null;
+                /** @description Número de puntadas (informativo), o null. */
+                puntadas: number | null;
+                /** @description Precio del arte (el que viaja a la OP), o null. */
+                precio: number | null;
                 /**
-                 * @description Tipo del bordado (para la UI).
+                 * @description BORDADO real o ESTAMPADO/aplicación.
                  * @enum {string}
                  */
                 tipo: 'BORDADO' | 'ESTAMPADO';
-                /** @description Precio del bordado en este modelo, o null. */
-                precio: number | null;
+                /** @description Id del proveedor que lo hace, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor que lo hace, o null. */
+                proveedor: string | null;
+                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
+                idArchivoFoto: string | null;
+                /** @description Posición dentro del modelo (0 = arte principal). */
+                orden: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
               }[];
             };
           };
@@ -65671,24 +65659,24 @@ export interface paths {
                 /** @description consumo × precio (o null sin importes). */
                 importe: number | null;
               }[];
-              /** @description Bordados del modelo (sin cantidad). */
-              bordados: {
-                /** @description Id del bordado/estampado. */
-                idBordado: number;
-                /** @description Nombre del bordado/estampado. */
-                bordado: string;
-                /** @description Precio del bordado en el modelo (o null sin importes). */
+              /** @description Arte del modelo (sin cantidad). */
+              artes: {
+                /** @description Id del arte (bordado/estampado) del modelo. */
+                idArte: number;
+                /** @description Nombre del arte. */
+                arte: string;
+                /** @description Precio del arte en el modelo (o null sin importes). */
                 precio: number | null;
               }[];
               /** @description Σ importes de tela (o null sin importes). */
               totalTela: number | null;
               /** @description Σ importes de avíos (o null sin importes). */
               totalAvios: number | null;
-              /** @description Σ precios de bordado (o null sin importes). */
-              totalBordado: number | null;
+              /** @description Σ precios del arte (o null sin importes). */
+              totalArte: number | null;
               /** @description Maquila base del modelo (o null sin importes). */
               maquila: number | null;
-              /** @description Costo estimado = tela + avíos + bordado + maquila (SIN regalías, D2). */
+              /** @description Costo estimado = tela + avíos + arte + maquila (SIN regalías, D2). */
               costoTotal: number | null;
               /** @description % de utilidad usado en el precio sugerido (config. de la empresa). */
               utilidadSugerida: number | null;
@@ -66272,7 +66260,7 @@ export interface paths {
                 telaPorPrenda: number | null;
                 /** @description Costo de avíos por prenda (receta paraCosto). */
                 aviosPorPrenda: number | null;
-                /** @description Costo de procesos por prenda (maquila + estampado + bordados). */
+                /** @description Costo de procesos por prenda (maquila + estampado + arte). */
                 procesosPorPrenda: number | null;
                 /** @description Tela teórica total = por prenda × cortado. */
                 tela: number | null;
@@ -66519,7 +66507,7 @@ export interface paths {
                 telaPorPrenda: number | null;
                 /** @description Costo de avíos por prenda (receta paraCosto). */
                 aviosPorPrenda: number | null;
-                /** @description Costo de procesos por prenda (maquila + estampado + bordados). */
+                /** @description Costo de procesos por prenda (maquila + estampado + arte). */
                 procesosPorPrenda: number | null;
                 /** @description Tela teórica total = por prenda × cortado. */
                 tela: number | null;
@@ -80987,10 +80975,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -81009,8 +80997,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -81184,10 +81172,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -81206,8 +81194,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -81385,10 +81373,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -81407,8 +81395,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -81601,10 +81589,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -81623,8 +81611,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -81803,10 +81791,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -81825,8 +81813,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -82004,10 +81992,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -82026,8 +82014,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -82201,10 +82189,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -82223,8 +82211,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
@@ -82400,10 +82388,10 @@ export interface paths {
                 /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
                 conceptoFijo: boolean;
                 /**
-                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @description Origen del renglón (BOM tela/avío/arte, o manual).
                  * @enum {string}
                  */
-                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                origen: 'bom_tela' | 'bom_avio' | 'bom_arte' | 'manual';
                 /** @description Descripción del renglón (nombre del insumo o del concepto). */
                 descripcion: string;
                 /** @description Consumo/cantidad (o null si no aplica). */
@@ -82422,8 +82410,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Traza: proveedor del avío usado, o null. */
                 idAvioProveedor: number | null;
-                /** @description Traza: bordado, o null. */
-                idBordado: number | null;
+                /** @description Traza: arte del modelo, o null. */
+                idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
                 /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */

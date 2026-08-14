@@ -7,7 +7,7 @@ import { z } from 'zod';
  *
  * Modelo de costeo (D2, 2026-07-02):
  *  • Pre-costo por modelo = receta `paraPreCosto` × precios de catálogo + maquila del modelo. El
- *    bordado entra UNA vez por modelo, SIN cantidad. La REGALÍA NO es componente del costo.
+ *    arte entra UNA vez por modelo, SIN cantidad. La REGALÍA NO es componente del costo.
  *  • Costo real por orden = componentes en DOBLE juego teórico (`*Calc`) / guardado (`*Cost`);
  *    `costoTotal` = Σ de los GUARDADOS. Costo unitario = `costoTotal` ÷ base de prorrateo (default
  *    `cortado` = piezas cortadas).
@@ -51,11 +51,11 @@ const esquemaPreCostoAvio = z.object({
   importe: z.number().nullable().describe('consumo × precio (o null sin importes).'),
 });
 
-/** Un renglón de bordado del pre-costo (precio UNA vez por modelo, sin cantidad). */
-const esquemaPreCostoBordado = z.object({
-  idBordado: z.number().int().describe('Id del bordado/estampado.'),
-  bordado: z.string().describe('Nombre del bordado/estampado.'),
-  precio: z.number().nullable().describe('Precio del bordado en el modelo (o null sin importes).'),
+/** Un renglón de ARTE del pre-costo (precio UNA vez por modelo, sin cantidad). */
+const esquemaPreCostoArte = z.object({
+  idArte: z.number().int().describe('Id del arte (bordado/estampado) del modelo.'),
+  arte: z.string().describe('Nombre del arte.'),
+  precio: z.number().nullable().describe('Precio del arte en el modelo (o null sin importes).'),
 });
 
 /**
@@ -70,15 +70,15 @@ export const esquemaPreCostoModelo = z
     descripcion: z.string().nullable().describe('Descripción del modelo.'),
     telas: z.array(esquemaPreCostoTela).describe('Telas de la receta (paraPreCosto).'),
     avios: z.array(esquemaPreCostoAvio).describe('Avíos de la receta (paraPreCosto).'),
-    bordados: z.array(esquemaPreCostoBordado).describe('Bordados del modelo (sin cantidad).'),
+    artes: z.array(esquemaPreCostoArte).describe('Arte del modelo (sin cantidad).'),
     totalTela: z.number().nullable().describe('Σ importes de tela (o null sin importes).'),
     totalAvios: z.number().nullable().describe('Σ importes de avíos (o null sin importes).'),
-    totalBordado: z.number().nullable().describe('Σ precios de bordado (o null sin importes).'),
+    totalArte: z.number().nullable().describe('Σ precios del arte (o null sin importes).'),
     maquila: z.number().nullable().describe('Maquila base del modelo (o null sin importes).'),
     costoTotal: z
       .number()
       .nullable()
-      .describe('Costo estimado = tela + avíos + bordado + maquila (SIN regalías, D2).'),
+      .describe('Costo estimado = tela + avíos + arte + maquila (SIN regalías, D2).'),
     utilidadSugerida: z
       .number()
       .nullable()
@@ -153,7 +153,7 @@ const esquemaCostoTeorico = z.object({
   procesosPorPrenda: z
     .number()
     .nullable()
-    .describe('Costo de procesos por prenda (maquila + estampado + bordados).'),
+    .describe('Costo de procesos por prenda (maquila + estampado + arte).'),
   tela: z.number().nullable().describe('Tela teórica total = por prenda × cortado.'),
   avios: z.number().nullable().describe('Avíos teóricos totales = por prenda × cortado.'),
   procesos: z.number().nullable().describe('Procesos teóricos totales = por prenda × cortado.'),

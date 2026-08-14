@@ -2,10 +2,10 @@
  * Modelos — Módulo 2 (F1-E4): el catálogo de productos. CRUD del `Modelo` (ex tabla
  * `Modelos`, doc `Documentacion_MJD/01-Modelos.md` §2) y el selector de `Genero`.
  *
- * La RECETA/BOM (telas/avíos/bordados) y las FOTOS viven en archivos hermanos
- * (`bom-modelo.ts`, `fotos-modelo.ts`) para no inflar éste: el `Modelo` se da de alta primero
- * y luego se le agregan el BOM y las fotos (igual que la foto del bordado en E3). Catálogo
- * GLOBAL (ADR-0007, A9): la unicidad de `codigo` es global.
+ * La RECETA/BOM (telas/avíos), el ARTE (bordados/estampados, HIJO del modelo desde V1-E3d) y las
+ * FOTOS viven en archivos hermanos (`bom-modelo.ts`, `arte-modelo.ts`, `fotos-modelo.ts`) para no
+ * inflar éste: el `Modelo` se da de alta primero y luego se le agregan el BOM, el arte y las
+ * fotos. Catálogo GLOBAL (ADR-0007, A9): la unicidad de `codigo` es global.
  *
  * Piezas del patrón conservadas (PLANMAESTRO §9.2): permiso primero (`modelos.ver`/
  * `.administrar`); Zod compartido de `src/contrato`; todo cambio en UNA transacción (A2) con

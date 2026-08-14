@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  esquemaModeloBomBordadosCuerpo,
   esquemaModeloBomTelasCuerpo,
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
@@ -131,27 +130,6 @@ describe('BOM: telas (consumo + 3 banderas 🔑) y sus reglas', () => {
       }).success,
     ).toBe(false);
     expect(esquemaModeloBomTelasCuerpo.safeParse({ telas: [] }).success).toBe(true);
-  });
-});
-
-describe('BOM: bordados (precio por renglón, SIN banderas ni cantidad)', () => {
-  it('acepta precio opcional (relajado para ETL) y rechaza repetidos', () => {
-    const ok = esquemaModeloBomBordadosCuerpo.safeParse({
-      bordados: [{ idBordado: 1, precio: 30 }, { idBordado: 2 }],
-    });
-    expect(ok.success).toBe(true);
-
-    const repetido = esquemaModeloBomBordadosCuerpo.safeParse({
-      bordados: [{ idBordado: 1 }, { idBordado: 1 }],
-    });
-    expect(repetido.success).toBe(false);
-  });
-
-  it('rechaza precio negativo', () => {
-    expect(
-      esquemaModeloBomBordadosCuerpo.safeParse({ bordados: [{ idBordado: 1, precio: -1 }] })
-        .success,
-    ).toBe(false);
   });
 });
 

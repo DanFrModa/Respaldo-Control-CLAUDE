@@ -5,7 +5,6 @@ import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod
 
 import { rutasAlmacenes } from './api/almacenes/almacenes.rutas.js';
 import { rutasAvios } from './api/avios/avios.rutas.js';
-import { rutasBordados } from './api/bordados/bordados.rutas.js';
 import { rutasClientes } from './api/clientes/clientes.rutas.js';
 import { rutasColores } from './api/colores/colores.rutas.js';
 import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
@@ -187,13 +186,13 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // Catálogos estructurados (F1-E2) — tallas/curvas (D4), clientes (D7).
   await app.register(rutasTallas, { prefix: '/api' });
   await app.register(rutasClientes, { prefix: '/api' });
-  // Catálogos de materiales (F1-E3) — telas unificadas (D5) + colores, avíos (R1) + proveedores,
-  // bordados (R2) + foto. Cada plugin define rutas internas sin `/api`; va bajo el prefijo `/api`.
+  // Catálogos de materiales (F1-E3) — telas unificadas (D5) + colores, avíos (R1) + proveedores.
+  // Cada plugin define rutas internas sin `/api`; va bajo el prefijo `/api`. (El catálogo de arte
+  // desapareció en V1-E3d: el arte vive dentro del modelo, en `rutasModelos`.)
   await app.register(rutasTelas, { prefix: '/api' });
   await app.register(rutasAvios, { prefix: '/api' });
-  await app.register(rutasBordados, { prefix: '/api' });
-  // Modelos (Módulo 2, F1-E4) — catálogo de productos + receta/BOM + fotos. Selector de
-  // géneros (`GET /api/generos`) bajo `modelos.ver`.
+  // Modelos (Módulo 2, F1-E4) — catálogo de productos + receta/BOM + ARTE + fotos + la galería
+  // de arte (`GET /api/artes`). Selector de géneros (`GET /api/generos`) bajo `modelos.ver`.
   await app.register(rutasModelos, { prefix: '/api' });
   // Pedidos (Módulo PEDIDOS, F2-E1) — pedido interno (CRUD + copiar + cancelar) + pedido real
   // (crear desde pedido, listar, editar, seguimiento). Folio por empresa (A3/A9). Importes

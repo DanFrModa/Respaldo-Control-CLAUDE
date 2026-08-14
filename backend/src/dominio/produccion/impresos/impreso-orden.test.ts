@@ -5,7 +5,7 @@
  *    incluso con matriz grande, orden cancelada o sin fotos (degradación elegante).
  *  • `armarDatosImpresoOrden` — reúsa `obtenerOrden`/`leerBom`/`leerFotosModelo`/`listarAdjuntos`/
  *    `leerTelasCompradas` (inyectados), filtra `paraProduccion`, excluye precios, descarta fotos no
- *    descargables (best-effort) y trae como ARTES las fotos de los bordados del BOM + los adjuntos
+ *    descargables (best-effort) y trae como ARTES las fotos del arte del modelo + los adjuntos
  *    de la orden con `tipoMime` image/*.
  *  • `textoTelaComprada` — el texto de la TELA a partir de las OC ligadas (dedup + folios).
  *  • `descargarImagenComoDataUrl` — best-effort (un fallo de red → `null`, no truena).
@@ -16,6 +16,7 @@ import { ErrorNoEncontrado } from '../../../comun/errores.js';
 import type { ServicioArchivos } from '../../../comun/archivos.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { OrdenSalida } from '../../../contrato/index.js';
+import type { ModeloArteDetalle } from '../../modelos/arte-modelo.js';
 import type { BomModelo } from '../../modelos/bom-modelo.js';
 import type { FotoModeloConUrl } from '../../modelos/fotos-modelo.js';
 import type { AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
@@ -41,6 +42,38 @@ const archivosFake = {
   solicitarSubida: vi.fn(),
   urlDescarga: vi.fn(() => Promise.resolve('https://r2/x')),
 } as unknown as ServicioArchivos;
+
+/**
+ * Un ARTE del modelo con los campos que al impreso le importan (nombre/tipo/keyFoto) y el resto
+ * con valores inocuos: `ModeloArteDetalle` trae toda la ficha del arte (V1-E3d) y repetirla en
+ * cada caso solo agregaría ruido.
+ */
+function arteBom(over: {
+  id: number;
+  nombre: string;
+  tipo?: 'BORDADO' | 'ESTAMPADO';
+  precio?: number;
+  keyFoto?: string;
+}): ModeloArteDetalle {
+  return {
+    id: over.id,
+    idModelo: 1,
+    nombre: over.nombre,
+    descripcion: null,
+    puntadas: null,
+    precio: over.precio ?? null,
+    tipo: over.tipo ?? 'BORDADO',
+    idProveedor: null,
+    proveedor: null,
+    idArchivoFoto: over.keyFoto === undefined ? null : 'arch-1',
+    orden: 0,
+    keyFoto: over.keyFoto ?? null,
+    creadoEn: new Date('2026-01-01T00:00:00Z'),
+    creadoPorId: null,
+    modificadoEn: new Date('2026-01-01T00:00:00Z'),
+    modificadoPorId: null,
+  };
+}
 
 /** Sesión de prueba con el permiso `ordenes.ver`. */
 function sesionConVer(): SesionUsuario {
@@ -91,7 +124,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     obsMaquila: 'Doble costura.',
     ...tabla,
     telas: [{ nombre: 'Jersey', consumoPorPrenda: 0.4 }],
-    bordados: [{ nombre: 'Logo pecho', tipo: 'BORDADO' }],
+    listaArte: [{ nombre: 'Logo pecho', tipo: 'BORDADO' }],
     habilitacion: [{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }],
     fotos: [],
     artes: [],
@@ -241,8 +274,8 @@ describe('generarPdfOrden', () => {
     expect(esPdf(buffer)).toBe(true);
   });
 
-  it('renderiza con secciones vacías (sin telas/bordados/habilitación)', async () => {
-    const buffer = await generarPdfOrden(datosBase({ telas: [], bordados: [], habilitacion: [] }));
+  it('renderiza con secciones vacías (sin telas/arte/habilitación)', async () => {
+    const buffer = await generarPdfOrden(datosBase({ telas: [], listaArte: [], habilitacion: [] }));
     expect(esPdf(buffer)).toBe(true);
   });
 
@@ -499,7 +532,7 @@ describe('armarDatosImpresoOrden', () => {
           paraCosto: false,
         },
       ],
-      bordados: [{ idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 12.5, keyFoto: null }],
+      artes: [arteBom({ id: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 12.5 })],
     };
 
     const datos = await armarDatosImpresoOrden(
@@ -509,12 +542,12 @@ describe('armarDatosImpresoOrden', () => {
       depsCon(ordenSalida(), bom, []),
     );
 
-    // Solo las telas/avíos paraProduccion entran; los bordados no llevan precio.
+    // Solo las telas/avíos paraProduccion entran; el arte no lleva precio en el impreso.
     expect(datos.telas).toEqual([{ nombre: 'Jersey', consumoPorPrenda: 0.4 }]);
     expect(datos.habilitacion).toEqual([
       { clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 },
     ]);
-    expect(datos.bordados).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
+    expect(datos.listaArte).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
     expect(JSON.stringify(datos)).not.toContain('12.5'); // ningún precio se filtró al impreso
 
     // Totales derivados de la matriz cuadran con el totalPiezas de la orden.
@@ -526,7 +559,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('el "Pedido cliente" cae al snapshot ocCliente cuando la orden no tiene referencias', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const datos = await armarDatosImpresoOrden(
       sesionConVer(),
       1,
@@ -537,7 +570,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('descarta fotos que no se pudieron descargar (best-effort) y conserva las buenas', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const fotos = [
       { urlDescarga: 'https://r2/ok' },
       { urlDescarga: 'https://r2/falla' },
@@ -561,7 +594,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('trae como ARTES solo los adjuntos de la orden con tipoMime image/*', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const adjuntos = [
       adjunto({ idArchivo: 'a1', tipoMime: 'image/png', urlDescarga: 'https://r2/arte-1' }),
       // Un Excel y un PDF adjuntos NO son artes: se excluyen por tipoMime.
@@ -590,7 +623,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('descarta artes que no se pudieron descargar (best-effort, el PDF sale igual)', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const adjuntos = [
       adjunto({ idArchivo: 'a1', urlDescarga: 'https://r2/ok' }),
       adjunto({ idArchivo: 'a2', urlDescarga: 'https://r2/falla' }),
@@ -612,7 +645,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('si listarAdjuntos FALLA por completo, el impreso sale igual SIN artes (best-effort)', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     // Silencia el warn tenue del degradado para no ensuciar la salida del runner.
     const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
@@ -632,7 +665,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('rellena la TELA con las OC de tela ligadas a la orden (no con el campo manual)', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const datos = await armarDatosImpresoOrden(
       sesionConVer(),
       1,
@@ -657,7 +690,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('cae a la TELA capturada a mano cuando la orden no tiene OC de tela', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const datos = await armarDatosImpresoOrden(
       sesionConVer(),
       1,
@@ -668,7 +701,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('si la lectura de OC de tela TRUENA, degrada a la tela manual (best-effort)', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const advertir = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const deps: DepsImpreso = {
@@ -686,7 +719,7 @@ describe('armarDatosImpresoOrden', () => {
   });
 
   it('sin OC y sin tela manual, el campo queda en null (el impreso pinta "—")', async () => {
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const datos = await armarDatosImpresoOrden(
       sesionConVer(),
       1,
@@ -704,17 +737,11 @@ describe('armarDatosImpresoOrden', () => {
     const bom: BomModelo = {
       telas: [],
       avios: [],
-      bordados: [
-        // El principal (1º del BOM) NO tiene foto…
-        {
-          idBordado: 1,
-          nombre: 'Principal sin foto',
-          tipo: 'BORDADO',
-          precio: null,
-          keyFoto: null,
-        },
+      artes: [
+        // El principal (1º del modelo) NO tiene foto…
+        arteBom({ id: 1, nombre: 'Principal sin foto', tipo: 'BORDADO' }),
         // …y el que sí la tiene NO se vuelve principal por eso.
-        { idBordado: 2, nombre: 'Segundo', tipo: 'ESTAMPADO', precio: null, keyFoto: 'bor/2.png' },
+        arteBom({ id: 2, nombre: 'Segundo', tipo: 'ESTAMPADO', keyFoto: 'bor/2.png' }),
       ],
     };
 
@@ -726,18 +753,18 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.artes).toEqual([{ dataUrl: 'data:img;https://r2/bor/2.png', titulo: 'Segundo' }]);
     expect(datos.artes.some((a) => a.principal === true)).toBe(false);
     // El arte principal sin foto sigue en la lista de TEXTO (no desaparece del impreso).
-    expect(datos.bordados.map((b) => b.nombre)).toEqual(['Principal sin foto', 'Segundo']);
+    expect(datos.listaArte.map((a) => a.nombre)).toEqual(['Principal sin foto', 'Segundo']);
     expect(esPdf(await generarPdfOrden(datos))).toBe(true);
   });
 
-  it('incrusta como ARTES las fotos de los bordados del BOM, con su nombre, antes de los adjuntos', async () => {
+  it('incrusta como ARTES las fotos del arte del modelo, con su nombre, antes de los adjuntos', async () => {
     const bom: BomModelo = {
       telas: [],
       avios: [],
-      bordados: [
-        { idBordado: 1, nombre: 'Logo pecho', tipo: 'BORDADO', precio: null, keyFoto: 'bor/1.png' },
+      artes: [
+        arteBom({ id: 1, nombre: 'Logo pecho', tipo: 'BORDADO', keyFoto: 'bor/1.png' }),
         // Sin foto: sigue saliendo en la lista de texto, pero no aporta imagen.
-        { idBordado: 2, nombre: 'Estampa espalda', tipo: 'ESTAMPADO', precio: null, keyFoto: null },
+        arteBom({ id: 2, nombre: 'Estampa espalda', tipo: 'ESTAMPADO' }),
       ],
     };
     // El servicio de archivos presigna la key del arte; la descarga devuelve un data-URL por URL.
@@ -752,17 +779,17 @@ describe('armarDatosImpresoOrden', () => {
       archivos,
     });
 
-    // Arte del BOM primero (con rótulo y marcado como PRINCIPAL: es el primero del BOM), adjunto
+    // Arte del modelo primero (con rótulo y marcado como PRINCIPAL: es el primero), adjunto
     // de la orden después (sin rótulo).
     expect(datos.artes).toEqual([
       { dataUrl: 'data:img;https://r2/bor/1.png', titulo: 'Logo pecho', principal: true },
       { dataUrl: 'data:img;https://r2/adjunto-1' },
     ]);
-    // Solo se presignó la key del bordado CON foto.
+    // Solo se presignó la key del arte CON foto.
     expect(urlDescarga).toHaveBeenCalledTimes(1);
     expect(urlDescarga).toHaveBeenCalledWith('bor/1.png');
     // La lista de texto del arte conserva los dos renglones (con su subtipo).
-    expect(datos.bordados).toEqual([
+    expect(datos.listaArte).toEqual([
       { nombre: 'Logo pecho', tipo: 'BORDADO' },
       { nombre: 'Estampa espalda', tipo: 'ESTAMPADO' },
     ]);
@@ -776,14 +803,14 @@ describe('armarDatosImpresoOrden', () => {
     } as unknown as ServicioArchivos;
   }
 
-  /** BOM de dos bordados con foto, en el orden dado (para probar el rótulo por índice). */
+  /** Modelo con dos artes con foto, en el orden dado (para probar el rótulo por índice). */
   function bomDosArtes(primero: [string, string], segundo: [string, string]): BomModelo {
     return {
       telas: [],
       avios: [],
-      bordados: [
-        { idBordado: 1, nombre: primero[0], tipo: 'BORDADO', precio: null, keyFoto: primero[1] },
-        { idBordado: 2, nombre: segundo[0], tipo: 'ESTAMPADO', precio: null, keyFoto: segundo[1] },
+      artes: [
+        arteBom({ id: 1, nombre: primero[0], tipo: 'BORDADO', keyFoto: primero[1] }),
+        arteBom({ id: 2, nombre: segundo[0], tipo: 'ESTAMPADO', keyFoto: segundo[1] }),
       ],
     };
   }
@@ -795,7 +822,7 @@ describe('armarDatosImpresoOrden', () => {
     {
       caso: 'falla la PRIMERA (atrapa el corrimiento de índice)',
       bom: bomDosArtes(['Caída', 'falla.png'], ['Buena', 'ok.png']),
-      // El arte PRINCIPAL (el 1º del BOM) es justo el que no bajó: no hay principal que marcar.
+      // El arte PRINCIPAL (el 1º del modelo) es justo el que no bajó: no hay principal que marcar.
       esperado: [{ dataUrl: PNG_1X1, titulo: 'Buena' }],
     },
     {
@@ -822,9 +849,7 @@ describe('armarDatosImpresoOrden', () => {
     const bom: BomModelo = {
       telas: [],
       avios: [],
-      bordados: [
-        { idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: null, keyFoto: 'bor/1.png' },
-      ],
+      artes: [arteBom({ id: 1, nombre: 'Logo', tipo: 'BORDADO', keyFoto: 'bor/1.png' })],
     };
     const archivos = {
       solicitarSubida: vi.fn(),
@@ -840,7 +865,7 @@ describe('armarDatosImpresoOrden', () => {
       expect(datos.artes).toEqual([]);
       expect(advertir).toHaveBeenCalled();
       // La lista de texto del arte sigue ahí (el bordado no desaparece del impreso).
-      expect(datos.bordados).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
+      expect(datos.listaArte).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
       expect(esPdf(await generarPdfOrden(datos))).toBe(true);
     } finally {
       advertir.mockRestore();
@@ -877,7 +902,7 @@ describe('armarDatosImpresoOrden', () => {
     const bom: BomModelo = {
       telas: [],
       avios: [],
-      bordados: [{ idBordado: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 9, keyFoto: null }],
+      artes: [arteBom({ id: 1, nombre: 'Logo', tipo: 'BORDADO', precio: 9 })],
     };
     const urlDescarga = vi.fn(() => Promise.resolve('https://r2/x'));
     const archivos = { solicitarSubida: vi.fn(), urlDescarga } as unknown as ServicioArchivos;
@@ -936,7 +961,7 @@ describe('armarDatosImpresoOrden', () => {
     } as unknown as SesionUsuario;
     expect(sesionSoloOrdenes.permisos.has('modelos.ver')).toBe(false);
 
-    const bom: BomModelo = { telas: [], avios: [], bordados: [] };
+    const bom: BomModelo = { telas: [], avios: [], artes: [] };
     const fotos = [{ urlDescarga: 'https://r2/ok' }] as unknown as FotoModeloConUrl[];
     const datos = await armarDatosImpresoOrden(
       sesionSoloOrdenes,
@@ -954,7 +979,7 @@ describe('armarDatosImpresoOrden', () => {
     const deps: DepsImpreso = {
       archivos: archivosFake,
       obtenerOrden: () => Promise.reject(new ErrorNoEncontrado('Orden', 999)),
-      leerBom: () => Promise.resolve({ telas: [], avios: [], bordados: [] }),
+      leerBom: () => Promise.resolve({ telas: [], avios: [], artes: [] }),
       leerFotosModelo: () => Promise.resolve([]),
       listarAdjuntos: () => Promise.resolve([]),
     };

@@ -20,7 +20,7 @@ import { moneda } from './comun';
 
 /**
  * PRE-COSTO por modelo (F7-E1; doc 06-Costos-y-EDR §2): busca un modelo y muestra su costo estimado —
- * la receta (telas/avíos/bordados) valuada a precios de catálogo + la maquila base + el precio de
+ * la receta (telas/avíos y el arte del modelo) valuada a precios de catálogo + la maquila base + el precio de
  * venta sugerido. Accesible también desde Modelos (mismo dato). `precostos.consultar`; los importes
  * salen en "—" sin `consultas.ver-importes`. La regalía va sobre la venta (lista de precios), no aquí.
  */
@@ -196,25 +196,24 @@ export function PreCostoPagina(): React.JSX.Element {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pre.data.bordados.length === 0 ? (
+                      {pre.data.artes.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={2} className="text-muted-foreground">
                             Sin arte.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        pre.data.bordados.map((b) => (
-                          <TableRow key={b.idBordado}>
-                            <TableCell>{b.bordado}</TableCell>
-                            <TableCell className="text-right">{moneda(b.precio)}</TableCell>
+                        pre.data.artes.map((a) => (
+                          <TableRow key={a.idArte}>
+                            <TableCell>{a.arte}</TableCell>
+                            <TableCell className="text-right">{moneda(a.precio)}</TableCell>
                           </TableRow>
                         ))
                       )}
                     </TableBody>
                   </Table>
                   <p className="mt-1 text-right text-sm font-medium">
-                    Total arte: {moneda(pre.data.totalBordado)} · Maquila:{' '}
-                    {moneda(pre.data.maquila)}
+                    Total arte: {moneda(pre.data.totalArte)} · Maquila: {moneda(pre.data.maquila)}
                   </p>
                 </section>
               </CardContent>

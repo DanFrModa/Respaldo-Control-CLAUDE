@@ -293,11 +293,108 @@ que el precosto salga con **esos** números y no con el fallback.
 
 ---
 
-## V1-E3d · El BOM vive en la OP ⭐ (14-ago-2026)
+## V1-E3d · El BOM vive en la OP, y el arte vive en el modelo ⭐ (14-ago-2026)
 
 **Indispensable para la primera versión** (Daniel: *"creo que sí es indispensable… De hecho así
 funciona en control viejo. El BOM debe de vivir en la OP"*). Decisiones en `DECISIONES.md`
-**§Post-F9.43**.
+**§Post-F9.43** y **§Post-F9.35**.
+
+> **⭐ ABSORBE §Post-F9.35 (el arte sale del catálogo y se va al modelo).** Daniel, revisando el
+> modelo en `prueba` el 14-ago: *"habíamos quedado que el arte ya no va a salir de un catálogo, sino
+> que va a vivir en el modelo directamente. No tiene sentido usar un catálogo de artes"*. Estaba
+> decidido con todo detalle el 12-ago pero **sin etapa asignada**, a propósito: *"por si aparecen
+> otros cambios del mismo tipo que convenga hacer juntos"*. Apareció éste, y **son el mismo cambio**:
+>
+> | | Arte (§Post-F9.35) | BOM en la OP (§Post-F9.43) |
+> |---|---|---|
+> | Hoy vive en | un catálogo global | el modelo, en vivo |
+> | Debe vivir en | el modelo, como **plantilla** | la OP, **congelado** |
+> | El precio del modelo es | **referencia** | **referencia** |
+> | El precio real se define en | **la OP** | **la OP** |
+> | El override es | por arte **y por orden** | por renglón **y por orden** |
+>
+> **Daniel: _"Hazlo junto, el arte y el BOM de una vez"_** (14-ago). Razones: **una sola migración**
+> (las dos tocan el mismo territorio), **una sola pantalla** de receta de la OP —donde el arte es un
+> renglón más—, y **`costo-orden.ts` se toca UNA vez** (ahí se suman maquila, aplicación y artes;
+> partirlo obligaría a reabrirlo dos veces). La ficha de E3d ya contemplaba copiar los **artes** a la
+> receta de la OP, así que el arte por orden hacía falta de todos modos.
+>
+> **Lo que §Post-F9.35 ya dejó resuelto y NO se re-abre:** los **167 artes compartidos se duplican**
+> al migrar (cada modelo con su copia + botón «copiar arte de otro modelo»); los **898 nunca usados
+> NO se migran** (la depuración que Daniel quería, gratis); la **galería sobrevive**, armada desde
+> los modelos y diciendo de qué modelo es cada foto.
+>
+> ⚠️ **Invariante que no se puede romper (§Post-F9.35):** el precio del arte **entra UNA vez por
+> modelo, SIN multiplicar por cantidad** (así está testeado en `costo-orden.test.ts`). Al mover el
+> arte al modelo desaparece el precio del catálogo y queda **un solo precio**; el cálculo debe seguir
+> dando **exactamente lo mismo** para los datos existentes.
+>
+> **Se puede partir POR DENTRO** (primero el modelo y su arte, luego la receta de la OP) para poder
+> probar antes — pero con **un solo diseño detrás**, no dos.
+
+### Pieza A — ✅ HECHA (14-ago-2026): el arte se va al modelo
+
+`ModeloArte` (nombre, tipo bordado/estampado, puntadas, **precio**, **proveedor** ⭐nuevo, foto) como
+**hijo del `Modelo`**; el catálogo `Bordado` y el puente `ModeloBordado` **desaparecen**. Con botón
+**«copiar arte de otro modelo»** (la conveniencia del catálogo sin reinventarlo) y la **galería
+armada desde los modelos**, donde cada foto dice de qué modelo es. **85 archivos, +8,792 / −12,982**
+— el saldo es negativo porque se retira más de lo que se agrega.
+
+**Cómo se verificó la invariante del costeo** (que era la línea roja): la prueba de
+`costo-orden.test.ts` **reimplementa la fórmula VIEJA** (`precioRenglon ?? precioCatalogo`), aplica la
+resolución de la migración sobre los mismos datos y exige igualdad — cubriendo renglón-manda,
+renglón-vacío-cae-al-catálogo, ambos nulos, **renglón en 0 que NO cae al catálogo**, y varios artes
+mezclados. Hallazgo fino que lo confirma: el costeo viejo **no filtraba por `bordados.activo`**, así
+que migrar los inactivos-pero-en-uso como artes vivos **preserva el costeo exacto** — es coherente,
+no un descuido.
+
+**La migración se EJECUTÓ, no solo se leyó** (Postgres nativo desechable; sin Docker, sin
+testcontainers, sin `migrate dev`): `prisma migrate diff` → **«No difference detected»** (el DDL a
+mano produce exactamente el schema); un arte de 3 modelos dejó **3 copias** con su foto; los precios
+salieron clavados a la cascada vieja (incluido el **0.00 que NO cae al catálogo**); los nunca usados
+**se reportan con `NOTICE`, no se tiran en silencio**; las 3 copias **comparten el mismo `Archivo`**
+(correcto: `archivos.key` es único y R2 no se clona desde SQL); y la traza del precosto se re-apuntó
+al arte del mismo modelo. Limpieza completa: tablas y enums viejos fuera, `bordados.ver`/`.administrar`
+borrados de `permisos` **y** de `roles_permisos`.
+
+**Permisos: CERO nuevos** (se quitan 2) → **este deploy NO requiere `SEED_ON_START`**.
+
+**Ronda de corrección del reviewer (8 hallazgos, todos arreglados — §7.3: un defecto conocido no es
+"menor"):**
+
+- **El arte que se va NO se va en silencio (D3).** «Copiar receta» con *reemplazar* borraba el arte
+  del destino registrando solo **cuántos** se crearon. Antes eso era inocuo (se borraba un puente y
+  el catálogo conservaba los datos); ahora **esa fila ES el arte**. Se lee ANTES de borrar y cada
+  renglón queda ÍNTEGRO en la bitácora (precio, proveedor, foto), y sus `Archivo` sin dueño se
+  limpian con la misma regla de foto compartida.
+- **La "deuda declarada" se cerró, y su enunciado era falso.** No solo quedaba una fila huérfana:
+  copiar un arte y quitar su foto EN PARALELO podía dejar **la copia sin foto y su `Archivo`
+  borrado** (el `count` no veía el INSERT aún sin commitear). Ahora `borrarArchivoSiQuedoHuerfano`
+  toma `SELECT … FOR UPDATE` sobre la fila de `archivos` antes de contar: conflictúa con el
+  `FOR KEY SHARE` del INSERT y serializa los quitados simultáneos. **Una línea, los dos casos.**
+- **La depuración de los 898 descartados ya no depende de un `RAISE NOTICE`** (que
+  `prisma migrate deploy` no propaga): la migración deja una fila por arte descartado en
+  `mapeo_migracion` (entidad **`Bordado:DescartadoSinUso`**, datos completos en `datos`),
+  consultable después del deploy. El `NOTICE` se conserva como comodidad.
+- **El ETL vuelve a escribir POR LOTES** (regla de `CLAUDE.md` §8): el arte se agrupa **por modelo**
+  en una transacción, con su mapeo dentro; el mapeo se precarga de un golpe (se va el N+1 de
+  `leerMapeo`). Medido con 600 artes en 200 modelos: **601 → 201 transacciones**, **603 → 4**
+  consultas al mapeo, −29 % de tiempo. Si un lote truena por data sucia se reintenta renglón por
+  renglón (la tolerancia del ETL no se pierde).
+- **Pruebas de vuelta:** se portó la prueba del hook «quitar foto» (`api/artes.foto.test.ts`,
+  regresión de `d938e92`, un bug que llegó a producción) y se estrenó
+  `dominio/modelos/arte-modelo.int.test.ts` (11 casos: foto compartida, bitácora completa del
+  borrado, copiar arte, galería). Además, en `precostos.int.test.ts`, el arte ajustado que perdió su
+  traza (`idModeloArte = null` por SetNull) **ya no se duplica** al recalcular: se reconoce por
+  nombre (es la identidad del arte dentro del modelo).
+- **Bitácora de `eliminarArte` completa** (faltaban `descripcion`, `orden` e `idArchivoFoto` — la
+  foto es la que importa: sin ella nadie puede volver a nombrar el objeto de R2), comentarios
+  rancios de "telas/avíos/bordados" corregidos, `vi.mock` a un módulo borrado retirado, y el
+  razonamiento de por qué el `DELETE` de `archivos` de la migración no puede arrastrar una
+  `modelo_foto`/`proveedor_archivo` escrito **junto al `DELETE`**.
+
+**Sigue la pieza B:** la receta de la OP congelada + liberación por Desarrollo + el precio del arte
+**por orden** + el ETL del histórico de `OrdenesHab`.
 
 ### El hueco
 

@@ -169,7 +169,7 @@ type OrdenConDetalle = Orden & {
     descripcion: string | null;
     /** Bandera + conteos del BOM: insumos de la regla de "orden completa" (requisitos-orden.ts). */
     llevaArte: boolean;
-    _count: { avios: number; bordados: number };
+    _count: { avios: number; artes: number };
   };
   cliente: { nombre: string };
   maquilero: { nombre: string } | null;
@@ -198,7 +198,7 @@ const incluirDetalle = {
       // de avíos de PRODUCCIÓN y artes del BOM. Van como `_count` (dos conteos en la misma
       // consulta) para no traer las recetas enteras.
       llevaArte: true,
-      _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+      _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
     },
   },
   cliente: { select: { nombre: true } },
@@ -539,7 +539,7 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     requisitos: requisitosOrden({
       renglonesMatriz: orden.lineas.length,
       aviosProduccion: orden.modelo._count.avios,
-      artesModelo: orden.modelo._count.bordados,
+      artesModelo: orden.modelo._count.artes,
       llevaArte: orden.modelo.llevaArte,
     }),
     motivoCancelada: orden.motivoCancelada,

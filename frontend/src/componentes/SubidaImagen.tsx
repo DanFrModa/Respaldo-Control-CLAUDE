@@ -89,14 +89,15 @@ export interface PropsSubidaImagen {
  * `subiendo`, `quitando` y `error`. Reutilizable por cualquier entidad con foto.
  *
  * @example
+ * // Así lo conecta `modulos/arte/FotoArte.tsx` (la foto del arte de un modelo, V1-E3d).
  * <SubidaImagen
  *   urlImagen={foto?.urlDescarga ?? null}
- *   textoAlt={bordado.nombre}
- *   alElegirArchivo={(archivo) => subir.mutate({ idBordado: bordado.id, archivo })}
- *   alQuitar={() => quitar.mutate(bordado.id)}
+ *   textoAlt={`Foto de ${arte.nombre}`}
+ *   alElegirArchivo={(archivo) => subir.mutate({ idArte: arte.id, archivo })}
+ *   alQuitar={() => quitar.mutate(arte.id)}
  *   subiendo={subir.isPending}
  *   quitando={quitar.isPending}
- *   testid="foto-bordado"
+ *   testid="foto-arte"
  * />
  */
 export function SubidaImagen({

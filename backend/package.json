@@ -24,7 +24,7 @@
     "etl:catalogos": "tsx migracion/etl-catalogos.ts",
     "etl:modelos": "tsx migracion/etl-modelos.ts",
     "etl:fotos-modelos": "tsx migracion/etl-modelos.ts --fotos-modelos",
-    "etl:fotos-bordados": "tsx migracion/etl-modelos.ts --fotos-bordados",
+    "etl:fotos-arte": "tsx migracion/etl-modelos.ts --fotos-arte",
     "etl:pedidos-ordenes": "tsx migracion/etl-pedidos-ordenes.ts",
     "etl:produccion": "tsx migracion/etl-produccion.ts",
     "etl:ipt": "tsx migracion/etl-ipt.ts",

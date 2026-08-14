@@ -16,12 +16,12 @@
  *  3. Tela-categorías (las usa Telas)
  *  4. Proveedores + fusión de terceros (los usan Avíos)
  *  5. Almacenes (PT + Tela, en FR Moda)
- *  6. Bordados
- *  7. Avíos (match difuso a proveedores)
- *  8. Colores (texto→idColor; los usa Telas-colores)
- *  9. Telas (unificadas; mapeo IdTelas/IdTelasDis)
- * 10. Telas-colores (necesita mapeo de telas y de colores)
- * 11. Tallas + curvas (desde Ordenes.Tallas)
+ *  6. Avíos (match difuso a proveedores)
+ *  7. Colores (texto→idColor; los usa Telas-colores)
+ *  8. Telas (unificadas; mapeo IdTelas/IdTelasDis)
+ *  9. Telas-colores (necesita mapeo de telas y de colores)
+ * 10. Tallas + curvas (desde Ordenes.Tallas)
+ * (El ARTE ya no es catálogo: se carga con el BOM, en `etl:modelos` — V1-E3d.)
  *
  * Cada loader corre con su propia composición de transacciones (cada `crear*` abre su tx):
  * un fallo a media carga NO deja a medias un registro (atomicidad por servicio, A2), y
@@ -38,7 +38,6 @@ import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import { cargarAlmacenes } from './loaders/almacenes.js';
 import { cargarAvios } from './loaders/avios.js';
-import { cargarBordados } from './loaders/bordados.js';
 import { cargarClientes, type ResultadoLoader } from './loaders/clientes.js';
 import { cargarColores } from './loaders/colores.js';
 import { cargarEmpresas } from './loaders/empresas.js';
@@ -94,7 +93,6 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   }
 
   log('Almacenes', await cargarAlmacenes(sesion, cliente, reporte, idEmpresa));
-  log('Bordados', await cargarBordados(sesion, cliente, reporte));
   log('Avíos', await cargarAvios(sesion, cliente, reporte));
   log('Colores', await cargarColores(sesion, cliente, reporte));
   log('Telas', await cargarTelas(sesion, cliente, reporte));

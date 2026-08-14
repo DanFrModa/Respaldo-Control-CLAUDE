@@ -4,18 +4,20 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Foto del ARTE (bordado/estampado): quién dice CUÁL foto se quita.
+ * Foto del ARTE del modelo: quién dice CUÁL foto se quita (V1-E3d — antes vivía en
+ * `bordados.foto.test.ts`, cuando el arte era catálogo; el endpoint cambió de
+ * `/api/bordados/{id}/foto` a `/api/modelos/{id}/artes/{idArte}/foto`, la trampa NO).
  *
  * El endpoint acepta un `idArchivo` OPCIONAL que acota el borrado a una foto concreta. Eso parte el
  * camino en dos y cada mitad tiene su trampa:
  *
  *  - El botón "quitar foto" NO manda `idArchivo` (quita la vigente, sea cual sea). Como el hook se
  *    monta en TanStack Query y ÉSTE llama al `mutationFn` con DOS argumentos (`variables` y un
- *    contexto `{ client, meta, mutationKey }`), pasarle la referencia pelada a una función de dos
+ *    contexto `{ client, meta, mutationKey }`), pasarle la referencia pelada a una función de más
  *    parámetros le metía el contexto en `idArchivo`: la querystring salía con un objeto anidado y
  *    la llamada reventaba ANTES de emitir el DELETE — el usuario veía un error de librería y la
- *    foto nunca se quitaba. Por eso la prueba monta el HOOK (no la función suelta): el defecto solo
- *    existe pasando por Query.
+ *    foto nunca se quitaba. **Ese defecto llegó a producción una vez** (commit `d938e92`), y por
+ *    eso la prueba monta el HOOK y no la función suelta: pasando por Query es donde existe.
  *  - La limpieza de una subida fallida SÍ debe mandar `idArchivo`; si no, borraría "la foto que
  *    haya" y se llevaría la que otro usuario acabara de subir al mismo arte (pérdida silenciosa).
  *
@@ -39,7 +41,7 @@ vi.mock('./cliente', () => ({
   },
 }));
 
-const { useQuitarFotoBordado, useSubirFotoBordado } = await import('./bordados');
+const { useQuitarFotoArte, useSubirFotoArte } = await import('./artes');
 
 /** Monta un hook con su proveedor y devuelve su `mutateAsync` ya listo para disparar. */
 function montar<V>(
@@ -60,7 +62,7 @@ function paramsDelDelete(indice: number): NonNullable<OpcionesApi['params']> {
 
 const PNG = new File(['x'], 'arte.png', { type: 'image/png' });
 
-describe('foto del arte (bordado)', () => {
+describe('foto del arte del modelo', () => {
   beforeEach(() => {
     post.mockReset();
     del.mockReset();
@@ -68,14 +70,14 @@ describe('foto del arte (bordado)', () => {
   });
 
   it('el botón "quitar foto" emite el DELETE SIN querystring', async () => {
-    const quitar = montar<number>(useQuitarFotoBordado);
+    const quitar = montar<{ idModelo: number; idArte: number }>(useQuitarFotoArte);
 
-    await quitar(7);
+    await quitar({ idModelo: 3, idArte: 7 });
 
     expect(del).toHaveBeenCalledTimes(1);
-    expect(del.mock.calls[0]?.[0]).toBe('/api/bordados/{id}/foto');
+    expect(del.mock.calls[0]?.[0]).toBe('/api/modelos/{id}/artes/{idArte}/foto');
     // Sin `idArchivo`: ni el valor, ni la llave, ni el contexto que Query pasa como 2º argumento.
-    expect(paramsDelDelete(0)).toEqual({ path: { id: 7 }, query: {} });
+    expect(paramsDelDelete(0)).toEqual({ path: { id: 3, idArte: 7 }, query: {} });
   });
 
   it('la limpieza de una subida fallida SÍ acota el borrado a SU archivo', async () => {
@@ -92,13 +94,13 @@ describe('foto del arte (bordado)', () => {
       'fetch',
       vi.fn(() => Promise.resolve({ ok: false, status: 403 } as Response)),
     );
-    const subir = montar<{ idBordado: number; archivo: File }>(useSubirFotoBordado);
+    const subir = montar<{ idModelo: number; idArte: number; archivo: File }>(useSubirFotoArte);
 
-    await expect(subir({ idBordado: 7, archivo: PNG })).rejects.toThrow();
+    await expect(subir({ idModelo: 3, idArte: 7, archivo: PNG })).rejects.toThrow();
 
     expect(del).toHaveBeenCalledTimes(1);
     expect(paramsDelDelete(0)).toEqual({
-      path: { id: 7 },
+      path: { id: 3, idArte: 7 },
       query: { idArchivo: 'arch_de_esta_subida' },
     });
   });

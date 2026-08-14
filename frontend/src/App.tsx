@@ -6,8 +6,7 @@ import { CascaronSistema } from '@/modulos/CascaronSistema';
 import { AdministracionPagina } from '@/modulos/administracion/AdministracionPagina';
 import { AlmacenesPagina } from '@/modulos/almacenes/AlmacenesPagina';
 import { AviosPagina } from '@/modulos/avios/AviosPagina';
-import { BordadosPagina } from '@/modulos/bordados/BordadosPagina';
-import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
+import { GaleriaArte } from '@/modulos/arte/GaleriaArte';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
@@ -179,8 +178,7 @@ const router = createBrowserRouter([
           { path: 'catalogos/clientes', element: <ClientesPagina /> },
           { path: 'catalogos/telas', element: <TelasPagina /> },
           { path: 'catalogos/avios', element: <AviosPagina /> },
-          { path: 'catalogos/bordados', element: <BordadosPagina /> },
-          { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
+          { path: 'arte/galeria', element: <GaleriaArte /> },
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
           // Pedidos por mes (rediseño R3, §4.1): la pantalla nueva con el constructor y "Generar

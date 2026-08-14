@@ -7,7 +7,7 @@ import { z } from 'zod';
  *
  * Un `Precosto` tiene un `estado`: `borrador` (editable) → `congelado` (INMUTABLE, base de la lista y
  * de la negociación). A lo más UN borrador por desarrollo. Sus renglones (`PrecostoLinea`) salen del
- * BOM del modelo (tela/avío/bordado, con los PRECIOS AMARRADOS de E1 y el promedio de las medidas por
+ * BOM del modelo (tela/avío/arte, con los PRECIOS AMARRADOS de E1 y el promedio de las medidas por
  * talla, R18) o son MANUALES (maquila, estampado, otros procesos…), agrupables por CONCEPTO de costo.
  *
  * Los IMPORTES/precios (precioUnit, importe, costoTotal) se OCULTAN (null) sin `consultas.ver-importes`
@@ -26,13 +26,13 @@ export const esquemaEstadoPrecosto = z
 export type EstadoPrecostoClave = z.infer<typeof esquemaEstadoPrecosto>;
 
 /**
- * Origen de un renglón: del BOM (tela/avío/bordado — se regeneran al recalcular) o `manual` (maquila
+ * Origen de un renglón: del BOM (tela/avío/arte — se regeneran al recalcular) o `manual` (maquila
  * y conceptos abiertos — sobreviven al recalcular). Coincide con el enum `OrigenPrecostoLinea` de la
  * BD.
  */
 export const esquemaOrigenPrecostoLinea = z
-  .enum(['bom_tela', 'bom_avio', 'bom_bordado', 'manual'])
-  .describe('Origen del renglón (BOM tela/avío/bordado, o manual).');
+  .enum(['bom_tela', 'bom_avio', 'bom_arte', 'manual'])
+  .describe('Origen del renglón (BOM tela/avío/arte, o manual).');
 
 /** Clave del origen de un renglón de precosto. */
 export type OrigenPrecostoLineaClave = z.infer<typeof esquemaOrigenPrecostoLinea>;
@@ -166,7 +166,7 @@ export const esquemaPrecostoLineaSalida = z
       .int()
       .nullable()
       .describe('Traza: proveedor del avío usado, o null.'),
-    idBordado: z.number().int().nullable().describe('Traza: bordado, o null.'),
+    idModeloArte: z.number().int().nullable().describe('Traza: arte del modelo, o null.'),
     editable: z
       .boolean()
       .describe('¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12).'),

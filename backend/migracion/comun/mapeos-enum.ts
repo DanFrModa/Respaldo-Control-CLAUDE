@@ -2,7 +2,7 @@
  * Mapeos de códigos del sistema viejo a los enums de v2 (F1-E6, ETL). Funciones puras,
  * cubiertas por tests unitarios.
  */
-import type { TipoBordadoClave } from '../../src/contrato/esquemas/bordado.js';
+import type { TipoArteClave } from '../../src/contrato/esquemas/arte.js';
 import type { TipoComponenteTelaClave } from '../../src/contrato/esquemas/tela.js';
 import type { TipoProveedorClave } from '../../src/contrato/esquemas/proveedor.js';
 
@@ -80,10 +80,10 @@ export function rolesDeMaquilero(costura: boolean, proceso: boolean): string[] {
 }
 
 /**
- * `Bordados.BorEst` → enum `TipoBordado`. En el viejo `BorEst` distingue bordado real de
+ * `Bordados.BorEst` → enum `TipoArte`. En el viejo `BorEst` distingue bordado real de
  * estampado/aplicación: `0`/vacío = BORDADO, distinto de 0 = ESTAMPADO.
  */
-export function mapearTipoBordado(borEst: string | undefined | null): TipoBordadoClave {
+export function mapearTipoArte(borEst: string | undefined | null): TipoArteClave {
   const t = (borEst ?? '').trim();
   if (t === '' || t === '0') {
     return 'BORDADO';

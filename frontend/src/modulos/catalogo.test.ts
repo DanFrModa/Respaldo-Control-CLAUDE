@@ -58,15 +58,17 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 104 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
     // el archivo histórico de órdenes; +1 en §Post-F9.28: el directorio histórico de terceros;
     // −3 en V1-E3a: se RETIRARON «Captura de corte», «Envío a maquila» y «Recibo de maquila», las
     // tres pantallas del mismo acto que ya vive en el panel de avance — una sola pantalla por acto,
-    // §Post-F9.36 punto 2). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(105);
+    // §Post-F9.36 punto 2); −1 en V1-E3d: el CATÁLOGO de arte desapareció —el arte vive dentro
+    // del modelo (§Post-F9.35)— y solo sobrevive su galería. Lo que cambia es SOLO qué se ve en
+    // el riel.
+    expect(MODULOS_MENU).toHaveLength(104);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -112,7 +114,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
   it('muestra las hojas "autenticado" con cualquier sesion (incluso sin permisos)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
-    // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
+    // el gate del hub Catálogos (telas, avíos, clientes, proveedores, colores,
     // tallas, temporadas, almacenes, etiquetas de marca) y la «Próximamente» Documental.
     // (CxC ya NO: es pantalla real gateada por `cxc.ver`, F9-E4. Auditores tampoco: `calidad.ver`, R9.
     // Ventas tampoco: es pantalla real gateada por `edr.ver`, F9.)
@@ -122,14 +124,12 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     expect(visibles.map((m) => m.clave).sort()).toEqual(
       [
         'almacenes',
-        'bordados',
         'catalogo-avios',
         'catalogo-telas',
         'clientes-catalogo',
         'colores',
         'documental',
         'etiquetas-marca',
-        'galeria-bordados',
         'proveedores',
         'resumen',
         'tallas',
@@ -675,7 +675,8 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       'archivo-ordenes',
       'rc-concentrado',
       'galeria-modelos',
-      'bordados',
+      // La GALERÍA de arte (V1-E3d): sigue fuera del riel, viva por ⌘K y en el hub.
+      'galeria-arte',
       'etiquetas-marca',
       'calidad-defectos',
       // 'inventario-movimientos' ya NO está aquí: el 12-ago-2026 entró al riel como hijo del

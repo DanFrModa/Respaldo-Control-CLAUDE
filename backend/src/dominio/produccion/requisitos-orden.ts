@@ -56,7 +56,7 @@ export interface InsumosRequisitosOrden {
   renglonesMatriz: number;
   /** Avíos `paraProduccion` en el BOM del modelo de la orden. */
   aviosProduccion: number;
-  /** Artes (bordados/estampados) en el BOM del modelo de la orden. */
+  /** Artes (bordados/estampados) del modelo de la orden. */
   artesModelo: number;
   /** ¿El MODELO lleva arte? (`Modelo.llevaArte`, default `true`). `false` = prenda lisa. */
   llevaArte: boolean;
@@ -126,7 +126,7 @@ export async function insumosRequisitosDeOrden(
   const [renglonesMatriz, aviosProduccion, artesModelo, modelo] = await Promise.all([
     tx.ordenLinea.count({ where: { idOrden: orden.id } }),
     tx.modeloAvio.count({ where: { idModelo: orden.idModelo, paraProduccion: true } }),
-    tx.modeloBordado.count({ where: { idModelo: orden.idModelo } }),
+    tx.modeloArte.count({ where: { idModelo: orden.idModelo } }),
     tx.modelo.findUnique({ where: { id: orden.idModelo }, select: { llevaArte: true } }),
   ]);
   // Si el modelo no apareciera (imposible: la FK lo garantiza), se asume lo que pidió Daniel —
@@ -267,7 +267,7 @@ export async function recalcularEstadoOrdenesDeModelo(
   // Los insumos del MODELO son los MISMOS para todas sus órdenes: se leen UNA vez (nada de N+1).
   const [aviosProduccion, artesModelo, modelo] = await Promise.all([
     tx.modeloAvio.count({ where: { idModelo, paraProduccion: true } }),
-    tx.modeloBordado.count({ where: { idModelo } }),
+    tx.modeloArte.count({ where: { idModelo } }),
     tx.modelo.findUnique({ where: { id: idModelo }, select: { llevaArte: true } }),
   ]);
 
@@ -419,7 +419,7 @@ export async function realinearEstadoOrdenes(
       select: {
         id: true,
         llevaArte: true,
-        _count: { select: { avios: { where: { paraProduccion: true } }, bordados: true } },
+        _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
       },
     }),
     tx.etapaMovimiento
@@ -439,7 +439,7 @@ export async function realinearEstadoOrdenes(
     const requisitos = requisitosOrden({
       renglonesMatriz: orden._count.lineas,
       aviosProduccion: modelo?._count.avios ?? 0,
-      artesModelo: modelo?._count.bordados ?? 0,
+      artesModelo: modelo?._count.artes ?? 0,
       // Sin modelo (imposible: la FK lo garantiza) se asume lo que pidió Daniel: "por default sí
       // lleva" — el lado que HACE ATENDER el tema.
       llevaArte: modelo?.llevaArte ?? true,

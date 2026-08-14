@@ -6,9 +6,9 @@
  * tabla en el viejo). Reproduce las consultas `CostoTela`/`CostoHabilitacion`/`CostoBordado`:
  *  • Tela   = Σ ( `ModeloTela.consumoPorPrenda` × `Tela.precioSugerido` )  [renglones `paraPreCosto`]
  *  • Avíos  = Σ ( `ModeloAvio.consumoPorPrenda` × `Avio.precioReferencia` ) [renglones `paraPreCosto`]
- *  • Bordado= Σ ( `ModeloBordado.precio` ?? `Bordado.precio` )  — UNA vez por modelo, SIN cantidad
+ *  • Arte   = Σ `ModeloArte.precio`                          — UNA vez por modelo, SIN cantidad
  *  • Maquila= `Modelo.maquilaBase`
- *  • Costo  = Tela + Avíos + Bordado + Maquila     (SIN regalías — la regalía va sobre la venta, D2)
+ *  • Costo  = Tela + Avíos + Arte + Maquila        (SIN regalías — la regalía va sobre la venta, D2)
  *
  * La LISTA DE PRECIOS (ex `ListaPreciosEd`) agrega a cada modelo su precio sugerido parametrizado
  * ({@link calcularPrecioSugerido}: utilidad + regalías, redondeo al alza), filtrable por género y
@@ -90,12 +90,9 @@ const incluirReceta = {
       },
     },
   },
-  bordados: {
-    select: {
-      idBordado: true,
-      precio: true,
-      bordado: { select: { nombre: true, precio: true } },
-    },
+  artes: {
+    select: { id: true, nombre: true, precio: true },
+    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.ModeloInclude;
 
@@ -112,10 +109,10 @@ interface NumerosPreCosto {
     precio: number;
     importe: number;
   }[];
-  bordados: { idBordado: number; bordado: string; precio: number }[];
+  artes: { idArte: number; arte: string; precio: number }[];
   totalTela: number;
   totalAvios: number;
-  totalBordado: number;
+  totalArte: number;
   maquila: number;
   costoTotal: number;
 }
@@ -165,20 +162,20 @@ function numerosPreCosto(modelo: ModeloConReceta): NumerosPreCosto {
       importe: consumo * precio,
     };
   });
-  const bordados = modelo.bordados.map((b) => ({
-    idBordado: b.idBordado,
-    bordado: b.bordado.nombre,
-    // El precio vive en el renglón del modelo; si falta (histórico), cae al del catálogo (ceronulo).
-    precio: b.precio == null ? num(b.bordado.precio) : b.precio.toNumber(),
+  // El arte vive DENTRO del modelo desde V1-E3d (§Post-F9.35): UN solo precio, sin catálogo detrás.
+  const artes = modelo.artes.map((a) => ({
+    idArte: a.id,
+    arte: a.nombre,
+    precio: num(a.precio),
   }));
 
   const totalTela = telas.reduce((s, t) => s + t.importe, 0);
   const totalAvios = avios.reduce((s, a) => s + a.importe, 0);
-  const totalBordado = bordados.reduce((s, b) => s + b.precio, 0);
+  const totalArte = artes.reduce((s, a) => s + a.precio, 0);
   const maquila = num(modelo.maquilaBase);
-  const costoTotal = totalTela + totalAvios + totalBordado + maquila;
+  const costoTotal = totalTela + totalAvios + totalArte + maquila;
 
-  return { telas, avios, bordados, totalTela, totalAvios, totalBordado, maquila, costoTotal };
+  return { telas, avios, artes, totalTela, totalAvios, totalArte, maquila, costoTotal };
 }
 
 /**
@@ -227,14 +224,14 @@ export async function calcularPreCosto(
       precioUnitario: $(a.precio),
       importe: $(a.importe),
     })),
-    bordados: n.bordados.map((b) => ({
-      idBordado: b.idBordado,
-      bordado: b.bordado,
-      precio: $(b.precio),
+    artes: n.artes.map((a) => ({
+      idArte: a.idArte,
+      arte: a.arte,
+      precio: $(a.precio),
     })),
     totalTela: $(n.totalTela),
     totalAvios: $(n.totalAvios),
-    totalBordado: $(n.totalBordado),
+    totalArte: $(n.totalArte),
     maquila: $(n.maquila),
     costoTotal: $(n.costoTotal),
     utilidadSugerida: verImportes ? params.utilidadSugerida : null,

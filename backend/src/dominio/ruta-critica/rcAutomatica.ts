@@ -163,7 +163,7 @@ async function resolverParametros(
   // Aplicación: si el BOM del modelo tiene bordados/estampados, la orden LLEVA aplicación — se
   // elige la activa más corta con días > 0 (conservador; el re-programar afina). Sin bordados,
   // "Sin Aplicación" (días 0) omite los procesos condicionales.
-  const tieneAplicacion = (await cliente.modeloBordado.count({ where: { idModelo } })) > 0;
+  const tieneAplicacion = (await cliente.modeloArte.count({ where: { idModelo } })) > 0;
   const aplicacion = tieneAplicacion
     ? await cliente.duracionPorAplicacion.findFirst({
         where: { activo: true, dias: { gt: 0 } },

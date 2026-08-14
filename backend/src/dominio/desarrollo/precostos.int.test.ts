@@ -677,6 +677,41 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     expect(restaurada.ajustado).toBe(false);
     expect(restaurada.importe).toBe(100); // 2 × 50 (sugerido vigente)
   });
+
+  it('un ARTE ajustado que perdió su traza NO se duplica al recalcular (se reconoce por nombre)', async () => {
+    // V1-E3d: el arte es HIJO del modelo, así que borrarlo pone `idModeloArte` del renglón en NULL
+    // (SetNull). Si el modelo vuelve a tener un arte con el MISMO nombre —recapturado, o
+    // re-apuntado por la migración—, el renglón ajustado huérfano ya no casa por id y el arte
+    // entraría DOS veces en el borrador. Con el catálogo viejo no pasaba (el id sobrevivía).
+    const modelo = await cliente.modelo.create({ data: { codigo: 'ARTE-HUERFANO' } });
+    const arte = await cliente.modeloArte.create({
+      data: { idModelo: modelo.id, nombre: 'Escudo', precio: 20 },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    let precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    // Se ajusta a mano el renglón del arte (B12: queda `ajustado`, recalcular ya no lo pisa).
+    const lineaArte = precosto.lineas.find((l) => l.conceptoCodigo === 'bordado')!;
+    precosto = await editarLinea(sesion(), precosto.id, lineaArte.id, { precioUnit: 35 }, bd());
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'bordado')?.ajustado).toBe(true);
+
+    // El arte se borra del modelo (la traza del renglón cae a NULL) y se recaptura con el MISMO
+    // nombre: id nuevo, misma identidad de negocio.
+    await cliente.modeloArte.delete({ where: { id: arte.id } });
+    await cliente.modeloArte.create({
+      data: { idModelo: modelo.id, nombre: 'Escudo', precio: 20 },
+    });
+    expect(
+      (await cliente.precostoLinea.findUniqueOrThrow({ where: { id: lineaArte.id } })).idModeloArte,
+    ).toBeNull();
+
+    precosto = await recalcularDesdeBom(sesion(), precosto.id, bd());
+
+    const artes = precosto.lineas.filter((l) => l.conceptoCodigo === 'bordado');
+    expect(artes).toHaveLength(1); // SIN duplicar
+    expect(artes[0]?.importe).toBe(35); // y gana el ajuste de la mesa
+  });
 });
 
 describe('congelado inmutable + estado del desarrollo', () => {

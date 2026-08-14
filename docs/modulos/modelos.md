@@ -11,7 +11,7 @@
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
 | `ModeloTela` | `modelo_tela` | Renglones BOM de tela (consumo + 3 banderas). PK compuesta (idModelo, idTela). |
 | `ModeloAvio` | `modelo_avio` | Renglones BOM de avío (consumo + 3 banderas). PK compuesta (idModelo, idAvio). |
-| `ModeloBordado` | `modelo_bordado` | Renglones BOM de bordado (precio nullable). PK compuesta (idModelo, idBordado). |
+| `ModeloArte` | `modelo_arte` | **ARTE del modelo** (V1-E3d, §Post-F9.35): nombre, tipo, puntadas, precio (el que viaja a la OP), proveedor y foto. Hijo del modelo, ya NO un puente a un catálogo. `nombre` único dentro del modelo; `precio` nullable en BD (histórico migrado). |
 
 ## Mapeo producido por E7
 
@@ -73,9 +73,13 @@ desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender e
 
 Los CSV del BOM viejo usan banderas `bPreCosto`/`bProduccion`/`bCosto` (valores `0`/`1`). En v2 son `paraPreCosto`/`paraProduccion`/`paraCosto` (booleanos). La transformación es directa y está cubierta por unit tests en `etl-modelos-unit.test.ts`.
 
-### BOM — precio de bordados
+### ARTE — precio (V1-E3d)
 
-`ModelosBor.csv` no tiene columna de precio (el viejo no lo guardaba por renglón). En v2 `ModeloBordado.precio` es **nullable en BD** (ADR-0009 — relajado para el ETL). La UI lo exige y lo pre-llena con `Bordado.precio` (editable). Esto es intencional y documentado.
+`ModelosBor.csv` no tiene columna de precio (el viejo no lo guardaba por renglón). El ETL toma el
+`Precio` del catálogo viejo (`Bordados.csv`) al crear el arte dentro del modelo — la MISMA cascada
+que aplicaba el costeo (`ModeloBordado.precio ?? Bordado.precio`), para que el costo no se mueva.
+`ModeloArte.precio` sigue **nullable en BD** (ADR-0009 — histórico que no traía precio); la UI lo
+pide.
 
 ### Códigos duplicados
 
@@ -89,33 +93,46 @@ El sistema viejo guardaba el NOMBRE DEL ARCHIVO de cada foto en los campos `Foto
 
 El ETL busca en `ETL_FOTOS_MOD_DIR` un archivo cuyo nombre-base (sin extensión) coincida case-insensitive con `Foto1`/`Foto2`. Si no encuentra el archivo, reporta la incidencia y continúa.
 
-### Fotos — bordados (completadas en E7)
+### Fotos — arte (completadas en E7)
 
-El ETL de E6 cargó el CATÁLOGO de bordados pero NO las fotos (campo `Foto` de `Bordados.csv`). E7 completa las fotos usando `ETL_FOTOS_BOR_DIR`.
+El campo `Foto` de `Bordados.csv` no se cargó en E6. E7 lo completa usando `ETL_FOTOS_BOR_DIR`,
+ligando la imagen a TODOS los artes que salieron de ese arte viejo: un arte compartido por varios
+modelos se duplicó al migrar (§Post-F9.35) y las copias COMPARTEN el mismo `Archivo` (el objeto de
+R2 se sube una vez; `archivos.key` es único). Por eso quitar la foto de un arte solo borra el
+`Archivo` cuando ningún otro arte lo referencia.
+
+Esa cuenta se hace **con la fila de `archivos` bloqueada** (`SELECT … FOR UPDATE` antes del
+`count`, en `borrarArchivoSiQuedoHuerfano`). No es adorno: sin el candado, copiar un arte y quitar
+su foto en paralelo podían cruzarse y dejar **la copia sin foto y su `Archivo` borrado** (el
+`count` no ve el INSERT que aún no commitea, y el `ON DELETE SET NULL` de la FK hace el resto);
+y dos quitados simultáneos dejaban la fila `Archivo` huérfana. El candado conflictúa con el
+`FOR KEY SHARE` que toma el INSERT y serializa ambos casos. Los tres caminos que borran arte —
+quitar la foto, eliminar el arte y **copiar la receta con reemplazo** (`bom-modelo.ts`)— pasan por
+la misma función.
 
 ### Foto principal y arte principal (Daniel, 25-jul-2026)
 
 El modelo tiene **una foto principal** ("la más importante") y **un arte principal**. La regla es:
 **principal = el PRIMERO**, y punto. No hay bandera `esPrincipal` en ninguna tabla — la única fuente
-de verdad es el orden (`ModeloFoto.orden`, que ya existía, y `ModeloBordado.orden`, agregado en la
+de verdad es el orden (`ModeloFoto.orden`, que ya existía, y `ModeloArte.orden`, heredado de la
 migración `20260725130000_modelo_bordado_orden`) — así es imposible que una bandera contradiga al
 orden de despliegue. Por default es la primera, sin que nadie tenga que marcar nada.
 
 - **Marcarla** = mover ese renglón al lugar 0 y reindexar los demás 0..N-1 conservando su orden
   relativo, en UNA transacción con bitácora (`marcarFotoPrincipal` en `dominio/modelos/fotos-modelo.ts`
-  y `marcarBordadoPrincipal` en `bom-modelo.ts`; el cálculo puro y compartido vive en
+  y `marcarArtePrincipal` en `arte-modelo.ts`; el cálculo puro y compartido vive en
   `dominio/modelos/orden-principal.ts`). Es **idempotente**: repetirla no escribe nada.
 - **Permisos:** `modelos.administrar` (el mismo de editar el modelo/BOM; sin permisos nuevos).
 - **Endpoints:** `POST /api/modelos/:id/fotos/:idFoto/principal` y
-  `POST /api/modelos/:id/bom/bordados/:idBordado/principal` (ambos devuelven la lista ya reordenada).
-- **Lecturas ordenadas:** las fotos por `orden, id`; el arte del BOM por `orden, nombre, idBordado`
+  `POST /api/modelos/:id/artes/:idArte/principal` (ambos devuelven la lista ya reordenada).
+- **Lecturas ordenadas:** las fotos por `orden, id`; el arte por `orden, nombre, id`
   (el desempate por nombre deja el histórico —todo en `orden` 0— exactamente como se listaba antes).
 - **Concurrencia:** el reindexado es leer-calcular-escribir, así que ambas operaciones toman un
   `pg_advisory_xact_lock(namespace, idModelo)` como primer paso de la transacción (namespaces 20 543
   fotos / 20 544 arte). Sin él, dos marcados simultáneos del mismo modelo dejarían `orden` duplicado
   y, con el desempate, la principal equivocada (lost update bajo READ COMMITTED).
-- **No se desbanca solo:** al guardar la receta, los artes nuevos entran con el `orden` siguiente al
-  máximo (nunca en 0) y entre ellos conservan el orden del cuerpo enviado; al copiar el BOM,
+- **No se desbanca solo:** los artes nuevos entran con el `orden` siguiente al
+  máximo (nunca en 0), en el orden en que se capturan; al copiar el BOM,
   reemplazar conserva el orden del origen y fusionar deja lo copiado detrás de lo que el destino ya
   tenía.
 - **Captura sin guardar:** en el frontend, "Marcar como principal" del arte recarga la ficha (y con
@@ -138,7 +155,7 @@ export DATABASE_URL="postgresql://..."
 
 # Variables opcionales — si no están, las fotos se saltan con aviso
 export ETL_FOTOS_MOD_DIR="/ruta/absoluta/a/fotos/de/modelos"   # ~9,000 archivos
-export ETL_FOTOS_BOR_DIR="/ruta/absoluta/a/fotos/de/bordados"  # ~2,686 archivos
+export ETL_FOTOS_BOR_DIR="/ruta/absoluta/a/fotos/del/arte"     # ~2,686 archivos
 
 # Variables R2 — solo requeridas si se cargan fotos
 export R2_ACCOUNT_ID="..."
@@ -155,8 +172,8 @@ npm run etl:modelos
 # Solo fotos de modelos (re-ejecutable si ya corrió etl:modelos)
 npm run etl:fotos-modelos
 
-# Solo fotos de bordados
-npm run etl:fotos-bordados
+# Solo fotos del arte
+npm run etl:fotos-arte
 
 # Cuadre completo de la fase F1 (E6+E7) — solo cuenta, no carga
 npm run etl:cuadre-fase
@@ -168,15 +185,15 @@ Todos los loaders son re-ejecutables:
 - **Modelos:** la clave de idempotencia es `MapeoMigracion.claveVieja` (`IdModelos`). Si ya existe, se salta.
 - **BOM:** el dominio usa "set-completo" (diff agrega/quita/actualiza). Re-ejecutar produce el mismo estado.
 - **Fotos de modelos:** se salta si ya existe un `ModeloFoto` de tipo FRENTE/ESPALDA con key `modelos/<id>/etl-*`.
-- **Fotos de bordados:** se salta si el bordado ya tiene `idArchivoFoto` no null.
+- **Fotos del arte:** se salta los artes que ya tienen `idArchivoFoto` no null.
 
 ## Estructura de keys en R2
 
 ```
 modelos/<idModelo>/etl-<uuid>/<nombre-saneado>.<ext>   → fotos de modelos (migración)
 modelos/<idModelo>/<uuid>/<nombre-saneado>.<ext>        → fotos subidas por la UI
-bordados/etl-<uuid>/<nombre-saneado>.<ext>              → fotos de bordados (migración)
-bordados/<uuid>/<nombre-saneado>.<ext>                  → fotos de bordados (UI)
+modelo-arte/etl-<uuid>/<nombre-saneado>.<ext>           → fotos del arte (migración)
+modelo-arte/<idArte>/<uuid>/<nombre-saneado>.<ext>      → fotos del arte (UI)
 ```
 
 El prefijo `etl-` en el UUID distingue las fotos migradas de las subidas por UI, para la idempotencia del ETL.

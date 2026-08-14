@@ -238,6 +238,12 @@ export function ModelosPagina(): React.JSX.Element {
   // depender de la paginación/filtro). El conteo del paginador (servidor) no se altera.
   const registros = conDeepLinkInyectado(datos?.datos ?? [], fichaDeepLink.data, idAbrir);
   const seleccion = registros.find((m) => m.id === seleccionId) ?? null;
+  // El cajón abre en cuanto hay un id seleccionado, y con el DEEP-LINK eso ocurre ANTES de que
+  // llegue el registro (listado y ficha viajan por su cuenta). En ese hueco el cajón enseñaba un
+  // panel EN BLANCO —justo en el camino «toco el arte → se abre su modelo»—; ahora enseña su
+  // estado de carga, o el error si la ficha del deep-link no se pudo traer.
+  const esperandoSeleccion = seleccionId !== null && seleccion === null;
+  const errorFichaDeepLink = esperandoSeleccion ? fichaDeepLink.error : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
@@ -529,6 +535,10 @@ export function ModelosPagina(): React.JSX.Element {
                 </span>
               </span>
             </span>
+          ) : errorFichaDeepLink !== null ? (
+            'No se pudo abrir el modelo'
+          ) : esperandoSeleccion ? (
+            'Abriendo modelo…'
           ) : (
             ''
           )
@@ -572,6 +582,15 @@ export function ModelosPagina(): React.JSX.Element {
       >
         {seleccion !== null ? (
           <DetalleModelo modelo={seleccion} puedeAdministrar={puedeAdministrar} />
+        ) : errorFichaDeepLink !== null ? (
+          <p className="text-sm text-destructive" role="alert">
+            {errorFichaDeepLink.message}
+          </p>
+        ) : esperandoSeleccion ? (
+          <div className="space-y-3" data-testid="detalle-modelo-cargando">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
         ) : null}
       </CajonDetalle>
 
@@ -783,7 +802,7 @@ function DetalleModelo({
               que se ve SIEMPRE (marcado o no), no solo cuando "hay dato". */}
           <CampoDetalle icono={Palette} etiqueta="Arte">
             {modelo.llevaArte
-              ? ficha.data !== undefined && ficha.data.bordados.length === 0
+              ? ficha.data !== undefined && ficha.data.artes.length === 0
                 ? 'Lleva arte — falta capturarlo'
                 : 'Lleva arte'
               : 'No lleva arte'}
