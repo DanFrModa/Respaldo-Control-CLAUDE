@@ -37,10 +37,15 @@ function aMedidasSalida(m: MedidasAvio): z.infer<typeof esquemaModeloAvioMedidas
     idModelo: m.idModelo,
     idAvio: m.idAvio,
     consumoPorTalla: m.consumoPorTalla,
+    tieneCurva: m.tieneCurva,
     tallas: m.tallas.map((t) => ({
       idTalla: t.idTalla,
       etiquetaTalla: t.etiquetaTalla,
       consumo: t.consumo,
+      enCurva: t.enCurva,
+      idAvioMedida: t.idAvioMedida,
+      medidaAmarrada: t.medidaAmarrada,
+      precioMedida: t.precioMedida,
     })),
   };
 }

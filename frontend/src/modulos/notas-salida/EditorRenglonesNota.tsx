@@ -1,10 +1,11 @@
 import { Trash2Icon } from 'lucide-react';
 
-import type { Avio } from '@/api/avios';
 import type { OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+
+import { SelectorAvio } from '../inventarios/SelectorAvio';
 
 import { aNumero, renglonVacio, type RenglonNotaCaptura } from './captura';
 
@@ -36,7 +37,6 @@ export interface ExistenciaAvioNota {
 export function EditorRenglonesNota({
   renglones,
   alCambiar,
-  avios,
   ordenes,
   recetaPorOrden,
   existenciaPorAvio,
@@ -44,7 +44,6 @@ export function EditorRenglonesNota({
 }: {
   renglones: RenglonNotaCaptura[];
   alCambiar: (renglones: RenglonNotaCaptura[]) => void;
-  avios: readonly Avio[];
   ordenes: readonly OrdenLigera[];
   /** Recetas conocidas por orden (idOrden → ids de avío de su receta) para el flag ✓/⚠. */
   recetaPorOrden?: Map<number, Set<number>> | undefined;
@@ -128,7 +127,6 @@ export function EditorRenglonesNota({
                 <RenglonAvio
                   renglon={renglon}
                   indice={indice}
-                  avios={avios}
                   recetaPorOrden={recetaPorOrden}
                   existenciaPorAvio={existenciaPorAvio}
                   soloLectura={soloLectura}
@@ -162,7 +160,6 @@ export function EditorRenglonesNota({
 function RenglonAvio({
   renglon,
   indice,
-  avios,
   recetaPorOrden,
   existenciaPorAvio,
   soloLectura,
@@ -170,7 +167,6 @@ function RenglonAvio({
 }: {
   renglon: RenglonNotaCaptura;
   indice: number;
-  avios: readonly Avio[];
   recetaPorOrden?: Map<number, Set<number>> | undefined;
   existenciaPorAvio?: Map<number, ExistenciaAvioNota> | undefined;
   soloLectura: boolean;
@@ -192,28 +188,21 @@ function RenglonAvio({
   return (
     <div className="mt-2 space-y-1.5">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_6rem_6rem]">
-        <label className="text-xs text-muted-foreground">
-          Avío
-          <SelectNativo
-            className="mt-1"
-            aria-label={`Avío del renglón ${indice + 1}`}
-            disabled={soloLectura}
-            value={renglon.idAvio === null ? '' : String(renglon.idAvio)}
-            onChange={(e) =>
-              actualizar(renglon.clave, {
-                idAvio: e.target.value === '' ? null : Number(e.target.value),
-              })
+        <div className="text-xs text-muted-foreground">
+          {/* Combobox con búsqueda SERVER-SIDE (V1-E3c): el `<select>` traía solo los primeros 100
+              avíos del catálogo y "buscaba" por prefijo (el typeahead del navegador). */}
+          <span className="mb-1 block">Avío</span>
+          <SelectorAvio
+            idSeleccionado={renglon.idAvio ?? undefined}
+            {...(renglon.avioEtiqueta === null ? {} : { etiquetaSeleccion: renglon.avioEtiqueta })}
+            deshabilitado={soloLectura}
+            alSeleccionar={(avio) =>
+              actualizar(renglon.clave, { idAvio: avio.id, avioEtiqueta: avio.clave })
             }
-            data-testid="selector-avio-nota"
-          >
-            <option value="">Elige un avío…</option>
-            {avios.map((a) => (
-              <option key={a.id} value={String(a.id)}>
-                {a.clave} — {a.descripcion}
-              </option>
-            ))}
-          </SelectNativo>
-        </label>
+            alLimpiar={() => actualizar(renglon.clave, { idAvio: null, avioEtiqueta: null })}
+            testid="selector-avio-nota"
+          />
+        </div>
         <label className="text-xs text-muted-foreground">
           Cantidad
           <Input

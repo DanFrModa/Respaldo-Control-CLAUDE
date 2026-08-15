@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  esquemaModeloBomAviosCuerpo,
   esquemaModeloBomTelasCuerpo,
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
@@ -130,6 +131,47 @@ describe('BOM: telas (consumo + 3 banderas 🔑) y sus reglas', () => {
       }).success,
     ).toBe(false);
     expect(esquemaModeloBomTelasCuerpo.safeParse({ telas: [] }).success).toBe(true);
+  });
+});
+
+describe('BOM: AMARRE de precio del renglón (R17, V1-E3c)', () => {
+  it('la tela acepta el amarre al renglón proveedor–tela–precio y su default es null', () => {
+    const sinAmarre = esquemaModeloBomTelasCuerpo.parse({
+      telas: [{ idTela: 1, consumoPorPrenda: 1 }],
+    });
+    expect(sinAmarre.telas[0]?.idTelaProveedor).toBeNull();
+
+    const conAmarre = esquemaModeloBomTelasCuerpo.parse({
+      telas: [{ idTela: 1, consumoPorPrenda: 1, idTelaProveedor: 77 }],
+    });
+    expect(conAmarre.telas[0]?.idTelaProveedor).toBe(77);
+  });
+
+  it('el avío acepta el proveedor amarrado del par AvioProveedor y su default es null', () => {
+    const sinAmarre = esquemaModeloBomAviosCuerpo.parse({
+      avios: [{ idAvio: 3, consumoPorPrenda: 2 }],
+    });
+    expect(sinAmarre.avios[0]?.idAvioProveedor).toBeNull();
+
+    const conAmarre = esquemaModeloBomAviosCuerpo.parse({
+      avios: [{ idAvio: 3, consumoPorPrenda: 2, idAvioProveedor: 9 }],
+    });
+    expect(conAmarre.avios[0]?.idAvioProveedor).toBe(9);
+  });
+
+  it('rechaza amarres que no son enteros positivos (0, negativos, decimales)', () => {
+    for (const idTelaProveedor of [0, -1, 1.5]) {
+      expect(
+        esquemaModeloBomTelasCuerpo.safeParse({
+          telas: [{ idTela: 1, consumoPorPrenda: 1, idTelaProveedor }],
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      esquemaModeloBomAviosCuerpo.safeParse({
+        avios: [{ idAvio: 1, consumoPorPrenda: 1, idAvioProveedor: -3 }],
+      }).success,
+    ).toBe(false);
   });
 });
 

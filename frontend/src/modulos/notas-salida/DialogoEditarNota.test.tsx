@@ -27,8 +27,14 @@ vi.mock('@/api/almacenes', () => ({
     isPending: false,
   }),
 }));
+// El renglón elige el avío con el COMBOBOX de búsqueda server-side (V1-E3c).
 vi.mock('@/api/avios', () => ({
-  useAvios: () => ({ data: { datos: [{ id: 3, clave: 'BOT-01', descripcion: 'Botón' }] } }),
+  useAvios: () => ({
+    data: { datos: [{ id: 3, clave: 'BOT-01', descripcion: 'Botón', esGenerico: false }] },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 vi.mock('@/api/telas', () => ({
   useTelas: () => ({ data: { datos: [{ id: 7, nombre: 'Felpa francesa' }] } }),
@@ -49,6 +55,12 @@ const useHabilitacionOrdenMock = vi.fn();
 vi.mock('@/api/habilitacion', () => ({
   useHabilitacionOrden: () => useHabilitacionOrdenMock() as unknown,
 }));
+
+/** Elige el avío en el combobox del renglón: enfocar abre la lista y se clickea la opción. */
+function elegirAvioBoton(): void {
+  fireEvent.focus(screen.getByTestId('selector-avio-nota-busqueda'));
+  fireEvent.mouseDown(screen.getAllByTestId('selector-avio-nota-opcion')[0] as HTMLElement);
+}
 
 describe('DialogoEditarNota (F4-E5)', () => {
   beforeEach(() => {
@@ -90,7 +102,7 @@ describe('DialogoEditarNota (F4-E5)', () => {
     fireEvent.change(screen.getByTestId('nota-maquilero'), { target: { value: '9' } });
     fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
     fireEvent.change(screen.getByTestId('selector-orden-nota'), { target: { value: '50' } });
-    fireEvent.change(screen.getByTestId('selector-avio-nota'), { target: { value: '3' } });
+    elegirAvioBoton();
     fireEvent.change(screen.getByTestId('cantidad-nota'), { target: { value: '5' } });
 
     const crear = screen.getByTestId('confirmar-nota');
@@ -110,8 +122,8 @@ describe('DialogoEditarNota (F4-E5)', () => {
     // la tela se registra en «Salida de tela a orden» (por color).
     expect(screen.queryByTestId('tipo-material-nota')).toBeNull();
     expect(screen.queryByTestId('selector-tela-nota')).toBeNull();
-    // El único selector de material del renglón es el de avío.
-    expect(screen.getByTestId('selector-avio-nota')).toBeInTheDocument();
+    // El único selector de material del renglón es el de avío (ahora un combobox buscable).
+    expect(screen.getByTestId('selector-avio-nota-busqueda')).toBeInTheDocument();
   });
 
   it('"Traer avíos de la orden" carga la receta como renglones con su cantidad sugerida (R6)', () => {
@@ -138,7 +150,8 @@ describe('DialogoEditarNota (F4-E5)', () => {
 
     // El renglón vacío inicial se descartó y quedó el avío de la receta (cantidad = requerido).
     expect(screen.getByTestId('cantidad-nota')).toHaveValue(180);
-    expect(screen.getByTestId('selector-avio-nota')).toHaveValue('3');
+    // La clave viaja con el renglón traído: el combobox la muestra sin depender del typeahead.
+    expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('BOT-01');
   });
 
   it('en EDICIÓN precarga el encabezado de la nota', () => {

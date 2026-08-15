@@ -142,6 +142,43 @@ export async function exigirModelo(tx: Tx, id: number): Promise<Modelo> {
   return modelo;
 }
 
+/** Una talla de la CURVA del modelo (en el orden de la curva). */
+export interface TallaCurvaModelo {
+  idTalla: number;
+  etiqueta: string;
+  /** Posición dentro de la curva (`CurvaTallaItem.posicion`): define el orden de captura. */
+  posicion: number;
+}
+
+/**
+ * Lee las TALLAS DE LA CURVA de un modelo, en el orden de la curva (D4). Devuelve `[]` cuando el
+ * modelo no tiene curva asignada — que es distinto de "la curva está vacía", pero para el
+ * llamador significa lo mismo: no hay tallas con las que capturar.
+ *
+ * Es la lista que la ficha del modelo publica (`tallasCurva`) y con la que las medidas por talla
+ * de un avío del BOM (R18) arman su matriz: SIN esto nada en el sistema sabía qué tallas ofrecer
+ * y la captura por talla no podía nacer (V1-E3c).
+ */
+export async function leerTallasCurvaModelo(tx: Tx, idModelo: number): Promise<TallaCurvaModelo[]> {
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: { idCurvaTalla: true },
+  });
+  if (modelo === null || modelo.idCurvaTalla === null) {
+    return [];
+  }
+  const items = await tx.curvaTallaItem.findMany({
+    where: { idCurva: modelo.idCurvaTalla },
+    select: { idTalla: true, posicion: true, talla: { select: { etiqueta: true } } },
+    orderBy: [{ posicion: 'asc' }, { idTalla: 'asc' }],
+  });
+  return items.map((i) => ({
+    idTalla: i.idTalla,
+    etiqueta: i.talla.etiqueta,
+    posicion: i.posicion,
+  }));
+}
+
 /** Valida que una temporada (si viene) exista y esté ACTIVA. Lanza `ErrorValidacion` si no. */
 async function exigirTemporadaValida(tx: Tx, idTemporada: number): Promise<void> {
   const temporada = await tx.temporada.findUnique({

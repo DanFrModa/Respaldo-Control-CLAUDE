@@ -25418,13 +25418,25 @@
                                     }
                                   ],
                                   "description": "Condiciones de este proveedor, o null."
+                                },
+                                "precioUnidadConsumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                                 }
                               },
                               "required": [
                                 "idProveedor",
                                 "nombreProveedor",
                                 "precio",
-                                "condiciones"
+                                "condiciones",
+                                "precioUnidadConsumo"
                               ],
                               "additionalProperties": false,
                               "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -25873,13 +25885,25 @@
                               }
                             ],
                             "description": "Condiciones de este proveedor, o null."
+                          },
+                          "precioUnidadConsumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                           }
                         },
                         "required": [
                           "idProveedor",
                           "nombreProveedor",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "precioUnidadConsumo"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -26230,13 +26254,25 @@
                               }
                             ],
                             "description": "Condiciones de este proveedor, o null."
+                          },
+                          "precioUnidadConsumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                           }
                         },
                         "required": [
                           "idProveedor",
                           "nombreProveedor",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "precioUnidadConsumo"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -26686,13 +26722,25 @@
                               }
                             ],
                             "description": "Condiciones de este proveedor, o null."
+                          },
+                          "precioUnidadConsumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                           }
                         },
                         "required": [
                           "idProveedor",
                           "nombreProveedor",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "precioUnidadConsumo"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -27041,13 +27089,25 @@
                               }
                             ],
                             "description": "Condiciones de este proveedor, o null."
+                          },
+                          "precioUnidadConsumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                           }
                         },
                         "required": [
                           "idProveedor",
                           "nombreProveedor",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "precioUnidadConsumo"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -27332,13 +27392,25 @@
                               }
                             ],
                             "description": "Condiciones de este proveedor, o null."
+                          },
+                          "precioUnidadConsumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
                           }
                         },
                         "required": [
                           "idProveedor",
                           "nombreProveedor",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "precioUnidadConsumo"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -29789,6 +29861,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio con el que se va a costear esta tela, o null si no hay ninguno."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
                           }
                         },
                         "required": [
@@ -29797,7 +29941,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioPorColor",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -29838,6 +29989,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio (por unidad de consumo) con el que se va a costear este avío."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de referencia del avío (catálogo)."
                           }
                         },
                         "required": [
@@ -29847,7 +30070,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -30015,6 +30245,38 @@
                         "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
                       },
                       "description": "Arte (bordados/estampados) del modelo."
+                    },
+                    "tallasCurva": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Etiqueta de la talla (CH, M, G…)."
+                          },
+                          "posicion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición dentro de la curva (orden de captura)."
+                          }
+                        },
+                        "required": [
+                          "idTalla",
+                          "etiqueta",
+                          "posicion"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Talla de la curva de tallas del modelo."
+                      },
+                      "description": "Tallas de la curva del modelo (vacía si no tiene curva)."
                     }
                   },
                   "required": [
@@ -30049,7 +30311,8 @@
                     "modificadoPorId",
                     "telas",
                     "avios",
-                    "artes"
+                    "artes",
+                    "tallasCurva"
                   ],
                   "additionalProperties": false,
                   "description": "Ficha de un modelo con su receta (BOM) completa."
@@ -31428,6 +31691,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio con el que se va a costear esta tela, o null si no hay ninguno."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
                           }
                         },
                         "required": [
@@ -31436,7 +31771,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioPorColor",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -31638,6 +31980,19 @@
                         "paraCosto": {
                           "default": true,
                           "type": "boolean"
+                        },
+                        "idTelaProveedor": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31712,6 +32067,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio con el que se va a costear esta tela, o null si no hay ninguno."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
                           }
                         },
                         "required": [
@@ -31720,7 +32147,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioPorColor",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -31951,6 +32385,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio (por unidad de consumo) con el que se va a costear este avío."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de referencia del avío (catálogo)."
                           }
                         },
                         "required": [
@@ -31960,7 +32466,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -32162,6 +32675,19 @@
                         "paraCosto": {
                           "default": true,
                           "type": "boolean"
+                        },
+                        "idAvioProveedor": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -32240,6 +32766,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio (por unidad de consumo) con el que se va a costear este avío."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de referencia del avío (catálogo)."
                           }
                         },
                         "required": [
@@ -32249,7 +32847,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -35656,6 +36261,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio con el que se va a costear esta tela, o null si no hay ninguno."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
                           }
                         },
                         "required": [
@@ -35664,7 +36341,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioPorColor",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -35705,6 +36389,78 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio (por unidad de consumo) con el que se va a costear este avío."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de referencia del avío (catálogo)."
                           }
                         },
                         "required": [
@@ -35714,7 +36470,14 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -185200,6 +185963,10 @@
                       "type": "boolean",
                       "description": "¿Este avío se consume por talla (R18)?"
                     },
+                    "tieneCurva": {
+                      "type": "boolean",
+                      "description": "¿El modelo tiene curva de tallas asignada?"
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -185216,14 +185983,64 @@
                             "description": "Etiqueta de la talla (para la UI)."
                           },
                           "consumo": {
-                            "type": "number",
-                            "description": "Consumo del avío para esta talla."
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo capturado del avío para esta talla; null = sin capturar (no hay fila)."
+                          },
+                          "enCurva": {
+                            "type": "boolean",
+                            "description": "¿La talla pertenece a la curva vigente del modelo?"
+                          },
+                          "idAvioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R5/B11: medida del avío que usa esta talla, o null."
+                          },
+                          "medidaAmarrada": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Etiqueta de la medida amarrada, o null."
+                          },
+                          "precioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de la medida amarrada, o null."
                           }
                         },
                         "required": [
                           "idTalla",
                           "etiquetaTalla",
-                          "consumo"
+                          "consumo",
+                          "enCurva",
+                          "idAvioMedida",
+                          "medidaAmarrada",
+                          "precioMedida"
                         ],
                         "additionalProperties": false,
                         "description": "Medida (consumo) de un avío del BOM para una talla."
@@ -185235,6 +186052,7 @@
                     "idModelo",
                     "idAvio",
                     "consumoPorTalla",
+                    "tieneCurva",
                     "tallas"
                   ],
                   "additionalProperties": false,
@@ -185419,6 +186237,19 @@
                         "consumo": {
                           "type": "number",
                           "minimum": 0
+                        },
+                        "idAvioMedida": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -185491,6 +186322,10 @@
                       "type": "boolean",
                       "description": "¿Este avío se consume por talla (R18)?"
                     },
+                    "tieneCurva": {
+                      "type": "boolean",
+                      "description": "¿El modelo tiene curva de tallas asignada?"
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -185507,14 +186342,64 @@
                             "description": "Etiqueta de la talla (para la UI)."
                           },
                           "consumo": {
-                            "type": "number",
-                            "description": "Consumo del avío para esta talla."
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo capturado del avío para esta talla; null = sin capturar (no hay fila)."
+                          },
+                          "enCurva": {
+                            "type": "boolean",
+                            "description": "¿La talla pertenece a la curva vigente del modelo?"
+                          },
+                          "idAvioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R5/B11: medida del avío que usa esta talla, o null."
+                          },
+                          "medidaAmarrada": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Etiqueta de la medida amarrada, o null."
+                          },
+                          "precioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de la medida amarrada, o null."
                           }
                         },
                         "required": [
                           "idTalla",
                           "etiquetaTalla",
-                          "consumo"
+                          "consumo",
+                          "enCurva",
+                          "idAvioMedida",
+                          "medidaAmarrada",
+                          "precioMedida"
                         ],
                         "additionalProperties": false,
                         "description": "Medida (consumo) de un avío del BOM para una talla."
@@ -185526,6 +186411,7 @@
                     "idModelo",
                     "idAvio",
                     "consumoPorTalla",
+                    "tieneCurva",
                     "tallas"
                   ],
                   "additionalProperties": false,

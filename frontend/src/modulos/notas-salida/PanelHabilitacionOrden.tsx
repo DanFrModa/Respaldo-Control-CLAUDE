@@ -119,6 +119,8 @@ export function PanelHabilitacionOrden({
       renglones: elegibles.map((a) => ({
         idOrden: hab.idOrden,
         idAvio: a.idAvio,
+        // La clave viaja al constructor para que el combobox del renglón muestre el avío.
+        clave: a.clave,
         cantidad: aNum(seleccion[a.idAvio]?.qty ?? ''),
         unidad: a.unidad,
       })),

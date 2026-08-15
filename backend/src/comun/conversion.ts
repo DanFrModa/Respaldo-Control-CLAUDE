@@ -64,6 +64,28 @@ export function validarFactor(factor: number): number {
 }
 
 /**
+ * SANEA un factor guardado para una LECTURA de pantalla: devuelve el factor si es usable
+ * (finito y > 0) y `null` si quedó corrupto (0, negativo, NaN). O sea: **un factor basura se lee
+ * como si no estuviera**.
+ *
+ * Por qué existe (V1-E3c): las consultas —la ficha del modelo, el selector de proveedores del
+ * BOM— resuelven el precio con el MISMO motor que el costeo ({@link resolverFactor}, que LANZA
+ * ante un factor inválido, y así debe seguir: valuar inventario con un factor malo es peor que
+ * fallar). Para no tener dos reglas de precio, la lectura no esquiva el motor: **sanea su
+ * entrada** y deja que el motor haga lo de siempre. El dominio impide capturar un factor ≤ 0,
+ * pero la columna es `Decimal?` sin CHECK y el ETL podría meterlo.
+ *
+ * Qué se ve cuando el factor está corrupto: como el valor se ignora, la conversión cae al
+ * siguiente escalón definido — el factor del PRODUCTO si es válido, y si tampoco, 1:1 (el precio
+ * se muestra sin convertir). Nunca un 500 en una pantalla de consulta.
+ *
+ * NO usarlo al escribir movimientos ni costos: ahí el factor inválido SÍ tiene que reventar.
+ */
+export function factorParaLectura(factor?: number | null): number | null {
+  return factor != null && Number.isFinite(factor) && factor > 0 ? factor : null;
+}
+
+/**
  * Convierte una CANTIDAD de la presentación de compra a la unidad de consumo del BOM.
  *   cantidadConsumo = cantidadPresentacion × factor   (15 rollos × 50 = 750 m).
  *

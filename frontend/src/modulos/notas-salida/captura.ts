@@ -30,6 +30,12 @@ export interface RenglonNotaCaptura {
   idOrden: number | null;
   /** Avío elegido (tipo = avio), o null. */
   idAvio: number | null;
+  /**
+   * Etiqueta del avío elegido ("BOT-01"), para que el COMBOBOX de búsqueda lo siga mostrando
+   * aunque su página del typeahead no lo traiga (V1-E3c: el selector ya no carga el catálogo
+   * entero, busca en el servidor). Solo display: al guardar viaja `idAvio`.
+   */
+  avioEtiqueta: string | null;
   /** Tela del renglón histórico (tipo = tela), o null. Ya no se captura (§Post-F9.38). */
   idTela: number | null;
   /** Nombre de la tela del renglón histórico (solo para mostrarlo), o null. */
@@ -62,6 +68,7 @@ export function renglonVacio(): RenglonNotaCaptura {
     tipo: 'avio',
     idOrden: null,
     idAvio: null,
+    avioEtiqueta: null,
     idTela: null,
     telaNombre: null,
     idLote: null,
@@ -131,6 +138,9 @@ export function capturaDesdeNota(nota: NotaSalida): RenglonNotaCaptura[] {
     tipo: linea.tipo,
     idOrden: linea.idOrden,
     idAvio: linea.idAvio,
+    // La clave/descripción del avío viene EN LA NOTA: así el combobox muestra el renglón guardado
+    // sin depender de que el typeahead lo traiga en su primera página.
+    avioEtiqueta: linea.avio,
     idTela: linea.idTela,
     // Nombres del renglón histórico de tela: se toman de la propia nota para poder MOSTRARLO sin
     // pedir el catálogo de telas (su captura ya no existe — §Post-F9.38).

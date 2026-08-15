@@ -44,6 +44,18 @@ const esquemaConsumo = z
   .positive({ error: 'El consumo debe ser mayor a 0' });
 
 /**
+ * Id de un AMARRE de precio del renglón del BOM (R17/D13): entero positivo, `null` = sin amarre.
+ * Es opcional en la captura y su default es `null` — el PUT del BOM es SET-COMPLETO: lo que no
+ * viene, no está (un renglón que se manda sin amarre queda sin amarre, no conserva el anterior).
+ */
+const esquemaAmarre = z
+  .number({ error: 'El id del amarre debe ser un número' })
+  .int({ error: 'El id del amarre debe ser entero' })
+  .positive({ error: 'El id del amarre debe ser positivo' })
+  .nullable()
+  .default(null);
+
+/**
  * Renglón de captura del BOM de TELAS de un modelo (doc 01-Modelos §2, `ModelosTela`): la
  * tela del catálogo, su consumo por prenda y las TRES banderas de uso. Las banderas tienen
  * default `true` en el alta; la unicidad de la tela DENTRO del modelo la valida el dominio
@@ -58,6 +70,13 @@ export const esquemaModeloTelaEntrada = z.object({
   paraPreCosto: z.boolean().default(true),
   paraProduccion: z.boolean().default(true),
   paraCosto: z.boolean().default(true),
+  /**
+   * AMARRE DE PRECIO (R17/D13): `TelaProveedor.id` del renglón proveedor–tela–precio que eligió
+   * Desarrollo. `null` = sin amarre → la cascada de precios cae a color/sugerido
+   * (`dominio/costos/resolucion-precios.ts`). El dominio valida que el renglón sea DE ESA tela y
+   * esté activo. Omitirlo equivale a `null` (el set-completo no conserva amarres implícitos).
+   */
+  idTelaProveedor: esquemaAmarre,
 });
 
 /** Datos validados de un renglón de tela del BOM. */
@@ -76,6 +95,13 @@ export const esquemaModeloAvioEntrada = z.object({
   paraPreCosto: z.boolean().default(true),
   paraProduccion: z.boolean().default(true),
   paraCosto: z.boolean().default(true),
+  /**
+   * AMARRE DE PRECIO (R17/D13): el PROVEEDOR del par `AvioProveedor` elegido por Desarrollo —
+   * `(idAvio de este renglón, idAvioProveedor)`, mismo criterio y nombre que
+   * `OrdenCompraLinea.idAvioProveedor` de F4. `null` = sin amarre → el precio cae a "más barato" /
+   * `Avio.precioReferencia`. El dominio valida que el par exista.
+   */
+  idAvioProveedor: esquemaAmarre,
 });
 
 /** Datos validados de un renglón de avío del BOM. */
@@ -342,7 +368,35 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
 
 // ── Salida del BOM (renglones embebidos en la ficha) ───────────────────────────
 
-/** Salida de un renglón de tela del BOM (con el nombre de la tela embebido para la UI). */
+/**
+ * De dónde salió el precio con el que se va a COSTEAR un renglón de la receta. Es el escalón de la
+ * cascada (`dominio/costos/resolucion-precios.ts`) que ganó, dicho con las palabras de la pantalla:
+ *
+ *  • `amarre`           — el proveedor amarrado por Desarrollo (el precio negociado).
+ *  • `mas-barato`       — sin amarre (o con un amarre SIN precio): el proveedor más barato del
+ *                         avío, ya normalizado ÷ factor (R1). NO está negociado: falta amarrarlo.
+ *  • `promedio-medidas` — avío "por medida" (R5/B11): promedio de los precios de sus medidas. Este
+ *                         escalón GANA sobre el amarre.
+ *  • `referencia`       — último recurso del catálogo (`Tela.precioSugerido` /
+ *                         `Avio.precioReferencia`), cuando no hay ningún proveedor con precio.
+ *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
+ *
+ * 🔑 Regla de la receta (Daniel, 15-ago-2026): **la pantalla nunca muestra una cifra distinta de la
+ * que va a costear**; muestra la que costea y dice de dónde salió. Por eso este campo viaja: sin él
+ * la UI tendría que adivinar la cascada, y adivinaba mal (enseñaba el precio de catálogo mientras
+ * el motor costeaba con el más barato).
+ */
+export const esquemaOrigenPrecioBom = z
+  .enum(['amarre', 'mas-barato', 'promedio-medidas', 'referencia', 'sin-precio'])
+  .describe('Escalón de la cascada del que salió el precio que va a costear.');
+
+/**
+ * Salida de un renglón de tela del BOM (con el nombre de la tela embebido para la UI) + el
+ * AMARRE de precio (R17) y —lo importante— el precio que VA A COSTEAR con su procedencia
+ * (`precioCosteo`/`origenPrecio`/`proveedorPrecio`). `precioReferencia` sigue viajando porque es el
+ * último escalón de la cascada (`Tela.precioSugerido`), pero SOLO es lo que costea cuando
+ * `origenPrecio === 'referencia'`.
+ */
 export const esquemaModeloTelaSalida = z
   .object({
     idTela: z.number().int().describe('Id de la tela.'),
@@ -351,10 +405,38 @@ export const esquemaModeloTelaSalida = z
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
+    idTelaProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Amarre R17: renglón proveedor–tela–precio elegido, o null.'),
+    proveedorAmarrado: z.string().nullable().describe('Nombre del proveedor amarrado, o null.'),
+    precioPorColor: z
+      .boolean()
+      .describe('¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color).'),
+    precioCosteo: z
+      .number()
+      .nullable()
+      .describe('El precio con el que se va a costear esta tela, o null si no hay ninguno.'),
+    origenPrecio: esquemaOrigenPrecioBom,
+    proveedorPrecio: z
+      .string()
+      .nullable()
+      .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    precioReferencia: z
+      .number()
+      .nullable()
+      .describe('Último escalón: precio de catálogo de la tela (precioSugerido).'),
   })
   .describe('Renglón de tela del BOM del modelo.');
 
-/** Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas). */
+/**
+ * Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas) + el AMARRE
+ * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` viene NORMALIZADO
+ * a unidad de consumo (÷ factor de conversión, R1) y sale de la MISMA función que usa el precosto
+ * (`resolverPrecioAvioCatalogo`), así que el número de la pantalla y el del costeo son el mismo:
+ * promedio de medidas (si el avío es "por medida") → amarre → más barato → referencia.
+ */
 export const esquemaModeloAvioSalida = z
   .object({
     idAvio: z.number().int().describe('Id del avío.'),
@@ -364,8 +446,37 @@ export const esquemaModeloAvioSalida = z
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
+    consumoPorTalla: z.boolean().describe('¿El consumo de este avío se captura por talla (R18)?'),
+    idAvioProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Amarre R17: proveedor del par AvioProveedor elegido, o null.'),
+    proveedorAmarrado: z.string().nullable().describe('Nombre del proveedor amarrado, o null.'),
+    precioCosteo: z
+      .number()
+      .nullable()
+      .describe('El precio (por unidad de consumo) con el que se va a costear este avío.'),
+    origenPrecio: esquemaOrigenPrecioBom,
+    proveedorPrecio: z
+      .string()
+      .nullable()
+      .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    precioReferencia: z
+      .number()
+      .nullable()
+      .describe('Último escalón: precio de referencia del avío (catálogo).'),
   })
   .describe('Renglón de avío del BOM del modelo.');
+
+/** Salida de una talla de la CURVA del modelo (para armar la matriz de medidas por talla, R18). */
+export const esquemaModeloTallaCurvaSalida = z
+  .object({
+    idTalla: z.number().int().describe('Id de la talla.'),
+    etiqueta: z.string().describe('Etiqueta de la talla (CH, M, G…).'),
+    posicion: z.number().int().describe('Posición dentro de la curva (orden de captura).'),
+  })
+  .describe('Talla de la curva de tallas del modelo.');
 
 // ── Salida del modelo (ficha con BOM + conteo de fotos) ────────────────────────
 
@@ -472,6 +583,14 @@ export const esquemaModeloFichaSalida = esquemaModeloSalida
     telas: z.array(esquemaModeloTelaSalida).describe('Telas del BOM.'),
     avios: z.array(esquemaModeloAvioSalida).describe('Avíos del BOM.'),
     artes: z.array(esquemaArteSalida).describe('Arte (bordados/estampados) del modelo.'),
+    /**
+     * Tallas de la CURVA del modelo, en el orden de la curva. Van SOLO en la ficha (el listado no
+     * las paga): son la lista con la que la receta arma el consumo por talla de un avío (R18) —
+     * vacía cuando el modelo no tiene curva asignada.
+     */
+    tallasCurva: z
+      .array(esquemaModeloTallaCurvaSalida)
+      .describe('Tallas de la curva del modelo (vacía si no tiene curva).'),
   })
   .describe('Ficha de un modelo con su receta (BOM) completa.');
 

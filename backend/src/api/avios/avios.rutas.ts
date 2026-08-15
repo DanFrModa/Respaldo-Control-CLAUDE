@@ -49,15 +49,20 @@ import {
   reemplazarMedidasAvio,
 } from '../../dominio/catalogos/avio-medidas.js';
 
-/** Proyecta un renglón de proveedor de avío a la forma JSON del contrato (decimales → number). */
+/**
+ * Proyecta un renglón de proveedor de avío a la forma JSON del contrato (decimales → number). El
+ * `precioUnidadConsumo` (precio ÷ factor R1) solo lo trae el endpoint dedicado de proveedores —el
+ * que alimenta el amarre de la receta—; en el listado de avíos viaja `null`.
+ */
 function aProveedorSalida(
-  fila: AvioConProveedores['proveedores'][number],
+  fila: AvioConProveedores['proveedores'][number] & { precioUnidadConsumo?: number | null },
 ): z.infer<typeof esquemaAvioProveedoresLista>['datos'][number] {
   return {
     idProveedor: fila.idProveedor,
     nombreProveedor: fila.proveedor.nombre,
     precio: fila.precio === null ? null : Number(fila.precio),
     condiciones: fila.condiciones,
+    precioUnidadConsumo: fila.precioUnidadConsumo ?? null,
   };
 }
 

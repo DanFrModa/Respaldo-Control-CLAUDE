@@ -1,8 +1,8 @@
-import { Loader2Icon, Trash2Icon } from 'lucide-react';
+import { ChevronRight, Loader2Icon, Trash2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useAvios } from '@/api/avios';
+import { useProveedoresDeAvio, type Avio } from '@/api/avios';
 import {
   useReemplazarAviosBom,
   useReemplazarTelasBom,
@@ -10,46 +10,73 @@ import {
   type ModeloFicha,
   type ModeloTela,
 } from '@/api/modelos';
-import { useTelas } from '@/api/telas';
+import { useTelaProveedores } from '@/api/tela-proveedores';
+import { type Tela } from '@/api/telas';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { formatearMoneda } from '@/lib/formato';
+import { cn } from '@/lib/utils';
+
+import { SelectorAvio } from '../inventarios/SelectorAvio';
+import { SelectorTela } from '../inventarios/SelectorTela';
 
 import { CopiarBomDialogo } from './CopiarBomDialogo';
 import { EditorMedidasAvio } from './EditorMedidasAvio';
 import { SeccionArte } from './SeccionArte';
 
-/** Tope alto: trae los catálogos activos para los selectores de componentes (ordenados por nombre). */
-const QUERY_CATALOGO = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
-
-/** Igual que `QUERY_CATALOGO` pero los avíos se ordenan por su `clave` (no tienen `nombre`). */
-const QUERY_CATALOGO_AVIOS = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'clave',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
-
 /** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
 type SeccionBom = 'telas' | 'avios' | 'artes';
 
-/** Renglón de tela/avío en captura: consumo como texto + 3 banderas. */
+/** De qué escalón de la cascada salió el precio que costea (lo resuelve el backend). */
+type OrigenPrecio = ModeloTela['origenPrecio'];
+
+/**
+ * Renglón de tela/avío en captura: consumo como texto + 3 banderas + el AMARRE de precio (R17).
+ * El amarre viaja con su etiqueta/precio ya resueltos para poder pintarlos sin volver a consultar.
+ */
 interface RenglonComponente {
   id: number;
   /** Nombre/clave del componente para mostrar. */
   etiqueta: string;
+  /** Segunda línea (descripción del avío), si la hay. */
+  detalle: string | null;
   /** Consumo por prenda como texto (`<input type=number>` entrega string). */
   consumo: string;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
+  /** Id del amarre (R17): `TelaProveedor.id` en telas, `idProveedor` en avíos. Null = sin amarre. */
+  idAmarre: number | null;
+  /** Nombre del proveedor amarrado (para pintar sin re-consultar). */
+  proveedorAmarrado: string | null;
+  /**
+   * ¿El proveedor amarrado cotiza POR COLOR? Entonces el precio que se ve es solo el piso: la
+   * cascada usará el del color de la orden (`TelaProveedorColor`), que puede ser MAYOR. Se pinta
+   * en el renglón para que nadie lea el base como si fuera el precio final.
+   */
+  precioPorColor: boolean;
+  /**
+   * 🔑 El precio con el que se VA A COSTEAR, tal como lo resolvió el motor en el servidor. La
+   * receta muestra SIEMPRE este número (regla de Daniel, 15-ago-2026: la pantalla nunca enseña una
+   * cifra distinta de la que costea) y {@link RenglonComponente.origenPrecio} dice de dónde salió.
+   */
+  precioCosteo: number | null;
+  /** Escalón de la cascada que ganó (amarre · más barato · promedio de medidas · referencia). */
+  origenPrecio: OrigenPrecio;
+  /** Proveedor del que salió `precioCosteo` (null si salió del catálogo o del promedio). */
+  proveedorPrecio: string | null;
+  /** Último escalón del catálogo: solo costea cuando `origenPrecio === 'referencia'`. */
+  precioReferencia: number | null;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -57,10 +84,18 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
   return {
     id: t.idTela,
     etiqueta: t.nombre,
+    detalle: null,
     consumo: String(t.consumoPorPrenda),
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
+    idAmarre: t.idTelaProveedor,
+    proveedorAmarrado: t.proveedorAmarrado,
+    precioPorColor: t.precioPorColor,
+    precioCosteo: t.precioCosteo,
+    origenPrecio: t.origenPrecio,
+    proveedorPrecio: t.proveedorPrecio,
+    precioReferencia: t.precioReferencia,
   };
 }
 
@@ -68,25 +103,44 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
 function aRenglonAvio(a: ModeloAvio): RenglonComponente {
   return {
     id: a.idAvio,
-    etiqueta: `${a.clave} — ${a.descripcion}`,
+    etiqueta: a.clave,
+    detalle: a.descripcion,
     consumo: String(a.consumoPorPrenda),
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
+    idAmarre: a.idAvioProveedor,
+    proveedorAmarrado: a.proveedorAmarrado,
+    // El avío no cotiza por color (eso es de la tela).
+    precioPorColor: false,
+    precioCosteo: a.precioCosteo,
+    origenPrecio: a.origenPrecio,
+    proveedorPrecio: a.proveedorPrecio,
+    precioReferencia: a.precioReferencia,
   };
 }
 
 /**
  * Editor de la RECETA de un modelo (F1-E4): tres pestañas (Telas / Avíos / Arte).
  *
- * Telas y avíos tienen un buscador de componente para agregar renglones, captura de consumo + 3
- * banderas 🔑 y un botón "Guardar receta" que envía el SET COMPLETO de esa sección (el backend
- * reemplaza en una transacción A2). El ARTE va aparte (`SeccionArte`): desde V1-E3d es un HIJO del
- * modelo con su propia ficha y su FOTO, así que se administra RENGLÓN POR RENGLÓN, sin "guardar
- * receta". Además, un botón "Copiar receta de…" clona el BOM de otro modelo.
+ * Telas y avíos se capturan en una TABLA DENSA de renglones compactos (~44 px) con un panel
+ * expandible por renglón (V1-E3c: antes cada renglón era una tarjeta de ~130 px y ocho avíos
+ * medían más de mil píxeles). En el renglón se ve lo que se consulta a diario —componente, de
+ * dónde sale su precio y el consumo—; en el panel, lo que se ajusta de vez en cuando: las TRES
+ * banderas 🔑 (siguen ahí: sirven para negociar quitarle piezas al modelo) y el AMARRE de precio.
+ * El botón "Guardar receta" envía el SET COMPLETO de esa sección (el backend reemplaza en una
+ * transacción A2).
+ *
+ * Los componentes se agregan con el COMBOBOX de búsqueda server-side del kit
+ * ({@link SelectorTela}/{@link SelectorAvio}): con 877 telas, el `<select>` nativo con tope de 100
+ * dejaba 777 inalcanzables y solo "buscaba" por prefijo (el typeahead del navegador).
+ *
+ * El ARTE va aparte (`SeccionArte`): desde V1-E3d es un HIJO del modelo con su propia ficha y su
+ * FOTO, así que se administra RENGLÓN POR RENGLÓN, sin "guardar receta". Además, un botón "Copiar
+ * receta de…" clona el BOM de otro modelo.
  *
  * El estado de captura de telas/avíos vive aquí (sembrado desde la ficha); el backend valida
- * (componentes activos, sin repetir) y es la autoridad (A1).
+ * (componentes activos, sin repetir, amarres que sí son de ese componente) y es la autoridad (A1).
  */
 export function EditorBom({
   ficha,
@@ -107,9 +161,6 @@ export function EditorBom({
     setAvios(ficha.avios.map(aRenglonAvio));
   }, [ficha]);
 
-  const catalogoTelas = useTelas(QUERY_CATALOGO);
-  const catalogoAvios = useAvios(QUERY_CATALOGO_AVIOS);
-
   const guardarTelas = useReemplazarTelasBom();
   const guardarAvios = useReemplazarAviosBom();
 
@@ -120,38 +171,56 @@ export function EditorBom({
   // exige el renglón. Los recién agregados (aún sin guardar) muestran un aviso.
   const idsAviosGuardados = new Set(ficha.avios.map((a) => a.idAvio));
 
-  function agregarTela(id: number): void {
-    const tela = catalogoTelas.data?.datos.find((t) => t.id === id);
-    if (!tela || idsTela.has(id)) {
+  function agregarTela(tela: Tela): void {
+    if (idsTela.has(tela.id)) {
+      toast.error(`La receta ya tiene la tela "${tela.nombre}".`);
       return;
     }
     setTelas((prev) => [
       ...prev,
       {
-        id,
+        id: tela.id,
         etiqueta: tela.nombre,
+        detalle: null,
         consumo: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
+        idAmarre: null,
+        proveedorAmarrado: null,
+        precioPorColor: false,
+        // Renglón recién agregado, aún sin guardar: lo único que se conoce en cliente es el
+        // catálogo. Al guardar, el servidor devuelve el escalón real de la cascada.
+        precioCosteo: tela.precioSugerido,
+        origenPrecio: tela.precioSugerido === null ? 'sin-precio' : 'referencia',
+        proveedorPrecio: null,
+        precioReferencia: tela.precioSugerido,
       },
     ]);
   }
 
-  function agregarAvio(id: number): void {
-    const avio = catalogoAvios.data?.datos.find((a) => a.id === id);
-    if (!avio || idsAvio.has(id)) {
+  function agregarAvio(avio: Avio): void {
+    if (idsAvio.has(avio.id)) {
+      toast.error(`La receta ya tiene el avío "${avio.clave}".`);
       return;
     }
     setAvios((prev) => [
       ...prev,
       {
-        id,
-        etiqueta: `${avio.clave} — ${avio.descripcion}`,
+        id: avio.id,
+        etiqueta: avio.clave,
+        detalle: avio.descripcion,
         consumo: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
+        idAmarre: null,
+        proveedorAmarrado: null,
+        precioPorColor: false,
+        precioCosteo: avio.precioReferencia,
+        origenPrecio: avio.precioReferencia === null ? 'sin-precio' : 'referencia',
+        proveedorPrecio: null,
+        precioReferencia: avio.precioReferencia,
       },
     ]);
   }
@@ -167,6 +236,7 @@ export function EditorBom({
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
+          idTelaProveedor: r.idAmarre,
         })),
       },
       {
@@ -186,6 +256,7 @@ export function EditorBom({
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
+          idAvioProveedor: r.idAmarre,
         })),
       },
       {
@@ -245,15 +316,22 @@ export function EditorBom({
           puedeAdministrar={puedeAdministrar}
           guardando={guardarTelas.isPending}
           deshabilitadoGlobal={guardando}
-          catalogo={(catalogoTelas.data?.datos ?? []).map((t) => ({
-            id: t.id,
-            etiqueta: t.nombre,
-          }))}
-          cargandoCatalogo={catalogoTelas.isPending}
-          idsUsados={idsTela}
-          alAgregar={agregarTela}
           alGuardar={guardarSeccionTelas}
           unidadAyuda="Consumo de tela por prenda."
+          selectorAgregar={
+            <SelectorTela
+              idSeleccionado={undefined}
+              alSeleccionar={agregarTela}
+              testid="agregar-tela-bom"
+            />
+          }
+          renderAmarre={(r, alAmarrar) => (
+            <AmarreTela
+              renglon={r}
+              deshabilitado={!puedeAdministrar || guardando}
+              alAmarrar={alAmarrar}
+            />
+          )}
         />
       ) : seccion === 'avios' ? (
         <SeccionComponentes
@@ -263,25 +341,33 @@ export function EditorBom({
           puedeAdministrar={puedeAdministrar}
           guardando={guardarAvios.isPending}
           deshabilitadoGlobal={guardando}
-          catalogo={(catalogoAvios.data?.datos ?? []).map((a) => ({
-            id: a.id,
-            etiqueta: `${a.clave} — ${a.descripcion}`,
-          }))}
-          cargandoCatalogo={catalogoAvios.isPending}
-          idsUsados={idsAvio}
-          alAgregar={agregarAvio}
           alGuardar={guardarSeccionAvios}
-          unidadAyuda="Consumo de avío por prenda."
+          unidadAyuda="Consumo de avío por prenda (los avíos que se consumen por talla lo capturan en su panel)."
+          selectorAgregar={
+            <SelectorAvio
+              idSeleccionado={undefined}
+              alSeleccionar={agregarAvio}
+              testid="agregar-avio-bom"
+            />
+          }
+          renderAmarre={(r, alAmarrar) => (
+            <AmarreAvio
+              renglon={r}
+              deshabilitado={!puedeAdministrar || guardando}
+              alAmarrar={alAmarrar}
+            />
+          )}
           renderExtra={(r) =>
             idsAviosGuardados.has(r.id) ? (
               <EditorMedidasAvio
                 idModelo={ficha.id}
                 idAvio={r.id}
                 puedeAdministrar={puedeAdministrar}
+                tieneCurvaModelo={ficha.tallasCurva.length > 0}
               />
             ) : (
-              <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
-                Guarda la receta para capturar medidas por talla de este avío.
+              <p className="border-t pt-2 text-xs text-muted-foreground">
+                Guarda la receta para capturar consumo por talla de este avío.
               </p>
             )
           }
@@ -299,13 +385,22 @@ export function EditorBom({
   );
 }
 
-/** Opción de catálogo para el selector de "agregar". */
-interface OpcionCatalogo {
-  id: number;
-  etiqueta: string;
+/**
+ * Cambios que emite el selector de amarre. Incluye el precio que PASARÁ A COSTEAR con el amarre
+ * nuevo, re-resuelto en cliente con la MISMA cascada del servidor: si no, entre elegir y guardar
+ * el renglón enseñaría el precio viejo (o peor, uno que ningún motor usa).
+ */
+interface CambioAmarre {
+  idAmarre: number | null;
+  proveedorAmarrado: string | null;
+  /** ¿El proveedor recién amarrado cotiza por color? (el renglón lo marca de inmediato). */
+  precioPorColor: boolean;
+  precioCosteo: number | null;
+  origenPrecio: OrigenPrecio;
+  proveedorPrecio: string | null;
 }
 
-/** Sección de telas o avíos (consumo + 3 banderas 🔑). */
+/** Sección de telas o avíos: tabla densa de renglones compactos con panel expandible. */
 function SeccionComponentes({
   titulo,
   renglones,
@@ -313,12 +408,10 @@ function SeccionComponentes({
   puedeAdministrar,
   guardando,
   deshabilitadoGlobal,
-  catalogo,
-  cargandoCatalogo,
-  idsUsados,
-  alAgregar,
   alGuardar,
   unidadAyuda,
+  selectorAgregar,
+  renderAmarre,
   renderExtra,
 }: {
   titulo: string;
@@ -327,16 +420,32 @@ function SeccionComponentes({
   puedeAdministrar: boolean;
   guardando: boolean;
   deshabilitadoGlobal: boolean;
-  catalogo: readonly OpcionCatalogo[];
-  cargandoCatalogo: boolean;
-  idsUsados: ReadonlySet<number>;
-  alAgregar: (id: number) => void;
   alGuardar: () => void;
   unidadAyuda: string;
-  /** Contenido extra por renglón (p. ej. medidas por talla del avío, R18). Opcional. */
+  /** Combobox de búsqueda server-side para agregar un componente (alcanza TODO el catálogo). */
+  selectorAgregar: React.ReactNode;
+  /** Selector del AMARRE de precio del renglón (R17), dentro del panel expandible. */
+  renderAmarre: (
+    r: RenglonComponente,
+    alAmarrar: (cambio: CambioAmarre) => void,
+  ) => React.ReactNode;
+  /** Contenido extra por renglón (p. ej. consumo por talla del avío, R18). Opcional. */
   renderExtra?: (r: RenglonComponente) => React.ReactNode;
 }): React.JSX.Element {
-  const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
+  const [expandidos, setExpandidos] = useState<ReadonlySet<number>>(new Set());
+  const clave = titulo === 'avíos' ? 'avios' : 'telas';
+
+  function alternar(id: number): void {
+    setExpandidos((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(id)) {
+        siguiente.delete(id);
+      } else {
+        siguiente.add(id);
+      }
+      return siguiente;
+    });
+  }
 
   function actualizar(id: number, cambios: Partial<RenglonComponente>): void {
     alCambiar((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
@@ -346,107 +455,46 @@ function SeccionComponentes({
   }
 
   return (
-    <div
-      className="space-y-3"
-      data-testid={`seccion-bom-${titulo === 'avíos' ? 'avios' : 'telas'}`}
-    >
-      {puedeAdministrar ? (
-        <SelectorAgregar
-          etiqueta={`Agregar ${titulo === 'avíos' ? 'avío' : 'tela'}…`}
-          disponibles={disponibles}
-          cargando={cargandoCatalogo}
-          deshabilitado={deshabilitadoGlobal}
-          alAgregar={alAgregar}
-          testid={`agregar-${titulo === 'avíos' ? 'avio' : 'tela'}-bom`}
-        />
-      ) : null}
+    <div className="space-y-3" data-testid={`seccion-bom-${clave}`}>
+      {puedeAdministrar ? <div className="max-w-md">{selectorAgregar}</div> : null}
 
       {renglones.length === 0 ? (
         <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
           La receta no tiene {titulo}.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {renglones.map((r) => (
-            <li key={r.id} className="rounded-lg border p-3" data-testid={`renglon-bom-${r.id}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.etiqueta}</span>
-                {puedeAdministrar ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => quitar(r.id)}
-                    disabled={deshabilitadoGlobal}
-                    aria-label={`Quitar ${r.etiqueta}`}
-                    data-testid={`quitar-bom-${r.id}`}
-                  >
-                    <Trash2Icon className="text-destructive" aria-hidden />
-                  </Button>
-                ) : null}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <div>
-                  <label
-                    htmlFor={`consumo-${r.id}`}
-                    className="block text-xs text-muted-foreground"
-                  >
-                    Consumo
-                  </label>
-                  <Input
-                    id={`consumo-${r.id}`}
-                    type="number"
-                    min={0}
-                    step="0.0001"
-                    inputMode="decimal"
-                    className="w-32"
-                    placeholder="0"
-                    value={r.consumo}
-                    disabled={!puedeAdministrar || deshabilitadoGlobal}
-                    onChange={(e) => actualizar(r.id, { consumo: e.target.value })}
-                    data-testid={`consumo-bom-${r.id}`}
-                  />
-                </div>
-                <fieldset className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraPreCosto}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraPreCosto: e.target.checked })}
-                      data-testid={`pre-costo-bom-${r.id}`}
-                    />
-                    Pre-costo
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraProduccion}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraProduccion: e.target.checked })}
-                      data-testid={`produccion-bom-${r.id}`}
-                    />
-                    Producción
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraCosto}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraCosto: e.target.checked })}
-                      data-testid={`costo-bom-${r.id}`}
-                    />
-                    Costo
-                  </label>
-                </fieldset>
-              </div>
-              {renderExtra ? renderExtra(r) : null}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border">
+          <TablaDensa>
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead className="w-8" />
+                <TablaDensaHead>{titulo === 'avíos' ? 'Avío' : 'Tela'}</TablaDensaHead>
+                <TablaDensaHead>Precio</TablaDensaHead>
+                <TablaDensaHead numerica className="w-28">
+                  Consumo
+                </TablaDensaHead>
+                <TablaDensaHead className="w-10" />
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {renglones.map((r) => (
+                <RenglonBom
+                  key={r.id}
+                  renglon={r}
+                  clave={clave}
+                  abierto={expandidos.has(r.id)}
+                  puedeAdministrar={puedeAdministrar}
+                  deshabilitadoGlobal={deshabilitadoGlobal}
+                  alAlternar={() => alternar(r.id)}
+                  alActualizar={(cambios) => actualizar(r.id, cambios)}
+                  alQuitar={() => quitar(r.id)}
+                  renderAmarre={renderAmarre}
+                  {...(renderExtra === undefined ? {} : { renderExtra })}
+                />
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
+        </div>
       )}
 
       <p className="text-xs text-muted-foreground">{unidadAyuda}</p>
@@ -457,7 +505,7 @@ function SeccionComponentes({
           size="sm"
           onClick={alGuardar}
           disabled={deshabilitadoGlobal}
-          data-testid={`guardar-bom-${titulo === 'avíos' ? 'avios' : 'telas'}`}
+          data-testid={`guardar-bom-${clave}`}
         >
           {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
           Guardar receta
@@ -466,41 +514,481 @@ function SeccionComponentes({
     </div>
   );
 }
-/** Selector de "agregar un componente" (no repetible). */
-function SelectorAgregar({
-  etiqueta,
-  disponibles,
-  cargando,
-  deshabilitado,
-  alAgregar,
-  testid,
+
+/**
+ * Un renglón de la receta: fila COMPACTA (componente · precio · consumo) + fila expandible con las
+ * tres banderas 🔑, el amarre de precio y lo que aporte la sección (consumo por talla del avío).
+ */
+function RenglonBom({
+  renglon,
+  clave,
+  abierto,
+  puedeAdministrar,
+  deshabilitadoGlobal,
+  alAlternar,
+  alActualizar,
+  alQuitar,
+  renderAmarre,
+  renderExtra,
 }: {
-  etiqueta: string;
-  disponibles: readonly OpcionCatalogo[];
-  cargando: boolean;
-  deshabilitado: boolean;
-  alAgregar: (id: number) => void;
-  testid: string;
+  renglon: RenglonComponente;
+  clave: 'telas' | 'avios';
+  abierto: boolean;
+  puedeAdministrar: boolean;
+  deshabilitadoGlobal: boolean;
+  alAlternar: () => void;
+  alActualizar: (cambios: Partial<RenglonComponente>) => void;
+  alQuitar: () => void;
+  renderAmarre: (
+    r: RenglonComponente,
+    alAmarrar: (cambio: CambioAmarre) => void,
+  ) => React.ReactNode;
+  renderExtra?: (r: RenglonComponente) => React.ReactNode;
 }): React.JSX.Element {
+  const r = renglon;
+  const casillas = [
+    ['paraPreCosto', 'Pre-costo', 'pre-costo'],
+    ['paraProduccion', 'Producción', 'produccion'],
+    ['paraCosto', 'Costo', 'costo'],
+  ] as const;
+
+  return (
+    <>
+      <TablaDensaFila seleccionada={abierto} data-testid={`renglon-bom-${r.id}`}>
+        <TablaDensaCelda className="p-0 pl-2">
+          <button
+            type="button"
+            onClick={alAlternar}
+            className="grid size-7 place-items-center rounded hover:bg-muted"
+            aria-label={
+              abierto ? `Ocultar detalle de ${r.etiqueta}` : `Ver detalle de ${r.etiqueta}`
+            }
+            aria-expanded={abierto}
+            data-testid={`expandir-bom-${r.id}`}
+          >
+            <ChevronRight
+              className={cn('size-4 transition-transform', abierto && 'rotate-90')}
+              aria-hidden
+            />
+          </button>
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <span className="font-medium">{r.etiqueta}</span>
+          {r.detalle !== null && r.detalle !== '' ? (
+            <span className="block truncate text-xs text-muted-foreground">{r.detalle}</span>
+          ) : null}
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <PrecioRenglon renglon={r} />
+        </TablaDensaCelda>
+        <TablaDensaCelda numerica>
+          <Input
+            type="number"
+            min={0}
+            step="0.0001"
+            inputMode="decimal"
+            className="h-7 w-24 text-right"
+            placeholder="0"
+            aria-label={`Consumo de ${r.etiqueta}`}
+            value={r.consumo}
+            disabled={!puedeAdministrar || deshabilitadoGlobal}
+            onChange={(e) => alActualizar({ consumo: e.target.value })}
+            data-testid={`consumo-bom-${r.id}`}
+          />
+        </TablaDensaCelda>
+        <TablaDensaCelda className="p-0 pr-2">
+          {puedeAdministrar ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={alQuitar}
+              disabled={deshabilitadoGlobal}
+              aria-label={`Quitar ${r.etiqueta}`}
+              data-testid={`quitar-bom-${r.id}`}
+            >
+              <Trash2Icon className="text-destructive" aria-hidden />
+            </Button>
+          ) : null}
+        </TablaDensaCelda>
+      </TablaDensaFila>
+
+      {abierto ? (
+        <TablaDensaFila className="bg-muted/20 hover:bg-muted/20">
+          <TablaDensaCelda />
+          <TablaDensaCelda colSpan={4} className="py-3">
+            <div className="space-y-3" data-testid={`detalle-bom-${r.id}`}>
+              {/* Las TRES banderas 🔑 (doc 01-Modelos §2): siguen aquí — sirven para negociar
+                  quitarle piezas al modelo (p. ej. una jareta) sin sacarlas de la receta. */}
+              <fieldset className="flex flex-wrap items-center gap-4">
+                <legend className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  ¿Dónde entra este componente?
+                </legend>
+                {casillas.map(([campo, etiqueta, testid]) => (
+                  <label key={campo} className="flex items-center gap-1.5 text-xs">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-input accent-primary"
+                      checked={r[campo]}
+                      disabled={!puedeAdministrar || deshabilitadoGlobal}
+                      onChange={(e) => alActualizar({ [campo]: e.target.checked })}
+                      data-testid={`${testid}-bom-${r.id}`}
+                    />
+                    {etiqueta}
+                  </label>
+                ))}
+              </fieldset>
+
+              {/* AMARRE de precio (R17): el proveedor con el que de verdad se va a costear. */}
+              <div data-testid={`amarre-bom-${clave}-${r.id}`}>
+                <p className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Precio amarrado (proveedor)
+                </p>
+                {renderAmarre(r, (cambio) => alActualizar(cambio))}
+              </div>
+
+              {renderExtra === undefined ? null : renderExtra(r)}
+            </div>
+          </TablaDensaCelda>
+        </TablaDensaFila>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Precio del componente en el renglón. ⭐ Regla de Daniel (15-ago-2026): **la receta nunca enseña
+ * una cifra distinta de la que va a costear** — muestra la que costea y dice de dónde salió. El
+ * escalón lo resuelve el SERVIDOR con el mismo motor del precosto
+ * (`dominio/costos/resolucion-precios.ts`); aquí solo se pinta:
+ *
+ *  • `amarre`           — precio negociado, con su proveedor. Si además cotiza por color, se marca:
+ *                         el costeo usará el precio del color de la orden, que puede ser mayor.
+ *  • `mas-barato`       — NO está negociado: es el más barato del avío (normalizado ÷ factor R1).
+ *                         Se dice de qué proveedor salió y se conserva la marca de "falta amarrar".
+ *                         Si encima había un amarre, es que ese proveedor no tiene precio: se grita.
+ *  • `promedio-medidas` — avío "por medida": promedio de los precios de sus medidas. GANA al amarre.
+ *  • `referencia`       — último recurso del catálogo (no hay ningún proveedor con precio).
+ *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
+ */
+function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.Element {
+  const importe = (
+    <span className="num text-sm font-medium">{formatearMoneda(renglon.precioCosteo)}</span>
+  );
+  // Un amarre que NO es el escalón que costea es un problema que hay que ver desde el renglón
+  // (típico: se amarró un proveedor que no tiene precio capturado).
+  const amarreIgnorado = renglon.idAmarre !== null && renglon.origenPrecio !== 'amarre';
+
+  switch (renglon.origenPrecio) {
+    case 'amarre':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            {renglon.proveedorPrecio ?? renglon.proveedorAmarrado ?? 'proveedor amarrado'}
+          </span>
+          {renglon.precioPorColor ? (
+            <ChipEstado
+              tono="info"
+              sinPunto
+              title="Este proveedor cotiza por color: el costeo usará el precio del color de la orden, que puede ser mayor."
+            >
+              precio por color
+            </ChipEstado>
+          ) : null}
+        </span>
+      );
+
+    case 'mas-barato':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            el más barato: {renglon.proveedorPrecio ?? '—'}
+          </span>
+          {amarreIgnorado ? (
+            <ChipEstado
+              tono="crit"
+              sinPunto
+              title={`El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado, así que el costeo lo salta.`}
+            >
+              amarre sin precio
+            </ChipEstado>
+          ) : (
+            <ChipEstado
+              tono="warn"
+              sinPunto
+              title="Este precio NO está negociado: falta amarrarlo."
+            >
+              sin amarrar
+            </ChipEstado>
+          )}
+        </span>
+      );
+
+    case 'promedio-medidas':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <ChipEstado
+            tono="info"
+            sinPunto
+            title="Este avío se compra POR MEDIDA: el costeo usa el promedio de los precios de sus medidas activas, aunque tenga proveedor amarrado."
+          >
+            promedio de medidas
+          </ChipEstado>
+        </span>
+      );
+
+    case 'referencia':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          {amarreIgnorado ? (
+            <ChipEstado
+              tono="crit"
+              sinPunto
+              title={`El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado, así que el costeo lo salta.`}
+            >
+              amarre sin precio
+            </ChipEstado>
+          ) : (
+            <ChipEstado
+              tono="warn"
+              sinPunto
+              title="Ningún proveedor tiene precio capturado: se costea con el precio de catálogo."
+            >
+              referencia
+            </ChipEstado>
+          )}
+        </span>
+      );
+
+    default:
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="num text-sm text-muted-foreground">—</span>
+          <ChipEstado
+            tono="crit"
+            sinPunto
+            title="No hay precio en ningún escalón: el costeo lo tomaría como 0."
+          >
+            sin precio
+          </ChipEstado>
+        </span>
+      );
+  }
+}
+
+/** Opciones del amarre de una TELA: sus renglones proveedor–precio (`TelaProveedor`). */
+function AmarreTela({
+  renglon,
+  deshabilitado,
+  alAmarrar,
+}: {
+  renglon: RenglonComponente;
+  deshabilitado: boolean;
+  alAmarrar: (cambio: CambioAmarre) => void;
+}): React.JSX.Element {
+  // Se monta SOLO con el panel abierto: así la receta no dispara una consulta por renglón.
+  const consulta = useTelaProveedores(renglon.id);
+  const opciones = (consulta.data ?? []).filter((p) => p.activo || p.id === renglon.idAmarre);
+
+  return (
+    <SelectorAmarre
+      cargando={consulta.isPending}
+      error={consulta.isError ? consulta.error.message : null}
+      vacio="Esta tela no tiene proveedores con precio. Captúralos en el catálogo de telas."
+      valor={renglon.idAmarre}
+      etiqueta={`Proveedor amarrado a ${renglon.etiqueta}`}
+      testid={`selector-amarre-tela-${renglon.id}`}
+      deshabilitado={deshabilitado}
+      opciones={opciones.map((p) => ({
+        id: p.id,
+        nombre: p.nombreProveedor,
+        precio: p.precio,
+        porColor: p.manejaPrecioPorColor,
+        nota: p.manejaPrecioPorColor ? 'precio por color' : null,
+      }))}
+      alElegir={(id) => {
+        const elegido = opciones.find((p) => p.id === id);
+        // CASCADA DE LA TELA (`resolverPrecioTela`): amarre → sugerido. Sin amarre —o con uno sin
+        // precio— costea el precio de catálogo de la tela; nunca hay "más barato" en telas.
+        if (elegido !== undefined && elegido.precio !== null) {
+          alAmarrar({
+            idAmarre: elegido.id,
+            proveedorAmarrado: elegido.nombreProveedor,
+            precioPorColor: elegido.manejaPrecioPorColor,
+            precioCosteo: elegido.precio,
+            origenPrecio: 'amarre',
+            proveedorPrecio: elegido.nombreProveedor,
+          });
+          return;
+        }
+        alAmarrar({
+          idAmarre: elegido?.id ?? null,
+          proveedorAmarrado: elegido?.nombreProveedor ?? null,
+          precioPorColor: elegido?.manejaPrecioPorColor ?? false,
+          precioCosteo: renglon.precioReferencia,
+          origenPrecio: renglon.precioReferencia === null ? 'sin-precio' : 'referencia',
+          proveedorPrecio: null,
+        });
+      }}
+    />
+  );
+}
+
+/** Opciones del amarre de un AVÍO: los proveedores que lo surten (el amarre guarda el proveedor). */
+function AmarreAvio({
+  renglon,
+  deshabilitado,
+  alAmarrar,
+}: {
+  renglon: RenglonComponente;
+  deshabilitado: boolean;
+  alAmarrar: (cambio: CambioAmarre) => void;
+}): React.JSX.Element {
+  const consulta = useProveedoresDeAvio(renglon.id);
+  const proveedores = consulta.data ?? [];
+  // El precio que se compara y se muestra es el de UNIDAD DE CONSUMO (precio ÷ factor R1): lo
+  // calcula el backend (A1), para que el número no cambie entre "recién amarrado" y "ya guardado".
+  const precioDe = (p: (typeof proveedores)[number]): number | null =>
+    p.precioUnidadConsumo ?? p.precio;
+
+  return (
+    <SelectorAmarre
+      cargando={consulta.isPending}
+      error={consulta.isError ? consulta.error.message : null}
+      vacio="Este avío no tiene proveedores con precio. Captúralos en el catálogo de avíos."
+      valor={renglon.idAmarre}
+      etiqueta={`Proveedor amarrado a ${renglon.etiqueta}`}
+      testid={`selector-amarre-avio-${renglon.id}`}
+      deshabilitado={deshabilitado}
+      opciones={proveedores.map((p) => ({
+        id: p.idProveedor,
+        nombre: p.nombreProveedor,
+        precio: precioDe(p),
+        nota: p.condiciones,
+      }))}
+      alElegir={(id) => {
+        const elegido = proveedores.find((p) => p.idProveedor === id);
+        const base = {
+          idAmarre: elegido?.idProveedor ?? null,
+          proveedorAmarrado: elegido?.nombreProveedor ?? null,
+          precioPorColor: false,
+        };
+        // ⚠️ El avío "POR MEDIDA" se costea con el PROMEDIO de sus medidas y ese escalón GANA al
+        // amarre (`resolverPrecioAvioCatalogo`): cambiar de proveedor no mueve lo que costea.
+        if (renglon.origenPrecio === 'promedio-medidas') {
+          alAmarrar({
+            ...base,
+            precioCosteo: renglon.precioCosteo,
+            origenPrecio: 'promedio-medidas',
+            proveedorPrecio: null,
+          });
+          return;
+        }
+        // CASCADA DEL AVÍO: amarre → más barato → referencia.
+        const precioElegido = elegido === undefined ? null : precioDe(elegido);
+        if (elegido !== undefined && precioElegido !== null) {
+          alAmarrar({
+            ...base,
+            precioCosteo: precioElegido,
+            origenPrecio: 'amarre',
+            proveedorPrecio: elegido.nombreProveedor,
+          });
+          return;
+        }
+        const masBarato = proveedores.reduce<{ nombre: string; precio: number } | null>(
+          (mejor, p) => {
+            const precio = precioDe(p);
+            if (precio === null || (mejor !== null && precio >= mejor.precio)) return mejor;
+            return { nombre: p.nombreProveedor, precio };
+          },
+          null,
+        );
+        if (masBarato !== null) {
+          alAmarrar({
+            ...base,
+            precioCosteo: masBarato.precio,
+            origenPrecio: 'mas-barato',
+            proveedorPrecio: masBarato.nombre,
+          });
+          return;
+        }
+        alAmarrar({
+          ...base,
+          precioCosteo: renglon.precioReferencia,
+          origenPrecio: renglon.precioReferencia === null ? 'sin-precio' : 'referencia',
+          proveedorPrecio: null,
+        });
+      }}
+    />
+  );
+}
+
+/** Una opción de amarre (proveedor con su precio). */
+interface OpcionAmarre {
+  id: number;
+  nombre: string;
+  precio: number | null;
+  /** ¿Este proveedor cotiza por color? (solo telas). */
+  porColor?: boolean;
+  nota: string | null;
+}
+
+/**
+ * Selector del amarre de precio: lista corta (los proveedores de ESE componente), así que un
+ * `<select>` nativo basta — el problema de las 877 telas no aplica aquí. "Sin amarrar" es una
+ * opción explícita: deja al renglón costeando por el escalón que siga en la cascada (que el
+ * renglón dice, no adivina).
+ */
+function SelectorAmarre({
+  opciones,
+  valor,
+  cargando,
+  error,
+  vacio,
+  etiqueta,
+  testid,
+  deshabilitado,
+  alElegir,
+}: {
+  opciones: readonly OpcionAmarre[];
+  valor: number | null;
+  cargando: boolean;
+  error: string | null;
+  vacio: string;
+  etiqueta: string;
+  testid: string;
+  deshabilitado: boolean;
+  /** Emite el id elegido (o null al desamarrar); el llamador resuelve la cascada de SU tipo. */
+  alElegir: (id: number | null) => void;
+}): React.JSX.Element {
+  if (error !== null) {
+    return (
+      <p className="text-xs text-destructive" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (!cargando && opciones.length === 0) {
+    return <p className="text-xs text-muted-foreground">{vacio}</p>;
+  }
   return (
     <SelectNativo
+      className="max-w-md"
       aria-label={etiqueta}
       data-testid={testid}
-      disabled={deshabilitado || cargando || disponibles.length === 0}
-      value=""
-      onChange={(e) => {
-        const id = Number(e.target.value);
-        if (Number.isFinite(id) && id > 0) {
-          alAgregar(id);
-        }
-      }}
+      disabled={deshabilitado || cargando}
+      value={valor === null ? '' : String(valor)}
+      onChange={(e) => alElegir(e.target.value === '' ? null : Number(e.target.value))}
     >
-      <option value="">
-        {cargando ? 'Cargando…' : disponibles.length === 0 ? 'No hay más por agregar' : etiqueta}
-      </option>
-      {disponibles.map((o) => (
+      <option value="">{cargando ? 'Cargando…' : 'Sin amarrar (usa la cascada de precios)'}</option>
+      {opciones.map((o) => (
         <option key={o.id} value={String(o.id)}>
-          {o.etiqueta}
+          {o.nombre} — {formatearMoneda(o.precio)}
+          {o.nota !== null && o.nota.trim() !== '' ? ` · ${o.nota}` : ''}
         </option>
       ))}
     </SelectNativo>

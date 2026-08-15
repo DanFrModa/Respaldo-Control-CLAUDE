@@ -200,6 +200,41 @@ function costoNormalizado(
   return precioAUnidadConsumo(proveedor.precio, factor);
 }
 
+/** De dónde salió el precio de un avío del CATÁLOGO (la cascada + el promedio por medidas). */
+export type OrigenPrecioAvioCatalogo = OrigenPrecioAvio | 'promedio-medidas';
+
+/** Resultado de valuar un avío del catálogo (cascada o promedio de medidas). */
+export interface PrecioAvioCatalogoResuelto {
+  precio: number | null;
+  origen: OrigenPrecioAvioCatalogo;
+  idProveedor: number | null;
+}
+
+/**
+ * ⭐ REGLA COMPLETA del precio de un avío del CATÁLOGO — la ÚNICA fuente, compartida por el
+ * precosto persistido (`desarrollo/precostos.ts`) y por la RECETA (`modelos/bom-modelo.ts`, que la
+ * usa para ENSEÑAR en pantalla exactamente el número con el que se va a costear):
+ *
+ *  1. avío "POR MEDIDA" (≥1 `AvioMedida` activa, R5/B11) → **promedio simple** de los precios de
+ *     sus medidas, SIN proveedor de traza (el precio no salió de un proveedor, decisión Daniel:
+ *     protege el costo sin desglosar). Este escalón **gana sobre el amarre**.
+ *  2. si no, la cascada amarrada de E1 ({@link resolverPrecioAvio}: amarre → más barato →
+ *     referencia), que además dice QUÉ proveedor se usó.
+ *
+ * Se extrajo aquí (V1-E3c) porque vivía privada en el precosto: la pantalla de la receta la
+ * necesitaba y copiarla habría creado dos reglas que derivan. **El comportamiento NO cambia**: es
+ * la misma aritmética, y el redondeo lo sigue aplicando el llamador (este módulo no redondea).
+ */
+export function resolverPrecioAvioCatalogo(
+  entrada: EntradaPrecioAvio & { readonly medidas: readonly number[] },
+): PrecioAvioCatalogoResuelto {
+  if (entrada.medidas.length > 0) {
+    const promedio = entrada.medidas.reduce((s, v) => s + v, 0) / entrada.medidas.length;
+    return { precio: promedio, origen: 'promedio-medidas', idProveedor: null };
+  }
+  return resolverPrecioAvio(entrada);
+}
+
 /**
  * Resuelve el precio de un AVÍO según la cascada de 3 pasos (amarre → más barato → referencia). El
  * precio de cada proveedor se NORMALIZA a unidad de consumo (÷ factor, R1) antes de comparar/elegir.

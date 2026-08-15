@@ -239,7 +239,7 @@ muestra como la advertencia de sobre-traspaso siguen el bucket elegido. Se agreg
 
 ---
 
-## V1-E3c · El editor de la receta del modelo (PROPUESTA — 13-ago-2026)
+## V1-E3c · El editor de la receta del modelo — ✅ HECHA (15-ago-2026)
 
 Salió de Daniel usando el editor de BOM en `prueba`. Seis observaciones suyas, **todas verificadas
 contra el código**. Se agrupan porque tocan los mismos archivos (`EditorBom.tsx`,
@@ -290,6 +290,85 @@ precosteo no da los números reales** — cae siempre al fallback.
 
 **Criterio de cierre:** capturar un avío por talla con su consumo, amarrarle proveedor y precio, y
 que el precosto salga con **esos** números y no con el fallback.
+
+### Nota de cierre (15-ago-2026)
+
+**Por qué se construyó ahora:** Daniel abrió la pantalla de Modelos en `prueba` y dijo *"ya habíamos
+hecho varios comentarios, pero no se hicieron… esto se supone que ya estaba hecho"*. Tenía razón: los
+seis puntos llevaban dos días documentados y verificados contra el código, con etiqueta **PROPUESTA**
+y sin una sola línea escrita. Ordenó *"éntrale a todo de una vez"*.
+
+**Qué quedó, punto por punto** (el 5 estaba retirado de antes y no se tocó):
+
+1. **El círculo se rompió por el lado correcto, y salió mejor que lo pedido.** No se agregó el "botón
+   de agregar" que la ficha pedía: los renglones **nacen de la curva del modelo en el servidor**
+   (`medidas-avio-talla.ts:130-180`), así que la matriz aparece completa sola. `tieneCurva` hace
+   honesto el mensaje que antes mentía, y `enCurva:false` **conserva** las tallas de una curva vieja
+   en vez de tirarlas.
+2. **El amarre de precio ya se escribe** (`idTelaProveedor`, `idAvioProveedor`, `idAvioMedida`), de
+   punta a punta y con prueba a nivel HTTP + aserción contra BD, incluido el rechazo de un amarre
+   ajeno. `copiarBom` **conserva** el amarre y copia `ModeloAvioTalla` con su medida;
+   `sincronizarAvios` **no** pisa la captura por talla. Con esto la cascada de D13/R17, que llevaba
+   dos fases leída-pero-nunca-escrita, deja de estar inerte.
+3. **La receta muestra proveedor y precio** — pero no como se había planteado: ver la decisión
+   **§Post-F9.47**, que nació de esta revisión.
+4. **Buscador de verdad**, reusando `SelectorTela`/`ComboboxBuscable` (el patrón que ya estaba en
+   producción). Se acabó el tope de 100 que dejaba **777 de 877 telas inalcanzables** y el typeahead
+   por prefijo del navegador (el *"solo encuentra por orden alfabético"* de Daniel).
+6. **Renglón compacto** con el detalle en panel expandible. **Las tres banderas NO se quitaron** —
+   sirven para negociar quitarle piezas al modelo—: solo dejaron de ocupar el 60 % del renglón.
+
+**Lo que cazó el reviewer independiente, y que ninguna prueba manual habría visto** (rechazó la
+primera entrega; los cuatro pasaban el CI en verde):
+
+- **⭐ El cero fantasma.** La lectura sintetizaba `consumo: 0` para pintar la matriz y la UI lo
+  **devolvía como captura real**: dejar XG/XXG en blanco creaba filas en cero. El precosto sacaba el
+  promedio **con los ceros adentro** (0.45 → **0.27**: el avío costeado ~40 % por debajo, y de ahí al
+  precio del cliente), y el MRP pedía **cero material** para esas tallas **sin levantar el aviso**
+  `tallasSinMedida` — porque 0 es un valor *definido*. Se cerró distinguiendo *no capturado* de *cero
+  de verdad* (el 0 tecleado es válido: hay avíos que no llevan en cierta talla).
+  **Y la prueba consagraba el defecto** (`toEqual([{10,1.5},{11,0},{12,0}])` como correcto): se
+  corrigió la prueba, no solo el código.
+- **La receta enseñaba una cifra distinta de la que costea**, en tres caminos → §Post-F9.47.
+- **El ETL del BOM borraba TODOS los amarres al re-correrse.** El endpoint es set-completo y el
+  loader re-enviaba renglones de Access, que no traen amarre → todo a NULL, en silencio. Los ETL son
+  re-corribles **por diseño** y la fase que sigue es **F10**: habría borrado esta etapa entera sin
+  avisar. Ahora el loader relee el amarre de la BD y lo re-envía, con prueba de re-corrido
+  (`etl-modelos.int.test.ts:183-219`).
+- **De proceso:** el coder comiteó y empujó contra la instrucción expresa, y ese commit **reprobaba
+  el CI solo** (llevaba `backend/openapi.json` pero no los dos generados del frontend, que el CI
+  compara). Fue a rama de trabajo, no a `prueba`; se resolvió con squash.
+
+**⭐ El quinto camino, que apareció buscando el cuarto.** Un avío **con medidas activas** (R5/B11) se
+costea con el **promedio de los precios de sus medidas**, y ese escalón **GANA sobre el amarre**
+(`precostos.ts:164-169`). La receta habría mostrado los $20 del proveedor amarrado mientras el
+precosto costeaba **$6.00** — y amarrar un proveedor no movía la cifra. Se alineó igual que los
+otros. Los cinco caminos hoy dicen la verdad: `amarre` (+ precio por color) · `mas-barato` (+ «sin
+amarrar» / «amarre sin precio») · `promedio-medidas` · `referencia` · `sin-precio` (antes un `$0.00`
+mudo).
+
+**Refactor declarado, no silencioso:** `precioAvioDeCatalogo` se movió de `precostos.ts` (donde era
+privada) a `resolucion-precios.ts`, para que la capa de lectura **no duplicara la regla** — que es
+justo como divergen los números. Movimiento puro: misma aritmética y mismo redondeo.
+
+**Dos cosas que se reportan y NO se tocaron** (§7.3: se dicen, no se callan):
+
+1. ⚠️ **Dos motores costean distinto el mismo renglón.** `pre-costo.ts` (el pre-costo rápido de F7)
+   usa `Avio.precioReferencia` cuando no hay amarre; el precosteo persistido usa **el más barato**.
+   Está puesto a propósito («no-regresión: F7 NO aplicaba más barato», `pre-costo.ts:141-142`). La
+   receta se alineó al **persistido**, que es el que fija precios de cliente y alimenta el MRP.
+   **Decisión de negocio ABIERTA, planteada a Daniel:** ¿se unifican, o el rápido es para tantear y
+   el formal para comprometerse? Mientras no se cierre, la diferencia es conocida y deliberada.
+2. **`color-referencia` de la cascada de tela no tiene consumidores** — escalón preparado para el
+   futuro. Cuando alguien lo encienda, la receta tendrá que decirlo (hoy no puede: el color se define
+   hasta la orden).
+
+**Criterio de cierre:** ✅ cumplido — se captura el consumo por talla, se amarra proveedor y precio, y
+el precosto sale con **esos** números y no con el fallback.
+
+**Nota de despliegue:** **SIN migración, SIN permisos nuevos, SIN seed** → el deploy a `prueba` **no**
+requiere `SEED_ON_START`. Las tres columnas del amarre ya existían en el esquema desde F8; lo único
+que faltaba era quién las escribiera.
 
 ---
 
@@ -488,6 +567,47 @@ distinto — sin que ninguna de las dos altere a la otra ni a las ya producidas.
 
 ---
 
+## V1-E3e · Un solo costo: manda el precio REAL de compra ⭐ (15-ago-2026)
+
+**Nace de la revisión de V1-E3c**, que destapó que conviven **tres cifras** para el mismo renglón: la
+receta, el pre-costo rápido de F7 y el precosto congelado. Daniel, al enterarse: *"No hay ningún
+motivo por el cual tener dos precios distintos. Hay que unificarlo. Si ya tenemos precios reales, lo
+mejor es tomar ese costo. El más actualizado."* Decisión completa en `DECISIONES.md` **§Post-F9.48**.
+
+**No es una idea nueva:** es el mismo criterio que Daniel ya dictó el 26-jul (§Post-F9.5) para el
+costo real de una orden. Lo que falta es **extenderlo a la receta y al precosteo**, que siguen
+viviendo del catálogo.
+
+**Qué entrega**
+
+1. **Una sola cascada** para todos los motores: último precio de **compra real** → precio del
+   proveedor en catálogo → `precioReferencia` (**solo lo nunca comprado**) → `sin-precio`.
+2. **El amarre elige el PROVEEDOR; el precio es el de la última compra a ESE proveedor** (decisión
+   fina de Daniel, elegida de tres opciones). El trabajo de negociación no se tira y el costo no se
+   queda viejo.
+3. **`pre-costo.ts` deja de ser un motor aparte.** El reviewer verificó que **no escribe nada** (es
+   lectura pura), así que alinearlo **no mueve ningún precio pactado**. Cierra sus **cuatro**
+   divergencias, no solo la que estaba documentada.
+4. La receta muestra el nuevo origen, con la misma regla de §Post-F9.47: **nunca una cifra distinta
+   de la que costea, y siempre diciendo de dónde salió**.
+
+**Qué NO entra:** cambiar qué se considera "comprado" — se reusa §Post-F9.5 regla 1 (**manda la OC
+autorizada**, no lo recibido ni lo surtido).
+
+⚠️ **A diferencia de §Post-F9.47, esto SÍ cambia el motor.** Los precosteos **congelados no se
+mueven** (son fotografías), pero **todo cálculo nuevo dará números distintos** a los de ayer — por
+diseño, que es justo lo que Daniel pidió. **Exige pruebas de no-regresión** de que lo congelado sigue
+dando lo mismo.
+
+**A decidir al construir:** si el último precio de compra se lee **en vivo** o se **materializa**
+(rendimiento — lo consultan la receta, el precosteo y el MRP). Reusa la maquinaria que ya existe en
+`dominio/costos/costo-real-compras.ts`.
+
+**Criterio de cierre:** el mismo renglón, visto desde la receta, el pre-costo rápido y el precosteo,
+da **el mismo número** — y ese número es el de la última compra real.
+
+---
+
 ## V1-E4 · Las defensas contra el daño callado
 
 Lo peor que puede pasar en producción no es que algo truene: es que corrompa datos sin avisar.
@@ -517,10 +637,11 @@ por definición nadie nota al probar a mano.
 
 **Qué entrega**
 
-1. **El amarre proveedor↔insumo** (`ModeloTela.idTelaProveedor`, `ModeloAvio.idAvioProveedor`): las
-   columnas existen y el motor **las lee**, pero **nada las escribe** — no hay API ni UI. Es la
-   promesa central de D13/R17 y hoy no se puede ejercer: el precosto de tela cae al precio sugerido
-   genérico y el de avío al **más barato automáticamente**.
+1. ~~**El amarre proveedor↔insumo** (`ModeloTela.idTelaProveedor`, `ModeloAvio.idAvioProveedor`): las
+   columnas existen y el motor **las lee**, pero **nada las escribe** — no hay API ni UI.~~
+   → ✅ **YA ENTREGADO en V1-E3c (15-ago-2026)**, junto con `ModeloAvioTalla.idAvioMedida`: contrato,
+   dominio y UI, con prueba HTTP + aserción contra BD y rechazo de amarre ajeno. La promesa de
+   D13/R17 dejó de estar inerte. **Este punto sale de E5** (queda con 2, no 3).
 2. **El factor de conversión en la OC del MRP**: la línea va en unidad de consumo y el resto la lee
    como presentación. Con un rollo de 50 m, recibir **infla la existencia ×50 y divide el costo
    ÷50**. Hoy solo avisa.
