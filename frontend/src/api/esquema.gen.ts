@@ -12827,6 +12827,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -12834,6 +12835,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
               }[];
@@ -12866,6 +12869,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -12873,6 +12877,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
               }[];
@@ -13440,6 +13446,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -13447,6 +13454,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
               }[];
@@ -13600,6 +13609,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -13607,6 +13617,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
               }[];
@@ -13758,6 +13770,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -13765,6 +13778,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
               }[];
@@ -13920,6 +13935,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -13927,6 +13943,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
               }[];
@@ -15540,6 +15558,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -15547,6 +15566,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
               }[];
@@ -15579,6 +15600,7 @@ export interface paths {
                  * @enum {string}
                  */
                 origenPrecio:
+                  | 'ultimo-precio-compra'
                   | 'amarre'
                   | 'mas-barato'
                   | 'promedio-medidas'
@@ -15586,6 +15608,8 @@ export interface paths {
                   | 'sin-precio';
                 /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
                 proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
               }[];

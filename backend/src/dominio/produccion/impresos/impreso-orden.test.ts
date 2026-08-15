@@ -508,6 +508,7 @@ describe('armarDatosImpresoOrden', () => {
           precioCosteo: null,
           origenPrecio: 'sin-precio' as const,
           proveedorPrecio: null,
+          amarreIgnorado: false,
           precioReferencia: null,
         },
         {
@@ -523,6 +524,7 @@ describe('armarDatosImpresoOrden', () => {
           precioCosteo: null,
           origenPrecio: 'sin-precio' as const,
           proveedorPrecio: null,
+          amarreIgnorado: false,
           precioReferencia: null,
         },
       ],
@@ -541,6 +543,7 @@ describe('armarDatosImpresoOrden', () => {
           precioCosteo: null,
           origenPrecio: 'sin-precio' as const,
           proveedorPrecio: null,
+          amarreIgnorado: false,
           precioReferencia: null,
         },
         {
@@ -557,6 +560,7 @@ describe('armarDatosImpresoOrden', () => {
           precioCosteo: null,
           origenPrecio: 'sin-precio' as const,
           proveedorPrecio: null,
+          amarreIgnorado: false,
           precioReferencia: null,
         },
       ],

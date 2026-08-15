@@ -2157,3 +2157,45 @@ alinearlo **no mueve ningún precio pactado**. La asimetría temida era la contr
   lee en vivo o se materializa (rendimiento), y **pruebas de no-regresión** de que los precostos
   congelados siguen dando lo mismo.
 - **Fecha:** 2026-08-15.
+
+#### (Post-F9.49) — La OC nace del último precio DE ESE proveedor, y la migración deja de borrar lo capturado en v2 (DANIEL, 15-ago-2026)
+
+Dos cabos que dejó abiertos §Post-F9.48, preguntados juntos para no frenar la construcción.
+
+**1. ⭐ El precio con el que nace un renglón de ORDEN DE COMPRA (explosión del MRP).**
+
+El coder de V1-E3e había **excluido el MRP a propósito** del escalón de "último precio de compra", con
+una razón que el reviewer avaló: lo que el MRP produce no es un costo, es el **precio sugerido de una
+OC dirigida a un proveedor concreto**, y poner ahí el precio de una compra a **otro** emitiría una
+orden con un precio que ese proveedor nunca dio.
+
+Daniel resolvió el fondo **sin romper ese argumento**, eligiendo de tres opciones:
+
+> **La OC nace con lo último que ESE proveedor cobró; si nunca se le compró, su precio de catálogo.**
+
+Se descartaron: dejarlo como estaba (el precio de la OC queda desalineado de lo que ese proveedor
+cobró la última vez) y usar el último precio pagado **a quien sea** (le mandaría al proveedor A una
+orden con el precio que dio el proveedor B).
+
+⚠️ **A quién se le compra NO cambia:** lo sigue fijando R1/F4 (el amarrado; si no, el más barato).
+Lo único que cambia es **a qué precio nace la línea**. Con esto el sistema queda con **un solo
+criterio** de punta a punta, que es lo que Daniel viene pidiendo desde §Post-F9.48 (*"no hay ningún
+motivo para tener dos costos diferentes"*).
+
+**2. La migración NUNCA borra lo que se capturó en el sistema nuevo.**
+
+Viene de un hallazgo del reviewer en V1-E3c: re-correr `etl-bom-modelos` **elimina los avíos
+agregados en v2** que no están en el CSV de Access y, por cascada, sus `ModeloAvioTalla`. Es la misma
+familia del amarre de precio que ya se protegió ahí, en otra dimensión. Elegido de dos opciones:
+
+> **La migración actualiza lo que viene del Access, pero nunca borra lo capturado en v2.**
+
+Importa porque **el ETL se re-corre varias veces antes del arranque y en el ensayo (V1-E7)**: sin
+esto, cada corrida borra trabajo humano **en silencio**. Se descartó la alternativa (que la migración
+mande y limpie) porque su única ventaja —fidelidad literal al Access— no compensa perder captura
+hecha a mano entre corrida y corrida. **Exige prueba de re-corrido** que falle de verdad si alguien
+quita la preservación, como la que ya existe para el amarre (`etl-modelos.int.test.ts:183-219`).
+
+- **Aplica en:** V1-E3e (`dominio/compras/mrp.ts` y `migracion/loaders/bom-modelos.ts`). **SIN
+  migración de esquema, SIN permisos, SIN seed.**
+- **Fecha:** 2026-08-15.

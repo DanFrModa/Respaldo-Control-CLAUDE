@@ -372,13 +372,19 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
  * De dónde salió el precio con el que se va a COSTEAR un renglón de la receta. Es el escalón de la
  * cascada (`dominio/costos/resolucion-precios.ts`) que ganó, dicho con las palabras de la pantalla:
  *
- *  • `amarre`           — el proveedor amarrado por Desarrollo (el precio negociado).
- *  • `mas-barato`       — sin amarre (o con un amarre SIN precio): el proveedor más barato del
- *                         avío, ya normalizado ÷ factor (R1). NO está negociado: falta amarrarlo.
+ *  • `ultimo-precio-compra` — ⭐ **el escalón 1 desde V1-E3e** (§Post-F9.48): el precio de la última
+ *                         COMPRA REAL (OC autorizada) de ese material. Con amarre, es la última
+ *                         compra **a ese proveedor**: el amarre elige al proveedor y el precio sale
+ *                         de la realidad más reciente con él.
+ *  • `amarre`           — el proveedor amarrado por Desarrollo (su precio negociado de catálogo):
+ *                         aplica cuando a ese proveedor todavía no se le ha comprado el material.
+ *  • `mas-barato`       — sin amarre (o con un amarre SIN precio) y sin compras: el proveedor más
+ *                         barato del avío, ya normalizado ÷ factor (R1). NO está negociado.
  *  • `promedio-medidas` — avío "por medida" (R5/B11): promedio de los precios de sus medidas. Este
- *                         escalón GANA sobre el amarre.
+ *                         escalón GANA sobre todos (una compra es de UNA medida: no representa al
+ *                         resto).
  *  • `referencia`       — último recurso del catálogo (`Tela.precioSugerido` /
- *                         `Avio.precioReferencia`), cuando no hay ningún proveedor con precio.
+ *                         `Avio.precioReferencia`): **solo lo nuevo que nunca se ha comprado**.
  *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
  *
  * 🔑 Regla de la receta (Daniel, 15-ago-2026): **la pantalla nunca muestra una cifra distinta de la
@@ -387,7 +393,14 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
  * el motor costeaba con el más barato).
  */
 export const esquemaOrigenPrecioBom = z
-  .enum(['amarre', 'mas-barato', 'promedio-medidas', 'referencia', 'sin-precio'])
+  .enum([
+    'ultimo-precio-compra',
+    'amarre',
+    'mas-barato',
+    'promedio-medidas',
+    'referencia',
+    'sin-precio',
+  ])
   .describe('Escalón de la cascada del que salió el precio que va a costear.');
 
 /**
@@ -423,6 +436,12 @@ export const esquemaModeloTelaSalida = z
       .string()
       .nullable()
       .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    amarreIgnorado: z
+      .boolean()
+      .describe(
+        'Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla ' +
+          'debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres.',
+      ),
     precioReferencia: z
       .number()
       .nullable()
@@ -462,6 +481,12 @@ export const esquemaModeloAvioSalida = z
       .string()
       .nullable()
       .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    amarreIgnorado: z
+      .boolean()
+      .describe(
+        'Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla ' +
+          'debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres.',
+      ),
     precioReferencia: z
       .number()
       .nullable()

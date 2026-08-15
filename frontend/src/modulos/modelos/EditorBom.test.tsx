@@ -184,6 +184,7 @@ function fichaBase(
         precioCosteo: 40,
         origenPrecio: 'referencia' as const,
         proveedorPrecio: null,
+        amarreIgnorado: false,
         precioReferencia: 40,
       },
     ],
@@ -257,14 +258,59 @@ describe('<EditorBom> — secciones de la receta', () => {
     await usuario.click(screen.getByTestId('expandir-bom-9'));
     await usuario.selectOptions(screen.getByTestId('selector-amarre-tela-9'), '31');
 
-    // Ya amarrado: el renglón muestra el precio del proveedor, no el de referencia.
-    expect(within(screen.getByTestId('renglon-bom-9')).getByText('Alsatex')).toBeInTheDocument();
+    // Ya amarrado: el renglón dice a quién quedó amarrado y avisa que FALTA GUARDAR. V1-E3e retiró
+    // la predicción del precio en cliente: desde §Post-F9.48 el escalón que gana depende de las
+    // COMPRAS reales, que el navegador no conoce — adivinarlo sería enseñar una cifra que no costea.
+    const fila = screen.getByTestId('renglon-bom-9');
+    expect(within(fila).getByText('amarrado: Alsatex')).toBeInTheDocument();
+    expect(within(fila).getByText('falta guardar')).toBeInTheDocument();
+    // Y mientras tanto sigue mostrando el precio que costea HOY (el de la ficha), no uno inventado.
+    expect(within(fila).getByText('$40.00')).toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('guardar-bom-telas'));
     const args = guardarTelasMutate.mock.calls[0]?.[0] as {
       telas: { idTelaProveedor: number | null }[];
     };
     expect(args.telas[0]?.idTelaProveedor).toBe(31);
+  });
+
+  it('⭐ V1-E3e: el renglón que costea con la ÚLTIMA COMPRA REAL lo dice, con su proveedor', () => {
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], {
+          telas: [
+            {
+              idTela: 9,
+              nombre: 'Jersey',
+              consumoPorPrenda: 1,
+              paraPreCosto: true,
+              paraProduccion: true,
+              paraCosto: true,
+              idTelaProveedor: 31,
+              proveedorAmarrado: 'Alsatex',
+              precioPorColor: false,
+              // El catálogo negociado dice otra cosa; el motor costea lo que de verdad se pagó.
+              precioCosteo: 33.5,
+              origenPrecio: 'ultimo-precio-compra' as const,
+              proveedorPrecio: 'Alsatex',
+              amarreIgnorado: false,
+              precioReferencia: 40,
+            },
+          ],
+        })}
+        puedeAdministrar
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
+
+    const renglon = screen.getByTestId('renglon-bom-9');
+    expect(within(renglon).getByText('$33.50')).toBeInTheDocument();
+    expect(within(renglon).getByText('última compra: Alsatex')).toBeInTheDocument();
+    // Tener amarre y costear por la última compra a ESE proveedor es lo NORMAL desde §Post-F9.48:
+    // no debe gritarse como si el amarre se estuviera ignorando.
+    expect(within(renglon).queryByText('amarre sin precio')).not.toBeInTheDocument();
+    // Y nunca se enseña el precio de catálogo, que no es el que costea.
+    expect(within(renglon).queryByText('$40.00')).not.toBeInTheDocument();
   });
 
   it('⭐ marca el amarre que cotiza POR COLOR (el base no es el precio que costea)', async () => {
@@ -277,24 +323,84 @@ describe('<EditorBom> — secciones de la receta', () => {
     await usuario.selectOptions(screen.getByTestId('selector-amarre-tela-9'), '32');
 
     const renglon = screen.getByTestId('renglon-bom-9');
-    expect(within(renglon).getByText('Textiles del Valle')).toBeInTheDocument();
-    // Sin este aviso, la receta enseñaría $55.00 mientras el motor costea el precio del color.
+    expect(within(renglon).getByText('amarrado: Textiles del Valle')).toBeInTheDocument();
+    // Sin este aviso, la receta enseñaría un precio base mientras el motor costea el del color.
     expect(within(renglon).getByText('precio por color')).toBeInTheDocument();
+    expect(within(renglon).getByText('falta guardar')).toBeInTheDocument();
   });
 
-  it('⭐ un amarre SIN precio se marca y se muestra el precio que SÍ va a costear', async () => {
-    const usuario = userEvent.setup();
-    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
-      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
-    });
-
-    await usuario.click(screen.getByTestId('expandir-bom-9'));
-    await usuario.selectOptions(screen.getByTestId('selector-amarre-tela-9'), '33');
+  it('⭐ un amarre SIN precio se marca y se muestra el precio que SÍ va a costear', () => {
+    // El estado lo manda el SERVIDOR (`amarreIgnorado`): la UI ya no lo deduce del origen.
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], {
+          telas: [
+            {
+              idTela: 9,
+              nombre: 'Jersey',
+              consumoPorPrenda: 1,
+              paraPreCosto: true,
+              paraProduccion: true,
+              paraCosto: true,
+              idTelaProveedor: 33,
+              proveedorAmarrado: 'Sin Precio SA',
+              precioPorColor: false,
+              precioCosteo: 40,
+              origenPrecio: 'referencia' as const,
+              proveedorPrecio: null,
+              amarreIgnorado: true,
+              precioReferencia: 40,
+            },
+          ],
+        })}
+        puedeAdministrar
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
 
     const renglon = screen.getByTestId('renglon-bom-9');
     expect(within(renglon).getByText('amarre sin precio')).toBeInTheDocument();
     // La tela sin amarre usable costea el precio de CATÁLOGO: es el número que se enseña.
     expect(within(renglon).getByText('$40.00')).toBeInTheDocument();
+  });
+
+  it('⭐ C1: con amarre pero la última compra fue a OTRO proveedor, SE GRITA (no queda gris)', () => {
+    // Escenario real: Desarrollo amarra a "Alsatex" para fijar la relación negociada pero deja
+    // `TelaProveedor.precio` en blanco, y a Alsatex nunca se le compró esa tela. La cascada salta
+    // el amarre y costea con la última compra a OTRO ($15). El número es correcto, pero sin este
+    // chip Desarrollo cotizaría creyendo que manda su amarre.
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], {
+          telas: [
+            {
+              idTela: 9,
+              nombre: 'Jersey',
+              consumoPorPrenda: 1,
+              paraPreCosto: true,
+              paraProduccion: true,
+              paraCosto: true,
+              idTelaProveedor: 31,
+              proveedorAmarrado: 'Alsatex',
+              precioPorColor: false,
+              precioCosteo: 15,
+              origenPrecio: 'ultimo-precio-compra' as const,
+              proveedorPrecio: 'Otro Textil',
+              amarreIgnorado: true,
+              precioReferencia: 40,
+            },
+          ],
+        })}
+        puedeAdministrar
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
+
+    const renglon = screen.getByTestId('renglon-bom-9');
+    expect(within(renglon).getByText('$15.00')).toBeInTheDocument();
+    expect(within(renglon).getByText('última compra: Otro Textil')).toBeInTheDocument();
+    // ⭐ La alerta que C1 rescató: el amarre no está mandando.
+    expect(within(renglon).getByText('amarre sin precio')).toBeInTheDocument();
   });
 
   it('⭐ SIN amarre el avío muestra el MÁS BARATO con su proveedor, marcado "sin amarrar" (H2b)', async () => {
@@ -317,6 +423,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               precioCosteo: 4.2,
               origenPrecio: 'mas-barato',
               proveedorPrecio: 'Zippers MX',
+              amarreIgnorado: false,
               // El catálogo dice 9, pero el motor NO costea con eso: costea 4.20.
               precioReferencia: 9,
             },
@@ -357,6 +464,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               precioCosteo: 6,
               origenPrecio: 'promedio-medidas',
               proveedorPrecio: null,
+              amarreIgnorado: false,
               precioReferencia: 2,
             },
           ],
@@ -378,7 +486,7 @@ describe('<EditorBom> — secciones de la receta', () => {
     expect(within(renglon()).getByText('promedio de medidas')).toBeInTheDocument();
   });
 
-  it('al DESAMARRAR un avío el renglón cae al más barato en vivo (no al precio viejo)', async () => {
+  it('al DESAMARRAR un avío el renglón avisa que falta guardar (el precio lo resuelve el servidor)', async () => {
     const usuario = userEvent.setup();
     const ficha = fichaBase([], {
       avios: [
@@ -396,6 +504,7 @@ describe('<EditorBom> — secciones de la receta', () => {
           precioCosteo: 3,
           origenPrecio: 'amarre',
           proveedorPrecio: 'Botones Caros',
+          amarreIgnorado: false,
           precioReferencia: 1,
         },
       ],
@@ -409,8 +518,11 @@ describe('<EditorBom> — secciones de la receta', () => {
     await usuario.selectOptions(screen.getByTestId('selector-amarre-avio-5'), '');
 
     const renglon = screen.getByTestId('renglon-bom-5');
-    expect(within(renglon).getByText('$1.20')).toBeInTheDocument();
-    expect(within(renglon).getByText('el más barato: Botones SA')).toBeInTheDocument();
+    // Conserva el precio que costea HOY ($3 del amarre) y avisa; NO adivina el escalón nuevo, que
+    // desde §Post-F9.48 puede ser la última compra real y el navegador no la conoce.
+    expect(within(renglon).getByText('$3.00')).toBeInTheDocument();
+    expect(within(renglon).getByText('falta guardar')).toBeInTheDocument();
+    expect(within(renglon).queryByText(/amarrado:/)).not.toBeInTheDocument();
   });
 
   it('la ficha ya trae el amarre por color y el renglón lo marca sin tocar nada', () => {
@@ -431,6 +543,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               precioCosteo: 55,
               origenPrecio: 'amarre' as const,
               proveedorPrecio: 'Textiles del Valle',
+              amarreIgnorado: false,
               precioReferencia: 40,
             },
           ],
@@ -463,6 +576,7 @@ describe('<EditorBom> — secciones de la receta', () => {
           precioCosteo: 1.2,
           origenPrecio: 'mas-barato' as const,
           proveedorPrecio: 'Botones SA',
+          amarreIgnorado: false,
           precioReferencia: 1,
         },
       ],

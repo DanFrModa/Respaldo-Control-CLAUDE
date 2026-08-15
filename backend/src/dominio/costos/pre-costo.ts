@@ -4,11 +4,26 @@
  *
  * El pre-costo NO es una tabla: es CÁLCULO de dominio sobre la receta (verificado: `PreCostos` no era
  * tabla en el viejo). Reproduce las consultas `CostoTela`/`CostoHabilitacion`/`CostoBordado`:
- *  • Tela   = Σ ( `ModeloTela.consumoPorPrenda` × `Tela.precioSugerido` )  [renglones `paraPreCosto`]
- *  • Avíos  = Σ ( `ModeloAvio.consumoPorPrenda` × `Avio.precioReferencia` ) [renglones `paraPreCosto`]
+ *  • Tela   = Σ ( consumo × precio resuelto )                [renglones `paraPreCosto`]
+ *  • Avíos  = Σ ( consumo × precio resuelto )                [renglones `paraPreCosto`]
  *  • Arte   = Σ `ModeloArte.precio`                          — UNA vez por modelo, SIN cantidad
  *  • Maquila= `Modelo.maquilaBase`
  *  • Costo  = Tela + Avíos + Arte + Maquila        (SIN regalías — la regalía va sobre la venta, D2)
+ *
+ * ⭐ **V1-E3e (§Post-F9.48): este módulo DEJÓ DE SER UN MOTOR APARTE.** Hasta agosto de 2026 el
+ * pre-costo rápido valuaba el mismo renglón distinto que la receta y que el precosto persistido —
+ * cuatro divergencias, no una—: (1) sin amarre usaba `Avio.precioReferencia` en vez de la cascada
+ * completa; (2) **no conocía `promedio-medidas`** (ni miraba `AvioMedida`); (3) **ignoraba
+ * `consumoPorTalla`** y siempre usaba `consumoPorPrenda`; y (4) multiplicaba el precio CRUDO en vez
+ * de redondearlo antes, como sí hace el motor persistido. Daniel: *"No hay ningún motivo por el cual
+ * tener dos precios distintos. Hay que unificarlo."* Las cuatro quedaron cerradas: aquí ya no hay
+ * aritmética propia — se llaman `resolverPrecioTela`/`resolverPrecioAvioCatalogo`
+ * (`resolucion-precios.ts`) con el ESCALÓN 1 de última compra real, y se redondea con la misma regla
+ * (`redondear2`/`redondear4` de `decimales.ts`) que usa `desarrollo/precostos.ts`.
+ *
+ * ⚠️ Este módulo **no escribe nada** (es lectura pura, sin `create`/`update`/`enTransaccion`): por eso
+ * alinearlo **no mueve ningún precio pactado**. Lo congelado vive en `Precosto`/`PrecostoLinea` y se
+ * lee tal cual se guardó.
  *
  * La LISTA DE PRECIOS (ex `ListaPreciosEd`) agrega a cada modelo su precio sugerido parametrizado
  * ({@link calcularPrecioSugerido}: utilidad + regalías, redondeo al alza), filtrable por género y
@@ -27,9 +42,20 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { num, numOrNull, redondear2 } from './decimales.js';
+import { num, numOrNull, promedioSimple, redondear2, redondear4 } from './decimales.js';
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';
-import { resolverPrecioAvio, resolverPrecioTela } from './resolucion-precios.js';
+import {
+  resolverPrecioAvioCatalogo,
+  resolverPrecioTela,
+  type CompraRealPrecio,
+} from './resolucion-precios.js';
+import {
+  claveMaterial,
+  claveMaterialProveedor,
+  leerUltimosPreciosCompra,
+  SIN_ULTIMOS_PRECIOS,
+  type UltimosPreciosCompra,
+} from './ultimo-precio-compra.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
@@ -53,13 +79,12 @@ export async function parametrosPrecioEmpresa(
 }
 
 /**
- * `include` para traer la receta paraPreCosto de un modelo con los precios de catálogo.
+ * `include` para traer la receta paraPreCosto de un modelo con TODO lo que la cascada única necesita.
  *
- * F8-E1 (R17): además del precio genérico de catálogo (`Tela.precioSugerido`/`Avio.precioReferencia`,
- * el de F7) se trae el AMARRE del BOM cuando existe — el renglón proveedor–producto–precio elegido
- * por Desarrollo. El pre-costo es por modelo (SIN color/talla), así que la cascada de tela se reduce
- * a amarre → sugerido, y la de avío a amarre → más barato → referencia. Un modelo SIN amarres
- * precostea IDÉNTICO a F7 (no-regresión, ver `numerosPreCosto`).
+ * Es EXACTAMENTE el mismo `include` del precosto persistido (`desarrollo/precostos.ts`
+ * → `incluirBomModelo`) más el género: el amarre R17, los proveedores del avío (para el "más
+ * barato"), sus **medidas activas** (R5/B11 → `promedio-medidas`) y el **consumo por talla** (R18).
+ * Cualquier campo que falte aquí es una divergencia esperando a pasar (V1-E3e cerró cuatro).
  */
 const incluirReceta = {
   genero: { select: { nombre: true } },
@@ -69,7 +94,9 @@ const incluirReceta = {
       idTela: true,
       consumoPorPrenda: true,
       idTelaProveedor: true,
-      telaProveedor: { select: { precio: true, manejaPrecioPorColor: true } },
+      telaProveedor: {
+        select: { idProveedor: true, precio: true, manejaPrecioPorColor: true },
+      },
       tela: { select: { nombre: true, precioSugerido: true } },
     },
   },
@@ -78,6 +105,7 @@ const incluirReceta = {
     select: {
       idAvio: true,
       consumoPorPrenda: true,
+      consumoPorTalla: true,
       idAvioProveedor: true,
       avio: {
         select: {
@@ -86,8 +114,13 @@ const incluirReceta = {
           precioReferencia: true,
           factorConversion: true,
           proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          // R5/B11: medidas ACTIVAS del avío "por medida" → su promedio simple gana la cascada.
+          medidas: { where: { activo: true }, select: { precio: true } },
         },
       },
+      // R18: cuando el consumo se captura POR TALLA, el pre-costo usa el PROMEDIO SIMPLE de las
+      // medidas capturadas (idéntico al precosto persistido), no `consumoPorPrenda`.
+      tallas: { select: { consumo: true } },
     },
   },
   artes: {
@@ -117,49 +150,102 @@ interface NumerosPreCosto {
   costoTotal: number;
 }
 
-/** Calcula los números crudos del pre-costo de un modelo (función determinista sobre su receta). */
-function numerosPreCosto(modelo: ModeloConReceta): NumerosPreCosto {
+/** Traduce una entrada del mapa de últimas compras a la forma mínima que pide la cascada. */
+function aCompraReal(
+  ultimos: UltimosPreciosCompra,
+  clave: string,
+  porProveedor = false,
+): CompraRealPrecio | null {
+  const u = (porProveedor ? ultimos.porMaterialProveedor : ultimos.porMaterial).get(clave);
+  return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
+}
+
+/**
+ * Ids de los materiales `paraPreCosto` de unos modelos, para pedir sus últimas compras EN UN LOTE
+ * (la lista de precios recorre el catálogo entero: un `findFirst` por renglón sería un N+1).
+ */
+function materialesDeModelos(modelos: readonly ModeloConReceta[]): {
+  telas: number[];
+  avios: number[];
+} {
+  return {
+    telas: modelos.flatMap((m) => m.telas.map((t) => t.idTela)),
+    avios: modelos.flatMap((m) => m.avios.map((a) => a.idAvio)),
+  };
+}
+
+/**
+ * Calcula los números crudos del pre-costo de un modelo (función determinista sobre su receta).
+ *
+ * ⭐ V1-E3e: usa la MISMA cascada y el MISMO redondeo que el precosto persistido — sin excepciones
+ * ni ramas propias. `ultimos` trae las últimas compras REALES ya leídas por lote (§Post-F9.48);
+ * pasar {@link SIN_ULTIMOS_PRECIOS} equivale a la cascada de catálogo de siempre.
+ */
+function numerosPreCosto(modelo: ModeloConReceta, ultimos: UltimosPreciosCompra): NumerosPreCosto {
   const telas = modelo.telas.map((t) => {
-    const consumo = num(t.consumoPorPrenda);
-    // F8-E1: si el BOM amarró un proveedor a esta tela, se resuelve por la cascada (amarre →
-    // sugerido); si NO hay amarre, se usa el precio sugerido genérico EXACTO como F7 (no-regresión).
-    const precio =
-      t.idTelaProveedor !== null && t.telaProveedor !== null
-        ? (resolverPrecioTela({
-            precioSugerido: numOrNull(t.tela.precioSugerido),
-            amarre: {
+    // Mismo redondeo del motor persistido: lo que se muestra y lo que multiplica son EL MISMO
+    // número (el importe crudo `consumo × precio` fue la 4ª divergencia que cerró V1-E3e).
+    const consumo = redondear4(num(t.consumoPorPrenda));
+    const resuelto = resolverPrecioTela({
+      precioSugerido: numOrNull(t.tela.precioSugerido),
+      amarre:
+        t.idTelaProveedor !== null && t.telaProveedor !== null
+          ? {
               precio: numOrNull(t.telaProveedor.precio),
               manejaPrecioPorColor: t.telaProveedor.manejaPrecioPorColor,
-            },
-          }).precio ?? 0)
-        : num(t.tela.precioSugerido);
-    return { idTela: t.idTela, tela: t.tela.nombre, consumo, precio, importe: consumo * precio };
+            }
+          : null,
+      ultimaCompra: aCompraReal(ultimos, claveMaterial('tela', t.idTela)),
+      ultimaCompraProveedorAmarrado:
+        t.telaProveedor == null
+          ? null
+          : aCompraReal(
+              ultimos,
+              claveMaterialProveedor('tela', t.idTela, t.telaProveedor.idProveedor),
+              true,
+            ),
+    });
+    const precio = redondear2(resuelto.precio ?? 0);
+    return {
+      idTela: t.idTela,
+      tela: t.tela.nombre,
+      consumo,
+      precio,
+      importe: redondear2(consumo * precio),
+    };
   });
   const avios = modelo.avios.map((a) => {
-    const consumo = num(a.consumoPorPrenda);
-    // F8-E1: si el BOM amarró un proveedor a este avío, se resuelve por la cascada (amarre → más
-    // barato → referencia, normalizando por factor); si NO hay amarre, se usa el precioReferencia
-    // EXACTO como F7 (no-regresión: F7 NO aplicaba "más barato" en el pre-costo).
-    const precio =
-      a.idAvioProveedor !== null
-        ? (resolverPrecioAvio({
-            precioReferencia: numOrNull(a.avio.precioReferencia),
-            factorConversionAvio: numOrNull(a.avio.factorConversion),
-            idAvioProveedor: a.idAvioProveedor,
-            proveedores: a.avio.proveedores.map((p) => ({
-              idProveedor: p.idProveedor,
-              precio: numOrNull(p.precio),
-              factorConversion: numOrNull(p.factorConversion),
-            })),
-          }).precio ?? 0)
-        : num(a.avio.precioReferencia);
+    // R18: el consumo POR TALLA se promedia (era la 3ª divergencia: el pre-costo lo ignoraba).
+    const consumo = redondear4(
+      a.consumoPorTalla && a.tallas.length > 0
+        ? promedioSimple(a.tallas.map((x) => num(x.consumo)))
+        : num(a.consumoPorPrenda),
+    );
+    const resuelto = resolverPrecioAvioCatalogo({
+      precioReferencia: numOrNull(a.avio.precioReferencia),
+      factorConversionAvio: numOrNull(a.avio.factorConversion),
+      idAvioProveedor: a.idAvioProveedor,
+      // R5/B11: el avío "por medida" se costea con el promedio de sus medidas (2ª divergencia).
+      medidas: a.avio.medidas.map((m) => num(m.precio)),
+      proveedores: a.avio.proveedores.map((p) => ({
+        idProveedor: p.idProveedor,
+        precio: numOrNull(p.precio),
+        factorConversion: numOrNull(p.factorConversion),
+      })),
+      ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', a.idAvio)),
+      ultimaCompraProveedorAmarrado:
+        a.idAvioProveedor === null
+          ? null
+          : aCompraReal(ultimos, claveMaterialProveedor('avio', a.idAvio, a.idAvioProveedor), true),
+    });
+    const precio = redondear2(resuelto.precio ?? 0);
     return {
       idAvio: a.idAvio,
       clave: a.avio.clave,
       descripcion: a.avio.descripcion,
       consumo,
       precio,
-      importe: consumo * precio,
+      importe: redondear2(consumo * precio),
     };
   });
   // El arte vive DENTRO del modelo desde V1-E3d (§Post-F9.35): UN solo precio, sin catálogo detrás.
@@ -198,7 +284,13 @@ export async function calcularPreCosto(
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
 
-  const n = numerosPreCosto(modelo);
+  // §Post-F9.48: escalón 1 de la cascada = la última COMPRA REAL, acotada a la empresa activa (A9).
+  const ultimos = await leerUltimosPreciosCompra(
+    cliente,
+    sesion.idEmpresaActiva,
+    materialesDeModelos([modelo]),
+  );
+  const n = numerosPreCosto(modelo, ultimos);
   const params = await parametrosPrecioEmpresa(cliente, sesion.idEmpresaActiva);
   const sugerido = calcularPrecioSugerido(n.costoTotal, params);
 
@@ -279,12 +371,21 @@ export async function listaPrecios(
     include: incluirReceta,
   });
   const params = await parametrosPrecioEmpresa(cliente, sesion.idEmpresaActiva);
+  // UNA sola consulta de últimas compras para TODOS los modelos de la lista (no una por renglón).
+  const ultimos =
+    modelos.length === 0
+      ? SIN_ULTIMOS_PRECIOS
+      : await leerUltimosPreciosCompra(
+          cliente,
+          sesion.idEmpresaActiva,
+          materialesDeModelos(modelos),
+        );
 
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const $ = (v: number): number | null => (verImportes ? redondear2(v) : null);
 
   const filas = modelos.map((m) => {
-    const n = numerosPreCosto(m);
+    const n = numerosPreCosto(m, ultimos);
     const sugerido = calcularPrecioSugerido(n.costoTotal, params);
     return {
       idModelo: m.id,

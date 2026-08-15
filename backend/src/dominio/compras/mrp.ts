@@ -46,6 +46,26 @@
  * NO-REGRESIÓN). El consumo de avíos por talla (R18) se compra por medida×curva. Documentado en cada
  * helper; los casos ambiguos (tela multi-color con precios distintos, talla sin medida) NO truenan en
  * silencio: van a `avisos` en la salida.
+ *
+ * ⭐ **LA OC NACE CON LO ÚLTIMO QUE ESE PROVEEDOR COBRÓ (DANIEL, 15-ago-2026 — §Post-F9.48).** El MRP
+ * también aplica el escalón 1 de la cascada única, pero con un LÍMITE que es el corazón de la
+ * decisión: **solo cuenta la última compra AL PROVEEDOR AL QUE SE LE VA A COMPRAR**. Nunca el precio
+ * de un tercero — eso emitiría una orden con un precio que ese proveedor jamás dio.
+ *
+ *  • **A QUIÉN se le compra NO cambia**: lo sigue fijando R1/F4 (proveedor amarrado; si no, el más
+ *    barato). Esta etapa no toca la política de compra, solo **a qué precio nace la línea**.
+ *  • **A QUÉ PRECIO**: la última compra REAL a ese proveedor (`ultimo-precio-compra.ts`, OC
+ *    autorizada, ya ÷ factor R1). Si nunca se le compró, su precio de catálogo/negociado — el
+ *    comportamiento de antes, intacto.
+ *  • **EXCEPCIÓN por COLOR**: si el precio salió del escalón `amarre-color`
+ *    (`TelaProveedorColor.precio` del color de la orden), ése MANDA sobre la última compra. Razón:
+ *    `OrdenCompraLinea` NO guarda color —vive en `OrdenCompraLineaTalla`, y una línea puede cubrir
+ *    varios colores con UN precio—, así que la "última compra" de una tela es CIEGA al color;
+ *    dejarla ganar cotizaría una tela negra con el precio de la blanca que se compró al final. Es el
+ *    mismo argumento que protege a `promedio-medidas` en los avíos (ver `resolucion-precios.ts`).
+ *
+ * Con esto el ciclo cierra sobre un solo criterio: la OC nace del precio real, se autoriza, y ese
+ * precio entra al histórico del que come todo el costeo.
  */
 import type {
   ExplosionSalida,
@@ -75,7 +95,17 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { num, numOrNull } from '../costos/decimales.js';
-import { resolverPrecioAvio, resolverPrecioTela } from '../costos/resolucion-precios.js';
+import {
+  resolverPrecioAvio,
+  resolverPrecioTela,
+  type OrigenPrecioTela,
+} from '../costos/resolucion-precios.js';
+import {
+  claveMaterialProveedor,
+  leerUltimosPreciosCompra,
+  SIN_ULTIMOS_PRECIOS,
+  type UltimosPreciosCompra,
+} from '../costos/ultimo-precio-compra.js';
 import { requeridoAvioReceta } from '../produccion/receta-avios.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
@@ -236,13 +266,82 @@ interface ProveedorPrecio {
 const SIN_PROVEEDOR: ProveedorPrecio = { idProveedor: null, proveedor: null, precio: null };
 
 /**
+ * Proveedor/precio elegido + la TRAZA de si el precio se pisó con la última compra real (D1). La
+ * traza no es decorativa: los AVISOS tienen que nombrar la fuente REAL del precio con el que quedó
+ * la línea. Un aviso que describe mal su propia causa es el mismo pecado que esta etapa corrigió en
+ * la receta —decir una cosa y hacer otra—, solo que en prosa.
+ */
+interface ProveedorPrecioResuelto extends ProveedorPrecio {
+  /** ¿El precio final salió de la última COMPRA REAL a ese proveedor (§Post-F9.48)? */
+  desdeUltimaCompra: boolean;
+}
+
+/**
+ * ⭐ §Post-F9.48 (D1, DANIEL 15-ago-2026): **la línea de OC nace con lo último que ESE proveedor
+ * cobró**. Recibe el proveedor/precio YA elegido por R1/F4 (amarrado o más barato) y le PISA el
+ * precio con la última compra REAL **a ese mismo proveedor**, si existe.
+ *
+ * Invariantes que respeta —y por las que existe como paso aparte, en vez de alimentar la cascada
+ * compartida—:
+ *  • **NUNCA cambia el proveedor.** La elección es de R1/F4 y esta etapa no la toca.
+ *  • **NUNCA usa el precio de un tercero.** Solo mira `porMaterialProveedor`, jamás el mapa global:
+ *    una OC dirigida a X no puede nacer con lo que cobró Y.
+ *  • **Sin compras a ese proveedor, no hace nada**: se queda el precio de catálogo/negociado que
+ *    traía (comportamiento anterior intacto → no-regresión).
+ *  • `respetarPrecio` deja al llamador BLINDAR un precio más específico que la compra: hoy lo usa la
+ *    tela cuyo precio salió del COLOR (`amarre-color`), porque `OrdenCompraLinea` no guarda color y
+ *    la última compra es ciega a él.
+ */
+function conUltimoPrecioDelProveedor(
+  elegido: ProveedorPrecio,
+  material: { tipo: 'tela' | 'avio'; id: number },
+  ultimos: UltimosPreciosCompra,
+  respetarPrecio = false,
+): ProveedorPrecioResuelto {
+  if (respetarPrecio || elegido.idProveedor === null) {
+    return { ...elegido, desdeUltimaCompra: false };
+  }
+  const ultima = ultimos.porMaterialProveedor.get(
+    claveMaterialProveedor(material.tipo, material.id, elegido.idProveedor),
+  );
+  return ultima === undefined
+    ? { ...elegido, desdeUltimaCompra: false }
+    : { ...elegido, precio: ultima.precio, desdeUltimaCompra: true };
+}
+
+/**
+ * Nombra, EN PROSA, la fuente del precio con el que quedó la línea. La usan los avisos: si el texto
+ * dijera "el precio base del proveedor" mientras D1 pisó el precio con la última compra, el aviso
+ * mandaría a revisar el dato equivocado.
+ */
+function fuenteDelPrecioTela(origen: OrigenPrecioTela, desdeUltimaCompra: boolean): string {
+  if (desdeUltimaCompra) {
+    return 'se usó el precio de la última compra a ese proveedor';
+  }
+  switch (origen) {
+    case 'amarre':
+      return 'se usó el precio base del proveedor';
+    case 'sugerido':
+      return 'el proveedor no tiene precio base: se usó el precio de catálogo de la tela';
+    case 'sin-precio':
+      return 'no hay ningún precio que usar: la línea nace SIN precio';
+    default:
+      // `amarre-color` no puede llegar aquí (el color solo resuelve con UN color en la orden) y
+      // `color-referencia` es inalcanzable en el MRP (nunca se pasa `precioColorReferencia`).
+      return 'se usó el precio que resolvió la cascada';
+  }
+}
+
+/**
  * Resuelve proveedor/precio de una TELA del BOM heredando el AMARRE de Desarrollo (F8-E6). Sin amarre →
  * NULL (como antes de F8: captura manual, D5). Con amarre → `idProveedorSugerido` = el proveedor elegido
  * (aunque el precio termine saliendo del sugerido genérico: a ese proveedor se le compra) y el precio se
  * resuelve con la cascada `resolverPrecioTela`. Precio-por-color: las telas del MRP se consumen por
  * MODELO completo (sin desglose por color en v2), así que sólo se resuelve por color cuando la orden es de
- * UN color; si tiene varios colores con precios de tela DISTINTOS, usa el precio BASE del amarre y DEJA UN
- * AVISO (no truena en silencio). Empuja avisos al arreglo compartido.
+ * UN color; si tiene varios colores con precios de tela DISTINTOS, el precio-por-color NO se aplica y se
+ * DEJA UN AVISO (no truena en silencio) que nombra la fuente REAL del precio con el que quedó la línea —
+ * base del proveedor, catálogo de la tela o última compra a ese proveedor (D1). Empuja avisos al arreglo
+ * compartido.
  *
  * NOTA (cascada, decisión F8-E6): AQUÍ la cascada OMITE el paso `color-referencia` (`TelaColor.precio`
  * sin proveedor) a propósito — la tela del MRP se consume por MODELO completo (no hay color por renglón
@@ -256,10 +355,12 @@ function resolverProveedorPrecioTela(
   mt: OrdenParaExplosion['modelo']['telas'][number],
   colores: number[],
   avisos: string[],
-): ProveedorPrecio {
+  ultimos: UltimosPreciosCompra,
+): ProveedorPrecioResuelto {
   const tp = mt.telaProveedor;
   if (mt.idTelaProveedor === null || tp === null) {
-    return SIN_PROVEEDOR; // sin amarre → como hoy (NULL / captura manual)
+    // sin amarre → como hoy (NULL / captura manual)
+    return { ...SIN_PROVEEDOR, desdeUltimaCompra: false };
   }
 
   // Proveedor amarrado dado de baja: se conserva la sugerencia, pero no en silencio (aviso a la OC).
@@ -272,22 +373,19 @@ function resolverProveedorPrecioTela(
 
   // Precio del COLOR en contexto: sólo si el proveedor cotiza por color Y la orden es de UN color.
   let precioColor: number | null = null;
+  // Multi-color con precios de tela DISTINTOS: el precio-por-color no se puede aplicar (la tela se
+  // compra por modelo completo). Solo se DETECTA aquí; el aviso se arma más abajo, cuando ya se
+  // sabe con qué precio quedó la línea (ver `fuenteDelPrecioTela`).
+  let multiColorConPreciosDistintos = false;
   if (tp.manejaPrecioPorColor) {
     const precioPorColor = new Map(tp.colores.map((c) => [c.idColor, numOrNull(c.precio)]));
     if (colores.length === 1) {
       precioColor = precioPorColor.get(colores[0]!) ?? null;
     } else {
-      // Multi-color: usa el precio BASE. Si los colores de la orden tienen precios de tela DISTINTOS,
-      // avisa (el base pierde ese detalle; la tela se compra por modelo completo, no por color).
       const distintos = new Set(
         colores.map((id) => precioPorColor.get(id)).filter((p): p is number => p != null),
       );
-      if (distintos.size >= 2) {
-        avisos.push(
-          `Tela "${mt.tela.nombre}": la orden tiene varios colores con precios de tela distintos ` +
-            `en "${tp.proveedor.nombre}"; se usó el precio base del proveedor. Revisa el precio de la OC.`,
-        );
-      }
+      multiColorConPreciosDistintos = distintos.size >= 2;
     }
   }
 
@@ -299,7 +397,28 @@ function resolverProveedorPrecioTela(
       precioColor,
     },
   });
-  return { idProveedor: tp.idProveedor, proveedor: tp.proveedor.nombre, precio: resuelto.precio };
+  // ⭐ D1/§Post-F9.48: la línea nace con lo último que ESTE proveedor cobró. Excepción: un precio
+  // por COLOR es más específico que la última compra (que no sabe de colores) y no se pisa.
+  const sugerido = conUltimoPrecioDelProveedor(
+    { idProveedor: tp.idProveedor, proveedor: tp.proveedor.nombre, precio: resuelto.precio },
+    { tipo: 'tela', id: mt.idTela },
+    ultimos,
+    resuelto.origen === 'amarre-color',
+  );
+
+  // El aviso va DESPUÉS de resolver el precio, para poder nombrar la fuente que de verdad se usó:
+  // armarlo antes hacía que dijera "el precio base del proveedor" incluso cuando D1 ya lo había
+  // pisado con la última compra — mandando a revisar un dato que no era el de la línea.
+  if (multiColorConPreciosDistintos) {
+    avisos.push(
+      `Tela "${mt.tela.nombre}": la orden tiene varios colores con precios de tela distintos ` +
+        `en "${tp.proveedor.nombre}", así que el precio por color no se aplicó; ` +
+        `${fuenteDelPrecioTela(resuelto.origen, sugerido.desdeUltimaCompra)}. ` +
+        `Revisa el precio de la OC.`,
+    );
+  }
+
+  return sugerido;
 }
 
 /**
@@ -316,7 +435,8 @@ function resolverProveedorPrecioTela(
 function resolverProveedorPrecioAvioAmarrado(
   ma: OrdenParaExplosion['modelo']['avios'][number],
   avisos: string[],
-): ProveedorPrecio | null {
+  ultimos: UltimosPreciosCompra,
+): ProveedorPrecioResuelto | null {
   if (ma.idAvioProveedor === null) return null;
   const fila = ma.avio.proveedores.find((p) => p.idProveedor === ma.idAvioProveedor);
   if (fila === undefined) return null;
@@ -341,11 +461,16 @@ function resolverProveedorPrecioAvioAmarrado(
           `"${fila.proveedor.nombre}" está INACTIVO; se mantiene la sugerencia, revísalo antes de la OC.`,
       );
     }
-    return {
-      idProveedor: fila.idProveedor,
-      proveedor: fila.proveedor.nombre,
-      precio: resuelto.precio,
-    };
+    // ⭐ D1/§Post-F9.48: el precio de la línea es el de la última compra A ESTE proveedor.
+    return conUltimoPrecioDelProveedor(
+      {
+        idProveedor: fila.idProveedor,
+        proveedor: fila.proveedor.nombre,
+        precio: resuelto.precio,
+      },
+      { tipo: 'avio', id: ma.idAvio },
+      ultimos,
+    );
   }
   return null; // amarre sin precio usable → fallback F4 (más barato)
 }
@@ -434,6 +559,11 @@ async function proveedorSugeridoAvio(
  *     amarre (o amarrado sin precio) → "más barato" de F4 (`proveedorSugeridoAvio`, fallback intacto).
  * AVÍOS genéricos (decisión (d)): netea contra el stock REAL (Σ kardex, D3) → solo el faltante va a
  * compra. Telas y avíos NO genéricos van completos a compra. Los casos ambiguos van a `avisos`.
+ *
+ * ⭐ **PRECIO de la línea (D1/§Post-F9.48):** una vez elegido el proveedor por R1/F4, el precio se
+ * PISA con el de la última compra REAL **a ese mismo proveedor** ({@link conUltimoPrecioDelProveedor});
+ * si nunca se le compró, queda el de catálogo/negociado. La elección del proveedor NO cambia y jamás
+ * se usa el precio de un tercero.
  */
 async function calcularRequerimientos(
   tx: Tx,
@@ -445,12 +575,23 @@ async function calcularRequerimientos(
   const resultado: RequerimientoCalculado[] = [];
   const colores = coloresDeOrden(orden);
   const piezasPorTalla = piezasPorTallaOrden(orden);
+  // ⭐ D1/§Post-F9.48: últimas compras REALES de todo el BOM, EN UN LOTE y acotadas a la empresa de
+  // la orden (A9). Solo se usa el mapa POR PROVEEDOR: la línea de OC jamás nace con el precio de un
+  // tercero. Si el BOM está vacío, ni se consulta.
+  const materiales = {
+    telas: orden.modelo.telas.filter((t) => t.paraProduccion).map((t) => t.idTela),
+    avios: orden.modelo.avios.filter((a) => a.paraProduccion).map((a) => a.idAvio),
+  };
+  const ultimos =
+    materiales.telas.length === 0 && materiales.avios.length === 0
+      ? SIN_ULTIMOS_PRECIOS
+      : await leerUltimosPreciosCompra(tx, orden.idEmpresa, materiales);
 
   // ── TELAS del BOM (paraProduccion) ──
   for (const mt of orden.modelo.telas) {
     if (!mt.paraProduccion) continue;
     const requerida = num(mt.consumoPorPrenda) * totalPiezas;
-    const sugerido = resolverProveedorPrecioTela(mt, colores, avisos);
+    const sugerido = resolverProveedorPrecioTela(mt, colores, avisos, ultimos);
     resultado.push({
       tipo: 'tela',
       idTela: mt.idTela,
@@ -484,8 +625,14 @@ async function calcularRequerimientos(
 
     // Amarre de Desarrollo primero (F8-E6); si no resuelve, "más barato" de F4 (fallback intacto).
     const sugerido =
-      resolverProveedorPrecioAvioAmarrado(ma, avisos) ??
-      (await proveedorSugeridoAvio(tx, ma.idAvio));
+      resolverProveedorPrecioAvioAmarrado(ma, avisos, ultimos) ??
+      // Sin amarre usable: el MÁS BARATO de F4 elige al proveedor (R1, intacto) y D1 le pone el
+      // precio de la última compra A ESE MISMO proveedor.
+      conUltimoPrecioDelProveedor(
+        await proveedorSugeridoAvio(tx, ma.idAvio),
+        { tipo: 'avio', id: ma.idAvio },
+        ultimos,
+      );
     resultado.push({
       tipo: 'avio',
       idTela: null,

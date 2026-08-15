@@ -29904,6 +29904,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -29922,6 +29923,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -29948,6 +29953,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -30032,6 +30038,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -30050,6 +30057,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -30077,6 +30088,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -31734,6 +31746,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -31752,6 +31765,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -31778,6 +31795,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -32110,6 +32128,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -32128,6 +32147,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -32154,6 +32177,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -32428,6 +32452,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -32446,6 +32471,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -32473,6 +32502,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -32809,6 +32839,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -32827,6 +32858,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -32854,6 +32889,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -36304,6 +36340,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -36322,6 +36359,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -36348,6 +36389,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
@@ -36432,6 +36474,7 @@
                           "origenPrecio": {
                             "type": "string",
                             "enum": [
+                              "ultimo-precio-compra",
                               "amarre",
                               "mas-barato",
                               "promedio-medidas",
@@ -36450,6 +36493,10 @@
                               }
                             ],
                             "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
                           },
                           "precioReferencia": {
                             "anyOf": [
@@ -36477,6 +36524,7 @@
                           "precioCosteo",
                           "origenPrecio",
                           "proveedorPrecio",
+                          "amarreIgnorado",
                           "precioReferencia"
                         ],
                         "additionalProperties": false,
