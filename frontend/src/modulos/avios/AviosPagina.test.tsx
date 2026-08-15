@@ -230,8 +230,20 @@ describe('<AviosPagina>', () => {
   it('muestra los proveedores y precios del avío al expandir el renglón (R1)', () => {
     const conProveedores = avio(5, 'BTN-05');
     conProveedores.proveedores = [
-      { idProveedor: 1, nombreProveedor: 'Botones SA', precio: 0.5, condiciones: 'contado' },
-      { idProveedor: 2, nombreProveedor: 'Hilos del Norte', precio: null, condiciones: null },
+      {
+        idProveedor: 1,
+        nombreProveedor: 'Botones SA',
+        precio: 0.5,
+        condiciones: 'contado',
+        precioUnidadConsumo: null,
+      },
+      {
+        idProveedor: 2,
+        nombreProveedor: 'Hilos del Norte',
+        precio: null,
+        condiciones: null,
+        precioUnidadConsumo: null,
+      },
     ];
     useAvios.mockReturnValue(consultaConDatos([conProveedores]));
     renderConProveedores(<AviosPagina />, {

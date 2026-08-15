@@ -49,4 +49,32 @@ describe('requeridoAvioReceta (R18 — helper compartido MRP ↔ Habilitación)'
     expect(r.requerido).toBe(150); // 3×10 (CH con medida) + 6×20 (M sin medida → consumoPorPrenda)
     expect(r.tallasSinMedida).toEqual([2]);
   });
+
+  it('⭐ "sin medida" y "medida CERO" NO son lo mismo (V1-E3c)', () => {
+    // Sin fila para la talla 2 (así queda una talla dejada en blanco en el editor): cae al
+    // consumo por prenda Y se reporta, que es justo el aviso que el MRP le enseña al usuario.
+    const sinFila = requeridoAvioReceta(
+      avio({ consumoPorTalla: true, tallas: [{ idTalla: 1, consumo: D(3) }] }),
+      30,
+      piezasPorTalla,
+    );
+    expect(sinFila.requerido).toBe(150);
+    expect(sinFila.tallasSinMedida).toEqual([2]);
+
+    // Con una fila de CERO capturada a propósito: requiere cero para esa talla y NO avisa. Si el
+    // editor guardara las tallas en blanco como 0, TODAS caerían aquí y el aviso desaparecería.
+    const conCero = requeridoAvioReceta(
+      avio({
+        consumoPorTalla: true,
+        tallas: [
+          { idTalla: 1, consumo: D(3) },
+          { idTalla: 2, consumo: D(0) },
+        ],
+      }),
+      30,
+      piezasPorTalla,
+    );
+    expect(conCero.requerido).toBe(30); // 3×10 + 0×20
+    expect(conCero.tallasSinMedida).toEqual([]);
+  });
 });

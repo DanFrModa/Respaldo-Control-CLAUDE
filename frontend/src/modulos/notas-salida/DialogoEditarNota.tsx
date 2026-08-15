@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useAvios } from '@/api/avios';
 import { useHabilitacionOrden } from '@/api/habilitacion';
 import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
@@ -42,6 +41,8 @@ function hoy(): string {
 export interface PrefillRenglonNota {
   idOrden: number;
   idAvio: number;
+  /** Clave del avío (la trae la habilitación): la muestra el combobox del renglón. */
+  clave?: string | null;
   cantidad: number;
   unidad: string | null;
 }
@@ -92,7 +93,6 @@ export function DialogoEditarNota({
   // ── Catálogos para los selectores. ───────────────────────────────────────────
   const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const almacenes = useAlmacenes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
-  const avios = useAvios({ pagina: 1, porPagina: 100 });
   const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
@@ -159,6 +159,7 @@ export function DialogoEditarNota({
           tipo: 'avio' as const,
           idOrden: r.idOrden,
           idAvio: r.idAvio,
+          avioEtiqueta: r.clave ?? null,
           idTela: null,
           telaNombre: null,
           idLote: null,
@@ -198,6 +199,7 @@ export function DialogoEditarNota({
       tipo: 'avio',
       idOrden: data.idOrden,
       idAvio: a.idAvio,
+      avioEtiqueta: a.clave,
       idTela: null,
       telaNombre: null,
       idLote: null,
@@ -432,7 +434,6 @@ export function DialogoEditarNota({
             <EditorRenglonesNota
               renglones={renglones}
               alCambiar={setRenglones}
-              avios={avios.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
               recetaPorOrden={recetaPorOrden}
               existenciaPorAvio={existenciaPorAvio}

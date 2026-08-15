@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { useEtiquetasMarca } from '@/api/etiquetas-marca';
 import { useActualizarOrden } from '@/api/ordenes';
 import { useProveedores } from '@/api/proveedores';
-import { useTelas } from '@/api/telas';
 import type { Orden, OrdenEditar } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
@@ -22,6 +21,8 @@ import {
   textoACuerpo,
   type DatosOrdenFormulario,
 } from './esquemas';
+import { SelectorTela } from '../inventarios/SelectorTela';
+
 import { useReinicioBloqueado, useSeccionGuardable, type EjecutorGuardado } from './guardado-orden';
 
 /** Tope alto: catálogos activos para los selectores del encabezado. */
@@ -33,13 +34,6 @@ const QUERY_PROVEEDORES = {
   incluirInactivos: 'false',
 } as const;
 const QUERY_ETIQUETAS = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
-const QUERY_TELAS = {
   pagina: 1,
   porPagina: 100,
   ordenarPor: 'nombre',
@@ -105,7 +99,6 @@ export function EditorEncabezadoOrden({
 
   const proveedores = useProveedores(QUERY_PROVEEDORES);
   const etiquetas = useEtiquetasMarca(QUERY_ETIQUETAS);
-  const telas = useTelas(QUERY_TELAS);
 
   const formulario = useForm<DatosOrdenFormulario>({
     resolver: zodResolver(esquemaOrdenFormulario),
@@ -171,6 +164,13 @@ export function EditorEncabezadoOrden({
   const guardando = actualizar.isPending;
   const registrar = formulario.register;
   const { setValue } = formulario;
+  // La tela del encabezado se elige con el combobox buscable: su valor sigue en el formulario
+  // (string vacío = sin asignar), y aquí se lee como número para el selector.
+  const idTelaFormulario = formulario.watch('idTela');
+  const idTelaSeleccionada =
+    idTelaFormulario === undefined || idTelaFormulario === ''
+      ? undefined
+      : Number(idTelaFormulario);
 
   return (
     <div className="space-y-4">
@@ -206,14 +206,20 @@ export function EditorEncabezadoOrden({
         </Field>
         <Field>
           <FieldLabel htmlFor="orden-tela">Tela</FieldLabel>
-          <SelectNativo id="orden-tela" disabled={soloLectura} {...registrar('idTela')}>
-            <option value="">Sin asignar</option>
-            {(telas.data?.datos ?? []).map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* Combobox con búsqueda SERVER-SIDE (V1-E3c): el `<select>` con tope de 100 dejaba
+              fuera a la mayoría de las 877 telas y solo "buscaba" por prefijo. El valor sigue
+              viviendo en el formulario (string), así que el guardado no cambia. */}
+          <SelectorTela
+            idInput="orden-tela"
+            deshabilitado={soloLectura}
+            idSeleccionado={idTelaSeleccionada}
+            {...(orden.tela === null ? {} : { etiquetaSeleccion: orden.tela })}
+            alSeleccionar={(tela) =>
+              setValue('idTela', String(tela.id), { shouldDirty: true, shouldValidate: true })
+            }
+            alLimpiar={() => setValue('idTela', '', { shouldDirty: true, shouldValidate: true })}
+            testid="orden-tela"
+          />
         </Field>
 
         <Field>

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   resolverPrecioAvio,
+  resolverPrecioAvioCatalogo,
   resolverPrecioColorReferencia,
   resolverPrecioTela,
 } from './resolucion-precios.js';
@@ -192,5 +193,58 @@ describe('resolverPrecioColorReferencia (colores HIJOS de la tela, §Post-F9.11)
         }),
       }),
     ).toEqual({ precio: 42, origen: 'sugerido' });
+  });
+});
+
+describe('resolverPrecioAvioCatalogo (regla COMPARTIDA precosto ↔ receta, V1-E3c)', () => {
+  const proveedores = [
+    { idProveedor: 1, precio: 500, factorConversion: 50 }, // $10 por unidad de consumo
+    { idProveedor: 2, precio: 8, factorConversion: null }, // $8
+  ];
+
+  it('sin medidas se comporta EXACTAMENTE como la cascada (amarre → más barato → referencia)', () => {
+    const entrada = { precioReferencia: 3, factorConversionAvio: null, proveedores, medidas: [] };
+    expect(resolverPrecioAvioCatalogo({ ...entrada, idAvioProveedor: 1 })).toEqual(
+      resolverPrecioAvio({ ...entrada, idAvioProveedor: 1 }),
+    );
+    // Sin amarre: el MÁS BARATO normalizado (8), NO el precioReferencia del catálogo (3).
+    expect(resolverPrecioAvioCatalogo(entrada)).toEqual({
+      precio: 8,
+      origen: 'mas-barato',
+      idProveedor: 2,
+    });
+  });
+
+  it('un avío POR MEDIDA se costea con el promedio de sus medidas, y eso GANA al amarre', () => {
+    const resuelto = resolverPrecioAvioCatalogo({
+      precioReferencia: 3,
+      factorConversionAvio: null,
+      proveedores,
+      idAvioProveedor: 1,
+      medidas: [5.8, 6.2],
+    });
+    expect(resuelto).toEqual({ precio: 6, origen: 'promedio-medidas', idProveedor: null });
+  });
+
+  it('sin proveedores con precio cae al precioReferencia del catálogo (último recurso)', () => {
+    expect(
+      resolverPrecioAvioCatalogo({
+        precioReferencia: 3,
+        factorConversionAvio: null,
+        proveedores: [{ idProveedor: 1, precio: null, factorConversion: null }],
+        medidas: [],
+      }),
+    ).toEqual({ precio: 3, origen: 'referencia', idProveedor: null });
+  });
+
+  it('sin nada devuelve sin-precio (el costeo lo tomaría como 0)', () => {
+    expect(
+      resolverPrecioAvioCatalogo({
+        precioReferencia: null,
+        factorConversionAvio: null,
+        proveedores: [],
+        medidas: [],
+      }),
+    ).toEqual({ precio: null, origen: 'sin-precio', idProveedor: null });
   });
 });

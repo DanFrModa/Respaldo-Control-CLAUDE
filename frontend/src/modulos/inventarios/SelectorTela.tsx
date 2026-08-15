@@ -17,6 +17,8 @@ export function SelectorTela({
   alSeleccionar,
   alLimpiar,
   idProveedor,
+  deshabilitado = false,
+  idInput,
   testid = 'selector-tela',
 }: {
   idSeleccionado: number | undefined;
@@ -37,6 +39,10 @@ export function SelectorTela({
    * no aparecen (el catálogo se captura desde cero — acuerdo del 7-ago-2026).
    */
   idProveedor?: number | undefined;
+  /** Solo lectura (p. ej. una orden cancelada): el combobox queda inerte. Default false. */
+  deshabilitado?: boolean;
+  /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
+  idInput?: string | undefined;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -80,8 +86,10 @@ export function SelectorTela({
       placeholder="Buscar tela por nombre…"
       etiqueta="Buscar tela"
       textoVacio="No hay telas que coincidan."
+      deshabilitado={deshabilitado}
       testid={testid}
       testidInput={`${testid}-busqueda`}
+      idInput={idInput}
     />
   );
 }

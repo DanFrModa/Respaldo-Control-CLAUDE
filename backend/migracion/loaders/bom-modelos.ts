@@ -31,6 +31,12 @@
  * Renglones con modelo/tela/avío sin mapeo, y artes sin datos en `Bordados.csv`, van al REPORTE
  * (§7: no null silencioso).
  *
+ * ⚠️ **Lo que el CSV no trae, el ETL no lo borra** (V1-E3c): el AMARRE de precio del renglón
+ * (`ModeloTela.idTelaProveedor` / `ModeloAvio.idAvioProveedor`, R17) lo captura Desarrollo en v2 y
+ * NO existe en Access. Como el endpoint del BOM es SET-COMPLETO, este loader RE-ENVÍA el amarre
+ * que ya está en BD; si no lo hiciera, una segunda corrida (F10 vuelve a pasar los ETL) dejaría
+ * todos los amarres en NULL sin decir nada.
+ *
  * `ModelosTela.csv` usa `IdTelasDis` (no `IdTelas`): se resuelve con `ENTIDAD_MAPEO.telaPorIdTelasDis`.
  * `ModelosHab.csv` usa `IdHabilitacion`: se resuelve con `ENTIDAD_MAPEO.avio`.
  * `ModelosBor.csv` no tiene precio: se toma el `Precio` de `Bordados.csv` (era el precio de
@@ -206,12 +212,24 @@ async function cargarTelasBom(
 
   // Conteo HONESTO (§7): leer de un golpe los renglones que YA existen en BD para los modelos
   // a tocar, así una 2ª corrida idempotente reporta `creados=0` / `existentes=N` (no infla).
+  //
+  // 🔑 De la MISMA lectura sale el AMARRE de precio (`idTelaProveedor`, R17). Access NO lo trae
+  // —lo captura Desarrollo en v2—, y el endpoint del BOM es SET-COMPLETO: lo que no viene en el
+  // payload se borra. Sin re-enviarlo, re-correr este ETL (son idempotentes y re-corribles POR
+  // DISEÑO, y F10 los vuelve a pasar) dejaría en NULL todos los amarres capturados, apagando en
+  // silencio la cascada de precios del precosto y del MRP. El CSV manda en consumo y banderas; el
+  // amarre lo manda la BD.
   const idsModelos = [...porModelo.keys()];
   const existentesBd = await (bd.cliente as PrismaClient).modeloTela.findMany({
     where: { idModelo: { in: idsModelos } },
-    select: { idModelo: true, idTela: true },
+    select: { idModelo: true, idTela: true, idTelaProveedor: true },
   });
   const yaPresentes = new Set(existentesBd.map((r) => `${String(r.idModelo)}:${String(r.idTela)}`));
+  const amarrePorRenglon = new Map(
+    existentesBd
+      .filter((r) => r.idTelaProveedor !== null)
+      .map((r) => [`${String(r.idModelo)}:${String(r.idTela)}`, r.idTelaProveedor]),
+  );
 
   // Aplicar el set-completo por modelo.
   let creados = 0;
@@ -220,8 +238,14 @@ async function cargarTelasBom(
   let omitidosValidacion = 0;
 
   for (const [idModelo, telas] of porModelo.entries()) {
+    // Se conserva el amarre YA capturado de cada renglón (ver arriba): sin esto el set-completo
+    // lo pondría en NULL.
+    const conAmarre = telas.map((t) => {
+      const amarre = amarrePorRenglon.get(`${String(idModelo)}:${String(t.idTela)}`);
+      return amarre === undefined ? t : { ...t, idTelaProveedor: amarre };
+    });
     const resultado = await intentarCrear(reporte, 'BOM-Tela', idModelo, () =>
-      reemplazarTelasBom(sesion, idModelo, telas, bd),
+      reemplazarTelasBom(sesion, idModelo, conAmarre, bd),
     );
     if (resultado === null) {
       omitidosValidacion += telas.length;
@@ -305,12 +329,20 @@ async function cargarAviosBom(
   }
 
   // Conteo HONESTO (§7): renglones que YA existen en BD (re-corrida idempotente → existentes).
+  // Y de la misma lectura, el AMARRE de precio del renglón (`idAvioProveedor`, R17): el CSV de
+  // Access no lo trae y el set-completo lo borraría al re-correr el ETL (mismo motivo que en
+  // telas — ver el comentario de `cargarTelasBom`).
   const idsModelos = [...porModelo.keys()];
   const existentesBd = await (bd.cliente as PrismaClient).modeloAvio.findMany({
     where: { idModelo: { in: idsModelos } },
-    select: { idModelo: true, idAvio: true },
+    select: { idModelo: true, idAvio: true, idAvioProveedor: true },
   });
   const yaPresentes = new Set(existentesBd.map((r) => `${String(r.idModelo)}:${String(r.idAvio)}`));
+  const amarrePorRenglon = new Map(
+    existentesBd
+      .filter((r) => r.idAvioProveedor !== null)
+      .map((r) => [`${String(r.idModelo)}:${String(r.idAvio)}`, r.idAvioProveedor]),
+  );
 
   let creados = 0;
   let existentes = 0;
@@ -318,8 +350,12 @@ async function cargarAviosBom(
   let omitidosValidacion = 0;
 
   for (const [idModelo, avios] of porModelo.entries()) {
+    const conAmarre = avios.map((a) => {
+      const amarre = amarrePorRenglon.get(`${String(idModelo)}:${String(a.idAvio)}`);
+      return amarre === undefined ? a : { ...a, idAvioProveedor: amarre };
+    });
     const resultado = await intentarCrear(reporte, 'BOM-Avio', idModelo, () =>
-      reemplazarAviosBom(sesion, idModelo, avios, bd),
+      reemplazarAviosBom(sesion, idModelo, conAmarre, bd),
     );
     if (resultado === null) {
       omitidosValidacion += avios.length;

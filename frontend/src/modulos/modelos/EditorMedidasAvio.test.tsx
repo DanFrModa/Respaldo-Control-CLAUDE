@@ -7,6 +7,12 @@ import { renderConProveedores } from '@/pruebas/utilidades';
 
 import { EditorMedidasAvio } from './EditorMedidasAvio';
 
+/**
+ * Pruebas del panel de CONSUMO POR TALLA de un avío del BOM (R18 + amarre de medida R5/B11).
+ * V1-E3c: la matriz nace de la CURVA del modelo (el servidor manda una fila por talla, con 0 si
+ * no se ha capturado) y el aviso "el modelo no tiene curva" solo sale cuando de verdad no la
+ * tiene (`tieneCurva`) — antes salía SIEMPRE porque nada creaba renglones.
+ */
 const useMedidasAvio = vi.fn<
   () => {
     data: MedidasAvio | undefined;
@@ -16,22 +22,42 @@ const useMedidasAvio = vi.fn<
   }
 >();
 const guardarMutate = vi.fn();
+const medidasDelCatalogo =
+  vi.fn<
+    () => { data: { datos: { id: number; medida: string; precio: number; activo: boolean }[] } }
+  >();
 
 vi.mock('@/api/modelo-medidas', () => ({
   useMedidasAvio: () => useMedidasAvio(),
   useReemplazarMedidasAvio: () => ({ mutate: guardarMutate, isPending: false }),
 }));
 
-function medidas(consumoPorTalla: boolean): MedidasAvio {
+vi.mock('@/api/medidas-avio', () => ({
+  useMedidasAvio: () => medidasDelCatalogo(),
+}));
+
+/** Respuesta del GET con la matriz DERIVADA de la curva (3 tallas, aún sin capturar). */
+function medidas(consumoPorTalla: boolean, extra: Partial<MedidasAvio> = {}): MedidasAvio {
   return {
     idModelo: 1,
     idAvio: 7,
     consumoPorTalla,
-    tallas: [
-      { idTalla: 10, etiquetaTalla: 'CH', consumo: 0 },
-      { idTalla: 11, etiquetaTalla: 'M', consumo: 0 },
-      { idTalla: 12, etiquetaTalla: 'G', consumo: 0 },
-    ],
+    tieneCurva: true,
+    tallas: [talla(10, 'CH'), talla(11, 'M'), talla(12, 'G')],
+    ...extra,
+  };
+}
+
+/** Talla de la curva SIN capturar (`consumo: null`) — la matriz existe, la fila en BD no. */
+function talla(idTalla: number, etiquetaTalla: string): MedidasAvio['tallas'][number] {
+  return {
+    idTalla,
+    etiquetaTalla,
+    consumo: null,
+    enCurva: true,
+    idAvioMedida: null,
+    medidaAmarrada: null,
+    precioMedida: null,
   };
 }
 
@@ -39,9 +65,11 @@ describe('<EditorMedidasAvio>', () => {
   beforeEach(() => {
     useMedidasAvio.mockReset();
     guardarMutate.mockReset();
+    medidasDelCatalogo.mockReset();
+    medidasDelCatalogo.mockReturnValue({ data: { datos: [] } });
   });
 
-  it('despliega la tabla de tallas al activar "consumo por talla"', async () => {
+  it('despliega la matriz de tallas de la CURVA al activar "consumo por talla"', async () => {
     const usuario = userEvent.setup();
     useMedidasAvio.mockReturnValue({
       data: medidas(false),
@@ -55,7 +83,7 @@ describe('<EditorMedidasAvio>', () => {
     await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
     const checkbox = screen.getByTestId('consumo-por-talla-7');
     expect(checkbox).not.toBeChecked();
-    // Sin activar, no hay tabla de tallas.
+    // Sin activar, no hay matriz de tallas.
     expect(screen.queryByTestId('tabla-tallas-avio-7')).not.toBeInTheDocument();
 
     await usuario.click(checkbox);
@@ -63,9 +91,11 @@ describe('<EditorMedidasAvio>', () => {
     expect(within(tabla).getByLabelText('CH')).toBeInTheDocument();
     expect(within(tabla).getByLabelText('M')).toBeInTheDocument();
     expect(within(tabla).getByLabelText('G')).toBeInTheDocument();
+    // Y NO se acusa falta de curva: el modelo sí la tiene.
+    expect(screen.queryByTestId('sin-curva-7')).not.toBeInTheDocument();
   });
 
-  it('guarda el set completo de medidas por talla (PUT)', async () => {
+  it('⭐ las tallas EN BLANCO no se guardan: solo viaja lo capturado (PUT)', async () => {
     const usuario = userEvent.setup();
     useMedidasAvio.mockReturnValue({
       data: medidas(true),
@@ -76,7 +106,8 @@ describe('<EditorMedidasAvio>', () => {
     renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
 
     await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
-    // Ya viene con consumoPorTalla=true → la tabla se ve.
+    // Ya viene con consumoPorTalla=true → la matriz se ve. Se captura SOLO CH y se dejan M y G
+    // en blanco (el caso real: "las demás las lleno después").
     await usuario.type(screen.getByTestId('consumo-talla-7-10'), '1.5');
     await usuario.click(screen.getByTestId('guardar-medidas-avio-7'));
 
@@ -84,16 +115,104 @@ describe('<EditorMedidasAvio>', () => {
     const args = guardarMutate.mock.calls[0]?.[0] as {
       idModelo: number;
       idAvio: number;
-      cuerpo: { consumoPorTalla: boolean; tallas: { idTalla: number; consumo: number }[] };
+      cuerpo: {
+        consumoPorTalla: boolean;
+        tallas: { idTalla: number; consumo: number; idAvioMedida: number | null }[];
+      };
     };
     expect(args.idModelo).toBe(1);
     expect(args.idAvio).toBe(7);
     expect(args.cuerpo.consumoPorTalla).toBe(true);
-    expect(args.cuerpo.tallas).toEqual([
-      { idTalla: 10, consumo: 1.5 },
-      { idTalla: 11, consumo: 0 },
-      { idTalla: 12, consumo: 0 },
-    ]);
+    // NADA de ceros fantasma: mandarlos crearía filas de 0 que hunden el promedio del precosto
+    // (0.45 → 0.27 con 2 de 5 tallas en blanco) y apagan el aviso `tallasSinMedida` del MRP.
+    expect(args.cuerpo.tallas).toEqual([{ idTalla: 10, consumo: 1.5, idAvioMedida: null }]);
+  });
+
+  it('un CERO tecleado a propósito SÍ se guarda (no se confunde con "sin capturar")', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    await usuario.type(screen.getByTestId('consumo-talla-7-10'), '0');
+    await usuario.click(screen.getByTestId('guardar-medidas-avio-7'));
+
+    await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+    const args = guardarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { tallas: { idTalla: number; consumo: number }[] };
+    };
+    expect(args.cuerpo.tallas).toEqual([{ idTalla: 10, consumo: 0, idAvioMedida: null }]);
+  });
+
+  it('una medida ya capturada se muestra tal cual (incluido un 0 guardado)', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true, {
+        tallas: [{ ...talla(10, 'CH'), consumo: 0 }, talla(11, 'M')],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    // El 0 capturado se ve como "0"; la talla sin capturar, vacía.
+    expect(screen.getByTestId('consumo-talla-7-10')).toHaveValue(0);
+    expect(screen.getByTestId('consumo-talla-7-11')).toHaveValue(null);
+  });
+
+  it('amarra la MEDIDA del avío a una talla cuando el avío tiene medidas (R5/B11)', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    medidasDelCatalogo.mockReturnValue({
+      data: {
+        datos: [
+          { id: 3, medida: '15 cm', precio: 5.8, activo: true },
+          { id: 4, medida: '18 cm', precio: 6.2, activo: true },
+        ],
+      },
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    // El amarre vive EN la fila de la medida: sin consumo no hay fila donde guardarlo, así que el
+    // selector está inerte hasta que se captura el consumo.
+    expect(screen.getByTestId('medida-talla-7-10')).toBeDisabled();
+    await usuario.type(screen.getByTestId('consumo-talla-7-10'), '1');
+    await usuario.selectOptions(screen.getByTestId('medida-talla-7-10'), '4');
+    await usuario.click(screen.getByTestId('guardar-medidas-avio-7'));
+
+    await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+    const args = guardarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { tallas: { idTalla: number; idAvioMedida: number | null }[] };
+    };
+    expect(args.cuerpo.tallas).toEqual([{ idTalla: 10, consumo: 1, idAvioMedida: 4 }]);
+  });
+
+  it('el aviso "sin curva" SOLO sale cuando el modelo no tiene curva', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true, { tieneCurva: false, tallas: [] }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    expect(screen.getByTestId('sin-curva-7')).toBeInTheDocument();
+    expect(screen.queryByTestId('tabla-tallas-avio-7')).not.toBeInTheDocument();
   });
 
   it('sin permiso de administrar, no ofrece guardar y deshabilita los inputs', async () => {

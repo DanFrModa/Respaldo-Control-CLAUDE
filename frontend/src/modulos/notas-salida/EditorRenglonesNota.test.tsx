@@ -1,10 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+// El renglón de avío usa el combobox de búsqueda server-side (V1-E3c): su capa de datos va
+// simulada para que este editor se pueda renderizar suelto (sin QueryClient ni red).
+vi.mock('@/api/avios', () => ({
+  useAvios: () => ({
+    data: { datos: [{ id: 3, clave: 'BOT-01', descripcion: 'Botón', esGenerico: false }] },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+}));
+
 import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
 import { renglonVacio, type RenglonNotaCaptura } from './captura';
 
-const AVIOS = [{ id: 3, clave: 'BOT-01', descripcion: 'Botón' }] as never;
 const ORDENES = [{ id: 50, folio: 1001, codigoModelo: 'MOD-1', cliente: 'Cliente A' }] as never;
 
 /** Renderiza el editor controlado y devuelve el último estado que emitió. */
@@ -23,7 +33,6 @@ function renderEditor(
     <EditorRenglonesNota
       renglones={estado.renglones}
       alCambiar={alCambiar}
-      avios={AVIOS}
       ordenes={ORDENES}
       recetaPorOrden={extra?.recetaPorOrden}
       existenciaPorAvio={extra?.existenciaPorAvio}

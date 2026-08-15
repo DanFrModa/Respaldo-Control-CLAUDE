@@ -139,17 +139,26 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
 
     // ── Armar la receta: 1 tela (con banderas) ──────────────────────────────────
     await detalle.getByTestId('tab-bom-telas').click();
-    await detalle.getByTestId('agregar-tela-bom').selectOption({ label: tela });
-    // El renglón aparece; captura el consumo y apaga "producción" (banderas mixtas).
+    // El componente se busca TECLEANDO (combobox server-side, V1-E3c): con 877 telas el `<select>`
+    // con tope de 100 dejaba fuera a la mayoría.
+    await detalle.getByTestId('agregar-tela-bom-busqueda').fill(tela);
+    await page.getByTestId('agregar-tela-bom-opcion').first().click();
+    // El renglón aparece; captura el consumo y apaga "producción" (banderas mixtas) — las tres
+    // banderas viven ahora en el panel expandible del renglón.
     const renglonTela = detalle.getByTestId('seccion-bom-telas').getByTestId(/^renglon-bom-\d+$/);
     await renglonTela.getByRole('spinbutton').fill('1.5');
-    await renglonTela.getByLabel('Producción').uncheck();
+    await renglonTela.getByRole('button', { name: /^Ver detalle de/ }).click();
+    await detalle
+      .getByTestId(/^detalle-bom-\d+$/)
+      .getByLabel('Producción')
+      .uncheck();
     await detalle.getByTestId('guardar-bom-telas').click();
     await expect(page.getByText('Telas de la receta guardadas.')).toBeVisible();
 
     // ── 1 avío ───────────────────────────────────────────────────────────────────
     await detalle.getByTestId('tab-bom-avios').click();
-    await detalle.getByTestId('agregar-avio-bom').selectOption({ label: `${avio} — Avío ${avio}` });
+    await detalle.getByTestId('agregar-avio-bom-busqueda').fill(avio);
+    await page.getByTestId('agregar-avio-bom-opcion').first().click();
     const renglonAvio = detalle.getByTestId('seccion-bom-avios').getByTestId(/^renglon-bom-\d+$/);
     await renglonAvio.getByRole('spinbutton').fill('4');
     await detalle.getByTestId('guardar-bom-avios').click();

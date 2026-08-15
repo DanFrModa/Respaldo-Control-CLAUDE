@@ -32,6 +32,7 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { registrarManejadorErrores } from '../errores.js';
 import { rutasModelos } from './modelos.rutas.js';
+import { rutasMedidasAvioTalla } from './medidas-avio-talla.rutas.js';
 import { registrarAuth } from '../../auth/plugin.js';
 import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -97,6 +98,9 @@ async function construirAppModelos(): Promise<FastifyInstance> {
   registrarManejadorErrores(instancia);
   registrarAuth(instancia, {});
   await instancia.register(rutasModelos, { prefix: '/api' });
+  // Sub-recurso de la receta: las medidas POR TALLA de un avío del BOM (R18) — la copia de BOM
+  // debe conservarlas, y eso se verifica por su endpoint.
+  await instancia.register(rutasMedidasAvioTalla, { prefix: '/api' });
   await instancia.ready();
   return instancia;
 }
@@ -409,6 +413,278 @@ describe('API de modelos (F1-E4)', () => {
       expect(avios.json<{ datos: { paraCosto: boolean }[] }>().datos[0]?.paraCosto).toBe(false);
     });
 
+    it('AMARRA el precio del renglón (R17): guarda proveedor de tela y de avío y los devuelve', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-AMARRE' });
+      const idTela = await crearTela('Felpa amarrada');
+      const idAvio = await crearAvio('CIE-AM');
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Alsatex' } });
+      const telaProveedor = await cliente.telaProveedor.create({
+        data: { idTela, idProveedor: proveedor.id, precio: 62.5 },
+      });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: proveedor.id, precio: 100, factorConversion: 50 },
+      });
+      await cliente.tela.update({ where: { id: idTela }, data: { precioSugerido: 40 } });
+      await cliente.avio.update({ where: { id: idAvio }, data: { precioReferencia: 3 } });
+
+      const telas = await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/telas`,
+        headers: { cookie },
+        payload: {
+          telas: [{ idTela, consumoPorPrenda: 1, idTelaProveedor: telaProveedor.id }],
+        },
+      });
+      expect(telas.statusCode).toBe(200);
+      expect(telas.json<{ datos: Record<string, unknown>[] }>().datos[0]).toMatchObject({
+        idTelaProveedor: telaProveedor.id,
+        proveedorAmarrado: 'Alsatex',
+        // Lo que VA A COSTEAR (el amarre gana la cascada) + de dónde salió.
+        precioCosteo: 62.5,
+        origenPrecio: 'amarre',
+        proveedorPrecio: 'Alsatex',
+        precioReferencia: 40,
+      });
+
+      const avios = await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
+      });
+      expect(avios.statusCode).toBe(200);
+      // El precio del amarre sale NORMALIZADO a unidad de consumo (100 / 50 = 2 por metro).
+      expect(avios.json<{ datos: Record<string, unknown>[] }>().datos[0]).toMatchObject({
+        idAvioProveedor: proveedor.id,
+        proveedorAmarrado: 'Alsatex',
+        precioCosteo: 2,
+        origenPrecio: 'amarre',
+        proveedorPrecio: 'Alsatex',
+        precioReferencia: 3,
+      });
+
+      // Persistido de verdad (lo que lee el precosto/MRP), no solo devuelto.
+      const filaTela = await cliente.modeloTela.findUnique({
+        where: { idModelo_idTela: { idModelo: body.id, idTela } },
+      });
+      expect(filaTela?.idTelaProveedor).toBe(telaProveedor.id);
+      const filaAvio = await cliente.modeloAvio.findUnique({
+        where: { idModelo_idAvio: { idModelo: body.id, idAvio } },
+      });
+      expect(filaAvio?.idAvioProveedor).toBe(proveedor.id);
+    });
+
+    it('⭐ SIN amarre la receta muestra lo que COSTEA: el más barato normalizado, con su proveedor', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-MAS-BARATO' });
+      const idAvio = await crearAvio('ZIP-01');
+      await cliente.avio.update({ where: { id: idAvio }, data: { precioReferencia: 9 } });
+      const caro = await cliente.proveedor.create({ data: { nombre: 'Cierres Caros' } });
+      const barato = await cliente.proveedor.create({ data: { nombre: 'Zippers MX' } });
+      // El "caro" vende por caja: 500 la caja de 100 = 5 por pieza. El barato, 4.20 por pieza.
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: caro.id, precio: 500, factorConversion: 100 },
+      });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: barato.id, precio: 4.2 },
+      });
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1 }] },
+      });
+      const ficha = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}`,
+        headers: { cookie },
+      });
+      // Lo que costea el precosto SIN amarre es el más barato normalizado (4.20), NO el
+      // `precioReferencia` del catálogo (9) que la receta enseñaba antes.
+      expect(ficha.json<{ avios: Record<string, unknown>[] }>().avios[0]).toMatchObject({
+        idAvioProveedor: null,
+        precioCosteo: 4.2,
+        origenPrecio: 'mas-barato',
+        proveedorPrecio: 'Zippers MX',
+        precioReferencia: 9,
+      });
+    });
+
+    it('⭐ un avío POR MEDIDA se muestra con el PROMEDIO de sus medidas (gana al amarre)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-POR-MEDIDA' });
+      const idAvio = await crearAvio('CIE-MED');
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Cierres del Centro' } });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: proveedor.id, precio: 20 },
+      });
+      await cliente.avioMedida.createMany({
+        data: [
+          { idAvio, medida: '15 cm', precio: 5.8 },
+          { idAvio, medida: '18 cm', precio: 6.2 },
+          // Inactiva: no entra al promedio (5.8 + 6.2) / 2 = 6.00.
+          { idAvio, medida: '22 cm', precio: 100, activo: false },
+        ],
+      });
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
+      });
+      const ficha = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}`,
+        headers: { cookie },
+      });
+      // Aunque HAY amarre, el precosto costea con el promedio de las medidas: la receta lo dice.
+      expect(ficha.json<{ avios: Record<string, unknown>[] }>().avios[0]).toMatchObject({
+        idAvioProveedor: proveedor.id,
+        precioCosteo: 6,
+        origenPrecio: 'promedio-medidas',
+        proveedorPrecio: null,
+      });
+    });
+
+    it('un amarre SIN precio no costea: la receta cae al escalón que sí (y lo dice)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-AMARRE-MUDO' });
+      const idAvio = await crearAvio('AV-MUDO');
+      const mudo = await cliente.proveedor.create({ data: { nombre: 'Proveedor sin lista' } });
+      const conPrecio = await cliente.proveedor.create({ data: { nombre: 'Proveedor con lista' } });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: mudo.id, precio: null },
+      });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: conPrecio.id, precio: 7 },
+      });
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: mudo.id }] },
+      });
+      const ficha = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}`,
+        headers: { cookie },
+      });
+      expect(ficha.json<{ avios: Record<string, unknown>[] }>().avios[0]).toMatchObject({
+        idAvioProveedor: mudo.id,
+        proveedorAmarrado: 'Proveedor sin lista',
+        precioCosteo: 7,
+        origenPrecio: 'mas-barato',
+        proveedorPrecio: 'Proveedor con lista',
+      });
+    });
+
+    it('⭐ la ficha ABRE aunque un factor de conversión esté corrupto (no 500)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-FACTOR-MALO' });
+      const idAvio = await crearAvio('AV-FACTOR');
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor factor 0' } });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: proveedor.id, precio: 30 },
+      });
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
+      });
+
+      // Un factor 0 NO se puede capturar por el dominio, pero la columna es `Decimal?` sin CHECK
+      // (pudo entrar por ETL o por una fila vieja): se fuerza a mano, como en producción.
+      await cliente.avioProveedor.update({
+        where: { idAvio_idProveedor: { idAvio, idProveedor: proveedor.id } },
+        data: { factorConversion: 0 },
+      });
+
+      const ficha = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}`,
+        headers: { cookie },
+      });
+      // La consulta NO revienta: el factor corrupto se lee como AUSENTE (1:1) y se muestra el
+      // precio sin convertir. Costear con él sí tiene que reventar — esa regla no se toca.
+      expect(ficha.statusCode).toBe(200);
+      expect(ficha.json<{ avios: Record<string, unknown>[] }>().avios[0]).toMatchObject({
+        precioCosteo: 30,
+        origenPrecio: 'amarre',
+        proveedorPrecio: 'Proveedor factor 0',
+      });
+    });
+
+    it('rechaza un amarre que no es de esa tela / de ese avío (400)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-AMARRE-MAL' });
+      const idTela = await crearTela('Tela A');
+      const otraTela = await crearTela('Tela B');
+      const idAvio = await crearAvio('AV-MAL');
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Prov ajeno' } });
+      const amarreDeOtraTela = await cliente.telaProveedor.create({
+        data: { idTela: otraTela, idProveedor: proveedor.id, precio: 10 },
+      });
+
+      const telas = await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/telas`,
+        headers: { cookie },
+        payload: { telas: [{ idTela, consumoPorPrenda: 1, idTelaProveedor: amarreDeOtraTela.id }] },
+      });
+      expect(telas.statusCode).toBe(400);
+
+      // El proveedor no surte ese avío (no hay par AvioProveedor).
+      const avios = await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${body.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
+      });
+      expect(avios.statusCode).toBe(400);
+    });
+
+    it('la FICHA publica las tallas de la curva del modelo (para capturar consumo por talla)', async () => {
+      const cookie = await cookieAdmin();
+      const ch = await cliente.talla.create({ data: { etiqueta: 'CH-F', orden: 1 } });
+      const g = await cliente.talla.create({ data: { etiqueta: 'G-F', orden: 3 } });
+      const curva = await cliente.curvaTalla.create({
+        data: {
+          nombre: 'Curva ficha',
+          items: {
+            create: [
+              { idTalla: ch.id, posicion: 0 },
+              { idTalla: g.id, posicion: 1 },
+            ],
+          },
+        },
+      });
+      const sinCurva = (await crearModeloApi(cookie, { codigo: 'SIN-CURVA' })).body;
+      const conCurva = (
+        await crearModeloApi(cookie, { codigo: 'CON-CURVA', idCurvaTalla: curva.id })
+      ).body;
+
+      const fichaSin = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${sinCurva.id}`,
+        headers: { cookie },
+      });
+      expect(fichaSin.json<{ tallasCurva: unknown[] }>().tallasCurva).toEqual([]);
+
+      const fichaCon = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${conCurva.id}`,
+        headers: { cookie },
+      });
+      expect(
+        fichaCon.json<{ tallasCurva: { etiqueta: string }[] }>().tallasCurva.map((t) => t.etiqueta),
+      ).toEqual(['CH-F', 'G-F']);
+    });
+
     it('rechaza meter al BOM una tela desactivada (400)', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM3' });
@@ -525,6 +801,68 @@ describe('API de modelos (F1-E4)', () => {
       // La propia del destino sigue (7) y se añadió la del origen (3).
       expect(porId.get(telaSoloDestino)).toBe(7);
       expect(porId.get(telaSoloOrigen)).toBe(3);
+    });
+
+    it('la copia CONSERVA el amarre de precio y las medidas por talla del avío', async () => {
+      const cookie = await cookieAdmin();
+      const origen = (await crearModeloApi(cookie, { codigo: 'ORIG-AM' })).body;
+      const destino = (await crearModeloApi(cookie, { codigo: 'DEST-AM' })).body;
+      const idTela = await crearTela('Felpa copiada');
+      const idAvio = await crearAvio('CIE-COPIA');
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor copia' } });
+      const telaProveedor = await cliente.telaProveedor.create({
+        data: { idTela, idProveedor: proveedor.id, precio: 50 },
+      });
+      await cliente.avioProveedor.create({
+        data: { idAvio, idProveedor: proveedor.id, precio: 7 },
+      });
+      const talla = await cliente.talla.create({ data: { etiqueta: 'U-COPIA', orden: 1 } });
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${origen.id}/bom/telas`,
+        headers: { cookie },
+        payload: { telas: [{ idTela, consumoPorPrenda: 2, idTelaProveedor: telaProveedor.id }] },
+      });
+      await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${origen.id}/bom/avios`,
+        headers: { cookie },
+        payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
+      });
+      const medidas = await app.inject({
+        method: 'PUT',
+        url: `/api/modelos/${origen.id}/avios/${idAvio}/medidas`,
+        headers: { cookie },
+        payload: { consumoPorTalla: true, tallas: [{ idTalla: talla.id, consumo: 0.75 }] },
+      });
+      expect(medidas.statusCode).toBe(200);
+
+      const copia = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${destino.id}/copiar-bom`,
+        headers: { cookie },
+        payload: { idOrigen: origen.id, reemplazar: true },
+      });
+      expect(copia.statusCode).toBe(200);
+      const bom = copia.json<{
+        telas: { idTelaProveedor: number | null }[];
+        avios: { idAvioProveedor: number | null; consumoPorTalla: boolean }[];
+      }>();
+      expect(bom.telas[0]?.idTelaProveedor).toBe(telaProveedor.id);
+      expect(bom.avios[0]?.idAvioProveedor).toBe(proveedor.id);
+      expect(bom.avios[0]?.consumoPorTalla).toBe(true);
+
+      // El consumo POR TALLA viajó con la receta (si no, el destino diría "costeo por talla" con
+      // la matriz vacía).
+      const copiadas = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${destino.id}/avios/${idAvio}/medidas`,
+        headers: { cookie },
+      });
+      const cuerpo = copiadas.json<{ tallas: { idTalla: number; consumo: number }[] }>();
+      expect(cuerpo.tallas).toHaveLength(1);
+      expect(cuerpo.tallas[0]).toMatchObject({ idTalla: talla.id, consumo: 0.75 });
     });
 
     it('TODO O NADA: un copiar-bom que falla deja el BOM del destino intacto (rollback)', async () => {

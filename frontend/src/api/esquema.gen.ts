@@ -11001,6 +11001,8 @@ export interface paths {
                   precio: number | null;
                   /** @description Condiciones de este proveedor, o null. */
                   condiciones: string | null;
+                  /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                  precioUnidadConsumo: number | null;
                 }[];
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
@@ -11178,6 +11180,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
+                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                precioUnidadConsumo: number | null;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -11341,6 +11345,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
+                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                precioUnidadConsumo: number | null;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -11493,6 +11499,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
+                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                precioUnidadConsumo: number | null;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -11664,6 +11672,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
+                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                precioUnidadConsumo: number | null;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -11805,6 +11815,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
+                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
+                precioUnidadConsumo: number | null;
               }[];
             };
           };
@@ -12802,6 +12814,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description Amarre R17: renglón proveedor–tela–precio elegido, o null. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description ¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color). */
+                precioPorColor: boolean;
+                /** @description El precio con el que se va a costear esta tela, o null si no hay ninguno. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
+                precioReferencia: number | null;
               }[];
               /** @description Avíos del BOM. */
               avios: {
@@ -12819,6 +12853,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description ¿El consumo de este avío se captura por talla (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Amarre R17: proveedor del par AvioProveedor elegido, o null. */
+                idAvioProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description El precio (por unidad de consumo) con el que se va a costear este avío. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de referencia del avío (catálogo). */
+                precioReferencia: number | null;
               }[];
               /** @description Arte (bordados/estampados) del modelo. */
               artes: {
@@ -12861,6 +12917,15 @@ export interface paths {
                 modificadoEn: string;
                 /** @description Id del último usuario que lo modificó. */
                 modificadoPorId: string | null;
+              }[];
+              /** @description Tallas de la curva del modelo (vacía si no tiene curva). */
+              tallasCurva: {
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta de la talla (CH, M, G…). */
+                etiqueta: string;
+                /** @description Posición dentro de la curva (orden de captura). */
+                posicion: number;
               }[];
             };
           };
@@ -13362,6 +13427,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description Amarre R17: renglón proveedor–tela–precio elegido, o null. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description ¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color). */
+                precioPorColor: boolean;
+                /** @description El precio con el que se va a costear esta tela, o null si no hay ninguno. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
+                precioReferencia: number | null;
               }[];
             };
           };
@@ -13472,6 +13559,8 @@ export interface paths {
               paraProduccion?: boolean;
               /** @default true */
               paraCosto?: boolean;
+              /** @default null */
+              idTelaProveedor?: number | null;
             }[];
           };
         };
@@ -13498,6 +13587,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description Amarre R17: renglón proveedor–tela–precio elegido, o null. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description ¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color). */
+                precioPorColor: boolean;
+                /** @description El precio con el que se va a costear esta tela, o null si no hay ninguno. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
+                precioReferencia: number | null;
               }[];
             };
           };
@@ -13634,6 +13745,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description ¿El consumo de este avío se captura por talla (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Amarre R17: proveedor del par AvioProveedor elegido, o null. */
+                idAvioProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description El precio (por unidad de consumo) con el que se va a costear este avío. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de referencia del avío (catálogo). */
+                precioReferencia: number | null;
               }[];
             };
           };
@@ -13744,6 +13877,8 @@ export interface paths {
               paraProduccion?: boolean;
               /** @default true */
               paraCosto?: boolean;
+              /** @default null */
+              idAvioProveedor?: number | null;
             }[];
           };
         };
@@ -13772,6 +13907,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description ¿El consumo de este avío se captura por talla (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Amarre R17: proveedor del par AvioProveedor elegido, o null. */
+                idAvioProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description El precio (por unidad de consumo) con el que se va a costear este avío. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de referencia del avío (catálogo). */
+                precioReferencia: number | null;
               }[];
             };
           };
@@ -15370,6 +15527,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description Amarre R17: renglón proveedor–tela–precio elegido, o null. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description ¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color). */
+                precioPorColor: boolean;
+                /** @description El precio con el que se va a costear esta tela, o null si no hay ninguno. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
+                precioReferencia: number | null;
               }[];
               /** @description Avíos del BOM. */
               avios: {
@@ -15387,6 +15566,28 @@ export interface paths {
                 paraProduccion: boolean;
                 /** @description ¿Entra en el costeo real? */
                 paraCosto: boolean;
+                /** @description ¿El consumo de este avío se captura por talla (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Amarre R17: proveedor del par AvioProveedor elegido, o null. */
+                idAvioProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description El precio (por unidad de consumo) con el que se va a costear este avío. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Último escalón: precio de referencia del avío (catálogo). */
+                precioReferencia: number | null;
               }[];
               /** @description Artes del modelo, ya ordenados. */
               artes: {
@@ -78378,14 +78579,24 @@ export interface paths {
               idAvio: number;
               /** @description ¿Este avío se consume por talla (R18)? */
               consumoPorTalla: boolean;
+              /** @description ¿El modelo tiene curva de tallas asignada? */
+              tieneCurva: boolean;
               /** @description Medidas por talla del avío. */
               tallas: {
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta de la talla (para la UI). */
                 etiquetaTalla: string;
-                /** @description Consumo del avío para esta talla. */
-                consumo: number;
+                /** @description Consumo capturado del avío para esta talla; null = sin capturar (no hay fila). */
+                consumo: number | null;
+                /** @description ¿La talla pertenece a la curva vigente del modelo? */
+                enCurva: boolean;
+                /** @description Amarre R5/B11: medida del avío que usa esta talla, o null. */
+                idAvioMedida: number | null;
+                /** @description Etiqueta de la medida amarrada, o null. */
+                medidaAmarrada: string | null;
+                /** @description Precio de la medida amarrada, o null. */
+                precioMedida: number | null;
               }[];
             };
           };
@@ -78493,6 +78704,8 @@ export interface paths {
             tallas: {
               idTalla: number;
               consumo: number;
+              /** @default null */
+              idAvioMedida?: number | null;
             }[];
           };
         };
@@ -78511,14 +78724,24 @@ export interface paths {
               idAvio: number;
               /** @description ¿Este avío se consume por talla (R18)? */
               consumoPorTalla: boolean;
+              /** @description ¿El modelo tiene curva de tallas asignada? */
+              tieneCurva: boolean;
               /** @description Medidas por talla del avío. */
               tallas: {
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta de la talla (para la UI). */
                 etiquetaTalla: string;
-                /** @description Consumo del avío para esta talla. */
-                consumo: number;
+                /** @description Consumo capturado del avío para esta talla; null = sin capturar (no hay fila). */
+                consumo: number | null;
+                /** @description ¿La talla pertenece a la curva vigente del modelo? */
+                enCurva: boolean;
+                /** @description Amarre R5/B11: medida del avío que usa esta talla, o null. */
+                idAvioMedida: number | null;
+                /** @description Etiqueta de la medida amarrada, o null. */
+                medidaAmarrada: string | null;
+                /** @description Precio de la medida amarrada, o null. */
+                precioMedida: number | null;
               }[];
             };
           };

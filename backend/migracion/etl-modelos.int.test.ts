@@ -179,6 +179,52 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(bom2.artes.existentes).toBe(2);
   }, 120_000);
 
+  it('⭐ re-correr el ETL NO borra los AMARRES de precio capturados en v2 (R17)', async () => {
+    // 1ª corrida: el BOM llega de Access, sin amarres (Access no los tiene).
+    await ejecutarEtlModelos(cliente);
+    // `orderBy` DETERMINISTA (lección del proyecto: los tests que leen "el primero" lo llevan;
+    // sin él, el renglón elegido depende del plan de Postgres y el test se vuelve caprichoso).
+    const telaBom = await cliente.modeloTela.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idTela: 'asc' }],
+    });
+    const avioBom = await cliente.modeloAvio.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idAvio: 'asc' }],
+    });
+    expect(telaBom).not.toBeNull();
+    expect(avioBom).not.toBeNull();
+    if (telaBom === null || avioBom === null) return;
+
+    // Desarrollo amarra precios YA en v2 (lo que hace el editor de la receta).
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor amarre ETL' } });
+    const telaProveedor = await cliente.telaProveedor.create({
+      data: { idTela: telaBom.idTela, idProveedor: proveedor.id, precio: 55 },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioBom.idAvio, idProveedor: proveedor.id, precio: 3 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: telaBom.idModelo, idTela: telaBom.idTela } },
+      data: { idTelaProveedor: telaProveedor.id },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: avioBom.idModelo, idAvio: avioBom.idAvio } },
+      data: { idAvioProveedor: proveedor.id },
+    });
+
+    // 2ª corrida del ETL (son re-corribles por diseño; F10 los vuelve a pasar): el set-completo
+    // reescribe consumo y banderas desde el CSV, pero el amarre DEBE sobrevivir.
+    await ejecutarEtlModelos(cliente);
+
+    const telaTras = await cliente.modeloTela.findUnique({
+      where: { idModelo_idTela: { idModelo: telaBom.idModelo, idTela: telaBom.idTela } },
+    });
+    const avioTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo: avioBom.idModelo, idAvio: avioBom.idAvio } },
+    });
+    expect(telaTras?.idTelaProveedor).toBe(telaProveedor.id);
+    expect(avioTras?.idAvioProveedor).toBe(proveedor.id);
+  }, 120_000);
+
   it('modelo con Activo=0 queda descontinuado (borrado suave)', async () => {
     await ejecutarEtlModelos(cliente);
     const m003 = await cliente.modelo.findFirst({ where: { codigo: 'M003' } });

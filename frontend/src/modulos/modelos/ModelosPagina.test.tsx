@@ -134,7 +134,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
 
 /** Ficha de ejemplo (datos + BOM). */
 function ficha(m: Modelo, extra: Partial<ModeloFicha> = {}): ModeloFicha {
-  return { ...m, telas: [], avios: [], artes: [], ...extra };
+  return { ...m, telas: [], avios: [], artes: [], tallasCurva: [], ...extra };
 }
 
 function pagina(datos: Modelo[]): TipoPagina {

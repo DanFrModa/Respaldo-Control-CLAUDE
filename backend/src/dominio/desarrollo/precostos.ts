@@ -46,7 +46,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
-import { resolverPrecioAvio, resolverPrecioTela } from '../costos/resolucion-precios.js';
+import { resolverPrecioAvioCatalogo, resolverPrecioTela } from '../costos/resolucion-precios.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaLineaManual = z.input<typeof esquemaPrecostoLineaManualCrear>;
@@ -161,16 +161,14 @@ function precioAvioDeCatalogo(
   avio: AvioParaValuar,
   idAvioProveedor: number | null,
 ): { precio: number | null; idProveedor: number | null } {
-  if (avio.medidas.length > 0) {
-    return {
-      precio: redondear2(promedioSimple(avio.medidas.map((m) => num(m.precio)))),
-      idProveedor: null,
-    };
-  }
-  const resuelto = resolverPrecioAvio({
+  // La REGLA (medidas → promedio; si no, cascada) vive en `resolverPrecioAvioCatalogo`, compartida
+  // con la receta para que la pantalla no pueda enseñar un número distinto del que costea. Aquí
+  // solo se aplica el redondeo, que sigue siendo decisión del llamador.
+  const resuelto = resolverPrecioAvioCatalogo({
     precioReferencia: numOrNull(avio.precioReferencia),
     factorConversionAvio: numOrNull(avio.factorConversion),
     idAvioProveedor,
+    medidas: avio.medidas.map((m) => num(m.precio)),
     proveedores: avio.proveedores.map((p) => ({
       idProveedor: p.idProveedor,
       precio: numOrNull(p.precio),

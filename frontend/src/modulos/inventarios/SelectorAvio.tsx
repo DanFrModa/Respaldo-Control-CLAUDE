@@ -14,17 +14,26 @@ import { useDebounce } from '@/lib/useDebounce';
  */
 export function SelectorAvio({
   idSeleccionado,
+  etiquetaSeleccion,
   alSeleccionar,
   alLimpiar,
   idInput,
+  deshabilitado = false,
   testid = 'selector-avio',
 }: {
   idSeleccionado: number | undefined;
+  /**
+   * Clave del avío seleccionado cuando el padre la conoce y la página del typeahead puede no
+   * traerlo (renglón YA guardado). Sin ella el campo se vería vacío con un avío elegido.
+   */
+  etiquetaSeleccion?: string | undefined;
   alSeleccionar: (avio: Avio) => void;
   /** Si viene, el combobox muestra ✕ para limpiar la selección (uso como filtro). */
   alLimpiar?: () => void;
   /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
   idInput?: string | undefined;
+  /** Solo lectura (p. ej. una nota confirmada): el combobox queda inerte. Default false. */
+  deshabilitado?: boolean;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -44,6 +53,7 @@ export function SelectorAvio({
 
   return (
     <ComboboxBuscable
+      {...(etiquetaSeleccion === undefined ? {} : { etiquetaSeleccion })}
       opciones={avios.map((a) => ({ ...a, nombre: a.clave }))}
       valor={idSeleccionado ?? null}
       onChange={(id) => {
@@ -78,6 +88,7 @@ export function SelectorAvio({
       placeholder="Buscar avío por clave o descripción…"
       etiqueta="Buscar avío"
       textoVacio="No hay avíos que coincidan."
+      deshabilitado={deshabilitado}
       testid={testid}
       testidInput={`${testid}-busqueda`}
       idInput={idInput}

@@ -37,6 +37,7 @@ import type { Avio, AvioProveedor, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { factorParaLectura, precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -659,29 +660,60 @@ export async function listarAvios(
   return armarPagina(datos, total, filtros);
 }
 
+/** Proveedor de un avío con su precio de compra Y ese precio ya en unidad de consumo (R1). */
+export type ProveedorDeAvio = AvioConProveedores['proveedores'][number] & {
+  /**
+   * `precio` ÷ factor de conversión (del proveedor, o el del avío como fallback): el precio POR
+   * UNIDAD DE CONSUMO, que es con el que costean el precosto y el BOM. Lo calcula el DOMINIO
+   * (A1: la aritmética de conversión vive en `comun/conversion.ts`, nunca en la pantalla) para que
+   * el editor de receta muestre el MISMO número que va a costear al amarrar un proveedor.
+   */
+  precioUnidadConsumo: number | null;
+};
+
 /**
- * Lista los proveedores de un avío con su precio/condiciones (R1). El precio por proveedor
- * vive aquí. Requiere `avios.ver`. Exige que el avío exista.
+ * Lista los proveedores de un avío con su precio/condiciones (R1) + el precio ya normalizado a
+ * unidad de consumo. El precio por proveedor vive aquí. Requiere `avios.ver`. Exige que el avío
+ * exista.
  */
 export async function listarProveedoresDeAvio(
   sesion: SesionUsuario,
   idAvio: number,
   bd?: ContextoBd,
-): Promise<AvioConProveedores['proveedores']> {
+): Promise<ProveedorDeAvio[]> {
   verificarPermiso(sesion, 'avios.ver');
   const cliente = clienteLectura(bd);
-  const avio = await cliente.avio.findUnique({ where: { id: idAvio }, select: { id: true } });
+  const avio = await cliente.avio.findUnique({
+    where: { id: idAvio },
+    select: { id: true, factorConversion: true },
+  });
   if (avio === null) {
     throw new ErrorNoEncontrado('Avio', idAvio);
   }
-  return cliente.avioProveedor.findMany({
+  const filas = await cliente.avioProveedor.findMany({
     where: { idAvio },
     select: {
       idProveedor: true,
       precio: true,
       condiciones: true,
+      factorConversion: true,
       proveedor: { select: { nombre: true } },
     },
     orderBy: { proveedor: { nombre: 'asc' } },
   });
+  return filas.map(({ factorConversion, ...fila }) => ({
+    ...fila,
+    precioUnidadConsumo:
+      fila.precio === null
+        ? null
+        : precioAUnidadConsumo(
+            fila.precio.toNumber(),
+            // Lectura: el factor se SANEA antes de entrar al motor (un valor corrupto se ignora
+            // como si no estuviera), para que el dropdown nunca tumbe la pantalla.
+            resolverFactor(
+              factorParaLectura(factorConversion?.toNumber()),
+              factorParaLectura(avio.factorConversion?.toNumber()),
+            ),
+          ),
+  }));
 }

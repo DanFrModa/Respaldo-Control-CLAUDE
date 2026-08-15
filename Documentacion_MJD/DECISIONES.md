@@ -1369,7 +1369,10 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 | Posición | Significado | Valores |
 |---|---|---|
-| 1 | **Concepto** (tipo de prenda) | 2 Conjunto · 3 Bermuda, Falda · 4 Vestido · 5 Playera, Vestido · 6 Sudadera (medio cierre, capucha o c. redondo) · 7 Pantalón, Jogger, Leggings · 8 Chamarra, Chaleco con cierre · 9 Gorra, Polos, batas |
+| 1 | **Concepto** (tipo de prenda) | 2 Conjunto · 3 Bermuda, Falda · 4 Vestido · 5 Playera ⭐ · 6 Sudadera (medio cierre, capucha o c. redondo) · 7 Pantalón, Jogger, Leggings · 8 Chamarra, Chaleco con cierre · 9 Gorra, Polos, batas |
+
+> ⭐ El documento de 2014 listaba el 5 como *"Playera, Vestido"*. Daniel lo corrigió el 15-ago-2026
+> (§Post-F9.46): **el 5 es Playera y nada más**; el Vestido es el 4. Series independientes.
 | 2 | **Género** | 1 Caballero · 2 Dama · 3 Niño Juvenil · 4 Niño Infantil · 5 Caballero · 6 Niña Infantil · 7 Niña Juvenil · 9 Bebas · 0 Bebos |
 | 3, 4, 5 | **Consecutivo** | 001–999 |
 
@@ -1384,7 +1387,7 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 1. Al proponer el siguiente consecutivo para **Caballero**, el generador debe tratar `x1` y `x5` como **el mismo género**: llenar primero la serie `1` y, agotada, continuar en la `5`. Su espacio real es de 1,998 por concepto, no 999.
 2. El generador debe **avisar cuando una combinación se acerque al tope**, en vez de fallar al llegar. Cualquier otra combinación puede llenarse igual, y ahí ya no habrá un dígito libre que duplicar.
-3. **Por confirmar al construir (no bloquea hoy):** en *concepto*, «Vestido» también aparece dos veces (4 = Vestido, 5 = Playera, Vestido). Puede ser el mismo truco de capacidad o coincidencia de nombre; si es lo primero, aplica la misma regla de continuidad.
+3. ~~**Por confirmar al construir (no bloquea hoy):** en *concepto*, «Vestido» también aparece dos veces (4 = Vestido, 5 = Playera, Vestido). Puede ser el mismo truco de capacidad o coincidencia de nombre; si es lo primero, aplica la misma regla de continuidad.~~ → ✅ **RESUELTO (Daniel, 15-ago-2026, §Post-F9.46): _"Vestido es 4 y playera es 5."_** NO es el truco de capacidad: son conceptos distintos, cada uno con su serie independiente de 999. El *"Vestido"* que el documento de 2014 lista en el 5 es ruido del documento viejo. **El encadenamiento de series existe SOLO en el género** (Caballero 1→5), nunca en el concepto.
 
 **La nomenclatura de DESARROLLO (definida por Daniel el 12-ago-2026).** Formato **`CYA-26-71-001`**:
 
@@ -1416,6 +1419,10 @@ O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIE
 5. **NADA se borra (D3).** El modelo promovido **conserva su número de desarrollo** junto al de producción; ambos son buscables. Lo que cuelga del desarrollo —precosteo con sus versiones, negociación con sus acuerdos, tech pack, fotos de muestra, el número del cliente— **no se toca**: sigue ligado y consultable.
 6. **El número del cliente NO se normaliza.** `Desarrollo.numeroCliente` ya existe: ahí va tal cual lo que mande el cliente, aunque cada vez venga distinto. *(Daniel: "normalmente le ponen letras que salen del cliente, y la verdad es que cada vez lo hacen diferente".)*
 7. **El código de PRODUCCIÓN lo define DANIEL, no el sistema.**
+   ⚠️ **SUPERADO por §Post-F9.46 (15-ago-2026): Daniel cambió de opinión y pidió que el sistema SÍ
+   precargue el siguiente número libre, con el campo editable.** Lo de abajo se conserva como
+   historia de por qué se había decidido al revés; **no se construye así**. Lo que SÍ sigue vigente
+   de este punto es que el sistema *valida y avisa* sin bloquear (los tres guiones).
 
    > Daniel: *"Normalmente yo defino los modelos de producción, no el sistema."*
 
@@ -1985,3 +1992,168 @@ cerradas con el mismo compare-and-set.
   menor y compatible: `idArchivo` opcional en `DELETE /api/bordados/{id}/foto`.
   ⚠️ **NO arregla la subida** — eso depende de que Gabriel corrija Cloudflare.
 - **Fecha:** 2026-08-14.
+
+#### (Post-F9.46) — Los tres cabos sueltos de la nomenclatura, y el nº de PRODUCCIÓN cambia de dueño (DANIEL, 15-ago-2026)
+
+La decisión §Post-F9.34 (12-ago) dejó tres puntos marcados como *"confirmar al construir"*. Se le
+preguntaron a Daniel **antes** de arrancar la etapa, para no frenarla a media construcción. Los tres
+quedan cerrados aquí, y **el tercero cambia lo que §Post-F9.34 había decidido.**
+
+**1. «Vestido» y «Playera» NO son una serie encadenada — son conceptos distintos.**
+
+> Daniel: *"Vestido es 4 y playera es 5."*
+
+La tabla del documento «Estructura de modelos FR Moda» (2014) listaba el 5 como *"Playera, Vestido"*,
+y eso abría la duda de si era el mismo truco de capacidad que Daniel usó en el género Caballero
+(llenar la serie `x1` y continuar en la `x5`). **No lo es:** el 4 es Vestido y el 5 es Playera, cada
+uno con su consecutivo independiente. La mención de "Vestido" en el 5 es ruido del documento viejo.
+
+⚠️ **Consecuencia para el generador:** el encadenamiento de series aplica **SOLO al GÉNERO**
+(Caballero = 1 y 5, con espacio real de 1,998 por concepto, §Post-F9.34). En el **concepto** NO se
+encadena nada: 4 y 5 son espacios separados de 999 cada uno.
+
+**2. El consecutivo de desarrollo corre por los DOS dígitos juntos** (concepto **y** género),
+reiniciando cada año.
+
+> Daniel, preguntado si "tipo de prenda" eran los dos dígitos o solo el concepto: *"lo que
+> recomiendes está bien."*
+
+**Esta la decidió el lead, no Daniel** — queda dicho para que nadie la cite como dictada por el
+negocio. La razón: si el contador corriera solo por el concepto, los números saldrían con huecos
+entre géneros (el jogger de dama heredaría el consecutivo del de caballero). Así, `CYA-26-71-001` es
+el primer jogger de caballero de C&A con entrega en 2026, y el primer jogger de dama del mismo
+cliente y año es `CYA-26-72-001`, no el `002`. Confirma lo que ya se había anotado como lectura del
+lead en §Post-F9.34.
+
+**3. ⭐ EL Nº DE PRODUCCIÓN SÍ SE PRECARGA — Daniel cambió de opinión.**
+
+> Daniel: *"Estoy cambiando de opinión. Chance sea mejor generar nuevos números de modelo para
+> producción…"*
+
+**Esto REEMPLAZA el punto 7 de §Post-F9.34**, donde Daniel había pedido lo contrario (*"normalmente
+yo defino los modelos de producción, no el sistema"*, y el consecutivo libre **a la vista pero no
+precargado**). Preguntado de nuevo con las tres opciones sobre la mesa, eligió:
+
+**El sistema precarga el siguiente número libre de esa combinación, y Daniel lo puede cambiar.**
+
+- Al **pasar un modelo a producción**, el campo llega **ya lleno** con el siguiente consecutivo libre
+  (los dos primeros dígitos ya vienen decididos desde el código de desarrollo, §Post-F9.34 punto 4).
+- Si le sirve, acepta y listo — el paso se vuelve un trámite de un clic.
+- Si quiere otro, **lo borra y teclea el suyo**: la última palabra sigue siendo de Daniel.
+- El sistema **valida** que no esté repetido y **avisa** (no bloquea) si los dos primeros dígitos no
+  cuadran con el tipo de prenda y el género del modelo, y cuando la combinación se acerca al tope de
+  999. Eso NO cambia: viene de §Post-F9.34 y sigue vigente.
+
+**Por qué el cambio no es un capricho:** con precarga se acaban los huecos y los repetidos por
+descuido, que es justo lo que un catálogo de 30 años acumula; y como el campo es editable, Daniel no
+pierde la excepción cuando la quiere. Lo que se abandona es la postura de "el sistema no propone".
+
+**El código de DESARROLLO lo sigue armando el sistema completo** (cliente + año de entrega + los dos
+dígitos + consecutivo), porque es mecánico y no tiene criterio de negocio de por medio. Eso no se
+tocó.
+
+- **Aplica en:** la etapa que construya §Post-F9.34 (separación desarrollo/producción). **Requiere
+  migración** (marca de origen en `Modelo`, abreviatura en `Cliente`); permisos y seed, no.
+- **Fecha:** 2026-08-15.
+
+#### (Post-F9.47) — La receta NUNCA enseña una cifra distinta de la que cuesta (DANIEL, 15-ago-2026)
+
+Salió de la revisión de **V1-E3c**. El encargo original pedía mostrar en cada renglón de la receta *"el
+precio del proveedor amarrado; si no hay amarre, el de catálogo marcado como referencia"* — una regla
+que **dictó el lead**, no Daniel. El reviewer independiente demostró que esa regla **seguía mintiendo**:
+la cascada real de `dominio/costos/resolucion-precios.ts` tiene más caminos que los dos supuestos, y en
+tres de ellos la pantalla enseñaba un número y el motor costeaba otro.
+
+**Los tres desfases encontrados:**
+
+| Caso | Lo que mostraba la pantalla | Lo que costeaba el motor |
+|---|---|---|
+| Tela amarrada a proveedor con **precio por color** | `$62.50 · Alsatex` (el precio base) | **$78.00** — el del color negro en `TelaProveedorColor` (`resolucion-precios.ts:133-135`) |
+| **Sin amarre** | el `precioReferencia` del catálogo, con chip "referencia" | el del **proveedor más barato normalizado** (`:222-232`) |
+| Amarre cuyo proveedor **no tiene precio** | `—` con el nombre del proveedor | cae callado al más barato (`:218-220`) |
+
+El primero era además un **dato muerto**: el backend calcula y publica `precioPorColor` a propósito
+(`bom-modelo.ts:171`), y el frontend nunca lo mapeaba — el campo solo aparecía en un fixture de prueba.
+
+**La regla que queda (elegida por Daniel de tres opciones):**
+
+> **La receta muestra SIEMPRE el precio con el que se va a costear, y dice de dónde salió.**
+
+- Sin amarre → el del **proveedor más barato**, nombrándolo (`$4.20 · el más barato: Zippers MX`), y
+  **conservando la marca de "no negociado"** (que es la información útil: falta amarrarlo).
+- Con amarre y precio por color → el **del color**, no el base.
+- Amarre sin precio → se distingue que hay amarre pero sin precio, y qué se usa en su lugar.
+- `Avio.precioReferencia` se muestra **solo** cuando de verdad es lo que costea (ningún proveedor con
+  precio).
+
+**⭐ Lo que Daniel DESCARTÓ, y por qué importa:** la tercera opción era arreglar el desfase **al revés**
+—cambiar el motor para que sin amarre costeara al `precioReferencia`—. Se descartó a propósito: eso
+movería los números de los precosteos **ya calculados y de los congelados**, que son la base de precios
+pactados con clientes. **El motor de costeo NO se toca; la pantalla se alinea al motor, nunca al revés.**
+
+- **Aplica en:** V1-E3c (`EditorBom.tsx`). **SIN migración, SIN permisos, SIN seed.** Cambio de
+  presentación: ninguna cifra calculada cambia de valor.
+- **Fecha:** 2026-08-15.
+
+#### (Post-F9.48) — ⭐ UN SOLO COSTO: manda el precio REAL de compra más reciente (DANIEL, 15-ago-2026)
+
+> Daniel, al enterarse de que el pre-costo rápido y el precosteo persistido costeaban distinto el
+> mismo renglón: *"No hay ningún motivo por el cual tener dos precios distintos. Hay que unificarlo.
+> Si ya tenemos precios reales, lo mejor es tomar ese costo. El más actualizado. El de referencia
+> podría funcionar solo cuando es algo nuevo que no se ha comprado. No hay ningún motivo para tener
+> dos costos diferentes. Entre más unificado esté, mejor."*
+
+**De dónde salió.** La revisión de **V1-E3c** destapó que conviven **tres cifras** para el mismo
+renglón: la receta (regla del motor persistido), el pre-costo rápido de F7 y el precosto congelado.
+El reviewer documentó **cuatro** divergencias de `pre-costo.ts` —no una, como decía su comentario—:
+sin amarre usa `precioReferencia` en vez del más barato; **no conoce `promedio-medidas`**; **ignora
+`consumoPorTalla`** (justo lo que V1-E3c acaba de hacer capturable); y no redondea antes de
+multiplicar. Hasta esta etapa la discrepancia era invisible; **ponerla en pantalla la volvió
+insostenible.**
+
+**No es una idea nueva: es la misma que Daniel ya dictó el 26-jul (§Post-F9.5)** para el costo real de
+una orden (*"al comprar cambian con frecuencia el proveedor y el precio"*), y que hizo que los avíos
+genéricos se valuaran al **último precio de compra**. Lo que se decide aquí es **extender ese criterio
+a la receta y al precosteo**, que seguían viviendo del catálogo.
+
+**LA CASCADA ÚNICA — una sola para todos los motores:**
+
+| # | Escalón | Cuándo aplica |
+|---|---|---|
+| 1 | **Último precio de COMPRA REAL** | siempre que ese material ya se haya comprado |
+| 2 | Precio del proveedor en el catálogo | si a ese proveedor nunca se le ha comprado |
+| 3 | **`precioReferencia` del catálogo** | **solo lo nuevo que nunca se ha comprado** (Daniel, textual) |
+| 4 | `sin-precio` | se dice; NO se inventa un `$0.00` mudo |
+
+**⭐ El cruce con el amarre de Desarrollo — la pregunta fina, resuelta por Daniel:**
+
+> **El amarre elige el PROVEEDOR; el precio es el de la última compra A ESE proveedor.**
+
+Elegido de tres opciones. Lo que Desarrollo negocia es **con quién** se compra; el costo sale de la
+realidad más reciente con ese proveedor. Si a ese proveedor aún no se le ha comprado el material, se
+usa su precio negociado; y si tampoco hay, el de referencia. **Así el trabajo de negociación no se
+tira** (sigue mandando la elección de proveedor) y el costo no se queda viejo. Se descartaron: que el
+precio negociado mandara siempre (se queda viejo si el proveedor sube y nadie actualiza el amarre) y
+que la última compra mandara siempre sin importar el amarre (amarrar dejaría de tener efecto).
+
+**Qué se entiende por "comprado":** lo mismo que ya fijó §Post-F9.5 regla 1 — **manda la OC
+AUTORIZADA**, no lo recibido ni lo surtido. Se reusa el criterio existente, no se inventa otro.
+
+⚠️ **CONSECUENCIA QUE HAY QUE DECIR EN VOZ ALTA:** esto **SÍ cambia el motor de costeo**, a
+diferencia de §Post-F9.47 (que fue solo de presentación). Los precosteos **ya congelados NO se
+mueven** —son fotografías, y su valor es justo ese—, pero **todo cálculo nuevo dará números
+distintos** a los de ayer. Es exactamente lo que Daniel quiere (números reales en vez de catálogo),
+y por eso queda escrito: quien compare un precosto viejo con uno nuevo verá diferencias **por
+diseño**.
+
+**Lo que también se cierra de paso:** `pre-costo.ts` (F7) deja de ser un motor aparte. El reviewer
+verificó que **no escribe nada** —es lectura pura, sin `create`/`update`/`enTransaccion`—, así que
+alinearlo **no mueve ningún precio pactado**. La asimetría temida era la contraria a la real.
+
+- **Aplica en:** etapa propia del track V1, **después** de V1-E3c (un solo coder a la vez sobre el
+  árbol). Toca `dominio/costos/resolucion-precios.ts`, `dominio/costos/pre-costo.ts` y la lectura del
+  BOM; reusa la maquinaria de último precio de compra que ya existe en
+  `dominio/costos/costo-real-compras.ts`. **Requiere decidir al construir** si el "último precio" se
+  lee en vivo o se materializa (rendimiento), y **pruebas de no-regresión** de que los precostos
+  congelados siguen dando lo mismo.
+- **Fecha:** 2026-08-15.
