@@ -38,6 +38,17 @@ export const esquemaModeloAvioTallaEntrada = z.object({
     .int({ error: 'El id de la talla debe ser entero' })
     .positive({ error: 'El id de la talla debe ser positivo' }),
   consumo: esquemaConsumoTalla,
+  /**
+   * AMARRE medida×talla (R5/B11): qué `AvioMedida` (tamaño real: "15 cm", "18 cm") usa esta talla,
+   * para que la compra/MRP desglose con el precio real de la medida. `null` = sin amarre. El
+   * dominio valida que la medida sea DE ESE avío y esté activa.
+   */
+  idAvioMedida: z
+    .number({ error: 'El id de la medida debe ser un número' })
+    .int({ error: 'El id de la medida debe ser entero' })
+    .positive({ error: 'El id de la medida debe ser positivo' })
+    .nullable()
+    .default(null),
 });
 
 /** Datos validados de un renglón de medida por talla. */
@@ -63,12 +74,26 @@ export const esquemaMedidasAvioGuardar = z
 /** Datos validados del cuerpo de guardar medidas por talla. */
 export type DatosMedidasAvioGuardar = z.infer<typeof esquemaMedidasAvioGuardar>;
 
-/** Salida de UNA medida por talla (con la etiqueta de la talla embebida para la UI). */
+/**
+ * Salida de UNA medida por talla (con la etiqueta de la talla embebida para la UI) + el AMARRE a
+ * la `AvioMedida` (R5/B11). Los renglones NACEN de la CURVA del modelo: una talla de la curva sin
+ * medida capturada sale con `consumo: 0` (y `enCurva: true`), para que la matriz exista SIEMPRE
+ * que haya curva. Una talla capturada que ya NO está en la curva (curva cambiada después) sale con
+ * `enCurva: false` para que la UI la muestre marcada en vez de perderla en silencio.
+ */
 export const esquemaModeloAvioTallaSalida = z
   .object({
     idTalla: z.number().int().describe('Id de la talla.'),
     etiquetaTalla: z.string().describe('Etiqueta de la talla (para la UI).'),
-    consumo: z.number().describe('Consumo del avío para esta talla.'),
+    consumo: z.number().describe('Consumo del avío para esta talla (0 = sin capturar).'),
+    enCurva: z.boolean().describe('¿La talla pertenece a la curva vigente del modelo?'),
+    idAvioMedida: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Amarre R5/B11: medida del avío que usa esta talla, o null.'),
+    medidaAmarrada: z.string().nullable().describe('Etiqueta de la medida amarrada, o null.'),
+    precioMedida: z.number().nullable().describe('Precio de la medida amarrada, o null.'),
   })
   .describe('Medida (consumo) de un avío del BOM para una talla.');
 
@@ -85,6 +110,12 @@ export const esquemaModeloAvioMedidasSalida = z
     idModelo: z.number().int().describe('Id del modelo.'),
     idAvio: z.number().int().describe('Id del avío (renglón del BOM).'),
     consumoPorTalla: z.boolean().describe('¿Este avío se consume por talla (R18)?'),
+    /**
+     * ¿El MODELO tiene curva de tallas asignada? Es el dato con el que la UI decide si puede
+     * ofrecer la matriz o debe pedir que se le asigne una curva: antes se deducía —mal— de que la
+     * lista viniera vacía, y el aviso "el modelo no tiene curva" salía incluso con curva puesta.
+     */
+    tieneCurva: z.boolean().describe('¿El modelo tiene curva de tallas asignada?'),
     tallas: z.array(esquemaModeloAvioTallaSalida).describe('Medidas por talla del avío.'),
   })
   .describe('Medidas por talla de un avío del BOM de un modelo.');

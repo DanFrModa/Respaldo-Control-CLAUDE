@@ -155,6 +155,11 @@ function aTelaBomSalida(
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
+    idTelaProveedor: t.idTelaProveedor,
+    proveedorAmarrado: t.proveedorAmarrado,
+    precioAmarrado: t.precioAmarrado,
+    precioPorColor: t.precioPorColor,
+    precioReferencia: t.precioReferencia,
   };
 }
 
@@ -170,6 +175,11 @@ function aAvioBomSalida(
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
+    consumoPorTalla: a.consumoPorTalla,
+    idAvioProveedor: a.idAvioProveedor,
+    proveedorAmarrado: a.proveedorAmarrado,
+    precioAmarrado: a.precioAmarrado,
+    precioReferencia: a.precioReferencia,
   };
 }
 
@@ -238,6 +248,11 @@ function aModeloFichaSalida(modelo: ModeloFicha): z.infer<typeof esquemaModeloFi
     telas: modelo.telas.map(aTelaBomSalida),
     avios: modelo.avios.map(aAvioBomSalida),
     artes: modelo.artes.map(aArteSalida),
+    tallasCurva: modelo.tallasCurva.map((t) => ({
+      idTalla: t.idTalla,
+      etiqueta: t.etiqueta,
+      posicion: t.posicion,
+    })),
   };
 }
 

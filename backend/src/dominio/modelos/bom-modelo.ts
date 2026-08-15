@@ -35,6 +35,7 @@ import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -52,7 +53,13 @@ import {
   leerArtesModelo,
   type ModeloArteDetalle,
 } from './arte-modelo.js';
-import { exigirModelo, incluirRelacionesModelo, type ModeloConRelaciones } from './modelos.js';
+import {
+  exigirModelo,
+  incluirRelacionesModelo,
+  leerTallasCurvaModelo,
+  type ModeloConRelaciones,
+  type TallaCurvaModelo,
+} from './modelos.js';
 
 // ── Tipos de entrada (lo que recibe el dominio ANTES de validar: defaults opcionales) ──
 // El dominio re-valida con `validarEntrada` (mismo patrón que `EntradaCrear*`): por eso los
@@ -73,7 +80,7 @@ type AvioBomValidado = z.output<typeof esquemaModeloAvioEntrada>;
 
 // ── Salida de cada sección del BOM (renglones con nombre embebido para la UI) ──
 
-/** Renglón de tela del BOM tal como sale al cliente. */
+/** Renglón de tela del BOM tal como sale al cliente (con su AMARRE de precio R17 resuelto). */
 export type ModeloTelaDetalle = {
   idTela: number;
   nombre: string;
@@ -81,9 +88,19 @@ export type ModeloTelaDetalle = {
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
+  /** `TelaProveedor.id` amarrado por Desarrollo (R17), o null. */
+  idTelaProveedor: number | null;
+  /** Nombre del proveedor amarrado, o null. */
+  proveedorAmarrado: string | null;
+  /** `TelaProveedor.precio` del amarre, o null. */
+  precioAmarrado: number | null;
+  /** ¿El proveedor amarrado cotiza por color? (entonces el precio fino sale del color). */
+  precioPorColor: boolean;
+  /** `Tela.precioSugerido`: el precio de CATÁLOGO, que la UI muestra como "referencia". */
+  precioReferencia: number | null;
 };
 
-/** Renglón de avío del BOM tal como sale al cliente. */
+/** Renglón de avío del BOM tal como sale al cliente (con su AMARRE de precio R17 resuelto). */
 export type ModeloAvioDetalle = {
   idAvio: number;
   clave: string;
@@ -92,6 +109,16 @@ export type ModeloAvioDetalle = {
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
+  /** ¿El consumo se captura POR TALLA (R18)? Lo administra `medidas-avio-talla.ts`. */
+  consumoPorTalla: boolean;
+  /** Proveedor del par `AvioProveedor` amarrado (R17), o null. */
+  idAvioProveedor: number | null;
+  /** Nombre del proveedor amarrado, o null. */
+  proveedorAmarrado: string | null;
+  /** Precio del amarre YA normalizado a unidad de consumo (÷ factor R1), o null. */
+  precioAmarrado: number | null;
+  /** `Avio.precioReferencia`: el precio de CATÁLOGO, que la UI muestra como "referencia". */
+  precioReferencia: number | null;
 };
 
 /** BOM completo de un modelo (telas + avíos + su ARTE), para embeber en la ficha. */
@@ -103,7 +130,11 @@ export interface BomModelo {
 
 // ── Lecturas de cada sección (ordenadas por nombre del componente) ────────────
 
-/** Lee las telas del BOM de un modelo (con el nombre de la tela, ordenadas por nombre). */
+/**
+ * Lee las telas del BOM de un modelo (con el nombre de la tela, ordenadas por nombre) y resuelve
+ * su AMARRE de precio (R17): proveedor + precio del `TelaProveedor` amarrado, más el precio
+ * SUGERIDO del catálogo, que la receta muestra marcado como "referencia" cuando no hay amarre.
+ */
 export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTelaDetalle[]> {
   const filas = await tx.modeloTela.findMany({
     where: { idModelo },
@@ -113,7 +144,15 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
       paraPreCosto: true,
       paraProduccion: true,
       paraCosto: true,
-      tela: { select: { nombre: true } },
+      idTelaProveedor: true,
+      telaProveedor: {
+        select: {
+          precio: true,
+          manejaPrecioPorColor: true,
+          proveedor: { select: { nombre: true } },
+        },
+      },
+      tela: { select: { nombre: true, precioSugerido: true } },
     },
     orderBy: { tela: { nombre: 'asc' } },
   });
@@ -124,10 +163,25 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
     paraPreCosto: f.paraPreCosto,
     paraProduccion: f.paraProduccion,
     paraCosto: f.paraCosto,
+    idTelaProveedor: f.idTelaProveedor,
+    proveedorAmarrado: f.telaProveedor?.proveedor.nombre ?? null,
+    precioAmarrado:
+      f.telaProveedor?.precio === null || f.telaProveedor?.precio === undefined
+        ? null
+        : f.telaProveedor.precio.toNumber(),
+    precioPorColor: f.telaProveedor?.manejaPrecioPorColor ?? false,
+    precioReferencia: f.tela.precioSugerido === null ? null : f.tela.precioSugerido.toNumber(),
   }));
 }
 
-/** Lee los avíos del BOM de un modelo (con clave/descripción, ordenados por clave). */
+/**
+ * Lee los avíos del BOM de un modelo (con clave/descripción, ordenados por clave) y resuelve su
+ * AMARRE de precio (R17). `ModeloAvio.idAvioProveedor` guarda el PROVEEDOR del par (no un id de
+ * `AvioProveedor`, que tiene PK compuesta), así que el par se reconstruye en UNA sola consulta
+ * para todos los renglones amarrados (sin N+1). El precio sale NORMALIZADO a unidad de consumo
+ * (÷ factor R1, `comun/conversion.ts`): así el número que ve Desarrollo en la receta es el mismo
+ * con el que costea el precosto.
+ */
 export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvioDetalle[]> {
   const filas = await tx.modeloAvio.findMany({
     where: { idModelo },
@@ -137,19 +191,63 @@ export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvio
       paraPreCosto: true,
       paraProduccion: true,
       paraCosto: true,
-      avio: { select: { clave: true, descripcion: true } },
+      consumoPorTalla: true,
+      idAvioProveedor: true,
+      avio: {
+        select: { clave: true, descripcion: true, precioReferencia: true, factorConversion: true },
+      },
     },
     orderBy: { avio: { clave: 'asc' } },
   });
-  return filas.map((f) => ({
-    idAvio: f.idAvio,
-    clave: f.avio.clave,
-    descripcion: f.avio.descripcion,
-    consumoPorPrenda: f.consumoPorPrenda.toNumber(),
-    paraPreCosto: f.paraPreCosto,
-    paraProduccion: f.paraProduccion,
-    paraCosto: f.paraCosto,
-  }));
+
+  // Pares (avío, proveedor) amarrados: una sola lectura para todos los renglones.
+  const pares = filas.flatMap((f) =>
+    f.idAvioProveedor === null ? [] : [{ idAvio: f.idAvio, idProveedor: f.idAvioProveedor }],
+  );
+  const amarres =
+    pares.length === 0
+      ? []
+      : await tx.avioProveedor.findMany({
+          where: { OR: pares },
+          select: {
+            idAvio: true,
+            idProveedor: true,
+            precio: true,
+            factorConversion: true,
+            proveedor: { select: { nombre: true } },
+          },
+        });
+  const amarrePorClave = new Map(amarres.map((a) => [`${a.idAvio}-${a.idProveedor}`, a]));
+
+  return filas.map((f) => {
+    const amarre =
+      f.idAvioProveedor === null
+        ? undefined
+        : amarrePorClave.get(`${f.idAvio}-${f.idAvioProveedor}`);
+    const precioPresentacion = amarre?.precio ?? null;
+    const factor = resolverFactor(
+      amarre?.factorConversion?.toNumber() ?? null,
+      f.avio.factorConversion?.toNumber() ?? null,
+    );
+    return {
+      idAvio: f.idAvio,
+      clave: f.avio.clave,
+      descripcion: f.avio.descripcion,
+      consumoPorPrenda: f.consumoPorPrenda.toNumber(),
+      paraPreCosto: f.paraPreCosto,
+      paraProduccion: f.paraProduccion,
+      paraCosto: f.paraCosto,
+      consumoPorTalla: f.consumoPorTalla,
+      idAvioProveedor: f.idAvioProveedor,
+      proveedorAmarrado: amarre?.proveedor.nombre ?? null,
+      precioAmarrado:
+        precioPresentacion === null
+          ? null
+          : precioAUnidadConsumo(precioPresentacion.toNumber(), factor),
+      precioReferencia:
+        f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
+    };
+  });
 }
 
 /** Lee el BOM completo (telas + avíos + arte) de un modelo. Reusado por la ficha. */
@@ -162,8 +260,15 @@ export async function leerBom(tx: Tx, idModelo: number): Promise<BomModelo> {
   return { telas, avios, artes };
 }
 
-/** Modelo con sus relaciones + el BOM completo embebido (forma de la FICHA). */
-export type ModeloFicha = ModeloConRelaciones & BomModelo;
+/**
+ * Modelo con sus relaciones + el BOM completo embebido + las TALLAS DE SU CURVA (forma de la
+ * FICHA). Las tallas viajan solo aquí (el listado no las paga): son la lista con la que la receta
+ * arma el consumo por talla de un avío (R18).
+ */
+export type ModeloFicha = ModeloConRelaciones &
+  BomModelo & {
+    tallasCurva: TallaCurvaModelo[];
+  };
 
 /**
  * Obtiene la FICHA de un modelo: datos generales + relaciones + conteo de fotos + el BOM
@@ -184,8 +289,11 @@ export async function obtenerFichaModelo(
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  const bom = await leerBom(cliente, idModelo);
-  return { ...modelo, ...bom };
+  const [bom, tallasCurva] = await Promise.all([
+    leerBom(cliente, idModelo),
+    leerTallasCurvaModelo(cliente, idModelo),
+  ]);
+  return { ...modelo, ...bom, tallasCurva };
 }
 
 // ── Validación de componentes (existen y están activos) ────────────────────────
@@ -226,7 +334,66 @@ async function exigirAviosValidos(tx: Tx, ids: number[]): Promise<void> {
   }
 }
 
-/** ¿Cambió alguna bandera o el consumo de un renglón de tela/avío? */
+/**
+ * Valida los AMARRES de precio de las TELAS (R17): cada `idTelaProveedor` debe EXISTIR, ser un
+ * renglón DE ESA MISMA tela y estar ACTIVO. Sin esta validación se podía amarrar el precio de otra
+ * tela (o uno dado de baja) y el precosto costearía con él sin que nadie lo notara.
+ */
+async function exigirAmarresTelaValidos(tx: Tx, deseados: TelaBomValidada[]): Promise<void> {
+  const conAmarre = deseados.filter((d) => d.idTelaProveedor !== null);
+  if (conAmarre.length === 0) return;
+
+  const renglones = await tx.telaProveedor.findMany({
+    where: { id: { in: conAmarre.map((d) => d.idTelaProveedor as number) } },
+    select: { id: true, idTela: true, activo: true, proveedor: { select: { nombre: true } } },
+  });
+  const porId = new Map(renglones.map((r) => [r.id, r]));
+
+  for (const d of conAmarre) {
+    const renglon = porId.get(d.idTelaProveedor as number);
+    if (renglon === undefined || renglon.idTela !== d.idTela) {
+      throw new ErrorValidacion(
+        'El proveedor amarrado a una de las telas no existe o no es de esa tela.',
+      );
+    }
+    if (!renglon.activo) {
+      throw new ErrorValidacion(
+        `El precio del proveedor "${renglon.proveedor.nombre}" está desactivado y no se puede amarrar.`,
+      );
+    }
+  }
+}
+
+/**
+ * Valida los AMARRES de precio de los AVÍOS (R17): el par `(idAvio, idAvioProveedor)` debe existir
+ * en `AvioProveedor` (el amarre guarda el PROVEEDOR, no un id propio — mismo criterio que
+ * `OrdenCompraLinea.idAvioProveedor` de F4).
+ */
+async function exigirAmarresAvioValidos(tx: Tx, deseados: AvioBomValidado[]): Promise<void> {
+  const conAmarre = deseados.filter((d) => d.idAvioProveedor !== null);
+  if (conAmarre.length === 0) return;
+
+  const existentes = await tx.avioProveedor.findMany({
+    where: {
+      OR: conAmarre.map((d) => ({
+        idAvio: d.idAvio,
+        idProveedor: d.idAvioProveedor as number,
+      })),
+    },
+    select: { idAvio: true, idProveedor: true },
+  });
+  const claves = new Set(existentes.map((e) => `${e.idAvio}-${e.idProveedor}`));
+
+  for (const d of conAmarre) {
+    if (!claves.has(`${d.idAvio}-${String(d.idAvioProveedor)}`)) {
+      throw new ErrorValidacion(
+        'El proveedor amarrado a uno de los avíos no surte ese avío (no tiene precio capturado para él).',
+      );
+    }
+  }
+}
+
+/** ¿Cambió alguna bandera, el consumo o el amarre de un renglón de tela/avío? */
 function cambiaRenglonComponente(
   actual: {
     consumoPorPrenda: Prisma.Decimal;
@@ -240,12 +407,15 @@ function cambiaRenglonComponente(
     paraProduccion: boolean;
     paraCosto: boolean;
   },
+  amarreActual: number | null,
+  amarreDeseado: number | null,
 ): boolean {
   return (
     actual.consumoPorPrenda.toNumber() !== deseado.consumoPorPrenda ||
     actual.paraPreCosto !== deseado.paraPreCosto ||
     actual.paraProduccion !== deseado.paraProduccion ||
-    actual.paraCosto !== deseado.paraCosto
+    actual.paraCosto !== deseado.paraCosto ||
+    amarreActual !== amarreDeseado
   );
 }
 
@@ -262,6 +432,7 @@ async function sincronizarTelas(
     tx,
     deseados.map((d) => d.idTela),
   );
+  await exigirAmarresTelaValidos(tx, deseados);
 
   const actuales = await tx.modeloTela.findMany({ where: { idModelo } });
   const actualPorId = new Map(actuales.map((f) => [f.idTela, f]));
@@ -271,7 +442,10 @@ async function sincronizarTelas(
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idTela));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idTela);
-    return actual !== undefined && cambiaRenglonComponente(actual, d);
+    return (
+      actual !== undefined &&
+      cambiaRenglonComponente(actual, d, actual.idTelaProveedor, d.idTelaProveedor)
+    );
   });
 
   if (aQuitar.length === 0 && aAgregar.length === 0 && aActualizar.length === 0) {
@@ -290,6 +464,7 @@ async function sincronizarTelas(
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
+        idTelaProveedor: d.idTelaProveedor,
         creadoPorId: sesion.id,
         modificadoPorId: sesion.id,
       })),
@@ -303,6 +478,7 @@ async function sincronizarTelas(
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
+        idTelaProveedor: d.idTelaProveedor,
         ...datosModificacion(sesion),
       },
     });
@@ -321,6 +497,7 @@ async function sincronizarAvios(
     tx,
     deseados.map((d) => d.idAvio),
   );
+  await exigirAmarresAvioValidos(tx, deseados);
 
   const actuales = await tx.modeloAvio.findMany({ where: { idModelo } });
   const actualPorId = new Map(actuales.map((f) => [f.idAvio, f]));
@@ -330,7 +507,10 @@ async function sincronizarAvios(
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idAvio));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idAvio);
-    return actual !== undefined && cambiaRenglonComponente(actual, d);
+    return (
+      actual !== undefined &&
+      cambiaRenglonComponente(actual, d, actual.idAvioProveedor, d.idAvioProveedor)
+    );
   });
 
   if (aQuitar.length === 0 && aAgregar.length === 0 && aActualizar.length === 0) {
@@ -349,12 +529,16 @@ async function sincronizarAvios(
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
+        idAvioProveedor: d.idAvioProveedor,
         creadoPorId: sesion.id,
         modificadoPorId: sesion.id,
       })),
     });
   }
   for (const d of aActualizar) {
+    // OJO: aquí NO se toca `consumoPorTalla` ni las filas `ModeloAvioTalla` — el consumo por talla
+    // (R18) es un sub-recurso con su propio endpoint (`medidas-avio-talla.ts`) y guardar la receta
+    // no debe borrarlo. Solo el renglón que se QUITA del set pierde sus medidas (Cascade).
     await tx.modeloAvio.update({
       where: { idModelo_idAvio: { idModelo, idAvio: d.idAvio } },
       data: {
@@ -362,6 +546,7 @@ async function sincronizarAvios(
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
+        idAvioProveedor: d.idAvioProveedor,
         ...datosModificacion(sesion),
       },
     });
@@ -575,6 +760,8 @@ export async function copiarBom(
     const artesACrear = artesOrigen.filter((a) => !artesDestino.has(a.nombre.toLocaleLowerCase()));
 
     if (telasACrear.length > 0) {
+      // El AMARRE de precio (R17) viaja con el renglón: copiar una receta y perder el proveedor
+      // amarrado dejaría al destino costeando con el precio genérico sin avisar.
       await tx.modeloTela.createMany({
         data: telasACrear.map((t) => ({
           idModelo: idDestino,
@@ -583,6 +770,7 @@ export async function copiarBom(
           paraPreCosto: t.paraPreCosto,
           paraProduccion: t.paraProduccion,
           paraCosto: t.paraCosto,
+          idTelaProveedor: t.idTelaProveedor,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
         })),
@@ -597,10 +785,33 @@ export async function copiarBom(
           paraPreCosto: a.paraPreCosto,
           paraProduccion: a.paraProduccion,
           paraCosto: a.paraCosto,
+          // El toggle R18 y su amarre R17 viajan con el renglón (ver el copiado de medidas abajo).
+          consumoPorTalla: a.consumoPorTalla,
+          idAvioProveedor: a.idAvioProveedor,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
         })),
       });
+
+      // MEDIDAS POR TALLA (R18) de los avíos copiados: sin esto, copiar la receta traía el toggle
+      // "se consume por talla" encendido y la matriz VACÍA — el destino quedaba con un avío que
+      // dice costear por talla y no tiene ni una medida (y su amarre medida×talla, perdido).
+      const medidasOrigen = await tx.modeloAvioTalla.findMany({
+        where: { idModelo: datos.idOrigen, idAvio: { in: aviosACrear.map((a) => a.idAvio) } },
+      });
+      if (medidasOrigen.length > 0) {
+        await tx.modeloAvioTalla.createMany({
+          data: medidasOrigen.map((m) => ({
+            idModelo: idDestino,
+            idAvio: m.idAvio,
+            idTalla: m.idTalla,
+            consumo: m.consumo,
+            idAvioMedida: m.idAvioMedida,
+            creadoPorId: sesion.id,
+            modificadoPorId: sesion.id,
+          })),
+        });
+      }
     }
     if (artesACrear.length > 0) {
       // Al REEMPLAZAR, el destino quedó vacío: se copia el `orden` del origen tal cual (el arte

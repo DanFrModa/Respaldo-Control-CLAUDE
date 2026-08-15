@@ -13,6 +13,12 @@
  * 🔑 Reglas (A1):
  *  • El renglón `ModeloAvio` (idModelo, idAvio) debe EXISTIR: si no, `ErrorNoEncontrado` (el avío
  *    no está en el BOM de ese modelo). El modelo debe existir (`exigirModelo`).
+ *  • La LECTURA arma la matriz desde la CURVA del modelo (V1-E3c): devuelve una fila por talla de
+ *    la curva (consumo 0 si no se ha capturado) + las capturadas que ya no están en la curva, y
+ *    publica `tieneCurva` para que la UI diga la verdad (antes la lista salía vacía SIEMPRE y el
+ *    aviso "el modelo no tiene curva" se mostraba aunque sí la tuviera).
+ *  • Cada talla puede AMARRAR una `AvioMedida` del avío (R5/B11, `idAvioMedida`): la medida debe
+ *    ser de ESE avío y estar activa.
  *  • Las tallas deben EXISTIR y estar ACTIVAS (no se meten tallas apagadas a las medidas).
  *  • La lista de tallas SIEMPRE reemplaza el set (set-completo), INDEPENDIENTE del toggle: si se
  *    manda `tallas:[]` se vacían las medidas; si se mandan tallas con `consumoPorTalla=false`,
@@ -37,7 +43,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { exigirModelo } from './modelos.js';
+import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
 export type EntradaMedidasAvio = z.input<typeof esquemaMedidasAvioGuardar>;
@@ -50,6 +56,14 @@ export interface ModeloAvioTallaDetalle {
   idTalla: number;
   etiquetaTalla: string;
   consumo: number;
+  /** ¿La talla pertenece a la CURVA vigente del modelo? (false = capturada con otra curva). */
+  enCurva: boolean;
+  /** `AvioMedida.id` amarrado a esta talla (R5/B11), o null. */
+  idAvioMedida: number | null;
+  /** Etiqueta de la medida amarrada ("15 cm"), o null. */
+  medidaAmarrada: string | null;
+  /** Precio de la medida amarrada, o null. */
+  precioMedida: number | null;
 }
 
 /** Medidas por talla completas de un avío del BOM (toggle + renglones). */
@@ -57,6 +71,8 @@ export interface MedidasAvio {
   idModelo: number;
   idAvio: number;
   consumoPorTalla: boolean;
+  /** ¿El MODELO tiene curva de tallas asignada? (con curva SIEMPRE hay renglones que capturar). */
+  tieneCurva: boolean;
   tallas: ModeloAvioTallaDetalle[];
 }
 
@@ -101,37 +117,109 @@ async function exigirTallasValidas(tx: Tx, idsTallas: number[]): Promise<void> {
   }
 }
 
-/** Lee las medidas por talla del avío (con la etiqueta), ordenadas por `talla.orden` luego etiqueta. */
+/**
+ * Lee las medidas por talla del avío. ⭐ Los renglones NACEN DE LA CURVA del modelo (V1-E3c): se
+ * devuelven TODAS las tallas de la curva —en el orden de la curva—, con su consumo capturado o 0
+ * si aún no se captura, y detrás las tallas capturadas que YA NO están en la curva (`enCurva:
+ * false`), para no perderlas en silencio si alguien cambió la curva después.
+ *
+ * Antes esta función hacía un solo `findMany` sobre `ModeloAvioTalla` y NADA en el sistema creaba
+ * esas filas: la lista salía siempre vacía y la UI concluía —falsamente— que "el modelo no tiene
+ * curva de tallas". Por eso `tieneCurva` viaja aparte: es el único dato con el que la UI puede
+ * decir la verdad.
+ */
 async function leerMedidasAvio(
   tx: Tx,
   idModelo: number,
   idAvio: number,
   consumoPorTalla: boolean,
 ): Promise<MedidasAvio> {
-  const filas = await tx.modeloAvioTalla.findMany({
-    where: { idModelo, idAvio },
-    select: {
-      idTalla: true,
-      consumo: true,
-      talla: { select: { etiqueta: true } },
-    },
-    orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
+  const [curva, filas] = await Promise.all([
+    leerTallasCurvaModelo(tx, idModelo),
+    tx.modeloAvioTalla.findMany({
+      where: { idModelo, idAvio },
+      select: {
+        idTalla: true,
+        consumo: true,
+        idAvioMedida: true,
+        talla: { select: { etiqueta: true, orden: true } },
+        avioMedida: { select: { medida: true, precio: true } },
+      },
+      orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
+    }),
+  ]);
+
+  const capturadaPorTalla = new Map(filas.map((f) => [f.idTalla, f]));
+  const detalle = (
+    f: (typeof filas)[number] | undefined,
+    idTalla: number,
+    etiquetaTalla: string,
+    enCurva: boolean,
+  ): ModeloAvioTallaDetalle => ({
+    idTalla,
+    etiquetaTalla,
+    consumo: f === undefined ? 0 : f.consumo.toNumber(),
+    enCurva,
+    idAvioMedida: f?.idAvioMedida ?? null,
+    medidaAmarrada: f?.avioMedida?.medida ?? null,
+    precioMedida: f?.avioMedida?.precio.toNumber() ?? null,
   });
+
+  const deLaCurva = curva.map((t) =>
+    detalle(capturadaPorTalla.get(t.idTalla), t.idTalla, t.etiqueta, true),
+  );
+  const idsCurva = new Set(curva.map((t) => t.idTalla));
+  const fueraDeCurva = filas
+    .filter((f) => !idsCurva.has(f.idTalla))
+    .map((f) => detalle(f, f.idTalla, f.talla.etiqueta, false));
+
   return {
     idModelo,
     idAvio,
     consumoPorTalla,
-    tallas: filas.map((f) => ({
-      idTalla: f.idTalla,
-      etiquetaTalla: f.talla.etiqueta,
-      consumo: f.consumo.toNumber(),
-    })),
+    tieneCurva: curva.length > 0,
+    tallas: [...deLaCurva, ...fueraDeCurva],
   };
 }
 
 /**
+ * Valida los AMARRES medida×talla (R5/B11): cada `idAvioMedida` debe existir, ser una medida DE
+ * ESE avío y estar ACTIVA. Sin esto se podría amarrar la talla a la medida de otro avío (o a una
+ * dada de baja) y la compra/MRP desglosaría con un precio ajeno.
+ */
+async function exigirMedidasAvioValidas(
+  tx: Tx,
+  idAvio: number,
+  deseados: MedidaTallaValidada[],
+): Promise<void> {
+  const ids = [
+    ...new Set(deseados.flatMap((d) => (d.idAvioMedida === null ? [] : [d.idAvioMedida]))),
+  ];
+  if (ids.length === 0) return;
+
+  const medidas = await tx.avioMedida.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, idAvio: true, medida: true, activo: true },
+  });
+  const porId = new Map(medidas.map((m) => [m.id, m]));
+
+  for (const id of ids) {
+    const medida = porId.get(id);
+    if (medida === undefined || medida.idAvio !== idAvio) {
+      throw new ErrorValidacion('Una de las medidas seleccionadas no existe o no es de este avío.');
+    }
+    if (!medida.activo) {
+      throw new ErrorValidacion(
+        `La medida "${medida.medida}" está desactivada y no se puede amarrar a una talla.`,
+      );
+    }
+  }
+}
+
+/**
  * Reemplaza el set de medidas por talla del avío (diff agrega/quita/actualiza). Exige tallas
- * válidas/activas. Devuelve true si hubo cambio. NO escribe bitácora (lo hace el llamador).
+ * válidas/activas y amarres de medida válidos. Devuelve true si hubo cambio. NO escribe bitácora
+ * (lo hace el llamador).
  */
 async function sincronizarMedidas(
   tx: Tx,
@@ -144,6 +232,7 @@ async function sincronizarMedidas(
     tx,
     deseados.map((d) => d.idTalla),
   );
+  await exigirMedidasAvioValidas(tx, idAvio, deseados);
 
   const actuales = await tx.modeloAvioTalla.findMany({ where: { idModelo, idAvio } });
   const actualPorId = new Map(actuales.map((f) => [f.idTalla, f]));
@@ -153,7 +242,10 @@ async function sincronizarMedidas(
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idTalla));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idTalla);
-    return actual !== undefined && actual.consumo.toNumber() !== d.consumo;
+    return (
+      actual !== undefined &&
+      (actual.consumo.toNumber() !== d.consumo || actual.idAvioMedida !== d.idAvioMedida)
+    );
   });
 
   if (aQuitar.length === 0 && aAgregar.length === 0 && aActualizar.length === 0) {
@@ -172,6 +264,7 @@ async function sincronizarMedidas(
         idAvio,
         idTalla: d.idTalla,
         consumo: d.consumo,
+        idAvioMedida: d.idAvioMedida,
         creadoPorId: sesion.id,
         modificadoPorId: sesion.id,
       })),
@@ -180,7 +273,7 @@ async function sincronizarMedidas(
   for (const d of aActualizar) {
     await tx.modeloAvioTalla.update({
       where: { idModelo_idAvio_idTalla: { idModelo, idAvio, idTalla: d.idTalla } },
-      data: { consumo: d.consumo, ...datosModificacion(sesion) },
+      data: { consumo: d.consumo, idAvioMedida: d.idAvioMedida, ...datosModificacion(sesion) },
     });
   }
   return true;

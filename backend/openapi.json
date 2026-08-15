@@ -29789,6 +29789,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado (TelaProveedor.precio), o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de catálogo de la tela (precioSugerido) — solo referencia."
                           }
                         },
                         "required": [
@@ -29797,7 +29847,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioPorColor",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -29838,6 +29893,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado por unidad de consumo (÷ factor R1), o null."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de referencia del avío (catálogo) — solo referencia."
                           }
                         },
                         "required": [
@@ -29847,7 +29952,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -30015,6 +30125,38 @@
                         "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
                       },
                       "description": "Arte (bordados/estampados) del modelo."
+                    },
+                    "tallasCurva": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Etiqueta de la talla (CH, M, G…)."
+                          },
+                          "posicion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición dentro de la curva (orden de captura)."
+                          }
+                        },
+                        "required": [
+                          "idTalla",
+                          "etiqueta",
+                          "posicion"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Talla de la curva de tallas del modelo."
+                      },
+                      "description": "Tallas de la curva del modelo (vacía si no tiene curva)."
                     }
                   },
                   "required": [
@@ -30049,7 +30191,8 @@
                     "modificadoPorId",
                     "telas",
                     "avios",
-                    "artes"
+                    "artes",
+                    "tallasCurva"
                   ],
                   "additionalProperties": false,
                   "description": "Ficha de un modelo con su receta (BOM) completa."
@@ -31428,6 +31571,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado (TelaProveedor.precio), o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de catálogo de la tela (precioSugerido) — solo referencia."
                           }
                         },
                         "required": [
@@ -31436,7 +31629,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioPorColor",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -31638,6 +31836,19 @@
                         "paraCosto": {
                           "default": true,
                           "type": "boolean"
+                        },
+                        "idTelaProveedor": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31712,6 +31923,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado (TelaProveedor.precio), o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de catálogo de la tela (precioSugerido) — solo referencia."
                           }
                         },
                         "required": [
@@ -31720,7 +31981,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioPorColor",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -31951,6 +32217,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado por unidad de consumo (÷ factor R1), o null."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de referencia del avío (catálogo) — solo referencia."
                           }
                         },
                         "required": [
@@ -31960,7 +32276,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -32162,6 +32483,19 @@
                         "paraCosto": {
                           "default": true,
                           "type": "boolean"
+                        },
+                        "idAvioProveedor": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -32240,6 +32574,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado por unidad de consumo (÷ factor R1), o null."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de referencia del avío (catálogo) — solo referencia."
                           }
                         },
                         "required": [
@@ -32249,7 +32633,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -35656,6 +36045,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: renglón proveedor–tela–precio elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado (TelaProveedor.precio), o null."
+                          },
+                          "precioPorColor": {
+                            "type": "boolean",
+                            "description": "¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color)."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de catálogo de la tela (precioSugerido) — solo referencia."
                           }
                         },
                         "required": [
@@ -35664,7 +36103,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "idTelaProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioPorColor",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -35705,6 +36149,56 @@
                           "paraCosto": {
                             "type": "boolean",
                             "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del proveedor amarrado por unidad de consumo (÷ factor R1), o null."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de referencia del avío (catálogo) — solo referencia."
                           }
                         },
                         "required": [
@@ -35714,7 +36208,12 @@
                           "consumoPorPrenda",
                           "paraPreCosto",
                           "paraProduccion",
-                          "paraCosto"
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioAmarrado",
+                          "precioReferencia"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -185200,6 +185699,10 @@
                       "type": "boolean",
                       "description": "¿Este avío se consume por talla (R18)?"
                     },
+                    "tieneCurva": {
+                      "type": "boolean",
+                      "description": "¿El modelo tiene curva de tallas asignada?"
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -185217,13 +185720,56 @@
                           },
                           "consumo": {
                             "type": "number",
-                            "description": "Consumo del avío para esta talla."
+                            "description": "Consumo del avío para esta talla (0 = sin capturar)."
+                          },
+                          "enCurva": {
+                            "type": "boolean",
+                            "description": "¿La talla pertenece a la curva vigente del modelo?"
+                          },
+                          "idAvioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R5/B11: medida del avío que usa esta talla, o null."
+                          },
+                          "medidaAmarrada": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Etiqueta de la medida amarrada, o null."
+                          },
+                          "precioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de la medida amarrada, o null."
                           }
                         },
                         "required": [
                           "idTalla",
                           "etiquetaTalla",
-                          "consumo"
+                          "consumo",
+                          "enCurva",
+                          "idAvioMedida",
+                          "medidaAmarrada",
+                          "precioMedida"
                         ],
                         "additionalProperties": false,
                         "description": "Medida (consumo) de un avío del BOM para una talla."
@@ -185235,6 +185781,7 @@
                     "idModelo",
                     "idAvio",
                     "consumoPorTalla",
+                    "tieneCurva",
                     "tallas"
                   ],
                   "additionalProperties": false,
@@ -185419,6 +185966,19 @@
                         "consumo": {
                           "type": "number",
                           "minimum": 0
+                        },
+                        "idAvioMedida": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -185491,6 +186051,10 @@
                       "type": "boolean",
                       "description": "¿Este avío se consume por talla (R18)?"
                     },
+                    "tieneCurva": {
+                      "type": "boolean",
+                      "description": "¿El modelo tiene curva de tallas asignada?"
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -185508,13 +186072,56 @@
                           },
                           "consumo": {
                             "type": "number",
-                            "description": "Consumo del avío para esta talla."
+                            "description": "Consumo del avío para esta talla (0 = sin capturar)."
+                          },
+                          "enCurva": {
+                            "type": "boolean",
+                            "description": "¿La talla pertenece a la curva vigente del modelo?"
+                          },
+                          "idAvioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R5/B11: medida del avío que usa esta talla, o null."
+                          },
+                          "medidaAmarrada": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Etiqueta de la medida amarrada, o null."
+                          },
+                          "precioMedida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio de la medida amarrada, o null."
                           }
                         },
                         "required": [
                           "idTalla",
                           "etiquetaTalla",
-                          "consumo"
+                          "consumo",
+                          "enCurva",
+                          "idAvioMedida",
+                          "medidaAmarrada",
+                          "precioMedida"
                         ],
                         "additionalProperties": false,
                         "description": "Medida (consumo) de un avío del BOM para una talla."
@@ -185526,6 +186133,7 @@
                     "idModelo",
                     "idAvio",
                     "consumoPorTalla",
+                    "tieneCurva",
                     "tallas"
                   ],
                   "additionalProperties": false,
