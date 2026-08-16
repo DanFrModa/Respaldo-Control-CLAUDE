@@ -28,6 +28,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Empresa, PrismaClient } from '../../datos/index.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 
@@ -43,7 +44,6 @@ let idTela: number;
 let idAvio: number;
 let idAvioGenerico: number;
 let idProveedor: number;
-let idModelo: number;
 let folioOc = 0;
 
 const PERM_TODOS: ClavePermiso[] = ['costos.ver', 'costos.capturar', 'consultas.ver-importes'];
@@ -158,8 +158,6 @@ beforeEach(async () => {
     },
   });
 
-  idModelo = modelo.id;
-
   const clienteNeg = await cliente.cliente.create({ data: { nombre: 'Tienda X' } });
   const crearOrden = async (folio: bigint, idEmpresa: number): Promise<number> => {
     const o = await cliente.orden.create({
@@ -176,6 +174,9 @@ beforeEach(async () => {
         },
       },
     });
+    // V1-E3d: el costo REAL se reconcilia contra la RECETA DE LA ORDEN. Se siembra igual que lo
+    // hace el alta (precio NULL → cae al catálogo, como el backfill de la migración).
+    await sembrarRecetaDeOrden(cliente, o.id, modelo.id);
     return o.id;
   };
   idOrden = await crearOrden(1n, empresa.id);
@@ -506,7 +507,8 @@ describe('costoRealOrden — el requerido va SIEMPRE en la base del COSTEO (piez
     // Toda la receta se desmarca de costo salvo la tela, y el snapshot se queda solo con avíos:
     // ningún renglón del snapshot es `paraCosto` ⇒ el 100 % del requerido salió de la receta.
     await cliente.requerimientoOrden.deleteMany({ where: { idOrden, idTela } });
-    await cliente.modeloAvio.updateMany({ where: { idModelo }, data: { paraCosto: false } });
+    // V1-E3d: la bandera que manda al costear es la de la RECETA DE LA ORDEN.
+    await cliente.ordenAvio.updateMany({ where: { idOrden }, data: { paraCosto: false } });
 
     const real = await costoRealOrden(sesion(), idOrden, bd());
     expect(real.origenRequerido).toBe('receta'); // NO 'snapshot-mrp': sería una etiqueta optimista
@@ -516,8 +518,9 @@ describe('costoRealOrden — el requerido va SIEMPRE en la base del COSTEO (piez
   });
 
   it('un material del snapshot que NO es `paraCosto` no se valúa, pero su compra sí cuenta', async () => {
-    await cliente.modeloAvio.updateMany({
-      where: { idModelo, idAvio },
+    // V1-E3d: la bandera que manda al costear es la de la RECETA DE LA ORDEN.
+    await cliente.ordenAvio.updateMany({
+      where: { idOrden, idAvio },
       data: { paraCosto: false },
     });
     await crearOc({ estatus: 'autorizada', lineas: [{ idAvio, cantidad: 400, precio: 5 }] });

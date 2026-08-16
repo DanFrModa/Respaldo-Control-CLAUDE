@@ -8,7 +8,8 @@
  *  • SIN precios ni costos: NO se imprime el precio de bordados, ni `maquilaOrd`/`aplicacionOrd`,
  *    ni `maquilaBase`. Es una orden para PRODUCIR, no un costeo.
  *  • SIN código de barra / UPC (esa funcionalidad está en retiro).
- *  • Sección AVÍOS = los avíos del modelo marcados `paraProduccion` (rotulada "Avíos" — el
+ *  • Sección AVÍOS = los avíos de la RECETA DE LA ORDEN marcados `paraProduccion` y no excluidos
+ *    (V1-E3d: el papel dice lo que ESTA orden lleva, no lo que lleva la plantilla) (rotulada "Avíos" — el
  *    renombrado de vocabulario de Daniel; la estructura interna sigue llamándose `habilitacion`).
  *  • Impresión por lote = UN solo PDF consolidado, una orden por página (salto entre órdenes).
  *
@@ -18,7 +19,8 @@
  *    `obtenerOrden`, que filtra por la empresa activa de la sesión (una orden de otra empresa, para
  *    esta sesión, no existe → `ErrorNoEncontrado`/404).
  *  • REUSO — los datos se arman con lo que ya existe: `obtenerOrden` (encabezado + matriz + total),
- *    `leerBom` (telas/avíos y el ARTE del modelo) y `listarFotos` (fotos del modelo). NO se reinventa.
+ *    `leerRecetaParaImpreso` (telas/avíos y el ARTE **de la RECETA DE LA ORDEN**, V1-E3d),
+ *    `leerBom` (solo para la FOTO de cada arte, que vive en el modelo) y `listarFotos`. NO se reinventa.
  *
  * Fotos: se incrustan en el PDF bajando los bytes del objeto R2 (vía la URL GET prefirmada que da
  * `listarFotos`) y degradando con ELEGANCIA: si una foto no se puede obtener, el PDF se renderiza
@@ -71,6 +73,7 @@ import { servicioArchivos, type ServicioArchivos } from '../../../comun/archivos
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd, type Tx } from '../../../comun/transaccion.js';
 import { leerBom } from '../../modelos/bom-modelo.js';
+import { leerRecetaParaImpreso } from '../receta-orden.js';
 // Se lee a BAJO NIVEL (`leerFotosModelo`, sin `verificarPermiso(modelos.ver)`) a propósito: la
 // impresión ya está autorizada por `ordenes.ver` y las fotos del modelo son parte del documento de
 // la orden. Exigir `modelos.ver` haría que un rol con `ordenes.ver` pero sin `modelos.ver` reciba
@@ -114,7 +117,7 @@ export interface TelaImpreso {
   consumoPorPrenda: number;
 }
 
-/** Un renglón de la sección AVÍOS (avíos del BOM `paraProduccion`; sin precio). */
+/** Un renglón de la sección AVÍOS (avíos de la receta de la orden `paraProduccion`; sin precio). */
 export interface AvioImpreso {
   clave: string;
   descripcion: string;
@@ -287,6 +290,8 @@ export interface DepsImpreso {
   descargarImagen?: DescargarImagen;
   obtenerOrden?: typeof obtenerOrden;
   leerBom?: typeof leerBom;
+  /** Receta CONGELADA de la orden (V1-E3d): lo que de verdad lleva ESTA orden. */
+  leerRecetaParaImpreso?: typeof leerRecetaParaImpreso;
   leerFotosModelo?: typeof leerFotosModelo;
   listarAdjuntos?: typeof listarAdjuntos;
   leerTelasCompradas?: LeerTelasCompradas;
@@ -334,8 +339,8 @@ export function armarTabla(
 
 /**
  * Resuelve TODOS los datos del impreso de una orden (A9: por la empresa activa de la sesión).
- * Reúsa `obtenerOrden` (encabezado + matriz + total), `leerBom` (telas/avíos y el ARTE, filtrando
- * `paraProduccion` para telas y habilitación) y `leerFotosModelo` (fotos del modelo, cuyos bytes
+ * Reúsa `obtenerOrden` (encabezado + matriz + total), `leerRecetaParaImpreso` (telas/avíos y el
+ * ARTE de la RECETA DE LA ORDEN, ya filtrada) y `leerFotosModelo` (fotos del modelo, cuyos bytes
  * baja best-effort). Requiere SOLO `ordenes.ver`: las fotos se leen a bajo nivel (sin exigir
  * `modelos.ver`) porque la impresión ya está autorizada y la foto es parte del documento de la
  * orden. Lanza `ErrorNoEncontrado` (404) si la orden no es de la empresa activa.
@@ -350,6 +355,7 @@ export async function armarDatosImpresoOrden(
   const descargarImagen = deps.descargarImagen ?? descargarImagenComoDataUrl;
   const obtener = deps.obtenerOrden ?? obtenerOrden;
   const leer = deps.leerBom ?? leerBom;
+  const leerRecetaImpreso = deps.leerRecetaParaImpreso ?? leerRecetaParaImpreso;
   const leerFotos = deps.leerFotosModelo ?? leerFotosModelo;
   const listarAdjuntosOrden = deps.listarAdjuntos ?? listarAdjuntos;
   const leerTelasOc = deps.leerTelasCompradas ?? leerTelasCompradasOrden;
@@ -360,7 +366,14 @@ export async function armarDatosImpresoOrden(
 
   const archivos = deps.archivos ?? servicioArchivos();
   const cliente = clienteLectura(bd);
-  const bom = await leer(cliente, orden.idModelo, sesion.idEmpresaActiva);
+  // ⭐ V1-E3d (§Post-F9.43): las LISTAS del papel (telas, habilitación y artes) salen de la RECETA
+  // CONGELADA DE LA ORDEN, no del BOM del modelo — el piso tiene que leer lo que ESTA orden lleva.
+  // Del BOM del modelo se sigue leyendo UNA sola cosa: la FOTO de cada arte (vive en el modelo; R2
+  // no se clona por orden), y se casa por NOMBRE, que es la identidad del arte.
+  const [bom, receta] = await Promise.all([
+    leer(cliente, orden.idModelo, sesion.idEmpresaActiva),
+    leerRecetaImpreso(cliente, id),
+  ]);
   const fotos = await leerFotos(orden.idModelo, bd, archivos);
 
   // TELA (petición Daniel): la que de verdad se compró para la orden. BEST-EFFORT: si la lectura
@@ -380,9 +393,16 @@ export async function armarDatosImpresoOrden(
   // se pierde ESA imagen y las demás siguen saliendo (mismo criterio que la descarga de bytes).
   // El arte llega ORDENADO (`leerArtesModelo`), así que su PRIMER renglón es el PRINCIPAL: se
   // marca para que el tope de la rejilla jamás lo recorte (Daniel, jul-2026).
-  const artesBom = bom.artes.flatMap((a, i) =>
-    a.keyFoto === null ? [] : [{ titulo: a.nombre, key: a.keyFoto, principal: i === 0 }],
-  );
+  // ⚠️ El recorrido va sobre `bom.artes` —que llega ORDENADO por el `orden` del modelo— y NO sobre
+  // la receta (ordenada por nombre): así el arte PRINCIPAL sigue siendo el primero del modelo y el
+  // tope de la rejilla jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden
+  // se conservan solo los artes que ESTA orden lleva; el nombre es la identidad del arte.
+  const nombresArteOrden = new Set(receta.artes.map((a) => a.nombre));
+  const artesBom = bom.artes
+    .filter((a) => nombresArteOrden.has(a.nombre))
+    .flatMap((a, i) =>
+      a.keyFoto === null ? [] : [{ titulo: a.nombre, key: a.keyFoto, principal: i === 0 }],
+    );
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
       titulo: arte.titulo,
@@ -471,18 +491,10 @@ export async function armarDatosImpresoOrden(
     observaciones: orden.observaciones,
     obsMaquila: orden.obsMaquila,
     ...tabla,
-    // Telas y Avíos: SOLO los marcados `paraProduccion`. Arte: todo el del BOM.
-    telas: bom.telas
-      .filter((t) => t.paraProduccion)
-      .map((t) => ({ nombre: t.nombre, consumoPorPrenda: t.consumoPorPrenda })),
-    listaArte: bom.artes.map((a) => ({ nombre: a.nombre, tipo: a.tipo })),
-    habilitacion: bom.avios
-      .filter((a) => a.paraProduccion)
-      .map((a) => ({
-        clave: a.clave,
-        descripcion: a.descripcion,
-        consumoPorPrenda: a.consumoPorPrenda,
-      })),
+    // Telas, Avíos y Arte: de la RECETA DE LA ORDEN, ya filtrada (`paraProduccion`, no excluidos).
+    telas: receta.telas,
+    listaArte: receta.artes.map((a) => ({ nombre: a.nombre, tipo: a.tipo })),
+    habilitacion: receta.avios,
     fotos: fotosImpreso,
     // Primero el arte del MODELO (sus fotos), luego el subido a la orden.
     artes: [...artesModelo, ...artesImpreso],

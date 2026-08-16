@@ -76,7 +76,7 @@ export const esquemaOrdenCentroFila = z
     idCliente: z.number().int().describe('Cliente de la orden.'),
     cliente: z.string().describe('Nombre del cliente.'),
     faltantes: z
-      .array(z.enum(['tallas', 'avios', 'arte']))
+      .array(z.enum(['tallas', 'receta', 'arte']))
       .describe(
         'Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como "Falta: …".',
       ),

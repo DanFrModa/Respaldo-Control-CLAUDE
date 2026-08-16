@@ -20,6 +20,17 @@
  *
  * NUNCA con `npm run etl:*` (esos no cargan `.env` a propósito, para no romper el CI).
  *
+ * ⭐ **V1-E3d (§Post-F9.43(e)): carga TAMBIÉN la HABILITACIÓN de cada orden** (`OrdenesHab`, 28,432
+ * renglones que hasta esta etapa se tiraban COMPLETOS): el avío que la orden llevó de verdad, con SU
+ * cantidad y SU precio. Daniel: *"no quiero que interfiera con el nuevo catálogo para no meter
+ * información basura acumulada de 30 años"* — por eso el avío va como **TEXTO** (§Post-F9.28): cero
+ * registros nuevos en el catálogo, sin selector, solo lectura y sin botón de "traer al catálogo".
+ * Lo que se gana: cuando alguien pregunte *"¿qué llevaba de verdad este modelo en 2019 y a qué
+ * precio?"*, la respuesta existe.
+ *
+ * Si el archivo ya estaba cargado por una corrida anterior (sin esta tabla), **re-correr el ETL la
+ * completa**: el camino de "reparación" detecta las órdenes sin habilitación y se la escribe.
+ *
  * Carga TAMBIÉN el **directorio histórico de terceros** (§Post-F9.28): la libreta de direcciones con
  * el teléfono y la dirección de los 1,052 terceros del Access, fuera del catálogo `Proveedor`. Son
  * las dos mitades de lo mismo: guardar la historia sin ensuciar los catálogos.
@@ -60,6 +71,8 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   console.log(`  Ya existían (idempotencia):    ${String(r.existentes)}`);
   console.log(`  Celdas color×talla:           ${String(r.celdas)}`);
   console.log(`  Movimientos de producción:    ${String(r.procesos)}`);
+  // ⭐ V1-E3d (§Post-F9.43(e)): los 28,432 renglones de `OrdenesHab` que hasta ahora se tiraban.
+  console.log(`  Habilitación (OrdenesHab):    ${String(r.habilitacion)}`);
   if (r.rescatadas > 0) {
     console.log(
       `  De empresas que NO migran, rescatadas en la principal: ${String(r.rescatadas)} ` +

@@ -80,6 +80,10 @@ vi.mock('@/api/historico-ordenes', () => ({
                 observaciones: null,
               },
             ],
+            // V1-E3d (§Post-F9.43(e)): lo que la orden llevó de verdad, con su precio de ESE día.
+            habilitacion: [
+              { avio: 'Etiqueta de lavado', claveV1: 'E01', cantidad: 1, precio: 0.15 },
+            ],
           },
     isPending: false,
   }),
@@ -119,6 +123,10 @@ describe('<ArchivoOrdenesPagina> (§Post-F9.26)', () => {
     // Y el taller que cortó viene como TEXTO del archivo, no de un catálogo.
     expect(screen.getAllByText('Oscar Aragón').length).toBeGreaterThan(0);
     expect(screen.getByText(/Orden 9876 del sistema anterior/)).toBeInTheDocument();
+    // V1-E3d: la habilitación del viejo se ve (con su precio del día) y se dice que es SOLO texto.
+    expect(screen.getByText('Etiqueta de lavado')).toBeInTheDocument();
+    expect(screen.getByText('$0.15')).toBeInTheDocument();
+    expect(screen.getByText(/no forman parte del catálogo de avíos/)).toBeInTheDocument();
   });
 
   it('filtrar por maquilero llega al servidor y regresa a la página 1', async () => {

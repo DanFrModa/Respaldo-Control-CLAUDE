@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaDesalineacionReceta, esquemaTipoCambioReceta } from './receta-orden.js';
+
 /**
  * Contrato Zod del MRP / EXPLOSIÓN de materiales por orden (F4-E4 — REQUISITOS-NUEVOS.md §R3/R7 +
  * principio Make-to-Order; doc `Documentacion_MJD/01-Modelos.md §2`). Tres operaciones:
@@ -55,6 +57,12 @@ export const esquemaRequerimientoSalida = z
     proveedorSugerido: z.string().nullable().describe('Nombre del proveedor sugerido, o null.'),
     precioSugerido: z.number().nullable().describe('Precio unitario sugerido (R1), o null.'),
     diff: esquemaDiffRequerimiento,
+    cambiosReceta: z
+      .array(esquemaTipoCambioReceta)
+      .describe(
+        'Qué cambió en el modelo respecto de lo que ESTA orden congeló para este material (vacío = ' +
+          'nada que avisar). Marca el renglón en el lugar de la decisión, §Post-F9.43(d).',
+      ),
   })
   .describe('Material requerido por la orden (snapshot de explosión).');
 
@@ -97,6 +105,11 @@ export const esquemaExplosionSalida = z
           'distintos (se usó el precio base) o avío por talla (R18) sin medida capturada para alguna ' +
           'talla (se usó el consumo por prenda). Vacío = nada que advertir. Nada truena en silencio.',
       ),
+    desalineacion: esquemaDesalineacionReceta.describe(
+      '⭐ PRIMER AVISO de §Post-F9.43(d): la receta CONGELADA de la orden vs. el BOM VIVO del ' +
+        'modelo, calculada al vuelo y entregada AQUÍ —el lugar de la decisión— porque es donde se ' +
+        'está a punto de gastar. Los renglones afectados lo repiten en `cambiosReceta`.',
+    ),
   })
   .describe('Explosión de materiales de una orden (R3).');
 

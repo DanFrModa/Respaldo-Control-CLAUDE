@@ -30,7 +30,7 @@ cerradas. Lo que falta no es el negocio: son **las fugas, las defensas y el ensa
 
 | Ola | Etapas, en orden | Por qué |
 |---|---|---|
-| 🟢 **1 — la columna vertebral** | `E3e` (un solo costo) → **`E3d pieza B`** (el BOM congelado en la OP) → `E3b` (los papeles y el PT) → `E4` (defensas) → `E6` (arranque) → `E7` (el ensayo) | Es la cadena desarrollo → compras → inventarios → EsMa que Daniel nombró |
+| 🟢 **1 — la columna vertebral** | ~~`E3e`~~ ✅ → ~~**`E3d pieza B`**~~ ✅ *(en CI)* → ~~`E3b`~~ ✅ *(ya estaba, 13-ago)* → **`E4`** (defensas) → `E6` (arranque) → `E7` (el ensayo) | Es la cadena desarrollo → compras → inventarios → EsMa que Daniel nombró |
 | 🟡 **2 — con el sistema ya en uso** | nomenclatura desarrollo/producción (§Post-F9.34/.46) · lo que queda de `E5` (días de crédito del cliente) | No bloquean capturar trabajo real |
 | 🔵 **Segunda etapa** | **Ruta Crítica** · **Costos/EDR + indicadores** | Decisión de Daniel, ratificada el 15-ago |
 
@@ -202,10 +202,11 @@ anotado en el código con el arreglo correcto.
 **Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
 `SEED_ON_START`.
 
-### E3b — construida (13-ago-2026): los papeles y el inventario de PT
+### E3b — ✅ HECHA (13-ago-2026): los papeles y el inventario de PT
 
-> **Estado:** código y doc terminados en la rama de tarea; **revisión independiente en curso** al
-> momento de escribir esta nota. No se abre el PR a `prueba` hasta que el reviewer apruebe.
+> **Estado:** ✅ **aprobada e integrada en `prueba`** — verificado el 16-ago contra la rama:
+> `impreso-traspaso-tela.ts` y `SelectorOrdenPt.tsx` están ahí. *(La nota decía "revisión en curso"
+> desde el 13-ago y se quedó congelada; con `V1-E3a` ✅ y `E3b` ✅, **`V1-E3` está COMPLETA**.)*
 
 **1. El impreso del traspaso de tela** (§Post-F9.38). Mandar tela a un cortador la saca físicamente y
 el papel va con ella. Se imprime **el folio que el traspaso ya tiene**: cero registros nuevos, cero
@@ -588,6 +589,127 @@ mano**. Mismo comportamiento que el precosteo con sus renglones ajustados. Danie
 
 Dos órdenes del mismo modelo, una con jareta y otra sin, que compren cosas distintas y cuesten
 distinto — sin que ninguna de las dos altere a la otra ni a las ya producidas.
+
+### Nota de cierre de la pieza B (16-ago-2026)
+
+**Criterio de cierre: ✅ cumplido y VERIFICADO por el reviewer**, no aceptado por lectura. Corrió
+`receta-orden.int.test.ts` contra Postgres real (40/40) y comprobó que **las aserciones discriminan**:
+la orden A lleva la jareta y explota 3 renglones, la B no la lleva y explota 2 — con el código viejo
+B daría 3 y la prueba fallaría. Habilitación 2 vs 1, costeo 12 vs 4. Y el segundo caso —el modelo
+pierde la jareta *después*— exige que la orden ya producida siga costeando 12 con la jareta presente.
+
+**Qué quedó**
+
+1. **Cuatro tablas** (`OrdenTela` · `OrdenAvio` + `OrdenAvioTalla` · `OrdenArte`) con cantidad, precio,
+   las tres banderas, el amarre de proveedor, `estado` por renglón, `agregadoAMano` y `excluido`.
+   La receta se **copia del modelo al crear la orden** y ahí se congela.
+2. **Seis consumidores** dejan de preguntarle al modelo: MRP, habilitación, costeo, semáforo, **el
+   impreso de la OP** y **la Ruta Crítica** — los dos últimos los encontró el coder, no la ficha. El
+   impreso *"mentía en una de dos órdenes hermanas"*.
+3. **Cortado el alcance hacia atrás:** `recalcularEstadoOrdenesDeModelo` ya no lo llaman
+   `bom-modelo.ts` ni `arte-modelo.ts`. Editar el BOM de un modelo dejó de alcanzar a las órdenes
+   vivas.
+4. **ETL** de los 28,432 renglones de `OrdenesHab` —que **hoy se tiraban completos**— al archivo
+   histórico, con el avío como **TEXTO, no FK** (§Post-F9.28): cero registros nuevos en el catálogo,
+   sin selector y **sin botón de "traer al catálogo"**.
+5. Las **seis reglas de negocio** que la construcción obligó a fijar están en `DECISIONES.md`
+   **§Post-F9.50**.
+
+**La migración: "impecable" (palabra del reviewer), y la EJECUTÓ él mismo** contra un Postgres nativo
+desechable con cinco casos sembrados — modelo con BOM → liberada · **cancelada → NO** · **modelo sin
+BOM → vacía y NO liberada** · **solo arte → SÍ** (el `EXISTS` no deja hueco) · solo tela → sí. Banderas
+conservadas una por una (`para_produccion=false` de la jareta sobrevivió), `precio` NULL en todo, y
+**bitácora por orden que dice la verdad orden por orden**. `prisma migrate diff` → **«No difference
+detected»**: las 254 líneas escritas a mano producen exactamente el esquema.
+
+**DOS RONDAS de revisión, catorce hallazgos, ninguno archivado como "menor".**
+
+*Primera ronda (8):* re-agregar un renglón vivo lo **sobrescribía en silencio** · el backfill y el ETL
+**liberaban recetas vacías** · el aviso de precio **se disparaba por compras y nombraba mal la causa**
+· el primer aviso de §Post-F9.43(d) **no existía** · la puerta **no cubría la OC capturada a mano** ·
+un **sexto consumidor** (RC) seguía preguntándole al modelo · y cinco menores.
+
+*Segunda ronda (6), con dos violaciones de D3 **dentro del módulo nuevo**:*
+
+- **⭐ El botón «Restaurar al modelo» destruía el precio congelado sin dejarlo escrito.** El reviewer
+  no lo dedujo: lo **ejecutó**. Dejó el renglón en `precio 9.99 / consumo 4`, restauró, y en la
+  bitácora solo quedaron los valores del modelo — *"los 9.99 no existen en ningún lado"*. Un clic
+  desde la pantalla, sobre **el dato exacto que la etapa existe para proteger**. ⚠️ **Era el MISMO
+  defecto que la pieza A ya había cerrado para el arte** (*"se lee ANTES de borrar y cada renglón
+  queda ÍNTEGRO en la bitácora"*), y las funciones que lo resuelven —`fotoTela`/`fotoAvio`/`fotoArte`—
+  **ya vivían en ese mismo archivo**, escritas por el propio coder y usadas en quitar y en revivir.
+  La lección no viajó del arte a la receta.
+- Lo mismo, más chico, en **editar**: un `antes` de dos campos, con las medidas por talla borradas
+  por el set-completo yéndose sin registro.
+- **La promesa incumplida:** §Post-F9.43(c) dice literal *"Desarrollo ajusta, **define las medidas por
+  talla** y libera"* — y la pantalla las mostraba **en texto plano**. El único camino era editar el BOM
+  del **modelo** y pulsar «Restaurar», o sea empujar hacia la plantilla justo lo que la etapa vino a
+  sacar de ella. **Se construyó** (celda editable por talla, conservando el `idAvioMedida` del
+  catálogo), no se archivó con una excusa — se le había ofrecido esa salida y el coder eligió construir.
+
+*Tercera ronda (4), las dos primeras **reproducidas ejecutando el dominio**, no deducidas:*
+
+- **⭐ El arreglo de la puerta la abrió de más.** La exención que permitía a Compras corregir una OC ya
+  hecha se aplicó **por ORDEN, no por línea**. El reviewer lo reprodujo: con la firma **revocada**,
+  metió una **línea nueva de 5,000 kg de otra tela** a la OC ligada y **pasó**. Eso es literalmente
+  *"gastar dinero contra una receta que nadie miró"*, el único propósito de la puerta. Se cerró con
+  identidad **material + conteo** (`tela:{id}`/`avio:{id}`/`libre:{desc}`), y el reviewer comprobó
+  después los tres huecos que quedaban: **cambiar el material** de una línea existente, **duplicarla**
+  y **dos líneas libres con la misma descripción** — los tres rechazados.
+- **⭐ Un comentario que MENTÍA.** El arreglo de H5 declaraba en el código y en un comentario de prueba
+  que *"su desviación se sigue vigilando en vez de volverse sorda para siempre"*, y era **falso**:
+  `comunesNuevo` seguía poniendo `estado: 'ajustado'` a todo renglón nuevo, y `desviadoAProposito` lo
+  callaba igual. El reviewer lo probó (`consumo orden 1 / modelo 9 → hayCambios = false`). Se corrigió
+  **haciendo cierta la frase** —el renglón copiado fiel del modelo nace `revisado`— en vez de borrarla.
+  *Un comentario falso es peor que ninguno: el siguiente que lo lea lo va a creer.*
+- **H3 quedó a medias:** *ajustar sí, definir no*. El editor de la OP era un **subconjunto estricto**
+  del del modelo. Se completó **extendiendo V1-E3c**, no reinventándolo (ver abajo).
+- La documentación del campo `agregadoAMano` quedó contradiciéndose tras cambiarle el significado —
+  incluida **la descripción publicada en el OpenAPI**.
+
+**⚠️ LA LECCIÓN DE PROCESO DE ESTA ETAPA: la lección no viajó, dos veces.** El H1 de la segunda ronda
+era **el mismo defecto que la pieza A había cerrado dos días antes** para el arte, con la función del
+arreglo viviendo **en el mismo archivo**, escrita por el propio coder y ya usada en otros dos caminos.
+Y H3 volvió a resolverse sin mirar cómo se había resuelto el problema idéntico en V1-E3c. A la tercera
+se le dijo explícitamente; el coder abrió `medidas-avio-talla.ts` + `EditorMedidasAvio` **antes de
+escribir una línea**, y el resultado fue *la misma forma con el universo cambiado*, no una
+implementación paralela. **Saber que un módulo vecino ya resolvió tu problema no es opcional: es parte
+de la tarea.**
+
+**El editor de medidas por talla en la OP** (N4) trajo las tres reglas de V1-E3c con **el universo
+cambiado**: los renglones nacen de **la matriz color×talla de la ORDEN** (en el modelo era la curva),
+porque es lo que esa orden produce y lo que el MRP explota; `null ≠ 0` en el contrato (vacío
+descaptura, un `0` tecleado se guarda); selector de `idAvioMedida` y toggle `consumoPorTalla`
+operables desde la orden. Una medida capturada de una talla que la orden **ya no lleva** no
+desaparece: sale marcada `enLaOrden: false`, y el reviewer verificó **contra el servidor** que el MRP
+la ignora por completo.
+
+**⭐ El arreglo de H5, que salió mejor que el encargo.** El aviso *"el modelo agregó X"* no tenía
+acción, y traer el material con «Agregar» lo hacía nacer sin amarre, sin medidas y **marcado
+`agregadoAMano`, con lo que su desviación quedaba sorda para siempre**. El coder no puso un letrero:
+**cambió el significado del campo**. `agregadoAMano` dejó de ser *"lo agregó una persona"* y pasó a ser
+**"esto no está en el modelo"**. Así, un material que sí vive en el BOM hereda precio, banderas, amarre
+y su juego de medidas, nace con `agregadoAMano: false` y **se le sigue vigilando**; solo lo ajeno al
+modelo queda a mano. Refuerza `desviadoAProposito` en vez de parcharlo.
+
+**Lo que el reviewer acreditó y no hay que deshacer:** `desviadoAProposito` es *"el corazón fino de la
+etapa"* (22 casos unitarios sin BD) · **separar `precio-mercado`** es *"la clase de detalle que solo se
+ve pensando en el día 30"* —sin eso, cada OC autorizada dejaría en **rojo permanente** a toda orden
+viva con esa tela— · `exigirNoEstaVivo` resuelto **en el contrato**, no con un parche · el test de RC
+usa **dos modelos distintos a propósito** para que el reuso de parámetros no tape lo que mide, que es
+*"escribir la prueba pensando en cómo podría mentir"*.
+
+**Una sospecha que el reviewer descartó PROBÁNDOLA:** temió un aviso de precio espurio permanente por
+congelar a 2 decimales un `precioCosteo` con más (promedio de medidas: (0.14+0.15)/2 = 0.145). Lo montó
+y **no ocurre**: `redondear2` en `bom-modelo.ts:311,453` deja a los dos lados comparando la misma cifra.
+
+**Lo que se acepta por lectura, dicho de frente:** el **e2e** no se pudo ejecutar (exige Docker,
+prohibido) — lo juzga el CI. Y el reviewer no terminó la suite de integración completa por lentitud del
+contenedor; sí corrió el archivo de la etapa.
+
+**Nota de despliegue:** ⚠️ **REQUIERE MIGRACIÓN** (4 tablas + backfill). **Es el primer despliegue de
+la sesión que no se deshace con un clic** — conviene coordinarlo con Gabriel. Permisos: **ninguno
+nuevo** (reusa `desarrollo.administrar`); seed: no.
 
 ---
 

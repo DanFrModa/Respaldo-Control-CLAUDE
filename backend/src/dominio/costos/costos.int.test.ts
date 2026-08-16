@@ -15,6 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Empresa, PrismaClient } from '../../datos/index.js';
 import { ErrorConflicto } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 
@@ -119,6 +120,10 @@ beforeEach(async () => {
     },
   });
   idOrden = orden.id;
+  // V1-E3d: el costeo lee la RECETA DE LA ORDEN. La orden se crea aquí directo (sin `crearOrden`,
+  // que es quien la copia), así que se siembra igual — con `precio` NULL, como el backfill de la
+  // migración: el costeo cae al catálogo y estas cifras no se mueven ni un centavo.
+  await sembrarRecetaDeOrden(cliente, idOrden, modelo.id);
 
   // Corte de 30 (< pedido 35). Etapa insertada directo (el motor de corte es de F3).
   await cliente.etapaMovimiento.create({

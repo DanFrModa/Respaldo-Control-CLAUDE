@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Cliente, Color, Empresa, Modelo, PrismaClient, Talla } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
 import { consultarIncompletas } from './consultas.js';
@@ -92,6 +93,10 @@ async function crearOrden(opciones: {
           }),
     },
   });
+  // V1-E3d: el realineado evalúa la RECETA DE LA ORDEN (liberada + arte). Estas órdenes se crean
+  // directo (como las carga el ETL), así que se les siembra la receta LIBERADA — que es
+  // exactamente lo que hacen el backfill de la migración y `crearOrdenMigrada` con lo histórico.
+  await sembrarRecetaDeOrden(cliente, orden.id, opciones.idModelo);
   return orden.id;
 }
 

@@ -144,7 +144,7 @@ npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-histori
 npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
 
 # Post-F9 (archivo histórico de órdenes + directorio de terceros) — ⚠️ DESPUÉS de `etl-catalogos`:
-npx tsx --env-file=.env migracion/etl-historico-ordenes.ts # §Post-F9.26/27/29: las 5,451 órdenes viejas + §Post-F9.28: la libreta de terceros
+npx tsx --env-file=.env migracion/etl-historico-ordenes.ts # §Post-F9.26/27/29: las 5,451 órdenes viejas + §Post-F9.43(e): su habilitación (OrdenesHab) + §Post-F9.28: la libreta de terceros
 
 # ⚠️ AL FINAL DE TODA CARGA/RECARGA (obligatorio, ver abajo):
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone al día el estado completa/incompleta
@@ -382,7 +382,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/cuadre-f7.ts`                | **F7: cuadre** (conteos v1/v2 + análisis empírico de la regalía D2: ¿el `Costo` viejo la incluía? + delta esperado)                                                                                                                  |
 | `migracion/etl-terceros-saldos.ts`      | **F9: saldos iniciales** de CxC/CxP (corte SINUBE → aperturas vía modo migración del motor; por lotes; `-- --archivo=<csv>`)                                                                                                         |
 | `migracion/etl-cfdi-masivo.ts`          | **F9: importación masiva de CFDI** (carpeta de XML → reusa E3/E4; compra/venta por RFC de empresa; `-- --dir=<carpeta>`)                                                                                                             |
-| `migracion/etl-historico-ordenes.ts`    | **Post-F9: archivo histórico de órdenes** (las 5,451 del viejo, con `empresaV1` — §Post-F9.26/27/29) **+ directorio histórico de terceros** (§Post-F9.28). ⚠️ Va DESPUÉS de `etl-catalogos`: sin sus mapeos se niega a correr |
+| `migracion/etl-historico-ordenes.ts`    | **Post-F9: archivo histórico de órdenes** (las 5,451 del viejo, con `empresaV1` — §Post-F9.26/27/29), **su HABILITACIÓN** (`OrdenesHab`, 28,432 renglones con el avío en TEXTO — §Post-F9.43(e), V1-E3d) **+ directorio histórico de terceros** (§Post-F9.28). ⚠️ Va DESPUÉS de `etl-catalogos`: sin sus mapeos se niega a correr. Si el archivo ya estaba cargado SIN la habilitación, **re-correrlo la completa** |
 | `migracion/cuadre-f9.ts`                | **F9: cuadre** (saldo esperado del corte vs Σ aperturas cargadas; descuadres listados; `-- --archivo=<csv>`)                                                                                                                         |
 | `migracion/cuadre.ts`                   | Cuadre F1 (conteos v1 CSV vs v2)                                                                                                                                                                                                     |
 | `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |

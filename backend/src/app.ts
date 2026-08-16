@@ -76,6 +76,7 @@ import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
 import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
@@ -217,6 +218,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.
   await app.register(rutasOrdenes, { prefix: '/api' });
+  await app.register(rutasRecetaOrden, { prefix: '/api' });
   // Órdenes — ADJUNTOS de apoyo en R2 (F8-E6, R6): sube/lista/borra archivos (Excel/PDF/imágenes)
   // ligados a una orden vía presigned. Permisos `ordenes.ver` (listar/descargar) / `ordenes.administrar`
   // (subir/eliminar); el DELETE borra también el objeto físico de R2 (best-effort). Sin permisos nuevos.

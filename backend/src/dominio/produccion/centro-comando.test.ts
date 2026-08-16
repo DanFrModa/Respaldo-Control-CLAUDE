@@ -28,10 +28,11 @@ function ordenBase() {
     idEmpresa: 1,
     empresa: { nombre: 'FR Moda' },
     idModelo: 3,
-    // `_count`s: insumos de la regla de "orden completa" (`requisitos-orden.ts`). Este modelo NO
-    // tiene receta de avíos → la fila reporta `faltantes: ['avios']`.
-    modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 0, artes: 2 } },
-    _count: { lineas: 3 },
+    // Insumos de la regla de "orden completa" (`requisitos-orden.ts`). V1-E3d: la casilla del
+    // MODELO + los datos de la ORDEN. Esta orden NO tiene su receta liberada → `faltantes: ['receta']`.
+    modelo: { codigo: '62182', descripcion: 'Sudadera', llevaArte: false },
+    recetaLiberadaEn: null as Date | null,
+    _count: { lineas: 3, recetaArtes: 2 },
     idMaquilero: 77,
     maquilero: { nombre: 'Asignado SA' },
     fechaEntrega: new Date('2026-07-04T00:00:00Z'),
@@ -158,19 +159,15 @@ describe('centro de comando — proyección de las 13 columnas (agregado por lot
     expect(fila.mesEntrega).toBe(7); // julio (de fechaEntrega)
     expect(fila.fechaEntrega).toBe('2026-07-04');
     expect(fila.cliente).toBe('C&A');
-    // Transparencia del estado: el modelo del stub tiene matriz y arte pero NO receta de avíos.
-    expect(fila.faltantes).toEqual(['avios']);
+    // Transparencia del estado: la orden del stub tiene matriz y arte pero su receta NO está
+    // liberada por Desarrollo (V1-E3d).
+    expect(fila.faltantes).toEqual(['receta']);
   });
 
-  it('faltantes: vacío cuando el modelo ya tiene su receta de avíos', async () => {
+  it('faltantes: vacío cuando Desarrollo ya liberó la receta de la orden (V1-E3d)', async () => {
     const { bd, tx } = bdStub();
     tx.orden.findMany.mockImplementation(() =>
-      Promise.resolve([
-        {
-          ...ordenBase(),
-          modelo: { codigo: '62182', descripcion: 'Sudadera', _count: { avios: 4, artes: 0 } },
-        },
-      ]),
+      Promise.resolve([{ ...ordenBase(), recetaLiberadaEn: new Date('2026-08-15T00:00:00Z') }]),
     );
     const s = sesionDePrueba({ permisos: ['ordenes.ver'], idEmpresaActiva: 1 });
     const pagina = await centroComandoOrdenes(s, {}, bd);
@@ -180,7 +177,9 @@ describe('centro de comando — proyección de las 13 columnas (agregado por lot
   it('faltantes: una orden CANCELADA no lista requisitos (su estado no lo manda la regla)', async () => {
     const { bd, tx } = bdStub();
     tx.orden.findMany.mockImplementation(() =>
-      Promise.resolve([{ ...ordenBase(), estado: 'cancelada', _count: { lineas: 0 } }]),
+      Promise.resolve([
+        { ...ordenBase(), estado: 'cancelada', _count: { lineas: 0, recetaArtes: 0 } },
+      ]),
     );
     const s = sesionDePrueba({ permisos: ['ordenes.ver'], idEmpresaActiva: 1 });
     const pagina = await centroComandoOrdenes(s, { incluirCanceladas: true }, bd);

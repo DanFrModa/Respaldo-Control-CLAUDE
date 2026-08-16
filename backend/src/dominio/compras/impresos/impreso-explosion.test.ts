@@ -38,6 +38,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
     huboCambios: false,
     regenerado: false,
     avisos: [],
+    // V1-E3d: la explosión trae la desalineación contra el BOM vivo (el impreso no la pinta).
+    desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
     grupos: [
       {
         idProveedor: 7,
@@ -59,6 +61,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugerido: 'Avíos Baratos',
             precioSugerido: 2,
             diff: 'sin-cambio',
+            cambiosReceta: [],
           },
         ],
       },
@@ -82,6 +85,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugerido: null,
             precioSugerido: null,
             diff: 'sin-cambio',
+            cambiosReceta: [],
           },
         ],
       },

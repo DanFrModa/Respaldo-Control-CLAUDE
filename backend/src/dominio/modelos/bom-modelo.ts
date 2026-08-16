@@ -59,7 +59,6 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
 import {
   borrarArchivoSiQuedoHuerfano,
@@ -830,11 +829,11 @@ export async function reemplazarAviosBom(
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
       await tocarModelo(tx, sesion, idModelo);
-      // El BOM de avíos es uno de los REQUISITOS de "orden completa" (Daniel 26-jul-2026): las
-      // órdenes de ESTE modelo a las que solo les faltaba la receta se COMPLETAN en la MISMA
-      // transacción (A2). Solo COMPLETA: un cambio de catálogo NUNCA degrada órdenes (ver
-      // `recalcularEstadoOrdenesDeModelo`).
-      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
+      // ⭐ V1-E3d (§Post-F9.43): AQUÍ YA NO SE TOCAN LAS ÓRDENES. Antes, editar el BOM del modelo
+      // recalculaba el estado de sus órdenes (`recalcularEstadoOrdenesDeModelo`) — el "alcance
+      // hacia atrás" que la etapa vino a cortar: cada orden tiene su receta CONGELADA, así que
+      // cambiar la plantilla no puede mover a ninguna. Si alguien quiere bajar el cambio a una
+      // orden, lo hace a mano desde su receta ("restaurar renglón").
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -1069,10 +1068,8 @@ export async function copiarBom(
     }
 
     await tocarModelo(tx, sesion, idDestino);
-    // Copiar un BOM puede DARLE su receta de avíos al modelo destino: las órdenes suyas a las que
-    // solo les faltaba eso se COMPLETAN aquí mismo (A2). Al REEMPLAZAR también puede quitársela,
-    // pero eso NO degrada nada: el recálculo por catálogo solo asciende.
-    await recalcularEstadoOrdenesDeModelo(tx, sesion, idDestino);
+    // V1-E3d: copiar un BOM ya no alcanza a las órdenes del modelo destino (su receta está
+    // congelada). Ver la nota de `reemplazarAviosBom`.
     await registrarBitacora(tx, sesion, {
       entidad: 'Modelo',
       idEntidad: idDestino,

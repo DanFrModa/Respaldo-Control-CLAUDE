@@ -13,7 +13,7 @@ describe('textoFaltantes', () => {
   });
 
   it('nombra un solo faltante en lenguaje de negocio', () => {
-    expect(textoFaltantes(['avios'])).toBe('Falta: avíos');
+    expect(textoFaltantes(['receta'])).toBe('Falta: liberar la receta');
     expect(textoFaltantes(['tallas'])).toBe('Falta: tallas');
   });
 
@@ -22,10 +22,12 @@ describe('textoFaltantes', () => {
   });
 
   it('une dos faltantes con "y"', () => {
-    expect(textoFaltantes(['avios', 'arte'])).toBe('Falta: avíos y arte');
+    expect(textoFaltantes(['receta', 'arte'])).toBe('Falta: liberar la receta y arte');
   });
 
   it('une los tres con coma y "y" al final', () => {
-    expect(textoFaltantes(['tallas', 'avios', 'arte'])).toBe('Falta: tallas, avíos y arte');
+    expect(textoFaltantes(['tallas', 'receta', 'arte'])).toBe(
+      'Falta: tallas, liberar la receta y arte',
+    );
   });
 });

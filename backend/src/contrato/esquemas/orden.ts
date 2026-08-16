@@ -306,19 +306,24 @@ export const esquemaEstadoOrden = z
 
 /**
  * REQUISITOS que sostienen el estado `completa` (Daniel 26-jul-2026): la orden dice POR QUÉ está
- * como está. Regla: **tallas + avíos, y arte si aplica**. `arte: "no-aplica"` = el modelo no lleva
- * arte (no bloquea). `faltantes` es lo que la UI muestra como "Falta: …".
+ * como está. Regla: **tallas + receta liberada, y arte si aplica**. `arte: "no-aplica"` = el modelo
+ * no lleva arte (no bloquea). `faltantes` es lo que la UI muestra como "Falta: …".
+ *
+ * ⭐ V1-E3d (§Post-F9.43): el segundo requisito era *"¿el modelo tiene avíos?"* y pasó a ser
+ * **"¿la receta de la OP está liberada?"** — el mismo semáforo diciendo algo verdadero. Preguntarle
+ * al MODELO nunca fue una pregunta sobre ESTA orden: dos órdenes del mismo modelo daban siempre la
+ * misma respuesta, aunque una llevara jareta y la otra no.
  */
 export const esquemaRequisitosOrden = z
   .object({
     tallas: z.boolean().describe('La orden tiene su matriz de tallas capturada (≥1 renglón).'),
-    avios: z.boolean().describe('El modelo tiene su receta de avíos de producción (≥1 avío).'),
+    receta: z.boolean().describe('Desarrollo LIBERÓ la receta congelada de esta orden.'),
     arte: z
       .union([z.literal('no-aplica'), z.boolean()])
-      .describe('El modelo tiene su arte; "no-aplica" si el modelo no lleva arte.'),
+      .describe('La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte.'),
     completa: z.boolean().describe('Se cumplen todos los requisitos que aplican.'),
     faltantes: z
-      .array(z.enum(['tallas', 'avios', 'arte']))
+      .array(z.enum(['tallas', 'receta', 'arte']))
       .describe('Requisitos que hoy faltan (vacío si está completa).'),
   })
   .describe('Por qué la orden está (o no) completa.');

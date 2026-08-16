@@ -22,7 +22,15 @@
 > nació de la revisión de E3c: convivían **tres cifras** para el mismo renglón y Daniel ordenó
 > unificarlas (*"no hay ningún motivo para tener dos costos diferentes"*, §Post-F9.48/.49). **Cambió
 > el motor de costeo**, con los precosteos congelados verificados intactos por construcción, guarda y
-> prueba. **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
+> prueba.
+>
+> ⚠️ **PENDIENTE DE GABRIEL (16-ago):** `V1-E3c` (PR #180) y `V1-E3e` (PR #181) están **integradas en
+> `prueba` pero SIN DESPLEGAR**. Las dos van **SIN migración, SIN permisos y SIN seed** → **no**
+> requieren `SEED_ON_START`. Hasta que se despliegue, Daniel no ve ni la receta arreglada ni los
+> costos unificados. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
+> configuración de Cloudflare R2, ver `docs/hoja-de-ruta/F1-etapas.md:222` para las cuatro trampas.)*
+>
+> **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
 > congelado en la OP, §Post-F9.43/.44), `V1-E4` a `V1-E7`, y la separación **desarrollo vs
 > producción** (§Post-F9.34, con sus tres cabos cerrados el 15-ago en §Post-F9.46 — el nº de
 > producción **se precarga editable**, cambio de opinión de Daniel).
@@ -251,6 +259,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
+
+- **⚠️ Deuda técnica ACTIVA — el typecheck del backend está al filo de la memoria del runner
+  (16-ago-2026).** `tsc --noEmit` murió en CI con **OOM (exit 134)** y se destrabó subiéndole el heap
+  a 6 GB en `.github/workflows/ci.yml`, **la misma venda que el lint ya llevaba desde el 6-ago** — en
+  su momento se le puso solo al lint y la cicatriz se repitió un paso más abajo. **Medido, no
+  supuesto** (`tsc --extendedDiagnostics`): `prueba` pedía **5.22 GB** y la rama que reventó **5.28 GB
+  (+1 %)**, o sea que **ninguna etapa concreta lo causó** — son 2,614 archivos, **3.5 M de tipos** y
+  **19.7 M de instanciaciones** (Prisma + Zod generan tipos enormes) creciendo poco a poco.
+  ⚠️ **Subir el número otra vez NO es la cura:** cada etapa suma tipos y el techo del runner no se
+  mueve. Cuando 6 GB no alcancen hay que **atacar la causa** — proyectos de TS separados,
+  `--build` incremental, o adelgazar los tipos generados. **El siguiente en caer será el typecheck
+  del frontend** (`tsc -b`), que hoy pasa pero va por el mismo camino.
 
 - **Módulo 12 · Documental:** los **adjuntos por orden (R6)** → ✅ **hechos en F8-E6b** (tabla `orden_archivo`; subir/listar/descargar/eliminar con **borrado físico R2**; la Orden es su ancla; el motor R2 existe desde F0). Las **fichas técnicas estructuradas (R5)** → **F6** (la auditoría AQL las consume como referencia) — siguen pendientes aparte, NO son lo mismo que los adjuntos. Confirmar al arrancar.
 - **Módulo 13 · Administración (lo que faltaba):** pantallas de usuarios/empresas → **F1-E1** (ya en la ficha) · consulta de bitácora → **F6-E1** (ya en la ficha) · configuración por empresa (ex-`Propiedades`) → **F1** (confirmar al arrancar) · **modo mantenimiento** → **F10**.

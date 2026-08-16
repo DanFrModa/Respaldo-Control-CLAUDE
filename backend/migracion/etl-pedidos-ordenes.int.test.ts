@@ -201,6 +201,61 @@ describe('ETL de pedidos y órdenes F2-E5 (integración, fixtures committeados)'
     expect(cancelado.pedCancelado).toBe(true);
   });
 
+  it('⭐ V1-E3d: la orden migrada nace con SU receta congelada, LIBERADA y SIN precios', async () => {
+    // El modelo M001 SÍ tiene BOM antes de migrar: es el caso "la orden hereda una receta".
+    const m001 = await cliente.modelo.findFirstOrThrow({ where: { codigo: 'M001' } });
+    const tela = await cliente.tela.create({ data: { nombre: 'Felpa ETL', precioSugerido: 40 } });
+    const avio = await cliente.avio.create({
+      data: { clave: 'ETL-1', descripcion: 'Botón', precioReferencia: 3 },
+    });
+    await cliente.modeloTela.create({
+      data: { idModelo: m001.id, idTela: tela.id, consumoPorPrenda: 1.2 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: m001.id, idAvio: avio.id, consumoPorPrenda: 4 },
+    });
+
+    await ejecutarEtlPedidosOrdenes(cliente);
+    const orden = await cliente.orden.findFirstOrThrow({
+      where: { idEmpresa: idEmpresaFR, folio: 9001n },
+      include: { recetaTelas: true, recetaAvios: true },
+    });
+    expect(orden.recetaTelas).toHaveLength(1);
+    expect(orden.recetaAvios).toHaveLength(1);
+
+    // Nace liberada: es de un mundo anterior a la puerta de Desarrollo, y dejarla cerrada
+    // bloquearía sus compras el día del deploy (mismo criterio que el backfill de la migración).
+    expect(orden.recetaLiberadaEn).not.toBeNull();
+    expect(orden.recetaLiberadaPorId).toBeNull(); // = "la liberó la migración", no una persona
+
+    // SIN precios congelados: una orden vieja no puede congelar el precio que la cascada resuelve
+    // HOY (sería inventar un dato). NULL = "no congeló precio" → el costeo cae al catálogo.
+    for (const r of [...orden.recetaTelas, ...orden.recetaAvios]) {
+      expect(r.precio).toBeNull();
+      expect(r.estado).toBe('sin_revisar');
+      expect(r.agregadoAMano).toBe(false);
+      expect(r.excluido).toBe(false);
+    }
+  });
+
+  it('⭐ V1-E3d: una orden cuyo modelo NO tiene BOM queda con receta VACÍA y SIN liberar', async () => {
+    // 2 de cada 3 órdenes del viejo caen aquí (su modelo no tiene BOM). Liberar "nada" dejaría al
+    // MRP explotando cero y a alguien creyendo que ya lo revisaron: la puerta se queda CERRADA y la
+    // señal correcta es "captura la receta de esta orden".
+    await ejecutarEtlPedidosOrdenes(cliente);
+    const sinBom = await cliente.orden.findFirst({
+      where: {
+        idEmpresa: idEmpresaFR,
+        recetaTelas: { none: {} },
+        recetaAvios: { none: {} },
+        recetaArtes: { none: {} },
+      },
+      select: { id: true, folio: true, estado: true, recetaLiberadaEn: true },
+    });
+    expect(sinBom).not.toBeNull();
+    expect(sinBom?.recetaLiberadaEn).toBeNull();
+  });
+
   it('ORDEN sin pedido → idPedidoLinea NULL; estado/fechaCompletada desde FechaDet (no now())', async () => {
     await ejecutarEtlPedidosOrdenes(cliente);
     // Orden 9003 es huérfana (IdPedidosDet=0).

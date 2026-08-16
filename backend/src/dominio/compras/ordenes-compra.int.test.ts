@@ -14,6 +14,7 @@ import type {
   Tela,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   actualizarOC,
@@ -85,6 +86,9 @@ beforeEach(async () => {
   tallaM = await cliente.talla.create({ data: { etiqueta: 'M', orden: 2 } });
   // Una orden de producción (para la liga por línea R7). Necesita modelo y cliente.
   const modelo = await cliente.modelo.create({ data: { codigo: 'A-100' } });
+  await cliente.modeloTela.create({
+    data: { idModelo: modelo.id, idTela: tela.id, consumoPorPrenda: 1 },
+  });
   const clienteNeg = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
   orden = await cliente.orden.create({
     data: {
@@ -94,6 +98,10 @@ beforeEach(async () => {
       idCliente: clienteNeg.id,
     },
   });
+  // ⭐ V1-E3d: ligar una OC a una orden exige su receta LIBERADA (§Post-F9.43(c)). La orden se crea
+  // aquí en directo (sin pasar por `crearOrden`), así que su receta se siembra a mano — igual que
+  // hizo el backfill con las órdenes que ya existían.
+  await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
 });
 
 describe('OC (F4-E2) — permisos (deny-by-default, A4)', () => {
@@ -748,6 +756,9 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
     // Daniel: "una OC puede ir ligada a varias OP". Ya se podía —la liga es por renglón—; esto lo
     // deja probado para que nadie lo "arregle" duplicando órdenes de compra.
     const modelo = await cliente.modelo.create({ data: { codigo: 'B-200' } });
+    await cliente.modeloTela.create({
+      data: { idModelo: modelo.id, idTela: tela.id, consumoPorPrenda: 1 },
+    });
     const clienteNeg = await cliente.cliente.findFirstOrThrow();
     const otraOrden = await cliente.orden.create({
       data: {
@@ -757,6 +768,7 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
         idCliente: clienteNeg.id,
       },
     });
+    await sembrarRecetaDeOrden(cliente, otraOrden.id, modelo.id);
     const oc = await crearOC(
       sesion(PERM_ADMIN_OC),
       {

@@ -115,6 +115,19 @@ const esquemaHistoricoProceso = z.object({
   observaciones: z.string().nullable(),
 });
 
+/**
+ * Un renglón de HABILITACIÓN del viejo (`OrdenesHab`) — V1-E3d, §Post-F9.43(e). El avío va como
+ * TEXTO (§Post-F9.28): **no existe en el catálogo de v2, no sale en ningún selector, es de solo
+ * lectura y no hay botón de "traer al catálogo"**. Es la respuesta a *"¿qué llevaba de verdad este
+ * modelo en 2019 y a qué precio?"* sin ensuciar el catálogo depurado.
+ */
+const esquemaHistoricoHab = z.object({
+  avio: z.string().describe('Descripción del avío TAL COMO la traía el viejo (texto, no FK).'),
+  claveV1: z.string().nullable().describe('Clave del avío en el viejo, si la traía.'),
+  cantidad: z.number().nullable().describe('`CantHabOrd`: la cantidad de ESA orden.'),
+  precio: z.number().nullable().describe('`PrecioHabOrd`: el precio de ESA orden.'),
+});
+
 /** La ficha completa de una orden histórica. */
 export const esquemaHistoricoOrdenDetalle = esquemaHistoricoOrdenResumen.extend({
   /**
@@ -130,6 +143,8 @@ export const esquemaHistoricoOrdenDetalle = esquemaHistoricoOrdenResumen.extend(
   idOrdenV1: z.string().describe('Id de la orden en el sistema viejo (para rastrearla allá).'),
   lineas: z.array(esquemaHistoricoLinea),
   procesos: z.array(esquemaHistoricoProceso),
+  /** La habilitación (avíos) que la orden llevó de verdad, con su cantidad y su precio (V1-E3d). */
+  habilitacion: z.array(esquemaHistoricoHab),
 });
 
 export type HistoricoOrdenResumen = z.infer<typeof esquemaHistoricoOrdenResumen>;

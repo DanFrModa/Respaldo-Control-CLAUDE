@@ -559,6 +559,16 @@ export interface paths {
                 cantidad: number;
                 observaciones: string | null;
               }[];
+              habilitacion: {
+                /** @description Descripción del avío TAL COMO la traía el viejo (texto, no FK). */
+                avio: string;
+                /** @description Clave del avío en el viejo, si la traía. */
+                claveV1: string | null;
+                /** @description `CantHabOrd`: la cantidad de ESA orden. */
+                cantidad: number | null;
+                /** @description `PrecioHabOrd`: el precio de ESA orden. */
+                precio: number | null;
+              }[];
             };
           };
         };
@@ -19265,14 +19275,14 @@ export interface paths {
                 requisitos: {
                   /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                   tallas: boolean;
-                  /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                  avios: boolean;
-                  /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                  /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                  receta: boolean;
+                  /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                   arte: 'no-aplica' | boolean;
                   /** @description Se cumplen todos los requisitos que aplican. */
                   completa: boolean;
                   /** @description Requisitos que hoy faltan (vacío si está completa). */
-                  faltantes: ('tallas' | 'avios' | 'arte')[];
+                  faltantes: ('tallas' | 'receta' | 'arte')[];
                 };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
@@ -20821,14 +20831,14 @@ export interface paths {
                 requisitos: {
                   /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                   tallas: boolean;
-                  /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                  avios: boolean;
-                  /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                  /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                  receta: boolean;
+                  /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                   arte: 'no-aplica' | boolean;
                   /** @description Se cumplen todos los requisitos que aplican. */
                   completa: boolean;
                   /** @description Requisitos que hoy faltan (vacío si está completa). */
-                  faltantes: ('tallas' | 'avios' | 'arte')[];
+                  faltantes: ('tallas' | 'receta' | 'arte')[];
                 };
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelada: string | null;
@@ -21124,14 +21134,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -21387,14 +21397,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -21667,14 +21677,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -21951,14 +21961,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -22224,14 +22234,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -22496,14 +22506,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -22772,14 +22782,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -23709,14 +23719,14 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description El modelo tiene su receta de avíos de producción (≥1 avío). */
-                avios: boolean;
-                /** @description El modelo tiene su arte; "no-aplica" si el modelo no lleva arte. */
+                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                receta: boolean;
+                /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
                 /** @description Se cumplen todos los requisitos que aplican. */
                 completa: boolean;
                 /** @description Requisitos que hoy faltan (vacío si está completa). */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               };
               /** @description Motivo de la cancelación, o null. */
               motivoCancelada: string | null;
@@ -23799,6 +23809,2326 @@ export interface paths {
               modificadoEn: string;
               /** @description Id del último usuario que la modificó. */
               modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Receta congelada de una orden (con la desalineación contra el BOM del modelo) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/renglones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Agregar un renglón a la receta de la orden */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json':
+            | {
+                /** @enum {string} */
+                tipo: 'tela';
+                idTela: number;
+                consumoPorPrenda: number;
+                precio?: number | null;
+                paraPreCosto?: boolean;
+                paraProduccion?: boolean;
+                paraCosto?: boolean;
+                idTelaProveedor?: number | null;
+                notas?: string | null;
+              }
+            | {
+                /** @enum {string} */
+                tipo: 'avio';
+                idAvio: number;
+                consumoPorPrenda: number;
+                precio?: number | null;
+                paraPreCosto?: boolean;
+                paraProduccion?: boolean;
+                paraCosto?: boolean;
+                consumoPorTalla?: boolean;
+                idAvioProveedor?: number | null;
+                tallas?: {
+                  idTalla: number;
+                  consumo: number;
+                  idAvioMedida?: number | null;
+                }[];
+                notas?: string | null;
+              }
+            | {
+                /** @enum {string} */
+                tipo: 'arte';
+                nombre: string;
+                descripcion?: string | null;
+                puntadas?: number | null;
+                precio?: number | null;
+                /** @enum {string} */
+                tipoArte?: 'BORDADO' | 'ESTAMPADO';
+                idProveedor?: number | null;
+                notas?: string | null;
+              };
+        };
+      };
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/renglones/{tipo}/{idRenglon}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Quitar un renglón de la receta de ESTA orden (el caso de la jareta) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+          /** @description Sección de la receta a la que pertenece el renglón. */
+          tipo: 'tela' | 'avio' | 'arte';
+          /** @description Id del renglón de la receta. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      /** @description Por qué esta orden no lleva ese insumo (queda en la bitácora). */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Editar un renglón de la receta (queda marcado como ajustado) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+          /** @description Sección de la receta a la que pertenece el renglón. */
+          tipo: 'tela' | 'avio' | 'arte';
+          /** @description Id del renglón de la receta. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      /** @description Campos a cambiar de un renglón de la receta. Editar lo deja en `ajustado`. */
+      requestBody: {
+        content: {
+          'application/json': {
+            consumoPorPrenda?: number;
+            precio?: number | null;
+            paraPreCosto?: boolean;
+            paraProduccion?: boolean;
+            paraCosto?: boolean;
+            consumoPorTalla?: boolean;
+            idTelaProveedor?: number | null;
+            idAvioProveedor?: number | null;
+            tallas?: {
+              idTalla: number;
+              consumo: number;
+              idAvioMedida?: number | null;
+            }[];
+            nombre?: string;
+            descripcion?: string | null;
+            puntadas?: number | null;
+            idProveedor?: number | null;
+            notas?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/renglones/{tipo}/{idRenglon}/restaurar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restaurar un renglón al valor que trae hoy el BOM del modelo */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+          /** @description Sección de la receta a la que pertenece el renglón. */
+          tipo: 'tela' | 'avio' | 'arte';
+          /** @description Id del renglón de la receta. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/revisar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Marcar TODA la receta como revisada (un solo clic) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/liberar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Liberar la receta: abre la puerta al MRP y a las órdenes de compra */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              liberadaEn: string | null;
+              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              puedeComprar: boolean;
+              /** @description Conteo de renglones de la receta por estado. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Traza al arte del modelo, o null. */
+                idModeloArte: number | null;
+                nombre: string;
+                descripcion: string | null;
+                puntadas: number | null;
+                /**
+                 * @description Bordado o estampado/aplicación.
+                 * @enum {string}
+                 */
+                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
             };
           };
         };
@@ -24778,7 +27108,7 @@ export interface paths {
                 /** @description Nombre del cliente. */
                 cliente: string;
                 /** @description Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como "Falta: …". */
-                faltantes: ('tallas' | 'avios' | 'arte')[];
+                faltantes: ('tallas' | 'receta' | 'arte')[];
               }[];
               /** @description Total de órdenes que cumplen el filtro. */
               total: number;
@@ -29149,6 +31479,14 @@ export interface paths {
                    * @enum {string}
                    */
                   diff: 'sin-cambio' | 'nuevo' | 'eliminado' | 'cantidad-cambiada';
+                  /** @description Qué cambió en el modelo respecto de lo que ESTA orden congeló para este material (vacío = nada que avisar). Marca el renglón en el lugar de la decisión, §Post-F9.43(d). */
+                  cambiosReceta: (
+                    | 'agregado'
+                    | 'quitado'
+                    | 'consumo'
+                    | 'precio'
+                    | 'precio-mercado'
+                  )[];
                 }[];
               }[];
               /** @description ¿El BOM cambió desde el snapshot anterior (hay renglones con diff ≠ sin-cambio)? */
@@ -29157,6 +31495,32 @@ export interface paths {
               regenerado: boolean;
               /** @description Avisos de la explosión (F8-E6, enganche): tela amarrada multi-color con precios de tela distintos (se usó el precio base) o avío por talla (R18) sin medida capturada para alguna talla (se usó el consumo por prenda). Vacío = nada que advertir. Nada truena en silencio. */
               avisos: string[];
+              /** @description ⭐ PRIMER AVISO de §Post-F9.43(d): la receta CONGELADA de la orden vs. el BOM VIVO del modelo, calculada al vuelo y entregada AQUÍ —el lugar de la decisión— porque es donde se está a punto de gastar. Los renglones afectados lo repiten en `cambiosReceta`. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
             };
           };
         };

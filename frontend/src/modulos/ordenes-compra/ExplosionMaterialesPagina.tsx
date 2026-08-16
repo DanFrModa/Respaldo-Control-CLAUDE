@@ -6,6 +6,7 @@ import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { Requerimiento } from '@/api/tipos';
+import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,6 +180,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         idOrden === o.id ? 'bg-primary-soft' : ''
                       }`}
                       data-testid="exp-orden-opcion"
+                      data-orden={o.id}
                     >
                       <span className="font-medium">Orden {o.folio}</span>
                       <span className="truncate text-muted-foreground">
@@ -202,9 +204,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 {datos ? ` · orden ${datos.folioOrden} · ${datos.totalPiezas} pzas` : ''}
               </h2>
               <div className="flex items-center gap-2">
+                {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
+                    liberada el servidor contesta 409 y la descarga reventaba sin decir por qué.
+                    Si la explosión no cargó, el botón se apaga y lo explica en el tooltip. */}
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={datos === undefined}
+                  title={
+                    datos === undefined
+                      ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
+                      : undefined
+                  }
                   onClick={() => imprimirExplosion(idOrden)}
                   data-testid="exp-imprimir"
                 >
@@ -309,6 +320,43 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               >
                 El BOM cambió desde la última explosión: los renglones afectados están marcados.
               </p>
+            ) : null}
+
+            {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d): la receta CONGELADA de esta orden contra el
+                BOM VIVO del modelo, EN EL LUGAR DE LA DECISIÓN — aquí es donde se está a punto de
+                gastar, así que el aviso va aquí y no escondido en otra pantalla. Lo calcula el
+                servidor al vuelo (A1); la pantalla solo lo pinta, y los renglones afectados lo
+                repiten en su propia fila. En ROJO solo cuando lo movió una PERSONA tocando el
+                modelo: un movimiento del precio de compra se informa, pero no da la alarma. */}
+            {(datos?.desalineacion.hayCambios ?? false) ? (
+              <div
+                className={
+                  datos?.desalineacion.critico === true
+                    ? 'mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
+                    : 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                }
+                data-testid="exp-desalineacion"
+              >
+                <p className="font-medium">
+                  {datos?.desalineacion.critico === true
+                    ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
+                    : 'Ojo: el modelo cambió desde que esta orden congeló su receta:'}
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {(datos?.desalineacion.cambios ?? []).map((c, i) => (
+                    <li
+                      key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
+                      data-testid="exp-cambio-receta"
+                    >
+                      {c.detalle}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1">
+                  La receta de esta orden NO se movió (para eso está congelada). Si algún cambio
+                  debe entrar, se trae a mano desde la receta de la orden.
+                </p>
+              </div>
             ) : null}
 
             {/* Avisos del enganche (F8-E6): tela amarrada multi-color con precios distintos (se usó el
@@ -426,6 +474,20 @@ function RenglonRequerimiento({
           <span className="truncate">{renglon.material}</span>
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
+          {/* V1-E3d: el renglón cuyo insumo se movió en el modelo lo dice EN SU FILA, para que el
+              aviso de arriba tenga a dónde apuntar. */}
+          {renglon.cambiosReceta.length > 0 ? (
+            <Badge
+              variant="outline"
+              className="border-destructive text-[10px] text-destructive"
+              data-testid="exp-renglon-desalineado"
+            >
+              {renglon.cambiosReceta.includes('precio-mercado') &&
+              renglon.cambiosReceta.length === 1
+                ? 'Cambió el precio de compra'
+                : 'El modelo cambió'}
+            </Badge>
+          ) : null}
         </p>
         <p className="text-xs text-muted-foreground">
           Requerido {formatearCantidad(renglon.cantidadRequerida)}

@@ -17,6 +17,7 @@ export function SelectorTela({
   alSeleccionar,
   alLimpiar,
   idProveedor,
+  idsExcluidos,
   deshabilitado = false,
   idInput,
   testid = 'selector-tela',
@@ -39,6 +40,12 @@ export function SelectorTela({
    * no aparecen (el catálogo se captura desde cero — acuerdo del 7-ago-2026).
    */
   idProveedor?: number | undefined;
+  /**
+   * Ids que NO se deben ofrecer (V1-E3d): p. ej. las telas que la receta de la orden YA lleva. Sin
+   * esto la pantalla invita a "agregar" algo que ya está, y esa puerta pisaba el precio congelado.
+   * Filtro de PRESENTACIÓN: la regla dura la impone el dominio (409).
+   */
+  idsExcluidos?: readonly number[];
   /** Solo lectura (p. ej. una orden cancelada): el combobox queda inerte. Default false. */
   deshabilitado?: boolean;
   /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
@@ -56,7 +63,8 @@ export function SelectorTela({
     ...(idProveedor === undefined ? {} : { idProveedor }),
   });
 
-  const telas = consulta.data?.datos ?? [];
+  const excluidos = new Set(idsExcluidos ?? []);
+  const telas = (consulta.data?.datos ?? []).filter((t) => !excluidos.has(t.id));
   // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
   // ofrecer las opciones viejas — clickearlas seleccionaba la tela EQUIVOCADA (carrera del e2e).
   const resolviendo = texto.trim() !== busqueda || consulta.isPending;

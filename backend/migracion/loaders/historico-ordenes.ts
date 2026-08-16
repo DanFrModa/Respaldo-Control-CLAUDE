@@ -51,7 +51,13 @@ import { leerCsv } from '../comun/csv.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
 import { despivotarRenglon, mapaColumnasTalla } from '../comun/tallas-orden.js';
-import { parsearBandera, parsearEntero, parsearFecha, parsearTexto } from '../comun/valores.js';
+import {
+  parsearBandera,
+  parsearDinero,
+  parsearEntero,
+  parsearFecha,
+  parsearTexto,
+} from '../comun/valores.js';
 
 /** Tamaño de tanda de `createMany`. Alto a propósito: son filas planas, sin FKs que resolver. */
 const LOTE = 2000;
@@ -72,6 +78,13 @@ export interface ResultadoHistoricoOrdenes {
   celdas: number;
   /** Movimientos de producción insertados. */
   procesos: number;
+  /**
+   * Renglones de HABILITACIÓN (`OrdenesHab`) insertados — V1-E3d, §Post-F9.43(e). Son los 28,432
+   * renglones que hasta esta etapa se tiraban COMPLETOS: el avío que la orden llevó de verdad, con
+   * SU cantidad y SU precio. Entran al ARCHIVO, con el avío como TEXTO (§Post-F9.28): cero
+   * registros nuevos en el catálogo.
+   */
+  habilitacion: number;
   /** Órdenes cuyo modelo no se pudo mapear (quedan con el código en texto). */
   sinModelo: number;
   /** Órdenes que ya estaban SIN su detalle (corrida anterior interrumpida) y se completaron. */
@@ -167,6 +180,20 @@ export function nombresDistintos(
   return [...nombres].sort((a, b) => a.localeCompare(b, 'es')).join(' · ');
 }
 
+/**
+ * Un renglón de HABILITACIÓN del viejo (`OrdenesHab`), ya resuelto a TEXTO (V1-E3d, §Post-F9.43(e)).
+ *
+ * Daniel: *"no quiero que interfiera con el nuevo catálogo para no meter información basura
+ * acumulada de 30 años"*. Por eso el avío viaja como texto —resuelto UNA vez aquí contra
+ * `Habilitacion.csv`— y no como FK: es la MISMA regla del directorio histórico (§Post-F9.28).
+ */
+export interface HabilitacionCruda {
+  avio: string;
+  claveV1: string | null;
+  cantidad: number | null;
+  precio: number | null;
+}
+
 /** Celda color×talla ya despivotada, antes de conocer el id nuevo de su orden. */
 interface CeldaCruda {
   color: string;
@@ -180,6 +207,7 @@ interface TrabajoOrden {
   cabecera: Prisma.HistoricoOrdenV1CreateManyInput;
   celdas: CeldaCruda[];
   procesos: ProcesoCrudo[];
+  habilitacion: HabilitacionCruda[];
 }
 
 /** Lo que le falta a una orden YA cargada (re-corrida después de una caída a media carga). */
@@ -187,6 +215,7 @@ interface Reparacion {
   idOrden: number;
   celdas: CeldaCruda[];
   procesos: ProcesoCrudo[];
+  habilitacion: HabilitacionCruda[];
 }
 
 /**
@@ -258,6 +287,20 @@ async function resolverEmpresaPrincipal(
   return null;
 }
 
+/** Proyecta la habilitación de una orden a las filas de `HistoricoOrdenV1Hab`. */
+function aFilasHabilitacion(
+  idOrden: number,
+  renglones: readonly HabilitacionCruda[],
+): Prisma.HistoricoOrdenV1HabCreateManyInput[] {
+  return renglones.map((h) => ({
+    idOrden,
+    avio: h.avio,
+    claveV1: h.claveV1,
+    cantidad: h.cantidad,
+    precio: h.precio,
+  }));
+}
+
 /** Proyecta los procesos de una orden a las filas de `HistoricoOrdenV1Proceso`. */
 function aFilasProceso(
   idOrden: number,
@@ -299,6 +342,7 @@ export async function cargarHistoricoOrdenes(
     rescatadas: 0,
     celdas: 0,
     procesos: 0,
+    habilitacion: 0,
     sinModelo: 0,
     reparadas: 0,
   };
@@ -353,6 +397,9 @@ export async function cargarHistoricoOrdenes(
   const conProcesos = new Set(
     (await cli.historicoOrdenV1Proceso.groupBy({ by: ['idOrden'] })).map((g) => g.idOrden),
   );
+  const conHabilitacion = new Set(
+    (await cli.historicoOrdenV1Hab.groupBy({ by: ['idOrden'] })).map((g) => g.idOrden),
+  );
 
   // Detalle color×talla agrupado por orden (se lee una vez).
   const detPorOrden = new Map<string, Record<string, string>[]>();
@@ -362,6 +409,35 @@ export async function cargarHistoricoOrdenes(
     const lista = detPorOrden.get(idOrd) ?? [];
     lista.push(fila);
     detPorOrden.set(idOrd, lista);
+  }
+
+  // ⭐ HABILITACIÓN del viejo agrupada por orden (`OrdenesHab`, V1-E3d §Post-F9.43(e)). El avío se
+  // resuelve a TEXTO AQUÍ, contra `Habilitacion.csv`: NO se toca el catálogo de avíos de v2 y no se
+  // crea ni un registro en él (§Post-F9.28). Sin descripción cae a la clave; sin ninguna de las dos,
+  // al id viejo — peor es un renglón mudo.
+  const aviosV1 = new Map<string, { descripcion: string | null; clave: string | null }>();
+  for (const fila of leerCsv('Habilitacion.csv')) {
+    const id = (fila.IdHabilitacion ?? '').trim();
+    if (id === '') continue;
+    aviosV1.set(id, {
+      descripcion: parsearTexto(fila.Descripcion),
+      clave: parsearTexto(fila.Clave),
+    });
+  }
+  const habilitacionPorOrden = new Map<string, HabilitacionCruda[]>();
+  for (const fila of leerCsv('OrdenesHab.csv')) {
+    const idOrd = (fila.IdOrdenes ?? '').trim();
+    if (idOrd === '') continue;
+    const idHab = (fila.IdHabilitacion ?? '').trim();
+    const cat = aviosV1.get(idHab);
+    const lista = habilitacionPorOrden.get(idOrd) ?? [];
+    lista.push({
+      avio: cat?.descripcion ?? cat?.clave ?? `Avío #${idHab === '' ? '?' : idHab} (Control viejo)`,
+      claveV1: cat?.clave ?? null,
+      cantidad: parsearDinero(fila.CantHabOrd),
+      precio: parsearDinero(fila.PrecioHabOrd),
+    });
+    habilitacionPorOrden.set(idOrd, lista);
   }
 
   // Movimientos de producción agrupados por orden (los cinco documentos del viejo).
@@ -417,6 +493,7 @@ export async function cargarHistoricoOrdenes(
     if (idOrdenV1 === '') continue;
 
     const procesosDeEsta = procesosPorOrden.get(idOrdenV1) ?? [];
+    const habDeEsta = habilitacionPorOrden.get(idOrdenV1) ?? [];
     const idYaCargada = yaCargadas.get(idOrdenV1);
     if (idYaCargada !== undefined) {
       resultado.existentes += 1;
@@ -433,11 +510,16 @@ export async function cargarHistoricoOrdenes(
       const celdasFaltantes =
         tieneDetalle && !conLineas.has(idYaCargada) ? celdasDe(f, idOrdenV1) : [];
       const faltanProcesos = procesosDeEsta.length > 0 && !conProcesos.has(idYaCargada);
-      if (celdasFaltantes.length > 0 || faltanProcesos) {
+      // La habilitación NACE en V1-E3d, así que en una base ya cargada por el ETL anterior TODAS
+      // las órdenes le faltan: este mismo camino de "reparación" la completa al re-correr el ETL,
+      // sin tener que vaciar el archivo.
+      const faltaHabilitacion = habDeEsta.length > 0 && !conHabilitacion.has(idYaCargada);
+      if (celdasFaltantes.length > 0 || faltanProcesos || faltaHabilitacion) {
         reparaciones.push({
           idOrden: idYaCargada,
           celdas: celdasFaltantes,
           procesos: faltanProcesos ? procesosDeEsta : [],
+          habilitacion: faltaHabilitacion ? habDeEsta : [],
         });
       }
       continue;
@@ -465,6 +547,7 @@ export async function cargarHistoricoOrdenes(
       idOrdenV1,
       celdas,
       procesos: procesosDeEsta,
+      habilitacion: habDeEsta,
       cabecera: {
         idEmpresa,
         idOrdenV1,
@@ -514,17 +597,22 @@ export async function cargarHistoricoOrdenes(
 
       const lineas: Prisma.HistoricoOrdenV1LineaCreateManyInput[] = [];
       const procesos: Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] = [];
+      const habilitacion: Prisma.HistoricoOrdenV1HabCreateManyInput[] = [];
       for (const t of tanda) {
         const idOrden = ids.get(t.idOrdenV1);
         if (idOrden === undefined) continue; // inalcanzable: se acaba de insertar.
         for (const c of t.celdas) lineas.push({ idOrden, ...c });
         procesos.push(...aFilasProceso(idOrden, t.procesos));
+        habilitacion.push(...aFilasHabilitacion(idOrden, t.habilitacion));
       }
       resultado.celdas += await insertarEnTandas(lineas, (lote) =>
         tx.historicoOrdenV1Linea.createMany({ data: lote }),
       );
       resultado.procesos += await insertarEnTandas(procesos, (lote) =>
         tx.historicoOrdenV1Proceso.createMany({ data: lote }),
+      );
+      resultado.habilitacion += await insertarEnTandas(habilitacion, (lote) =>
+        tx.historicoOrdenV1Hab.createMany({ data: lote }),
       );
     }, OPCIONES_TX);
   }
@@ -535,15 +623,20 @@ export async function cargarHistoricoOrdenes(
     await cli.$transaction(async (tx) => {
       const lineas: Prisma.HistoricoOrdenV1LineaCreateManyInput[] = [];
       const procesos: Prisma.HistoricoOrdenV1ProcesoCreateManyInput[] = [];
+      const habilitacion: Prisma.HistoricoOrdenV1HabCreateManyInput[] = [];
       for (const r of tanda) {
         for (const c of r.celdas) lineas.push({ idOrden: r.idOrden, ...c });
         procesos.push(...aFilasProceso(r.idOrden, r.procesos));
+        habilitacion.push(...aFilasHabilitacion(r.idOrden, r.habilitacion));
       }
       resultado.celdas += await insertarEnTandas(lineas, (lote) =>
         tx.historicoOrdenV1Linea.createMany({ data: lote }),
       );
       resultado.procesos += await insertarEnTandas(procesos, (lote) =>
         tx.historicoOrdenV1Proceso.createMany({ data: lote }),
+      );
+      resultado.habilitacion += await insertarEnTandas(habilitacion, (lote) =>
+        tx.historicoOrdenV1Hab.createMany({ data: lote }),
       );
     }, OPCIONES_TX);
   }

@@ -76,6 +76,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirRecetaLiberada } from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -276,6 +277,54 @@ function esAdmin(sesion: SesionUsuario): boolean {
  *    (acuerdo con Daniel): las nuevas siempre traen dueño, así que la puerta se cierra sola.
  * Devuelve el conjunto (sin repetidos) de idOrden ligados, para derivar `OrdenCompraOrden`.
  */
+/**
+ * Identidad de una línea **para efectos de la puerta**: QUÉ se compra, no cuánto ni a qué precio.
+ * Así, corregir cantidad/precio conserva la identidad (exento) y meter otro material no (gate).
+ */
+interface LineaParaPuerta {
+  idOrden?: number | null | undefined;
+  idTela?: number | null | undefined;
+  idAvio?: number | null | undefined;
+  descripcionLibre?: string | null | undefined;
+}
+
+function claveMaterial(l: LineaParaPuerta): string {
+  if (l.idTela != null) return `tela:${String(l.idTela)}`;
+  if (l.idAvio != null) return `avio:${String(l.idAvio)}`;
+  return `libre:${(l.descripcionLibre ?? '').trim().toLowerCase()}`;
+}
+
+/** Cuenta las líneas por material de UNA orden dentro de un juego de líneas. */
+function contarPorMaterial(
+  idOrden: number,
+  lineas: readonly LineaParaPuerta[],
+): Map<string, number> {
+  const cuenta = new Map<string, number>();
+  for (const l of lineas) {
+    if ((l.idOrden ?? null) !== idOrden) continue;
+    const k = claveMaterial(l);
+    cuenta.set(k, (cuenta.get(k) ?? 0) + 1);
+  }
+  return cuenta;
+}
+
+/**
+ * ¿La edición **AGREGA** líneas contra esta orden respecto de lo que la OC ya le compraba? Basta
+ * con que un material aparezca más veces que antes (uno nuevo aparece 0 → 1).
+ */
+function agregaLineas(
+  idOrden: number,
+  lineas: readonly LineaParaPuerta[],
+  yaComprado: ReadonlyMap<number, ReadonlyMap<string, number>>,
+): boolean {
+  const antes = yaComprado.get(idOrden);
+  if (antes === undefined) return true; // liga NUEVA: siempre pasa por la puerta
+  for (const [material, cuantas] of contarPorMaterial(idOrden, lineas)) {
+    if (cuantas > (antes.get(material) ?? 0)) return true;
+  }
+  return false;
+}
+
 async function validarLineas(
   tx: Tx,
   idEmpresa: number,
@@ -288,6 +337,24 @@ async function validarLineas(
    * inventarlo sería peor. `autorizarOC` cierra el hueco: no autoriza con complementos pendientes.
    */
   automatica = false,
+  /**
+   * Lo que esta OC **ya le compraba** a cada orden de producción antes de la edición, como
+   * multiconjunto `idOrden → (material → cuántas líneas)`.
+   *
+   * La PUERTA de la receta (V1-E3d) se exime **LÍNEA POR LÍNEA, no orden por orden**: corregir la
+   * cantidad o el precio de una línea que ya existía no es gastar de nuevo, pero **agregar una
+   * línea** —material nuevo, o una línea de más del mismo material— sí lo es, y por ahí se colaba
+   * un renglón de 5,000 kg contra una receta con la firma revocada (segundo hallazgo del reviewer:
+   * la cota por ORDEN abría de más). Borrar líneas también queda exento.
+   *
+   * ⚠️ **El corte es sobre QUÉ se compra, no sobre CUÁNTO, y eso hay que decirlo completo:** con la
+   * firma revocada, la cantidad de una línea que YA existía se puede subir **sin tope** (10 → 12 o
+   * 10 → 100,000). Es deliberado —es el reverso de haber abierto el lockout que dejaba a Compras
+   * sin poder corregir una OC ya hecha—, pero no es "solo gastar menos": también deja gastar más
+   * sobre un material que la receta firmada sí incluía. Si algún día se quiere topar el monto, ése
+   * es un control de COMPRAS (autorización por importe), no de esta puerta.
+   */
+  yaComprado: ReadonlyMap<number, ReadonlyMap<string, number>> = new Map(),
 ): Promise<{ idsOrden: Set<number>; lineas: DatosCompraLineaEntrada[] }> {
   const idsOrdenLigada = new Set<number>();
   const idsTela = new Set<number>();
@@ -443,6 +510,16 @@ async function validarLineas(
       if (!existentes.has(idOrden)) {
         throw new ErrorNoEncontrado('Orden', idOrden);
       }
+    }
+    // ⭐ LA PUERTA, también por la puerta de atrás (V1-E3d, §Post-F9.43(c) — hallazgo del reviewer).
+    // La decisión dice *"no se puede explotar el MRP **ni generar OC**"*, y una OC capturada A MANO
+    // en *Compras › Nueva OC* y ligada a la orden gasta el mismo dinero contra la misma receta que
+    // nadie revisó. Que no pase por el MRP no la hace inocente: lo que la puerta protege es el
+    // gasto, no el camino. Se verifica ORDEN POR ORDEN y DESPUÉS del filtro por empresa, para no
+    // filtrar la existencia de una orden ajena (misma razón que en `explosionarOrden`).
+    for (const idOrden of idsOrdenLigada) {
+      if (!agregaLineas(idOrden, lineas, yaComprado)) continue;
+      await exigirRecetaLiberada(tx, idOrden, idEmpresa);
     }
   }
 
@@ -803,11 +880,26 @@ export async function actualizarOC(
     if (datos.lineas !== undefined) {
       // El proveedor contra el que se validan las telas es el que VA A QUEDAR: si la edición lo
       // cambia, las telas tienen que ser del nuevo (si no, la OC quedaría inconsistente).
+      // Lo que la OC YA le compraba a cada orden, línea por línea (ver `yaComprado`).
+      const lineasActuales = await tx.ordenCompraLinea.findMany({
+        where: { idOrdenCompra: id, idOrden: { not: null } },
+        select: { idOrden: true, idTela: true, idAvio: true, descripcionLibre: true },
+      });
+      const yaComprado = new Map<number, Map<string, number>>();
+      for (const l of lineasActuales) {
+        if (l.idOrden === null) continue;
+        const porMaterial = yaComprado.get(l.idOrden) ?? new Map<string, number>();
+        const k = claveMaterial(l);
+        porMaterial.set(k, (porMaterial.get(k) ?? 0) + 1);
+        yaComprado.set(l.idOrden, porMaterial);
+      }
       const { idsOrden, lineas } = await validarLineas(
         tx,
         sesion.idEmpresaActiva,
         datos.lineas,
         datos.idProveedor ?? actual.idProveedor,
+        false,
+        yaComprado,
       );
       // Cascade borra la matriz de cada línea.
       await tx.ordenCompraLinea.deleteMany({ where: { idOrdenCompra: id } });

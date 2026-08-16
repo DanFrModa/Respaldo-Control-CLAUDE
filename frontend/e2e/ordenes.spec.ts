@@ -129,7 +129,7 @@ async function crearOrdenConMatriz(
 }
 
 test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () => {
-  test('Generar OP (con su "Falta: avíos") → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
+  test('Generar OP (con su "Falta: receta") → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
     page,
   }) => {
     test.setTimeout(150_000);
@@ -177,14 +177,24 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     const folio1 = await generarOp(page, { cliente, color, talla }, '20');
     const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
-    // ── La OP nace con matriz (R3) pero NO completa: el modelo de la prueba no tiene receta de
-    //    avíos NI arte capturado (y "lleva arte" viene MARCADO por default, decisión de Daniel).
-    //    Desde el 26-jul-2026 el estado es AUTOMÁTICO (tallas + avíos, y arte si aplica) y la
-    //    pantalla tiene que DECIR qué falta. Ojo: incompleta NO impide operar la orden.
+    // ── La OP nace con matriz (R3) pero NO completa. Desde V1-E3d (§Post-F9.43) el estado
+    //    AUTOMÁTICO es **tallas + receta LIBERADA, y arte si aplica**: la receta se acaba de copiar
+    //    del modelo y Desarrollo todavía no la libera, y el modelo de la prueba tampoco tiene arte
+    //    ("lleva arte" viene MARCADO por default, decisión de Daniel). La pantalla tiene que DECIR
+    //    qué falta. Ojo: incompleta NO impide operar la orden (cortar y producir siguen abiertos).
     await abrirOrdenEnCaptura(page, folio1, codigoModelo);
     const detalle = page.getByTestId('detalle-orden');
     await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Capturada');
-    await expect(detalle.getByTestId('faltantes-orden').first()).toHaveText('Falta: avíos y arte');
+    await expect(detalle.getByTestId('faltantes-orden').first()).toHaveText(
+      'Falta: liberar la receta y arte',
+    );
+    // ⭐ V1-E3d: la RECETA DE LA ORDEN se ve en su propio bloque, y dice que aún no está liberada.
+    await expect(detalle.getByTestId('receta-sin-liberar')).toBeVisible();
+    // …y la puerta de Desarrollo se abre desde aquí: un clic marca todo revisado y otro libera.
+    // (El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA y liberar se RECHAZA —
+    // que es justamente la regla: liberar "nada" no le sirve a nadie.)
+    await detalle.getByTestId('receta-liberar').click();
+    await expect(page.getByText(/no hay nada que liberar/i)).toBeVisible();
     const matriz = detalle.getByTestId('matriz-orden');
     await matriz.getByTestId('matriz-orden-celda').first().fill('25');
     // Guardado ÚNICO (Daniel 24-jul-2026): un solo botón en el pie del diálogo, para TODO.

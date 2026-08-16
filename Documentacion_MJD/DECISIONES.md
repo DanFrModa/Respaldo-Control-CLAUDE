@@ -2199,3 +2199,45 @@ quita la preservación, como la que ya existe para el amarre (`etl-modelos.int.t
 - **Aplica en:** V1-E3e (`dominio/compras/mrp.ts` y `migracion/loaders/bom-modelos.ts`). **SIN
   migración de esquema, SIN permisos, SIN seed.**
 - **Fecha:** 2026-08-15.
+
+#### (Post-F9.50) — Las cinco reglas que el BOM en la OP obligó a fijar (V1-E3d pieza B, 15/16-ago-2026)
+
+Ninguna la preguntó Daniel: **salieron de construir §Post-F9.43/.44** y de dos rondas de revisión. Se
+asientan porque **cambian lo que la gente ve y hace**, no solo cómo está escrito el código.
+
+**1. Una orden nueva ya NO nace «completa»: nace «capturada — falta liberar la receta».**
+Es el control que Daniel pidió (*"la información correcta que se tiene que comprar"*), pero es lo más
+visible de la etapa en el día a día. La puerta va **antes de comprar**: sin liberar no se puede
+explotar el MRP ni generar OC — **cortar y producir NO se bloquean**.
+
+**2. El backfill LIBERA las órdenes vivas que ya existen** (no las canceladas, no las de receta
+vacía). Sin esto, el día del deploy **todo el backlog quedaría sin poder comprar** hasta que alguien
+firmara orden por orden. Se paga con que el control empieza a aplicar a las órdenes **nuevas**, no
+retroactivamente — que es lo correcto: nadie revisó esas recetas, y fingir que sí las revisó sería
+peor que no pedirlo.
+
+**3. El backfill NO congela precios** (`precio` NULL → cae al catálogo). Reproducir la cascada de
+precios en SQL sería **inventar un número que nadie calculó** y estamparlo como si fuera un acuerdo.
+Las órdenes viejas siguen costeando por catálogo, como hasta hoy; las nuevas sí congelan.
+
+**4. Quitar un renglón NO lo borra: lo marca como excluido (lápida).** Es lo que permite distinguir
+*"a esta orden le quité la jareta"* de *"el modelo agregó una jareta que esta orden no tiene"* —
+sin la lápida las dos se ven idénticas y el aviso de desalineación no podría existir. Coherente con
+D3, y además la lápida **revive** si se vuelve a agregar el mismo material.
+
+**5. ⭐ Editar una receta ya liberada REVOCA la firma.** Salió de un hallazgo del reviewer: sin esto
+se podía meter material nuevo a una receta ya firmada y **comprarlo sin que nadie lo volviera a
+revisar** — o sea, la puerta se podía rodear por dentro. Ahora agregar/editar/quitar/restaurar
+re-abren la receta y dejan `liberacion-revocada` en la bitácora con su motivo, y la orden vuelve a
+«falta liberar la receta». **«Marcar todo revisado» NO revoca** (no cambia qué se compra).
+
+**6. El aviso de desalineación distingue quién movió el precio.** Si lo movió una persona en el
+modelo → *"pasó de X a Y en el modelo"*, y con OC hecha enciende el **rojo**. Si lo movió **la última
+compra real** (el motor de §Post-F9.48) → *"el modelo no cambió: cambió el precio de compra"*, y
+**se informa sin encender la alarma**. Sin esta separación, cada OC autorizada dejaría en rojo
+permanente a toda orden viva con esa tela, y el aviso se volvería ruido de fondo que nadie mira.
+
+- **Aplica en:** V1-E3d pieza B. **REQUIERE MIGRACIÓN** (4 tablas nuevas + backfill) — es el primer
+  despliegue de la sesión que no se deshace con un clic. Permisos: **ninguno nuevo** (reusa
+  `desarrollo.administrar`); seed: no.
+- **Fecha:** 2026-08-15/16.

@@ -665,6 +665,8 @@ model Proveedor {
   avios                   AvioProveedor[]
   /// Artes de modelo que hace este proveedor (V1-E3d, §Post-F9.35). Restrict.
   artesModelo             ModeloArte[]
+  /// Artes de la RECETA CONGELADA de órdenes que hace este proveedor (V1-E3d). Restrict.
+  artesOrden              OrdenArte[]
   /// Órdenes de producción donde está asignado como maquilero (F2-E2, Restrict).
   ordenes                 Orden[]
   /// Etapas de producción donde es el TERCERO (cortador/maquilero/estampador) (F3-E1,
@@ -966,6 +968,8 @@ model Talla {
   inventarioCiclicoDet   InventarioCiclicoDet[]
   /// Medidas por talla de avíos del BOM (F8-E1, R18). Restrict.
   modeloAvioTallas       ModeloAvioTalla[]
+  /// Medidas por talla de avíos de la RECETA DE LA ORDEN (V1-E3d, R18). Restrict.
+  ordenAvioTallas        OrdenAvioTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1341,6 +1345,8 @@ model Tela {
   colores            TelaColor[]
   /// Renglones del BOM de modelos que usan esta tela (F1-E4, Restrict hacia la tela).
   modelos            ModeloTela[]
+  /// Renglones de la RECETA CONGELADA de órdenes que usan esta tela (V1-E3d, Restrict).
+  ordenTelas         OrdenTela[]
   /// Órdenes de producción que disponen de esta tela (F2-E2, Restrict).
   ordenes            Orden[]
   /// Renglones de kardex de TELA de esta tela (dimensión tela×lote, D5). Las filas las
@@ -1776,6 +1782,8 @@ model Avio {
   medidas            AvioMedida[]
   /// Renglones del BOM de modelos que usan este avío (F1-E4, Restrict hacia el avío).
   modelos            ModeloAvio[]
+  /// Renglones de la RECETA CONGELADA de órdenes que usan este avío (V1-E3d, Restrict).
+  ordenAvios         OrdenAvio[]
   /// Renglones de kardex de AVÍO de este avío (dimensión avío×lote opcional + esGenerico,
   /// R4). Las filas las ejercita F4 (el inventario de avíos); la tabla nace en F3-E1 para
   /// fijar el motor genérico. Restrict.
@@ -1856,6 +1864,8 @@ model AvioMedida {
 
   /// Amarres medida↔talla del BOM que apuntan a esta medida (R5, B11). SetNull al borrarla.
   modeloAvioTallas ModeloAvioTalla[]
+  /// Amarres medida↔talla de la RECETA DE LA ORDEN (V1-E3d). SetNull al borrarla.
+  ordenAvioTallas  OrdenAvioTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2189,6 +2199,10 @@ model ModeloArte {
   /// modelo NO bloquea ni borra el precosto — su snapshot (`descripcion`/`precioUnit`) ya no
   /// depende de la FK, igual que `PrecostoLinea.idTelaProveedor`.
   precostoLineas PrecostoLinea[]
+
+  /// Renglones de RECETA DE ORDEN copiados de este arte (V1-E3d, traza). SetNull: quitar el arte
+  /// del modelo NO toca lo ya congelado en las órdenes (su nombre/precio ya viven en la copia).
+  ordenArtes OrdenArte[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2653,6 +2667,27 @@ model Orden {
   /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
   rutaProcesos         RutaOrden[]
 
+  // ── RECETA CONGELADA DE LA ORDEN (V1-E3d, §Post-F9.43) ────────────────────────────────────
+  //    "El BOM debe de vivir en la OP" (Daniel). Al nacer la orden se COPIA la receta del modelo
+  //    (telas + avíos con sus medidas por talla + artes) con su CANTIDAD y su PRECIO; a partir de
+  //    ahí la orden vive de SU receta y el modelo sigue siendo la plantilla. Ver `orden_tela`.
+
+  /// Cuándo Desarrollo LIBERÓ la receta de esta orden (§Post-F9.43(c)). NULL = sin liberar: **no
+  /// se puede explotar el MRP ni generar OC** (la puerta va antes de COMPRAR). Cortar y producir
+  /// NO se bloquean: el piso no se detiene porque Desarrollo no haya terminado de revisar.
+  recetaLiberadaEn    DateTime? @map("receta_liberada_en")
+  /// Quién liberó la receta. NULL con `recetaLiberadaEn` presente = la liberó la MIGRACIÓN
+  /// (backfill de V1-E3d: las órdenes que ya existían nacieron liberadas para no parar la
+  /// operación el día del deploy; sus renglones sí quedaron `sin_revisar`).
+  recetaLiberadaPorId String?   @map("receta_liberada_por_id")
+
+  /// Renglones de TELA de la receta congelada de esta orden. Cascade.
+  recetaTelas OrdenTela[]
+  /// Renglones de AVÍO de la receta congelada de esta orden. Cascade.
+  recetaAvios OrdenAvio[]
+  /// ARTES congelados de esta orden (bordado/estampado con su precio de ESTA orden). Cascade.
+  recetaArtes OrdenArte[]
+
   lineas               OrdenLinea[]
   referencias          OrdenReferencia[]
   comentarios          OrdenComentario[]
@@ -2869,6 +2904,227 @@ model OrdenComentario {
 
   @@index([idOrden])
   @@map("orden_comentario")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RECETA CONGELADA DE LA ORDEN DE PRODUCCIÓN (V1-E3d, §Post-F9.43)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Daniel (14-ago-2026): *"Un modelo se desarrolla a partir de cierta información. Y en ocasiones
+// se negocia con el cliente que ya no lleve alguna cosa (por ejemplo, quitarle una jareta para
+// abaratar el costo)… **El BOM debe de vivir en la OP**. De hecho así funciona en Control viejo."*
+//
+// EL HUECO QUE TAPA: hasta aquí, TODO lo que en producción necesitaba saber qué lleva la prenda
+// (MRP, habilitación, costeo real y el semáforo de "orden completa") leía el BOM del **modelo, en
+// vivo**. Como las banderas `paraProduccion`/`paraCosto` son del MODELO, apagar la jareta de un
+// cliente la apagaba en TODAS las órdenes de ese modelo, incluidas las ya producidas CON jareta.
+//
+// LA FORMA ESTÁ PROBADA POR 30 AÑOS: el viejo tiene `OrdenesHab(IdOrdenes, IdHabilitacion,
+// CantHabOrd, PrecioHabOrd)` — congela por orden el avío, SU cantidad y SU precio. Medido sobre el
+// volcado (5,451 órdenes / 28,432 renglones): 132 de 1,222 órdenes comparables (10.8 %) NO coinciden
+// con el BOM de su modelo (72 quitaron un avío, 100 agregaron, 60 cambiaron cantidad); en 2,577
+// órdenes la receta SOLO existe en la OP; y 15,255 de 24,480 renglones (62 %) traen precio distinto
+// al del catálogo (la OP guardó **el precio del día**). v2 añade lo que el viejo no congelaba:
+// **la TELA** (en v2 tiene consumo por prenda y alimenta el MRP) y **el ARTE**.
+//
+// LAS REGLAS DE ESTAS CUATRO TABLAS:
+//  1. **Se copian al CREAR la orden** (elección de Daniel sobre "al explotar el MRP": así se revisa
+//     y ajusta ANTES de comprar nada). Después son de la ORDEN: cambiar el modelo NO las pisa.
+//  2. **Las TRES banderas viajan** (`paraPreCosto`/`paraProduccion`/`paraCosto`). No se colapsan a
+//     una sola lista: cada consumidor conserva EXACTAMENTE el filtro que ya usaba, solo que ahora
+//     sobre la receta de la orden → cero regresión de alcance.
+//  3. **Quitar un renglón que vino del MODELO no lo borra: lo EXCLUYE** (`excluido`). Sin esa
+//     lápida, el comparador contra el modelo no podría distinguir *"le quité la jareta a ESTA
+//     orden"* (el caso de negocio) de *"el modelo agregó una jareta"*, y el aviso gritaría justo en
+//     el caso que la etapa vino a habilitar. El renglón AGREGADO A MANO sí se borra de verdad (no
+//     hay nada que recordar frente al modelo) dejando su copia ÍNTEGRA en la bitácora (D3).
+//  4. **`estado` por renglón** (`sin_revisar`/`revisado`/`ajustado`) — mismo patrón `ajustado` que
+//     el precosteo de F8. `ajustado` significa *"lo tocó una persona"*: por eso, ante una diferencia
+//     contra el modelo, un renglón `ajustado` la atribuye a la persona y uno no-ajustado al modelo.
+//     Ése es TODO el estado que hace falta: la desalineación se calcula AL VUELO comparando la
+//     receta congelada con el BOM vivo — **sin evento, sin outbox, sin estado acumulado**
+//     (§Post-F9.43(d): sin correo, el evento no compra nada).
+
+/// En qué punto de revisión está un renglón de la receta de la orden (§Post-F9.43(c)).
+///
+/// ⚠️ **NO se fuerza el OK uno por uno.** El 89 % de las órdenes lleva la receta del modelo tal
+/// cual; obligar a 8 clics por OP entrena a la gente a clickear sin leer, y ahí se pierde el control
+/// con la ilusión de tenerlo. Por eso hay UN botón de "marcar todo revisado" y el renglón que se
+/// desvía del modelo se pinta distinto para pedir atención solo.
+enum EstadoRenglonReceta {
+  /// Nació de la copia y nadie lo ha mirado.
+  sin_revisar
+  /// Alguien de Desarrollo lo miró y lo dio por bueno TAL COMO vino del modelo.
+  revisado
+  /// Se editó (o se agregó/excluyó) a mano en ESTA orden. Un cambio posterior del modelo NO lo pisa.
+  ajustado
+
+  @@map("estado_renglon_receta")
+}
+
+/// Renglón de TELA de la receta congelada de una orden (V1-E3d). Espejo de `ModeloTela` + el
+/// PRECIO de esta orden + el estado de revisión. El viejo NO congelaba la tela (`Ordenes.IdTelasDis`
+/// era una sola en el encabezado); en v2 sí, porque la tela tiene consumo por prenda y alimenta el
+/// MRP — dejarla fuera repetiría el hueco que la etapa vino a tapar.
+model OrdenTela {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idTela  Int   @map("id_tela")
+  tela    Tela  @relation(fields: [idTela], references: [id], onDelete: Restrict)
+
+  /// Consumo de tela por prenda EN ESTA ORDEN (copiado de `ModeloTela.consumoPorPrenda`).
+  consumoPorPrenda Decimal  @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// PRECIO congelado de esta tela EN ESTA ORDEN (el "precio del día" del viejo). Se copia del
+  /// precio que la receta del modelo COSTEA (la cascada única de §Post-F9.48) y desde entonces es
+  /// de la orden. NULL = no había ningún precio que congelar (el catálogo tampoco lo tenía).
+  precio           Decimal? @db.Decimal(12, 2)
+
+  /// 🔑 Las tres banderas, copiadas del modelo. Aquí significan lo mismo, pero **para esta orden**.
+  paraPreCosto   Boolean @default(true) @map("para_pre_costo")
+  paraProduccion Boolean @default(true) @map("para_produccion")
+  paraCosto      Boolean @default(true) @map("para_costo")
+
+  /// Amarre proveedor–tela heredado del BOM (R17). El MRP lo usa para saber A QUIÉN comprarle.
+  /// SetNull: si el renglón proveedor se retira de la tela, el amarre se limpia (nunca cuelga).
+  idTelaProveedor Int?           @map("id_tela_proveedor")
+  telaProveedor   TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
+
+  estado        EstadoRenglonReceta @default(sin_revisar)
+  /// El renglón NO vino del modelo: lo agregó una persona en esta orden (regla 3 del encabezado).
+  agregadoAMano Boolean             @default(false) @map("agregado_a_mano")
+  /// LÁPIDA: el renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se
+  /// conserva visible y tachado; ningún consumidor lo cuenta.
+  excluido      Boolean             @default(false)
+  /// Por qué se ajustó/excluyó (texto libre, opcional). Viaja a la bitácora.
+  notas         String?             @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idTela])
+  @@index([idOrden])
+  @@index([idTela])
+  @@index([idTelaProveedor])
+  @@map("orden_tela")
+}
+
+/// Renglón de AVÍO de la receta congelada de una orden (V1-E3d) — el heredero directo de
+/// `OrdenesHab` del viejo (`CantHabOrd`/`PrecioHabOrd`). Espejo de `ModeloAvio` + precio + estado.
+model OrdenAvio {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idAvio  Int   @map("id_avio")
+  avio    Avio  @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Consumo por prenda EN ESTA ORDEN (`CantHabOrd` del viejo).
+  consumoPorPrenda Decimal  @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// PRECIO congelado por unidad de consumo EN ESTA ORDEN (`PrecioHabOrd` del viejo).
+  precio           Decimal? @db.Decimal(12, 2)
+
+  paraPreCosto   Boolean @default(true) @map("para_pre_costo")
+  paraProduccion Boolean @default(true) @map("para_produccion")
+  paraCosto      Boolean @default(true) @map("para_costo")
+
+  /// ¿Este avío se consume POR TALLA (R18)? Si sí, las medidas viven en `tallas`.
+  consumoPorTalla Boolean @default(false) @map("consumo_por_talla")
+  /// Proveedor del par `(idAvio, idAvioProveedor)` → `AvioProveedor` (SIN FK de relación, mismo
+  /// criterio y nombre que `ModeloAvio.idAvioProveedor` y `OrdenCompraLinea.idAvioProveedor`).
+  idAvioProveedor Int?    @map("id_avio_proveedor")
+
+  estado        EstadoRenglonReceta @default(sin_revisar)
+  agregadoAMano Boolean             @default(false) @map("agregado_a_mano")
+  excluido      Boolean             @default(false)
+  notas         String?             @db.Text
+
+  /// Medidas por talla de ESTE avío en ESTA orden (R18). Cascade.
+  tallas OrdenAvioTalla[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idAvio])
+  @@index([idOrden])
+  @@index([idAvio])
+  @@index([idAvioProveedor])
+  @@map("orden_avio")
+}
+
+/// Medida (consumo) por TALLA de un avío de la receta de la orden (V1-E3d, R18). Copia de
+/// `ModeloAvioTalla`, editable por orden — es la parte que Daniel puso a cargo de Desarrollo
+/// (*"Desarrollo ajusta, define las medidas por talla y libera"*).
+model OrdenAvioTalla {
+  idOrdenAvio Int       @map("id_orden_avio")
+  ordenAvio   OrdenAvio @relation(fields: [idOrdenAvio], references: [id], onDelete: Cascade)
+  idTalla     Int       @map("id_talla")
+  talla       Talla     @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Medida (consumo) del avío para esta talla EN ESTA ORDEN.
+  consumo      Decimal     @db.Decimal(12, 4)
+  /// Amarre medida×talla (qué `AvioMedida` usa esta talla), copiado del BOM. SetNull.
+  idAvioMedida Int?        @map("id_avio_medida")
+  avioMedida   AvioMedida? @relation(fields: [idAvioMedida], references: [id], onDelete: SetNull)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idOrdenAvio, idTalla])
+  @@index([idOrdenAvio])
+  @@index([idTalla])
+  @@index([idAvioMedida])
+  @@map("orden_avio_talla")
+}
+
+/// ARTE congelado de una orden (V1-E3d + §Post-F9.35). Copia de `ModeloArte` con **el precio de
+/// ESTA orden** — el override que la decisión pedía ("el precio del modelo es referencia; el real
+/// se define en la OP"). El viejo NO hacía nada por orden con los bordados: esto es nuevo de v2.
+///
+/// ⚠️ **Invariante heredada de la pieza A:** el precio del arte entra **UNA vez por orden, SIN
+/// multiplicar por cantidad** (`dominio/costos/costo-orden.ts`). La foto NO se copia (vive en el
+/// modelo, y R2 no se clona desde SQL): la traza `idModeloArte` la alcanza mientras exista.
+model OrdenArte {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Traza al arte del modelo del que se copió. SetNull: quitar el arte del modelo NO toca lo ya
+  /// congelado (nombre y precio ya viven aquí), igual que `PrecostoLinea.idModeloArte`.
+  idModeloArte Int?        @map("id_modelo_arte")
+  modeloArte   ModeloArte? @relation(fields: [idModeloArte], references: [id], onDelete: SetNull)
+
+  /// Nombre del arte EN ESTA ORDEN. Único dentro de la orden (misma regla que dentro del modelo).
+  nombre      String
+  descripcion String?
+  puntadas    Int?
+  /// Precio del arte EN ESTA ORDEN (el override de §Post-F9.35). NULL = sin precio congelado.
+  precio      Decimal?   @db.Decimal(12, 2)
+  tipo        TipoArte   @default(BORDADO)
+  /// Proveedor que hace el arte. Restrict (un proveedor en uso no se borra físico).
+  idProveedor Int?       @map("id_proveedor")
+  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+
+  estado        EstadoRenglonReceta @default(sin_revisar)
+  agregadoAMano Boolean             @default(false) @map("agregado_a_mano")
+  excluido      Boolean             @default(false)
+  notas         String?             @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, nombre])
+  @@index([idOrden])
+  @@index([idModeloArte])
+  @@index([idProveedor])
+  @@map("orden_arte")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -6064,6 +6320,8 @@ model TelaProveedor {
   colores        TelaProveedorColor[]
   /// Renglones del BOM AMARRADOS a este proveedor–tela (F8-E1, R17). SetNull al quitar el renglón.
   modelosTela    ModeloTela[]
+  /// Renglones de la RECETA DE LA ORDEN amarrados a este proveedor–tela (V1-E3d). SetNull.
+  ordenesTela    OrdenTela[]
   /// Renglones de precosto que salieron de este amarre (F8-E3, traza). SetNull.
   precostoLineas PrecostoLinea[]
 
@@ -6600,8 +6858,10 @@ model HistoricoOrdenV1 {
   /// 39,853 celdas en cada consulta.
   totalPiezas Int @default(0) @map("total_piezas")
 
-  lineas   HistoricoOrdenV1Linea[]
-  procesos HistoricoOrdenV1Proceso[]
+  lineas       HistoricoOrdenV1Linea[]
+  procesos     HistoricoOrdenV1Proceso[]
+  /// Habilitación (avíos) que la orden llevó de verdad en el viejo (`OrdenesHab`, V1-E3d).
+  habilitacion HistoricoOrdenV1Hab[]
 
   creadoEn DateTime @default(now()) @map("creado_en")
 
@@ -6649,6 +6909,45 @@ model HistoricoOrdenV1Proceso {
   @@index([idOrden])
   @@index([tercero])
   @@map("historico_orden_v1_proceso")
+}
+
+/// La HABILITACIÓN (avíos) que una orden del viejo llevó de verdad, con SU cantidad y SU precio
+/// (`OrdenesHab`, 28,432 renglones que hasta V1-E3d se tiraban completos). §Post-F9.43(e).
+///
+/// Daniel (14-ago-2026): *"no sé si vale la pena migrar toda la info… mucha de esa info no es tan
+/// real. No quisiera hacer un catálogo con información no precisa… pero no quiero que interfiera
+/// con el nuevo catálogo para no meter información basura acumulada de 30 años."*
+///
+/// Por eso vive AQUÍ y no en el catálogo, con **la regla ya establecida en §Post-F9.28**: el avío va
+/// como **TEXTO**, resuelto UNA vez al migrar. Consecuencias, todas buscadas:
+///  • **No se crea ni un solo registro en el catálogo de avíos.**
+///  • No aparece en ningún selector de captura; es de SOLO LECTURA.
+///  • **No hay —ni habrá— botón de "traer al catálogo"**: ese botón sería la puerta trasera por la
+///    que volvería la basura recién depurada. Por eso tampoco existe en el directorio histórico.
+///
+/// Lo que se gana: cuando alguien pregunte *"¿qué llevaba de verdad este modelo en 2019 y a qué
+/// precio?"*, la respuesta existe.
+model HistoricoOrdenV1Hab {
+  id      Int              @id @default(autoincrement())
+  idOrden Int              @map("id_orden")
+  orden   HistoricoOrdenV1 @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Descripción del avío TAL COMO la traía el viejo (`Habilitacion.Descripcion`), resuelta al
+  /// migrar. TEXTO ligado a NADA. Si el catálogo viejo no traía descripción, cae a la clave.
+  avio     String
+  /// Clave del avío en el viejo (`Habilitacion.Clave`), si la traía. Respalda la búsqueda.
+  claveV1  String?  @map("clave_v1")
+  /// `OrdenesHab.CantHabOrd` — la cantidad de ESA orden.
+  cantidad Decimal? @db.Decimal(12, 4)
+  /// `OrdenesHab.PrecioHabOrd` — el precio de ESA orden (15,255 de 24,480 renglones difieren del
+  /// catálogo: la OP guardaba el precio del día).
+  precio   Decimal? @db.Decimal(12, 2)
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@index([idOrden])
+  @@index([avio])
+  @@map("historico_orden_v1_hab")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
