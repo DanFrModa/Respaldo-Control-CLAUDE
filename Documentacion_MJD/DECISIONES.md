@@ -2321,18 +2321,24 @@ catálogo."* **Texto libre.** Más simple que la propuesta del lead y mejor para
 > Daniel: *"Tengo entendido que los proveedores se pueden clasificar mediante un catálogo de tipos de
 > proveedores. Creo que ahí hay que ponerle que son de arte."*
 
-⚠️ **Corrección al entendido de Daniel, verificada en código:** `Proveedor.tipo` **NO es un catálogo**,
-es un **enum grabado en el programa** (`TELAS`/`AVIOS`/`SERVICIOS`/`SIN_CLASIFICAR`, `schema.prisma:547`).
-Desde la pantalla se ve igual que un catálogo, pero agregar un tipo exige **migración y despliegue**.
+⚠️ ~~**Corrección al entendido de Daniel:** `Proveedor.tipo` NO es un catálogo, es un enum grabado en el
+programa; agregar `ARTE` exige migración.~~ ❌ **ESA "CORRECCIÓN" DEL LEAD ERA FALSA. Daniel tenía
+razón** y lo demostró con una captura de la pantalla de proveedores.
 
-✅ **CERRADO (Daniel, 16-ago-2026):** se le explicaron los dos caminos —agregar `ARTE` al enum (chico) o
-convertirlo en catálogo administrable (etapa aparte)— y aceptó la recomendación del lead:
-**se agrega `ARTE` al enum ahora**; la conversión a catálogo queda para cuando estorbe de verdad.
+✅ **Lo que de verdad hay (verificado en `prisma/seed.ts:354-369`):** existe **`ProveedorRol`**, un
+**catálogo real en tabla, N:N** con el proveedor — *"Roles / servicios: qué hace este proveedor (elige
+al menos uno)"*. Ya trae **nueve** roles sembrados: `maquila-costura`, `corte`, `estampado`, `bordado`,
+`lavado`, `aplicacion`, `vende-telas`, `vende-avios`, `otros-servicios`. El `codigo` es la clave
+estable y **el nombre visible es editable**.
 
-⚠️ **Consecuencia operativa, dicha de frente:** hoy la mayoría de los proveedores está en
-`SIN_CLASIFICAR`, así que **alguien tendrá que reclasificarlos una vez** para que el filtro sirva. Si
-nadie lo hace, el selector del arte saldría casi vacío — **peor que mostrarlos todos**. Al construir:
-que el filtro **no esconda** a los `SIN_CLASIFICAR` mientras la reclasificación no ocurra, o que avise.
+**El error del lead:** miró `Proveedor.tipo` —una clasificación **vieja y burda** que convive con
+ésta— y concluyó que no existía el catálogo. Lección: cuando el dueño dice *"tengo entendido que ya
+existe"*, **buscar en la pantalla antes que en el esquema**.
+
+✅ **CERRADO (Daniel, 16-ago-2026): el filtro del arte se hace por ROLES.** No hace falta enum nuevo, ni
+migración, ni reclasificar a nadie: los proveedores de arte ya se marcan con `bordado` / `estampado`.
+*(Al construir: decidir si `lavado` y `aplicacion` también cuentan como arte para ese selector —
+Daniel los trata como tipos de arte en el punto 4.)*
 
 **4. ⭐ El TIPO de arte debe ser un CATÁLOGO, no una lista fija.**
 > *"Aparte de bordado y estampado, podríamos tener lavados, embosado, etc. Creo que hay que tener un
@@ -2430,4 +2436,47 @@ de E6.**
 
 - **Aplica en:** el punto 1 no requiere construir nada (ya existe); el punto 2 es un insumo de Daniel;
   el punto 3 reordena V1-E6.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.54) — Los nombres de los roles de proveedor, y el principio del "proceso raro" (DANIEL, 16-ago-2026)
+
+Daniel, viendo la pantalla de proveedores: *"Hoy tienes esto ya definido. Ya hay arte (estampado), arte
+bordado, aplicaciones, lavados. Prácticamente ya hay todo."*
+
+**1. Renombres pedidos.** El `codigo` es la clave estable; solo cambia el **nombre visible**:
+
+| Código | Antes | **Ahora** |
+|---|---|---|
+| `estampado` | Prov. de Arte (estampado) | **Estampador** |
+| `bordado` | Prov. de Arte (bordado) | **Bordador** |
+| `vende-telas` | Vende telas | **Telas** |
+| `vende-avios` | Vende avíos | **Avíos** |
+
+> *"Yo cambiaría el nombre a Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como
+> Telas y Avíos, le quitaría el «Vende»."*
+
+⚠️ Los nombres se siembran en `ROLES_PROVEEDOR_BASE` y el seed **actualiza el nombre si el código ya
+existe** → el deploy de este cambio **requiere `SEED_ON_START=true`**. Al construir, verificar si la
+pantalla de catálogos ya permite renombrarlos a mano (sería mejor: sin despliegue).
+
+**2. ⭐ El principio del "proceso raro" — vale más que el renombre.**
+
+> Daniel, sobre el embosado: *"dentro de aplicación podemos poner el embosado, o podemos dar de alta
+> embosado también… o en otros. **Hay procesos que hago muy muy poco. No justifica hacer todo un
+> desarrollo para las pocas veces que lo ocupo.**"*
+
+**Regla de diseño que queda para todo el proyecto:** un proceso poco frecuente **no justifica una
+entidad propia**. Se acomoda en `aplicacion` o en `otros-servicios`, o se le da de alta un rol si es
+tan barato como una fila de catálogo — pero **nunca** se le construye flujo, pantalla ni reporte
+propio. Es el mismo criterio con el que Daniel apagó la Ruta Crítica en la v1 (§Post-F9.36 punto 1) y
+descartó la remisión y el packing list (punto 6).
+
+**Aplicado aquí:** el **embosado** NO recibe rol propio de entrada. Si al usarlo resulta que estorba
+no distinguirlo, se agrega entonces — una fila de catálogo, no un desarrollo.
+
+**3. Daniel anunció más observaciones sobre proveedores**, que mandará aparte para no cortar el hilo en
+curso. **Pendiente de recibir.**
+
+- **Aplica en:** V1-E3f (junto con los siete del arte). Los renombres van en `prisma/seed.ts`
+  (**requiere `SEED_ON_START`**). Sin migración: los códigos no cambian.
 - **Fecha:** 2026-08-16.
