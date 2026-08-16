@@ -30,7 +30,7 @@ cerradas. Lo que falta no es el negocio: son **las fugas, las defensas y el ensa
 
 | Ola | Etapas, en orden | Por qué |
 |---|---|---|
-| 🟢 **1 — la columna vertebral** | `E3e` (un solo costo) → **`E3d pieza B`** (el BOM congelado en la OP) → `E3b` (los papeles y el PT) → `E4` (defensas) → `E6` (arranque) → `E7` (el ensayo) | Es la cadena desarrollo → compras → inventarios → EsMa que Daniel nombró |
+| 🟢 **1 — la columna vertebral** | ~~`E3e`~~ ✅ → ~~**`E3d pieza B`**~~ ✅ *(en CI)* → ~~`E3b`~~ ✅ *(ya estaba, 13-ago)* → **`E4`** (defensas) → `E6` (arranque) → `E7` (el ensayo) | Es la cadena desarrollo → compras → inventarios → EsMa que Daniel nombró |
 | 🟡 **2 — con el sistema ya en uso** | nomenclatura desarrollo/producción (§Post-F9.34/.46) · lo que queda de `E5` (días de crédito del cliente) | No bloquean capturar trabajo real |
 | 🔵 **Segunda etapa** | **Ruta Crítica** · **Costos/EDR + indicadores** | Decisión de Daniel, ratificada el 15-ago |
 
@@ -202,10 +202,11 @@ anotado en el código con el arreglo correcto.
 **Nota de despliegue:** sin migración, sin permisos nuevos, sin seed → **no** hace falta
 `SEED_ON_START`.
 
-### E3b — construida (13-ago-2026): los papeles y el inventario de PT
+### E3b — ✅ HECHA (13-ago-2026): los papeles y el inventario de PT
 
-> **Estado:** código y doc terminados en la rama de tarea; **revisión independiente en curso** al
-> momento de escribir esta nota. No se abre el PR a `prueba` hasta que el reviewer apruebe.
+> **Estado:** ✅ **aprobada e integrada en `prueba`** — verificado el 16-ago contra la rama:
+> `impreso-traspaso-tela.ts` y `SelectorOrdenPt.tsx` están ahí. *(La nota decía "revisión en curso"
+> desde el 13-ago y se quedó congelada; con `V1-E3a` ✅ y `E3b` ✅, **`V1-E3` está COMPLETA**.)*
 
 **1. El impreso del traspaso de tela** (§Post-F9.38). Mandar tela a un cortador la saca físicamente y
 el papel va con ella. Se imprime **el folio que el traspaso ya tiene**: cero registros nuevos, cero
