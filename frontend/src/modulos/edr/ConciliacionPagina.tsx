@@ -434,6 +434,7 @@ function AgregarManual(props: { idEdr: number }): React.JSX.Element {
             alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
             etiqueta="Cliente"
             placeholder="Elige…"
+            idInput="man-cliente"
             testid="man-cliente"
           />
         </Field>

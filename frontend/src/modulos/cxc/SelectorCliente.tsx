@@ -18,6 +18,8 @@ export function SelectorCliente({
   alLimpiar,
   etiqueta = 'Buscar cliente',
   placeholder = 'Buscar cliente por nombre…',
+  deshabilitado = false,
+  idInput,
   testid = 'selector-cliente',
 }: {
   idSeleccionado: number | undefined;
@@ -37,6 +39,15 @@ export function SelectorCliente({
   etiqueta?: string;
   /** Texto del input vacío (los filtros dicen "Todos los clientes"). */
   placeholder?: string;
+  /**
+   * Bloquea el control (V1-E4). Lo necesitan los formularios que ya lo bloqueaban cuando era un
+   * `<select>`: mientras guardan, y —en «Editar proyecto»— porque el cliente NO se puede cambiar
+   * (cambiarlo dejaría el departamento apuntando a otro cliente y el backend rechazaría el
+   * guardado). Sin esta prop, el combobox llegó EDITABLE donde antes tenía candado.
+   */
+  deshabilitado?: boolean;
+  /** `id` del input, para que un `<FieldLabel htmlFor>` lo siga enfocando al hacer clic. */
+  idInput?: string | undefined;
   testid?: string;
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -76,6 +87,8 @@ export function SelectorCliente({
       conLupa
       permitirLimpiar={alLimpiar !== undefined}
       cargando={resolviendo}
+      deshabilitado={deshabilitado}
+      idInput={idInput}
       placeholder={placeholder}
       etiqueta={etiqueta}
       textoVacio="No hay clientes que coincidan."

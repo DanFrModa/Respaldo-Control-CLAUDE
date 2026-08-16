@@ -197,6 +197,8 @@ export function DialogoPedido({
                   único que cambia es el control con el que se captura. */}
               <FiltroCliente
                 idCliente={idClienteElegido === '' ? null : Number(idClienteElegido)}
+                deshabilitado={guardando}
+                nombreInicial={pedido?.cliente}
                 alCambiar={(c) =>
                   formulario.setValue('idCliente', c === null ? '' : String(c.id), {
                     shouldValidate: true,
@@ -205,6 +207,7 @@ export function DialogoPedido({
                 }
                 etiqueta="Cliente"
                 placeholder="Elige un cliente…"
+                idInput="pedido-cliente"
                 testid="pedido-cliente"
               />
               <FieldError errors={[errors.idCliente]} />

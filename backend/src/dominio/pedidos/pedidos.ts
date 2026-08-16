@@ -683,8 +683,8 @@ export async function copiarPedido(
  *
  * Las dos salidas honestas, y ninguna otra:
  *  • el pedido NO tiene OPs vivas → se cancela, como siempre;
- *  • sí las tiene y NO se pidió cancelarlas → `ErrorConflicto` que las NOMBRA (con su folio y si
- *    ya llevan corte), para que el usuario decida con el dato en la mano;
+ *  • sí las tiene y NO se pidió cancelarlas → `ErrorConflicto` que las NOMBRA por su FOLIO, para
+ *    que el usuario vaya a verlas y decida;
  *  • sí las tiene y se pidió `cancelarOrdenes` → se cancelan TODAS en la MISMA transacción (A2),
  *    con su motivo y su bitácora una por una (nunca un conteo, D3). Eso exige `ordenes.cancelar`:
  *    el mismo permiso que cancelar una OP a mano, porque es exactamente lo que está pasando.

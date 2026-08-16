@@ -59,11 +59,14 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
+import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
-  guardarPlantilla,
-  leerCamposVariablesJson,
+  cargarOcYaImportadas,
+  claveOcCliente,
+  detectarDuplicadosOc,
+  mensajeDuplicado,
   NAMESPACE_LOCK_IMPORTACION,
-} from './importacion.js';
+} from './oc-duplicada.js';
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
 import { parsearPdfCya, type RenglonPdfCyaParseado } from './parseo-pdf-cya.js';
 import {
@@ -127,94 +130,6 @@ function valorCampo(campo: CampoPdfCya, r: RenglonPdfCyaParseado): string {
 /** Clave de comparación de un modelo del cliente (trim; los IDs de C&A son numéricos y estables). */
 function claveModeloCliente(texto: string): string {
   return texto.trim();
-}
-
-// ── Defensa V1-E4 (punto 1): la MISMA OC del cliente no se importa dos veces ─
-
-/** Clave de comparación de un nº de OC del cliente (trim + mayúsculas; vacío = sin OC). */
-export function claveOcCliente(texto: string | null | undefined): string {
-  return (texto ?? '').trim().toUpperCase();
-}
-
-/** Por qué un PDF de la tanda es un DUPLICADO. */
-export type DuplicadoPdf =
-  /** Esa OC ya tiene OP en la base (importación anterior). */
-  | { origen: 'importado'; idOrden: number; folioOrden: number }
-  /** Dos PDFs de la MISMA tanda traen el mismo nº de orden (el mismo papel subido dos veces). */
-  | { origen: 'lote'; nombreArchivoPrimero: string };
-
-/**
- * Decide, PDF por PDF y en su orden, si su nº de orden del cliente ya se importó (DOMINIO PURO —
- * lo prueba `importacion-pdf.test.ts`). Gana el duplicado contra la BASE sobre el de la tanda: es
- * el que el usuario necesita ver primero (ya hay una OP viva cortándose con ese papel).
- *
- * Un PDF sin nº de orden (no parseó, o el papel no lo trae) NUNCA es duplicado: sin identidad no
- * hay con qué compararlo, y bloquearlo por eso pararía importaciones legítimas.
- */
-export function detectarDuplicadosOc(
-  pdfs: readonly { nombreArchivo: string; numeroOrden: string }[],
-  yaImportadas: ReadonlyMap<string, { idOrden: number; folioOrden: number }>,
-): (DuplicadoPdf | null)[] {
-  const vistosEnLote = new Map<string, string>();
-  return pdfs.map((pdf) => {
-    const clave = claveOcCliente(pdf.numeroOrden);
-    if (clave === '') return null;
-    const enBd = yaImportadas.get(clave);
-    if (enBd !== undefined) {
-      return { origen: 'importado', idOrden: enBd.idOrden, folioOrden: enBd.folioOrden };
-    }
-    const primero = vistosEnLote.get(clave);
-    if (primero !== undefined) {
-      return { origen: 'lote', nombreArchivoPrimero: primero };
-    }
-    vistosEnLote.set(clave, pdf.nombreArchivo);
-    return null;
-  });
-}
-
-/** Mensaje ÚNICO del duplicado (misma redacción en la vista previa y en el confirm). */
-export function mensajeDuplicado(duplicado: DuplicadoPdf, numeroOrden: string): string {
-  return duplicado.origen === 'importado'
-    ? `La OC ${numeroOrden} del cliente YA se importó: nació la OP ${String(duplicado.folioOrden)}. No se vuelve a importar (se duplicaría la producción).`
-    : `La OC ${numeroOrden} viene repetida en esta tanda (ya la trae "${duplicado.nombreArchivoPrimero}"); solo se importa una vez.`;
-}
-
-/**
- * Lee qué nº de orden del cliente YA tienen OP viva (no cancelada) en la empresa activa (A9). La
- * comparación es por `Orden.ocCliente` —el snapshot que cada OP guarda del papel— acotada al
- * CLIENTE del pedido. Las órdenes CANCELADAS no cuentan: si la importación anterior se canceló
- * entera, volver a importar ese papel es legítimo.
- */
-async function cargarOcYaImportadas(
-  bd: Pick<Tx, 'orden'>,
-  idCliente: number,
-  idEmpresa: number,
-  numeros: readonly string[],
-): Promise<Map<string, { idOrden: number; folioOrden: number }>> {
-  const claves = [...new Set(numeros.map(claveOcCliente))].filter((c) => c !== '');
-  if (claves.length === 0) return new Map();
-  const ordenes = await bd.orden.findMany({
-    where: {
-      idEmpresa,
-      estado: { not: 'cancelada' },
-      // La OP llega al cliente por su renglón de pedido (`Orden` no tiene FK directa al cliente).
-      pedidoLinea: { pedido: { idCliente } },
-      // `mode: 'insensitive'` sobre el set de claves: el papel puede venir con espacios/mayúsculas
-      // distintas y seguiría siendo la MISMA orden de compra.
-      ocCliente: { in: claves, mode: 'insensitive' },
-    },
-    select: { id: true, folio: true, ocCliente: true },
-    orderBy: { id: 'asc' },
-  });
-  const mapa = new Map<string, { idOrden: number; folioOrden: number }>();
-  for (const orden of ordenes) {
-    const clave = claveOcCliente(orden.ocCliente);
-    // Se conserva la PRIMERA (orderBy id asc): la OP original, no la última copia.
-    if (clave !== '' && !mapa.has(clave)) {
-      mapa.set(clave, { idOrden: orden.id, folioOrden: Number(orden.folio) });
-    }
-  }
-  return mapa;
 }
 
 /** Suma de piezas de las tallas del PDF (lo que pidió el cliente). */
@@ -664,8 +579,13 @@ export async function analizarImportacionPdf(
       tallasNuevas: [...new Set(tallasNuevas)],
       advertencias,
       yaImportado:
-        duplicado !== null && duplicado.origen === 'importado'
-          ? { idOrden: duplicado.idOrden, folioOrden: duplicado.folioOrden }
+        duplicado !== null &&
+        duplicado.origen === 'importado' &&
+        duplicado.existente.donde === 'orden'
+          ? {
+              idOrden: duplicado.existente.idOrden,
+              folioOrden: duplicado.existente.folioOrden,
+            }
           : null,
     };
   });

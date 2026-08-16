@@ -75,6 +75,12 @@ async function sembrarBase(): Promise<void> {
   await cliente.estadoLista.create({
     data: { codigo: 'abierta', nombre: 'Abierta', orden: 1, esCierre: false },
   });
+  // Estado de CIERRE (espejo del seed real, `prisma/seed.ts`): sin él, la prueba de la guarda
+  // `esCierre` moría en su `findFirstOrThrow` ANTES de ejercitar nada — o sea, la promesa "una
+  // lista cerrada no se toca" no la verificaba nadie. (Hallazgo del reviewer de V1-E4.)
+  await cliente.estadoLista.create({
+    data: { codigo: 'cerrada', nombre: 'Cerrada', orden: 3, esCierre: true },
+  });
 }
 
 /**
@@ -724,6 +730,13 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
     expect(datos.antes.precioCalculado).toBe(antesEnBd.precioCalculado.toNumber());
     expect(datos.antes.precioAprobado).toBe(antesEnBd.precioAprobado?.toNumber());
     expect(datos.antes.aprobadoPorId).toBe('usuario-prueba');
+    // Los importes son NÚMEROS, no cadenas. Se asevera el TIPO además del valor porque el bug que
+    // esto cazó era exactamente ése: el `replacer` de `JSON.stringify` recibe el valor DESPUÉS de
+    // `toJSON()`, así que los `Decimal` entraban como `"40"` y la conversión nunca corría.
+    expect(typeof datos.antes.costoUnit).toBe('number');
+    expect(typeof datos.antes.precioAprobado).toBe('number');
+    // Las fechas quedan en ISO 8601 (cadena), no como objeto vacío.
+    expect(datos.antes.creadoEn).toBe(antesEnBd.creadoEn.toISOString());
     expect(Array.isArray(datos.eventosNegociacion)).toBe(true);
   });
 

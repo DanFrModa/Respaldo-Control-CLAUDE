@@ -359,6 +359,7 @@ function DialogoSolicitar({
                 alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
                 etiqueta="Cliente"
                 placeholder="Selecciona…"
+                idInput="mu-cliente"
                 testid="mu-cliente"
               />
             </Field>

@@ -181,6 +181,7 @@ export function CapturaProductividadPagina(): React.JSX.Element {
                   alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
                   etiqueta="Cliente (opcional)"
                   placeholder="Sin cliente"
+                  idInput="cap-cliente"
                   testid="cap-cliente"
                 />
               </Field>

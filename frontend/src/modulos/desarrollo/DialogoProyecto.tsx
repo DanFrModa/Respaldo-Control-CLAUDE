@@ -157,6 +157,11 @@ export function DialogoProyecto({
                   formulario (`setValue` con validación), solo cambia el control que lo captura. */}
               <FiltroCliente
                 idCliente={idClienteElegido === '' ? null : Number(idClienteElegido)}
+                /* El cliente NO se cambia en EDICIÓN: el departamento del proyecto cuelga de él y
+                   el backend rechaza el guardado si dejan de casar (`proyectos.ts`). El `<select>`
+                   llevaba este mismo candado; al pasar al combobox se había perdido. */
+                deshabilitado={guardando || esEdicion}
+                nombreInicial={proyecto?.cliente}
                 alCambiar={(c) => {
                   formulario.setValue('idCliente', c === null ? '' : String(c.id), {
                     shouldValidate: true,
@@ -166,6 +171,7 @@ export function DialogoProyecto({
                 }}
                 etiqueta="Cliente"
                 placeholder="Elige un cliente…"
+                idInput="proyecto-cliente"
                 testid="proyecto-cliente"
               />
               <FieldError errors={[errors.idCliente]} />

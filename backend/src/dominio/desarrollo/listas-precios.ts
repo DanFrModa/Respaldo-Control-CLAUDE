@@ -704,30 +704,48 @@ export async function eliminarLista(
 }
 
 /**
- * Convierte una fila de Prisma a JSON apto para la bitácora, SIN perder información: los `Decimal`
- * y `BigInt` de Prisma no son serializables tal cual (`JSON.stringify` los tira o revienta), y un
- * `antes` mutilado no serviría para reconstruir lo borrado (D3). Fechas → ISO.
+ * Convierte una fila de Prisma a JSON apto para la bitácora, SIN perder información: un `antes`
+ * mutilado no serviría para reconstruir lo borrado (D3).
+ *
+ *  • `Prisma.Decimal` → NÚMERO (importes legibles y comparables, no cadenas).
+ *  • `Date` → ISO 8601.
+ *  • `BigInt` → cadena (los folios no caben en un `number` sin riesgo).
+ *
+ * ⚠️ POR QUÉ SE RECORRE A MANO Y NO CON EL `replacer` DE `JSON.stringify`: el replacer recibe el
+ * valor DESPUÉS de que `JSON.stringify` llamó a su `toJSON()`. `Prisma.Decimal` y `Date` TIENEN
+ * `toJSON`, así que al replacer le llegaba ya una cadena y las ramas de Decimal/Date eran CÓDIGO
+ * MUERTO: los importes terminaban en la bitácora como `"40"` en vez de `40`. Recorriendo el objeto
+ * antes de serializar, la conversión sí ocurre. (Hallazgo del reviewer de V1-E4.)
  */
 function aJsonBitacora(fila: unknown): Prisma.InputJsonValue {
-  const texto = JSON.stringify(fila, (_clave, valor: unknown) => {
-    if (typeof valor === 'bigint') return valor.toString();
-    if (valor instanceof Date) return valor.toISOString();
-    // `Prisma.Decimal` se reconoce por su `toFixed`; se guarda como NÚMERO para que el `antes` sea
-    // legible en la bitácora (y no un `{}` vacío, que es lo que sale de un Decimal sin tratar).
-    if (esDecimal(valor)) return Number(valor.toString());
-    return valor;
-  });
-  return JSON.parse(texto) as Prisma.InputJsonValue;
+  return normalizarJson(fila) as Prisma.InputJsonValue;
 }
 
-/** ¿El valor es un `Prisma.Decimal`? (Se detecta por forma: `toFixed` + `toString`.) */
-function esDecimal(valor: unknown): valor is { toString: () => string } {
-  return (
-    typeof valor === 'object' &&
-    valor !== null &&
-    'toFixed' in valor &&
-    typeof valor.toFixed === 'function'
-  );
+/** Recorre el valor convirtiendo Decimal/Date/BigInt ANTES de que intervenga `JSON.stringify`. */
+function normalizarJson(valor: unknown): unknown {
+  if (valor === null || valor === undefined) return null;
+  if (typeof valor === 'bigint') return valor.toString();
+  if (valor instanceof Date) return valor.toISOString();
+  if (Array.isArray(valor)) return valor.map(normalizarJson);
+  if (esDecimal(valor)) return Number((valor as { toString: () => string }).toString());
+  if (typeof valor === 'object') {
+    const salida: Record<string, unknown> = {};
+    for (const [clave, v] of Object.entries(valor)) {
+      // `undefined` se omite (igual que `JSON.stringify`): así el llamador puede podar campos.
+      if (v === undefined) continue;
+      salida[clave] = normalizarJson(v);
+    }
+    return salida;
+  }
+  return valor;
+}
+
+/**
+ * ¿El valor es un `Prisma.Decimal`? Se detecta por FORMA (`toFixed` + `d`/`s`/`e` internos no son
+ * estables entre versiones), que es lo único disponible sin importar el runtime de Prisma aquí.
+ */
+function esDecimal(valor: object): boolean {
+  return 'toFixed' in valor && typeof valor.toFixed === 'function';
 }
 
 // ── Lecturas ────────────────────────────────────────────────────────────────────────

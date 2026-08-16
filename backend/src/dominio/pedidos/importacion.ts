@@ -67,23 +67,13 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
+import {
+  cargarOcYaImportadas,
+  claveOcCliente,
+  describirExistente,
+  NAMESPACE_LOCK_IMPORTACION,
+} from './oc-duplicada.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
-
-/**
- * Namespace del `pg_advisory_xact_lock` que serializa POR CLIENTE la confirmación de una
- * importación de OC (V1-E4 punto 1). Vive AQUÍ —y no en `importacion-pdf.ts`— para que las dos
- * rutas de importación compartan el MISMO candado sin ciclo de imports: el importador por PDF ya
- * depende de este módulo.
- *
- * Sin él, dos confirmaciones simultáneas del mismo papel leerían ambas "todavía no existe" (READ
- * COMMITTED) y nacerían los dos pedidos duplicados.
- *
- * No se usa un `@@unique` de BD sobre `(cliente, ocCliente)` a propósito: esa columna llega del ETL
- * del sistema viejo, donde el número de OC NO estaba controlado (hay repetidos y vacíos), así que
- * un unique tumbaría la migración. El candado + la re-verificación DENTRO de la transacción dan la
- * misma garantía para lo que se captura de aquí en adelante, sin tocar el histórico.
- */
-export const NAMESPACE_LOCK_IMPORTACION = 20_641;
 
 /** Tope del archivo decodificado (los OCs son chicos; blinda memoria/parseo). */
 const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024;
@@ -825,14 +815,19 @@ export async function confirmarImportacion(
 // ── Helpers compartidos ──────────────────────────────────────────────────────
 
 /**
- * Defensa V1-E4 (punto 1): exige que la OC del cliente NO se haya importado ya. La identidad del
- * papel es `Pedido.ocCliente` acotada al CLIENTE + la empresa activa (A9); los pedidos CANCELADOS
- * no cuentan (si la importación anterior se canceló entera, re-importar es legítimo).
+ * Defensa V1-E4 (punto 1): exige que la OC del cliente NO se haya importado ya, POR NINGUNA DE LAS
+ * DOS PUERTAS.
+ *
+ * ⚠️ En la primera ronda esta guarda solo miraba `Pedido.ocCliente`, mientras la del importador PDF
+ * miraba `Orden.ocCliente`. Como el PDF guarda el nº de orden del papel ÚNICAMENTE en la OP (en el
+ * pedido va la referencia general de la tanda), una OC importada por PDF se podía volver a importar
+ * por Excel SIN QUE NADA AVISARA — y al revés sí se detectaba. Ahora las dos puertas comparten
+ * `cargarOcYaImportadas`, que consulta ambas fuentes (ver `oc-duplicada.ts`).
  *
  * LÍMITE HONESTO: sin OC capturada no hay con qué comparar, así que una importación SIN referencia
  * sigue pudiendo repetirse. Es deliberado: inventar una identidad (nombre del archivo, fecha…)
- * bloquearía importaciones legítimas del mismo cliente el mismo día. El importador por PDF no
- * tiene ese hueco porque cada OP trae su propio nº de orden del papel.
+ * bloquearía importaciones legítimas del mismo cliente el mismo día. El importador por PDF no tiene
+ * ese hueco porque cada OP trae su propio nº de orden del papel.
  *
  * Debe llamarse DENTRO de la tx y DESPUÉS de tomar `NAMESPACE_LOCK_IMPORTACION`, o vuelve a haber
  * ventana de carrera.
@@ -843,20 +838,12 @@ async function exigirOcNoImportada(
   idEmpresa: number,
   ocCliente: string | null,
 ): Promise<void> {
-  if (ocCliente === null || ocCliente.trim() === '') return;
-  const existente = await tx.pedido.findFirst({
-    where: {
-      idEmpresa,
-      idCliente,
-      pedCancelado: false,
-      ocCliente: { equals: ocCliente.trim(), mode: 'insensitive' },
-    },
-    select: { folio: true },
-    orderBy: { id: 'asc' },
-  });
-  if (existente !== null) {
+  if (claveOcCliente(ocCliente) === '') return;
+  const yaImportadas = await cargarOcYaImportadas(tx, idCliente, idEmpresa, [ocCliente ?? '']);
+  const existente = yaImportadas.get(claveOcCliente(ocCliente));
+  if (existente !== undefined) {
     throw new ErrorConflicto(
-      `La OC "${ocCliente}" de este cliente YA se importó: nació el pedido ${String(Number(existente.folio))}. No se vuelve a importar (se duplicaría la producción); si de verdad es otra orden de compra, cámbiale la referencia.`,
+      `La OC "${(ocCliente ?? '').trim()}" de este cliente YA se importó: nació ${describirExistente(existente)}. No se vuelve a importar (se duplicaría la producción); si de verdad es otra orden de compra, cámbiale la referencia.`,
     );
   }
 }

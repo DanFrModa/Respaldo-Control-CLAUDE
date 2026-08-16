@@ -156,6 +156,7 @@ export function DialogoCrearLista({
                   alCambiar={(c) => cambiarCliente(c === null ? '' : String(c.id))}
                   etiqueta="Cliente"
                   placeholder="Elige un cliente…"
+                  idInput="crear-lista-cliente"
                   testid="crear-lista-cliente"
                 />
               </Field>

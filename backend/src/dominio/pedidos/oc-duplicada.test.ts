@@ -6,21 +6,28 @@
  * semanas después, cortando doble. Es el defecto que por definición nadie nota probando a mano, así
  * que el núcleo de la decisión (`detectarDuplicadosOc`) se cementa aquí, en dominio PURO.
  *
- * La parte que toca la base (qué OC ya tienen OP viva, el candado por cliente y el aborto de la
- * transacción) se prueba en `importacion-pdf.int.test.ts` contra Postgres real.
+ * La parte que toca la base (qué OC ya están importadas, el candado por cliente y el aborto de la
+ * transacción) se prueba en `importacion-pdf.int.test.ts` e `importacion.int.test.ts` contra
+ * Postgres real.
  */
 import { describe, expect, it } from 'vitest';
 
-import { claveOcCliente, detectarDuplicadosOc, mensajeDuplicado } from './importacion-pdf.js';
+import {
+  claveOcCliente,
+  detectarDuplicadosOc,
+  describirExistente,
+  mensajeDuplicado,
+  type OcExistente,
+} from './oc-duplicada.js';
 
 /** Atajo: el mapa "esta OC ya tiene OP" tal como lo devuelve la lectura de la base. */
 function yaImportadas(
   filas: { numeroOrden: string; idOrden: number; folioOrden: number }[],
-): Map<string, { idOrden: number; folioOrden: number }> {
+): Map<string, OcExistente> {
   return new Map(
     filas.map((f) => [
       claveOcCliente(f.numeroOrden),
-      { idOrden: f.idOrden, folioOrden: f.folioOrden },
+      { donde: 'orden', idOrden: f.idOrden, folioOrden: f.folioOrden },
     ]),
   );
 }
@@ -42,7 +49,9 @@ describe('detectarDuplicadosOc', () => {
       yaImportadas([{ numeroOrden: '620884', idOrden: 41, folioOrden: 1207 }]),
     );
 
-    expect(resultado).toEqual([{ origen: 'importado', idOrden: 41, folioOrden: 1207 }]);
+    expect(resultado).toEqual([
+      { origen: 'importado', existente: { donde: 'orden', idOrden: 41, folioOrden: 1207 } },
+    ]);
   });
 
   it('reconoce el duplicado aunque el papel venga con espacios o en minúsculas', () => {
@@ -51,7 +60,10 @@ describe('detectarDuplicadosOc', () => {
       yaImportadas([{ numeroOrden: 'OC-A12', idOrden: 9, folioOrden: 300 }]),
     );
 
-    expect(resultado[0]).toEqual({ origen: 'importado', idOrden: 9, folioOrden: 300 });
+    expect(resultado[0]).toEqual({
+      origen: 'importado',
+      existente: { donde: 'orden', idOrden: 9, folioOrden: 300 },
+    });
   });
 
   it('deja pasar la OC que nunca se ha importado', () => {
@@ -87,8 +99,12 @@ describe('detectarDuplicadosOc', () => {
     );
 
     // Los dos apuntan a la OP que ya existe: es lo que el usuario necesita ver.
-    expect(resultado[0]).toEqual({ origen: 'importado', idOrden: 41, folioOrden: 1207 });
-    expect(resultado[1]).toEqual({ origen: 'importado', idOrden: 41, folioOrden: 1207 });
+    const esperado = {
+      origen: 'importado',
+      existente: { donde: 'orden', idOrden: 41, folioOrden: 1207 },
+    };
+    expect(resultado[0]).toEqual(esperado);
+    expect(resultado[1]).toEqual(esperado);
   });
 
   it('un PDF SIN nº de orden nunca es duplicado (sin identidad no hay con qué comparar)', () => {
@@ -114,7 +130,10 @@ describe('detectarDuplicadosOc', () => {
     );
 
     expect(resultado[0]).toBeNull();
-    expect(resultado[1]).toEqual({ origen: 'importado', idOrden: 7, folioOrden: 88 });
+    expect(resultado[1]).toEqual({
+      origen: 'importado',
+      existente: { donde: 'orden', idOrden: 7, folioOrden: 88 },
+    });
     expect(resultado[2]).toBeNull();
   });
 });
@@ -122,12 +141,22 @@ describe('detectarDuplicadosOc', () => {
 describe('mensajeDuplicado', () => {
   it('dice QUÉ OP ya existe (el usuario tiene que poder ir a verla)', () => {
     const mensaje = mensajeDuplicado(
-      { origen: 'importado', idOrden: 41, folioOrden: 1207 },
+      { origen: 'importado', existente: { donde: 'orden', idOrden: 41, folioOrden: 1207 } },
       '620884',
     );
 
     expect(mensaje).toContain('620884');
-    expect(mensaje).toContain('1207');
+    expect(mensaje).toContain('OP 1207');
+  });
+
+  it('nombra el PEDIDO cuando la OC entró por el importador de Excel', () => {
+    const mensaje = mensajeDuplicado(
+      { origen: 'importado', existente: { donde: 'pedido', idPedido: 3, folioPedido: 34 } },
+      'OC-CA-4471',
+    );
+
+    expect(mensaje).toContain('OC-CA-4471');
+    expect(mensaje).toContain('pedido 34');
   });
 
   it('para el repetido en la tanda, nombra el archivo que sí se va a importar', () => {
@@ -138,5 +167,14 @@ describe('mensajeDuplicado', () => {
 
     expect(mensaje).toContain('primero.pdf');
     expect(mensaje).toContain('620884');
+  });
+});
+
+describe('describirExistente', () => {
+  it('nombra el documento correcto según de dónde salió la OC', () => {
+    expect(describirExistente({ donde: 'orden', idOrden: 1, folioOrden: 900 })).toBe('la OP 900');
+    expect(describirExistente({ donde: 'pedido', idPedido: 1, folioPedido: 55 })).toBe(
+      'el pedido 55',
+    );
   });
 });
