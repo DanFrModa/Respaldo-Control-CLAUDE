@@ -82,6 +82,7 @@ async function resolverParametros(
   cliente: ClienteBd,
   idEmpresa: number,
   idModelo: number,
+  idOrden: number,
 ): Promise<ResolucionParametros> {
   // 1) La última orden PROGRAMADA del mismo modelo manda (resurtidos repiten parámetros).
   const previa = await cliente.orden.findFirst({
@@ -160,10 +161,17 @@ async function resolverParametros(
     return { ok: false, motivo: 'No hay tipos de tela activos en el catálogo de duraciones.' };
   }
 
-  // Aplicación: si el BOM del modelo tiene bordados/estampados, la orden LLEVA aplicación — se
-  // elige la activa más corta con días > 0 (conservador; el re-programar afina). Sin bordados,
-  // "Sin Aplicación" (días 0) omite los procesos condicionales.
-  const tieneAplicacion = (await cliente.modeloArte.count({ where: { idModelo } })) > 0;
+  // Aplicación: si ESTA ORDEN lleva arte (bordado/estampado), LLEVA aplicación — se elige la activa
+  // más corta con días > 0 (conservador; el re-programar afina). Sin arte, "Sin Aplicación" (días 0)
+  // omite los procesos condicionales.
+  //
+  // ⭐ V1-E3d (§Post-F9.43, hallazgo del reviewer): la pregunta se le hace a la **receta congelada
+  // de la orden**, no al modelo. Preguntándole al modelo, dos órdenes hermanas —una con el arte
+  // excluido— recibían la misma plantilla y los mismos procesos condicionales de estampado, que es
+  // exactamente la familia de defectos que esta etapa vino a cerrar. Los renglones EXCLUIDOS no
+  // cuentan: esa orden no lleva ese arte.
+  const tieneAplicacion =
+    (await cliente.ordenArte.count({ where: { idOrden, excluido: false } })) > 0;
   const aplicacion = tieneAplicacion
     ? await cliente.duracionPorAplicacion.findFirst({
         where: { activo: true, dias: { gt: 0 } },
@@ -243,7 +251,7 @@ export async function procesarOrdenCreada(
     return;
   }
 
-  const parametros = await resolverParametros(cliente, orden.idEmpresa, orden.idModelo);
+  const parametros = await resolverParametros(cliente, orden.idEmpresa, orden.idModelo, orden.id);
   if (!parametros.ok) {
     await registrarOmision(orden.id, parametros.motivo, bd);
     return;

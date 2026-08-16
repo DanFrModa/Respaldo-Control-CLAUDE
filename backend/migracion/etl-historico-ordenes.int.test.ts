@@ -76,6 +76,8 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27/29)', () => {
     expect(resultado.rescatadas).toBe(1); // la 1003, de la empresa 9 (Zipora), que no migra
     expect(resultado.celdas).toBe(3); // MARINO 10+5 y ROJO 3 (los ceros no emiten fila)
     expect(resultado.procesos).toBe(5); // 1 corte + 2 entregas + 1 recibo + 1 estampado
+    // ⭐ V1-E3d (§Post-F9.43(e)): la HABILITACIÓN del viejo (`OrdenesHab`), que antes se tiraba.
+    expect(resultado.habilitacion).toBe(4);
     expect(resultado.reparadas).toBe(0);
 
     const orden = await cliente.historicoOrdenV1.findFirstOrThrow({
@@ -88,6 +90,33 @@ describe('Archivo histórico de órdenes (§Post-F9.26/27/29)', () => {
     expect(orden.cortadores).toBe('Oscar Aragon');
     expect(orden.maquileros).toBe('MONT · Taller Sosa');
     expect(orden.estampadores).toBe('Bordados SA');
+  });
+
+  it('⭐ carga la HABILITACIÓN del viejo con el avío como TEXTO, sin tocar el catálogo (V1-E3d)', async () => {
+    await cargarArchivo();
+
+    const orden = await cliente.historicoOrdenV1.findFirstOrThrow({
+      where: { idOrdenV1: '1001' },
+      include: { habilitacion: { orderBy: { avio: 'asc' } } },
+    });
+    expect(orden.habilitacion).toHaveLength(2);
+    // El avío llega con su descripción del catálogo VIEJO, resuelta una sola vez al migrar.
+    expect(orden.habilitacion[0]).toMatchObject({ avio: 'Etiqueta de lavado', claveV1: 'E01' });
+    // Y con SU cantidad y SU precio — el "precio del día" (catálogo $0.14, la orden $0.15).
+    expect(orden.habilitacion[0]?.cantidad?.toNumber()).toBe(1);
+    expect(orden.habilitacion[0]?.precio?.toNumber()).toBe(0.15);
+    // Un avío sin descripción cae a su CLAVE: peor es un renglón mudo.
+    expect(orden.habilitacion[1]?.avio).toBe('G18');
+
+    // Un avío que ni existe en el catálogo viejo NO se pierde ni inventa nada: queda nombrado.
+    const otra = await cliente.historicoOrdenV1.findFirstOrThrow({
+      where: { idOrdenV1: '1002' },
+      include: { habilitacion: true },
+    });
+    expect(otra.habilitacion.some((h) => h.avio.includes('#99'))).toBe(true);
+
+    // ⚠️ LA CONDICIÓN DE DANIEL: ni un solo registro nuevo en el catálogo de avíos de v2.
+    expect(await cliente.avio.count()).toBe(0);
   });
 
   it('rescata la orden de una empresa EXTINTA y guarda de cuál era (§Post-F9.29)', async () => {

@@ -130,7 +130,10 @@ describe('salidaAProduccion (R3, B4)', () => {
     // La orden nació con su matriz y el SNAPSHOT de la OC del cliente (B3).
     expect(resultado.orden.idPedidoLinea).toBe(idLinea);
     expect(resultado.orden.totalPiezas).toBe(100);
-    expect(resultado.orden.estado).toBe('completa');
+    // V1-E3d (§Post-F9.43): la OP nace `capturada` — su receta acaba de copiarse del modelo y
+    // Desarrollo todavía no la libera. Ése es el control nuevo, no una regresión.
+    expect(resultado.orden.estado).toBe('capturada');
+    expect(resultado.orden.requisitos.faltantes).toEqual(['receta']);
     expect(resultado.orden.ocCliente).toBe('OC-CA-4471');
     // La OP hereda la ventana de entrega del pedido (fechaHasta).
     expect(resultado.orden.fechaEntrega).toBe('2026-08-15');

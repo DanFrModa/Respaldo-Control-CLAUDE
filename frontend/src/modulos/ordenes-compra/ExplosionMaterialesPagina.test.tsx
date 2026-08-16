@@ -38,6 +38,8 @@ function explosionDePrueba() {
     huboCambios: false,
     regenerado: false,
     avisos: [],
+    // V1-E3d: la explosión trae la desalineación de la receta congelada vs. el BOM vivo.
+    desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
     grupos: [
       {
         idProveedor: 11,
@@ -59,6 +61,7 @@ function explosionDePrueba() {
             proveedorSugerido: 'Avíos Baratos',
             precioSugerido: 2,
             diff: 'sin-cambio',
+            cambiosReceta: [],
           },
         ],
       },
@@ -82,6 +85,7 @@ function explosionDePrueba() {
             proveedorSugerido: null,
             precioSugerido: null,
             diff: 'sin-cambio',
+            cambiosReceta: [],
           },
           {
             id: 3,
@@ -99,6 +103,7 @@ function explosionDePrueba() {
             proveedorSugerido: null,
             precioSugerido: null,
             diff: 'sin-cambio',
+            cambiosReceta: [],
           },
         ],
       },
@@ -332,5 +337,109 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
     expect(screen.queryByTestId('exp-falta-direccion')).not.toBeInTheDocument();
+  });
+  // ── ⭐ PRIMER AVISO de §Post-F9.43(d): la desalineación EN EL LUGAR DE LA DECISIÓN (V1-E3d) ──
+  //
+  // La ficha es explícita: *"sin OC todavía → rojo en el lugar de la decisión: al explotar el MRP /
+  // generar la OC, los renglones que cambiaron salen marcados diciendo QUÉ cambió"*. Aquí es donde
+  // se está a punto de gastar; que el aviso solo viviera en el detalle de la orden dejaba a esta
+  // pantalla —la que decide— muda.
+
+  it('sin desalineación no estorba con el aviso', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    expect(screen.queryByTestId('exp-desalineacion')).not.toBeInTheDocument();
+  });
+
+  it('el modelo cambió: lo dice AQUÍ, con QUÉ cambió, y marca el renglón afectado', async () => {
+    const base = explosionDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: {
+        ...base,
+        desalineacion: {
+          hayCambios: true,
+          conOrdenCompra: false,
+          critico: false,
+          cambios: [
+            {
+              tipo: 'avio',
+              idRenglon: 9,
+              material: 'BOT-01 — Botón',
+              que: 'consumo',
+              detalle: 'La cantidad de "BOT-01 — Botón" pasó de 6 a 8 en el modelo.',
+            },
+          ],
+        },
+        grupos: base.grupos.map((g) => ({
+          ...g,
+          renglones: g.renglones.map((r) =>
+            r.id === 1 ? { ...r, cambiosReceta: ['consumo'] } : r,
+          ),
+        })),
+      },
+      isPending: false,
+      isError: false,
+    });
+
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    const aviso = screen.getByTestId('exp-desalineacion');
+    expect(aviso).toHaveTextContent('pasó de 6 a 8 en el modelo');
+    // …y el renglón concreto queda marcado, que es a lo que apunta el aviso.
+    expect(screen.getByTestId('exp-renglon-desalineado')).toHaveTextContent('El modelo cambió');
+  });
+
+  it('⭐ un movimiento del PRECIO DE COMPRA se informa SIN rojo y con su causa real', async () => {
+    // El escenario del reviewer: el comprador ajusta su propia OC y la autoriza. Eso mueve el precio
+    // de la receta del modelo (desde V1-E3e ES la última compra real), pero NADIE tocó el modelo.
+    const base = explosionDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: {
+        ...base,
+        desalineacion: {
+          hayCambios: true,
+          conOrdenCompra: true,
+          critico: false, // ← lo decide el servidor: sin esto sería rojo permanente
+          cambios: [
+            {
+              tipo: 'avio',
+              idRenglon: 9,
+              material: 'BOT-01 — Botón',
+              que: 'precio-mercado',
+              detalle:
+                'La última COMPRA REAL de "BOT-01 — Botón" es de $2.20 y esta orden congeló $2.00. El modelo no cambió: cambió el precio de compra.',
+            },
+          ],
+        },
+        grupos: base.grupos.map((g) => ({
+          ...g,
+          renglones: g.renglones.map((r) =>
+            r.id === 1 ? { ...r, cambiosReceta: ['precio-mercado'] } : r,
+          ),
+        })),
+      },
+      isPending: false,
+      isError: false,
+    });
+
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    const aviso = screen.getByTestId('exp-desalineacion');
+    expect(aviso).toHaveTextContent('El modelo no cambió');
+    expect(aviso).not.toHaveTextContent('ya tiene compras'); // NO es el cartel rojo
+    expect(screen.getByTestId('exp-renglon-desalineado')).toHaveTextContent(
+      'Cambió el precio de compra',
+    );
   });
 });

@@ -19,6 +19,7 @@ import type { OrdenSalida } from '../../../contrato/index.js';
 import type { ModeloArteDetalle } from '../../modelos/arte-modelo.js';
 import type { BomModelo } from '../../modelos/bom-modelo.js';
 import type { FotoModeloConUrl } from '../../modelos/fotos-modelo.js';
+import type { RecetaParaImpreso } from '../receta-orden.js';
 import type { AdjuntoOrdenConUrl } from '../adjuntos-orden.js';
 
 import {
@@ -470,6 +471,31 @@ describe('armarDatosImpresoOrden', () => {
   }
 
   /**
+   * Deriva la RECETA DE LA ORDEN (V1-E3d) del fixture del BOM del modelo, aplicando el filtro
+   * `paraProduccion` que antes hacía el propio impreso. Así los escenarios de estas pruebas no
+   * cambian de significado al mover la fuente del papel del modelo a la orden.
+   */
+  function recetaDesdeBom(bom: BomModelo): RecetaParaImpreso {
+    return {
+      telas: bom.telas
+        .filter((t) => t.paraProduccion)
+        .map((t) => ({ nombre: t.nombre, consumoPorPrenda: t.consumoPorPrenda })),
+      avios: bom.avios
+        .filter((a) => a.paraProduccion)
+        .map((a) => ({
+          clave: a.clave,
+          descripcion: a.descripcion,
+          consumoPorPrenda: a.consumoPorPrenda,
+        })),
+      artes: bom.artes.map((a) => ({
+        nombre: a.nombre,
+        tipo: a.tipo,
+        idModeloArte: a.id,
+      })),
+    };
+  }
+
+  /**
    * `deps` con las lecturas de dominio inyectadas (fakes), parametrizable por BOM/fotos/adjuntos y
    * por las telas COMPRADAS (OC ligadas a la orden; vacío = el impreso cae a la tela manual).
    */
@@ -484,7 +510,12 @@ describe('armarDatosImpresoOrden', () => {
     return {
       archivos: archivosFake,
       obtenerOrden: () => Promise.resolve(orden),
+      // El BOM del modelo se sigue leyendo para UNA sola cosa: la FOTO de cada arte (V1-E3d).
       leerBom: () => Promise.resolve(bom),
+      // La RECETA DE LA ORDEN es la que arma las listas del papel. En estas pruebas se deriva del
+      // MISMO fixture del BOM (aplicando el filtro `paraProduccion` que hacía el impreso), para
+      // que las expectativas históricas sigan describiendo exactamente el mismo escenario.
+      leerRecetaParaImpreso: () => Promise.resolve(recetaDesdeBom(bom)),
       leerFotosModelo: () => Promise.resolve(fotos),
       listarAdjuntos: () => Promise.resolve(adjuntos),
       leerTelasCompradas: () => Promise.resolve(telasCompradas),
@@ -1012,6 +1043,7 @@ describe('armarDatosImpresoOrden', () => {
       archivos: archivosFake,
       obtenerOrden: () => Promise.reject(new ErrorNoEncontrado('Orden', 999)),
       leerBom: () => Promise.resolve({ telas: [], avios: [], artes: [] }),
+      leerRecetaParaImpreso: () => Promise.resolve({ telas: [], avios: [], artes: [] }),
       leerFotosModelo: () => Promise.resolve([]),
       listarAdjuntos: () => Promise.resolve([]),
     };

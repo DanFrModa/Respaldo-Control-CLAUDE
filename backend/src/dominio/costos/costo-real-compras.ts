@@ -714,35 +714,40 @@ async function leerUltimosPrecios(
   return { precios, avisos };
 }
 
-/** `select` de la orden para el costo real: empresa + receta `paraCosto` (la que manda al costear). */
+/**
+ * `select` de la orden para el costo real: empresa + **RECETA CONGELADA DE LA ORDEN** `paraCosto`
+ * (la que manda al costear).
+ *
+ * ⭐ V1-E3d (§Post-F9.43): antes leía el BOM del MODELO, así que dos órdenes del mismo modelo se
+ * reconciliaban contra la misma lista aunque hubieran comprado cosas distintas. Ahora cada orden se
+ * reconcilia contra LO SUYO. Los renglones EXCLUIDOS quedan fuera en la consulta.
+ */
 const seleccionOrdenReal = {
   id: true,
   folio: true,
   idEmpresa: true,
-  modelo: {
+  recetaTelas: {
+    where: { paraCosto: true, excluido: false },
     select: {
-      telas: {
-        where: { paraCosto: true },
+      idTela: true,
+      consumoPorPrenda: true,
+      precio: true,
+      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+    },
+  },
+  recetaAvios: {
+    where: { paraCosto: true, excluido: false },
+    select: {
+      idAvio: true,
+      consumoPorPrenda: true,
+      precio: true,
+      avio: {
         select: {
-          idTela: true,
-          consumoPorPrenda: true,
-          tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
-        },
-      },
-      avios: {
-        where: { paraCosto: true },
-        select: {
-          idAvio: true,
-          consumoPorPrenda: true,
-          avio: {
-            select: {
-              clave: true,
-              descripcion: true,
-              unidad: true,
-              precioReferencia: true,
-              esGenerico: true,
-            },
-          },
+          clave: true,
+          descripcion: true,
+          unidad: true,
+          precioReferencia: true,
+          esGenerico: true,
         },
       },
     },
@@ -751,7 +756,7 @@ const seleccionOrdenReal = {
 
 type OrdenReal = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenReal }>;
 
-/** Un material del BOM `paraCosto` normalizado (la fuente de verdad del COSTEO). */
+/** Un material `paraCosto` de la RECETA DE LA ORDEN, normalizado (la verdad del COSTEO). */
 interface MaterialBom {
   clave: string;
   tipo: 'tela' | 'avio';
@@ -764,10 +769,17 @@ interface MaterialBom {
   precioCatalogo: number | null;
 }
 
-/** Normaliza el BOM `paraCosto` del modelo (telas + avíos) a una lista uniforme. */
+/**
+ * Normaliza la RECETA `paraCosto` DE LA ORDEN (telas + avíos) a una lista uniforme (V1-E3d).
+ *
+ * `precioCatalogo` toma **el precio CONGELADO en la orden** y, si esa orden no congeló ninguno
+ * (`null`: recetas anteriores a V1-E3d, backfilleadas por la migración), cae al precio de catálogo
+ * como hasta hoy. Es lo que hace que las ~4,000 órdenes que ya existían costeen EXACTAMENTE igual
+ * que antes de esta etapa, y que las nuevas costeen con su propio precio.
+ */
 function bomParaCosto(orden: OrdenReal): MaterialBom[] {
   return [
-    ...orden.modelo.telas.map((t) => ({
+    ...orden.recetaTelas.map((t) => ({
       clave: `tela-${String(t.idTela)}`,
       tipo: 'tela' as const,
       idTela: t.idTela,
@@ -776,9 +788,9 @@ function bomParaCosto(orden: OrdenReal): MaterialBom[] {
       unidad: t.tela.unidadMedida,
       esGenerico: false,
       consumoPorPrenda: num(t.consumoPorPrenda),
-      precioCatalogo: numOrNull(t.tela.precioSugerido),
+      precioCatalogo: numOrNull(t.precio) ?? numOrNull(t.tela.precioSugerido),
     })),
-    ...orden.modelo.avios.map((a) => ({
+    ...orden.recetaAvios.map((a) => ({
       clave: `avio-${String(a.idAvio)}`,
       tipo: 'avio' as const,
       idTela: null,
@@ -787,7 +799,7 @@ function bomParaCosto(orden: OrdenReal): MaterialBom[] {
       unidad: a.avio.unidad,
       esGenerico: a.avio.esGenerico,
       consumoPorPrenda: num(a.consumoPorPrenda),
-      precioCatalogo: numOrNull(a.avio.precioReferencia),
+      precioCatalogo: numOrNull(a.precio) ?? numOrNull(a.avio.precioReferencia),
     })),
   ];
 }

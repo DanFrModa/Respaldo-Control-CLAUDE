@@ -41,8 +41,10 @@ function bdParaCrear(): ContextoBd {
     idPedidoLinea: 50,
     idModelo: 9,
     cliente: { nombre: 'Liverpool' },
-    // `_count`: insumos de la regla de "orden completa" (requisitos-orden.ts) que trae el include.
-    modelo: { codigo: '501', descripcion: 'Playera', _count: { avios: 2, artes: 1 } },
+    // V1-E3d: la casilla del MODELO + los insumos de la ORDEN (receta liberada + arte de la receta).
+    modelo: { codigo: '501', descripcion: 'Playera', llevaArte: false },
+    recetaLiberadaEn: new Date('2026-08-15T00:00:00Z'),
+    _count: { recetaArtes: 1 },
     maquilero: null,
     etiquetaMarca: null,
     tela: null,
@@ -108,12 +110,28 @@ function bdParaCrear(): ContextoBd {
       create: vi.fn(() => Promise.resolve({ id: 1 })),
       update: vi.fn(() => Promise.resolve({})),
       findFirst: vi.fn(() => Promise.resolve(ordenDetallada)),
+      findUnique: vi.fn(() => Promise.resolve({ recetaLiberadaEn: null })),
     },
     // Insumos de la regla de "orden completa": el alta la recalcula en la misma tx.
     ordenLinea: { count: vi.fn(() => Promise.resolve(1)) },
-    modeloAvio: { count: vi.fn(() => Promise.resolve(2)) },
-    modeloArte: { count: vi.fn(() => Promise.resolve(1)) },
     modelo: { findUnique: vi.fn(() => Promise.resolve({ llevaArte: true })) },
+    // V1-E3d: el alta COPIA la receta del modelo a la orden en la misma tx. El stub la deja vacía
+    // (ese camino tiene sus propias pruebas); aquí solo tiene que no estorbar.
+    ordenTela: { count: vi.fn(() => Promise.resolve(0)), createMany: vi.fn() },
+    ordenAvio: { count: vi.fn(() => Promise.resolve(0)), create: vi.fn(), createMany: vi.fn() },
+    ordenArte: {
+      count: vi.fn(() => Promise.resolve(0)),
+      createMany: vi.fn(),
+    },
+    modeloTela: { findMany: vi.fn(() => Promise.resolve([])) },
+    modeloAvio: { findMany: vi.fn(() => Promise.resolve([])) },
+    modeloArte: { findMany: vi.fn(() => Promise.resolve([])) },
+    modeloAvioTalla: { findMany: vi.fn(() => Promise.resolve([])) },
+    avioProveedor: { findMany: vi.fn(() => Promise.resolve([])) },
+    avioMedida: { findMany: vi.fn(() => Promise.resolve([])) },
+    ordenCompraLinea: { findMany: vi.fn(() => Promise.resolve([])) },
+    // Cinturón del des-completar: la orden recién nacida no tiene actividad de producción.
+    etapaMovimiento: { count: vi.fn(() => Promise.resolve(0)) },
     bitacora: { create: vi.fn(() => Promise.resolve({})) },
     // El alta escribe el evento outbox `orden-creada` en la MISMA tx (R3, B5).
     eventoOutbox: { create: vi.fn(() => Promise.resolve({ id: 1 })) },

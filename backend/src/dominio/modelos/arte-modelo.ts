@@ -52,7 +52,6 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
@@ -371,7 +370,8 @@ export async function crearArte(
       });
 
       await tocarModelo(tx, sesion, idModelo);
-      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
+      // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
+      // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
       await registrarBitacora(tx, sesion, {
         entidad: 'ModeloArte',
         idEntidad: creado.id,
@@ -641,7 +641,8 @@ export async function copiarArteDeOtroModelo(
       });
 
       await tocarModelo(tx, sesion, idModelo);
-      await recalcularEstadoOrdenesDeModelo(tx, sesion, idModelo);
+      // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
+      // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
       await registrarBitacora(tx, sesion, {
         entidad: 'ModeloArte',
         idEntidad: creado.id,

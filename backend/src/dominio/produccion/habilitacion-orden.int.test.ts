@@ -13,6 +13,7 @@ import type {
   Talla,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { habilitacionOrden } from './habilitacion-orden.js';
 
@@ -145,6 +146,9 @@ beforeEach(async () => {
     },
   });
   ordenId = orden.id;
+  // V1-E3d: la habilitación lee la RECETA DE LA ORDEN. La orden se crea aquí directo (sin pasar por
+  // `crearOrden`, que es quien copia la receta), así que se siembra igual que lo hace el alta.
+  await sembrarRecetaDeOrden(cliente, ordenId, modeloId);
 });
 
 describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
@@ -209,20 +213,48 @@ describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
   });
 
   it('REQUERIDO por talla (R18): usa la medida por talla cuando el avío la maneja', async () => {
-    // Hilo por talla: CH 3, M 4 → requerido = 3×10 + 4×20 = 110 (en vez de 2×30 = 60).
-    await cliente.modeloAvio.update({
-      where: { idModelo_idAvio: { idModelo: modeloId, idAvio: avioHilo.id } },
+    // Hilo por talla EN LA RECETA DE LA ORDEN: CH 3, M 4 → requerido = 3×10 + 4×20 = 110
+    // (en vez de 2×30 = 60). V1-E3d: la medida que manda es la de la ORDEN.
+    const renglon = await cliente.ordenAvio.update({
+      where: { idOrden_idAvio: { idOrden: ordenId, idAvio: avioHilo.id } },
       data: { consumoPorTalla: true },
+      select: { id: true },
     });
-    await cliente.modeloAvioTalla.createMany({
+    await cliente.ordenAvioTalla.createMany({
       data: [
-        { idModelo: modeloId, idAvio: avioHilo.id, idTalla: tallaCH.id, consumo: 3 },
-        { idModelo: modeloId, idAvio: avioHilo.id, idTalla: tallaM.id, consumo: 4 },
+        { idOrdenAvio: renglon.id, idTalla: tallaCH.id, consumo: 3 },
+        { idOrdenAvio: renglon.id, idTalla: tallaM.id, consumo: 4 },
       ],
     });
     const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
     const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
     expect(hilo.requerido).toBe(110);
+  });
+
+  it('⭐ V1-E3d: cambiar el BOM del MODELO ya NO cambia lo que surte una orden viva', async () => {
+    // El modelo duplica el consumo del botón y le agrega el cierre. La orden está congelada: sigue
+    // pidiendo 180 botones y NO conoce el cierre. Antes de esta etapa las dos cosas la alcanzaban.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modeloId, idAvio: avioBoton.id } },
+      data: { consumoPorPrenda: 12 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modeloId, idAvio: avioCierre.id, consumoPorPrenda: 1 },
+    });
+
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    expect(h.avios.find((a) => a.idAvio === avioBoton.id)?.requerido).toBe(180);
+    expect(h.avios.find((a) => a.idAvio === avioCierre.id)).toBeUndefined();
+  });
+
+  it('⭐ EL CASO DE LA JARETA: el renglón EXCLUIDO no se surte ni sale como faltante', async () => {
+    await cliente.ordenAvio.update({
+      where: { idOrden_idAvio: { idOrden: ordenId, idAvio: avioHilo.id } },
+      data: { excluido: true, estado: 'ajustado' },
+    });
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    expect(h.avios.find((a) => a.idAvio === avioHilo.id)).toBeUndefined();
+    expect(h.avios).toHaveLength(1);
   });
 
   it('% global capa el enviado al requerido por avío', async () => {

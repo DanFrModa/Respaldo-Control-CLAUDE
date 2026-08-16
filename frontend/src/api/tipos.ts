@@ -859,6 +859,30 @@ export type TipoHitoOrden = HitoOrden['tipo'];
 export type RegistrarHitoCuerpo =
   paths['/api/ruta-critica/ordenes/{id}/hitos']['post']['requestBody']['content']['application/json'];
 
+// ── Receta CONGELADA de la orden (V1-E3d, §Post-F9.43: "el BOM vive en la OP") ──
+
+/** Receta congelada de una orden, con su desalineación contra el BOM del modelo. */
+export type RecetaOrden =
+  paths['/api/ordenes/{id}/receta']['get']['responses']['200']['content']['application/json'];
+/** Renglón de TELA de la receta de la orden. */
+export type RecetaOrdenTela = RecetaOrden['telas'][number];
+/** Renglón de AVÍO de la receta de la orden. */
+export type RecetaOrdenAvio = RecetaOrden['avios'][number];
+/** Renglón de ARTE de la receta de la orden. */
+export type RecetaOrdenArte = RecetaOrden['artes'][number];
+/** Un cambio del BOM del modelo respecto de la receta congelada. */
+export type CambioReceta = RecetaOrden['desalineacion']['cambios'][number];
+/** Estado de revisión de un renglón (sin revisar / revisado / ajustado). */
+export type EstadoRenglonReceta = RecetaOrdenTela['estado'];
+/** Sección de la receta a la que pertenece un renglón. */
+export type TipoRenglonReceta = RecetaOrdenTela['tipo'];
+/** Cuerpo para AGREGAR un renglón a la receta de la orden. */
+export type RecetaAgregarCuerpo =
+  paths['/api/ordenes/{id}/receta/renglones']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para EDITAR un renglón de la receta. */
+export type RecetaEditarCuerpo =
+  paths['/api/ordenes/{id}/receta/renglones/{tipo}/{idRenglon}']['patch']['requestBody']['content']['application/json'];
+
 /** Página de la bandeja "mis tareas" de la RC (`GET /api/ruta-critica/bandeja`). */
 export type BandejaRcPagina =
   paths['/api/ruta-critica/bandeja']['get']['responses']['200']['content']['application/json'];

@@ -86,13 +86,13 @@ async function sembrarCatalogoRc(): Promise<{ idArticulo: number }> {
 
 /** Crea una orden completa (matriz Rojo/CH) con fecha de entrega opcional. */
 async function crearOrdenPrueba(
-  opciones: { fechaEntrega?: string; estado?: 'completa' | 'cancelada' } = {},
+  opciones: { fechaEntrega?: string; estado?: 'completa' | 'cancelada'; idModelo?: number } = {},
 ): Promise<number> {
   const orden = await cliente.orden.create({
     data: {
       folio: BigInt(Math.floor(Math.random() * 1_000_000) + 1),
       idEmpresa,
-      idModelo,
+      idModelo: opciones.idModelo ?? idModelo,
       idCliente: idClienteNegocio,
       estado: opciones.estado ?? 'completa',
       fechaEntrega:
@@ -122,6 +122,50 @@ describe('procesarOrdenCreada (R3, B5)', () => {
     expect(orden?.fechaEntregaRC?.toISOString().slice(0, 10)).toBe('2026-09-01');
     const renglones = await cliente.rutaOrden.count({ where: { idOrden } });
     expect(renglones).toBe(2);
+  });
+
+  it('⭐ V1-E3d: la APLICACIÓN la decide la receta de LA ORDEN, no el arte del MODELO', async () => {
+    // El sexto consumidor que cazó el reviewer: `tieneAplicacion` le preguntaba al `modeloArte`, así
+    // que dos órdenes hermanas —una con el arte excluido de SU receta— recibían la misma plantilla y
+    // los mismos procesos condicionales de estampado. Ahora cada orden responde por lo suyo.
+    await sembrarCatalogoRc();
+    const conAplicacion = await cliente.duracionPorAplicacion.findFirstOrThrow({
+      where: { clave: 'A1' },
+    });
+    const sinAplicacion = await cliente.duracionPorAplicacion.findFirstOrThrow({
+      where: { clave: 'A0' },
+    });
+    // Los dos MODELOS llevan arte: la diferencia va a estar SOLO en la receta de cada orden. Se
+    // usan modelos distintos a propósito, porque `resolverParametros` reusa los parámetros de la
+    // última orden programada del MISMO modelo (F5, "los resurtidos repiten parámetros") y eso
+    // taparía lo que aquí se quiere medir.
+    await cliente.modeloArte.create({ data: { idModelo, nombre: 'Logo pecho', precio: 10 } });
+    const modeloB = await cliente.modelo.create({ data: { codigo: 'RC-B', llevaArte: true } });
+    await cliente.modeloArte.create({
+      data: { idModelo: modeloB.id, nombre: 'Logo pecho', precio: 10 },
+    });
+
+    // Orden A: su receta SÍ trae el arte. Orden B: se lo excluyeron (el caso de la jareta).
+    const idA = await crearOrdenPrueba({ fechaEntrega: '2026-09-01' });
+    const idB = await crearOrdenPrueba({ fechaEntrega: '2026-09-01', idModelo: modeloB.id });
+    await cliente.ordenArte.create({ data: { idOrden: idA, nombre: 'Logo pecho', precio: 10 } });
+    await cliente.ordenArte.create({
+      data: { idOrden: idB, nombre: 'Logo pecho', precio: 10, excluido: true, estado: 'ajustado' },
+    });
+
+    await procesarOrdenCreada({ idEmpresa, idOrden: idA }, bd());
+    await procesarOrdenCreada({ idEmpresa, idOrden: idB }, bd());
+
+    const a = await cliente.orden.findUnique({
+      where: { id: idA },
+      select: { idDuracionAplicacion: true },
+    });
+    const b = await cliente.orden.findUnique({
+      where: { id: idB },
+      select: { idDuracionAplicacion: true },
+    });
+    expect(a?.idDuracionAplicacion).toBe(conAplicacion.id);
+    expect(b?.idDuracionAplicacion).toBe(sinAplicacion.id);
   });
 
   it('REUSA los parámetros de la última orden programada del mismo modelo', async () => {

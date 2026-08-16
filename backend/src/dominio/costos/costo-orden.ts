@@ -4,11 +4,12 @@
  *
  * TRES orígenes del costo de materiales (los dos primeros de doc 06 §3; el REAL lo pidió DANIEL el
  * 26-jul-2026, `DECISIONES.md` §Post-F9.5):
- *  • TEÓRICO (`*Calc`) — calculado en vivo de la receta `paraCosto` × precios VIGENTES (costo ACTUAL,
- *    D1), referido a las piezas CORTADAS (la producción):
- *      telaPorPrenda   = Σ ( ModeloTela.consumoPorPrenda × Tela.precioSugerido )   [paraCosto]
- *      aviosPorPrenda  = Σ ( ModeloAvio.consumoPorPrenda × Avio.precioReferencia ) [paraCosto]
- *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ bordados
+ *  • TEÓRICO (`*Calc`) — calculado de la **RECETA CONGELADA DE LA ORDEN** `paraCosto` (V1-E3d,
+ *    §Post-F9.43) × su precio congelado (o el de catálogo si esa orden no congeló ninguno), referido
+ *    a las piezas CORTADAS (la producción):
+ *      telaPorPrenda   = Σ ( OrdenTela.consumoPorPrenda × (OrdenTela.precio ?? Tela.precioSugerido) )
+ *      aviosPorPrenda  = Σ ( OrdenAvio.consumoPorPrenda × (OrdenAvio.precio ?? Avio.precioReferencia) )
+ *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes de la OP
  *      tela/avios/procesos (TOTALES) = por-prenda × cortado
  *    La REGALÍA NO entra (D2): va sobre la venta (lista de precios).
  *  • REAL DE COMPRAS (`*Real`) — lo REALMENTE comprado: Σ de las líneas de OC autorizada+ ligadas a
@@ -61,10 +62,10 @@ import { num, redondear2 } from './decimales.js';
 type ClienteLectura = ReturnType<typeof clienteLectura>;
 
 /**
- * `select` de la orden con su receta paraCosto (precios vigentes) y su costo guardado. Es un
- * SUPERCONJUNTO de `seleccionOrdenReal` (`costo-real-compras.ts`): trae también el `idTela`/`idAvio`
- * y el nombre/unidad de cada material del BOM, para que el motor del costo REAL pueda reusar esta
- * MISMA lectura (una sola consulta de la orden, también dentro de la transacción de guardado).
+ * `select` de la orden con su RECETA CONGELADA `paraCosto` y su costo guardado. Es un SUPERCONJUNTO
+ * de `seleccionOrdenReal` (`costo-real-compras.ts`): trae también el `idTela`/`idAvio` y el
+ * nombre/unidad de cada material, para que el motor del costo REAL pueda reusar esta MISMA lectura
+ * (una sola consulta de la orden, también dentro de la transacción de guardado).
  */
 const seleccionOrdenCosto = {
   id: true,
@@ -76,38 +77,37 @@ const seleccionOrdenCosto = {
   maquilaOrd: true,
   aplicacionOrd: true,
   cliente: { select: { nombre: true } },
-  modelo: {
+  modelo: { select: { codigo: true, descripcion: true, maquilaBase: true } },
+  // ⭐ V1-E3d (§Post-F9.43): el costeo lee la RECETA CONGELADA DE LA ORDEN, no el BOM del modelo.
+  // Los renglones EXCLUIDOS (la jareta que esta orden no lleva) quedan fuera en la consulta: no se
+  // costean. Es el "cuesten distinto" del criterio de cierre de la etapa.
+  recetaTelas: {
+    where: { paraCosto: true, excluido: false },
     select: {
-      codigo: true,
-      descripcion: true,
-      maquilaBase: true,
-      telas: {
-        where: { paraCosto: true },
-        select: {
-          idTela: true,
-          consumoPorPrenda: true,
-          tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
-        },
-      },
-      avios: {
-        where: { paraCosto: true },
-        select: {
-          idAvio: true,
-          consumoPorPrenda: true,
-          avio: {
-            select: {
-              clave: true,
-              descripcion: true,
-              unidad: true,
-              precioReferencia: true,
-              esGenerico: true,
-            },
-          },
-        },
-      },
-      artes: { select: { precio: true } },
+      idTela: true,
+      consumoPorPrenda: true,
+      precio: true,
+      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
     },
   },
+  recetaAvios: {
+    where: { paraCosto: true, excluido: false },
+    select: {
+      idAvio: true,
+      consumoPorPrenda: true,
+      precio: true,
+      avio: {
+        select: {
+          clave: true,
+          descripcion: true,
+          unidad: true,
+          precioReferencia: true,
+          esGenerico: true,
+        },
+      },
+    },
+  },
+  recetaArtes: { where: { excluido: false }, select: { precio: true } },
   costoOrden: true,
 } satisfies Prisma.OrdenSelect;
 
@@ -120,20 +120,34 @@ export interface TeoricoPorPrenda {
   procesos: number;
 }
 
-/** Calcula el costo teórico POR PRENDA de una orden (receta × precios vigentes + procesos). */
+/**
+ * Calcula el costo teórico POR PRENDA de una orden (**receta de la ORDEN** × precio + procesos).
+ *
+ * ⭐ V1-E3d (§Post-F9.43): el precio de cada renglón es **el que la orden congeló**; si esa orden no
+ * congeló ninguno (`precio` NULL: recetas anteriores a esta etapa, backfilleadas por la migración)
+ * cae al precio de catálogo, que es exactamente lo que hacía antes. Así el histórico costea igual
+ * que ayer y lo nuevo costea con SU precio — que es lo que Daniel pidió: *"el precio del modelo es
+ * referencia; el real se define en la OP"*.
+ */
 export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
-  const tela = orden.modelo.telas.reduce(
-    (s, t) => s + num(t.consumoPorPrenda) * num(t.tela.precioSugerido),
+  const tela = orden.recetaTelas.reduce(
+    (s, t) =>
+      s +
+      num(t.consumoPorPrenda) *
+        (t.precio === null ? num(t.tela.precioSugerido) : t.precio.toNumber()),
     0,
   );
-  const avios = orden.modelo.avios.reduce(
-    (s, a) => s + num(a.consumoPorPrenda) * num(a.avio.precioReferencia),
+  const avios = orden.recetaAvios.reduce(
+    (s, a) =>
+      s +
+      num(a.consumoPorPrenda) *
+        (a.precio === null ? num(a.avio.precioReferencia) : a.precio.toNumber()),
     0,
   );
-  // ARTE: desde V1-E3d (§Post-F9.35) el arte vive DENTRO del modelo y tiene UN solo precio — ya no
-  // hay cascada `ModeloBordado.precio ?? Bordado.precio`, porque el catálogo desapareció. La
-  // migración resolvió esa cascada al copiar, así que el resultado es idéntico al de antes.
-  const arte = orden.modelo.artes.reduce((s, a) => s + num(a.precio), 0);
+  // ARTE: desde V1-E3d el arte vive congelado en la ORDEN, con SU precio (§Post-F9.35: "el precio
+  // del modelo es referencia; el real se define en la OP"). ⚠️ Entra UNA vez, SIN multiplicar por
+  // cantidad — invariante heredada de la pieza A y cubierta por `costo-orden.test.ts`.
+  const arte = orden.recetaArtes.reduce((s, a) => s + num(a.precio), 0);
   // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + arte.
   const maquila =
     orden.maquilaOrd == null ? num(orden.modelo.maquilaBase) : orden.maquilaOrd.toNumber();

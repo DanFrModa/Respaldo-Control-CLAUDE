@@ -129,6 +129,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { copiarRecetaDelModelo } from './receta-orden.js';
 import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
@@ -167,10 +168,11 @@ type OrdenConDetalle = Orden & {
   modelo: {
     codigo: string;
     descripcion: string | null;
-    /** Bandera + conteos del BOM: insumos de la regla de "orden completa" (requisitos-orden.ts). */
+    /** Casilla "lleva arte": el único insumo de la regla que sigue viviendo en el MODELO. */
     llevaArte: boolean;
-    _count: { avios: number; artes: number };
   };
+  /** Artes VIVOS de la RECETA de esta orden (insumo de la regla, V1-E3d). */
+  _count: { recetaArtes: number };
   cliente: { nombre: string };
   maquilero: { nombre: string } | null;
   etiquetaMarca: { nombre: string } | null;
@@ -194,13 +196,13 @@ const incluirDetalle = {
     select: {
       codigo: true,
       descripcion: true,
-      // Insumos de la regla de "orden completa": la bandera "lleva arte" del modelo + los conteos
-      // de avíos de PRODUCCIÓN y artes del BOM. Van como `_count` (dos conteos en la misma
-      // consulta) para no traer las recetas enteras.
+      // Único insumo de la regla que sigue en el MODELO (V1-E3d): la casilla "lleva arte". Los
+      // otros dos son de la ORDEN (receta liberada + artes de la receta) y viajan abajo.
       llevaArte: true,
-      _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
     },
   },
+  // Conteo del arte VIVO de la receta de ESTA orden, sin traer la receta entera.
+  _count: { select: { recetaArtes: { where: { excluido: false } } } },
   cliente: { select: { nombre: true } },
   maquilero: { select: { nombre: true } },
   etiquetaMarca: { select: { nombre: true } },
@@ -538,8 +540,10 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     // Transparencia del estado (Daniel 26-jul-2026): la orden dice POR QUÉ está como está.
     requisitos: requisitosOrden({
       renglonesMatriz: orden.lineas.length,
-      aviosProduccion: orden.modelo._count.avios,
-      artesModelo: orden.modelo._count.artes,
+      // V1-E3d: el requisito ya no le pregunta al MODELO si tiene avíos, sino a ESTA orden si su
+      // receta está liberada y si trae su arte.
+      recetaLiberada: orden.recetaLiberadaEn !== null,
+      artesOrden: orden._count.recetaArtes,
       llevaArte: orden.modelo.llevaArte,
     }),
     motivoCancelada: orden.motivoCancelada,
@@ -744,6 +748,15 @@ export async function crearOrden(
     if (datos.lineas !== undefined && datos.lineas.length > 0) {
       await sincronizarMatriz(tx, sesion, orden.id, datos.lineas);
     }
+
+    // ⭐ V1-E3d (§Post-F9.43): LA RECETA SE CONGELA AQUÍ. Daniel eligió copiarla AL CREAR la orden
+    // (sobre la alternativa "al explotar el MRP") para que se revise y ajuste ANTES de comprar nada.
+    // Desde este punto la orden vive de SU receta: cambiar el BOM del modelo ya no la alcanza.
+    const receta = await copiarRecetaDelModelo(tx, sesion, {
+      id: orden.id,
+      idEmpresa: origen.idEmpresa,
+      idModelo: origen.idModelo,
+    });
     // `tocarAuditoria: false`: la orden ACABA de nacer con su `datosCreacion`; si el recálculo no
     // cambia nada, no tiene por qué emitir un UPDATE extra ni re-sellar `modificadoEn`.
     await recalcularEstadoOrden(tx, sesion, orden, { tocarAuditoria: false });
@@ -758,6 +771,7 @@ export async function crearOrden(
         idModelo: origen.idModelo,
         idCliente: origen.idCliente,
         renglones: datos.lineas?.length ?? 0,
+        receta: { ...receta },
       },
     });
 

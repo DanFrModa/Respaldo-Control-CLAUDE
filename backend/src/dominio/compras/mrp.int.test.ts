@@ -26,6 +26,7 @@ import type {
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
@@ -92,7 +93,31 @@ async function crearOrden(): Promise<number> {
       },
     },
   });
+  // V1-E3d: la explosión lee la RECETA DE LA ORDEN, y la orden se crea aquí directo (sin pasar por
+  // `crearOrden` del dominio, que es quien la copia). Se siembra igual que lo hace el alta, ya
+  // LIBERADA — la puerta de compra tiene su propia batería en `receta-orden.int.test.ts`.
+  await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
   return orden.id;
+}
+
+/**
+ * ⭐ V1-E3d (§Post-F9.43): el MRP explota la **RECETA CONGELADA DE LA ORDEN**, no el BOM del modelo.
+ *
+ * Esta batería prueba la MATEMÁTICA del MRP (requerido, neteo de genéricos, amarres, precios,
+ * diffs), y sus casos la preparan tocando el BOM del MODELO — que es la forma corta de describir
+ * "una orden cuya receta dice esto". Para que sigan describiendo lo mismo, aquí se RE-COPIA la
+ * receta de la orden antes de explotar: es el equivalente exacto de haber creado la orden DESPUÉS
+ * del cambio del modelo.
+ *
+ * Que el cambio del modelo NO alcance a una orden ya creada —lo que la etapa vino a arreglar— tiene
+ * su propia batería en `produccion/receta-orden.int.test.ts` y en `produccion/habilitacion-orden.int.test.ts`.
+ */
+async function explosionarConRecetaFresca(): Promise<Awaited<ReturnType<typeof explosionarOrden>>> {
+  await cliente.ordenTela.deleteMany({ where: { idOrden } });
+  await cliente.ordenAvio.deleteMany({ where: { idOrden } });
+  await cliente.ordenArte.deleteMany({ where: { idOrden } });
+  await sembrarRecetaDeOrden(cliente, idOrden, modelo.id);
+  return explosionarOrden(sesion(), idOrden, bd());
 }
 
 beforeAll(() => {
@@ -161,7 +186,7 @@ beforeEach(async () => {
 
 describe('Explosión (R3) — requerido = consumo × piezas, telas + avíos', () => {
   it('explosiona el BOM contra la matriz y agrupa por proveedor sugerido', async () => {
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
 
     expect(ex.totalPiezas).toBe(30);
     expect(ex.regenerado).toBe(false);
@@ -193,7 +218,7 @@ describe('Explosión (R3) — requerido = consumo × piezas, telas + avíos', ()
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
       data: { paraProduccion: false },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const todos = ex.grupos.flatMap((g) => g.renglones);
     expect(todos.find((r) => r.idAvio === avioBoton.id)).toBeUndefined();
     expect(todos.find((r) => r.idTela === telaFelpa.id)).toBeDefined();
@@ -205,7 +230,7 @@ describe('Explosión (R3) — requerido = consumo × piezas, telas + avíos', ()
       where: { idAvio_idProveedor: { idAvio: avioBoton.id, idProveedor: provCaro.id } },
       data: { precio: 2 },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(Math.min(provBarato.id, provCaro.id));
   });
@@ -230,7 +255,7 @@ describe('Explosión — neteo de genéricos contra el kardex (decisión d, D3)'
       bd(),
     );
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
     expect(hilo?.existenciaStock).toBeCloseTo(100);
     expect(hilo?.cantidadAComprar).toBeCloseTo(0);
@@ -253,7 +278,7 @@ describe('Explosión — neteo de genéricos contra el kardex (decisión d, D3)'
       },
       bd(),
     );
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
     expect(hilo?.cantidadAComprar).toBeCloseTo(35); // 60 − 25
     expect(hilo?.estadoGenerico).toBe('faltante-parcial');
@@ -262,13 +287,13 @@ describe('Explosión — neteo de genéricos contra el kardex (decisión d, D3)'
 
 describe('Explosión — snapshot regenerable + diff', () => {
   it('regenerar tras cambiar el BOM reporta cantidad-cambiada', async () => {
-    await explosionarOrden(sesion(), idOrden, bd()); // snapshot 1
+    await explosionarConRecetaFresca(); // snapshot 1
     // Cambia el consumo de felpa: 1.5 → 2 m.
     await cliente.modeloTela.update({
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { consumoPorPrenda: 2 },
     });
-    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const ex2 = await explosionarConRecetaFresca();
     expect(ex2.regenerado).toBe(true);
     expect(ex2.huboCambios).toBe(true);
     const felpa = ex2.grupos.flatMap((g) => g.renglones).find((r) => r.idTela === telaFelpa.id);
@@ -280,11 +305,11 @@ describe('Explosión — snapshot regenerable + diff', () => {
   });
 
   it('material retirado del BOM aparece como eliminado en la salida', async () => {
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     await cliente.modeloAvio.delete({
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
     });
-    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const ex2 = await explosionarConRecetaFresca();
     const boton = ex2.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
     expect(boton?.diff).toBe('eliminado');
   });
@@ -292,7 +317,7 @@ describe('Explosión — snapshot regenerable + diff', () => {
 
 describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
   it('genera una OC por proveedor con líneas ligadas a la orden', async () => {
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
       idOrden,
@@ -317,7 +342,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
   });
 
   it('respeta la selección de renglones (no compra lo no seleccionado)', async () => {
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id)!;
     // Selecciona solo el botón explícitamente.
     const resultado = await generarOCDesdeExplosion(
@@ -333,7 +358,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
 
 describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', () => {
   it('refleja pendiente → en-oc → recibido conforme avanza el flujo', async () => {
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
 
     // 1) Antes de comprar: el botón está pendiente.
     const t0 = await estatusMaterialesOrden(sesion(), idOrden, bd());
@@ -372,7 +397,7 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
   });
 
   it('una línea de OC libre ligada a la orden sale como no-identificado', async () => {
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     // OC con una línea LIBRE ligada a la orden (no es del BOM).
     await cliente.ordenCompra.create({
       data: {
@@ -401,7 +426,7 @@ const renglonAvio = (ex: Awaited<ReturnType<typeof explosionarOrden>>, idAvio: n
 
 describe('MRP F8-E6 — NO-REGRESIÓN F4 (sin amarres ni consumo por talla)', () => {
   it('un modelo sin amarres y sin consumo por talla explota IDÉNTICO a F4', async () => {
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     // Sin nada que advertir.
     expect(ex.avisos).toEqual([]);
     // Tela sin amarre → sin proveedor/precio sugerido (captura manual, como antes de F8).
@@ -426,7 +451,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tp.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
     expect(felpa?.precioSugerido).toBeCloseTo(10);
@@ -451,7 +476,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tp.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd()); // la orden es sólo Rojo
+    const ex = await explosionarConRecetaFresca(); // la orden es sólo Rojo
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.precioSugerido).toBeCloseTo(12); // precio del color Rojo
     expect(ex.avisos).toEqual([]);
@@ -485,7 +510,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tp.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.precioSugerido).toBeCloseTo(10); // precio BASE (no por color)
     const aviso = ex.avisos.find((a) => a.includes('varios colores'));
@@ -505,7 +530,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tp.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene
     expect(felpa?.precioSugerido).toBeCloseTo(10);
@@ -520,7 +545,7 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
       data: { idAvioProveedor: provCaro.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(provCaro.id);
     expect(boton?.precioSugerido).toBeCloseTo(3);
@@ -536,7 +561,7 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
       data: { idAvioProveedor: provSinPrecio.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(provBarato.id); // fallback
     expect(boton?.precioSugerido).toBeCloseTo(2);
@@ -553,7 +578,7 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
       data: { idAvioProveedor: provInactivo.id },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene (Desarrollo lo eligió)
     expect(boton?.precioSugerido).toBeCloseTo(9);
@@ -574,7 +599,7 @@ describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = 
     await cliente.modeloAvio.create({
       data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const zip = renglonAvio(ex, avioZip.id);
     // Antes de F8-E6 el fallback ignoraba el factor del avío (habría dado 10); ahora 10 ÷ 2 = 5.
     expect(zip?.precioSugerido).toBeCloseTo(5);
@@ -592,14 +617,14 @@ describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = 
       data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
     });
     // Sin amarre (más barato).
-    const exSin = await explosionarOrden(sesion(), idOrden, bd());
+    const exSin = await explosionarConRecetaFresca();
     const zipSin = renglonAvio(exSin, avioZip.id);
     // Con amarre al MISMO proveedor.
     await cliente.modeloAvio.update({
       where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioZip.id } },
       data: { idAvioProveedor: prov.id },
     });
-    const exCon = await explosionarOrden(sesion(), idOrden, bd());
+    const exCon = await explosionarConRecetaFresca();
     const zipCon = renglonAvio(exCon, avioZip.id);
     expect(zipSin?.precioSugerido).toBeCloseTo(5); // 20 ÷ 4
     expect(zipCon?.precioSugerido).toBeCloseTo(zipSin!.precioSugerido!);
@@ -615,9 +640,9 @@ describe('MRP F8-E6 — diff incluye proveedor/precio del amarre (FIX 6)', () =>
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tp.id },
     });
-    await explosionarOrden(sesion(), idOrden, bd()); // snapshot 1: felpa @ $10
+    await explosionarConRecetaFresca(); // snapshot 1: felpa @ $10
     await cliente.telaProveedor.update({ where: { id: tp.id }, data: { precio: 15 } });
-    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const ex2 = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex2, telaFelpa.id);
     expect(felpa?.precioSugerido).toBeCloseTo(15);
     expect(felpa?.diff).toBe('cantidad-cambiada'); // cambió el PRECIO, misma cantidad
@@ -635,12 +660,12 @@ describe('MRP F8-E6 — diff incluye proveedor/precio del amarre (FIX 6)', () =>
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tpA.id },
     });
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     await cliente.modeloTela.update({
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: tpB.id },
     });
-    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const ex2 = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex2, telaFelpa.id);
     expect(felpa?.idProveedorSugerido).toBe(provCaro.id);
     expect(felpa?.diff).toBe('cantidad-cambiada'); // mismo precio, distinto proveedor
@@ -660,7 +685,7 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
         { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaM.id, consumo: 7 },
       ],
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.cantidadRequerida).toBeCloseTo(190);
     expect(ex.avisos).toEqual([]);
@@ -675,7 +700,7 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
     await cliente.modeloAvioTalla.create({
       data: { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 5 },
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.cantidadRequerida).toBeCloseTo(170);
     expect(ex.avisos.some((a) => a.includes('sin medida por talla'))).toBe(true);
@@ -708,7 +733,7 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
       },
       bd(),
     );
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const hilo = renglonAvio(ex, avioHilo.id);
     expect(hilo?.cantidadRequerida).toBeCloseTo(110);
     expect(hilo?.existenciaStock).toBeCloseTo(50);
@@ -722,7 +747,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
   // volver a crear la orden aquí chocaría contra el unique (idEmpresa, folio).
 
   it('hereda la fecha de entrega de la ORDEN y la dirección FAVORITA del catálogo', async () => {
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
       idOrden,
@@ -741,7 +766,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     const otra = await cliente.direccionEntrega.create({
       data: { nombre: 'Bodega Montaño', direccion: 'Calle 5 #10' },
     });
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
       idOrden,
@@ -756,7 +781,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
 
   it('sin fecha en la orden Y sin fecha capturada, dice QUÉ falta (no genera a medias)', async () => {
     await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
 
     await expect(
       generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
@@ -766,7 +791,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
 
   it('sin dirección favorita Y sin dirección capturada, dice QUÉ falta', async () => {
     await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
 
     await expect(
       generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
@@ -788,7 +813,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
       where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
       data: { idTelaProveedor: amarre.id },
     });
-    await explosionarOrden(sesion(), idOrden, bd());
+    await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
       idOrden,
@@ -871,7 +896,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idTela: telaFelpa.id,
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const felpa = renglonTela(ex, telaFelpa.id);
     // El proveedor NO cambia (lo fija el amarre, R1/F4)…
     expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
@@ -895,7 +920,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idTela: telaFelpa.id,
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(10);
   });
 
@@ -914,7 +939,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idTela: telaFelpa.id,
       estatus: 'borrador',
     });
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(10);
   });
 
@@ -940,7 +965,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idTela: telaFelpa.id,
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd()); // la orden es sólo Rojo
+    const ex = await explosionarConRecetaFresca(); // la orden es sólo Rojo
     // Gana el precio del COLOR (12): es más específico que una compra ciega al color.
     expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(12);
   });
@@ -961,7 +986,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idAvio: avioBoton.id,
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(provBarato.id); // R1 intacto
     expect(boton?.precioSugerido).toBeCloseTo(2.5); // lo que ÉL cobró, no el $0.50 del otro
@@ -985,7 +1010,7 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
       idAvio: avioBoton.id,
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const boton = renglonAvio(ex, avioBoton.id);
     expect(boton?.idProveedorSugerido).toBe(provCaro.id);
     expect(boton?.precioSugerido).toBeCloseTo(4);
@@ -1040,7 +1065,7 @@ describe('MRP — el AVISO de multi-color nombra la fuente REAL del precio (V1-E
       },
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     // El precio de la línea es el de la última compra (17), no el base (10) ni los de color.
     expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(17);
     const aviso = ex.avisos.find((a) => a.includes('varios colores'));
@@ -1080,7 +1105,7 @@ describe('MRP — el AVISO de multi-color nombra la fuente REAL del precio (V1-E
       },
     });
 
-    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const ex = await explosionarConRecetaFresca();
     const aviso = ex.avisos.find((a) => a.includes('varios colores'));
     expect(aviso).toBeDefined();
     // Antes también aquí mentía diciendo "precio base": ese proveedor no tiene precio base.

@@ -6,8 +6,21 @@
  *
  * Tres operaciones, toda la lógica AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan:
  *
- *  1. `explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda del BOM `paraProduccion` × piezas
- *     color×talla de la orden ), para TELAS y AVÍOS por igual. PERSISTE un SNAPSHOT regenerable
+ * ⭐ **V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
+ * modelo.** Daniel: *"El BOM debe de vivir en la OP"*. Consecuencias, todas buscadas:
+ *  • Dos órdenes del mismo modelo pueden **comprar cosas distintas** (una con jareta y otra sin).
+ *  • Cambiar el BOM del modelo **ya no cambia lo que compra una orden viva**: si el cambio debe
+ *    bajar, alguien lo baja a mano desde la receta de esa orden ("restaurar renglón").
+ *  • **La puerta**: sin la receta LIBERADA por Desarrollo no se explota ni se genera OC
+ *    (`exigirRecetaLiberada`). Cortar y producir NO se bloquean.
+ *  • El **precio** de la línea de OC NO sale del precio congelado en la receta: sigue saliendo de la
+ *    última compra real al proveedor al que se le compra (§Post-F9.48/V1-E3e). La receta aporta
+ *    **qué**, **cuánto** y **a quién** (el amarre); el precio congelado es el que COSTEA la orden.
+ *    Las dos decisiones hablan de momentos distintos: congelar es del día que nació la orden,
+ *    comprar es del día que se compra.
+ *
+ *  1. `explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda de la RECETA DE LA ORDEN
+ *     `paraProduccion` y no excluida × piezas color×talla de la orden ), para TELAS y AVÍOS. PERSISTE un SNAPSHOT regenerable
  *     (`RequerimientoOrden`): congela el cálculo aunque el BOM cambie después. Regenerar = borrar el
  *     snapshot previo de la orden y reescribirlo en UNA transacción (A2/D3), devolviendo el DIFF
  *     contra el snapshot viejo (nuevo/eliminado/cantidad-cambiada) para mostrarlo. Avíos GENÉRICOS
@@ -80,6 +93,7 @@ import type {
   EstatusMaterialFila,
   EstatusMaterial,
 } from '../../contrato/index.js';
+import type { TipoCambioRecetaClave } from '../../contrato/index.js';
 import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -107,6 +121,7 @@ import {
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
 import { requeridoAvioReceta } from '../produccion/receta-avios.js';
+import { desalineacionDeOrden, exigirRecetaLiberada } from '../produccion/receta-orden.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 
@@ -132,61 +147,63 @@ interface RequerimientoCalculado {
 }
 
 /**
- * Selección de la orden para la explosión (BOM del modelo + matriz). Desde F8-E6 trae también los
- * AMARRES de precio de Desarrollo (`ModeloTela.idTelaProveedor` con su `TelaProveedor` + colores;
- * `ModeloAvio.idAvioProveedor` + los `AvioProveedor` del avío) y, en la matriz, el `idColor` del
- * renglón y el `idTalla`/etiqueta de cada cantidad (para el precio-por-color y el consumo por talla R18).
+ * Selección de la orden para la explosión (RECETA CONGELADA DE LA ORDEN + matriz, V1-E3d). Trae los
+ * AMARRES de precio heredados de Desarrollo (`OrdenTela.idTelaProveedor` con su `TelaProveedor` +
+ * colores; `OrdenAvio.idAvioProveedor` + los `AvioProveedor` del avío) y, en la matriz, el `idColor`
+ * del renglón y el `idTalla`/etiqueta de cada cantidad (precio-por-color y consumo por talla R18).
  */
 const seleccionOrdenExplosion = {
   id: true,
   folio: true,
   idEmpresa: true,
   idModelo: true,
-  modelo: {
+  modelo: { select: { codigo: true } },
+  // ⭐ V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
+  // modelo. Los renglones EXCLUIDOS (la jareta que esta orden no lleva) se filtran en la consulta:
+  // para el MRP simplemente no existen. El filtro `paraProduccion` se conserva TAL CUAL, solo que
+  // ahora sobre la bandera de la orden → cero cambio de alcance.
+  recetaTelas: {
+    where: { excluido: false },
     select: {
-      codigo: true,
-      telas: {
+      idTela: true,
+      consumoPorPrenda: true,
+      paraProduccion: true,
+      idTelaProveedor: true,
+      telaProveedor: {
         select: {
-          idTela: true,
-          consumoPorPrenda: true,
-          paraProduccion: true,
-          idTelaProveedor: true,
-          telaProveedor: {
+          idProveedor: true,
+          precio: true,
+          manejaPrecioPorColor: true,
+          proveedor: { select: { nombre: true, activo: true } },
+          colores: { select: { idColor: true, precio: true } },
+        },
+      },
+      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+    },
+  },
+  recetaAvios: {
+    where: { excluido: false },
+    select: {
+      idAvio: true,
+      consumoPorPrenda: true,
+      consumoPorTalla: true,
+      paraProduccion: true,
+      idAvioProveedor: true,
+      tallas: { select: { idTalla: true, consumo: true } },
+      avio: {
+        select: {
+          clave: true,
+          descripcion: true,
+          unidad: true,
+          esGenerico: true,
+          precioReferencia: true,
+          factorConversion: true,
+          proveedores: {
             select: {
               idProveedor: true,
               precio: true,
-              manejaPrecioPorColor: true,
-              proveedor: { select: { nombre: true, activo: true } },
-              colores: { select: { idColor: true, precio: true } },
-            },
-          },
-          tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
-        },
-      },
-      avios: {
-        select: {
-          idAvio: true,
-          consumoPorPrenda: true,
-          consumoPorTalla: true,
-          paraProduccion: true,
-          idAvioProveedor: true,
-          tallas: { select: { idTalla: true, consumo: true } },
-          avio: {
-            select: {
-              clave: true,
-              descripcion: true,
-              unidad: true,
-              esGenerico: true,
-              precioReferencia: true,
               factorConversion: true,
-              proveedores: {
-                select: {
-                  idProveedor: true,
-                  precio: true,
-                  factorConversion: true,
-                  proveedor: { select: { nombre: true, activo: true } },
-                },
-              },
+              proveedor: { select: { nombre: true, activo: true } },
             },
           },
         },
@@ -201,12 +218,12 @@ const seleccionOrdenExplosion = {
   },
 } satisfies Prisma.OrdenSelect;
 
-/** Orden cargada con lo que la explosión necesita (BOM del modelo + matriz + amarres, F8-E6). */
+/** Orden cargada con lo que la explosión necesita (receta congelada + matriz + amarres). */
 type OrdenParaExplosion = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenExplosion }>;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-/** Carga la orden (de la empresa activa, A9) con su BOM y matriz, o lanza `ErrorNoEncontrado`. */
+/** Carga la orden (empresa activa, A9) con su RECETA y matriz, o lanza `ErrorNoEncontrado`. */
 async function cargarOrden(
   tx: Tx,
   idOrden: number,
@@ -333,7 +350,7 @@ function fuenteDelPrecioTela(origen: OrigenPrecioTela, desdeUltimaCompra: boolea
 }
 
 /**
- * Resuelve proveedor/precio de una TELA del BOM heredando el AMARRE de Desarrollo (F8-E6). Sin amarre →
+ * Resuelve proveedor/precio de una TELA de la receta heredando el AMARRE de Desarrollo (F8-E6). Sin amarre →
  * NULL (como antes de F8: captura manual, D5). Con amarre → `idProveedorSugerido` = el proveedor elegido
  * (aunque el precio termine saliendo del sugerido genérico: a ese proveedor se le compra) y el precio se
  * resuelve con la cascada `resolverPrecioTela`. Precio-por-color: las telas del MRP se consumen por
@@ -352,7 +369,7 @@ function fuenteDelPrecioTela(origen: OrigenPrecioTela, desdeUltimaCompra: boolea
  * este aviso la OC se crearía a un proveedor de baja en silencio.
  */
 function resolverProveedorPrecioTela(
-  mt: OrdenParaExplosion['modelo']['telas'][number],
+  mt: OrdenParaExplosion['recetaTelas'][number],
   colores: number[],
   avisos: string[],
   ultimos: UltimosPreciosCompra,
@@ -433,7 +450,7 @@ function resolverProveedorPrecioTela(
  * fallback F4 —que sí filtra activos— y no hace falta avisar (el amarrado inactivo no se usa).
  */
 function resolverProveedorPrecioAvioAmarrado(
-  ma: OrdenParaExplosion['modelo']['avios'][number],
+  ma: OrdenParaExplosion['recetaAvios'][number],
   avisos: string[],
   ultimos: UltimosPreciosCompra,
 ): ProveedorPrecioResuelto | null {
@@ -481,7 +498,7 @@ function resolverProveedorPrecioAvioAmarrado(
  * aquí sólo arma el AVISO con las etiquetas de las tallas que cayeron al consumo por prenda.
  */
 function requeridoAvio(
-  ma: OrdenParaExplosion['modelo']['avios'][number],
+  ma: OrdenParaExplosion['recetaAvios'][number],
   totalPiezas: number,
   piezasPorTalla: Map<number, { piezas: number; etiqueta: string }>,
   avisos: string[],
@@ -575,20 +592,20 @@ async function calcularRequerimientos(
   const resultado: RequerimientoCalculado[] = [];
   const colores = coloresDeOrden(orden);
   const piezasPorTalla = piezasPorTallaOrden(orden);
-  // ⭐ D1/§Post-F9.48: últimas compras REALES de todo el BOM, EN UN LOTE y acotadas a la empresa de
-  // la orden (A9). Solo se usa el mapa POR PROVEEDOR: la línea de OC jamás nace con el precio de un
-  // tercero. Si el BOM está vacío, ni se consulta.
+  // ⭐ D1/§Post-F9.48: últimas compras REALES de toda la RECETA, EN UN LOTE y acotadas a la empresa
+  // de la orden (A9). Solo se usa el mapa POR PROVEEDOR: la línea de OC jamás nace con el precio de
+  // un tercero. Si la receta está vacía, ni se consulta.
   const materiales = {
-    telas: orden.modelo.telas.filter((t) => t.paraProduccion).map((t) => t.idTela),
-    avios: orden.modelo.avios.filter((a) => a.paraProduccion).map((a) => a.idAvio),
+    telas: orden.recetaTelas.filter((t) => t.paraProduccion).map((t) => t.idTela),
+    avios: orden.recetaAvios.filter((a) => a.paraProduccion).map((a) => a.idAvio),
   };
   const ultimos =
     materiales.telas.length === 0 && materiales.avios.length === 0
       ? SIN_ULTIMOS_PRECIOS
       : await leerUltimosPreciosCompra(tx, orden.idEmpresa, materiales);
 
-  // ── TELAS del BOM (paraProduccion) ──
-  for (const mt of orden.modelo.telas) {
+  // ── TELAS de la RECETA DE LA ORDEN (paraProduccion, no excluidas) ──
+  for (const mt of orden.recetaTelas) {
     if (!mt.paraProduccion) continue;
     const requerida = num(mt.consumoPorPrenda) * totalPiezas;
     const sugerido = resolverProveedorPrecioTela(mt, colores, avisos, ultimos);
@@ -608,8 +625,8 @@ async function calcularRequerimientos(
     });
   }
 
-  // ── AVÍOS del BOM (paraProduccion) ──
-  for (const ma of orden.modelo.avios) {
+  // ── AVÍOS de la RECETA DE LA ORDEN (paraProduccion, no excluidos) ──
+  for (const ma of orden.recetaAvios) {
     if (!ma.paraProduccion) continue;
     const requerida = requeridoAvio(ma, totalPiezas, piezasPorTalla, avisos);
     const esGenerico = ma.avio.esGenerico;
@@ -673,6 +690,8 @@ function aRequerimientoSalida(
     proveedorSugerido: { nombre: string } | null;
   },
   diff: DiffRequerimiento,
+  /** Cambios del modelo que afectan a ESTE material (§Post-F9.43(d)); vacío = nada que avisar. */
+  cambiosReceta: TipoCambioRecetaClave[] = [],
 ): RequerimientoSalida {
   const tipo: 'tela' | 'avio' = fila.idTela !== null ? 'tela' : 'avio';
   const material =
@@ -700,6 +719,7 @@ function aRequerimientoSalida(
     proveedorSugerido: fila.proveedorSugerido?.nombre ?? null,
     precioSugerido: fila.precioSugerido === null ? null : Number(fila.precioSugerido),
     diff,
+    cambiosReceta,
   };
 }
 
@@ -748,7 +768,13 @@ export async function explosionarOrden(
   const idEmpresa = sesion.idEmpresaActiva;
 
   return enTransaccion(async (tx) => {
+    // La orden PRIMERO (A9): si es de otra empresa se responde 404 y no se dice nada más de ella —
+    // ni siquiera si su receta está liberada.
     const orden = await cargarOrden(tx, idOrden, idEmpresa);
+    // ⭐ LA PUERTA (V1-E3d, §Post-F9.43(c)): sin la receta liberada por Desarrollo no se explota el
+    // MRP. La puerta va antes de COMPRAR, no antes de producir: cortar, enviar a maquila, recibir y
+    // entregar NO pasan por aquí.
+    await exigirRecetaLiberada(tx, idOrden, idEmpresa);
     const totalPiezas = totalPiezasOrden(orden);
 
     // Existencia de un avío genérico = total (todos los almacenes) de la empresa activa (Σ kardex,
@@ -828,12 +854,31 @@ export async function explosionarOrden(
           proveedorSugerido: null,
           precioSugerido: null,
           diff: 'eliminado',
+          // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
+          cambiosReceta: [],
         });
       }
     }
 
     // Reemplaza el snapshot: borra el viejo y escribe el nuevo (A2/D3).
     await tx.requerimientoOrden.deleteMany({ where: { idOrden } });
+    // ⭐ PRIMER AVISO de §Post-F9.43(d): la desalineación va AQUÍ, el lugar de la decisión — quien
+    // está a punto de gastar no debería tener que abrir la orden en otra pantalla para enterarse de
+    // que el modelo se movió. Se calcula al vuelo con la MISMA regla de la receta (no se
+    // re-implementa) y se reparte por material para MARCAR los renglones afectados.
+    const desalineacion = await desalineacionDeOrden(tx, idOrden, idEmpresa);
+    const cambiosPorMaterial = new Map<string, TipoCambioRecetaClave[]>();
+    for (const c of desalineacion.cambios) {
+      if (c.tipo === 'arte') continue; // el arte no se compra por MRP: no tiene renglón que marcar
+      const clave = `${c.tipo}-${c.material}`;
+      const lista = cambiosPorMaterial.get(clave);
+      if (lista === undefined) cambiosPorMaterial.set(clave, [c.que]);
+      else lista.push(c.que);
+    }
+    /** Los cambios que le tocan a un renglón, casados por el MISMO texto de material. */
+    const cambiosDe = (r: RequerimientoCalculado): TipoCambioRecetaClave[] =>
+      cambiosPorMaterial.get(`${r.tipo}-${r.material}`) ?? [];
+
     const filas: RequerimientoSalida[] = [];
     for (const c of calculados) {
       const creada = await tx.requerimientoOrden.create({
@@ -857,7 +902,11 @@ export async function explosionarOrden(
         },
       });
       filas.push(
-        aRequerimientoSalida(creada, diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio'),
+        aRequerimientoSalida(
+          creada,
+          diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio',
+          cambiosDe(c),
+        ),
       );
     }
 
@@ -870,6 +919,7 @@ export async function explosionarOrden(
         renglones: filas.length,
         totalPiezas,
         regenerado,
+        desalineada: desalineacion.hayCambios,
       },
     });
 
@@ -886,6 +936,7 @@ export async function explosionarOrden(
       huboCambios,
       regenerado,
       avisos,
+      desalineacion,
     };
   }, bd);
 }
@@ -922,6 +973,10 @@ export async function generarOCDesdeExplosion(
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', idOrden);
     }
+    // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
+    // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
+    // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
+    await exigirRecetaLiberada(tx, idOrden, idEmpresa);
 
     // §Post-F9.18: toda OC nace con FECHA DE ENTREGA y DIRECCIÓN del catálogo. Aquí no se inventan:
     // se toman de lo que ya existe — la fecha de entrega de la ORDEN de producción y la dirección

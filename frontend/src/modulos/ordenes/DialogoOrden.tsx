@@ -37,6 +37,7 @@ import { ProveedorGuardadoOrden, useRegistroGuardadoOrden } from './guardado-ord
 import { PanelComentarios } from './PanelComentarios';
 import { PanelHitosOrden } from './PanelHitosOrden';
 import { PanelMatriz } from './PanelMatriz';
+import { PanelRecetaOrden } from './PanelRecetaOrden';
 import { PanelReferencias } from './PanelReferencias';
 import { textoFaltantes } from './requisitos';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
@@ -87,7 +88,7 @@ function EstadoOrdenBadge({
   faltantes = [],
 }: {
   estado: EstadoOrden;
-  faltantes?: readonly ('tallas' | 'avios' | 'arte')[];
+  faltantes?: readonly ('tallas' | 'receta' | 'arte')[];
 }): React.JSX.Element {
   const { texto, variante } = badgeEstado(estado);
   const falta = estado === 'capturada' ? textoFaltantes(faltantes) : null;
@@ -471,6 +472,18 @@ function DetalleOrden({
           orden={orden}
           puedeAdministrar={puedeAdministrar}
           alCopiarMatriz={alCopiarMatriz}
+        />
+      </SeccionDetalle>
+
+      {/* ⭐ RECETA CONGELADA DE LA ORDEN (V1-E3d, §Post-F9.43): "el BOM vive en la OP". Lo que ESTA
+          orden lleva —copiado del modelo al crearla y ajustable sin tocar a ninguna otra—, con la
+          liberación de Desarrollo que abre la puerta de compra y los avisos de desalineación contra
+          el BOM vivo del modelo. Editar exige `desarrollo.administrar`; el backend re-decide (A1). */}
+      <SeccionDetalle titulo="Receta de la orden" icono={ListChecks}>
+        <PanelRecetaOrden
+          idOrden={orden.id}
+          puedeAdministrar={puedeAdministrarDesarrollo}
+          ordenCancelada={orden.estado === 'cancelada'}
         />
       </SeccionDetalle>
 

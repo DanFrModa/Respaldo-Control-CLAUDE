@@ -348,6 +348,51 @@ export function ArchivoOrdenesPagina(): React.JSX.Element {
               )}
             </section>
 
+            {/* ⭐ V1-E3d (§Post-F9.43(e)): la HABILITACIÓN que la orden llevó de verdad en el viejo
+                (`OrdenesHab`, 28,432 renglones que antes se tiraban completos). El avío va como
+                TEXTO: NO existe en el catálogo de v2, no sale en ningún selector y no hay —ni
+                habrá— botón de "traer al catálogo" (ésa sería la puerta trasera por la que
+                volvería la basura de 30 años). Solo consulta. */}
+            <section>
+              <h3 className="mb-2 text-sm font-semibold">
+                Qué llevaba (avíos del sistema anterior)
+              </h3>
+              {d.habilitacion.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay habilitación capturada para esta orden en el sistema anterior.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="py-1 pr-4">Clave</th>
+                        <th className="py-1 pr-4">Avío</th>
+                        <th className="py-1 pr-4 text-right">Cantidad</th>
+                        <th className="py-1 text-right">Precio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.habilitacion.map((h, i) => (
+                        <tr key={`${h.avio}-${String(i)}`} className="border-t">
+                          <td className="py-1 pr-4">{h.claveV1 ?? '—'}</td>
+                          <td className="py-1 pr-4">{h.avio}</td>
+                          <td className="py-1 pr-4 text-right tabular-nums">{h.cantidad ?? '—'}</td>
+                          <td className="py-1 text-right tabular-nums">
+                            {h.precio === null ? '—' : `$${h.precio.toFixed(2)}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Datos del sistema anterior, guardados como texto: no forman parte del catálogo
+                    de avíos y no se pueden usar para capturar.
+                  </p>
+                </div>
+              )}
+            </section>
+
             {d.observaciones === null ? null : (
               <section>
                 <h3 className="mb-1 text-sm font-semibold">Observaciones</h3>

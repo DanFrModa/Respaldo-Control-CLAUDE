@@ -35,16 +35,36 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
     await expect(page.getByTestId('est-buscar-orden')).toBeVisible();
   });
 
-  test('al elegir una orden, la explosión muestra el botón de generar OC', async ({ page }) => {
+  test('al elegir una orden, la explosión muestra sus controles o la PUERTA de la receta', async ({
+    page,
+  }) => {
     await entrarComoAdmin(page);
     await page.goto('/compras/explosion');
 
     // Si hay alguna orden sembrada/migrada, al elegirla aparecen los controles de la explosión.
     const opciones = page.getByTestId('exp-orden-opcion');
     if ((await opciones.count()) > 0) {
-      await opciones.first().click();
-      await expect(page.getByTestId('exp-generar-oc')).toBeVisible();
-      await expect(page.getByTestId('exp-imprimir')).toBeVisible();
+      const primera = opciones.first();
+      const idOrden = await primera.getAttribute('data-orden');
+
+      // ⭐ V1-E3d (§Post-F9.43(c)): explotar el MRP exige la receta LIBERADA por Desarrollo. Para no
+      // perder la cobertura del botón —que es lo que este spec probaba antes de la puerta— abrimos
+      // la puerta NOSOTROS por API (misma sesión del navegador, patrón de `ruta-critica-motor`):
+      // revisar todo + liberar. Si la orden que le tocó a esta corrida tiene receta, liberar
+      // responde 200 y volvemos a EXIGIR el botón; si su receta está vacía (2 de cada 3 órdenes
+      // migradas), liberar responde 409 y entonces lo que se exige es la puerta dicha con todas sus
+      // letras. Lo que NUNCA se acepta es que la pantalla se quede muda.
+      await page.request.post(`/api/ordenes/${String(idOrden)}/receta/revisar`);
+      const liberada = (
+        await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`)
+      ).ok();
+
+      await primera.click();
+      if (liberada) {
+        await expect(page.getByTestId('exp-generar-oc')).toBeVisible();
+      } else {
+        await expect(page.getByText(/todavía no la libera Desarrollo/)).toBeVisible();
+      }
     }
   });
 });

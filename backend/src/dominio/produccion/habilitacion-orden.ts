@@ -1,8 +1,13 @@
 /**
  * HABILITACIÓN / SURTIDO de avíos por orden (rediseño R6, brecha B13 — `docs/rediseno/
  * REDISENO-FRONTEND.md §4.6`; decisión de Daniel 6-jul-2026). Tablero "qué avíos lleva la orden vs.
- * qué ya se envió al maquilero": por cada avío de la RECETA del modelo (BOM `ModeloAvio
- * paraProduccion`) cruza el REQUERIDO contra el ENVIADO y deja la FALTA + un estado por avío.
+ * qué ya se envió al maquilero": por cada avío de la **RECETA CONGELADA DE LA ORDEN**
+ * (`OrdenAvio paraProduccion`, no excluido) cruza el REQUERIDO contra el ENVIADO y deja la FALTA +
+ * un estado por avío.
+ *
+ * ⭐ **V1-E3d (§Post-F9.43): la fuente cambió del modelo a la ORDEN.** Antes leía `ModeloAvio`, así
+ * que dos órdenes del mismo modelo tenían por fuerza la misma lista de surtido — aunque a una le
+ * hubieran quitado la jareta. Ahora cada orden pide lo que SU receta dice.
  *
  * Toda la lógica vive AQUÍ (A1); la ruta REST solo valida permiso + delega. Consulta ON-DEMAND (de
  * solo lectura, sin transacción de escritura): la habilitación es una foto del momento.
@@ -41,9 +46,9 @@ import { requeridoAvioReceta } from './receta-avios.js';
 const TOLERANCIA = 1e-6;
 
 /**
- * Selección FOCALIZADA de la orden para la habilitación: solo el BOM de AVÍOS `paraProduccion`
- * (con su consumo por prenda / por talla, R18) y la matriz (para las piezas). NO trae telas ni
- * proveedores/precios (aquí no aplican) — a diferencia del `select` del MRP.
+ * Selección FOCALIZADA de la orden para la habilitación: solo los AVÍOS `paraProduccion` de la
+ * RECETA DE LA ORDEN (con su consumo por prenda / por talla, R18) y la matriz (para las piezas). NO
+ * trae telas ni proveedores/precios (aquí no aplican) — a diferencia del `select` del MRP.
  */
 const seleccionOrdenHabilitacion = {
   id: true,
@@ -52,20 +57,18 @@ const seleccionOrdenHabilitacion = {
   idModelo: true,
   idMaquilero: true,
   maquilero: { select: { nombre: true } },
-  modelo: {
+  modelo: { select: { codigo: true } },
+  // La RECETA de ESTA orden (V1-E3d): `paraProduccion` y NO excluida. Un renglón excluido —la
+  // jareta que esta orden no lleva— no se surte ni aparece como faltante.
+  recetaAvios: {
+    where: { paraProduccion: true, excluido: false },
     select: {
-      codigo: true,
-      avios: {
-        where: { paraProduccion: true },
-        select: {
-          idAvio: true,
-          consumoPorPrenda: true,
-          consumoPorTalla: true,
-          tallas: { select: { idTalla: true, consumo: true } },
-          avio: {
-            select: { clave: true, descripcion: true, unidad: true, esGenerico: true },
-          },
-        },
+      idAvio: true,
+      consumoPorPrenda: true,
+      consumoPorTalla: true,
+      tallas: { select: { idTalla: true, consumo: true } },
+      avio: {
+        select: { clave: true, descripcion: true, unidad: true, esGenerico: true },
       },
     },
   },
@@ -168,7 +171,7 @@ export async function habilitacionOrden(
   let pendientes = 0;
   let faltaTotal = 0;
   let faltanAvios = 0;
-  for (const ma of orden.modelo.avios) {
+  for (const ma of orden.recetaAvios) {
     idsReceta.add(ma.idAvio);
     const { requerido } = requeridoAvioReceta(ma, totalPiezas, piezasPorTalla);
     const enviado = enviadoPorAvio.get(ma.idAvio) ?? 0;

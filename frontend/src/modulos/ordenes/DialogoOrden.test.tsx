@@ -113,7 +113,7 @@ function orden(
     fechaCompletada: null,
     requisitos: opciones.requisitos ?? {
       tallas: true,
-      avios: true,
+      receta: true,
       arte: 'no-aplica' as const,
       completa: true,
       faltantes: [],
@@ -206,10 +206,10 @@ describe('<DialogoOrden>', () => {
         estado: 'capturada',
         requisitos: {
           tallas: true,
-          avios: false,
+          receta: false,
           arte: 'no-aplica' as const,
           completa: false,
-          faltantes: ['avios'],
+          faltantes: ['receta'],
         },
       }),
       [...PERM_TODOS],
@@ -217,7 +217,9 @@ describe('<DialogoOrden>', () => {
 
     const detalle = screen.getByTestId('detalle-orden');
     expect(within(detalle).getAllByTestId('estado-orden')[0]).toHaveTextContent('Capturada');
-    expect(within(detalle).getAllByTestId('faltantes-orden')[0]).toHaveTextContent('Falta: avíos');
+    expect(within(detalle).getAllByTestId('faltantes-orden')[0]).toHaveTextContent(
+      'Falta: liberar la receta',
+    );
   });
 
   it('una orden CANCELADA no lista requisitos pendientes', () => {
@@ -226,10 +228,10 @@ describe('<DialogoOrden>', () => {
         estado: 'cancelada',
         requisitos: {
           tallas: false,
-          avios: false,
+          receta: false,
           arte: 'no-aplica' as const,
           completa: false,
-          faltantes: ['tallas', 'avios'],
+          faltantes: ['tallas', 'receta'],
         },
       }),
       [...PERM_TODOS],

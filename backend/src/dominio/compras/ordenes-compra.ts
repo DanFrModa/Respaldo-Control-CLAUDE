@@ -76,6 +76,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirRecetaLiberada } from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -443,6 +444,15 @@ async function validarLineas(
       if (!existentes.has(idOrden)) {
         throw new ErrorNoEncontrado('Orden', idOrden);
       }
+    }
+    // ⭐ LA PUERTA, también por la puerta de atrás (V1-E3d, §Post-F9.43(c) — hallazgo del reviewer).
+    // La decisión dice *"no se puede explotar el MRP **ni generar OC**"*, y una OC capturada A MANO
+    // en *Compras › Nueva OC* y ligada a la orden gasta el mismo dinero contra la misma receta que
+    // nadie revisó. Que no pase por el MRP no la hace inocente: lo que la puerta protege es el
+    // gasto, no el camino. Se verifica ORDEN POR ORDEN y DESPUÉS del filtro por empresa, para no
+    // filtrar la existencia de una orden ajena (misma razón que en `explosionarOrden`).
+    for (const idOrden of idsOrdenLigada) {
+      await exigirRecetaLiberada(tx, idOrden, idEmpresa);
     }
   }
 

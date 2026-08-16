@@ -89,8 +89,8 @@ function fila(id: number, folio: number): OrdenCentro {
     mesEntrega: null,
     cliente: `Cliente ${folio}`,
     estado: 'capturada',
-    // Regla del estado automático: a esta orden le falta la receta de avíos del modelo.
-    faltantes: ['avios'],
+    // Regla del estado automático (V1-E3d): a esta orden le falta LIBERAR su receta.
+    faltantes: ['receta'],
   } as unknown as OrdenCentro;
 }
 
@@ -104,7 +104,7 @@ function ordenDetalle(id = 1, folio = 101): Orden {
     estado: 'capturada',
     requisitos: {
       tallas: false,
-      avios: true,
+      receta: true,
       arte: 'no-aplica',
       completa: false,
       faltantes: ['tallas'],
@@ -162,8 +162,8 @@ describe('<CentroOrdenesPagina>', () => {
     useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
     renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
 
-    // En la lista, junto al chip de avance: la fila no tiene la receta de avíos.
-    expect(screen.getAllByText('Falta: avíos').length).toBeGreaterThan(0);
+    // En la lista, junto al chip de avance: la fila no tiene su receta liberada.
+    expect(screen.getAllByText('Falta: liberar la receta').length).toBeGreaterThan(0);
     // En el detalle (que en el fixture es una orden SIN matriz): falta la captura de tallas.
     expect(screen.getByText('Falta: tallas')).toBeInTheDocument();
   });
@@ -176,7 +176,7 @@ describe('<CentroOrdenesPagina>', () => {
         estado: 'completa',
         requisitos: {
           tallas: true,
-          avios: true,
+          receta: true,
           arte: true,
           completa: true,
           faltantes: [],

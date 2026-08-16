@@ -16,6 +16,7 @@ import type { ClavePermiso } from '../../contrato/index.js';
 import { ErrorConflicto } from '../../comun/errores.js';
 import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { autorizarOC, cancelarOC, crearOC } from '../compras/ordenes-compra.js';
 import { cancelarNotaSalida, confirmarNotaSalida, crearNotaSalida } from '../notas/notas-salida.js';
@@ -131,6 +132,12 @@ async function crearOrdenConMatriz(): Promise<number> {
       },
     },
   });
+  // ⭐ V1-E3d: la OC de tela de este archivo va LIGADA a la orden, y eso exige su receta liberada
+  // (§Post-F9.43(c)). La orden se crea aquí en directo, así que se le siembra la receta a mano.
+  await cliente.modeloTela.create({
+    data: { idModelo: modelo.id, idTela: tela.id, consumoPorPrenda: 1 },
+  });
+  await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
   return orden.id;
 }
 

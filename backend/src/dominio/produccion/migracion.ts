@@ -39,6 +39,7 @@ import { siguienteFolio } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 
 import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { copiarRecetaDelModelo } from './receta-orden.js';
 
 /** Una celda de la matriz a migrar: color + talla + cantidad (ya resueltos a ids del catálogo). */
 export interface CeldaOrdenMigrada {
@@ -187,6 +188,37 @@ export async function crearOrdenMigrada(
       }
     }
 
+    // V1-E3d (§Post-F9.43): la orden nace con SU receta congelada, copiada del BOM del modelo —
+    // igual que en el alta interactiva. Sin esto, una orden migrada llegaría a `prueba` sin receta
+    // y los cuatro consumidores (MRP, habilitación, costeo y semáforo) la verían VACÍA.
+    const receta = await copiarRecetaDelModelo(
+      tx,
+      sesion,
+      { id: orden.id, idEmpresa: entrada.idEmpresa, idModelo: entrada.idModelo },
+      // `sinPrecios`: una orden de 2025 no puede congelar el precio que la cascada resuelve HOY —
+      // sería inventar un dato. NULL = "esta orden no congeló precio" → el costeo cae al catálogo,
+      // igual que antes de la etapa (y es lo mismo que hizo el backfill de la migración).
+      { sinPrecios: true },
+    );
+    // Las órdenes históricas nacen LIBERADAS: son de un mundo anterior a la puerta de Desarrollo y
+    // dejarlas cerradas bloquearía sus compras el día del deploy (mismo criterio que el backfill de
+    // la migración `20260815140000_receta_en_la_orden`). Sus renglones sí quedan `sin_revisar`.
+    //
+    // DOS EXCEPCIONES, las dos con la misma razón que el dominio:
+    //  • Una orden CANCELADA no compra nada: no se le abre una puerta que no va a usar.
+    //  • ⚠️ Una orden cuya receta quedó VACÍA **tampoco se libera** — es lo mismo que rechaza
+    //    `liberarReceta`: liberar "nada" dejaría al MRP explotando cero y a alguien creyendo que ya
+    //    lo revisaron. No es un caso raro: **2,577 órdenes del viejo (2 de cada 3) tienen un modelo
+    //    sin BOM**, así que su receta solo puede nacer vacía y hay que capturarla en la OP —que es
+    //    exactamente como funcionaba el viejo—. Cerrarles la puerta es la señal correcta.
+    const recetaVacia = receta.telas + receta.avios + receta.artes === 0;
+    if (entrada.estado !== 'cancelada' && !recetaVacia) {
+      await tx.orden.update({
+        where: { id: orden.id },
+        data: { recetaLiberadaEn: new Date(), recetaLiberadaPorId: null },
+      });
+    }
+
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
       idEntidad: orden.id,
@@ -198,6 +230,7 @@ export async function crearOrdenMigrada(
         estado: entrada.estado,
         renglones,
         celdas,
+        receta: { ...receta, liberada: entrada.estado !== 'cancelada' && !recetaVacia },
       },
     });
 

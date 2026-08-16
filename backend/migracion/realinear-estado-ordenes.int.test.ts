@@ -18,6 +18,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Cliente, Color, Empresa, Modelo, PrismaClient, Talla } from '../src/datos/index.js';
+import { sembrarRecetaDeOrden } from '../src/pruebas/receta.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../src/pruebas/contexto.js';
 
 import { realinearTodo, type OpcionesRealineado } from './realinear-estado-ordenes.js';
@@ -72,6 +73,9 @@ async function crearOrden(datos: {
           }),
     },
   });
+  // V1-E3d: el realineado evalúa la RECETA DE LA ORDEN (liberada + arte). Estas órdenes simulan lo
+  // que deja el ETL, así que se les siembra la receta LIBERADA — igual que `crearOrdenMigrada`.
+  await sembrarRecetaDeOrden(cliente, orden.id, datos.idModelo);
   return orden.id;
 }
 

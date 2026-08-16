@@ -223,6 +223,8 @@ export async function obtenerHistoricoOrden(
       ...incluirResumen,
       lineas: { orderBy: [{ color: 'asc' }, { id: 'asc' }] },
       procesos: { orderBy: [{ fecha: 'asc' }, { id: 'asc' }] },
+      // V1-E3d (§Post-F9.43(e)): los avíos que la orden llevó de verdad en el viejo. Texto puro.
+      habilitacion: { orderBy: [{ avio: 'asc' }, { id: 'asc' }] },
     },
   });
   if (orden === null) throw new ErrorNoEncontrado('Orden histórica', id);
@@ -242,6 +244,12 @@ export async function obtenerHistoricoOrden(
       tercero: p.tercero,
       cantidad: p.cantidad,
       observaciones: p.observaciones,
+    })),
+    habilitacion: orden.habilitacion.map((h) => ({
+      avio: h.avio,
+      claveV1: h.claveV1,
+      cantidad: h.cantidad === null ? null : h.cantidad.toNumber(),
+      precio: h.precio === null ? null : h.precio.toNumber(),
     })),
   };
 }

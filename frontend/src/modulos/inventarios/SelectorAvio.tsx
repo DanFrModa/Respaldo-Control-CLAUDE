@@ -18,6 +18,7 @@ export function SelectorAvio({
   alSeleccionar,
   alLimpiar,
   idInput,
+  idsExcluidos,
   deshabilitado = false,
   testid = 'selector-avio',
 }: {
@@ -32,6 +33,12 @@ export function SelectorAvio({
   alLimpiar?: () => void;
   /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
   idInput?: string | undefined;
+  /**
+   * Ids que NO se deben ofrecer (V1-E3d): p. ej. los avíos que la receta de la orden YA lleva. Sin
+   * esto la pantalla invita a "agregar" algo que ya está, y esa puerta pisaba el precio congelado.
+   * Filtro de PRESENTACIÓN: la regla dura la impone el dominio (409).
+   */
+  idsExcluidos?: readonly number[];
   /** Solo lectura (p. ej. una nota confirmada): el combobox queda inerte. Default false. */
   deshabilitado?: boolean;
   testid?: string;
@@ -46,7 +53,8 @@ export function SelectorAvio({
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
 
-  const avios = consulta.data?.datos ?? [];
+  const excluidos = new Set(idsExcluidos ?? []);
+  const avios = (consulta.data?.datos ?? []).filter((a) => !excluidos.has(a.id));
   // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
   // ofrecer las opciones viejas — clickearlas seleccionaba el avío EQUIVOCADO (carrera del e2e).
   const resolviendo = texto.trim() !== busqueda || consulta.isPending;

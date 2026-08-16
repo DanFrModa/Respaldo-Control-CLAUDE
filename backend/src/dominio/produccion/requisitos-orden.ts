@@ -5,13 +5,19 @@
  * viejo existía, pero está en desuso. Acá podríamos definirla como completa cuando ya tenga los
  * avíos, los artes. De manera automática se pone como completa."*
  *
- * REGLA ELEGIDA por él — **"tallas + avíos, y arte si aplica"**:
+ * REGLA ELEGIDA por él — **"tallas + receta liberada, y arte si aplica"**:
  *  • `tallas` — la orden tiene su matriz capturada (≥1 renglón color×talla).
- *  • `avios`  — el MODELO de la orden tiene su receta de avíos de producción (≥1 `ModeloAvio`
- *               con `paraProduccion`). Es la MISMA fuente que usa la habilitación
- *               (`habilitacion-orden.ts`) y el MRP: sin receta no hay qué surtir.
+ *  • `receta` — **Desarrollo LIBERÓ la receta congelada de ESTA orden** (`Orden.recetaLiberadaEn`).
  *  • `arte`   — se exige cuando el modelo LLEVA arte (`Modelo.llevaArte`); las prendas lisas se
  *               completan normal (el propio impreso de Daniel dice "NO LLEVA BORDADO/ESTAMPADO").
+ *               El arte se cuenta en la **receta de la ORDEN**, no en el BOM del modelo.
+ *
+ * ⭐ **V1-E3d (§Post-F9.43): el segundo requisito CAMBIÓ de fuente, no de espíritu.** Era *"¿el
+ * MODELO tiene avíos `paraProduccion`?"*, que nunca fue una pregunta sobre ESTA orden: dos órdenes
+ * del mismo modelo daban siempre la misma respuesta, aunque una llevara jareta y la otra no. Ahora
+ * pregunta *"¿la receta de la OP está liberada?"* — el mismo semáforo diciendo algo verdadero, y
+ * además lo que de verdad importa antes de comprar. Consecuencia buscada: **editar el BOM de un
+ * modelo ya NO alcanza hacia atrás a sus órdenes**, que era el defecto que la etapa vino a matar.
  *
  * EL ARTE, cerrado por Daniel el 26-jul-2026 (textual): *"por default sí lleva. A menos que la
  * marques como que no lleva. Y de esa manera si no meten la información del arte, o no desmarcan
@@ -28,8 +34,8 @@
  * `cancelada`.
  *
  * La función `requisitosOrden` es PURA (sin BD): es la ÚNICA fuente de la regla — la usan el alta,
- * el guardado/copiado de matriz y el recálculo por cambio del BOM del modelo. No hay una segunda
- * copia de la regla en ningún lado.
+ * el guardado/copiado de matriz, la liberación de la receta y el recálculo por la casilla
+ * "lleva arte" del modelo. No hay una segunda copia de la regla en ningún lado.
  *
  * Al final del archivo viven los helpers que APLICAN la regla en la BD (`recalcularEstadoOrden` y
  * `recalcularEstadoOrdenesDeModelo`), siempre dentro de la transacción del llamador (A2).
@@ -41,12 +47,12 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Tx } from '../../comun/transaccion.js';
 
 /** Cada requisito que se evalúa para completar una orden. */
-export type ClaveRequisitoOrden = 'tallas' | 'avios' | 'arte';
+export type ClaveRequisitoOrden = 'tallas' | 'receta' | 'arte';
 
 /** Etiqueta en lenguaje de negocio de cada requisito (la usa la UI y los mensajes). */
 export const ETIQUETA_REQUISITO_ORDEN: Record<ClaveRequisitoOrden, string> = {
   tallas: 'tallas',
-  avios: 'avíos',
+  receta: 'liberar la receta',
   arte: 'arte',
 };
 
@@ -54,10 +60,10 @@ export const ETIQUETA_REQUISITO_ORDEN: Record<ClaveRequisitoOrden, string> = {
 export interface InsumosRequisitosOrden {
   /** Renglones de la matriz (colores) capturados en la orden. */
   renglonesMatriz: number;
-  /** Avíos `paraProduccion` en el BOM del modelo de la orden. */
-  aviosProduccion: number;
-  /** Artes (bordados/estampados) del modelo de la orden. */
-  artesModelo: number;
+  /** ¿Desarrollo LIBERÓ la receta congelada de ESTA orden? (V1-E3d, §Post-F9.43). */
+  recetaLiberada: boolean;
+  /** Artes VIVOS (no excluidos) de la receta de ESTA orden. */
+  artesOrden: number;
   /** ¿El MODELO lleva arte? (`Modelo.llevaArte`, default `true`). `false` = prenda lisa. */
   llevaArte: boolean;
 }
@@ -65,7 +71,7 @@ export interface InsumosRequisitosOrden {
 /** Resultado de evaluar la regla. `arte: 'no-aplica'` = el modelo no lleva arte (no bloquea). */
 export interface RequisitosOrden {
   tallas: boolean;
-  avios: boolean;
+  receta: boolean;
   arte: 'no-aplica' | boolean;
   /** true = se cumplen TODOS los requisitos que aplican → la orden es `completa`. */
   completa: boolean;
@@ -79,26 +85,26 @@ export interface RequisitosOrden {
  */
 export function requisitosOrden(insumos: InsumosRequisitosOrden): RequisitosOrden {
   const tallas = insumos.renglonesMatriz > 0;
-  const avios = insumos.aviosProduccion > 0;
-  const arte = evaluarArte(insumos.llevaArte, insumos.artesModelo);
+  const receta = insumos.recetaLiberada;
+  const arte = evaluarArte(insumos.llevaArte, insumos.artesOrden);
 
   const faltantes: ClaveRequisitoOrden[] = [];
   if (!tallas) faltantes.push('tallas');
-  if (!avios) faltantes.push('avios');
+  if (!receta) faltantes.push('receta');
   if (arte === false) faltantes.push('arte');
 
-  return { tallas, avios, arte, completa: faltantes.length === 0, faltantes };
+  return { tallas, receta, arte, completa: faltantes.length === 0, faltantes };
 }
 
 /**
  * Requisito del ARTE (decisión de Daniel, ver cabecera). La bandera del MODELO manda: si la prenda
- * no lleva arte, el requisito no aplica; si lo lleva, se cumple SOLO con el arte capturado en el
- * BOM — y si falta, el arte sale `false` y la orden queda incompleta hasta que alguien lo atienda
- * (capturar el arte o desmarcar la casilla).
+ * no lleva arte, el requisito no aplica; si lo lleva, se cumple con el arte que trae **la receta de
+ * ESTA orden** (V1-E3d) — y si falta, el arte sale `false` y la orden queda incompleta hasta que
+ * alguien lo atienda (capturar el arte o desmarcar la casilla).
  */
-function evaluarArte(llevaArte: boolean, artesModelo: number): 'no-aplica' | boolean {
+function evaluarArte(llevaArte: boolean, artesOrden: number): 'no-aplica' | boolean {
   if (!llevaArte) return 'no-aplica';
-  return artesModelo > 0;
+  return artesOrden > 0;
 }
 
 /**
@@ -123,15 +129,20 @@ export async function insumosRequisitosDeOrden(
   tx: Tx,
   orden: { id: number; idModelo: number },
 ): Promise<InsumosRequisitosOrden> {
-  const [renglonesMatriz, aviosProduccion, artesModelo, modelo] = await Promise.all([
+  const [renglonesMatriz, artesOrden, fila, modelo] = await Promise.all([
     tx.ordenLinea.count({ where: { idOrden: orden.id } }),
-    tx.modeloAvio.count({ where: { idModelo: orden.idModelo, paraProduccion: true } }),
-    tx.modeloArte.count({ where: { idModelo: orden.idModelo } }),
+    tx.ordenArte.count({ where: { idOrden: orden.id, excluido: false } }),
+    tx.orden.findUnique({ where: { id: orden.id }, select: { recetaLiberadaEn: true } }),
     tx.modelo.findUnique({ where: { id: orden.idModelo }, select: { llevaArte: true } }),
   ]);
   // Si el modelo no apareciera (imposible: la FK lo garantiza), se asume lo que pidió Daniel —
   // "por default sí lleva" — que es el lado que HACE ATENDER el tema, no el que lo esconde.
-  return { renglonesMatriz, aviosProduccion, artesModelo, llevaArte: modelo?.llevaArte ?? true };
+  return {
+    renglonesMatriz,
+    recetaLiberada: fila?.recetaLiberadaEn != null,
+    artesOrden,
+    llevaArte: modelo?.llevaArte ?? true,
+  };
 }
 
 /**
@@ -227,34 +238,35 @@ const LOTE_RECALCULO = 500;
  * nombrar la causa REAL: `bom-modelo` (se editó la receta de avíos/arte) o `lleva-arte` (se marcó o
  * desmarcó la casilla del modelo).
  */
-export type MotivoRecalculoModelo = 'bom-modelo' | 'lleva-arte';
+export type MotivoRecalculoModelo = 'lleva-arte';
 
 /**
- * RECÁLCULO por cambio del BOM del modelo (avíos o arte). **SOLO COMPLETA: nunca des-completa**
- * (26-jul-2026, tras revisión). Editar la receta de un modelo es una operación cotidiana de
- * catálogo y no puede degradar de golpe su histórico —órdenes entregadas hace años— ni sacar de los
- * tableros a las que están a medio producir. El "des-completar" vive únicamente en la edición de la
- * MATRIZ de una orden concreta, y con el cinturón de la actividad de producción (ver
- * {@link recalcularEstadoOrden}).
+ * RECÁLCULO por cambio de la casilla **"lleva arte"** del modelo. **SOLO COMPLETA: nunca
+ * des-completa** (26-jul-2026, tras revisión). Es una operación cotidiana de catálogo y no puede
+ * degradar de golpe su histórico —órdenes entregadas hace años— ni sacar de los tableros a las que
+ * están a medio producir. El "des-completar" vive únicamente en la edición de la MATRIZ de una orden
+ * concreta, y con el cinturón de la actividad de producción (ver {@link recalcularEstadoOrden}).
  *
- * Cómo decide, sin duplicar la regla: se le pregunta a la función PURA qué pasaría con una orden de
- * este modelo **que ya tuviera su matriz** (`renglonesMatriz: 1`). Si ni así se completa (p. ej. el
- * modelo se quedó sin receta de avíos), NO HAY NADA QUE HACER y se sale sin tocar la base. Si sí, el
- * único requisito que falta por verificar orden-por-orden es la matriz, y eso se resuelve en la
- * consulta (`lineas: { some: {} }`) en vez de traer ids a memoria.
+ * ⭐ **V1-E3d (§Post-F9.43): éste era el "alcance hacia atrás" y se le cortó el brazo largo.** Antes
+ * lo llamaba también CADA edición del BOM o del arte del modelo (`motivo: 'bom-modelo'`), porque el
+ * estado de la orden dependía del BOM del modelo. Ahora la orden tiene su receta congelada, así que
+ * **tocar el BOM de un modelo ya no toca ninguna orden**: sus llamadas desde `bom-modelo.ts` y
+ * `arte-modelo.ts` desaparecieron. Lo único que sigue viviendo en el modelo es la casilla
+ * `llevaArte` —desmarcarla vuelve `no-aplica` el requisito del arte—, y por eso esta función
+ * sobrevive con ese único motivo.
  *
- * Universo acotado: SOLO las `capturada` de ESE modelo con matriz (las `completa` ya lo están y las
- * `cancelada` no se tocan). Escribe en LOTES de {@link LOTE_RECALCULO} para no armar un `IN (...)`
- * gigante dentro de la transacción, y deja **bitácora POR ORDEN** (A7: la orden es entidad crítica;
- * no basta la del modelo).
+ * Cómo decide, sin duplicar la regla: los tres insumos que faltan por orden (matriz, receta liberada
+ * y arte de la receta) se leen POR ORDEN en UNA consulta con `_count`, y la respuesta la da la
+ * función PURA {@link requisitosOrden}. Aquí no se re-implementa nada.
  *
- * A9: NO se filtra por empresa a propósito. Los modelos y su BOM son catálogo GLOBAL (ADR-0007), así
- * que la receta nueva vuelve completables a las órdenes de cualquier empresa; filtrar por la activa
- * dejaría a las demás mintiendo. No se devuelve ni un dato de otra empresa: solo se sincroniza un
- * estado derivado con la verdad.
+ * Universo acotado: SOLO las `capturada` de ESE modelo (las `completa` ya lo están y las `cancelada`
+ * no se tocan) que además tengan matriz y receta liberada — el filtro va en la consulta, no en
+ * memoria. Escribe en LOTES de {@link LOTE_RECALCULO} y deja **bitácora POR ORDEN** (A7: la orden es
+ * entidad crítica; no basta la del modelo).
  *
- * `motivo` viaja a la bitácora de cada orden para que el rastro nombre la causa REAL del cambio
- * (editar la receta vs. desmarcar "lleva arte").
+ * A9: NO se filtra por empresa a propósito. Los modelos son catálogo GLOBAL (ADR-0007), así que la
+ * casilla afecta a las órdenes de cualquier empresa; filtrar por la activa dejaría a las demás
+ * mintiendo. No se devuelve ni un dato de otra empresa: solo se sincroniza un estado derivado.
  *
  * Devuelve cuántas órdenes se completaron (para diagnóstico).
  */
@@ -262,39 +274,49 @@ export async function recalcularEstadoOrdenesDeModelo(
   tx: Tx,
   sesion: SesionUsuario,
   idModelo: number,
-  motivo: MotivoRecalculoModelo = 'bom-modelo',
+  motivo: MotivoRecalculoModelo = 'lleva-arte',
 ): Promise<number> {
-  // Los insumos del MODELO son los MISMOS para todas sus órdenes: se leen UNA vez (nada de N+1).
-  const [aviosProduccion, artesModelo, modelo] = await Promise.all([
-    tx.modeloAvio.count({ where: { idModelo, paraProduccion: true } }),
-    tx.modeloArte.count({ where: { idModelo } }),
-    tx.modelo.findUnique({ where: { id: idModelo }, select: { llevaArte: true } }),
-  ]);
-
-  // ¿Podría completarse una orden de este modelo que YA tenga su matriz? La respuesta la da la
-  // regla PURA (única fuente); aquí no se re-implementa nada.
-  const podria = requisitosOrden({
-    renglonesMatriz: 1,
-    aviosProduccion,
-    artesModelo,
-    llevaArte: modelo?.llevaArte ?? true,
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: { llevaArte: true },
   });
-  if (!podria.completa) {
-    return 0;
-  }
+  const llevaArte = modelo?.llevaArte ?? true;
 
+  // Universo: `capturada` de este modelo CON matriz y CON receta liberada. Lo demás no puede
+  // completarse por un cambio de la casilla, y filtrarlo aquí evita traerlo a memoria.
   const candidatas = await tx.orden.findMany({
-    where: { idModelo, estado: 'capturada', lineas: { some: {} } },
-    select: { id: true, fechaCompletada: true },
+    where: {
+      idModelo,
+      estado: 'capturada',
+      lineas: { some: {} },
+      recetaLiberadaEn: { not: null },
+    },
+    select: {
+      id: true,
+      fechaCompletada: true,
+      _count: { select: { recetaArtes: { where: { excluido: false } } } },
+    },
     orderBy: { id: 'asc' },
   });
   if (candidatas.length === 0) return 0;
 
+  // La regla PURA decide orden por orden (única fuente; nada re-implementado aquí).
+  const aCompletar = candidatas.filter(
+    (o) =>
+      requisitosOrden({
+        renglonesMatriz: 1,
+        recetaLiberada: true,
+        artesOrden: o._count.recetaArtes,
+        llevaArte,
+      }).completa,
+  );
+  if (aCompletar.length === 0) return 0;
+
   const ahora = new Date();
   const auditoria = datosModificacion(sesion);
   // Dos grupos: las que además SELLAN `fechaCompletada` (primera vez) y las que ya la traen.
-  const sellando = candidatas.filter((o) => o.fechaCompletada === null).map((o) => o.id);
-  const yaSelladas = candidatas.filter((o) => o.fechaCompletada !== null).map((o) => o.id);
+  const sellando = aCompletar.filter((o) => o.fechaCompletada === null).map((o) => o.id);
+  const yaSelladas = aCompletar.filter((o) => o.fechaCompletada !== null).map((o) => o.id);
 
   for (const lote of trocear(sellando, LOTE_RECALCULO)) {
     await tx.orden.updateMany({
@@ -312,7 +334,7 @@ export async function recalcularEstadoOrdenesDeModelo(
   // A7: la orden es entidad crítica — cada una deja su renglón, no solo el modelo que lo provocó.
   // También por LOTES: un `createMany` con miles de renglones es la misma lista sin cota que los
   // `updateMany` evitan.
-  for (const lote of trocear(candidatas, LOTE_RECALCULO)) {
+  for (const lote of trocear(aCompletar, LOTE_RECALCULO)) {
     await registrarBitacoraLote(
       tx,
       sesion,
@@ -325,7 +347,7 @@ export async function recalcularEstadoOrdenesDeModelo(
     );
   }
 
-  return candidatas.length;
+  return aCompletar.length;
 }
 
 /** Parte un arreglo en trozos de `tamano` (el último puede ir corto). */
@@ -406,21 +428,20 @@ export async function realinearEstadoOrdenes(
       idModelo: true,
       estado: true,
       fechaCompletada: true,
-      _count: { select: { lineas: true } },
+      // V1-E3d: los insumos "receta liberada" y "arte" son de la ORDEN, no del modelo.
+      recetaLiberadaEn: true,
+      _count: { select: { lineas: true, recetaArtes: { where: { excluido: false } } } },
     },
   });
   if (ordenes.length === 0) return vacio;
 
-  // Insumos del MODELO (una sola consulta para todos los modelos del lote) y actividad viva.
+  // Único insumo del MODELO que sobrevive (V1-E3d): la casilla "lleva arte". Una sola consulta
+  // para todos los modelos del lote. Más la actividad viva (el cinturón del des-completar).
   const idsModelo = [...new Set(ordenes.map((o) => o.idModelo))];
   const [modelos, conActividad] = await Promise.all([
     tx.modelo.findMany({
       where: { id: { in: idsModelo } },
-      select: {
-        id: true,
-        llevaArte: true,
-        _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
-      },
+      select: { id: true, llevaArte: true },
     }),
     tx.etapaMovimiento
       .groupBy({ by: ['idOrden'], where: { idOrden: { in: idsOrden }, canceladoEn: null } })
@@ -438,8 +459,8 @@ export async function realinearEstadoOrdenes(
     const modelo = porModelo.get(orden.idModelo);
     const requisitos = requisitosOrden({
       renglonesMatriz: orden._count.lineas,
-      aviosProduccion: modelo?._count.avios ?? 0,
-      artesModelo: modelo?._count.artes ?? 0,
+      recetaLiberada: orden.recetaLiberadaEn !== null,
+      artesOrden: orden._count.recetaArtes,
       // Sin modelo (imposible: la FK lo garantiza) se asume lo que pidió Daniel: "por default sí
       // lleva" — el lado que HACE ATENDER el tema.
       llevaArte: modelo?.llevaArte ?? true,

@@ -741,6 +741,40 @@ export {
   type HabilitacionOrden,
 } from './esquemas/habilitacion.js';
 
+// ── Receta CONGELADA de la orden (V1-E3d pieza B, §Post-F9.43: "el BOM vive en la OP") ──
+export {
+  esquemaCambioReceta,
+  esquemaDesalineacionReceta,
+  esquemaEstadoRenglonReceta,
+  esquemaRecetaAgregarCuerpo,
+  esquemaRecetaEditarCuerpo,
+  esquemaRecetaOrden,
+  esquemaRecetaOrdenArte,
+  esquemaRecetaOrdenAvio,
+  esquemaRecetaOrdenAvioTalla,
+  esquemaRecetaOrdenTela,
+  esquemaRecetaQuitarCuerpo,
+  esquemaRecetaTallaEntrada,
+  esquemaRecetaTipoParam,
+  esquemaResumenReceta,
+  esquemaTipoCambioReceta,
+  esquemaTipoRenglonReceta,
+  type CambioReceta,
+  type DatosRecetaAgregar,
+  type DatosRecetaEditar,
+  type DatosRecetaQuitar,
+  type DesalineacionReceta,
+  type EstadoRenglonRecetaClave,
+  type RecetaOrden,
+  type RecetaOrdenArte,
+  type RecetaOrdenAvio,
+  type RecetaOrdenAvioTalla,
+  type RecetaOrdenTela,
+  type ResumenReceta,
+  type TipoCambioRecetaClave,
+  type TipoRenglonRecetaClave,
+} from './esquemas/receta-orden.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,

@@ -207,16 +207,18 @@ export async function centroComandoOrdenes(
           select: {
             codigo: true,
             descripcion: true,
-            // Insumos de la regla de "orden completa" (`requisitos-orden.ts`): la bandera "lleva
-            // arte" + la receta de avíos de producción y el arte del BOM. Dos conteos en la misma
-            // consulta, sin traer las recetas.
+            // Insumo de la regla de "orden completa" que sigue viviendo en el MODELO: la casilla
+            // "lleva arte". Los otros dos (receta liberada y arte de la receta) son de la ORDEN
+            // desde V1-E3d (§Post-F9.43) y se leen abajo, sin traer las recetas.
             llevaArte: true,
-            _count: { select: { avios: { where: { paraProduccion: true } }, artes: true } },
           },
         },
         // Renglones de la matriz: el requisito "tallas" es por RENGLONES, no por piezas (una
-        // matriz capturada en ceros ya cuenta como capturada).
-        _count: { select: { lineas: true } },
+        // matriz capturada en ceros ya cuenta como capturada). Y los artes VIVOS de la receta de
+        // ESTA orden (V1-E3d) — conteo en la misma consulta, sin traer la receta.
+        _count: { select: { lineas: true, recetaArtes: { where: { excluido: false } } } },
+        // ¿Desarrollo liberó la receta de ESTA orden? (requisito `receta`, V1-E3d).
+        recetaLiberadaEn: true,
         idMaquilero: true,
         maquilero: { select: { nombre: true } },
         fechaEntrega: true,
@@ -355,8 +357,8 @@ export async function centroComandoOrdenes(
           ? []
           : requisitosOrden({
               renglonesMatriz: fila._count.lineas,
-              aviosProduccion: fila.modelo._count.avios,
-              artesModelo: fila.modelo._count.artes,
+              recetaLiberada: fila.recetaLiberadaEn !== null,
+              artesOrden: fila._count.recetaArtes,
               llevaArte: fila.modelo.llevaArte,
             }).faltantes,
     };
