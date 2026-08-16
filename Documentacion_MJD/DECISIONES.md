@@ -2480,3 +2480,44 @@ curso. **Pendiente de recibir.**
 - **Aplica en:** V1-E3f (junto con los siete del arte). Los renombres van en `prisma/seed.ts`
   (**requiere `SEED_ON_START`**). Sin migración: los códigos no cambian.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.55) — Alta de proveedor leyendo su Constancia de Situación Fiscal (DANIEL, 16-ago-2026)
+
+> Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
+> alta. Con ese documento se llena toda la info en automático: RFC, direcciones, etc."*
+
+**Qué se llenaría, y por qué NO requiere migración.** Los campos que la constancia trae ya existen en
+`Proveedor` (F1-E1B / R15): `rfc`, `razonSocial`, `regimenFiscalSat`, `codigoPostalExpedicion` y
+`direccion` (texto libre, se compone de calle/número/colonia/municipio/estado). **Cero cambios de
+esquema** para los datos; sí hace falta guardar el PDF como adjunto.
+
+**El precedente que lo abarata:** ya hay un lector de PDF en producción — el **importador de OC de C&A**
+(`parseo-pdf-cya.ts`, §Post-F9.2). Misma mecánica: extraer texto y mapear a campos. **Se reusa, no se
+inventa.**
+
+**⭐ REGLA: el documento PROPONE, la persona CONFIRMA. No hay llenado silencioso.**
+El `rfc` y el `regimenFiscalSat` alimentan el **CFDI**: un carácter mal leído no se nota hasta que una
+factura sale mal. El flujo es subir → la pantalla se llena con los datos resaltados → **Aceptar**. Dos
+segundos más a cambio de no meter basura fiscal en silencio. *(Mismo criterio que §Post-F9.34 punto 7
+para el nº de producción: el sistema asiste y verifica, no decide.)*
+
+**Tres cosas a construir con cuidado:**
+
+1. **Dos formatos:** persona **física** (nombre y apellidos) y persona **moral** (razón social). Traen
+   campos distintos; se contemplan los dos.
+2. **El SAT cambia el formato cada tanto.** Si no logra leerlo, **NO bloquea el alta**: se captura a
+   mano como hoy, avisando que no pudo. Degradar con gracia, nunca al revés.
+3. **La constancia se CONSERVA** como adjunto del proveedor, no se lee y se tira. La maquinaria de
+   adjuntos + R2 ya existe.
+
+**Fuera de alcance por ahora:** validar el QR de la constancia contra el SAT (exige salida a internet
+desde el servidor; se puede agregar después si hace falta).
+
+**Pregunta abierta a Daniel:** ¿solo en el **alta**, o también al **editar** un proveedor existente
+(subir la constancia y que actualice sus datos fiscales)? *(Default del lead: **los dos** — es el mismo
+trabajo.)*
+
+- **Aplica en:** etapa de **proveedores**, junto con §Post-F9.54 y el resto de observaciones que Daniel
+  anunció que mandará. **Se agrupa a propósito** para no tocar esa pantalla tres veces. Sin migración
+  de datos; adjunto del proveedor por revisar si ya existe.
+- **Fecha:** 2026-08-16.
