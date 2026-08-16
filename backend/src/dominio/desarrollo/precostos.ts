@@ -45,8 +45,18 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
-import { resolverPrecioAvioCatalogo, resolverPrecioTela } from '../costos/resolucion-precios.js';
+import { num, numOrNull, promedioSimple, redondear2, redondear4 } from '../costos/decimales.js';
+import {
+  resolverPrecioAvioCatalogo,
+  resolverPrecioTela,
+  type CompraRealPrecio,
+} from '../costos/resolucion-precios.js';
+import {
+  claveMaterial,
+  claveMaterialProveedor,
+  leerUltimosPreciosCompra,
+  type UltimosPreciosCompra,
+} from '../costos/ultimo-precio-compra.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaLineaManual = z.input<typeof esquemaPrecostoLineaManualCrear>;
@@ -90,7 +100,9 @@ const incluirBomModelo = {
       idTela: true,
       consumoPorPrenda: true,
       idTelaProveedor: true,
-      telaProveedor: { select: { precio: true, manejaPrecioPorColor: true } },
+      // `idProveedor`: V1-E3e lo necesita para el escalón 1 con amarre (§Post-F9.48 — el amarre
+      // elige el PROVEEDOR y el precio sale de la última compra A ESE proveedor).
+      telaProveedor: { select: { idProveedor: true, precio: true, manejaPrecioPorColor: true } },
       tela: { select: { nombre: true, precioSugerido: true } },
     },
   },
@@ -127,11 +139,6 @@ type ModeloConBom = Prisma.ModeloGetPayload<{ include: typeof incluirBomModelo }
 /** Un renglón nuevo (sin `idPrecosto`, que se agrega al insertar en lote). */
 type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
 
-/** Promedio SIMPLE de una lista de números (asume no vacía; el llamador lo garantiza). */
-function promedioSimple(valores: number[]): number {
-  return valores.reduce((s, v) => s + v, 0) / valores.length;
-}
-
 /**
  * Forma MÍNIMA de un avío del catálogo para valuarlo (la comparten el renglón del BOM y el renglón
  * MANUAL ligado a un avío). Es justo lo que selecciona {@link incluirBomModelo} para el avío.
@@ -148,18 +155,45 @@ interface AvioParaValuar {
   medidas: { precio: Prisma.Decimal }[];
 }
 
+/** Traduce una entrada del mapa de últimas compras a la forma mínima que pide la cascada. */
+function aCompraReal(
+  ultimos: UltimosPreciosCompra,
+  clave: string,
+  porProveedor = false,
+): CompraRealPrecio | null {
+  const u = (porProveedor ? ultimos.porMaterialProveedor : ultimos.porMaterial).get(clave);
+  return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
+}
+
+/**
+ * Últimas COMPRAS REALES (§Post-F9.48) de todos los insumos del BOM de un modelo, EN UN LOTE: una
+ * consulta para todo el BOM, no una por renglón. Acotadas a la empresa activa (A9).
+ */
+async function ultimosPreciosDelBom(
+  tx: Tx,
+  idEmpresa: number,
+  modelo: ModeloConBom,
+): Promise<UltimosPreciosCompra> {
+  return leerUltimosPreciosCompra(tx, idEmpresa, {
+    telas: modelo.telas.map((t) => t.idTela),
+    avios: modelo.avios.map((a) => a.idAvio),
+  });
+}
+
 /**
  * Precio de un AVÍO del catálogo, con la ÚNICA regla del precosto (no se duplica en ningún lado):
  *  • avío "por medida" (≥1 medida activa, R5/B11) → PROMEDIO SIMPLE de los precios de sus medidas,
  *    SIN proveedor de traza (el precio no salió de un proveedor);
- *  • si no, la cascada amarrada de E1 (`resolverPrecioAvio`: amarre → más barato → referencia),
- *    que además dice QUÉ proveedor se usó.
+ *  • si no, la cascada única de V1-E3e (`resolverPrecioAvio`: última compra al proveedor amarrado →
+ *    amarre → última compra real → más barato → referencia), que además dice QUÉ proveedor se usó.
  * La usan `lineasBomDesdeModelo` (renglones del BOM) y `agregarLineaManual` (renglón manual ligado
  * a un avío, Daniel ago-2026).
  */
 function precioAvioDeCatalogo(
   avio: AvioParaValuar,
   idAvioProveedor: number | null,
+  idAvio: number,
+  ultimos: UltimosPreciosCompra,
 ): { precio: number | null; idProveedor: number | null } {
   // La REGLA (medidas → promedio; si no, cascada) vive en `resolverPrecioAvioCatalogo`, compartida
   // con la receta para que la pantalla no pueda enseñar un número distinto del que costea. Aquí
@@ -174,6 +208,11 @@ function precioAvioDeCatalogo(
       precio: numOrNull(p.precio),
       factorConversion: numOrNull(p.factorConversion),
     })),
+    ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', idAvio)),
+    ultimaCompraProveedorAmarrado:
+      idAvioProveedor === null
+        ? null
+        : aCompraReal(ultimos, claveMaterialProveedor('avio', idAvio, idAvioProveedor), true),
   });
   // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. La cascada
   // DIVIDE (`precio ÷ factorConversion`, R1: el avío comprado por caja/rollo), así que devuelve
@@ -244,6 +283,7 @@ function lineasBomDesdeModelo(
   modelo: ModeloConBom,
   conceptos: ConceptosBase,
   sesion: SesionUsuario,
+  ultimos: UltimosPreciosCompra,
 ): LineaNueva[] {
   const auditoria = datosCreacion(sesion);
   const lineas: LineaNueva[] = [];
@@ -264,13 +304,31 @@ function lineasBomDesdeModelo(
               manejaPrecioPorColor: t.telaProveedor.manejaPrecioPorColor,
             }
           : null,
+      // §Post-F9.48: escalón 1 — la última COMPRA REAL manda sobre el catálogo.
+      ultimaCompra: aCompraReal(ultimos, claveMaterial('tela', t.idTela)),
+      ultimaCompraProveedorAmarrado:
+        t.telaProveedor == null
+          ? null
+          : aCompraReal(
+              ultimos,
+              claveMaterialProveedor('tela', t.idTela, t.telaProveedor.idProveedor),
+              true,
+            ),
     });
     // Redondeado a 2 = la misma regla de todos los renglones (el importe se calcula con ESTE
     // número, no con uno más fino que la columna `Decimal(12,2)` no puede guardar). Hoy es un
     // no-op —la cascada de tela no divide y sus columnas ya son de 2 decimales—, pero deja la
     // invariante en un solo lugar por si mañana alguna gana precisión.
     const precioUnit = redondear2(resuelto.precio ?? 0);
-    const desdeAmarre = resuelto.origen === 'amarre' || resuelto.origen === 'amarre-color';
+    // Traza FIEL del proveedor: el amarre firma el precio cuando ganó su escalón de catálogo O
+    // cuando el escalón 1 (última compra real) salió justamente de ÉL — que es el caso normal desde
+    // §Post-F9.48. Si la última compra fue a OTRO proveedor, el renglón NO acredita al amarrado.
+    const desdeAmarre =
+      resuelto.origen === 'amarre' ||
+      resuelto.origen === 'amarre-color' ||
+      (resuelto.origen === 'ultimo-precio-compra' &&
+        t.telaProveedor != null &&
+        resuelto.idProveedor === t.telaProveedor.idProveedor);
     lineas.push({
       idConceptoCosto: conceptos.tela,
       origen: 'bom_tela',
@@ -298,7 +356,7 @@ function lineasBomDesdeModelo(
     );
     // R5, B11: avío "por medida" → PROMEDIO de sus medidas; si no, la cascada amarrada de E1. La
     // regla vive en `precioAvioDeCatalogo` (la comparte el renglón MANUAL ligado a un avío).
-    const resuelto = precioAvioDeCatalogo(a.avio, a.idAvioProveedor);
+    const resuelto = precioAvioDeCatalogo(a.avio, a.idAvioProveedor, a.idAvio, ultimos);
     const precioUnit = resuelto.precio ?? 0;
     lineas.push({
       idConceptoCosto: conceptos.avios,
@@ -593,8 +651,9 @@ export async function generarPrecosto(
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
     const conceptos = await conceptosBase(tx);
+    const ultimos = await ultimosPreciosDelBom(tx, sesion.idEmpresaActiva, modelo);
     const lineas = [
-      ...lineasBomDesdeModelo(modelo, conceptos, sesion),
+      ...lineasBomDesdeModelo(modelo, conceptos, sesion, ultimos),
       lineaCorte(modelo, conceptos, sesion),
       lineaMaquila(modelo, conceptos, sesion),
     ];
@@ -667,6 +726,7 @@ export async function recalcularDesdeBom(
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
     const conceptos = await conceptosBase(tx);
+    const ultimos = await ultimosPreciosDelBom(tx, sesion.idEmpresaActiva, modelo);
 
     // R5, B12: los renglones BOM AJUSTADOS a mano en la negociación se PRESERVAN (no se regeneran).
     // Se borran sólo los BOM no ajustados y se re-generan del modelo, SALTANDO los insumos que ya
@@ -695,7 +755,7 @@ export async function recalcularDesdeBom(
     await tx.precostoLinea.deleteMany({
       where: { idPrecosto, origen: { in: [...ORIGENES_BOM] }, ajustado: false },
     });
-    const lineas = lineasBomDesdeModelo(modelo, conceptos, sesion).filter(
+    const lineas = lineasBomDesdeModelo(modelo, conceptos, sesion, ultimos).filter(
       (l) =>
         !clavesAjustadas.has(claveBom(l)) &&
         !(l.origen === 'bom_arte' && artesAjustadasPorNombre.has(claveArtePorNombre(l))),
@@ -800,8 +860,13 @@ export async function agregarLineaManual(
           `El avío "${delCatalogo.clave}" está desactivado; no se puede precostear.`,
         );
       }
-      // Sin amarre por Desarrollo (esto no viene del BOM): la cascada cae a "más barato"/referencia.
-      const resuelto = precioAvioDeCatalogo(delCatalogo, null);
+      // Sin amarre por Desarrollo (esto no viene del BOM): la cascada arranca en la ÚLTIMA COMPRA
+      // REAL del avío (§Post-F9.48) y de ahí cae a "más barato"/referencia. Un renglón manual tiene
+      // que valuar igual que uno del BOM: si no, vuelven a existir dos precios para lo mismo.
+      const ultimosDelAvio = await leerUltimosPreciosCompra(tx, sesion.idEmpresaActiva, {
+        avios: [delCatalogo.id],
+      });
+      const resuelto = precioAvioDeCatalogo(delCatalogo, null, delCatalogo.id, ultimosDelAvio);
       avio = {
         id: delCatalogo.id,
         etiqueta: `${delCatalogo.clave} — ${delCatalogo.descripcion}`,
@@ -1037,11 +1102,12 @@ export async function restaurarLineaBom(
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
     const conceptos = await conceptosBase(tx);
+    const ultimos = await ultimosPreciosDelBom(tx, sesion.idEmpresaActiva, modelo);
     const clave = claveBom(linea);
     // El arte que perdió su traza se reconoce por NOMBRE (ver `claveArtePorNombre`): si el modelo
     // volvió a tener un arte así llamado, restaurar lo REENGANCHA en vez de borrar el renglón.
     const porNombre = linea.origen === 'bom_arte' && linea.idModeloArte === null;
-    const original = lineasBomDesdeModelo(modelo, conceptos, sesion).find((l) =>
+    const original = lineasBomDesdeModelo(modelo, conceptos, sesion, ultimos).find((l) =>
       porNombre
         ? l.origen === 'bom_arte' && claveArtePorNombre(l) === claveArtePorNombre(linea)
         : claveBom(l) === clave,

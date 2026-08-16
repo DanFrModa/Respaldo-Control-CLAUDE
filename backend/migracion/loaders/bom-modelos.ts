@@ -31,11 +31,25 @@
  * Renglones con modelo/tela/avío sin mapeo, y artes sin datos en `Bordados.csv`, van al REPORTE
  * (§7: no null silencioso).
  *
- * ⚠️ **Lo que el CSV no trae, el ETL no lo borra** (V1-E3c): el AMARRE de precio del renglón
- * (`ModeloTela.idTelaProveedor` / `ModeloAvio.idAvioProveedor`, R17) lo captura Desarrollo en v2 y
- * NO existe en Access. Como el endpoint del BOM es SET-COMPLETO, este loader RE-ENVÍA el amarre
- * que ya está en BD; si no lo hiciera, una segunda corrida (F10 vuelve a pasar los ETL) dejaría
- * todos los amarres en NULL sin decir nada.
+ * ⚠️ **LO QUE SE CAPTURÓ EN v2, EL ETL NO LO BORRA — NUNCA** (DANIEL, 15-ago-2026, D2 de V1-E3e:
+ * *"la migración actualiza lo que viene del Access, pero nunca borra lo que se capturó en el sistema
+ * nuevo"*). El endpoint del BOM es SET-COMPLETO: lo que no va en el payload, el dominio lo borra. Y
+ * los ETL son **re-corribles por diseño** (F10 los vuelve a pasar, y el ensayo varias veces). Sin
+ * protección, cada corrida arrasaría trabajo humano en silencio. Este loader lo evita en DOS
+ * dimensiones, y las dos hacen falta:
+ *
+ *  1. **El AMARRE de precio** (`ModeloTela.idTelaProveedor` / `ModeloAvio.idAvioProveedor`, R17): lo
+ *     captura Desarrollo en v2 y Access no lo trae, así que se RE-ENVÍA el que ya está en BD (si no,
+ *     todos volverían a NULL, apagando la cascada de precios del precosto y del MRP).
+ *  2. **Los RENGLONES ENTEROS capturados en v2** (una tela o un avío que el modelo lleva y que el
+ *     Access nunca tuvo): se re-envían **tal cual están en BD** —consumo, banderas y amarre—, así
+ *     que el set-completo no los ve como sobrantes. Sin esto, re-correr el ETL borraba el renglón y,
+ *     **por cascada, sus `ModeloAvioTalla`** (el consumo por talla capturado a mano, R18).
+ *
+ * **El CSV manda en lo que trae; la BD manda en lo que el CSV no trae.** Consecuencia asumida y
+ * explícita: un renglón que se BORRE en Access después de una corrida ya no se borra en v2 (queda
+ * como si fuera captura nueva). Es exactamente el intercambio que pidió Daniel — perder una baja
+ * rara del sistema viejo es reparable a mano; perder captura del sistema nuevo, no.
  *
  * `ModelosTela.csv` usa `IdTelasDis` (no `IdTelas`): se resuelve con `ENTIDAD_MAPEO.telaPorIdTelasDis`.
  * `ModelosHab.csv` usa `IdHabilitacion`: se resuelve con `ENTIDAD_MAPEO.avio`.
@@ -222,7 +236,17 @@ async function cargarTelasBom(
   const idsModelos = [...porModelo.keys()];
   const existentesBd = await (bd.cliente as PrismaClient).modeloTela.findMany({
     where: { idModelo: { in: idsModelos } },
-    select: { idModelo: true, idTela: true, idTelaProveedor: true },
+    select: {
+      idModelo: true,
+      idTela: true,
+      idTelaProveedor: true,
+      // D2 (Daniel, 15-ago-2026): con esto se pueden RE-ENVIAR tal cual los renglones que el CSV
+      // no trae — los capturados en v2 —, para que el set-completo no los borre.
+      consumoPorPrenda: true,
+      paraPreCosto: true,
+      paraProduccion: true,
+      paraCosto: true,
+    },
   });
   const yaPresentes = new Set(existentesBd.map((r) => `${String(r.idModelo)}:${String(r.idTela)}`));
   const amarrePorRenglon = new Map(
@@ -230,6 +254,13 @@ async function cargarTelasBom(
       .filter((r) => r.idTelaProveedor !== null)
       .map((r) => [`${String(r.idModelo)}:${String(r.idTela)}`, r.idTelaProveedor]),
   );
+  // Renglones ya en BD, agrupados por modelo (para detectar los que el CSV no trae).
+  const enBdPorModelo = new Map<number, typeof existentesBd>();
+  for (const r of existentesBd) {
+    const lista = enBdPorModelo.get(r.idModelo);
+    if (lista === undefined) enBdPorModelo.set(r.idModelo, [r]);
+    else lista.push(r);
+  }
 
   // Aplicar el set-completo por modelo.
   let creados = 0;
@@ -244,8 +275,21 @@ async function cargarTelasBom(
       const amarre = amarrePorRenglon.get(`${String(idModelo)}:${String(t.idTela)}`);
       return amarre === undefined ? t : { ...t, idTelaProveedor: amarre };
     });
+    // ⭐ D2: los renglones que ESTÁN en BD y NO vienen en el CSV se capturaron en v2 → se re-envían
+    // TAL CUAL para que el set-completo no los borre. El CSV manda en lo que trae; la BD en el resto.
+    const delCsv = new Set(telas.map((t) => t.idTela));
+    const capturadosEnV2 = (enBdPorModelo.get(idModelo) ?? [])
+      .filter((r) => !delCsv.has(r.idTela))
+      .map((r) => ({
+        idTela: r.idTela,
+        consumoPorPrenda: r.consumoPorPrenda.toNumber(),
+        paraPreCosto: r.paraPreCosto,
+        paraProduccion: r.paraProduccion,
+        paraCosto: r.paraCosto,
+        idTelaProveedor: r.idTelaProveedor,
+      }));
     const resultado = await intentarCrear(reporte, 'BOM-Tela', idModelo, () =>
-      reemplazarTelasBom(sesion, idModelo, conAmarre, bd),
+      reemplazarTelasBom(sesion, idModelo, [...conAmarre, ...capturadosEnV2], bd),
     );
     if (resultado === null) {
       omitidosValidacion += telas.length;
@@ -335,7 +379,19 @@ async function cargarAviosBom(
   const idsModelos = [...porModelo.keys()];
   const existentesBd = await (bd.cliente as PrismaClient).modeloAvio.findMany({
     where: { idModelo: { in: idsModelos } },
-    select: { idModelo: true, idAvio: true, idAvioProveedor: true },
+    select: {
+      idModelo: true,
+      idAvio: true,
+      idAvioProveedor: true,
+      // D2: para poder re-enviar íntegros los renglones capturados en v2 (ver `cargarTelasBom`).
+      // ⚠️ `consumoPorTalla` NO viaja en el payload del set-completo y el dominio NO lo pisa al
+      // actualizar, así que el toggle R18 sobrevive solo — lo que hay que salvar es EL RENGLÓN:
+      // si desaparece del set, se borra y con él, POR CASCADA, sus `ModeloAvioTalla`.
+      consumoPorPrenda: true,
+      paraPreCosto: true,
+      paraProduccion: true,
+      paraCosto: true,
+    },
   });
   const yaPresentes = new Set(existentesBd.map((r) => `${String(r.idModelo)}:${String(r.idAvio)}`));
   const amarrePorRenglon = new Map(
@@ -343,6 +399,12 @@ async function cargarAviosBom(
       .filter((r) => r.idAvioProveedor !== null)
       .map((r) => [`${String(r.idModelo)}:${String(r.idAvio)}`, r.idAvioProveedor]),
   );
+  const enBdPorModelo = new Map<number, typeof existentesBd>();
+  for (const r of existentesBd) {
+    const lista = enBdPorModelo.get(r.idModelo);
+    if (lista === undefined) enBdPorModelo.set(r.idModelo, [r]);
+    else lista.push(r);
+  }
 
   let creados = 0;
   let existentes = 0;
@@ -354,8 +416,21 @@ async function cargarAviosBom(
       const amarre = amarrePorRenglon.get(`${String(idModelo)}:${String(a.idAvio)}`);
       return amarre === undefined ? a : { ...a, idAvioProveedor: amarre };
     });
+    // ⭐ D2: renglones capturados en v2 (no vienen del Access) → se re-envían tal cual. Sin esto,
+    // re-correr el ETL los borraba junto con su consumo por talla (R18) sin decir una palabra.
+    const delCsv = new Set(avios.map((a) => a.idAvio));
+    const capturadosEnV2 = (enBdPorModelo.get(idModelo) ?? [])
+      .filter((r) => !delCsv.has(r.idAvio))
+      .map((r) => ({
+        idAvio: r.idAvio,
+        consumoPorPrenda: r.consumoPorPrenda.toNumber(),
+        paraPreCosto: r.paraPreCosto,
+        paraProduccion: r.paraProduccion,
+        paraCosto: r.paraCosto,
+        idAvioProveedor: r.idAvioProveedor,
+      }));
     const resultado = await intentarCrear(reporte, 'BOM-Avio', idModelo, () =>
-      reemplazarAviosBom(sesion, idModelo, conAmarre, bd),
+      reemplazarAviosBom(sesion, idModelo, [...conAmarre, ...capturadosEnV2], bd),
     );
     if (resultado === null) {
       omitidosValidacion += avios.length;

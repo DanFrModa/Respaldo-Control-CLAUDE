@@ -837,3 +837,221 @@ describe('permisos + aislamiento por empresa (A9)', () => {
     );
   });
 });
+
+// ── V1-E3e · UN SOLO COSTO: manda el precio REAL de compra (§Post-F9.48) ──────────────────────────
+
+describe('V1-E3e — el precosto valúa con la ÚLTIMA COMPRA REAL (§Post-F9.48)', () => {
+  let folioOc = 0;
+
+  /** Crea una OC de un renglón (fecha explícita: es la que decide cuál es la "última compra"). */
+  async function compra(opciones: {
+    idProveedor: number;
+    fecha: string;
+    precio: number;
+    idTela?: number;
+    idAvio?: number;
+    estatus?: 'borrador' | 'autorizada' | 'cancelada';
+    idEmpresa?: number;
+  }): Promise<void> {
+    folioOc += 1;
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: BigInt(folioOc),
+        idEmpresa: opciones.idEmpresa ?? empresa.id,
+        idProveedor: opciones.idProveedor,
+        estatus: opciones.estatus ?? 'autorizada',
+        fecha: new Date(`${opciones.fecha}T00:00:00.000Z`),
+        lineas: {
+          create: [
+            {
+              idTela: opciones.idTela ?? null,
+              idAvio: opciones.idAvio ?? null,
+              cantidad: 100,
+              precio: opciones.precio,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  beforeEach(() => {
+    folioOc = 0;
+  });
+
+  it('sin amarre: la compra REAL manda sobre el catálogo (tela y avío)', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Felpa', precioSugerido: 20 } });
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'BOT', descripcion: 'Botón', precioReferencia: 3 },
+    });
+    const prov: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Insumos SA' } });
+    // Compra vieja y compra nueva: manda la NUEVA (aunque sea más cara que el catálogo).
+    await compra({ idProveedor: prov.id, fecha: '2026-01-01', precio: 18, idTela: tela.id });
+    await compra({ idProveedor: prov.id, fecha: '2026-07-01', precio: 30, idTela: tela.id });
+    await compra({ idProveedor: prov.id, fecha: '2026-07-02', precio: 5, idAvio: avio.id });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'REAL-SIN-AMARRE',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+        avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 3 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.importe).toBe(60); // 2 × 30
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'avios')?.importe).toBe(15); // 3 × 5
+  });
+
+  it('⭐ el AMARRE elige el proveedor; el precio es el de la última compra A ESE proveedor', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Rib', precioSugerido: 20 } });
+    const amarrado: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Amarrado' } });
+    const otro: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Otro' } });
+    const telaProv = await cliente.telaProveedor.create({
+      data: { idTela: tela.id, idProveedor: amarrado.id, precio: 25 }, // precio NEGOCIADO
+    });
+    // Al amarrado se le compró en mayo a $28; a OTRO, más reciente (julio) y más barato ($15).
+    await compra({ idProveedor: amarrado.id, fecha: '2026-05-01', precio: 28, idTela: tela.id });
+    await compra({ idProveedor: otro.id, fecha: '2026-07-01', precio: 15, idTela: tela.id });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'REAL-CON-AMARRE',
+        maquilaBase: 0,
+        telas: {
+          create: [{ idTela: tela.id, consumoPorPrenda: 1, idTelaProveedor: telaProv.id }],
+        },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+    // Ni los $25 negociados ni los $15 del otro proveedor: los $28 que de verdad se le pagaron a ÉL.
+    expect(linea?.precioUnit).toBe(28);
+    // Y el renglón sigue acreditando al proveedor amarrado (el precio SALIÓ de él).
+    expect(linea?.idTelaProveedor).toBe(telaProv.id);
+  });
+
+  it('al proveedor amarrado nunca se le compró → manda su precio NEGOCIADO', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Jersey', precioSugerido: 9 } });
+    const amarrado: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Nuevo' } });
+    const otro: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Viejo' } });
+    const telaProv = await cliente.telaProveedor.create({
+      data: { idTela: tela.id, idProveedor: amarrado.id, precio: 25 },
+    });
+    await compra({ idProveedor: otro.id, fecha: '2026-07-01', precio: 15, idTela: tela.id });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'AMARRE-SIN-COMPRA',
+        maquilaBase: 0,
+        telas: {
+          create: [{ idTela: tela.id, consumoPorPrenda: 1, idTelaProveedor: telaProv.id }],
+        },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(25);
+  });
+
+  it('una OC en borrador o cancelada NO es una compra: manda el catálogo', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Polar', precioSugerido: 20 } });
+    const prov: Proveedor = await cliente.proveedor.create({ data: { nombre: 'X' } });
+    await compra({
+      idProveedor: prov.id,
+      fecha: '2026-08-01',
+      precio: 999,
+      idTela: tela.id,
+      estatus: 'borrador',
+    });
+    await compra({
+      idProveedor: prov.id,
+      fecha: '2026-08-02',
+      precio: 888,
+      idTela: tela.id,
+      estatus: 'cancelada',
+    });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'NO-COMPRADO',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(20);
+  });
+
+  it('⭐ NO-REGRESIÓN: un precosto CONGELADO no se mueve aunque después cambie el precio de compra', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Felpa', precioSugerido: 20 } });
+    const prov: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Insumos SA' } });
+    await compra({ idProveedor: prov.id, fecha: '2026-01-01', precio: 30, idTela: tela.id });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'CONGELADO-FIRME',
+        maquilaBase: 10,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const congelado = await congelarVersion(sesion(), borrador.id, bd());
+    expect(congelado.costoTotal).toBe(70); // 2 × 30 + 10 de maquila
+
+    // Pasa el tiempo y la tela SUBE: nueva compra autorizada, mucho más cara.
+    await compra({ idProveedor: prov.id, fecha: '2026-09-09', precio: 55, idTela: tela.id });
+
+    // La FOTO no se mueve: ni el total persistido, ni el renglón, ni lo que se lee del API.
+    const releido = await obtenerPrecosto(sesion(), borrador.id, bd());
+    expect(releido.costoTotal).toBe(70);
+    expect(releido.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(30);
+    expect(releido.lineas.find((l) => l.conceptoCodigo === 'tela')?.importe).toBe(60);
+    const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
+    expect(enBd.costoTotal?.toNumber()).toBe(70);
+    // Y sigue siendo inmutable (D3): recalcularlo con el precio nuevo es imposible.
+    await expect(recalcularDesdeBom(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // La versión NUEVA sí toma el precio nuevo: es exactamente lo que Daniel pidió.
+    const v2 = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(v2.costoTotal).toBe(120); // 2 × 55 + 10
+  });
+
+  it('A9: una compra de OTRA empresa no cambia el precosto de ésta', async () => {
+    const tela: Tela = await cliente.tela.create({ data: { nombre: 'Lino', precioSugerido: 20 } });
+    const prov: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Y' } });
+    const otraEmpresa: Empresa = await crearEmpresaPrueba(cliente, 'Empresa vecina');
+    await compra({
+      idProveedor: prov.id,
+      fecha: '2026-08-01',
+      precio: 77,
+      idTela: tela.id,
+      idEmpresa: otraEmpresa.id,
+    });
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'A9-COMPRAS',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(20);
+  });
+});

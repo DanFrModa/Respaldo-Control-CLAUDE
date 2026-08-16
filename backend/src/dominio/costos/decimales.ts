@@ -33,3 +33,14 @@ export function num(d: Prisma.Decimal | null | undefined): number {
 export function numOrNull(d: Prisma.Decimal | null | undefined): number | null {
   return d == null ? null : d.toNumber();
 }
+
+/**
+ * PROMEDIO SIMPLE de una lista de números (asume no vacía; el llamador lo garantiza). Vive aquí
+ * porque lo usan los DOS motores que valúan la receta —el pre-costo rápido (`pre-costo.ts`) y el
+ * precosto persistido (`../desarrollo/precostos.ts`)— para el consumo por talla (R18) y para el
+ * precio de un avío por medida (R5/B11). Tenerlo por duplicado era exactamente el patrón que
+ * V1-E3e vino a cerrar (§Post-F9.48): la misma regla escrita dos veces acaba divergiendo.
+ */
+export function promedioSimple(valores: readonly number[]): number {
+  return valores.reduce((s, v) => s + v, 0) / valores.length;
+}

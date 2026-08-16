@@ -40,9 +40,16 @@ import { redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvioCatalogo,
   resolverPrecioTela,
+  type CompraRealPrecio,
   type OrigenPrecioAvioCatalogo,
   type OrigenPrecioTela,
 } from '../costos/resolucion-precios.js';
+import {
+  claveMaterial,
+  claveMaterialProveedor,
+  leerUltimosPreciosCompra,
+  type UltimosPreciosCompra,
+} from '../costos/ultimo-precio-compra.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -101,6 +108,8 @@ export type OrigenPrecioBom = OrigenPrecioAvioCatalogo;
  */
 function origenTelaParaBom(origen: OrigenPrecioTela): OrigenPrecioBom {
   switch (origen) {
+    case 'ultimo-precio-compra':
+      return 'ultimo-precio-compra';
     case 'amarre':
     case 'amarre-color':
       return 'amarre';
@@ -109,6 +118,56 @@ function origenTelaParaBom(origen: OrigenPrecioTela): OrigenPrecioBom {
       return 'referencia';
     default:
       return 'sin-precio';
+  }
+}
+
+/**
+ * Traduce una entrada del mapa de últimas compras a la forma MÍNIMA que pide la cascada
+ * (`CompraRealPrecio`). `undefined` ⇒ ese material/proveedor nunca se ha comprado.
+ */
+function aCompraReal(
+  ultimos: UltimosPreciosCompra,
+  clave: string,
+  porProveedor = false,
+): CompraRealPrecio | null {
+  const mapa = porProveedor ? ultimos.porMaterialProveedor : ultimos.porMaterial;
+  const u = mapa.get(clave);
+  return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
+}
+
+/**
+ * ⚠️ ¿El renglón tiene AMARRE pero el precio que costea **no lo firmó el proveedor amarrado**?
+ *
+ * Es la alerta «tu amarre no se está usando», y desde V1-E3e la decide el SERVIDOR: la UI no puede
+ * deducirla del origen. Antes bastaba con `origenPrecio !== 'amarre'`, pero ahora el escalón normal
+ * de un renglón amarrado es `ultimo-precio-compra` —la última compra A ESE proveedor—, que NO es un
+ * amarre ignorado... salvo cuando la compra fue a OTRO. Ese caso es alcanzable y silencioso:
+ * Desarrollo amarra a un proveedor para fijar la relación negociada pero deja `TelaProveedor.precio`
+ * en blanco (la columna es nullable), a ese proveedor nunca se le compró, y la cascada cae al
+ * escalón general y costea con el precio de un tercero. La cifra es correcta; lo que faltaba era
+ * decir que el amarre no manda.
+ *
+ * Se compara por **id de proveedor**, nunca por nombre (dos proveedores pueden llamarse parecido y
+ * el nombre es un dato de presentación).
+ */
+function amarreNoFirmaElPrecio(
+  idProveedorAmarrado: number | null,
+  resuelto: { origen: OrigenPrecioTela | OrigenPrecioAvioCatalogo; idProveedor: number | null },
+): boolean {
+  if (idProveedorAmarrado === null) {
+    return false; // sin amarre no hay nada que ignorar
+  }
+  switch (resuelto.origen) {
+    case 'amarre':
+    case 'amarre-color':
+      return false; // el precio ES el del amarrado
+    case 'ultimo-precio-compra':
+      // El caso normal desde §Post-F9.48: la compra es DEL amarrado. Si fue a otro, sí se ignoró.
+      return resuelto.idProveedor !== idProveedorAmarrado;
+    default:
+      // más barato / referencia / sugerido / color-referencia / promedio-medidas / sin-precio:
+      // ninguno salió del proveedor amarrado.
+      return true;
   }
 }
 
@@ -132,6 +191,11 @@ export type ModeloTelaDetalle = {
   origenPrecio: OrigenPrecioBom;
   /** Proveedor del que salió `precioCosteo` (null si salió del catálogo). */
   proveedorPrecio: string | null;
+  /**
+   * ⚠️ Hay AMARRE pero el precio que costea **no lo firmó el proveedor amarrado**. Lo decide el
+   * SERVIDOR comparando ids (nunca nombres): ver {@link amarreNoFirmaElPrecio}.
+   */
+  amarreIgnorado: boolean;
   /** `Tela.precioSugerido`: último escalón de la cascada. */
   precioReferencia: number | null;
 };
@@ -157,6 +221,8 @@ export type ModeloAvioDetalle = {
   origenPrecio: OrigenPrecioBom;
   /** Proveedor del que salió `precioCosteo` (null en promedio-medidas/referencia). */
   proveedorPrecio: string | null;
+  /** ⚠️ Hay AMARRE pero el precio que costea no lo firmó el amarrado ({@link amarreNoFirmaElPrecio}). */
+  amarreIgnorado: boolean;
   /** `Avio.precioReferencia`: último escalón de la cascada. */
   precioReferencia: number | null;
 };
@@ -172,12 +238,20 @@ export interface BomModelo {
 
 /**
  * Lee las telas del BOM de un modelo (con el nombre de la tela, ordenadas por nombre) y resuelve
- * el PRECIO QUE VA A COSTEAR con la MISMA cascada del motor (`resolverPrecioTela`: amarre →
- * sugerido — sin color, porque la receta es por modelo y el color aparece hasta la orden), diciendo
- * de qué escalón salió. La receta no puede enseñar un número distinto del que costea (regla de
- * Daniel, 15-ago-2026), y por eso NO se calcula aquí a mano: se llama al mismo resolvedor.
+ * el PRECIO QUE VA A COSTEAR con la MISMA cascada del motor (`resolverPrecioTela`), diciendo de qué
+ * escalón salió. La receta no puede enseñar un número distinto del que costea (regla de Daniel,
+ * §Post-F9.47), y por eso NO se calcula aquí a mano: se llama al mismo resolvedor.
+ *
+ * Desde V1-E3e (§Post-F9.48) la cascada arranca con la **última COMPRA REAL** de la tela, así que
+ * hace falta la EMPRESA ACTIVA (A9: las OC de otra empresa no cuentan). El histórico se lee POR
+ * LOTE —una sola consulta para todas las telas del BOM, no una por renglón— con
+ * `leerUltimosPreciosCompra`.
  */
-export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTelaDetalle[]> {
+export async function leerTelasBom(
+  tx: Tx,
+  idModelo: number,
+  idEmpresa: number,
+): Promise<ModeloTelaDetalle[]> {
   const filas = await tx.modeloTela.findMany({
     where: { idModelo },
     select: {
@@ -189,6 +263,7 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
       idTelaProveedor: true,
       telaProveedor: {
         select: {
+          idProveedor: true,
           precio: true,
           manejaPrecioPorColor: true,
           proveedor: { select: { nombre: true } },
@@ -198,9 +273,19 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
     },
     orderBy: { tela: { nombre: 'asc' } },
   });
+
+  const ultimos = await leerUltimosPreciosCompra(tx, idEmpresa, {
+    telas: filas.map((f) => f.idTela),
+  });
+
   return filas.map((f) => {
     const precioSugerido = f.tela.precioSugerido === null ? null : f.tela.precioSugerido.toNumber();
     const proveedorAmarrado = f.telaProveedor?.proveedor.nombre ?? null;
+    const claveGlobal = claveMaterial('tela', f.idTela);
+    const claveAmarrado =
+      f.telaProveedor == null
+        ? null
+        : claveMaterialProveedor('tela', f.idTela, f.telaProveedor.idProveedor);
     const resuelto = resolverPrecioTela({
       precioSugerido,
       amarre:
@@ -210,6 +295,9 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
               precio: f.telaProveedor.precio === null ? null : f.telaProveedor.precio.toNumber(),
               manejaPrecioPorColor: f.telaProveedor.manejaPrecioPorColor,
             },
+      ultimaCompra: aCompraReal(ultimos, claveGlobal),
+      ultimaCompraProveedorAmarrado:
+        claveAmarrado === null ? null : aCompraReal(ultimos, claveAmarrado, true),
     });
     return {
       idTela: f.idTela,
@@ -225,10 +313,17 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
       origenPrecio: origenTelaParaBom(resuelto.origen),
       // Solo se acredita al proveedor cuando el precio SALIÓ de él (misma regla de traza que usa
       // el precosto al guardar `idTelaProveedor`): con el sugerido genérico, nadie lo firma.
+      // Con `ultimo-precio-compra` firma QUIEN VENDIÓ (que con amarre es el amarrado, y sin
+      // amarre puede ser cualquiera: por eso se saca del mapa y no se asume).
       proveedorPrecio:
-        resuelto.origen === 'amarre' || resuelto.origen === 'amarre-color'
-          ? proveedorAmarrado
-          : null,
+        resuelto.origen === 'ultimo-precio-compra'
+          ? (ultimos.porMaterialProveedor.get(
+              claveMaterialProveedor('tela', f.idTela, resuelto.idProveedor ?? -1),
+            )?.proveedor ?? null)
+          : resuelto.origen === 'amarre' || resuelto.origen === 'amarre-color'
+            ? proveedorAmarrado
+            : null,
+      amarreIgnorado: amarreNoFirmaElPrecio(f.telaProveedor?.idProveedor ?? null, resuelto),
       precioReferencia: precioSugerido,
     };
   });
@@ -244,7 +339,11 @@ export async function leerTelasBom(tx: Tx, idModelo: number): Promise<ModeloTela
  * precio y su factor) y las medidas activas; `ModeloAvio.idAvioProveedor` guarda el PROVEEDOR del
  * par (no un id de `AvioProveedor`, que tiene PK compuesta).
  */
-export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvioDetalle[]> {
+export async function leerAviosBom(
+  tx: Tx,
+  idModelo: number,
+  idEmpresa: number,
+): Promise<ModeloAvioDetalle[]> {
   const filas = await tx.modeloAvio.findMany({
     where: { idModelo },
     select: {
@@ -306,6 +405,10 @@ export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvio
     else lista.push(m.precio.toNumber());
   }
 
+  // V1-E3e (§Post-F9.48): el escalón 1 de la cascada es la última COMPRA REAL. Se lee POR LOTE
+  // (una consulta para TODOS los avíos del BOM) y acotado a la empresa activa (A9).
+  const ultimos = await leerUltimosPreciosCompra(tx, idEmpresa, { avios: idsAvio });
+
   return filas.map((f) => {
     const delAvio = proveedoresPorAvio.get(f.idAvio) ?? [];
     const nombrePorProveedor = new Map(delAvio.map((p) => [p.idProveedor, p.proveedor.nombre]));
@@ -317,6 +420,11 @@ export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvio
       factorConversionAvio: factorParaLectura(f.avio.factorConversion?.toNumber()),
       idAvioProveedor: f.idAvioProveedor,
       medidas: medidasPorAvio.get(f.idAvio) ?? [],
+      ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', f.idAvio)),
+      ultimaCompraProveedorAmarrado:
+        f.idAvioProveedor === null
+          ? null
+          : aCompraReal(ultimos, claveMaterialProveedor('avio', f.idAvio, f.idAvioProveedor), true),
       proveedores: delAvio.map((p) => ({
         idProveedor: p.idProveedor,
         precio: p.precio === null ? null : p.precio.toNumber(),
@@ -345,21 +453,33 @@ export async function leerAviosBom(tx: Tx, idModelo: number): Promise<ModeloAvio
       // costeo guarda 0.69 pero calcula el importe con otro número.
       precioCosteo: resuelto.precio === null ? null : redondear2(resuelto.precio),
       origenPrecio: resuelto.origen,
+      // El proveedor que FIRMA el precio. Con `ultimo-precio-compra` puede ser uno que ni siquiera
+      // está capturado como `AvioProveedor` (se le compró sin darlo de alta en el catálogo del
+      // avío): por eso el nombre se toma del histórico de compras antes que del catálogo.
       proveedorPrecio:
         resuelto.idProveedor === null
           ? null
-          : (nombrePorProveedor.get(resuelto.idProveedor) ?? null),
+          : (nombrePorProveedor.get(resuelto.idProveedor) ??
+            ultimos.porMaterialProveedor.get(
+              claveMaterialProveedor('avio', f.idAvio, resuelto.idProveedor),
+            )?.proveedor ??
+            null),
+      amarreIgnorado: amarreNoFirmaElPrecio(f.idAvioProveedor, resuelto),
       precioReferencia:
         f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
     };
   });
 }
 
-/** Lee el BOM completo (telas + avíos + arte) de un modelo. Reusado por la ficha. */
-export async function leerBom(tx: Tx, idModelo: number): Promise<BomModelo> {
+/**
+ * Lee el BOM completo (telas + avíos + arte) de un modelo. Reusado por la ficha y por el impreso de
+ * la orden. `idEmpresa` es la empresa ACTIVA (A9): desde V1-E3e el precio que costea sale de la
+ * última compra REAL, y las OC de otra empresa no cuentan.
+ */
+export async function leerBom(tx: Tx, idModelo: number, idEmpresa: number): Promise<BomModelo> {
   const [telas, avios, artes] = await Promise.all([
-    leerTelasBom(tx, idModelo),
-    leerAviosBom(tx, idModelo),
+    leerTelasBom(tx, idModelo, idEmpresa),
+    leerAviosBom(tx, idModelo, idEmpresa),
     leerArtesModelo(tx, idModelo),
   ]);
   return { telas, avios, artes };
@@ -395,7 +515,7 @@ export async function obtenerFichaModelo(
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
   const [bom, tallasCurva] = await Promise.all([
-    leerBom(cliente, idModelo),
+    leerBom(cliente, idModelo, sesion.idEmpresaActiva),
     leerTallasCurvaModelo(cliente, idModelo),
   ]);
   return { ...modelo, ...bom, tallasCurva };
@@ -692,7 +812,7 @@ export async function reemplazarTelasBom(
         datos: { bom: 'telas', telas: deseados.map((d) => d.idTela) },
       });
     }
-    return leerTelasBom(tx, idModelo);
+    return leerTelasBom(tx, idModelo, sesion.idEmpresaActiva);
   }, bd);
 }
 
@@ -722,7 +842,7 @@ export async function reemplazarAviosBom(
         datos: { bom: 'avios', avios: deseados.map((d) => d.idAvio) },
       });
     }
-    return leerAviosBom(tx, idModelo);
+    return leerAviosBom(tx, idModelo, sesion.idEmpresaActiva);
   }, bd);
 }
 
@@ -740,7 +860,7 @@ export async function listarTelasBom(
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  return leerTelasBom(cliente, idModelo);
+  return leerTelasBom(cliente, idModelo, sesion.idEmpresaActiva);
 }
 
 /** Lista los avíos del BOM de un modelo. */
@@ -755,7 +875,7 @@ export async function listarAviosBom(
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  return leerAviosBom(cliente, idModelo);
+  return leerAviosBom(cliente, idModelo, sesion.idEmpresaActiva);
 }
 
 // ── Copiar BOM de otro modelo (atómico) ───────────────────────────────────────
@@ -967,6 +1087,6 @@ export async function copiarBom(
       },
     });
 
-    return leerBom(tx, idDestino);
+    return leerBom(tx, idDestino, sesion.idEmpresaActiva);
   }, bd);
 }

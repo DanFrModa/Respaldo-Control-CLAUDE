@@ -360,7 +360,7 @@ export async function armarDatosImpresoOrden(
 
   const archivos = deps.archivos ?? servicioArchivos();
   const cliente = clienteLectura(bd);
-  const bom = await leer(cliente, orden.idModelo);
+  const bom = await leer(cliente, orden.idModelo, sesion.idEmpresaActiva);
   const fotos = await leerFotos(orden.idModelo, bd, archivos);
 
   // TELA (petición Daniel): la que de verdad se compró para la orden. BEST-EFFORT: si la lectura

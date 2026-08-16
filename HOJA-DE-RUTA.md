@@ -18,9 +18,11 @@
 > PR #179) · **`V1-E3c` ✅ (el editor de la receta del modelo, 15-ago)** — los seis comentarios que
 > Daniel dejó usando el BOM en `prueba`; el amarre de precio de D13/R17, leído desde F7 y **nunca
 > escrito**, por fin se captura; decisión **§Post-F9.47** (*la receta nunca enseña una cifra distinta
-> de la que costea*). **PENDIENTES del track:** `V1-E3`, **`V1-E3e`** (⭐ *un solo costo: manda el
-> precio REAL de compra* — nació de la revisión de E3c, §Post-F9.48: hoy conviven **tres cifras**
-> para el mismo renglón y Daniel ordenó unificarlas; **cambia el motor de costeo**), `V1-E3d pieza B` (el BOM
+> de la que costea*) · **`V1-E3e` ✅ (⭐ un solo costo: manda el precio REAL de compra, 15-ago)** —
+> nació de la revisión de E3c: convivían **tres cifras** para el mismo renglón y Daniel ordenó
+> unificarlas (*"no hay ningún motivo para tener dos costos diferentes"*, §Post-F9.48/.49). **Cambió
+> el motor de costeo**, con los precosteos congelados verificados intactos por construcción, guarda y
+> prueba. **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
 > congelado en la OP, §Post-F9.43/.44), `V1-E4` a `V1-E7`, y la separación **desarrollo vs
 > producción** (§Post-F9.34, con sus tres cabos cerrados el 15-ago en §Post-F9.46 — el nº de
 > producción **se precarga editable**, cambio de opinión de Daniel).

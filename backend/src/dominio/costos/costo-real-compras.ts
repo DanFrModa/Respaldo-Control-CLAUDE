@@ -108,7 +108,7 @@ import type {
   OrigenPrecioReal,
   OrigenRequerido,
 } from '../../contrato/index.js';
-import { EstatusOrdenCompra, type Prisma } from '../../datos/index.js';
+import type { Prisma } from '../../datos/index.js';
 
 import { resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
@@ -117,19 +117,20 @@ import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 
 import { cantidadesDeOrden } from './cantidades.js';
 import { num, numOrNull, redondear2 } from './decimales.js';
+import {
+  claveMaterial,
+  ESTATUS_COMPRADO,
+  leerUltimosPreciosCompra,
+  type ReferenciaCompra,
+} from './ultimo-precio-compra.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
 
-/**
- * Estatus de OC que cuentan como COMPRADO (regla 1 de Daniel: manda lo AUTORIZADO, no lo recibido).
- * Quedan fuera `borrador`, `pendiente_autorizacion` y `cancelada`.
- */
-export const ESTATUS_COMPRADO: readonly EstatusOrdenCompra[] = [
-  EstatusOrdenCompra.autorizada,
-  EstatusOrdenCompra.recibida_parcial,
-  EstatusOrdenCompra.recibida_total,
-];
+// El criterio de "comprado" (OC AUTORIZADA, regla 1 de Daniel) y la referencia a la OC viven desde
+// V1-E3e en `ultimo-precio-compra.ts`, compartidos con la cascada de precios (§Post-F9.48). Se
+// re-exportan aquí para no romper a quien ya los importaba de este módulo.
+export { ESTATUS_COMPRADO, type ReferenciaCompra };
 
 /** Tolerancia de comparación de cantidades decimales (4 decimales en BD). */
 const TOLERANCIA = 1e-6;
@@ -148,17 +149,6 @@ function redondear4(n: number): number {
 }
 
 // ── Tipos de ENTRADA del núcleo puro (los arma el lector de BD de más abajo) ─────────────────────
-
-/** Referencia a una orden de compra (trazabilidad: qué OC, de quién y cuándo). */
-export interface ReferenciaCompra {
-  idOrdenCompra: number;
-  numCompra: number;
-  estatus: string;
-  /** Fecha de la OC en `YYYY-MM-DD` (o null si la OC no la trae). */
-  fecha: string | null;
-  idProveedor: number;
-  proveedor: string;
-}
 
 /** Un material que la orden REQUIERE (BOM `paraCosto`, reconciliado con el MRP), con sus precios. */
 export interface RequeridoMaterial {
@@ -682,11 +672,12 @@ function avisoFactor(material: string): string {
  * órdenes que la consumen (regla 3). "Más reciente" = fecha de la OC descendente (las OC sin fecha
  * van al final), y a igualdad, el folio/renglón mayor (determinista).
  *
- * Se resuelve con una consulta POR MATERIAL (`findFirst`, índice por `id_tela`/`id_avio`) y solo de
- * los materiales que REALMENTE hay que valuar: son unas pocas decenas por orden, van en paralelo, y
- * así el orden es EXACTO (incluidas las OC sin fecha), en vez de traer todo el histórico de compras
- * del material para quedarnos con una fila. El camino de migración ni siquiera las ejecuta
- * (`guardarCostoOrden` con `calcularReal: false`).
+ * ⚠️ **Desde V1-E3e la regla NO vive aquí: vive en `ultimo-precio-compra.ts`**, compartida con la
+ * cascada de precios de la receta/precosteo (§Post-F9.48). Esta función es solo el adaptador que
+ * traduce el resultado a la forma que espera el costo real (clave → precio + OC) y que agrega el
+ * aviso de la deuda de F4 cuando el factor de conversión es ≠ 1. Tener la regla en un solo lugar es
+ * el punto de la etapa: duplicarla es cómo divergen los números. De paso, la lectura pasó de UN
+ * `findFirst` POR MATERIAL a UNA sola consulta por lote (mismo orden, mismo resultado).
  */
 async function leerUltimosPrecios(
   cliente: ClienteLectura,
@@ -703,37 +694,22 @@ async function leerUltimosPrecios(
 }> {
   const precios = new Map<string, { precio: number; compra: ReferenciaCompra }>();
   const avisos: string[] = [];
-  const filas = await Promise.all(
-    materiales.map(async (m) => {
-      const linea = await cliente.ordenCompraLinea.findFirst({
-        where: {
-          ...(m.idTela === null ? { idAvio: m.idAvio } : { idTela: m.idTela }),
-          ordenCompra: { idEmpresa, estatus: { in: [...ESTATUS_COMPRADO] } },
-        },
-        orderBy: [
-          { ordenCompra: { fecha: { sort: 'desc', nulls: 'last' } } },
-          { ordenCompra: { numCompra: 'desc' } },
-          { id: 'desc' },
-        ],
-        select: seleccionLineaOc,
-      });
-      return { clave: m.clave, material: m.material, linea };
-    }),
-  );
-
-  const encontradas = filas.flatMap((f) => (f.linea === null ? [] : [f.linea]));
-  const { factoresAvio, factoresAvioProveedor } = await leerFactores(cliente, encontradas);
-  for (const f of filas) {
-    if (f.linea === null) continue;
-    const factor = factorDeLinea(f.linea, factoresAvio, factoresAvioProveedor);
-    if (factor !== 1) {
-      avisos.push(avisoFactor(f.material));
+  if (materiales.length === 0) {
+    return { precios, avisos };
+  }
+  const { porMaterial } = await leerUltimosPreciosCompra(cliente, idEmpresa, {
+    telas: materiales.flatMap((m) => (m.idTela === null ? [] : [m.idTela])),
+    avios: materiales.flatMap((m) => (m.idAvio === null ? [] : [m.idAvio])),
+  });
+  for (const m of materiales) {
+    const id = m.idTela ?? m.idAvio;
+    if (id === null) continue;
+    const ultima = porMaterial.get(claveMaterial(m.idTela === null ? 'avio' : 'tela', id));
+    if (ultima === undefined) continue;
+    if (ultima.factor !== 1) {
+      avisos.push(avisoFactor(m.material));
     }
-    precios.set(f.clave, {
-      // Precio por unidad de CONSUMO (R1: precio por presentación ÷ factor) — igual que la recepción.
-      precio: num(f.linea.precio) / factor,
-      compra: referencia(f.linea),
-    });
+    precios.set(m.clave, { precio: ultima.precio, compra: ultima.compra });
   }
   return { precios, avisos };
 }

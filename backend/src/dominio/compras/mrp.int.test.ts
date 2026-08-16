@@ -488,7 +488,10 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     const ex = await explosionarOrden(sesion(), idOrden, bd());
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.precioSugerido).toBeCloseTo(10); // precio BASE (no por color)
-    expect(ex.avisos.some((a) => a.includes('varios colores'))).toBe(true);
+    const aviso = ex.avisos.find((a) => a.includes('varios colores'));
+    expect(aviso).toBeDefined();
+    // Sin compras previas, la fuente REAL es el precio base: el aviso debe decir eso.
+    expect(aviso).toContain('se usó el precio base del proveedor');
   });
 
   it('proveedor amarrado INACTIVO: mantiene la sugerencia + AVISO', async () => {
@@ -803,5 +806,284 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await expect(
       autorizarOC(sesion(['compras.ver', 'compras.autorizar']), conTela.id, bd()),
     ).rejects.toThrow(/Cardigan/);
+  });
+});
+
+// ── V1-E3e · D1 (DANIEL, 15-ago-2026): la OC nace con lo último que ESE proveedor cobró ───────────
+
+describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última compra AL MISMO proveedor', () => {
+  let folioOc = 0;
+
+  /** OC de un renglón para sembrar histórico de compras (no ligada a la orden). */
+  async function compra(opciones: {
+    idProveedor: number;
+    fecha: string;
+    precio: number;
+    idTela?: number;
+    idAvio?: number;
+    estatus?: 'borrador' | 'autorizada' | 'cancelada';
+  }): Promise<void> {
+    folioOc += 1;
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: BigInt(9000 + folioOc),
+        idEmpresa: empresa.id,
+        idProveedor: opciones.idProveedor,
+        estatus: opciones.estatus ?? 'autorizada',
+        fecha: new Date(`${opciones.fecha}T00:00:00.000Z`),
+        lineas: {
+          create: [
+            {
+              idTela: opciones.idTela ?? null,
+              idAvio: opciones.idAvio ?? null,
+              cantidad: 100,
+              precio: opciones.precio,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  beforeEach(() => {
+    folioOc = 0;
+  });
+
+  it('TELA amarrada: la línea nace con lo último que le cobró el proveedor AMARRADO', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    // Al amarrado le compramos a $14; a OTRO proveedor, más reciente y más barato ($7).
+    await compra({
+      idProveedor: provBarato.id,
+      fecha: '2026-05-01',
+      precio: 14,
+      idTela: telaFelpa.id,
+    });
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-07-01',
+      precio: 7,
+      idTela: telaFelpa.id,
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    // El proveedor NO cambia (lo fija el amarre, R1/F4)…
+    expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
+    // …y el precio es el que ÉL cobró, nunca el del tercero ($7) ni el de catálogo ($10).
+    expect(felpa?.precioSugerido).toBeCloseTo(14);
+  });
+
+  it('sin compras a ese proveedor, la línea conserva su precio de catálogo (no-regresión)', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    // Solo hay compras a OTRO proveedor: no deben tocar la línea del amarrado.
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-07-01',
+      precio: 7,
+      idTela: telaFelpa.id,
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(10);
+  });
+
+  it('una OC en borrador o cancelada no es compra: la línea sigue con el catálogo', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    await compra({
+      idProveedor: provBarato.id,
+      fecha: '2026-08-01',
+      precio: 99,
+      idTela: telaFelpa.id,
+      estatus: 'borrador',
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(10);
+  });
+
+  it('⭐ un precio POR COLOR NO se pisa con la última compra (la compra no sabe de colores)', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaFelpa.id,
+        idProveedor: provBarato.id,
+        precio: 10,
+        manejaPrecioPorColor: true,
+        colores: { create: [{ idColor: colorRojo.id, precio: 12 }] },
+      },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    // Compra REAL al mismo proveedor, pero de un color que no se sabe cuál es.
+    await compra({
+      idProveedor: provBarato.id,
+      fecha: '2026-07-01',
+      precio: 8,
+      idTela: telaFelpa.id,
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd()); // la orden es sólo Rojo
+    // Gana el precio del COLOR (12): es más específico que una compra ciega al color.
+    expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(12);
+  });
+
+  it('AVÍO sin amarre: el MÁS BARATO sigue eligiendo proveedor, y el precio es el que ÉL cobró', async () => {
+    // provBarato es el más barato del catálogo ($2); provCaro ($3) no debe ganar aunque su compra
+    // sea más reciente y más barata.
+    await compra({
+      idProveedor: provBarato.id,
+      fecha: '2026-05-01',
+      precio: 2.5,
+      idAvio: avioBoton.id,
+    });
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-07-01',
+      precio: 0.5,
+      idAvio: avioBoton.id,
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provBarato.id); // R1 intacto
+    expect(boton?.precioSugerido).toBeCloseTo(2.5); // lo que ÉL cobró, no el $0.50 del otro
+  });
+
+  it('AVÍO amarrado: manda la última compra al amarrado, no la del más barato', async () => {
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { idAvioProveedor: provCaro.id },
+    });
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-05-01',
+      precio: 4,
+      idAvio: avioBoton.id,
+    });
+    await compra({
+      idProveedor: provBarato.id,
+      fecha: '2026-07-01',
+      precio: 1,
+      idAvio: avioBoton.id,
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provCaro.id);
+    expect(boton?.precioSugerido).toBeCloseTo(4);
+  });
+});
+
+describe('MRP — el AVISO de multi-color nombra la fuente REAL del precio (V1-E3e)', () => {
+  /**
+   * El texto se armaba ANTES de que D1 pisara el precio, así que decía "se usó el precio base del
+   * proveedor" incluso cuando la línea había nacido con la última compra: mandaba a revisar un dato
+   * que no era el de la línea. Un aviso que describe mal su propia causa confunde a quien lo lee
+   * dentro de seis meses, y es el mismo pecado —decir una cosa y hacer otra— que esta etapa vino a
+   * corregir en la receta.
+   */
+  it('con una compra previa a ese proveedor, dice "última compra" (no "precio base")', async () => {
+    const colorAzul = await cliente.color.create({ data: { nombre: 'Azul V1E3e' } });
+    const tp = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaFelpa.id,
+        idProveedor: provBarato.id,
+        precio: 10,
+        manejaPrecioPorColor: true,
+        colores: {
+          create: [
+            { idColor: colorRojo.id, precio: 12 },
+            { idColor: colorAzul.id, precio: 15 },
+          ],
+        },
+      },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    // La orden pasa a tener DOS colores con precios de tela distintos → el por-color no aplica.
+    await cliente.ordenLinea.create({
+      data: {
+        idOrden,
+        idColor: colorAzul.id,
+        tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      },
+    });
+    // Y existe una compra REAL a ese mismo proveedor: D1 pisa el precio con ella.
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: 9500n,
+        idEmpresa: empresa.id,
+        idProveedor: provBarato.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-07-01T00:00:00.000Z'),
+        lineas: { create: [{ idTela: telaFelpa.id, cantidad: 100, precio: 17 }] },
+      },
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    // El precio de la línea es el de la última compra (17), no el base (10) ni los de color.
+    expect(renglonTela(ex, telaFelpa.id)?.precioSugerido).toBeCloseTo(17);
+    const aviso = ex.avisos.find((a) => a.includes('varios colores'));
+    expect(aviso).toBeDefined();
+    // ⭐ El texto nombra la fuente REAL, no la que se usaba antes de D1.
+    expect(aviso).toContain('se usó el precio de la última compra a ese proveedor');
+    expect(aviso).not.toContain('se usó el precio base del proveedor');
+  });
+
+  it('sin precio base ni compras, el aviso dice que se cayó al catálogo de la tela', async () => {
+    const colorAzul = await cliente.color.create({ data: { nombre: 'Azul sin base' } });
+    // La tela SÍ tiene precio de catálogo (la fixture no lo trae): es el escalón al que se cae.
+    await cliente.tela.update({ where: { id: telaFelpa.id }, data: { precioSugerido: 9 } });
+    const tp = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaFelpa.id,
+        idProveedor: provBarato.id,
+        precio: null, // el proveedor NO fija precio base
+        manejaPrecioPorColor: true,
+        colores: {
+          create: [
+            { idColor: colorRojo.id, precio: 12 },
+            { idColor: colorAzul.id, precio: 15 },
+          ],
+        },
+      },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    await cliente.ordenLinea.create({
+      data: {
+        idOrden,
+        idColor: colorAzul.id,
+        tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      },
+    });
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const aviso = ex.avisos.find((a) => a.includes('varios colores'));
+    expect(aviso).toBeDefined();
+    // Antes también aquí mentía diciendo "precio base": ese proveedor no tiene precio base.
+    expect(aviso).toContain('se usó el precio de catálogo de la tela');
   });
 });

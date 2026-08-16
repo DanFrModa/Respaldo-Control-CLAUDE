@@ -225,6 +225,65 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(avioTras?.idAvioProveedor).toBe(proveedor.id);
   }, 120_000);
 
+  it('⭐ D2: re-correr el ETL NO borra los renglones de BOM capturados en v2 (ni su consumo por talla)', async () => {
+    // Daniel (15-ago-2026): *"la migración actualiza lo que viene del Access, pero nunca borra lo
+    // que se capturó en el sistema nuevo"*. Antes de V1-E3e, el set-completo del ETL arrasaba estos
+    // renglones —y por cascada sus `ModeloAvioTalla`— en cada re-corrida, en silencio.
+    await ejecutarEtlModelos(cliente);
+
+    const modeloConBom = await cliente.modeloAvio.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idAvio: 'asc' }],
+    });
+    expect(modeloConBom).not.toBeNull();
+    if (modeloConBom === null) return;
+    const idModelo = modeloConBom.idModelo;
+
+    // Alguien captura en v2 una tela y un avío que Access NUNCA tuvo…
+    const telaNueva = await cliente.tela.create({ data: { nombre: 'Tela capturada en v2' } });
+    const avioNuevo = await cliente.avio.create({
+      data: { clave: 'V2-NEW', descripcion: 'Avío capturado en v2' },
+    });
+    await cliente.modeloTela.create({
+      data: { idModelo, idTela: telaNueva.id, consumoPorPrenda: 2.5, paraCosto: false },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo, idAvio: avioNuevo.id, consumoPorPrenda: 4, consumoPorTalla: true },
+    });
+    // …y le captura su consumo POR TALLA (R18), que cuelga del renglón por FK con Cascade.
+    const talla = await cliente.talla.create({ data: { etiqueta: 'V2-XG', orden: 99 } });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioNuevo.id, idTalla: talla.id, consumo: 1.75 },
+    });
+
+    // 2ª corrida del ETL (re-corrible por diseño; el ensayo lo pasa varias veces).
+    await ejecutarEtlModelos(cliente);
+
+    const telaTras = await cliente.modeloTela.findUnique({
+      where: { idModelo_idTela: { idModelo, idTela: telaNueva.id } },
+    });
+    const avioTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioNuevo.id } },
+    });
+    // El renglón sigue vivo y con SUS datos (no los pisó el CSV, que ni lo menciona).
+    expect(telaTras).not.toBeNull();
+    expect(telaTras?.consumoPorPrenda.toNumber()).toBe(2.5);
+    expect(telaTras?.paraCosto).toBe(false);
+    expect(avioTras).not.toBeNull();
+    expect(avioTras?.consumoPorPrenda.toNumber()).toBe(4);
+    expect(avioTras?.consumoPorTalla).toBe(true);
+    // Y su consumo por talla sobrevivió (era lo que se iba por cascada).
+    const medidaTras = await cliente.modeloAvioTalla.findFirst({
+      where: { idModelo, idAvio: avioNuevo.id, idTalla: talla.id },
+    });
+    expect(medidaTras?.consumo.toNumber()).toBe(1.75);
+
+    // Y lo que SÍ viene del Access se sigue actualizando: el renglón migrado sigue ahí.
+    const migradoTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo, idAvio: modeloConBom.idAvio } },
+    });
+    expect(migradoTras).not.toBeNull();
+  }, 120_000);
+
   it('modelo con Activo=0 queda descontinuado (borrado suave)', async () => {
     await ejecutarEtlModelos(cliente);
     const m003 = await cliente.modelo.findFirst({ where: { codigo: 'M003' } });

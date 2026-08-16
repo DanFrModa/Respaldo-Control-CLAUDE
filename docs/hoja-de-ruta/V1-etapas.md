@@ -18,6 +18,30 @@ tomadas** (no se re-abren) y el **criterio de cierre**. El detalle de cada halla
 documentación entra en el MISMO commit · nada se comitea sin autorización · un defecto conocido no
 es "menor" (§7.3).
 
+## ⭐ ORDEN DE EJECUCIÓN (DANIEL, 15-ago-2026) — *"ya quiero empezar a usar el sistema"*
+
+> Daniel: *"Lo primero sería tener desde el desarrollo a inventarios pasando por compras de avíos,
+> telas, estados de cuenta de maquilas (EsMa), etc."* Y sobre la Ruta Crítica y Costos: *"podría ser
+> en una segunda etapa"* (confirma §Post-F9.36 punto 1).
+
+**El punto de partida que cambia la lectura de esta ficha:** lo que Daniel pide **YA ESTÁ
+CONSTRUIDO** — Desarrollo, compras de avíos y telas, inventarios, EsMa y producción son F1–F9,
+cerradas. Lo que falta no es el negocio: son **las fugas, las defensas y el ensayo**.
+
+| Ola | Etapas, en orden | Por qué |
+|---|---|---|
+| 🟢 **1 — la columna vertebral** | `E3e` (un solo costo) → **`E3d pieza B`** (el BOM congelado en la OP) → `E3b` (los papeles y el PT) → `E4` (defensas) → `E6` (arranque) → `E7` (el ensayo) | Es la cadena desarrollo → compras → inventarios → EsMa que Daniel nombró |
+| 🟡 **2 — con el sistema ya en uso** | nomenclatura desarrollo/producción (§Post-F9.34/.46) · lo que queda de `E5` (días de crédito del cliente) | No bloquean capturar trabajo real |
+| 🔵 **Segunda etapa** | **Ruta Crítica** · **Costos/EDR + indicadores** | Decisión de Daniel, ratificada el 15-ago |
+
+**`E3d pieza B` se queda en la Ola 1 por decisión expresa de Daniel** (15-ago: *"sí lo haría de una
+vez. Es importante"*), pese a ser la más grande y llevar migración. Coherente con lo que ya había
+dicho el 14-ago: *"creo que sí es indispensable… así funciona en control viejo"*. Y tiene lógica de
+cadena: **el MRP explota de la receta**, así que congelarla en la OP es lo que hace que las compras
+salgan de lo que de verdad se va a producir.
+
+⚠️ **`E5` punto 1 salió de la lista**: lo entregó `V1-E3c` el 15-ago (ver su nota).
+
 ---
 
 ## V1-E1 · Los cuatro arreglos del precosteo — ✅ HECHA (13-ago-2026)
@@ -605,6 +629,115 @@ dando lo mismo.
 
 **Criterio de cierre:** el mismo renglón, visto desde la receta, el pre-costo rápido y el precosteo,
 da **el mismo número** — y ese número es el de la última compra real.
+
+### Nota de cierre (15-ago-2026)
+
+**Qué quedó**
+
+1. **La regla se EXTRAJO, no se copió** — `dominio/costos/ultimo-precio-compra.ts` (nuevo). La lógica
+   del "último precio de compra" vivía **privada** dentro de `costo-real-compras.ts` (§Post-F9.5);
+   ahora es un módulo propio del que ése importa. **Una sola** definición de *comprado* (OC autorizada
+   / recibida parcial / total) y **un solo** desempate (`fecha DESC NULLS LAST → folio DESC → renglón
+   DESC`). Duplicar la regla es exactamente cómo divergen los números — el defecto que la etapa vino a
+   matar—, así que copiarla habría sido construir el problema de nuevo. De paso, `costo-real-compras`
+   pasó de un `findFirst` por material a **una consulta por lote**.
+2. **La cascada única** en `resolucion-precios.ts`, con el escalón 1 por encima del catálogo, en tela
+   y en avío. El cruce con el amarre tal como lo dictó Daniel: **el amarre elige el proveedor; el
+   precio es el de la última compra a ESE proveedor**; si nunca se le compró, su precio negociado; si
+   tampoco, la cascada general. **Los campos nuevos son opcionales** → quien no los pasa obtiene la
+   cascada de antes, idéntica.
+3. **`pre-costo.ts` dejó de ser un motor aparte:** cerradas sus **CUATRO** divergencias (no solo la
+   que su propio comentario documentaba) — la del "más barato", `promedio-medidas`, `consumoPorTalla`
+   y el redondeo antes de multiplicar.
+4. **Se retiró la re-implementación de la cascada en TSX** (`AmarreTela`/`AmarreAvio`): era una
+   **quinta divergencia** y ya no podía acertar, porque al cliente le falta el histórico de compras.
+   Ahora el renglón conserva el precio que costea hoy y marca *"falta guardar"*. El reviewer: *"fue la
+   decisión honesta: el cliente ya no puede acertar y ahora no lo finge."*
+
+**En vivo por LOTE, no materializado** (decisión del coder, con razón escrita). Una sola consulta
+`DISTINCT ON` para todos los materiales pedidos → **O(1) consultas por llamada**; la lista de precios
+resuelve **todo el catálogo en 3 consultas fijas**. Se descartó materializar (`Tela.ultimoPrecioCompra`)
+por la invalidación: habría que actualizarla en **cinco caminos** (autorizar / des-autorizar / cancelar
+/ editar renglón / borrarlo) **más el ETL**, y el que se olvide deja un precio falso **en silencio** —
+justo la clase de defecto que la etapa combate—. Además choca con D3 (la existencia es la suma de
+movimientos, nunca un nivel guardado).
+
+**⭐ La línea roja, verificada por el reviewer en TRES vías** (no se le aceptó al coder):
+
+1. **Estructural:** la lectura del precosto es proyección pura de filas persistidas — **no hay
+   recálculo en lectura**, así que un cambio de precio de compra no puede alcanzar una foto congelada.
+2. **Guarda:** `exigirBorrador` protege los **6** caminos de mutación, y en cada uno corre **antes** de
+   leer las últimas compras, bajo el advisory lock por desarrollo.
+3. **Prueba:** un precosto se congela con la tela a $30 (total 70), **después** entra una OC autorizada
+   a $55, y al re-leer sigue en 70 — el total proyectado, el `precioUnit`, el `importe`, **el valor
+   persistido en BD** y el `ErrorConflicto` de `recalcularDesdeBom`. Y la **versión nueva sí da 120**:
+   el cambio por diseño, visible. *(De regalo, otra prueba: una compra de OTRA empresa no altera este
+   precosto — A9.)*
+
+**El defecto que el coder cazó ANTES de entregar, y no calló.** Su primer `DISTINCT ON` ordenaba por
+las claves del grupo y no por fecha, así que el ganador global habría sido **el del proveedor con id
+más chico**, no el más reciente — un precio equivocado **en silencio**. Lo corrigió y le puso dos
+pruebas discriminantes; el reviewer comprobó que **sí discriminan** (verificó el orden de creación de
+los proveedores: la versión con el bug fallaría).
+
+**Lo que encontró el reviewer y entró en la ronda de corrección:**
+
+- **Se había apagado la alerta de "tu amarre no se está usando".** Excluir `ultimo-precio-compra` del
+  chip crítico es correcto en el caso normal, pero se excluía **incondicionalmente**. Escenario
+  alcanzable: se amarra la tela a Alsatex para fijar la relación, su `precio` sigue en blanco (columna
+  nullable — amarrar antes de capturar el precio es lo normal), nunca se le compró, y la última compra
+  fue a **otro** proveedor. La cascada salta el amarre y costea con el precio del otro: la cifra es
+  correcta, pero **el aviso desapareció justo en el camino que esta etapa vuelve el más común**.
+
+  **Cómo se cerró:** el dato lo calcula el **servidor** (`amarreNoFirmaElPrecio`), comparando **ids de
+  proveedor, nunca nombres**, y sale al contrato como `amarreIgnorado`. Su `default → true` hace que
+  **un escalón nuevo que alguien agregue mañana grite por omisión** en vez de callarse — la polaridad
+  correcta para una alerta. Con **pruebas pareadas** (front y backend): una exige que grite en el caso
+  del amarre sin precio, su gemela exige que **se calle** cuando la compra sí es del amarrado. Ya no se
+  puede "arreglar" en una dirección sin romper la otra.
+- **Un aviso que describía mal su propia causa.** El del multi-color decía *"se usó el precio base del
+  proveedor"*, pero se armaba **antes** de que D1 pisara el precio. El reviewer lo marcó como nit; se
+  arregló igual (§7.3: un defecto conocido no se archiva) porque es **el mismo pecado que esta etapa
+  vino a corregir en la receta — decir una cosa y hacer otra**. Al escribirlo apareció que **mentía en
+  DOS casos, no en uno**: un proveedor amarrado *sin precio base* hacía caer la cascada al precio de
+  catálogo de la tela y el aviso seguía atribuyéndoselo al proveedor. Se resolvió por la vía buena —el
+  aviso **se arma después de resolver el precio**— y hoy los cuatro estados alcanzables tienen su
+  texto fiel.
+
+**Dos decisiones de Daniel que llegaron con la etapa ya aprobada** (§Post-F9.49):
+
+- **El precio de la OC del MRP** nace de lo último que **ESE** proveedor cobró. Respeta al 100 % la
+  objeción del coder —que el reviewer había avalado— de no poner **nunca** el precio de un tercero: el
+  helper solo consulta el mapa **por material+proveedor**, jamás el global, y **no cambia el proveedor
+  en ninguna rama** (a quién se le compra lo sigue fijando R1/F4). Verificado por el lead además del
+  reviewer: no existe la línea de código que podría poner el precio de otro.
+  **⭐ Y el coder blindó de más, con razón:** si el precio salió de `amarre-color`, **no se pisa** —
+  `OrdenCompraLinea` no guarda color, así que la última compra es ciega a él y dejarla ganar cotizaría
+  una tela negra con el precio de la blanca. El MRP es el **único** llamador con color, o sea el único
+  donde esa ceguera estaría viva. El reviewer repasó los cuatro casos de *"hay color pero ganó otro
+  escalón"* y confirmó que en todos pisar el precio es lo correcto, y que `color-referencia` es
+  **inalcanzable** en el MRP.
+- **La migración deja de borrar lo capturado en v2**, y el agujero era **más ancho** que el amarre: el
+  set-completo borraba **el renglón entero** que el CSV no trae y, por cascada, sus `ModeloAvioTalla`.
+  La regla quedó en una línea: **«el CSV manda en lo que trae; la BD manda en lo que el CSV no trae»**,
+  con la consecuencia asumida escrita al lado (una baja hecha en Access después de una corrida ya no se
+  propaga sola — el intercambio que Daniel eligió). Con prueba de re-corrido que afirma los valores
+  **exactos** y comprueba que el renglón migrado **sigue** actualizándose: no se "arregló" preservando
+  todo y dejando de migrar.
+
+**Lo que NO entró, con su razón (§7.3: se dice, no se calla):**
+
+- **`promedio-medidas` sigue ganando** al último precio de compra: una línea de OC se liga al **avío**,
+  no a la medida, así que su precio es el de **una** medida y cotizaría mal a las demás.
+- **La misma ceguera existe con el color de las telas** y quedó escrita: `OrdenCompraLinea` no tiene
+  color, así que la "última compra" de una tela es tan ciega al color como al tamaño en los avíos. **No
+  está vivo** (ningún llamador pasa `precioColor`), pero el día que alguien meta color al precosto, una
+  tela negra se costearía con el precio de la blanca comprada al final.
+- **Deuda pre-existente que ahora se ve más:** con factor de conversión ≠ 1, el último precio arrastra
+  el defecto conocido del MRP (`HOJA-DE-RUTA` §4). `costo-real-compras` avisa; la receta y el precosteo
+  todavía no.
+
+**Nota de despliegue:** **SIN migración, SIN permisos nuevos, SIN seed** → no requiere `SEED_ON_START`.
 
 ---
 

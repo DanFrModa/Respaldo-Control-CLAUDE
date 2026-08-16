@@ -39,13 +39,15 @@ beforeEach(async () => {
   });
 });
 
-describe('calcularPreCosto — no-regresión F7 (modelo SIN amarres)', () => {
-  it('valúa tela por precioSugerido y avío por precioReferencia, igual que F7', async () => {
+describe('calcularPreCosto — modelo SIN amarres (cascada única, §Post-F9.48)', () => {
+  it('valúa la tela por precioSugerido y el avío por el MÁS BARATO (V1-E3e)', async () => {
     const tela = await cliente.tela.create({ data: { nombre: 'Felpa', precioSugerido: 20 } });
     const avio = await cliente.avio.create({
       data: { clave: 'BOT', descripcion: 'Botón', precioReferencia: 3 },
     });
-    // Un proveedor MÁS BARATO existe pero NO hay amarre → NO debe influir (F7 usa precioReferencia).
+    // Un proveedor MÁS BARATO existe y NO hay amarre. ⚠️ Desde V1-E3e (§Post-F9.48) el pre-costo
+    // dejó de ser un motor aparte y come de la CASCADA ÚNICA, en la que "más barato" está POR
+    // ENCIMA de `precioReferencia`: por diseño, éste es el precio que hoy costea.
     const provBarato = await cliente.proveedor.create({ data: { nombre: 'Botones Baratos' } });
     await cliente.avioProveedor.create({
       data: { idAvio: avio.id, idProveedor: provBarato.id, precio: 1 },
@@ -61,10 +63,13 @@ describe('calcularPreCosto — no-regresión F7 (modelo SIN amarres)', () => {
     });
 
     const pre = await calcularPreCosto(sesion(), modelo.id, bd());
-    expect(pre.totalTela).toBe(30); // 1.5 × 20 (precioSugerido)
-    expect(pre.totalAvios).toBe(6); // 2 × 3 (precioReferencia) — NO el proveedor barato (1)
+    expect(pre.totalTela).toBe(30); // 1.5 × 20 (precioSugerido: la tela no tiene "más barato")
+    // V1-E3e: 2 × 1 (el proveedor MÁS BARATO), no 2 × 3 (`precioReferencia`). Ése es el cambio que
+    // Daniel pidió —*"si ya tenemos precios reales, lo mejor es tomar ese costo"*— y es la MISMA
+    // cifra que da el precosteo. La expectativa vieja (6) quedó del mundo de F7.
+    expect(pre.totalAvios).toBe(2);
     expect(pre.maquila).toBe(8);
-    expect(pre.costoTotal).toBe(44); // 30 + 6 + 0 arte + 8
+    expect(pre.costoTotal).toBe(40); // 30 + 2 + 0 arte + 8
   });
 });
 

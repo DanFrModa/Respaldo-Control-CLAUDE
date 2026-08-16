@@ -71,12 +71,26 @@ interface RenglonComponente {
    * cifra distinta de la que costea) y {@link RenglonComponente.origenPrecio} dice de dónde salió.
    */
   precioCosteo: number | null;
-  /** Escalón de la cascada que ganó (amarre · más barato · promedio de medidas · referencia). */
+  /** Escalón de la cascada que ganó (última compra · amarre · más barato · promedio · referencia). */
   origenPrecio: OrigenPrecio;
   /** Proveedor del que salió `precioCosteo` (null si salió del catálogo o del promedio). */
   proveedorPrecio: string | null;
+  /**
+   * ⚠️ Hay amarre pero el precio que costea NO lo firmó el proveedor amarrado. **Lo decide el
+   * servidor** (compara ids de proveedor): la UI ya no puede deducirlo del origen, porque desde
+   * §Post-F9.48 un renglón amarrado costea normalmente por `ultimo-precio-compra` —la última
+   * compra A ESE proveedor—, y solo es "amarre ignorado" cuando la compra fue a OTRO.
+   */
+  amarreIgnorado: boolean;
   /** Último escalón del catálogo: solo costea cuando `origenPrecio === 'referencia'`. */
   precioReferencia: number | null;
+  /**
+   * El amarre se cambió en pantalla y AÚN NO se guarda, así que `precioCosteo` sigue siendo el que
+   * costea HOY (el del amarre anterior). Desde V1-E3e el escalón que gana depende del **histórico
+   * de compras**, que el navegador no tiene: predecirlo aquí sería justo la "cifra distinta de la
+   * que costea" que prohíbe §Post-F9.47. Se dice que falta guardar y el servidor devuelve la real.
+   */
+  pendienteRecalculo: boolean;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -95,7 +109,9 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
     precioCosteo: t.precioCosteo,
     origenPrecio: t.origenPrecio,
     proveedorPrecio: t.proveedorPrecio,
+    amarreIgnorado: t.amarreIgnorado,
     precioReferencia: t.precioReferencia,
+    pendienteRecalculo: false,
   };
 }
 
@@ -116,7 +132,9 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     precioCosteo: a.precioCosteo,
     origenPrecio: a.origenPrecio,
     proveedorPrecio: a.proveedorPrecio,
+    amarreIgnorado: a.amarreIgnorado,
     precioReferencia: a.precioReferencia,
+    pendienteRecalculo: false,
   };
 }
 
@@ -194,7 +212,10 @@ export function EditorBom({
         precioCosteo: tela.precioSugerido,
         origenPrecio: tela.precioSugerido === null ? 'sin-precio' : 'referencia',
         proveedorPrecio: null,
+        amarreIgnorado: false,
         precioReferencia: tela.precioSugerido,
+        // Renglón nuevo: el escalón real (¿ya se compró esta tela?) lo resuelve el servidor.
+        pendienteRecalculo: true,
       },
     ]);
   }
@@ -220,7 +241,10 @@ export function EditorBom({
         precioCosteo: avio.precioReferencia,
         origenPrecio: avio.precioReferencia === null ? 'sin-precio' : 'referencia',
         proveedorPrecio: null,
+        amarreIgnorado: false,
         precioReferencia: avio.precioReferencia,
+        // Renglón nuevo: el escalón real (¿ya se compró este avío?) lo resuelve el servidor.
+        pendienteRecalculo: true,
       },
     ]);
   }
@@ -386,18 +410,23 @@ export function EditorBom({
 }
 
 /**
- * Cambios que emite el selector de amarre. Incluye el precio que PASARÁ A COSTEAR con el amarre
- * nuevo, re-resuelto en cliente con la MISMA cascada del servidor: si no, entre elegir y guardar
- * el renglón enseñaría el precio viejo (o peor, uno que ningún motor usa).
+ * Cambios que emite el selector de amarre: **solo el amarre**, nunca el precio.
+ *
+ * ⚠️ **V1-E3e retiró la re-resolución en cliente.** Hasta agosto de 2026 el selector re-calculaba
+ * aquí la cascada (amarre → más barato → referencia) para adelantar el precio. Desde §Post-F9.48 el
+ * escalón que gana depende del **histórico de COMPRAS** —la última compra a ese proveedor—, que el
+ * navegador no tiene; adivinarlo produciría exactamente la "cifra distinta de la que costea" que
+ * prohíbe §Post-F9.47. Además, esa copia de la cascada en TSX era una quinta fuente de divergencia.
+ * Ahora el renglón conserva el precio que costea HOY, se marca `pendienteRecalculo` y al guardar el
+ * servidor devuelve el número real (la ficha se recarga y siembra la captura otra vez).
  */
 interface CambioAmarre {
   idAmarre: number | null;
   proveedorAmarrado: string | null;
   /** ¿El proveedor recién amarrado cotiza por color? (el renglón lo marca de inmediato). */
   precioPorColor: boolean;
-  precioCosteo: number | null;
-  origenPrecio: OrigenPrecio;
-  proveedorPrecio: string | null;
+  /** Siempre `true`: el precio del renglón quedó pendiente de que lo resuelva el servidor. */
+  pendienteRecalculo: true;
 }
 
 /** Sección de telas o avíos: tabla densa de renglones compactos con panel expandible. */
@@ -657,29 +686,94 @@ function RenglonBom({
 }
 
 /**
- * Precio del componente en el renglón. ⭐ Regla de Daniel (15-ago-2026): **la receta nunca enseña
+ * Precio del componente en el renglón. ⭐ Regla de Daniel (§Post-F9.47): **la receta nunca enseña
  * una cifra distinta de la que va a costear** — muestra la que costea y dice de dónde salió. El
  * escalón lo resuelve el SERVIDOR con el mismo motor del precosto
  * (`dominio/costos/resolucion-precios.ts`); aquí solo se pinta:
  *
- *  • `amarre`           — precio negociado, con su proveedor. Si además cotiza por color, se marca:
- *                         el costeo usará el precio del color de la orden, que puede ser mayor.
+ *  • `ultimo-precio-compra` — ⭐ §Post-F9.48: el precio de la última COMPRA REAL (OC autorizada), que
+ *                         desde V1-E3e MANDA sobre todo el catálogo. Se dice a quién se le compró.
+ *  • `amarre`           — precio negociado de catálogo, con su proveedor: a ese proveedor todavía no
+ *                         se le ha comprado. Si además cotiza por color, se marca: el costeo usará
+ *                         el precio del color de la orden, que puede ser mayor.
  *  • `mas-barato`       — NO está negociado: es el más barato del avío (normalizado ÷ factor R1).
  *                         Se dice de qué proveedor salió y se conserva la marca de "falta amarrar".
  *                         Si encima había un amarre, es que ese proveedor no tiene precio: se grita.
- *  • `promedio-medidas` — avío "por medida": promedio de los precios de sus medidas. GANA al amarre.
- *  • `referencia`       — último recurso del catálogo (no hay ningún proveedor con precio).
+ *  • `promedio-medidas` — avío "por medida": promedio de los precios de sus medidas. GANA a todo.
+ *  • `referencia`       — catálogo: material NUEVO que nunca se ha comprado ni tiene proveedor.
  *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
  */
 function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.Element {
   const importe = (
     <span className="num text-sm font-medium">{formatearMoneda(renglon.precioCosteo)}</span>
   );
-  // Un amarre que NO es el escalón que costea es un problema que hay que ver desde el renglón
-  // (típico: se amarró un proveedor que no tiene precio capturado).
-  const amarreIgnorado = renglon.idAmarre !== null && renglon.origenPrecio !== 'amarre';
+  // ⚠️ «Tu amarre no se está usando» ya NO se deduce del origen: lo dice el SERVIDOR
+  // (`amarreIgnorado`), que compara ids de proveedor. Desde §Post-F9.48 el escalón normal de un
+  // renglón amarrado es `ultimo-precio-compra` —la última compra A ESE proveedor—, así que ése no
+  // es amarre ignorado... salvo cuando la compra fue a OTRO, y ése es justo el caso que hay que
+  // gritar: se amarró un proveedor sin precio capturado y el costeo se fue con un tercero.
+  // Mientras el amarre esté sin guardar, la bandera del servidor es del amarre ANTERIOR: se calla
+  // (el chip «falta guardar» ya dice que el escalón está por resolverse).
+  const amarreIgnorado = renglon.amarreIgnorado && !renglon.pendienteRecalculo;
+
+  // El amarre cambió y falta guardar: el número de al lado sigue siendo el que costea HOY. No se
+  // adivina el nuevo (depende del histórico de compras, que el navegador no tiene): se avisa, se
+  // dice a quién quedó amarrado y —si ese proveedor cotiza por color— se conserva la advertencia.
+  // UNA sola definición del chip crítico: el mismo hecho («el amarre no manda») en los tres
+  // escalones que pueden llegar a él. El título dice a dónde se fue el precio cuando se sabe.
+  const chipAmarreIgnorado = (
+    <ChipEstado
+      tono="crit"
+      sinPunto
+      title={
+        `El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado ` +
+        `ni compras, así que el costeo lo salta` +
+        (renglon.proveedorPrecio === null ? '.' : ` y usa el de ${renglon.proveedorPrecio}.`)
+      }
+    >
+      amarre sin precio
+    </ChipEstado>
+  );
+
+  const pendiente = renglon.pendienteRecalculo ? (
+    <>
+      {renglon.proveedorAmarrado === null ? null : (
+        <span className="truncate text-xs text-muted-foreground">
+          amarrado: {renglon.proveedorAmarrado}
+        </span>
+      )}
+      {renglon.precioPorColor ? (
+        <ChipEstado
+          tono="info"
+          sinPunto
+          title="Este proveedor cotiza por color: el costeo usará el precio del color de la orden, que puede ser mayor."
+        >
+          precio por color
+        </ChipEstado>
+      ) : null}
+      <ChipEstado
+        tono="warn"
+        sinPunto
+        title="El precio que se ve es el que costea HOY. Guarda la receta: el servidor resuelve el escalón con el amarre nuevo (desde §Post-F9.48 depende de las compras reales, que el navegador no conoce)."
+      >
+        falta guardar
+      </ChipEstado>
+    </>
+  ) : null;
 
   switch (renglon.origenPrecio) {
+    case 'ultimo-precio-compra':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            última compra: {renglon.proveedorPrecio ?? '—'}
+          </span>
+          {amarreIgnorado ? chipAmarreIgnorado : null}
+          {pendiente}
+        </span>
+      );
+
     case 'amarre':
       return (
         <span className="flex flex-wrap items-center gap-1.5">
@@ -687,7 +781,9 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
           <span className="truncate text-xs text-muted-foreground">
             {renglon.proveedorPrecio ?? renglon.proveedorAmarrado ?? 'proveedor amarrado'}
           </span>
-          {renglon.precioPorColor ? (
+          {/* Con el amarre recién cambiado la marca de color la pinta `pendiente` (junto al
+              proveedor nuevo): pintarla aquí también la duplicaría. */}
+          {renglon.precioPorColor && !renglon.pendienteRecalculo ? (
             <ChipEstado
               tono="info"
               sinPunto
@@ -696,6 +792,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
               precio por color
             </ChipEstado>
           ) : null}
+          {pendiente}
         </span>
       );
 
@@ -707,13 +804,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
             el más barato: {renglon.proveedorPrecio ?? '—'}
           </span>
           {amarreIgnorado ? (
-            <ChipEstado
-              tono="crit"
-              sinPunto
-              title={`El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado, así que el costeo lo salta.`}
-            >
-              amarre sin precio
-            </ChipEstado>
+            chipAmarreIgnorado
           ) : (
             <ChipEstado
               tono="warn"
@@ -723,6 +814,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
               sin amarrar
             </ChipEstado>
           )}
+          {pendiente}
         </span>
       );
 
@@ -737,6 +829,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
           >
             promedio de medidas
           </ChipEstado>
+          {pendiente}
         </span>
       );
 
@@ -745,13 +838,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
         <span className="flex flex-wrap items-center gap-1.5">
           {importe}
           {amarreIgnorado ? (
-            <ChipEstado
-              tono="crit"
-              sinPunto
-              title={`El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado, así que el costeo lo salta.`}
-            >
-              amarre sin precio
-            </ChipEstado>
+            chipAmarreIgnorado
           ) : (
             <ChipEstado
               tono="warn"
@@ -761,6 +848,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
               referencia
             </ChipEstado>
           )}
+          {pendiente}
         </span>
       );
 
@@ -775,6 +863,7 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
           >
             sin precio
           </ChipEstado>
+          {pendiente}
         </span>
       );
   }
@@ -811,27 +900,15 @@ function AmarreTela({
         nota: p.manejaPrecioPorColor ? 'precio por color' : null,
       }))}
       alElegir={(id) => {
+        // Solo se registra el AMARRE. El precio lo resuelve el servidor al guardar: desde
+        // §Post-F9.48 el escalón que gana es la última COMPRA REAL a ese proveedor, y el
+        // navegador no tiene el histórico de compras (ver {@link CambioAmarre}).
         const elegido = opciones.find((p) => p.id === id);
-        // CASCADA DE LA TELA (`resolverPrecioTela`): amarre → sugerido. Sin amarre —o con uno sin
-        // precio— costea el precio de catálogo de la tela; nunca hay "más barato" en telas.
-        if (elegido !== undefined && elegido.precio !== null) {
-          alAmarrar({
-            idAmarre: elegido.id,
-            proveedorAmarrado: elegido.nombreProveedor,
-            precioPorColor: elegido.manejaPrecioPorColor,
-            precioCosteo: elegido.precio,
-            origenPrecio: 'amarre',
-            proveedorPrecio: elegido.nombreProveedor,
-          });
-          return;
-        }
         alAmarrar({
           idAmarre: elegido?.id ?? null,
           proveedorAmarrado: elegido?.nombreProveedor ?? null,
           precioPorColor: elegido?.manejaPrecioPorColor ?? false,
-          precioCosteo: renglon.precioReferencia,
-          origenPrecio: renglon.precioReferencia === null ? 'sin-precio' : 'referencia',
-          proveedorPrecio: null,
+          pendienteRecalculo: true,
         });
       }}
     />
@@ -871,56 +948,15 @@ function AmarreAvio({
         nota: p.condiciones,
       }))}
       alElegir={(id) => {
+        // Igual que en la tela: se registra el amarre y NADA MÁS. La cascada que antes se
+        // re-implementaba aquí (amarre → más barato → referencia) era una copia que ya no puede
+        // acertar —le falta el histórico de compras— y era, en sí misma, una fuente de divergencia.
         const elegido = proveedores.find((p) => p.idProveedor === id);
-        const base = {
+        alAmarrar({
           idAmarre: elegido?.idProveedor ?? null,
           proveedorAmarrado: elegido?.nombreProveedor ?? null,
           precioPorColor: false,
-        };
-        // ⚠️ El avío "POR MEDIDA" se costea con el PROMEDIO de sus medidas y ese escalón GANA al
-        // amarre (`resolverPrecioAvioCatalogo`): cambiar de proveedor no mueve lo que costea.
-        if (renglon.origenPrecio === 'promedio-medidas') {
-          alAmarrar({
-            ...base,
-            precioCosteo: renglon.precioCosteo,
-            origenPrecio: 'promedio-medidas',
-            proveedorPrecio: null,
-          });
-          return;
-        }
-        // CASCADA DEL AVÍO: amarre → más barato → referencia.
-        const precioElegido = elegido === undefined ? null : precioDe(elegido);
-        if (elegido !== undefined && precioElegido !== null) {
-          alAmarrar({
-            ...base,
-            precioCosteo: precioElegido,
-            origenPrecio: 'amarre',
-            proveedorPrecio: elegido.nombreProveedor,
-          });
-          return;
-        }
-        const masBarato = proveedores.reduce<{ nombre: string; precio: number } | null>(
-          (mejor, p) => {
-            const precio = precioDe(p);
-            if (precio === null || (mejor !== null && precio >= mejor.precio)) return mejor;
-            return { nombre: p.nombreProveedor, precio };
-          },
-          null,
-        );
-        if (masBarato !== null) {
-          alAmarrar({
-            ...base,
-            precioCosteo: masBarato.precio,
-            origenPrecio: 'mas-barato',
-            proveedorPrecio: masBarato.nombre,
-          });
-          return;
-        }
-        alAmarrar({
-          ...base,
-          precioCosteo: renglon.precioReferencia,
-          origenPrecio: renglon.precioReferencia === null ? 'sin-precio' : 'referencia',
-          proveedorPrecio: null,
+          pendienteRecalculo: true,
         });
       }}
     />

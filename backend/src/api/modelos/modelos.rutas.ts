@@ -161,6 +161,7 @@ function aTelaBomSalida(
     precioCosteo: t.precioCosteo,
     origenPrecio: t.origenPrecio,
     proveedorPrecio: t.proveedorPrecio,
+    amarreIgnorado: t.amarreIgnorado,
     precioReferencia: t.precioReferencia,
   };
 }
@@ -183,6 +184,7 @@ function aAvioBomSalida(
     precioCosteo: a.precioCosteo,
     origenPrecio: a.origenPrecio,
     proveedorPrecio: a.proveedorPrecio,
+    amarreIgnorado: a.amarreIgnorado,
     precioReferencia: a.precioReferencia,
   };
 }
