@@ -84,8 +84,24 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      # MISMA causa que el lint, diez días después (16-ago-2026): `tsc --noEmit`
+      # murió con OOM (exit 134) en el runner. En su momento se le subió el heap
+      # SOLO al lint, y el typecheck se quedó con el default — así que la cicatriz
+      # se repitió un paso más abajo.
+      #
+      # No lo disparó una etapa concreta: medido con `--extendedDiagnostics`,
+      # `prueba` ya pedía 5.22 GB y la rama que reventó, 5.28 GB (+1 %). El
+      # proyecto lleva tiempo al filo: 2,614 archivos, 3.5 M de tipos y 19.7 M de
+      # instanciaciones (Prisma + Zod generan tipos enormes).
+      #
+      # ⚠️ Esto NO es la cura, es la venda: cada etapa suma tipos y el techo del
+      # runner no se mueve. Cuando 6 GB no alcancen, hay que ATACAR LA CAUSA
+      # (proyectos de TS separados / `--build` incremental / adelgazar los tipos
+      # generados), no volver a subir el número. Deuda en `HOJA-DE-RUTA.md` §4.
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Formato (prettier --check)
         run: npm run format:check
