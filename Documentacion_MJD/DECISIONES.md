@@ -2347,9 +2347,14 @@ en medio del nombre).
 ⚠️ **Es la TERCERA vez esta semana que aparece este patrón**: el mismo defecto se arregló en el BOM
 (V1-E3c punto 4) y en las 12 pantallas de cliente (V1-E4 punto 7), **y no viajó al arte**. Al
 construirlo: **reusar `ComboboxBuscable`**, y de paso **barrer TODOS los `SelectNativo` de proveedor
-que queden**, no solo éste. *(Nota fina: `LIKE %texto%` casa una subcadena contigua; si Daniel espera
-que "moda textil" encuentre "Textiles Moda del Norte", hace falta partir la búsqueda en palabras y
-exigirlas todas. Confirmar al construir.)*
+que queden**, no solo éste.
+
+✅ **CERRADO (Daniel, 16-ago-2026):** preguntado si bastaba con que **una palabra** case en cualquier
+parte del nombre (lo que el servidor ya hace) o si quería además que *"moda textil"* encontrara
+*"Textiles Moda del Norte"* con las palabras sueltas y en otro orden — *"como ya funciona el buscador,
+que busques una palabra está perfecto"*. **NO se parte la búsqueda en palabras.** El trabajo es
+puramente de pantalla: cambiar el desplegable nativo por el `ComboboxBuscable` que ya consume esa
+búsqueda.
 
 **8. DIFERIDO a una etapa posterior, por decisión de Daniel:**
 > *"En una siguiente etapa quiero poder poner la ficha del estampado."*
