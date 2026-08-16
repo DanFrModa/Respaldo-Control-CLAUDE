@@ -22,7 +22,15 @@
 > nació de la revisión de E3c: convivían **tres cifras** para el mismo renglón y Daniel ordenó
 > unificarlas (*"no hay ningún motivo para tener dos costos diferentes"*, §Post-F9.48/.49). **Cambió
 > el motor de costeo**, con los precosteos congelados verificados intactos por construcción, guarda y
-> prueba. **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
+> prueba.
+>
+> ⚠️ **PENDIENTE DE GABRIEL (16-ago):** `V1-E3c` (PR #180) y `V1-E3e` (PR #181) están **integradas en
+> `prueba` pero SIN DESPLEGAR**. Las dos van **SIN migración, SIN permisos y SIN seed** → **no**
+> requieren `SEED_ON_START`. Hasta que se despliegue, Daniel no ve ni la receta arreglada ni los
+> costos unificados. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
+> configuración de Cloudflare R2, ver `docs/hoja-de-ruta/F1-etapas.md:222` para las cuatro trampas.)*
+>
+> **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
 > congelado en la OP, §Post-F9.43/.44), `V1-E4` a `V1-E7`, y la separación **desarrollo vs
 > producción** (§Post-F9.34, con sus tres cabos cerrados el 15-ago en §Post-F9.46 — el nº de
 > producción **se precarga editable**, cambio de opinión de Daniel).

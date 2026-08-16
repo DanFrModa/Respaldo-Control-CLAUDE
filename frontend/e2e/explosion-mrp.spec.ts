@@ -62,8 +62,13 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
       await primera.click();
       if (liberada) {
         await expect(page.getByTestId('exp-generar-oc')).toBeVisible();
+        // La aserción histórica de este spec: el impreso de la explosión también está ahí, y
+        // HABILITADO (con la puerta cerrada el servidor da 409, por eso el botón se apaga).
+        await expect(page.getByTestId('exp-imprimir')).toBeVisible();
+        await expect(page.getByTestId('exp-imprimir')).toBeEnabled();
       } else {
         await expect(page.getByText(/todavía no la libera Desarrollo/)).toBeVisible();
+        await expect(page.getByTestId('exp-imprimir')).toBeDisabled();
       }
     }
   });

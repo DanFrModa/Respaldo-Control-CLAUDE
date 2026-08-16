@@ -70,6 +70,7 @@ function avio(over: Partial<RecetaOrdenAvio> = {}): RecetaOrdenAvio {
     idAvioProveedor: null,
     proveedorAmarrado: null,
     tallas: [],
+    tieneTallas: false,
     consumoModelo: 1,
     precioModelo: 0.85,
     precioModeloDeCompra: false,

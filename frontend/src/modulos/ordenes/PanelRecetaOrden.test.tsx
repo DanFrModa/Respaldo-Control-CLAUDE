@@ -12,6 +12,7 @@ const marcarMutateMock = vi.fn();
 const liberarMutateMock = vi.fn();
 const quitarMutateMock = vi.fn();
 const restaurarMutateMock = vi.fn();
+const editarMutateMock = vi.fn();
 
 vi.mock('@/api/receta-orden', () => ({
   useRecetaOrden: (id: unknown) => useRecetaOrdenMock(id) as unknown,
@@ -20,7 +21,7 @@ vi.mock('@/api/receta-orden', () => ({
   useQuitarRenglonReceta: () => ({ mutate: quitarMutateMock, isPending: false }),
   useRestaurarRenglonReceta: () => ({ mutate: restaurarMutateMock, isPending: false }),
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
-  useEditarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditarRenglonReceta: () => ({ mutate: editarMutateMock, isPending: false }),
 }));
 
 /** Receta base: una tela y dos avíos (uno de ellos, la jareta), sin revisar y sin liberar. */
@@ -83,6 +84,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
+        tieneTallas: false,
         consumoModelo: 2,
         precioModelo: 2,
         precioModeloDeCompra: false,
@@ -110,6 +112,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
+        tieneTallas: false,
         consumoModelo: 1,
         precioModelo: 8,
         precioModeloDeCompra: false,
@@ -325,5 +328,171 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
     };
     render(receta);
     expect(screen.getByText('El modelo cambió')).toBeInTheDocument();
+  });
+});
+
+describe('Medidas por talla en la OP (§Post-F9.43(c))', () => {
+  /** Receta con el botón capturado POR TALLA (dos tallas, una amarrada al catálogo). */
+  function conMedidas(): RecetaOrden {
+    const base = recetaDePrueba();
+    return {
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              consumoPorTalla: true,
+              tieneTallas: true,
+              tallas: [
+                {
+                  idTalla: 100,
+                  etiqueta: 'CH',
+                  consumo: 0.5,
+                  enLaOrden: true,
+                  idAvioMedida: 7,
+                  medidaAmarrada: '15 cm',
+                  precioMedida: 3,
+                },
+                // ⭐ V1-E3c en la OP: la talla G la produce la orden y NO tiene medida capturada.
+                // Antes ni siquiera aparecía; ahora se puede capturar desde aquí.
+                {
+                  idTalla: 101,
+                  etiqueta: 'G',
+                  consumo: null,
+                  enLaOrden: true,
+                  idAvioMedida: null,
+                  medidaAmarrada: null,
+                  precioMedida: null,
+                },
+              ],
+            }
+          : a,
+      ),
+    };
+  }
+
+  it('la talla que la orden produce y NO tiene medida se puede CAPTURAR (V1-E3c en la OP)', async () => {
+    render(conMedidas());
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+
+    // La talla G viene con `consumo: null` = SIN CAPTURAR: campo vacío, no un 0.
+    const cajaG = screen.getByTestId('medida-receta-avio-2-101');
+    expect(cajaG).toHaveValue(null);
+    await userEvent.type(cajaG, '1.2');
+    await userEvent.click(screen.getByTestId('guardar-medidas-receta-avio-2'));
+
+    // Set-COMPLETO: viaja la ya capturada (con su amarre) y la recién tecleada.
+    expect(editarMutateMock).toHaveBeenCalledWith(
+      {
+        idOrden: 50,
+        tipo: 'avio',
+        idRenglon: 2,
+        cuerpo: {
+          tallas: [
+            { idTalla: 100, consumo: 0.5, idAvioMedida: 7 },
+            { idTalla: 101, consumo: 1.2, idAvioMedida: null },
+          ],
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('⭐ la talla que la orden YA NO LLEVA no se borra en silencio: viaja en el set-completo', async () => {
+    // El PATCH es SET-COMPLETO: lo que no viaja, se borra. Una medida capturada de una talla que
+    // esta orden dejó de producir (`enLaOrden: false`) tiene que seguir viajando al editar otra
+    // talla — si no, tocar CH borraría la medida de XL sin que nadie se entere. Hoy es correcto
+    // por construcción (está en `avio.tallas` y solo se filtran las vacías); esta aserción lo
+    // clava para que el próximo refactor no lo rompa sin enterarse.
+    const base = conMedidas();
+    const conAjena: RecetaOrden = {
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              tallas: [
+                ...a.tallas,
+                {
+                  idTalla: 102,
+                  etiqueta: 'XL',
+                  consumo: 0.9,
+                  enLaOrden: false,
+                  idAvioMedida: 8,
+                  medidaAmarrada: '20 cm',
+                  precioMedida: 4,
+                },
+              ],
+            }
+          : a,
+      ),
+    };
+    render(conAjena);
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+
+    // Se ve, marcada, al final — no desaparece de la pantalla.
+    expect(screen.getByTestId('medida-receta-avio-2-102')).toHaveValue(0.9);
+    expect(screen.getByText('no va en esta orden')).toBeInTheDocument();
+
+    // Y al editar OTRA talla, la de XL viaja intacta (con su amarre).
+    await userEvent.type(screen.getByTestId('medida-receta-avio-2-101'), '1.2');
+    await userEvent.click(screen.getByTestId('guardar-medidas-receta-avio-2'));
+    expect(editarMutateMock).toHaveBeenCalledWith(
+      {
+        idOrden: 50,
+        tipo: 'avio',
+        idRenglon: 2,
+        cuerpo: {
+          tallas: [
+            { idTalla: 100, consumo: 0.5, idAvioMedida: 7 },
+            { idTalla: 101, consumo: 1.2, idAvioMedida: null },
+            { idTalla: 102, consumo: 0.9, idAvioMedida: 8 },
+          ],
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('vaciar una talla ya capturada la BORRA (no viaja como 0)', async () => {
+    render(conMedidas());
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    await userEvent.clear(screen.getByTestId('medida-receta-avio-2-100'));
+    await userEvent.click(screen.getByTestId('guardar-medidas-receta-avio-2'));
+
+    expect(editarMutateMock).toHaveBeenCalledWith(
+      { idOrden: 50, tipo: 'avio', idRenglon: 2, cuerpo: { tallas: [] } },
+      expect.anything(),
+    );
+  });
+
+  it('el toggle "se consume por talla" se puede APAGAR desde la orden', async () => {
+    render(conMedidas());
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    await userEvent.click(screen.getByTestId('consumo-por-talla-receta-2'));
+
+    expect(editarMutateMock).toHaveBeenCalledWith(
+      { idOrden: 50, tipo: 'avio', idRenglon: 2, cuerpo: { consumoPorTalla: false } },
+      expect.anything(),
+    );
+  });
+
+  it('sin tallas en la matriz de la orden lo DICE en vez de fingir una matriz', async () => {
+    const base = conMedidas();
+    render({
+      ...base,
+      avios: base.avios.map((a) => (a.id === 2 ? { ...a, tieneTallas: false, tallas: [] } : a)),
+    });
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    expect(screen.getByTestId('sin-tallas-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('guardar-medidas-receta-avio-2')).not.toBeInTheDocument();
+  });
+
+  it('sin permiso de administrar se ven pero NO se editan', async () => {
+    render(conMedidas(), false);
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    expect(screen.getByTestId('medida-receta-avio-2-100')).toBeDisabled();
+    expect(screen.getByTestId('consumo-por-talla-receta-2')).toBeDisabled();
+    expect(screen.queryByTestId('guardar-medidas-receta-avio-2')).not.toBeInTheDocument();
   });
 });

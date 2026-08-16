@@ -9,7 +9,7 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -21,6 +21,7 @@ import {
   useRecetaOrden,
   useRestaurarRenglonReceta,
 } from '@/api/receta-orden';
+import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
 import type {
   RecetaOrden,
   RecetaOrdenArte,
@@ -36,6 +37,7 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +50,8 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { SelectNativo } from '@/components/ui/native-select';
+import { formatearMoneda } from '@/lib/formato';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 
@@ -399,6 +403,14 @@ function AvisosDesalineacion({ receta }: { receta: RecetaOrden }): React.JSX.Ele
       <p className="text-xs text-muted-foreground">
         La receta de esta orden NO se movió (para eso está congelada). Si algún cambio debe entrar,
         usa «Restaurar» en el renglón.
+        {d.cambios.some((c) => c.que === 'agregado') ? (
+          <>
+            {' '}
+            Para los materiales que el modelo <strong>agregó</strong>, usa «Agregar»: como ya viven
+            en el modelo, el renglón se trae solo su precio, su proveedor amarrado y sus medidas por
+            talla.
+          </>
+        ) : null}
       </p>
     </div>
   );
@@ -451,6 +463,198 @@ function ChipsRenglon({
   );
 }
 
+/** Una talla en captura dentro de la OP (consumo como TEXTO + el amarre a la medida del avío). */
+interface RenglonTallaOrden {
+  idTalla: number;
+  etiqueta: string;
+  /** Texto: `''` = SIN CAPTURAR (no viaja en el set-completo). Un `'0'` tecleado sí viaja. */
+  consumo: string;
+  enLaOrden: boolean;
+  idAvioMedida: number | null;
+}
+
+/**
+ * MEDIDAS POR TALLA del avío, **capturables en la orden** (§Post-F9.43(c): *"Desarrollo ajusta,
+ * **define las medidas por talla** y libera"*).
+ *
+ * ⭐ Extiende a la OP lo que V1-E3c resolvió en el modelo (`EditorMedidasAvio` +
+ * `medidas-avio-talla.ts`) — no lo reinventa:
+ *  - Los renglones **nacen del universo de tallas** (aquí, la matriz color×talla de LA ORDEN), no
+ *    de las filas que alguien haya alcanzado a capturar. Sin esto, un avío `consumoPorTalla` cuyo
+ *    modelo nunca capturó medidas se quedaba sin forma de capturarlas desde la orden.
+ *  - **`null` ≠ `0`**: vacío es "sin capturar" y no viaja en el set-completo; un `0` tecleado sí
+ *    viaja (es un cero a propósito, y el MRP lo respeta).
+ *  - **Amarre `idAvioMedida`** contra el catálogo de medidas del avío, deshabilitado mientras no
+ *    haya consumo (el amarre vive en la fila, y sin consumo no hay fila donde guardarlo).
+ *  - **Toggle `consumoPorTalla`**, para poder encenderlo/apagarlo desde la orden.
+ *
+ * El PATCH del renglón ya es SET-COMPLETO, así que se manda el juego entero de una vez.
+ */
+function MedidasPorTalla({
+  avio,
+  editable,
+  ocupado,
+  alGuardar,
+}: {
+  avio: RecetaOrdenAvio;
+  editable: boolean;
+  ocupado: boolean;
+  alGuardar: (cuerpo: {
+    consumoPorTalla?: boolean;
+    tallas?: { idTalla: number; consumo: number; idAvioMedida: number | null }[];
+  }) => void;
+}): React.JSX.Element {
+  const [abierto, setAbierto] = useState(false);
+  const [renglones, setRenglones] = useState<RenglonTallaOrden[]>([]);
+  const catalogoMedidas = useMedidasDelCatalogo(abierto ? avio.idAvio : undefined);
+
+  // Se siembra desde el servidor cada vez que llega/cambia la receta (es la autoridad, A1).
+  useEffect(() => {
+    setRenglones(
+      avio.tallas.map((t) => ({
+        idTalla: t.idTalla,
+        etiqueta: t.etiqueta,
+        consumo: t.consumo === null ? '' : String(t.consumo),
+        enLaOrden: t.enLaOrden,
+        idAvioMedida: t.idAvioMedida,
+      })),
+    );
+  }, [avio.tallas]);
+
+  function cambiar(idTalla: number, cambios: Partial<RenglonTallaOrden>): void {
+    setRenglones((prev) => prev.map((r) => (r.idTalla === idTalla ? { ...r, ...cambios } : r)));
+  }
+
+  function guardar(): void {
+    alGuardar({
+      // Las tallas en BLANCO NO se mandan: el set-completo las borra, que es justo cómo se
+      // "descaptura" una medida. Mandarlas como 0 crearía ceros reales que envenenan el MRP.
+      tallas: renglones
+        .filter((r) => r.consumo.trim() !== '')
+        .map((r) => ({
+          idTalla: r.idTalla,
+          consumo: Number(r.consumo.replace(',', '.')),
+          idAvioMedida: r.idAvioMedida,
+        })),
+    });
+  }
+
+  const medidasCatalogo = (catalogoMedidas.data?.datos ?? []).filter((m) => m.activo);
+  const resumen = avio.tallas
+    .filter((t) => t.consumo !== null)
+    .map((t) => `${t.etiqueta} ${String(t.consumo)}`)
+    .join(' · ');
+
+  return (
+    <span className="ml-1 align-middle text-xs" data-testid={`receta-avio-tallas-${avio.id}`}>
+      <button
+        type="button"
+        className="text-muted-foreground underline decoration-dotted underline-offset-2"
+        aria-expanded={abierto}
+        onClick={() => setAbierto((v) => !v)}
+        data-testid={`toggle-medidas-receta-avio-${avio.id}`}
+      >
+        (por talla: {resumen === '' ? 'sin medidas capturadas' : resumen})
+      </button>
+
+      {abierto ? (
+        <span
+          className="mt-1 block space-y-1.5 rounded-md border bg-card p-2"
+          data-testid={`panel-medidas-receta-avio-${avio.id}`}
+        >
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-input accent-primary"
+              checked={avio.consumoPorTalla}
+              disabled={!editable || ocupado}
+              onChange={(e) => alGuardar({ consumoPorTalla: e.target.checked })}
+              data-testid={`consumo-por-talla-receta-${avio.id}`}
+            />
+            ¿Este avío se consume por talla EN ESTA ORDEN?
+          </label>
+
+          {!avio.tieneTallas ? (
+            <span className="block text-muted-foreground" data-testid={`sin-tallas-${avio.id}`}>
+              Esta orden todavía no tiene tallas capturadas en su matriz: captúralas para poder
+              definir el consumo por talla.
+            </span>
+          ) : (
+            <>
+              {renglones.map((r) => (
+                <span key={r.idTalla} className="flex flex-wrap items-center gap-2">
+                  <label
+                    htmlFor={`medida-receta-avio-${String(avio.id)}-${String(r.idTalla)}`}
+                    className="flex w-20 shrink-0 items-center gap-1 font-medium"
+                  >
+                    {r.etiqueta}
+                    {r.enLaOrden ? null : (
+                      <ChipEstado tono="warn" sinPunto>
+                        no va en esta orden
+                      </ChipEstado>
+                    )}
+                  </label>
+                  <Input
+                    id={`medida-receta-avio-${String(avio.id)}-${String(r.idTalla)}`}
+                    type="number"
+                    min={0}
+                    step="0.0001"
+                    inputMode="decimal"
+                    className="h-7 w-24"
+                    placeholder="sin capturar"
+                    value={r.consumo}
+                    disabled={!editable || ocupado}
+                    onChange={(e) => cambiar(r.idTalla, { consumo: e.target.value })}
+                    data-testid={`medida-receta-avio-${avio.id}-${r.idTalla}`}
+                  />
+                  {medidasCatalogo.length > 0 ? (
+                    <SelectNativo
+                      className="w-48"
+                      aria-label={`Medida del avío para la talla ${r.etiqueta}`}
+                      title={
+                        r.consumo.trim() === ''
+                          ? 'Captura primero el consumo de esta talla para poder amarrarle una medida.'
+                          : undefined
+                      }
+                      disabled={!editable || ocupado || r.consumo.trim() === ''}
+                      value={r.idAvioMedida === null ? '' : String(r.idAvioMedida)}
+                      onChange={(e) =>
+                        cambiar(r.idTalla, {
+                          idAvioMedida: e.target.value === '' ? null : Number(e.target.value),
+                        })
+                      }
+                      data-testid={`medida-amarre-receta-avio-${avio.id}-${r.idTalla}`}
+                    >
+                      <option value="">Sin medida amarrada</option>
+                      {medidasCatalogo.map((m) => (
+                        <option key={m.id} value={String(m.id)}>
+                          {m.medida} — {formatearMoneda(m.precio)}
+                        </option>
+                      ))}
+                    </SelectNativo>
+                  ) : null}
+                </span>
+              ))}
+
+              {editable ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={guardar}
+                  disabled={ocupado}
+                  data-testid={`guardar-medidas-receta-avio-${avio.id}`}
+                >
+                  Guardar consumo por talla
+                </Button>
+              ) : null}
+            </>
+          )}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /** Celda numérica editable (consumo o precio): guarda al salir del campo, si de verdad cambió. */
 function CeldaNumero({
   valor,
@@ -458,21 +662,28 @@ function CeldaNumero({
   ocupado,
   testid,
   alGuardar,
+  compacto = false,
 }: {
   valor: number | null;
   editable: boolean;
   ocupado: boolean;
   testid: string;
   alGuardar: (nuevo: number) => void;
+  /** Caja angosta para las medidas por talla, que van varias en la misma línea. */
+  compacto?: boolean;
 }): React.JSX.Element {
   const [texto, setTexto] = useState<string | null>(null);
   const mostrado = texto ?? (valor === null ? '' : String(valor));
   if (!editable) {
-    return <span className="num text-sm">{valor === null ? '—' : valor}</span>;
+    return (
+      <span className={compacto ? 'num text-xs' : 'num text-sm'}>
+        {valor === null ? '—' : valor}
+      </span>
+    );
   }
   return (
     <Input
-      className="h-8 w-24 text-right"
+      className={compacto ? 'h-6 w-14 px-1 text-right text-xs' : 'h-8 w-24 text-right'}
       inputMode="decimal"
       value={mostrado}
       disabled={ocupado}
@@ -631,8 +842,9 @@ function AgregarRenglon({
           <DialogHeader>
             <DialogTitle>Agregar {tipo === 'tela' ? 'tela' : 'avío'} a esta orden</DialogTitle>
             <DialogDescription>
-              Se agrega SOLO a esta orden (queda marcado como agregado a mano). El modelo no se
-              toca.
+              Se agrega SOLO a esta orden; el modelo no se toca. Si el material ya vive en el BOM
+              del modelo, el renglón hereda su precio, su proveedor amarrado y sus medidas por
+              talla; si no, queda marcado como agregado a mano.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -862,10 +1074,24 @@ function SeccionAvios({
                 <span className="text-sm">
                   {a.clave} — {a.descripcion}
                 </span>
-                {a.consumoPorTalla ? (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    (por talla: {a.tallas.map((t) => `${t.etiqueta} ${t.consumo}`).join(' · ')})
-                  </span>
+                {/* Se muestra aunque el toggle esté apagado: es el único lugar donde se puede
+                    ENCENDER el consumo por talla de esta orden (antes solo aparecía si ya venía
+                    encendido, así que no había forma de activarlo desde la OP). */}
+                {a.tieneTallas || a.consumoPorTalla ? (
+                  <MedidasPorTalla
+                    avio={a}
+                    editable={editable && !a.excluido}
+                    ocupado={ocupado || editar.isPending}
+                    alGuardar={(cuerpo) =>
+                      editar.mutate(
+                        { idOrden, tipo: 'avio', idRenglon: a.id, cuerpo },
+                        {
+                          onSuccess: () => toast.success('Consumo por talla guardado.'),
+                          onError: (error) => toast.error(error.message),
+                        },
+                      )
+                    }
+                  />
                 ) : null}
               </TablaDensaCelda>
               <TablaDensaCelda>

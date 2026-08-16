@@ -303,6 +303,49 @@ se vuelve a desplegar** (redeploy). El nginx del frontend está preparado para e
 | Cambié algo de build/deploy en el dashboard y "no agarra"       | `railway.json` manda sobre el dashboard                                                             | Cambia build/deploy editando el `railway.json` del servicio en un PR (es infraestructura versionada)                                              |
 | `prisma: not found` en el pre-deploy                            | La imagen no tiene la CLI de Prisma en runtime                                                      | No pasa con nuestro setup: el `preDeployCommand` corre en la **imagen del Dockerfile**, y la etapa runner copia `node_modules` completo (con la CLI de Prisma y `prisma/migrations`) — verificado. (Este problema solo aplicaría a builds con Railpack/Nixpacks, que omiten devDependencies; nosotros usamos Dockerfile.) Si pasara, avisa al equipo (cambio de código por PR) |
 
+## 9.1. ⭐ «No se pueden subir fotos» — las cuatro trampas de R2
+
+> Estas cuatro estaban **enterradas** en la ficha de una etapa de junio
+> (`docs/hoja-de-ruta/F1-etapas.md:222`). Viven aquí porque es donde uno las busca. *(Pasó de nuevo el
+> 15-ago-2026: Daniel no pudo subir fotos en `prueba` y hubo que ir a arqueologiar la ficha vieja.)*
+
+**Primero: el mensaje de la pantalla te dice DÓNDE mirar.** Los dos textos salen de
+`frontend/src/api/subida-archivo.ts` y significan cosas distintas:
+
+| Lo que dice la pantalla | Qué pasó | Dónde está la causa |
+| --- | --- | --- |
+| *«No se pudo guardar la imagen. Puede tratarse de un problema de **configuración del almacenamiento**, no de tu conexión…»* | El navegador **no recibió respuesta**: el `PUT` a R2 murió por CORS o por permisos (R2 rechaza **sin cabeceras CORS** y el navegador lo disfraza de falla de red) | **Trampas 1, 2 o 4** de abajo |
+| *«El almacenamiento **rechazó** la imagen (error 403 / 400…)»* | R2 **sí** contestó, y el número es la pista | El código HTTP acota la causa |
+
+**Para acotar en 10 segundos:** F12 → pestaña **Red** → intenta subir → busca la línea a
+`*.r2.cloudflarestorage.com`. **403** = llave o credenciales (1 o 2). **Bloqueada por CORS** = política
+del bucket (4).
+
+**Las cuatro trampas, en orden de probabilidad:**
+
+1. **El token S3 debe ser «Object Read & Write»** con alcance al bucket. **Read-only da `403
+   AccessDenied` en el PUT** y se ve exactamente como un "error de CORS". Ojo también con que el token
+   **no haya expirado ni se haya rotado**.
+2. **Las variables del backend deben ser las REALES**, no los valores de relleno: `R2_ACCOUNT_ID`,
+   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. Si alguna quedó en `dev`, la URL se firma
+   con credenciales falsas y R2 la rechaza igual. *(El firmado de la URL es **local**: el backend no
+   contacta a R2 para generarla, así que una credencial falsa no falla hasta que el navegador sube.)*
+3. **No firmar `content-length` ni `content-type`** en el PUT prefirmado — el navegador los maneja como
+   cabeceras especiales. *(Ya resuelto en código; no lo re-rompas.)* En la misma línea: el SDK v3 de AWS
+   añade **checksum CRC32 por defecto** y R2 lo rechaza → por eso el cliente lleva
+   `requestChecksumCalculation: 'WHEN_REQUIRED'` (`backend/src/comun/archivos.ts`).
+4. **La política CORS del bucket** debe permitir **PUT y GET desde el origen público del frontend** de
+   ESE environment. Si el dominio de Railway cambió en algún redeploy, el origen viejo ya no coincide y
+   el navegador bloquea.
+
+**Y una quinta, distinta pero del mismo día:** `BETTER_AUTH_URL` debe apuntar al **dominio público del
+frontend**; si no, falla cerrar sesión y la sesión da 401.
+
+⚠️ **Las ocho pantallas que suben archivos comparten el mismo camino**
+(`frontend/src/api/subida-archivo.ts`): foto de modelo, foto de arte, adjuntos de
+desarrollo/orden/pedido, PDF de proveedor, logo de empresa y PDF de entrada de tela. **Si fallan
+TODAS, es configuración** (esta sección). **Si falla UNA sola, es código** de esa pantalla.
+
 ## 10. Pasos manuales en GitHub (no en Railway/R2)
 
 - **Crear la rama `prueba`** si aún no existe (desde `main`): es la base del flujo

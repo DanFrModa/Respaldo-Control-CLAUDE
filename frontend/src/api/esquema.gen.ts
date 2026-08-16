@@ -23959,7 +23959,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24006,7 +24006,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24037,16 +24037,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -24065,7 +24073,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24320,7 +24328,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24367,7 +24375,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24398,16 +24406,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -24426,7 +24442,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24645,7 +24661,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24692,7 +24708,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24723,16 +24739,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -24751,7 +24775,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -24973,7 +24997,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25020,7 +25044,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25051,16 +25075,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -25079,7 +25111,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25286,7 +25318,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25333,7 +25365,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25364,16 +25396,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -25392,7 +25432,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25599,7 +25639,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25646,7 +25686,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25677,16 +25717,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -25705,7 +25753,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25912,7 +25960,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25959,7 +26007,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;
@@ -25990,16 +26038,24 @@ export interface paths {
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
-                /** @description Medidas por talla (si aplica). */
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
                 tallas: {
                   idTalla: number;
                   /** @description Etiqueta de la talla (CH, M, G…). */
                   etiqueta: string;
-                  /** @description Medida del avío para esta talla EN ESTA ORDEN. */
-                  consumo: number;
-                  /** @description Amarre medida×talla, o null. */
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
                   idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
                 }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
                 consumoModelo: number | null;
                 precioModelo: number | null;
                 /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
@@ -26018,7 +26074,7 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'sin_revisar' | 'revisado' | 'ajustado';
-                /** @description El renglón NO vino del modelo: lo agregó una persona en esta orden. */
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
                 agregadoAMano: boolean;
                 /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
                 excluido: boolean;

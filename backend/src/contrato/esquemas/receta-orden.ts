@@ -68,7 +68,12 @@ const camposComunesRenglon = {
   estado: esquemaEstadoRenglonReceta,
   agregadoAMano: z
     .boolean()
-    .describe('El renglón NO vino del modelo: lo agregó una persona en esta orden.'),
+    .describe(
+      'El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. ' +
+        'NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene ' +
+        'crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) ' +
+        'y esta bandera queda en false, para que su desviación se siga avisando.',
+    ),
   excluido: z
     .boolean()
     .describe(
@@ -136,8 +141,23 @@ export const esquemaRecetaOrdenAvioTalla = z
   .object({
     idTalla: z.number().int(),
     etiqueta: z.string().describe('Etiqueta de la talla (CH, M, G…).'),
-    consumo: z.number().describe('Medida del avío para esta talla EN ESTA ORDEN.'),
-    idAvioMedida: z.number().int().nullable().describe('Amarre medida×talla, o null.'),
+    consumo: z
+      .number()
+      .nullable()
+      .describe(
+        'Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El ' +
+          '`null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras ' +
+          'que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo).',
+      ),
+    enLaOrden: z
+      .boolean()
+      .describe(
+        '¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida ' +
+          'capturada que la orden ya no lleva; se enseña para no perderla en silencio.',
+      ),
+    idAvioMedida: z.number().int().nullable().describe('Amarre medida×talla (R5/B11), o null.'),
+    medidaAmarrada: z.string().nullable().describe('Etiqueta de la medida amarrada ("15 cm").'),
+    precioMedida: z.number().nullable().describe('Precio de la medida amarrada, o null.'),
   })
   .describe('Medida por talla de un avío de la receta de la orden.');
 
@@ -168,7 +188,17 @@ export const esquemaRecetaOrdenAvio = z
       .nullable()
       .describe('Proveedor del par `AvioProveedor` amarrado, o null.'),
     proveedorAmarrado: z.string().nullable(),
-    tallas: z.array(esquemaRecetaOrdenAvioTalla).describe('Medidas por talla (si aplica).'),
+    tallas: z
+      .array(esquemaRecetaOrdenAvioTalla)
+      .describe(
+        'Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con ' +
+          '`consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que ' +
+          'V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un ' +
+          'avío por talla sin medidas capturadas no se podía capturar desde la orden.',
+      ),
+    tieneTallas: z
+      .boolean()
+      .describe('¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar).'),
     consumoModelo: z.number().nullable(),
     precioModelo: z.number().nullable(),
     precioModeloDeCompra: z

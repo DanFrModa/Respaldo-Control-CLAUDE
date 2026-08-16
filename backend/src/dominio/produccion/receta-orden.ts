@@ -69,6 +69,7 @@ import type {
   RecetaOrden,
   RecetaOrdenArte,
   RecetaOrdenAvio,
+  RecetaOrdenAvioTalla,
   RecetaOrdenTela,
   ResumenReceta,
   TipoRenglonRecetaClave,
@@ -360,7 +361,8 @@ const SELECT_AVIO = {
       idTalla: true,
       consumo: true,
       idAvioMedida: true,
-      talla: { select: { etiqueta: true } },
+      talla: { select: { etiqueta: true, orden: true } },
+      avioMedida: { select: { medida: true, precio: true } },
     },
   },
 } satisfies Prisma.OrdenAvioSelect;
@@ -449,6 +451,48 @@ function fotoAvio(f: FilaAvio): object {
       idAvioMedida: t.idAvioMedida,
     })),
   };
+}
+
+/**
+ * MATRIZ de medidas por talla de un avío, **armada desde el universo de tallas de la ORDEN**
+ * (V1-E3d/N4, extendiendo `leerMedidasAvio` de V1-E3c a la OP).
+ *
+ * Devuelve una fila por talla que la orden produce —capturada o no, con `consumo: null` cuando no
+ * lo está— más las capturadas que la orden ya no lleva (`enLaOrden: false`), para que ninguna
+ * medida desaparezca en silencio. El `null` NO es un 0: un 0 es un cero puesto a propósito.
+ */
+function medidasPorTalla(
+  f: FilaAvio,
+  tallasOrden: { idTalla: number; talla: { etiqueta: string; orden: number } }[],
+): RecetaOrdenAvioTalla[] {
+  const capturada = new Map(f.tallas.map((t) => [t.idTalla, t]));
+  const detalle = (
+    t: FilaAvio['tallas'][number] | undefined,
+    idTalla: number,
+    etiqueta: string,
+    enLaOrden: boolean,
+  ): RecetaOrdenAvioTalla => ({
+    idTalla,
+    etiqueta,
+    consumo: t === undefined ? null : num(t.consumo),
+    enLaOrden,
+    idAvioMedida: t?.idAvioMedida ?? null,
+    medidaAmarrada: t?.avioMedida?.medida ?? null,
+    precioMedida:
+      t?.avioMedida === null || t?.avioMedida === undefined ? null : num(t.avioMedida.precio),
+  });
+
+  const idsOrden = new Set(tallasOrden.map((t) => t.idTalla));
+  return [
+    ...tallasOrden.map((t) => detalle(capturada.get(t.idTalla), t.idTalla, t.talla.etiqueta, true)),
+    ...f.tallas
+      .filter((t) => !idsOrden.has(t.idTalla))
+      .sort(
+        (a, b) =>
+          a.talla.orden - b.talla.orden || a.talla.etiqueta.localeCompare(b.talla.etiqueta, 'es'),
+      )
+      .map((t) => detalle(t, t.idTalla, t.talla.etiqueta, false)),
+  ];
 }
 
 /** Foto ÍNTEGRA de un renglón de ARTE. */
@@ -680,7 +724,7 @@ export async function obtenerRecetaOrden(
 
 /** Arma la salida completa de la receta (compartido por la lectura y por cada mutación). */
 async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden> {
-  const [filasTela, filasAvio, filasArte, telasModelo, aviosModelo, artesModelo, ocs] =
+  const [filasTela, filasAvio, filasArte, telasModelo, aviosModelo, artesModelo, ocs, tallasOrden] =
     await Promise.all([
       tx.ordenTela.findMany({
         where: { idOrden: orden.id },
@@ -704,6 +748,17 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       // cualquier renglón de OC NO cancelada ligado a la orden.
       tx.ordenCompraLinea.count({
         where: { idOrden: orden.id, ordenCompra: { estatus: { not: 'cancelada' } } },
+      }),
+      // ⭐ V1-E3d/N4: el universo de tallas de la RECETA es el de la ORDEN (su matriz color×talla),
+      // no la curva del modelo — es lo que esta orden de verdad produce y lo que el MRP explota.
+      // Extiende a la OP la regla de V1-E3c: la matriz se arma desde el universo, no desde las
+      // filas que alguien haya alcanzado a capturar (si no, un avío por talla sin medidas nunca
+      // se podía capturar desde la orden).
+      tx.ordenLineaTalla.findMany({
+        where: { ordenLinea: { idOrden: orden.id } },
+        select: { idTalla: true, talla: { select: { etiqueta: true, orden: true } } },
+        distinct: ['idTalla'],
+        orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
       }),
     ]);
 
@@ -784,14 +839,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       idAvioProveedor: f.idAvioProveedor,
       proveedorAmarrado:
         f.idAvioProveedor === null ? null : (nombreProveedor.get(f.idAvioProveedor) ?? null),
-      tallas: f.tallas
-        .map((t) => ({
-          idTalla: t.idTalla,
-          etiqueta: t.talla.etiqueta,
-          consumo: num(t.consumo),
-          idAvioMedida: t.idAvioMedida,
-        }))
-        .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es')),
+      tallas: medidasPorTalla(f, tallasOrden),
+      tieneTallas: tallasOrden.length > 0,
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
@@ -923,19 +972,33 @@ export async function exigirRecetaLiberada(
 
 // ── 4. MUTACIONES ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * Lo que la mutación puede contarle de vuelta a `enRecetaEditable`. Hoy solo una cosa: que el
+ * renglón que tocó era una **LÁPIDA** (`excluido`), que por definición no cambia QUÉ se compra —
+ * así que no tiene por qué revocar la firma de Desarrollo (hallazgo del reviewer).
+ */
+interface ContextoMutacionReceta {
+  cayoSobreLapida: () => void;
+}
+
 /** Lo que toda mutación de la receta comparte: permiso, orden viva, transacción y salida completa. */
 async function enRecetaEditable<T>(
   sesion: SesionUsuario,
   idOrden: number,
   bd: ContextoBd | undefined,
-  accion: (tx: Tx, orden: OrdenParaReceta) => Promise<T>,
+  accion: (tx: Tx, orden: OrdenParaReceta, ctx: ContextoMutacionReceta) => Promise<T>,
   opciones: { cambiaElContenido?: boolean } = {},
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
   return enTransaccion(async (tx) => {
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
     exigirOrdenViva(orden);
-    await accion(tx, orden);
+    let sobreLapida = false;
+    await accion(tx, orden, {
+      cayoSobreLapida: () => {
+        sobreLapida = true;
+      },
+    });
 
     // ⭐ TOCAR EL CONTENIDO DE UNA RECETA YA LIBERADA LA RE-ABRE (hallazgo del reviewer).
     //
@@ -951,7 +1014,7 @@ async function enRecetaEditable<T>(
     // false`): una orden a medio producir no se saca de los tableros por un cambio de receta —es la
     // misma regla de Daniel del 26-jul—. Quien mira la orden lo ve igual, porque este panel dice
     // "Sin liberar" en grande y la puerta de compra está cerrada de verdad.
-    if (opciones.cambiaElContenido === true && orden.recetaLiberadaEn !== null) {
+    if (opciones.cambiaElContenido === true && !sobreLapida && orden.recetaLiberadaEn !== null) {
       await tx.orden.update({
         where: { id: orden.id },
         data: { recetaLiberadaEn: null, recetaLiberadaPorId: null, ...datosModificacion(sesion) },
@@ -989,8 +1052,13 @@ function soloDefinido<T extends object>(campos: T): { [K in keyof T]?: Exclude<T
 
 /**
  * AGREGA un renglón a la receta de ESTA orden, o **REVIVE una lápida** (`desarrollo.administrar`).
- * Un renglón nuevo nace `ajustado` y `agregadoAMano`: no vino del modelo, así que ningún recálculo
- * lo puede pisar y ningún aviso de desalineación lo puede reclamar.
+ *
+ * Cómo nace depende de si el material vive o no en el BOM del modelo:
+ *  - **No está en el modelo** → `ajustado` + `agregadoAMano`: solo existe en esta orden, ningún
+ *    recálculo lo pisa y ningún aviso de desalineación lo reclama.
+ *  - **Sí está en el modelo** (traer al pedido lo que el modelo agregó después) → hereda precio,
+ *    banderas, amarre y medidas por talla, `agregadoAMano: false`, y **`revisado` si se copió tal
+ *    cual** — para que un cambio POSTERIOR del modelo sí levante su aviso.
  *
  * ⚠️ **LOS TRES CAMINOS SON DISTINTOS, y confundirlos costaba caro** (hallazgo del reviewer):
  *
@@ -1020,13 +1088,25 @@ export async function agregarRenglonReceta(
     bd,
     async (tx, orden) => {
       const auditoria = { ...datosCreacion(sesion) };
-      /** Lo que marca a un renglón NUEVO (nunca a uno revivido: ése vino del modelo). */
-      const comunesNuevo = {
-        estado: EstadoRenglonReceta.ajustado,
-        agregadoAMano: true,
+      /**
+       * Lo que marca a un renglón NUEVO (nunca a uno revivido: ése vino del modelo).
+       *
+       * ⚠️ `agregadoAMano` NO es "lo agregó una persona": es **"esto no está en el modelo"**. Si el
+       * material SÍ vive en el BOM —el caso de traer al pedido lo que el modelo agregó después— el
+       * renglón nace **como del modelo**: hereda precio, banderas, amarre y medidas por talla.
+       *
+       * ⚠️⚠️ Y NACE `revisado`, NO `ajustado`. Es la mitad que faltaba: `desviadoAProposito` calla
+       * al renglón `ajustado` **igual** que al agregado a mano, así que dejarlo `ajustado` lo dejaba
+       * exactamente igual de sordo y el flip de la bandera no compraba nada (segundo hallazgo del
+       * reviewer). Copiado FIEL del modelo = nadie lo ajustó = si el modelo cambia mañana, AVISA.
+       * En cuanto la persona teclea algo distinto de lo que dice el modelo, sí es un ajuste y se
+       * calla, que es la regla de siempre.
+       */
+      const comunesNuevo = (copiaFielDelModelo: boolean) => ({
+        estado: copiaFielDelModelo ? EstadoRenglonReceta.revisado : EstadoRenglonReceta.ajustado,
         excluido: false,
         notas: datos.notas ?? null,
-      };
+      });
       /** Lo que marca a una lápida REVIVIDA (sin tocar `agregadoAMano`: su origen no cambia). */
       const comunesRevivido = {
         estado: EstadoRenglonReceta.ajustado,
@@ -1042,6 +1122,11 @@ export async function agregarRenglonReceta(
           select: SELECT_TELA,
         });
         exigirNoEstaVivo(previo, `La tela "${previo?.tela.nombre ?? ''}"`);
+        // ¿Este material está en el BOM del modelo? Si sí, el renglón nuevo se trae de ahí lo que
+        // el cuerpo no dijo (H5): precio de la cascada, banderas y amarre por proveedor.
+        const delModelo = (await leerTelasBom(tx, orden.idModelo, orden.idEmpresa)).find(
+          (t) => t.idTela === datos.idTela,
+        );
 
         // Solo lo que el cuerpo trajo (al revivir) / con defaults (al crear).
         const delCuerpo = {
@@ -1064,12 +1149,21 @@ export async function agregarRenglonReceta(
               idOrden: orden.id,
               idTela: datos.idTela,
               consumoPorPrenda: delCuerpo.consumoPorPrenda,
-              precio: delCuerpo.precio ?? null,
-              paraPreCosto: datos.paraPreCosto ?? true,
-              paraProduccion: datos.paraProduccion ?? true,
-              paraCosto: datos.paraCosto ?? true,
-              idTelaProveedor: datos.idTelaProveedor ?? null,
-              ...comunesNuevo,
+              precio: delCuerpo.precio ?? precioDecimal(delModelo?.precioCosteo ?? null),
+              paraPreCosto: datos.paraPreCosto ?? delModelo?.paraPreCosto ?? true,
+              paraProduccion: datos.paraProduccion ?? delModelo?.paraProduccion ?? true,
+              paraCosto: datos.paraCosto ?? delModelo?.paraCosto ?? true,
+              idTelaProveedor: datos.idTelaProveedor ?? delModelo?.idTelaProveedor ?? null,
+              agregadoAMano: delModelo === undefined,
+              ...comunesNuevo(
+                delModelo !== undefined &&
+                  datos.consumoPorPrenda === delModelo.consumoPorPrenda &&
+                  datos.precio === undefined &&
+                  datos.paraPreCosto === undefined &&
+                  datos.paraProduccion === undefined &&
+                  datos.paraCosto === undefined &&
+                  datos.idTelaProveedor === undefined,
+              ),
               ...auditoria,
             },
           });
@@ -1079,7 +1173,9 @@ export async function agregarRenglonReceta(
           idTela: datos.idTela,
           cambios: datos,
           revivido: previo !== null,
-          ...(previo === null ? {} : { antes: fotoTela(previo) }),
+          ...(previo === null
+            ? { delModelo: delModelo !== undefined }
+            : { antes: fotoTela(previo) }),
         });
         return;
       }
@@ -1093,6 +1189,10 @@ export async function agregarRenglonReceta(
         exigirNoEstaVivo(
           previo,
           `El avío "${previo === null ? '' : `${previo.avio.clave} — ${previo.avio.descripcion}`}"`,
+        );
+
+        const delModeloAvio = (await leerAviosBom(tx, orden.idModelo, orden.idEmpresa)).find(
+          (a) => a.idAvio === datos.idAvio,
         );
 
         const delCuerpo = {
@@ -1120,13 +1220,26 @@ export async function agregarRenglonReceta(
                     idOrden: orden.id,
                     idAvio: datos.idAvio,
                     consumoPorPrenda: delCuerpo.consumoPorPrenda,
-                    precio: delCuerpo.precio ?? null,
-                    paraPreCosto: datos.paraPreCosto ?? true,
-                    paraProduccion: datos.paraProduccion ?? true,
-                    paraCosto: datos.paraCosto ?? true,
-                    consumoPorTalla: datos.consumoPorTalla ?? false,
-                    idAvioProveedor: datos.idAvioProveedor ?? null,
-                    ...comunesNuevo,
+                    precio: delCuerpo.precio ?? precioDecimal(delModeloAvio?.precioCosteo ?? null),
+                    paraPreCosto: datos.paraPreCosto ?? delModeloAvio?.paraPreCosto ?? true,
+                    paraProduccion: datos.paraProduccion ?? delModeloAvio?.paraProduccion ?? true,
+                    paraCosto: datos.paraCosto ?? delModeloAvio?.paraCosto ?? true,
+                    consumoPorTalla:
+                      datos.consumoPorTalla ?? delModeloAvio?.consumoPorTalla ?? false,
+                    idAvioProveedor:
+                      datos.idAvioProveedor ?? delModeloAvio?.idAvioProveedor ?? null,
+                    agregadoAMano: delModeloAvio === undefined,
+                    ...comunesNuevo(
+                      delModeloAvio !== undefined &&
+                        datos.consumoPorPrenda === delModeloAvio.consumoPorPrenda &&
+                        datos.precio === undefined &&
+                        datos.paraPreCosto === undefined &&
+                        datos.paraProduccion === undefined &&
+                        datos.paraCosto === undefined &&
+                        datos.consumoPorTalla === undefined &&
+                        datos.idAvioProveedor === undefined &&
+                        datos.tallas === undefined,
+                    ),
                     ...auditoria,
                   },
                   select: { id: true },
@@ -1134,13 +1247,34 @@ export async function agregarRenglonReceta(
               ).id;
         if (datos.tallas !== undefined) {
           await reemplazarMedidasAvio(tx, sesion, id, datos.tallas);
+        } else if (previo === null && delModeloAvio !== undefined) {
+          // Renglón NUEVO que sí está en el modelo: se trae también su juego de medidas por talla
+          // (lo que antes se perdía y había que recuperar con un "Restaurar" que nadie anunciaba).
+          const medidas = await tx.modeloAvioTalla.findMany({
+            where: { idModelo: orden.idModelo, idAvio: datos.idAvio },
+            select: { idTalla: true, consumo: true, idAvioMedida: true },
+          });
+          if (medidas.length > 0) {
+            await reemplazarMedidasAvio(
+              tx,
+              sesion,
+              id,
+              medidas.map((m) => ({
+                idTalla: m.idTalla,
+                consumo: num(m.consumo),
+                idAvioMedida: m.idAvioMedida,
+              })),
+            );
+          }
         }
         await bitacoraReceta(tx, sesion, orden.id, 'CREAR', {
           tipo: 'avio',
           idAvio: datos.idAvio,
           cambios: datos,
           revivido: previo !== null,
-          ...(previo === null ? {} : { antes: fotoAvio(previo) }),
+          ...(previo === null
+            ? { delModelo: delModeloAvio !== undefined }
+            : { antes: fotoAvio(previo) }),
         });
         return;
       }
@@ -1153,6 +1287,9 @@ export async function agregarRenglonReceta(
         select: SELECT_ARTE,
       });
       exigirNoEstaVivo(previo, `El arte "${datos.nombre}"`);
+      const delModeloArte = (await leerArtesModelo(tx, orden.idModelo)).find(
+        (a) => a.nombre === datos.nombre,
+      );
 
       const delCuerpoArte = {
         descripcion: datos.descripcion,
@@ -1172,12 +1309,21 @@ export async function agregarRenglonReceta(
           data: {
             idOrden: orden.id,
             nombre: datos.nombre,
-            descripcion: datos.descripcion ?? null,
-            puntadas: datos.puntadas ?? null,
-            precio: delCuerpoArte.precio ?? null,
-            tipo: datos.tipoArte ?? 'BORDADO',
-            idProveedor: datos.idProveedor ?? null,
-            ...comunesNuevo,
+            descripcion: datos.descripcion ?? delModeloArte?.descripcion ?? null,
+            puntadas: datos.puntadas ?? delModeloArte?.puntadas ?? null,
+            precio: delCuerpoArte.precio ?? precioDecimal(delModeloArte?.precio ?? null),
+            tipo: datos.tipoArte ?? delModeloArte?.tipo ?? 'BORDADO',
+            idProveedor: datos.idProveedor ?? delModeloArte?.idProveedor ?? null,
+            idModeloArte: delModeloArte?.id ?? null,
+            agregadoAMano: delModeloArte === undefined,
+            ...comunesNuevo(
+              delModeloArte !== undefined &&
+                datos.precio === undefined &&
+                datos.descripcion === undefined &&
+                datos.puntadas === undefined &&
+                datos.tipoArte === undefined &&
+                datos.idProveedor === undefined,
+            ),
             ...auditoria,
           },
         });
@@ -1187,7 +1333,9 @@ export async function agregarRenglonReceta(
         nombre: datos.nombre,
         cambios: datos,
         revivido: previo !== null,
-        ...(previo === null ? {} : { antes: fotoArte(previo) }),
+        ...(previo === null
+          ? { delModelo: delModeloArte !== undefined }
+          : { antes: fotoArte(previo) }),
       });
     },
     // Cambia QUÉ se compra: si la receta ya estaba liberada, se re-abre (ver `enRecetaEditable`).
@@ -1215,11 +1363,13 @@ export async function editarRenglonReceta(
     sesion,
     idOrden,
     bd,
-    async (tx, orden) => {
+    async (tx, orden, ctx) => {
       const marca = { estado: EstadoRenglonReceta.ajustado, ...datosModificacion(sesion) };
 
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
+        // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de Desarrollo.
+        if (fila.excluido) ctx.cayoSobreLapida();
         await tx.ordenTela.update({
           where: { id: fila.id },
           data: {
@@ -1242,7 +1392,10 @@ export async function editarRenglonReceta(
         await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
           tipo,
           idRenglon,
-          antes: { consumoPorPrenda: num(fila.consumoPorPrenda), precio: dec(fila.precio) },
+          // D3: la foto ÍNTEGRA, no dos campos. El PATCH del contrato expone banderas y amarre,
+          // así que el `antes` tiene que poder reconstruir el renglón completo (no solo `cambios`,
+          // que dice a qué quedó pero no de qué venía).
+          antes: fotoTela(fila),
           cambios: datos,
         });
         return;
@@ -1250,6 +1403,8 @@ export async function editarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+        const antes = fotoAvio(fila);
+        if (fila.excluido) ctx.cayoSobreLapida();
         await tx.ordenAvio.update({
           where: { id: fila.id },
           data: {
@@ -1278,13 +1433,15 @@ export async function editarRenglonReceta(
         await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
           tipo,
           idRenglon,
-          antes: { consumoPorPrenda: num(fila.consumoPorPrenda), precio: dec(fila.precio) },
+          // D3: incluye las medidas por talla VIEJAS — `reemplazarMedidasAvio` las borra en bloque.
+          antes,
           cambios: datos,
         });
         return;
       }
 
       const fila = await exigirRenglonArte(tx, orden.id, idRenglon);
+      if (fila.excluido) ctx.cayoSobreLapida();
       if (datos.idProveedor != null) {
         await exigirProveedorExiste(tx, datos.idProveedor);
       }
@@ -1323,7 +1480,7 @@ export async function editarRenglonReceta(
       await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
         tipo,
         idRenglon,
-        antes: { nombre: fila.nombre, precio: dec(fila.precio) },
+        antes: fotoArte(fila),
         cambios: datos,
       });
     },
@@ -1465,6 +1622,9 @@ export async function restaurarRenglonReceta(
           tipo,
           idRenglon,
           restaurado: true,
+          // D3: restaurar PISA el precio congelado, las banderas y el amarre. Lo que desaparece
+          // queda ÍNTEGRO aquí (no un resumen): es el único rastro de lo que Desarrollo negoció.
+          antes: fotoTela(fila),
           consumoPorPrenda: delModelo.consumoPorPrenda,
           precio: delModelo.precioCosteo,
         });
@@ -1473,6 +1633,9 @@ export async function restaurarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+        // La foto se toma ANTES de tocar nada: `reemplazarMedidasAvio` borra el juego completo de
+        // medidas por talla, y sin esto se irían sin dejar rastro (D3, mismo cierre que la pieza A).
+        const antes = fotoAvio(fila);
         const delModelo = (await leerAviosBom(tx, orden.idModelo, orden.idEmpresa)).find(
           (a) => a.idAvio === fila.idAvio,
         );
@@ -1515,9 +1678,16 @@ export async function restaurarRenglonReceta(
           tipo,
           idRenglon,
           restaurado: true,
+          antes,
           consumoPorPrenda: delModelo.consumoPorPrenda,
           precio: delModelo.precioCosteo,
-          tallas: medidas.length,
+          // Las medidas NUEVAS van completas (no un conteo): con `antes.tallas` se reconstruye el
+          // juego viejo y con éstas el nuevo.
+          tallas: medidas.map((m) => ({
+            idTalla: m.idTalla,
+            consumo: num(m.consumo),
+            idAvioMedida: m.idAvioMedida,
+          })),
         });
         return;
       }
@@ -1549,6 +1719,7 @@ export async function restaurarRenglonReceta(
         tipo,
         idRenglon,
         restaurado: true,
+        antes: fotoArte(fila),
         precio: delModelo.precio,
       });
     },

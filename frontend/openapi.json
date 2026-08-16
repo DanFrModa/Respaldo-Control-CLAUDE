@@ -58724,7 +58724,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -58914,7 +58914,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -59044,8 +59044,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -59058,19 +59069,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -59120,6 +59160,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -59159,7 +59200,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -59986,7 +60027,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -60176,7 +60217,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -60306,8 +60347,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -60320,19 +60372,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -60382,6 +60463,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -60421,7 +60503,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -61152,7 +61234,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -61342,7 +61424,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -61472,8 +61554,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -61486,19 +61579,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -61548,6 +61670,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -61587,7 +61710,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -62181,7 +62304,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -62371,7 +62494,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -62501,8 +62624,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -62515,19 +62649,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -62577,6 +62740,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -62616,7 +62780,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -63194,7 +63358,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -63384,7 +63548,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -63514,8 +63678,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -63528,19 +63703,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -63590,6 +63794,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -63629,7 +63834,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -64182,7 +64387,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -64372,7 +64577,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -64502,8 +64707,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -64516,19 +64732,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -64578,6 +64823,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -64617,7 +64863,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -65170,7 +65416,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -65360,7 +65606,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",
@@ -65490,8 +65736,19 @@
                                   "description": "Etiqueta de la talla (CH, M, G…)."
                                 },
                                 "consumo": {
-                                  "type": "number",
-                                  "description": "Medida del avío para esta talla EN ESTA ORDEN."
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo)."
+                                },
+                                "enLaOrden": {
+                                  "type": "boolean",
+                                  "description": "¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio."
                                 },
                                 "idAvioMedida": {
                                   "anyOf": [
@@ -65504,19 +65761,48 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Amarre medida×talla, o null."
+                                  "description": "Amarre medida×talla (R5/B11), o null."
+                                },
+                                "medidaAmarrada": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Etiqueta de la medida amarrada (\"15 cm\")."
+                                },
+                                "precioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio de la medida amarrada, o null."
                                 }
                               },
                               "required": [
                                 "idTalla",
                                 "etiqueta",
                                 "consumo",
-                                "idAvioMedida"
+                                "enLaOrden",
+                                "idAvioMedida",
+                                "medidaAmarrada",
+                                "precioMedida"
                               ],
                               "additionalProperties": false,
                               "description": "Medida por talla de un avío de la receta de la orden."
                             },
-                            "description": "Medidas por talla (si aplica)."
+                            "description": "Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden."
+                          },
+                          "tieneTallas": {
+                            "type": "boolean",
+                            "description": "¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar)."
                           },
                           "consumoModelo": {
                             "anyOf": [
@@ -65566,6 +65852,7 @@
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
+                          "tieneTallas",
                           "consumoModelo",
                           "precioModelo",
                           "precioModeloDeCompra"
@@ -65605,7 +65892,7 @@
                           },
                           "agregadoAMano": {
                             "type": "boolean",
-                            "description": "El renglón NO vino del modelo: lo agregó una persona en esta orden."
+                            "description": "El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa \"lo tecleó una persona\": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando."
                           },
                           "excluido": {
                             "type": "boolean",

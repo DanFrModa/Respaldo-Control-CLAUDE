@@ -204,9 +204,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 {datos ? ` · orden ${datos.folioOrden} · ${datos.totalPiezas} pzas` : ''}
               </h2>
               <div className="flex items-center gap-2">
+                {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
+                    liberada el servidor contesta 409 y la descarga reventaba sin decir por qué.
+                    Si la explosión no cargó, el botón se apaga y lo explica en el tooltip. */}
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={datos === undefined}
+                  title={
+                    datos === undefined
+                      ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
+                      : undefined
+                  }
                   onClick={() => imprimirExplosion(idOrden)}
                   data-testid="exp-imprimir"
                 >

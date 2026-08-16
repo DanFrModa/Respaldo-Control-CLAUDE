@@ -7,7 +7,7 @@ import type { Avio, Color, Empresa, PrismaClient, Talla, Tela } from '../../dato
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { explosionarOrden } from '../compras/mrp.js';
-import { crearOC } from '../compras/ordenes-compra.js';
+import { actualizarOC, crearOC } from '../compras/ordenes-compra.js';
 import { obtenerCostoOrden } from '../costos/costo-orden.js';
 import { enTransaccion } from '../../comun/transaccion.js';
 
@@ -16,6 +16,7 @@ import {
   agregarRenglonReceta,
   copiarRecetaDelModelo,
   editarRenglonReceta,
+  leerRecetaParaImpreso,
   liberarReceta,
   marcarRecetaRevisada,
   obtenerRecetaOrden,
@@ -614,6 +615,445 @@ describe('⭐ La puerta cubre TAMBIÉN la OC capturada a mano (hallazgo del revi
   it('una OC LIBRE (sin orden ligada) no pasa por la puerta: se puede capturar siempre', async () => {
     const oc = await crearOC(sesionOc(), await cuerpoOc('Telas Libres'), bd());
     expect(oc.id).toBeGreaterThan(0);
+  });
+});
+
+describe('⭐ D3 — lo que una mutación PISA queda escrito íntegro (hallazgo del reviewer)', () => {
+  /** Última bitácora de la receta de A (la más reciente). */
+  async function ultimaBitacora(): Promise<Record<string, unknown>> {
+    const fila = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'RecetaOrden', idEntidad: String(ordenA) },
+      orderBy: { id: 'desc' },
+    });
+    return fila.datos as Record<string, unknown>;
+  }
+
+  it('RESTAURAR deja el precio congelado y el amarre en la bitácora antes de pisarlos', async () => {
+    const amarre = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaJersey.id,
+        idProveedor: (await cliente.proveedor.create({ data: { nombre: 'Alsatex' } })).id,
+        precio: 50,
+      },
+    });
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jersey = r0.telas.find((t) => t.idTela === telaJersey.id)!;
+    // Desarrollo negocia: precio 9.99, consumo 4, amarrado a Alsatex, fuera del costo.
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'tela',
+      jersey.id,
+      { precio: 9.99, consumoPorPrenda: 4, paraCosto: false, idTelaProveedor: amarre.id },
+      bd(),
+    );
+
+    await restaurarRenglonReceta(sesion(), ordenA, 'tela', jersey.id, bd());
+
+    const datos = await ultimaBitacora();
+    expect(datos.restaurado).toBe(true);
+    // ⭐ Lo que desapareció está ÍNTEGRO (no un resumen ni un conteo).
+    expect(datos.antes).toMatchObject({
+      idTela: telaJersey.id,
+      precio: 9.99,
+      consumoPorPrenda: 4,
+      paraCosto: false,
+      idTelaProveedor: amarre.id,
+      estado: 'ajustado',
+    });
+  });
+
+  it('RESTAURAR un avío deja sus MEDIDAS POR TALLA viejas escritas (se borran en bloque)', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      boton.id,
+      { precio: 7.5, tallas: [{ idTalla: tallaCH.id, consumo: 0.7 }] },
+      bd(),
+    );
+
+    await restaurarRenglonReceta(sesion(), ordenA, 'avio', boton.id, bd());
+
+    const datos = await ultimaBitacora();
+    const antes = datos.antes as Record<string, unknown>;
+    expect(antes.precio).toBe(7.5);
+    expect(antes.tallas).toEqual([{ idTalla: tallaCH.id, consumo: 0.7, idAvioMedida: null }]);
+  });
+
+  it('EDITAR guarda la foto ÍNTEGRA del antes, no dos campos', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      boton.id,
+      { tallas: [{ idTalla: tallaCH.id, consumo: 0.9 }] },
+      bd(),
+    );
+    // Segunda edición: el `antes` tiene que traer la medida 0.9 que esta edición borra.
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      boton.id,
+      { tallas: [{ idTalla: tallaCH.id, consumo: 0.3 }], paraProduccion: false },
+      bd(),
+    );
+
+    const antes = (await ultimaBitacora()).antes as Record<string, unknown>;
+    expect(antes.tallas).toEqual([{ idTalla: tallaCH.id, consumo: 0.9, idAvioMedida: null }]);
+    expect(antes.paraProduccion).toBe(true);
+    expect(antes).toHaveProperty('idAvioProveedor');
+    expect(antes).toHaveProperty('estado');
+  });
+
+  it('editar una LÁPIDA no revoca la firma de Desarrollo (no cambia qué se compra)', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jareta = r0.avios.find((a) => a.idAvio === avioJareta.id)!;
+    await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      jareta.id,
+      { motivo: 'este pedido va sin jareta' },
+      bd(),
+    );
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarReceta(sesion(), ordenA, bd());
+
+    const r1 = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      jareta.id,
+      { notas: 'nota sobre el renglón muerto' },
+      bd(),
+    );
+    expect(r1.liberadaEn).not.toBeNull();
+  });
+});
+
+describe('⭐ La MATRIZ de medidas por talla la arma el SERVIDOR desde el universo de la ORDEN', () => {
+  it('una fila por talla de la orden (en orden), `null` en lo no capturado, y la talla ajena no se pierde', async () => {
+    // La orden produce CH/M/G. El modelo trae medida para CH y para XL — una talla que esta orden
+    // NO lleva. (Extiende a la OP lo de V1-E3c: la matriz nace del universo, no de las filas.)
+    const tallaM = await cliente.talla.create({ data: { etiqueta: 'M', orden: 2 } });
+    const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 3 } });
+    const tallaXL = await cliente.talla.create({ data: { etiqueta: 'XL', orden: 4 } });
+    const cierre = await cliente.avio.create({
+      data: { clave: 'CIE-09', descripcion: 'Cierre', unidad: 'pza' },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo, idAvio: cierre.id, consumoPorPrenda: 1, consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo, idAvio: cierre.id, idTalla: tallaCH.id, consumo: 0.5 },
+        { idModelo, idAvio: cierre.id, idTalla: tallaXL.id, consumo: 0.9 },
+      ],
+    });
+
+    // Orden nueva con matriz CH/M/G (el universo de tallas de ESTA orden).
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 77n,
+        idEmpresa: empresa.id,
+        idModelo,
+        idCliente,
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 10 },
+                  { idTalla: tallaM.id, cantidad: 10 },
+                  { idTalla: tallaG.id, cantidad: 10 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await enTransaccion(
+      (tx) =>
+        copiarRecetaDelModelo(tx, sesion(), {
+          id: orden.id,
+          idEmpresa: empresa.id,
+          idModelo,
+        }),
+      bd(),
+    );
+
+    const receta = await obtenerRecetaOrden(sesion(), orden.id, bd());
+    const avio = receta.avios.find((a) => a.idAvio === cierre.id)!;
+    expect(avio.tieneTallas).toBe(true);
+
+    // ⭐ Una fila por talla de la ORDEN, en el orden del catálogo, y la ajena AL FINAL.
+    expect(avio.tallas.map((t) => t.etiqueta)).toEqual(['CH', 'M', 'G', 'XL']);
+    expect(avio.tallas.map((t) => t.enLaOrden)).toEqual([true, true, true, false]);
+    // CH capturada; M y G existen pero SIN capturar → `null`, que NO es 0 (un 0 sería un cero
+    // puesto a propósito y el MRP lo respetaría).
+    expect(avio.tallas.map((t) => t.consumo)).toEqual([0.5, null, null, 0.9]);
+    for (const t of avio.tallas) {
+      expect(t.consumo).not.toBe(0);
+    }
+  });
+
+  it('sin matriz capturada, la orden lo DICE (`tieneTallas: false`) en vez de fingir filas', async () => {
+    const orden = await cliente.orden.create({
+      data: { folio: 78n, idEmpresa: empresa.id, idModelo, idCliente },
+    });
+    await enTransaccion(
+      (tx) =>
+        copiarRecetaDelModelo(tx, sesion(), {
+          id: orden.id,
+          idEmpresa: empresa.id,
+          idModelo,
+        }),
+      bd(),
+    );
+    const receta = await obtenerRecetaOrden(sesion(), orden.id, bd());
+    const avio = receta.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(avio.tieneTallas).toBe(false);
+    expect(avio.tallas).toEqual([]);
+  });
+});
+
+describe('⭐ El QUINTO consumidor: el impreso de la OP lee la receta de la ORDEN', () => {
+  it('la jareta EXCLUIDA no sale en el papel, y el renglón sin `paraProduccion` tampoco', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jareta = r0.avios.find((a) => a.idAvio === avioJareta.id)!;
+    const jersey = r0.telas.find((t) => t.idTela === telaJersey.id)!;
+    await quitarRenglonReceta(sesion(), ordenA, 'avio', jareta.id, { motivo: 'sin jareta' }, bd());
+    await editarRenglonReceta(sesion(), ordenA, 'tela', jersey.id, { paraProduccion: false }, bd());
+
+    const receta = await enTransaccion((tx) => leerRecetaParaImpreso(tx, ordenA), bd());
+    expect(receta.avios.map((a) => a.clave)).toEqual(['BOT-01']);
+    expect(receta.telas).toEqual([]);
+
+    // Y la orden HERMANA, que no se tocó, sigue llevando las dos cosas en su papel.
+    const hermana = await enTransaccion((tx) => leerRecetaParaImpreso(tx, ordenB), bd());
+    expect(hermana.avios.map((a) => a.clave).sort()).toEqual(['BOT-01', 'JAR-01']);
+    expect(hermana.telas.map((t) => t.nombre)).toEqual(['Jersey']);
+  });
+});
+
+describe('⭐ Traer al pedido un insumo que el MODELO agregó (hallazgo del reviewer)', () => {
+  it('nace con el amarre, las medidas por talla y las banderas del modelo, y NO se marca "a mano"', async () => {
+    // El modelo agrega un avío DESPUÉS de que las órdenes congelaron su receta, con todo lo suyo.
+    const cierre = await cliente.avio.create({
+      data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza', precioReferencia: 12 },
+    });
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Avíos del Centro' } });
+    // OJO: `idAvioProveedor` guarda el **idProveedor** del par `(idAvio, idAvioProveedor)`.
+    await cliente.avioProveedor.create({
+      data: { idAvio: cierre.id, idProveedor: proveedor.id, precio: 12 },
+    });
+    await cliente.modeloAvio.create({
+      data: {
+        idModelo,
+        idAvio: cierre.id,
+        consumoPorPrenda: 1,
+        consumoPorTalla: true,
+        paraCosto: false,
+        idAvioProveedor: proveedor.id,
+      },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: cierre.id, idTalla: tallaCH.id, consumo: 0.55 },
+    });
+
+    // El aviso lo dice; la acción es "Agregar" con el mismo material.
+    const antes = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(antes.desalineacion.cambios.some((c) => c.que === 'agregado')).toBe(true);
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: cierre.id, consumoPorPrenda: 1 },
+      bd(),
+    );
+    const nuevo = r.avios.find((a) => a.idAvio === cierre.id)!;
+    expect(nuevo).toMatchObject({
+      agregadoAMano: false, // ← viene del modelo: su desviación se sigue vigilando
+      paraCosto: false,
+      consumoPorTalla: true,
+      proveedorAmarrado: 'Avíos del Centro',
+    });
+    expect(nuevo.tallas).toEqual([expect.objectContaining({ idTalla: tallaCH.id, consumo: 0.55 })]);
+    // Y el aviso de "el modelo lleva algo que esta orden no tiene" se apaga.
+    expect(r.desalineacion.cambios.some((c) => c.que === 'agregado')).toBe(false);
+  });
+
+  it('un material que NO está en el modelo sí se marca "a mano" (y por eso no avisa)', async () => {
+    const extra = await cliente.tela.create({ data: { nombre: 'Rib', precioSugerido: 30 } });
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'tela', idTela: extra.id, consumoPorPrenda: 0.2 },
+      bd(),
+    );
+    expect(r.telas.find((t) => t.idTela === extra.id)).toMatchObject({ agregadoAMano: true });
+    expect(r.desalineacion.hayCambios).toBe(false);
+  });
+});
+
+describe('⭐ La puerta también cubre AGREGAR LÍNEAS a una OC ya hecha (2º hallazgo del reviewer)', () => {
+  /** Deja la receta liberada, crea una OC ligada, y luego REVOCA la firma tocando la receta. */
+  async function ocLigadaYFirmaRevocada(): Promise<number> {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarReceta(sesion(), ordenA, bd());
+    const oc = await crearOC(sesionOc(), await cuerpoOc('Proveedor A', ordenA), bd());
+
+    // Desarrollo toca el contenido → la firma se revoca (regla de la ronda anterior).
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jersey = r.telas.find((t) => t.idTela === telaJersey.id)!;
+    await editarRenglonReceta(sesion(), ordenA, 'tela', jersey.id, { consumoPorPrenda: 3 }, bd());
+    const revocada = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(revocada.liberadaEn).toBeNull();
+    return oc.id;
+  }
+
+  it('con la firma REVOCADA, meterle una LÍNEA NUEVA a la OC ligada se rechaza', async () => {
+    const idOc = await ocLigadaYFirmaRevocada();
+    const otraTela = await cliente.tela.create({ data: { nombre: 'Rib', precioSugerido: 30 } });
+    const proveedor = await cliente.proveedor.findFirstOrThrow();
+    const direccion = await cliente.direccionEntrega.findFirstOrThrow();
+
+    // El escenario exacto del reviewer: 5,000 kg de otra tela contra la misma orden.
+    await expect(
+      actualizarOC(
+        sesionOc(),
+        idOc,
+        {
+          idProveedor: proveedor.id,
+          idDireccionEntrega: direccion.id,
+          lineas: [
+            { idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg', idOrden: ordenA },
+            { idTela: otraTela.id, cantidad: 5000, precio: 30, unidad: 'kg', idOrden: ordenA },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('…y una LÍNEA DE MÁS del mismo material tampoco pasa (el conteo también cuenta)', async () => {
+    const idOc = await ocLigadaYFirmaRevocada();
+    const proveedor = await cliente.proveedor.findFirstOrThrow();
+    const direccion = await cliente.direccionEntrega.findFirstOrThrow();
+    await expect(
+      actualizarOC(
+        sesionOc(),
+        idOc,
+        {
+          idProveedor: proveedor.id,
+          idDireccionEntrega: direccion.id,
+          lineas: [
+            { idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg', idOrden: ordenA },
+            { idTela: telaJersey.id, cantidad: 900, precio: 50, unidad: 'kg', idOrden: ordenA },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('CORREGIR la cantidad de una línea que ya existía SÍ se permite, SIN TOPE (deliberado)', async () => {
+    // La puerta es sobre QUÉ se compra, no sobre CUÁNTO: subir la cantidad de una línea que ya
+    // existía se permite aunque la firma esté revocada (aquí 10 → 12; nada impide 10 → 100,000).
+    // Es el reverso de haber abierto el lockout de Compras. Topar el monto sería un control de
+    // COMPRAS (autorización por importe), no de esta puerta.
+    const idOc = await ocLigadaYFirmaRevocada();
+    const proveedor = await cliente.proveedor.findFirstOrThrow();
+    const direccion = await cliente.direccionEntrega.findFirstOrThrow();
+    const oc = await actualizarOC(
+      sesionOc(),
+      idOc,
+      {
+        idProveedor: proveedor.id,
+        idDireccionEntrega: direccion.id,
+        lineas: [
+          { idTela: telaJersey.id, cantidad: 12, precio: 55, unidad: 'kg', idOrden: ordenA },
+        ],
+      },
+      bd(),
+    );
+    expect(oc.lineas).toHaveLength(1);
+    expect(oc.lineas[0]?.cantidad).toBe(12);
+  });
+
+  it('QUITAR una línea también se permite (quitarla no compra nada nuevo)', async () => {
+    const idOc = await ocLigadaYFirmaRevocada();
+    const proveedor = await cliente.proveedor.findFirstOrThrow();
+    const direccion = await cliente.direccionEntrega.findFirstOrThrow();
+    const oc = await actualizarOC(
+      sesionOc(),
+      idOc,
+      { idProveedor: proveedor.id, idDireccionEntrega: direccion.id, lineas: [] },
+      bd(),
+    );
+    expect(oc.lineas).toHaveLength(0);
+  });
+});
+
+describe('⭐ El renglón traído del modelo SÍ vuelve a avisar (2º hallazgo del reviewer)', () => {
+  it('copiado tal cual nace REVISADO, y si el modelo cambia después, AVISA', async () => {
+    const cierre = await cliente.avio.create({
+      data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza', precioReferencia: 12 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo, idAvio: cierre.id, consumoPorPrenda: 1 },
+    });
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: cierre.id, consumoPorPrenda: 1 },
+      bd(),
+    );
+    const nuevo = r.avios.find((a) => a.idAvio === cierre.id)!;
+    // Copia FIEL del modelo: ni "a mano" ni "ajustado" → nadie lo desvió a propósito.
+    expect(nuevo).toMatchObject({ agregadoAMano: false, estado: 'revisado' });
+
+    // El escenario del reviewer: el modelo lo mueve de 1 a 9 DESPUÉS.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: cierre.id } },
+      data: { consumoPorPrenda: 9 },
+    });
+    const despues = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(despues.desalineacion.hayCambios).toBe(true);
+    expect(despues.desalineacion.cambios).toContainEqual(
+      expect.objectContaining({ tipo: 'avio', que: 'consumo' }),
+    );
+    // Y la receta congelada NO se movió: sigue en 1.
+    expect(despues.avios.find((a) => a.idAvio === cierre.id)?.consumoPorPrenda).toBe(1);
+  });
+
+  it('si al traerlo la persona TECLEA otro consumo, es un ajuste y se calla', async () => {
+    const cierre = await cliente.avio.create({
+      data: { clave: 'CIE-02', descripcion: 'Cierre corto', unidad: 'pza' },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo, idAvio: cierre.id, consumoPorPrenda: 1 },
+    });
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: cierre.id, consumoPorPrenda: 4 },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === cierre.id)).toMatchObject({
+      agregadoAMano: false,
+      estado: 'ajustado',
+    });
+    expect(r.desalineacion.hayCambios).toBe(false);
   });
 });
 
