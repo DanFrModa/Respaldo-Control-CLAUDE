@@ -2241,3 +2241,127 @@ permanente a toda orden viva con esa tela, y el aviso se volvería ruido de fond
   despliegue de la sesión que no se deshace con un clic. Permisos: **ninguno nuevo** (reusa
   `desarrollo.administrar`); seed: no.
 - **Fecha:** 2026-08-15/16.
+
+#### (Post-F9.51) — Las reglas que las DEFENSAS obligaron a fijar (V1-E4, 16-ago-2026)
+
+Daniel quiere operar el sistema. Esta etapa es la que se construye **antes** de capturar trabajo real:
+*"lo peor que puede pasar en producción no es que algo truene: es que corrompa datos sin avisar"*.
+Ninguna de estas reglas se le preguntó a Daniel — **son consecuencias de tapar los siete huecos**, y se
+escriben aquí porque cambian cómo se comporta el sistema.
+
+**1. ⭐ La identidad de una importación es `ocCliente` + CLIENTE, y las canceladas NO cuentan.**
+
+Importar dos veces la misma OC del cliente **duplicaba todo en silencio** —pedido, órdenes, nº de
+producción, ruta crítica y explosión de materiales— y se descubría semanas después **cortando doble**:
+tela y horas de maquila reales. La defensa va en los **dos** importadores (PDF y Excel).
+
+- **Excluir las canceladas es deliberado:** si la importación anterior se canceló, re-importar es
+  legítimo y no debe trabarse.
+- **El resurtido NO se atiende re-importando el papel** — se atiende con el botón de resurtido (punto 3
+  de esta misma etapa). Por eso la regla no produce falsos positivos.
+- **NO se puso un `@@unique(cliente, ocCliente)` en la BD**, y la razón es del negocio: esa columna
+  viene del ETL del sistema viejo, donde el nº de OC **no estaba controlado** (repetidos y vacíos). El
+  unique tumbaría la migración. El candado + la re-verificación dentro de la transacción dan la
+  garantía **hacia adelante** sin tocar el histórico.
+- ⚠️ **Límite conocido y aceptado:** un Excel **sin OC capturada** no se puede deduplicar — sin ese
+  dato no hay identidad, e inventar una (nombre de archivo, fecha) **bloquearía importaciones
+  legítimas** del mismo cliente el mismo día.
+
+**2. Un precosto NO se puede congelar en CERO.** Un modelo sin receta generaba las anclas de maquila y
+corte en $0 y la versión se congelaba **inmutable** — de ahí podía salir el precio de un cliente. Ahora
+se rechaza al congelar, no al aprobar.
+
+**3. «Cancelar pedido» dice la verdad, y puede cancelar en cascada.** Antes afirmaba que dejaba de
+producirse **y las OPs seguían vivas, cortándose**. Ahora: sin OPs vivas cancela igual; con OPs vivas
+**se niega nombrando los folios**; y con petición explícita + motivo las cancela en la misma
+transacción, con bitácora **por orden**.
+⚠️ **Cancelar una OP que ya llevaba corte SÍ se permite** — es **paridad exacta** con lo que el flujo
+manual ya hacía, no una puerta nueva. Verificado línea por línea contra `cancelarOrden`.
+
+**4. Un desarrollo metido por error en una lista de precios ya se puede sacar.** El
+`@@unique([idDesarrollo])` de la BD significaba que ese desarrollo **no podía entrar NUNCA a otra
+lista**: quedaba atrapado para siempre. El borrado es **físico** —un borrado suave no soltaría el
+unique, o sea que no abriría la trampa—, y por eso **el objeto completo del `antes` más todos sus
+`NegociacionEvento` van a la bitácora** antes de borrar, en la misma transacción (D3 se cumple ahí).
+
+**5. El Pedido Real se puede cancelar** (§Post-F9.37 punto 9 — cierra el TODO abierto desde F2-E1).
+Cancelación **suave con motivo**, y **cancelado deja de admitir edición y seguimiento**, para que no sea
+un adorno. **Requiere migración** (`pedido_real` += `cancelado`, `motivo_cancelada`).
+
+- **Aplica en:** V1-E4. **Una migración** (`20260816120000_cancelar_pedido_real`). **CERO permisos
+  nuevos, CERO seed** — reusa `listas.administrar`, `pedidos-reales.administrar` y `ordenes.cancelar`.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.52) — El ARTE, como Daniel lo usa de verdad (DANIEL, 16-ago-2026)
+
+Daniel revisando la ficha del modelo en `prueba`, **dos días después** de que el arte se mudara del
+catálogo al modelo (§Post-F9.35 / V1-E3d pieza A). Siete observaciones. **Cada una verificada contra
+el código antes de escribirla aquí** — las siete aplican, ninguna estaba resuelta.
+
+**1. El NOMBRE del arte no hace falta.**
+> *"No necesita tener un nombre del arte. Si la tabla exige un nombre, ponle uno compuesto. O si no,
+> no es necesario."*
+
+Hoy `ModeloArte.nombre` es **obligatorio** (`String`, sin `?`). Deja de pedirse al usuario: o se
+compone solo (tipo + posición + consecutivo, p. ej. *"Bordado frente 1"*) o desaparece. ⚠️ Ojo: hay un
+`@@unique([idOrden, nombre])` en `OrdenArte` que un nombre compuesto debe seguir respetando.
+
+**2. Falta decir si va en el FRENTE o la ESPALDA.**
+> *"Creo que es importante definir si va en el frente o la espalda."*
+
+Campo nuevo. No existe hoy. *(Al construir: confirmar si son solo esas dos o hay más — manga, costado.)*
+
+**3. El selector de proveedores debe mostrar SOLO los de arte.** Hoy muestra **todos**. `Proveedor.tipo`
+ya existe (`TELAS`/`AVIOS`/`SERVICIOS`/`SIN_CLASIFICAR`) pero **no hay un tipo de arte**: hay que
+decidir si se agrega uno o se usa `SERVICIOS`.
+
+**4. ⭐ El TIPO de arte debe ser un CATÁLOGO, no una lista fija.**
+> *"Aparte de bordado y estampado, podríamos tener lavados, embosado, etc. Creo que hay que tener un
+> catálogo de tipos de arte."*
+
+Hoy es un **enum** (`TipoArte`: `BORDADO`/`ESTAMPADO`) — agregar un tipo exige migración y despliegue.
+Pasa a catálogo administrable, como `TipoProceso` (F3-E1), que es el precedente del repo.
+
+**5. Cada arte lleva SUS PROPIAS FOTOS, en plural.**
+> *"Cada arte debe de llevar sus propias fotos (aparte de las fotos del modelo)."*
+
+Hoy `ModeloArte.idArchivoFoto` es **UNA sola** foto. Pasa a colección, como `ModeloFoto`.
+
+**6. Las PUNTADAS se van.**
+> *"Las puntadas solo aplica para bordados. Yo quitaría ese campo."*
+
+⚠️ **Al construir, decidir con cuidado:** quitar la columna **borra el dato de los bordados que sí lo
+tienen** (D3: nada se destruye en silencio). Alternativas: dejarlo como atributo del **tipo de arte**
+(punto 4) para que solo aparezca en bordado, o conservarlo oculto. **No se borra sin decidirlo.**
+
+**7. ⭐ El proveedor se busca por CUALQUIER PALABRA — y esto ya estaba acordado.**
+> *"El proveedor debe de buscarse por cualquier palabra. No solo por la primera letra de la primera
+> palabra. **Habíamos acordado** que siempre que se busque un proveedor debe de buscar en todas las
+> palabras."*
+
+**Causa verificada:** el selector del arte es un `SelectNativo` con `porPagina: 100`
+(`DialogoArte.tsx:46,237`) — el "buscar tecleando" es el **typeahead del navegador**, que solo pega por
+**prefijo**. El servidor **ya busca bien** (`idsPorNombreSinAcentos`: `LIKE %texto%` sin acentos, casa
+en medio del nombre).
+
+⚠️ **Es la TERCERA vez esta semana que aparece este patrón**: el mismo defecto se arregló en el BOM
+(V1-E3c punto 4) y en las 12 pantallas de cliente (V1-E4 punto 7), **y no viajó al arte**. Al
+construirlo: **reusar `ComboboxBuscable`**, y de paso **barrer TODOS los `SelectNativo` de proveedor
+que queden**, no solo éste. *(Nota fina: `LIKE %texto%` casa una subcadena contigua; si Daniel espera
+que "moda textil" encuentre "Textiles Moda del Norte", hace falta partir la búsqueda en palabras y
+exigirlas todas. Confirmar al construir.)*
+
+**8. DIFERIDO a una etapa posterior, por decisión de Daniel:**
+> *"En una siguiente etapa quiero poder poner la ficha del estampado."*
+
+La **ficha técnica del estampado** adjunta al arte. **No entra en la primera versión**; queda anotado
+para no perderse. Emparienta con las fichas técnicas estructuradas (R5) que ya estaban pendientes.
+
+⚠️ **Ripple que hay que mirar al construir:** **`OrdenArte` copia de `ModeloArte`** desde V1-E3d pieza
+B. Todo cambio de forma aquí (nombre, posición, tipo-catálogo, fotos múltiples, puntadas) **debe
+recorrer también la receta congelada de la orden**, su copia y su comparador de desalineación.
+
+- **Aplica en:** etapa propia — **`V1-E3f`**, después de V1-E4. **REQUIERE MIGRACIÓN** (nombre,
+  posición, catálogo de tipos, fotos múltiples, puntadas) y probablemente **seed** (los tipos de arte
+  iniciales). Permisos: reusar los de catálogos.
+- **Fecha:** 2026-08-16.
