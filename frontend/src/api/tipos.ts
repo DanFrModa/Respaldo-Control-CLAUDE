@@ -374,6 +374,12 @@ export type PedidoRealLinea = PedidoReal['lineas'][number];
 /** Cuerpo de alta de un pedido real (`POST /api/pedidos/{id}/reales`). */
 export type PedidoRealCrear =
   paths['/api/pedidos/{id}/reales']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelar un pedido (V1-E4 punto 5: opcionalmente arrastra sus OPs). */
+export type PedidoCancelarCuerpo =
+  paths['/api/pedidos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelar un pedido real (V1-E4 punto 6: motivo obligatorio). */
+export type PedidoRealCancelarCuerpo =
+  paths['/api/pedidos-reales/{idReal}/cancelar']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de edicion del encabezado de un pedido real (`PATCH /api/pedidos-reales/{idReal}`). */
 export type PedidoRealEditar =
   paths['/api/pedidos-reales/{idReal}']['patch']['requestBody']['content']['application/json'];

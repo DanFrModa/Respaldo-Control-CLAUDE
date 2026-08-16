@@ -2,7 +2,6 @@ import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import {
   useActividades,
   useCancelarRegistroProductividad,
@@ -11,6 +10,7 @@ import {
   useRegistrosProductividad,
 } from '@/api/productividad';
 import type { RegistroProductividadCrear } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -51,7 +51,6 @@ export function CapturaProductividadPagina(): React.JSX.Element {
 
   const actividades = useActividades({ area, porPagina: 100 });
   const personal = usePersonal({ area: 'ip', porPagina: 100 });
-  const clientes = useClientes({ porPagina: 100 });
   const registros = useRegistrosProductividad({ area, porPagina: 20 });
   const registrar = useRegistrarProductividad();
   const cancelar = useCancelarRegistroProductividad();
@@ -176,19 +175,14 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             ) : (
               <Field>
                 <FieldLabel htmlFor="cap-cliente">Cliente (opcional)</FieldLabel>
-                <SelectNativo
-                  id="cap-cliente"
-                  value={idCliente}
-                  onChange={(e) => setIdCliente(e.target.value)}
-                  data-testid="cap-cliente"
-                >
-                  <option value="">Sin cliente</option>
-                  {(clientes.data?.datos ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
+                {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+                <FiltroCliente
+                  idCliente={idCliente === '' ? null : Number(idCliente)}
+                  alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
+                  etiqueta="Cliente (opcional)"
+                  placeholder="Sin cliente"
+                  testid="cap-cliente"
+                />
               </Field>
             )}
 

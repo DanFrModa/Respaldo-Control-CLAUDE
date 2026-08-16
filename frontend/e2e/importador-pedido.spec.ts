@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del IMPORTADOR del pedido del cliente (rediseño R8, B15 — proto §4.1 "Etapa 3") contra el
@@ -80,7 +80,7 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
     await expect(page.getByRole('heading', { name: 'Pre-costeos', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
-    await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoProyecto, cliente, 'proyecto-cliente');
     await dialogoProyecto.getByLabel('Departamento').selectOption({ label: departamento });
     await dialogoProyecto.getByLabel('Nombre / tema').fill(nombreProyecto);
     await page.getByTestId('guardar-proyecto').click();

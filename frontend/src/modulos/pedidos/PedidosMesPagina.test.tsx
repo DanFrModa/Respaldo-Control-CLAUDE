@@ -1,7 +1,9 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PedidosPorMes } from '@/api/tipos';
+import type { ClavePermiso } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { PedidosMesPagina } from './PedidosMesPagina';
@@ -39,7 +41,10 @@ vi.mock('@/api/empresas', () => ({
   useEmpresas: () => ({ data: [], isPending: false }),
 }));
 vi.mock('@/api/colores', () => ({
-  useColores: () => ({ data: { datos: [] }, isPending: false }),
+  // `useCrearColor` lo pide `AgregarColorMatriz`, el combobox con búsqueda server-side que la
+  // matriz de "Generar OP" reusa desde V1-E4 (punto 7).
+  useColores: () => ({ data: { datos: [] }, isPending: false, isFetching: false }),
+  useCrearColor: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/api/tallas', () => ({
   useTallasActivas: () => ({ data: { datos: [] }, isPending: false }),
@@ -166,5 +171,67 @@ describe('<PedidosMesPagina>', () => {
     });
 
     expect(screen.getByTestId('constructor-pedido')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ V1-E4 punto 3 — EL RESURTIDO. El backend modela N OPs por renglón A PROPÓSITO
+   * (`salidaAProduccion` reusa el nº de producción del modelo en la segunda salida), pero la
+   * pantalla cambiaba el botón "Generar OP" por la liga a la orden en cuanto nacía la primera: la
+   * SEGUNDA OP era imposible desde aquí. El renglón de ejemplo YA tiene OP (folio 5500), así que
+   * esta prueba falla si el botón desaparece de nuevo.
+   */
+  describe('⭐ resurtido: la segunda OP de un renglón (V1-E4)', () => {
+    const PERM: ClavePermiso[] = ['pedidos.ver', 'pedidos.administrar', 'ordenes.administrar'];
+
+    it('con una OP ya creada, sigue habiendo cómo generar otra', () => {
+      usePedidosPorMes.mockReturnValue(consulta(paginaDeEjemplo(false)));
+      renderConProveedores(<PedidosMesPagina />, { sesion: estadoSesionDePrueba(PERM) });
+
+      // La liga a la OP existente sigue ahí…
+      expect(screen.getByTestId('pedidos-liga-orden')).toHaveTextContent('5500');
+      // …y ADEMÁS el botón de resurtido.
+      expect(screen.getByTestId('pedidos-resurtido')).toBeInTheDocument();
+    });
+
+    it('el botón de resurtido abre el panel de Generar OP del MISMO renglón', async () => {
+      const usuario = userEvent.setup();
+      usePedidosPorMes.mockReturnValue(consulta(paginaDeEjemplo(false)));
+      renderConProveedores(<PedidosMesPagina />, { sesion: estadoSesionDePrueba(PERM) });
+
+      await usuario.click(screen.getByTestId('pedidos-resurtido'));
+
+      const panel = await screen.findByTestId('panel-generar-op');
+      expect(panel).toHaveAttribute('aria-label', expect.stringContaining('KM-114'));
+    });
+
+    it('sin ordenes.administrar no se ofrece el resurtido', () => {
+      usePedidosPorMes.mockReturnValue(consulta(paginaDeEjemplo(false)));
+      renderConProveedores(<PedidosMesPagina />, {
+        sesion: estadoSesionDePrueba(['pedidos.ver']),
+      });
+
+      expect(screen.queryByTestId('pedidos-resurtido')).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * ⭐ V1-E4 punto 7 — los colores de la matriz de "Generar OP" salían de la PRIMERA PÁGINA del
+   * catálogo (100). El catálogo los rebasa (el importador de OC por PDF crea colores solo), así
+   * que había colores INALCANZABLES y el usuario terminaba duplicándolos. Ahora se busca en
+   * servidor con el mismo combobox que la matriz de la OP.
+   */
+  it('⭐ la matriz de Generar OP busca colores en servidor, no en una lista precargada', async () => {
+    const usuario = userEvent.setup();
+    usePedidosPorMes.mockReturnValue(consulta(paginaDeEjemplo(false)));
+    renderConProveedores(<PedidosMesPagina />, {
+      sesion: estadoSesionDePrueba(['pedidos.ver', 'pedidos.administrar', 'ordenes.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('pedidos-resurtido'));
+    await screen.findByTestId('panel-generar-op');
+
+    // El combobox con typeahead (`matriz-color-al-vuelo`), NO el <select> del catálogo cargado.
+    expect(screen.getByTestId('matriz-color-al-vuelo')).toBeInTheDocument();
+    expect(screen.queryByTestId('matriz-op-agregar-color')).not.toBeInTheDocument();
   });
 });

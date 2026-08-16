@@ -94,7 +94,7 @@ describe('dominio Pedidos (F2-E1) — permisos (deny-by-default, A4)', () => {
   });
 
   it('cancelar sin permiso administrar → ErrorPermiso', async () => {
-    await expect(cancelarPedido(sesionSoloVer(), 1, {}, archivosStub)).rejects.toBeInstanceOf(
+    await expect(cancelarPedido(sesionSoloVer(), 1, {}, {}, archivosStub)).rejects.toBeInstanceOf(
       ErrorPermiso,
     );
   });

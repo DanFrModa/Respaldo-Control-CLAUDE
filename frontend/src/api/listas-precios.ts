@@ -221,6 +221,38 @@ export function useEditarFactoresLista(): UseMutationResult<
   });
 }
 
+/**
+ * QUITA un renglón de una lista (V1-E4 punto 4). Devuelve la lista ya sin él.
+ *
+ * No es una comodidad: `lista_precios_linea` tiene `@@unique([idDesarrollo])`, así que un
+ * desarrollo metido por error quedaba ATRAPADO —no podía entrar a la lista correcta nunca—.
+ */
+async function quitarLinea(idLinea: number): Promise<ListaDetalle> {
+  const { data, error } = await api.DELETE('/api/listas-precios/lineas/{idLinea}', {
+    params: { path: { idLinea } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/** BORRA una lista completa (V1-E4 punto 4). 204 sin cuerpo. */
+async function eliminarLista(id: number): Promise<void> {
+  const { error } = await api.DELETE('/api/listas-precios/{id}', { params: { path: { id } } });
+  if (error) throw new ErrorDeApi(error);
+}
+
+/** Quita un renglón de la lista e invalida listas + proyectos (el desarrollo vuelve a candidato). */
+export function useQuitarLineaLista(): UseMutationResult<ListaDetalle, ErrorDeApi, number> {
+  const invalidar = useInvalidar();
+  return useMutation({ mutationFn: quitarLinea, onSuccess: invalidar });
+}
+
+/** Borra una lista e invalida listas + proyectos. */
+export function useEliminarLista(): UseMutationResult<void, ErrorDeApi, number> {
+  const invalidar = useInvalidar();
+  return useMutation({ mutationFn: eliminarLista, onSuccess: invalidar });
+}
+
 /** Aprueba el precio calculado de un renglón. */
 export function useAprobarLinea(): UseMutationResult<ListaDetalle, ErrorDeApi, number> {
   const invalidar = useInvalidar();

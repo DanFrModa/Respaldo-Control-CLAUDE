@@ -2,9 +2,9 @@ import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useClientes } from '@/api/clientes';
 import { useTableroPedidosMes } from '@/api/ordenes-consulta';
 import type { TableroPedidosMesFila, TableroPedidosMesQuery } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
 import {
@@ -38,8 +38,6 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const [anio, setAnio] = useState<number | null>(new Date().getFullYear());
   const [idCliente, setIdCliente] = useState<number | null>(null);
-
-  const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: TableroPedidosMesQuery = {
     ...(anio !== null ? { anio } : {}),
@@ -85,19 +83,13 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
-          <SelectNativo
-            value={idCliente === null ? TODOS : String(idCliente)}
-            onChange={(e) => setIdCliente(e.target.value === TODOS ? null : Number(e.target.value))}
-            aria-label="Filtrar por cliente"
-            data-testid="filtro-cliente"
-          >
-            <option value={TODOS}>Todos los clientes</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E4 (punto 7): era un <select> de la primera página del catálogo (100) y con
+              ~117 clientes los del final del alfabeto NO aparecían. */}
+          <FiltroCliente
+            idCliente={idCliente}
+            alCambiar={(c) => setIdCliente(c?.id ?? null)}
+            testid="filtro-cliente"
+          />
         </div>
 
         {/* Salto a Pedidos reales (existe) + stubs (F3/F4/F7) */}

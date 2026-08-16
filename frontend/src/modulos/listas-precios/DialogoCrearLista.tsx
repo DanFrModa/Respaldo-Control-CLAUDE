@@ -2,8 +2,9 @@ import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useClientes, useDepartamentosCliente } from '@/api/clientes';
+import { useDepartamentosCliente } from '@/api/clientes';
 import { useCandidatosLista, useCrearLista } from '@/api/listas-precios';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,15 +18,6 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
-
-/** Tope alto para el selector de clientes. */
-const QUERY_CLIENTES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /**
  * Contexto de un PROYECTO desde el que se genera la lista (Daniel, ago-2026): fija cliente +
@@ -68,7 +60,6 @@ export function DialogoCrearLista({
   const [fecha, setFecha] = useState('');
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
 
-  const clientes = useClientes(QUERY_CLIENTES);
   const departamentos = useDepartamentosCliente(idCliente === '' ? undefined : Number(idCliente));
   const candidatos = useCandidatosLista(
     idCliente === '' ? undefined : Number(idCliente),
@@ -158,18 +149,15 @@ export function DialogoCrearLista({
             <>
               <Field>
                 <FieldLabel htmlFor="crear-lista-cliente">Cliente</FieldLabel>
-                <SelectNativo
-                  id="crear-lista-cliente"
-                  value={idCliente}
-                  onChange={(e) => cambiarCliente(e.target.value)}
-                >
-                  <option value="">Elige un cliente…</option>
-                  {(clientes.data?.datos ?? []).map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
+                {/* V1-E4 (punto 7): búsqueda server-side; el <select> se llenaba con la primera
+                    página del catálogo (100) y con ~117 clientes había inalcanzables. */}
+                <FiltroCliente
+                  idCliente={idCliente === '' ? null : Number(idCliente)}
+                  alCambiar={(c) => cambiarCliente(c === null ? '' : String(c.id))}
+                  etiqueta="Cliente"
+                  placeholder="Elige un cliente…"
+                  testid="crear-lista-cliente"
+                />
               </Field>
 
               <Field>

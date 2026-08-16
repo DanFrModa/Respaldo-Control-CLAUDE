@@ -219,8 +219,71 @@ describe('<PedidosPagina>', () => {
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByRole('heading', { name: 'Cancelar pedido' })).toBeInTheDocument();
 
-    await usuario.click(screen.getByTestId('confirmar-accion'));
-    expect(cancelarMutate).toHaveBeenCalledWith(7, expect.anything());
+    await usuario.click(screen.getByTestId('confirmar-cancelar-pedido'));
+    expect(cancelarMutate).toHaveBeenCalledWith({ id: 7, cuerpo: {} }, expect.anything());
+  });
+
+  /**
+   * ⭐ V1-E4 punto 5. El diálogo de antes prometía que el pedido "deja de producirse" y era
+   * MENTIRA: sus OPs seguían vivas, cortándose. Nadie lo nota probando a mano —la cancelación
+   * "funciona"—, así que la promesa (y la forma de cumplirla) se cementan aquí.
+   */
+  describe('⭐ cancelar dice la verdad sobre las OPs (V1-E4)', () => {
+    it('avisa que cancelar NO detiene las órdenes de producción', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      const dialogo = await screen.findByRole('dialog');
+
+      expect(dialogo).toHaveTextContent(/NO detiene sus órdenes de producción/i);
+    });
+
+    it('con la casilla marcada + motivo, manda cancelarOrdenes y el motivo', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      await usuario.click(await screen.findByTestId('cancelar-tambien-ordenes'));
+      await usuario.type(screen.getByTestId('cancelar-pedido-motivo'), 'El cliente canceló');
+      await usuario.click(screen.getByTestId('confirmar-cancelar-pedido'));
+
+      expect(cancelarMutate).toHaveBeenCalledWith(
+        { id: 7, cuerpo: { cancelarOrdenes: true, motivo: 'El cliente canceló' } },
+        expect.anything(),
+      );
+    });
+
+    it('marcada SIN motivo no deja confirmar (toda OP cancelada lleva su porqué)', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      await usuario.click(await screen.findByTestId('cancelar-tambien-ordenes'));
+
+      expect(screen.getByTestId('confirmar-cancelar-pedido')).toBeDisabled();
+      expect(cancelarMutate).not.toHaveBeenCalled();
+    });
+
+    it('sin `ordenes.cancelar` la casilla NO se ofrece', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      await screen.findByRole('dialog');
+
+      expect(screen.queryByTestId('cancelar-tambien-ordenes')).not.toBeInTheDocument();
+    });
   });
 
   it('abre el diálogo de copiar con selección múltiple de renglones', async () => {

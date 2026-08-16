@@ -13,7 +13,12 @@ import {
   type ServicioArchivos,
 } from '../../comun/archivos.js';
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Cliente, Empresa, Modelo, PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -26,7 +31,14 @@ import {
   listarPedidos,
   obtenerPedido,
 } from './pedidos.js';
-import { crearPedidoReal, listarPedidosReales } from './pedidos-reales.js';
+import {
+  actualizarPedidoReal,
+  actualizarSeguimientoPedidoReal,
+  cancelarPedidoReal,
+  crearPedidoReal,
+  listarPedidosReales,
+} from './pedidos-reales.js';
+import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 /**
  * Integración del dominio de Pedidos (F2-E1) contra el Postgres efímero (testcontainers).
@@ -357,7 +369,7 @@ describe('Pedidos (F2-E1) — cancelación suave (doc 02 §4.2)', () => {
       archivos,
     );
 
-    const cancelado = await cancelarPedido(s, pedido.id, bd(), archivos);
+    const cancelado = await cancelarPedido(s, pedido.id, {}, bd(), archivos);
     expect(cancelado.pedCancelado).toBe(true);
 
     // sigue consultable
@@ -371,7 +383,7 @@ describe('Pedidos (F2-E1) — cancelación suave (doc 02 §4.2)', () => {
     expect(conCancelados.datos.some((p) => p.id === pedido.id)).toBe(true);
 
     // cancelar dos veces es conflicto
-    await expect(cancelarPedido(s, pedido.id, bd(), archivos)).rejects.toBeInstanceOf(
+    await expect(cancelarPedido(s, pedido.id, {}, bd(), archivos)).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
   });
@@ -483,5 +495,216 @@ describe('Pedidos (R3, B4) — coherencia de los amarres a desarrollo (H1 del re
     );
     expect(cambiado.lineas[0]?.idModelo).toBe(modeloB.id);
     expect(cambiado.lineas[0]?.idDesarrollo).toBeNull();
+  });
+});
+
+/**
+ * ⭐ V1-E4 punto 5 — «Cancelar pedido» MENTÍA. La pantalla prometía que el pedido "deja de
+ * producirse" y cancelar solo ponía `pedCancelado = true`: sus OPs seguían vivas, en el centro de
+ * órdenes, en el WIP y en el MRP, cortándose. Nadie lo nota probando a mano (la cancelación
+ * "funciona"): el descubrimiento llega cuando alguien corta un pedido cancelado.
+ */
+describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
+  const PERM_CON_CANCELAR: ClavePermiso[] = [...PERM_TODOS, 'ordenes.ver', 'ordenes.administrar'];
+
+  /** Crea un pedido con un renglón y le genera su OP. Devuelve los ids. */
+  async function pedidoConOp(): Promise<{ idPedido: number; idOrden: number; folioOrden: number }> {
+    const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
+    const pedido = await crearPedido(
+      s,
+      { idCliente: clienteNegocio.id, lineas: [{ idModelo: modeloA.id, cantidadPedida: 100 }] },
+      bd(),
+      archivos,
+    );
+    const color = await cliente.color.create({ data: { nombre: `Color ${String(Date.now())}` } });
+    const talla = await cliente.talla.create({
+      data: { etiqueta: `T${String(Date.now())}`, orden: 1 },
+    });
+    const salida = await salidaAProduccion(
+      s,
+      pedido.lineas[0]!.id,
+      { lineas: [{ idColor: color.id, tallas: [{ idTalla: talla.id, cantidad: 100 }] }] },
+      bd(),
+    );
+    return {
+      idPedido: pedido.id,
+      idOrden: salida.orden.id,
+      folioOrden: salida.orden.folio,
+    };
+  }
+
+  it('con OPs vivas y SIN pedir cancelarlas: se RECHAZA, nombrándolas, y nada cambia', async () => {
+    const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
+    const { idPedido, idOrden, folioOrden } = await pedidoConOp();
+
+    const error = await cancelarPedido(s, idPedido, {}, bd(), archivos).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect((error as Error).message).toContain(String(folioOrden));
+    // NADA se movió: ni el pedido ni la OP.
+    const pedido = await cliente.pedido.findUniqueOrThrow({ where: { id: idPedido } });
+    expect(pedido.pedCancelado).toBe(false);
+    const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(orden.estado).not.toBe('cancelada');
+  });
+
+  it('con `cancelarOrdenes` + motivo: se cancelan el pedido Y sus OPs, en la misma transacción', async () => {
+    const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
+    const { idPedido, idOrden } = await pedidoConOp();
+
+    const resultado = await cancelarPedido(
+      s,
+      idPedido,
+      { cancelarOrdenes: true, motivo: 'El cliente canceló la compra' },
+      bd(),
+      archivos,
+    );
+
+    expect(resultado.pedCancelado).toBe(true);
+    const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(orden.estado).toBe('cancelada');
+    expect(orden.motivoCancelada).toContain('El cliente canceló la compra');
+    // D3/A7: cada OP cancelada dejó SU propio renglón de bitácora (no un "se cancelaron N").
+    const bitacoraOrden = await cliente.bitacora.findFirst({
+      where: { entidad: 'Orden', idEntidad: String(idOrden), accion: 'CANCELAR' },
+    });
+    expect(bitacoraOrden).not.toBeNull();
+    expect((bitacoraOrden?.datos as { origen?: string }).origen).toBe('cancelar-pedido');
+  });
+
+  it('sin `ordenes.cancelar` NO se pueden arrastrar las OPs (403 antes de tocar nada)', async () => {
+    const { idPedido, idOrden } = await pedidoConOp();
+    const sinCancelarOrdenes = sesion(PERM_CON_CANCELAR); // sin `ordenes.cancelar`
+
+    await expect(
+      cancelarPedido(
+        sinCancelarOrdenes,
+        idPedido,
+        { cancelarOrdenes: true, motivo: 'x' },
+        bd(),
+        archivos,
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+
+    const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(orden.estado).not.toBe('cancelada');
+  });
+
+  it('cancelar las OPs sin motivo se rechaza (toda orden cancelada lleva su porqué)', async () => {
+    const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
+    const { idPedido } = await pedidoConOp();
+
+    await expect(
+      cancelarPedido(s, idPedido, { cancelarOrdenes: true }, bd(), archivos),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('las OPs YA canceladas no estorban: el pedido se cancela sin pedir nada más', async () => {
+    const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
+    const { idPedido, idOrden } = await pedidoConOp();
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { estado: 'cancelada', motivoCancelada: 'cancelada antes' },
+    });
+
+    const resultado = await cancelarPedido(s, idPedido, {}, bd(), archivos);
+
+    expect(resultado.pedCancelado).toBe(true);
+  });
+});
+
+/**
+ * ⭐ V1-E4 punto 6 — CANCELAR EL PEDIDO REAL. Lo decidió Daniel en §Post-F9.37 punto 9 (*"Sí."*),
+ * cerrando el TODO que llevaba abierto desde F2-E1. Suave y con motivo (D3).
+ */
+describe('⭐ cancelar el pedido real (V1-E4)', () => {
+  /** Crea un pedido con un renglón y su pedido real. */
+  async function pedidoRealNuevo(): Promise<{ idPedido: number; idReal: number }> {
+    const s = sesion([...PERM_TODOS]);
+    const pedido = await crearPedido(
+      s,
+      { idCliente: clienteNegocio.id, lineas: [{ idModelo: modeloA.id, cantidadPedida: 50 }] },
+      bd(),
+      archivos,
+    );
+    const real = await crearPedidoReal(s, pedido.id, { numPedReal: 'PR-77' }, bd());
+    return { idPedido: pedido.id, idReal: real.id };
+  }
+
+  it('cancela suave con motivo: sigue consultable, marcado y con su porqué', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const { idPedido, idReal } = await pedidoRealNuevo();
+
+    const cancelado = await cancelarPedidoReal(
+      s,
+      idReal,
+      { motivo: 'Se adelantó la entrega' },
+      bd(),
+    );
+
+    expect(cancelado.cancelado).toBe(true);
+    expect(cancelado.motivoCancelada).toBe('Se adelantó la entrega');
+    // NO se borró: sigue en el listado del pedido.
+    const listado = await listarPedidosReales(s, idPedido, bd());
+    expect(listado.some((r) => r.id === idReal && r.cancelado)).toBe(true);
+    // Bitácora (A7).
+    const registro = await cliente.bitacora.findFirst({
+      where: { entidad: 'PedidoReal', idEntidad: String(idReal), accion: 'CANCELAR' },
+    });
+    expect(registro).not.toBeNull();
+    expect((registro?.datos as { motivo?: string }).motivo).toBe('Se adelantó la entrega');
+  });
+
+  it('cancelar dos veces es conflicto', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const { idReal } = await pedidoRealNuevo();
+    await cancelarPedidoReal(s, idReal, { motivo: 'a' }, bd());
+    await expect(cancelarPedidoReal(s, idReal, { motivo: 'b' }, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+  });
+
+  it('sin motivo NO se cancela (mismo criterio que cancelar una orden)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const { idReal } = await pedidoRealNuevo();
+    await expect(cancelarPedidoReal(s, idReal, { motivo: '   ' }, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('cancelado ya no se edita ni se le captura seguimiento (la cancelación no es decorativa)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const { idReal } = await pedidoRealNuevo();
+    const antes = await cancelarPedidoReal(s, idReal, { motivo: 'ya no va' }, bd());
+
+    await expect(
+      actualizarPedidoReal(s, idReal, { cedis: 'CEDIS NUEVO' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(
+      actualizarSeguimientoPedidoReal(
+        s,
+        idReal,
+        { lineas: [{ id: antes.lineas[0]!.id, cantidadPR: 10 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('RBAC + A9: sin pedidos-reales.administrar no se cancela; el de otra empresa no existe', async () => {
+    const { idReal } = await pedidoRealNuevo();
+
+    await expect(
+      cancelarPedidoReal(sesion(['pedidos.ver']), idReal, { motivo: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa PR');
+    const sesionOtra = sesionDePrueba({
+      idEmpresaActiva: otra.id,
+      permisos: [...PERM_TODOS],
+    });
+    // A9: 404, NUNCA 409 (un 409 confirmaría que existe).
+    await expect(
+      cancelarPedidoReal(sesionOtra, idReal, { motivo: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

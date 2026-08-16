@@ -2448,6 +2448,13 @@ model PedidoReal {
   /// Fecha en que se entregó (viejo: `FechaEntregadaReal`).
   fechaEntregadaReal DateTime? @map("fecha_entregada_real") @db.Date
 
+  /// Pedido real CANCELADO — cancelación SUAVE (V1-E4 punto 6, decisión §Post-F9.37 punto 9:
+  /// Daniel, *"Sí"*). Cierra el TODO que estaba abierto desde F2-E1. Nunca se borra: sigue
+  /// consultable, igual que `Pedido.pedCancelado` y `Orden.estado = cancelada` (D3).
+  cancelado          Boolean   @default(false)
+  /// Motivo de la cancelación (OBLIGATORIO al cancelar, mismo criterio que `Orden.motivoCancelada`).
+  motivoCancelada    String?   @map("motivo_cancelada") @db.Text
+
   lineas PedidoRealLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")

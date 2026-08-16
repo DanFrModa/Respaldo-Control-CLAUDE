@@ -1150,6 +1150,30 @@ export async function restaurarLineaBom(
 }
 
 /**
+ * ⭐ V1-E4 (punto 2) — GUARD del congelado: un precosto NO se congela en CERO.
+ *
+ * El caso real: se genera el precosto de un modelo cuya receta todavía está vacía (o cuyos insumos
+ * no tienen precio), así que sus renglones nacen en $0.00 — incluidas las anclas de maquila y
+ * corte. `congelarVersion` solo exigía "≥1 renglón", así que la versión se congelaba con
+ * `costoTotal = 0` y quedaba INMUTABLE (D3). De ahí sale, sin un solo aviso, el `costoUnit` de un
+ * renglón de lista de precios y el precio que se le cotiza al cliente: vender a costo cero.
+ *
+ * Nadie lo nota probando a mano porque el congelado "funciona": la pantalla no truena, solo miente.
+ * Es dominio PURO a propósito, para que la regresión se pueda cementar sin base de datos.
+ *
+ * Negativo también se rechaza: un total bajo cero solo puede salir de renglones mal capturados, y
+ * congelarlo dejaría un precio de venta por debajo del costo, igual de inmutable.
+ */
+export function exigirCostoCongelable(costoTotal: number): void {
+  if (costoTotal > 0) return;
+  throw new ErrorConflicto(
+    costoTotal === 0
+      ? 'El precosto suma $0.00; congelarlo dejaría una versión INMUTABLE en cero, y de ahí sale el precio al cliente. Captura la receta del modelo (telas/avíos) o los costos de maquila y corte antes de congelar.'
+      : `El precosto suma un total NEGATIVO ($${costoTotal.toFixed(2)}); revisa los renglones antes de congelar.`,
+  );
+}
+
+/**
  * CONGELA un borrador (A2): valida que tenga ≥1 renglón, calcula y PERSISTE `costoTotal` (Σ importes),
  * marca `estado=congelado` + `congeladoEn`/`congeladoPorId`. La versión queda INMUTABLE (D3). Al haber
  * ≥1 congelado, el estado DERIVADO del desarrollo pasa a "cotizado" SOLO (E2). Requiere
@@ -1179,6 +1203,8 @@ export async function congelarVersion(
       );
     }
     const costoTotal = redondear2(lineas.reduce((suma, l) => suma + l.importe.toNumber(), 0));
+    // V1-E4 (punto 2): la versión que se congela es INMUTABLE y alimenta el precio al cliente.
+    exigirCostoCongelable(costoTotal);
 
     await tx.precosto.update({
       where: { id: idPrecosto },

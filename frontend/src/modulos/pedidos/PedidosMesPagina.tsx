@@ -578,21 +578,46 @@ export function PedidosMesPagina(): React.JSX.Element {
                               <td className="px-3 py-1.5" />
                               <td className="px-3 py-1.5">
                                 {renglon.folioOrden !== null ? (
-                                  <button
-                                    type="button"
-                                    className="num cursor-pointer font-semibold text-primary hover:underline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void navigate('/produccion/ordenes', {
-                                        state: { idOrden: renglon.idOrden },
-                                      });
-                                    }}
-                                    title="Ver en el centro de Órdenes"
-                                    data-testid="pedidos-liga-orden"
-                                  >
-                                    {renglon.folioOrden}
-                                    {renglon.numOrdenes > 1 ? ` (+${renglon.numOrdenes - 1})` : ''}
-                                  </button>
+                                  <span className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      className="num cursor-pointer font-semibold text-primary hover:underline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void navigate('/produccion/ordenes', {
+                                          state: { idOrden: renglon.idOrden },
+                                        });
+                                      }}
+                                      title="Ver en el centro de Órdenes"
+                                      data-testid="pedidos-liga-orden"
+                                    >
+                                      {renglon.folioOrden}
+                                      {renglon.numOrdenes > 1
+                                        ? ` (+${renglon.numOrdenes - 1})`
+                                        : ''}
+                                    </button>
+                                    {/* RESURTIDO (V1-E4 punto 3): el backend modela N OPs por
+                                        renglón A PROPÓSITO (`salidaAProduccion` reusa el nº de
+                                        producción del modelo en la 2ª salida), pero la pantalla
+                                        cambiaba el botón por la liga en cuanto nacía la primera:
+                                        la segunda OP era IMPOSIBLE desde aquí. */}
+                                    {puedeCrearOp && pedido.estatus === 'vigente' ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-5"
+                                        title="Generar otra OP de este renglón (resurtido)"
+                                        aria-label={`Generar otra OP del modelo ${renglon.codigoModelo} (resurtido)`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setGenerarOpDe({ pedido, renglon });
+                                        }}
+                                        data-testid="pedidos-resurtido"
+                                      >
+                                        <Plus className="size-3.5" aria-hidden />
+                                      </Button>
+                                    ) : null}
+                                  </span>
                                 ) : puedeCrearOp && pedido.estatus === 'vigente' ? (
                                   <Button
                                     variant="outline"
@@ -1002,6 +1027,21 @@ function DetalleRenglon({
               <Route aria-hidden />
               Ver ruta crítica
             </Button>
+            {/* RESURTIDO (V1-E4 punto 3): la segunda OP del renglón. Antes, con una OP ya
+                creada, no había forma de generar otra desde la pantalla — aunque el backend lo
+                modela a propósito (reusa el nº de producción del modelo). */}
+            {puedeCrearOp && pedido.estatus === 'vigente' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={alGenerarOp}
+                title="Genera otra OP de este mismo renglón (resurtido)"
+                data-testid="cajon-resurtido"
+              >
+                <Plus aria-hidden />
+                Generar otra OP (resurtido)
+              </Button>
+            ) : null}
           </>
         ) : puedeCrearOp && pedido.estatus === 'vigente' ? (
           <Button size="sm" onClick={alGenerarOp} data-testid="cajon-generar-op">

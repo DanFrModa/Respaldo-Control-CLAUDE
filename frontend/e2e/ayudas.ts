@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Credenciales del admin sembrado (backend `prisma/seed.ts`) y su empresa. */
 export const CREDENCIALES_ADMIN = {
@@ -93,4 +93,26 @@ export async function crearColorYTalla(
   await expect(page.getByText(`Talla "${talla}" creada.`)).toBeVisible();
 
   return { color, talla };
+}
+
+/**
+ * Elige un CLIENTE en el combobox con búsqueda server-side (V1-E4 punto 7).
+ *
+ * Antes era un `<select>` alimentado de la primera página del catálogo (`porPagina: 100`, que
+ * además es el tope del contrato de paginación): con ~117 clientes activos, los del final del
+ * alfabeto NO APARECÍAN y quedaban inalcanzables — sin error, sin aviso. Ahora se teclea y el
+ * servidor busca, así que la interacción del e2e cambió de `selectOption` a "teclear + elegir".
+ *
+ * `contenedor` acota la búsqueda del input (típicamente el diálogo); la LISTA de opciones se
+ * renderiza en el mismo contenedor del combobox, pero se busca desde `page` porque puede escapar
+ * del `<dialog>` en algunos layouts.
+ */
+export async function elegirCliente(
+  page: Page,
+  contenedor: Locator,
+  nombre: string,
+  testid = 'selector-cliente',
+): Promise<void> {
+  await contenedor.getByTestId(`${testid}-busqueda`).fill(nombre);
+  await page.getByTestId(`${testid}-opcion`).first().click();
 }

@@ -256,7 +256,15 @@ describe('confirmar importación por PDF (1 PDF)', () => {
 });
 
 describe('confirmar importación por PDF (multi-PDF)', () => {
-  it('dos PDFs → UN pedido con 2 OPs (resurtido) y catálogos REUSADOS', async () => {
+  /**
+   * ⚠️ ESTA PRUEBA CAMBIÓ EN V1-E4 (punto 1). Antes subía el MISMO fixture dos veces y esperaba 2
+   * OPs, llamándolo "resurtido" — que es justo el defecto que costaba tela y maquila: la misma OC
+   * del cliente pariendo producción por duplicado. Con una sola OC de fixture disponible, la
+   * tanda multi-PDF hoy demuestra lo contrario: el pedido nace UNA vez, con UNA OP, y el papel
+   * repetido se REPORTA (no se traga en silencio). La cobertura de "catálogos reusados" no se
+   * pierde: vive completa en el describe «idempotencia de catálogos».
+   */
+  it('el MISMO papel dos veces en una tanda → UNA sola OP; el repetido se reporta', async () => {
     const idModelo = await crearModelo('DEV-CYA-2');
 
     const res = await confirmarImportacionPdf(
@@ -270,25 +278,105 @@ describe('confirmar importación por PDF (multi-PDF)', () => {
       archivosFalsos(),
     );
 
-    expect(res.ordenes).toHaveLength(2);
-    expect(res.ligasAprendidas).toBe(1); // el 2º upsert es no-op (misma liga)
+    expect(res.ordenes).toHaveLength(1);
+    expect(res.noReconocidos).toHaveLength(1);
+    expect(res.noReconocidos[0]!.nombreArchivo).toBe('OC-2.pdf');
+    expect(res.noReconocidos[0]!.motivo).toContain('OC-1.pdf');
 
-    // UN solo pedido con 2 renglones y 2 OPs.
-    const pedidos = await cliente.pedido.count();
-    expect(pedidos).toBe(1);
-    const lineas = await cliente.pedidoLinea.count({ where: { idPedido: res.idPedido } });
-    expect(lineas).toBe(2);
-    const adjuntos = await cliente.ordenArchivo.count();
-    expect(adjuntos).toBe(2);
+    // UN pedido, UN renglón, UNA OP, UN adjunto: nada se duplicó.
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: res.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+    expect(await cliente.ordenArchivo.count()).toBe(1);
+  });
+});
 
-    // Los 3 colores por pack (BLANCO A/B/C) y la talla 5-6 se crearon UNA vez y se reusaron en la 2ª OP
-    // (no se duplican: 3 colores, no 6).
-    const colores = await cliente.color.count({
-      where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
+/**
+ * ⭐ V1-E4 punto 1 — LA DEFENSA CENTRAL DE LA ETAPA. Importar dos veces la misma OC del cliente
+ * creaba EN SILENCIO un segundo pedido, una segunda OP con su nº de producción, su ruta crítica y
+ * su MRP; se descubría semanas después CORTANDO DOBLE. Nadie lo nota probando a mano (las dos
+ * importaciones "funcionan"), así que la regresión vive aquí.
+ */
+describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
+  /** Importa el fixture (OC 620884) y devuelve el resultado. */
+  async function importar(idModelo: number): ReturnType<typeof confirmarImportacionPdf> {
+    return confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+  }
+
+  it('la SEGUNDA importación del mismo papel no crea NADA y explica por qué', async () => {
+    const idModelo = await crearModelo('DEV-CYA-DUP');
+    const primera = await importar(idModelo);
+    expect(primera.ordenes).toHaveLength(1);
+
+    await expect(importar(idModelo)).rejects.toThrow(ErrorValidacion);
+
+    // Lo que de verdad importa: NO nació un segundo pedido/OP/renglón (ni un nº de producción más).
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+    expect(await cliente.pedidoLinea.count()).toBe(1);
+  });
+
+  it('la vista previa lo AVISA antes de confirmar (advertencia + la OP que ya existe)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-DUP-PREV');
+    const primera = await importar(idModelo);
+    const opCreada = primera.ordenes[0]!;
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    expect(renglon.yaImportado).toEqual({
+      idOrden: opCreada.idOrden,
+      folioOrden: opCreada.folio,
     });
-    expect(colores).toBe(3);
-    const tallas56 = await cliente.talla.count({ where: { etiqueta: '5-6' } });
-    expect(tallas56).toBe(1);
+    const aviso = renglon.advertencias.find((a) => a.tipo === 'duplicado');
+    expect(aviso?.mensaje).toContain('620884');
+  });
+
+  it('si la OP anterior se CANCELÓ, re-importar el papel sí se permite', async () => {
+    const idModelo = await crearModelo('DEV-CYA-DUP-CANCEL');
+    const primera = await importar(idModelo);
+    await cliente.orden.update({
+      where: { id: primera.ordenes[0]!.idOrden },
+      data: { estado: 'cancelada', motivoCancelada: 'prueba' },
+    });
+
+    const segunda = await importar(idModelo);
+
+    expect(segunda.ordenes).toHaveLength(1);
+    expect(await cliente.orden.count({ where: { estado: { not: 'cancelada' } } })).toBe(1);
+  });
+
+  it('la OC de OTRO cliente no bloquea (el nº de orden solo identifica dentro de su cliente)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-DUP-OTRO');
+    await importar(idModelo);
+
+    const otro = await cliente.cliente.create({ data: { nombre: 'Otro cliente' } });
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: otro.id,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes).toHaveLength(1);
+    expect(await cliente.orden.count()).toBe(2);
   });
 });
 

@@ -10,17 +10,22 @@ import {
   MessagesSquareIcon,
   PencilIcon,
   Plus,
+  Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useClientes, useDepartamentosCliente } from '@/api/clientes';
+import { useDepartamentosCliente } from '@/api/clientes';
 import { useEstadosLista } from '@/api/estados-lista';
+import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import {
   descargarListaExcel,
   imprimirListaPdf,
   useAjustarPrecioLinea,
   useAprobarLinea,
+  useEliminarLista,
+  useQuitarLineaLista,
   useDesgloseCostoLinea,
   useListaPrecios,
   useListasPrecios,
@@ -59,15 +64,6 @@ import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
 import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
 import { SelectorEstadoLista } from './SelectorEstadoLista';
-
-/** Tope alto para los selectores de filtro. */
-const QUERY_CATALOGO = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /** Query de estados (para los chips): ordenados por su `orden`. */
 const QUERY_ESTADOS = {
@@ -126,7 +122,6 @@ export function ListasPreciosPagina(): React.JSX.Element {
   // Drill-in: la lista abierta a página completa (null = listado).
   const [seleccionId, setSeleccionId] = useState<number | null>(null);
 
-  const clientes = useClientes(QUERY_CATALOGO);
   const estados = useEstadosLista(QUERY_ESTADOS);
   const departamentosFiltro = useDepartamentosCliente(
     idClienteFiltro === '' ? undefined : Number(idClienteFiltro),
@@ -208,19 +203,11 @@ export function ListasPreciosPagina(): React.JSX.Element {
             alCambiar={setIdEstadoFiltro}
           />
           <span className="w-40" data-testid="filtros-listas">
-            <SelectNativo
-              className="h-[30px] text-xs"
-              aria-label="Filtrar por cliente"
-              value={idClienteFiltro}
-              onChange={(e) => cambiarClienteFiltro(e.target.value)}
-            >
-              <option value="">Todos los clientes</option>
-              {(clientes.data?.datos ?? []).map((c) => (
-                <option key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </option>
-              ))}
-            </SelectNativo>
+            {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+            <FiltroCliente
+              idCliente={idClienteFiltro === '' ? null : Number(idClienteFiltro)}
+              alCambiar={(c) => cambiarClienteFiltro(c === null ? '' : String(c.id))}
+            />
           </span>
           <SelectNativo
             className="w-44 h-[30px] text-xs"
@@ -360,6 +347,8 @@ function PaginaLista({
   const puedeAprobar = tienePermiso('listas.aprobar');
   const puedeAdministrar = tienePermiso('listas.administrar');
   const puedeNegociar = tienePermiso('listas.negociar');
+  const [borrarListaAbierto, setBorrarListaAbierto] = useState(false);
+  const borrarLista = useEliminarLista();
 
   const consulta = useListaPrecios(idLista);
   const [editarFactoresAbierto, setEditarFactoresAbierto] = useState(false);
@@ -455,6 +444,21 @@ function PaginaLista({
               <FileDown aria-hidden />
               Excel
             </Button>
+            {/* V1-E4 (punto 4): una lista creada por error retenía a TODOS sus desarrollos —el
+                `@@unique([idDesarrollo])` impide que entren a otra— y no había cómo borrarla.
+                Queda íntegra en la bitácora (D3); una lista en estado de cierre se rechaza. */}
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBorrarListaAbierto(true)}
+                data-testid="borrar-lista"
+              >
+                <Trash2 aria-hidden />
+                Borrar lista
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -543,6 +547,7 @@ function PaginaLista({
                   verImportes={verImportes}
                   puedeAprobar={puedeAprobar}
                   puedeNegociar={puedeNegociar}
+                  puedeAdministrar={puedeAdministrar}
                 />
               ))}
             </TablaDensaCuerpo>
@@ -567,6 +572,33 @@ function PaginaLista({
         abierto={editarFactoresAbierto}
         alCambiarAbierto={setEditarFactoresAbierto}
         lista={lista}
+      />
+
+      {/* V1-E4 (punto 4): borrar la lista completa. */}
+      <DialogoConfirmacion
+        abierto={borrarListaAbierto}
+        alCambiarAbierto={setBorrarListaAbierto}
+        titulo="Borrar lista de precios"
+        descripcion={
+          <>
+            Se borra la <b>lista #{lista.folio}</b> con sus {lista.lineas.length} renglón(es) y su
+            historial de negociación. Queda <b>íntegra en la bitácora</b> y sus desarrollos vuelven
+            a quedar disponibles para otra lista. No se puede deshacer desde la pantalla.
+          </>
+        }
+        textoConfirmar="Borrar lista"
+        variante="destructive"
+        procesando={borrarLista.isPending}
+        alConfirmar={() =>
+          borrarLista.mutate(lista.id, {
+            onSuccess: () => {
+              toast.success(`Lista #${String(lista.folio)} borrada.`);
+              setBorrarListaAbierto(false);
+              alRegresar();
+            },
+            onError: (error) => toast.error(error.message),
+          })
+        }
       />
     </div>
   );
@@ -602,13 +634,18 @@ function FilaRenglon({
   verImportes,
   puedeAprobar,
   puedeNegociar,
+  puedeAdministrar,
 }: {
   linea: ListaLinea;
   verImportes: boolean;
   puedeAprobar: boolean;
   puedeNegociar: boolean;
+  /** `listas.administrar` — habilita QUITAR el renglón (V1-E4 punto 4). */
+  puedeAdministrar: boolean;
 }): React.JSX.Element {
   const aprobar = useAprobarLinea();
+  const quitar = useQuitarLineaLista();
+  const [quitarAbierto, setQuitarAbierto] = useState(false);
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
   const [negociacionAbierta, setNegociacionAbierta] = useState(false);
   const [expandido, setExpandido] = useState(false);
@@ -710,6 +747,21 @@ function FilaRenglon({
               <MessagesSquareIcon aria-hidden />
               Negociación
             </Button>
+            {/* V1-E4 (punto 4): quitar el renglón. Sin esto, un desarrollo metido por error
+                quedaba atrapado para siempre (`@@unique([idDesarrollo])` a nivel BD). */}
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Quitar este renglón de la lista (queda en la bitácora)"
+                aria-label={`Quitar ${linea.codigoModelo} de la lista`}
+                onClick={() => setQuitarAbierto(true)}
+                data-testid="quitar-renglon-lista"
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </Button>
+            ) : null}
           </div>
           <DialogoAjustarPrecio
             abierto={tecleoAbierto}
@@ -722,6 +774,31 @@ function FilaRenglon({
             linea={linea}
             verImportes={verImportes}
             puedeNegociar={puedeNegociar}
+          />
+          {/* V1-E4 (punto 4): confirmación de quitar el renglón. */}
+          <DialogoConfirmacion
+            abierto={quitarAbierto}
+            alCambiarAbierto={setQuitarAbierto}
+            titulo="Quitar renglón de la lista"
+            descripcion={
+              <>
+                Se quita <b>{linea.codigoModelo}</b> de esta lista, con su precio y su historial de
+                negociación. Queda <b>íntegro en la bitácora</b> y el desarrollo vuelve a quedar
+                disponible para otra lista.
+              </>
+            }
+            textoConfirmar="Quitar renglón"
+            variante="destructive"
+            procesando={quitar.isPending}
+            alConfirmar={() =>
+              quitar.mutate(linea.id, {
+                onSuccess: () => {
+                  toast.success(`Renglón "${linea.codigoModelo}" quitado de la lista.`);
+                  setQuitarAbierto(false);
+                },
+                onError: (error) => toast.error(error.message),
+              })
+            }
           />
         </TablaDensaCelda>
       </TablaDensaFila>

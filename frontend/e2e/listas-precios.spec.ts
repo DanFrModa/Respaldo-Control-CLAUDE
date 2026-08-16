@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del módulo LISTAS DE PRECIOS (F8-E4) contra el stack real. Cubre el ciclo del spec: preparar un
@@ -49,7 +49,7 @@ test.describe('Listas de precios (F8-E4)', () => {
     await page.goto('/desarrollo');
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
-    await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoProyecto, cliente, 'proyecto-cliente');
     await dialogoProyecto.getByLabel('Departamento').selectOption({ label: departamento });
     await dialogoProyecto.getByLabel('Nombre / tema').fill(nombreProyecto);
     await page.getByTestId('guardar-proyecto').click();
@@ -93,7 +93,7 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(page.getByRole('heading', { name: 'Listas de precios' })).toBeVisible();
     await page.getByTestId('nuevo-lista-precios').click();
     const dialogoLista = page.getByRole('dialog');
-    await dialogoLista.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoLista, cliente, 'crear-lista-cliente');
     await dialogoLista.getByLabel('Departamento').selectOption({ label: departamento });
 
     const candidato = dialogoLista.getByTestId('fila-candidato').filter({ hasText: codigoModelo });

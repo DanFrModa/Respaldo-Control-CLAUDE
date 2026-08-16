@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import {
   useCancelarMuestrario,
   useCrearMuestrario,
@@ -11,6 +10,7 @@ import {
 } from '@/api/muestrarios';
 import { useTemporadas } from '@/api/temporadas';
 import type { Muestrario, MuestrariosQuery } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -308,7 +308,6 @@ function DialogoSolicitar({
   alCerrar: () => void;
 }): React.JSX.Element {
   const crear = useCrearMuestrario();
-  const clientes = useClientes({ porPagina: 100 });
   const temporadas = useTemporadas({ porPagina: 100 });
   const [idCliente, setIdCliente] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -353,19 +352,15 @@ function DialogoSolicitar({
           <div className="grid gap-4 py-4">
             <Field>
               <FieldLabel htmlFor="mu-cliente">Cliente</FieldLabel>
-              <SelectNativo
-                id="mu-cliente"
-                value={idCliente}
-                onChange={(e) => setIdCliente(e.target.value)}
-                data-testid="mu-cliente"
-              >
-                <option value="">Selecciona…</option>
-                {(clientes.data?.datos ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E4 (punto 7): búsqueda server-side; con ~117 clientes el <select> topado a
+                  100 dejaba fuera a los del final del alfabeto. */}
+              <FiltroCliente
+                idCliente={idCliente === '' ? null : Number(idCliente)}
+                alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
+                etiqueta="Cliente"
+                placeholder="Selecciona…"
+                testid="mu-cliente"
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="mu-categoria">Categoría</FieldLabel>

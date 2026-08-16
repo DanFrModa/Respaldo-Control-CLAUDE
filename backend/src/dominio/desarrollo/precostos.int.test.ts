@@ -776,6 +776,45 @@ describe('congelado inmutable + estado del desarrollo', () => {
       ErrorConflicto,
     );
   });
+
+  /**
+   * ⭐ V1-E4 (punto 2). El caso que se colaba: modelo SIN receta y sin costo de maquila → el
+   * precosto sí trae renglones (las anclas maquila/corte), así que la guarda de "≥1 renglón" lo
+   * dejaba pasar y la versión quedaba congelada —INMUTABLE— en $0.00. De ahí sale el `costoUnit`
+   * del renglón de lista y el precio que se le cotiza al cliente.
+   */
+  it('⭐ NO congela un precosto que suma CERO (versión inmutable que acabaría de precio al cliente)', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'SIN-RECETA', maquilaBase: 0 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    // Tiene renglones (las anclas) pero todos en 0: la guarda vieja lo dejaba pasar.
+    expect(borrador.lineas.length).toBeGreaterThan(0);
+    expect(borrador.lineas.every((l) => l.importe === 0)).toBe(true);
+
+    await expect(congelarVersion(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // Sigue siendo BORRADOR: no quedó nada sellado a medias.
+    const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
+    expect(enBd.estado).toBe('borrador');
+    expect(enBd.congeladoEn).toBeNull();
+  });
+
+  it('con el costo capturado (aunque sea un centavo), el mismo precosto SÍ congela', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'CON-MAQUILA', maquilaBase: 0 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const maquila = borrador.lineas.find((l) => l.conceptoCodigo === 'maquila')!;
+    await editarLinea(sesion(), borrador.id, maquila.id, { precioUnit: 0.01 }, bd());
+
+    const congelado = await congelarVersion(sesion(), borrador.id, bd());
+
+    expect(congelado.estado).toBe('congelado');
+    expect(congelado.costoTotal).toBe(0.01);
+  });
 });
 
 describe('permisos + aislamiento por empresa (A9)', () => {

@@ -15,6 +15,8 @@ import type {
   PedidoCrear,
   PedidoEditar,
   PedidoReal,
+  PedidoCancelarCuerpo,
+  PedidoRealCancelarCuerpo,
   PedidoRealCrear,
   PedidoRealEditar,
   PedidoRealSeguimiento,
@@ -80,10 +82,22 @@ async function copiarPedido(id: number, cuerpo: PedidoCopiar): Promise<Pedido> {
   return data;
 }
 
-/** Cancela un pedido (cancelación suave, `POST /api/pedidos/{id}/cancelar`). */
-async function cancelarPedido(id: number): Promise<Pedido> {
+/**
+ * Cancela un pedido (cancelación suave, `POST /api/pedidos/{id}/cancelar`).
+ *
+ * V1-E4 (punto 5): el cuerpo lleva `cancelarOrdenes` + `motivo`. Sin él, el backend RECHAZA el
+ * pedido que tiene OPs vivas en vez de fingir que las detiene.
+ */
+async function cancelarPedido({
+  id,
+  cuerpo,
+}: {
+  id: number;
+  cuerpo: PedidoCancelarCuerpo;
+}): Promise<Pedido> {
   const { data, error } = await api.POST('/api/pedidos/{id}/cancelar', {
     params: { path: { id } },
+    body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
   return data;
@@ -138,7 +152,11 @@ export function useCopiarPedido(): UseMutationResult<Pedido, ErrorDeApi, ArgsCop
 }
 
 /** Cancela un pedido (suave) e invalida la lista. */
-export function useCancelarPedido(): UseMutationResult<Pedido, ErrorDeApi, number> {
+export function useCancelarPedido(): UseMutationResult<
+  Pedido,
+  ErrorDeApi,
+  { id: number; cuerpo: PedidoCancelarCuerpo }
+> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: cancelarPedido,
@@ -262,6 +280,39 @@ export function useActualizarSeguimiento(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ idReal, cuerpo }: ArgsSeguimiento) => actualizarSeguimiento(idReal, cuerpo),
+    onSuccess: (_resultado, variables) => invalidarReales(queryClient, variables.idPedido),
+  });
+}
+
+/** Cancela un pedido real (suave, con motivo — `POST /api/pedidos-reales/{idReal}/cancelar`). */
+async function cancelarPedidoReal(
+  idReal: number,
+  cuerpo: PedidoRealCancelarCuerpo,
+): Promise<PedidoReal> {
+  const { data, error } = await api.POST('/api/pedidos-reales/{idReal}/cancelar', {
+    params: { path: { idReal } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/** Argumentos de la mutación de cancelar un pedido real (V1-E4 punto 6). */
+export interface ArgsCancelarPedidoReal {
+  idPedido: number;
+  idReal: number;
+  cuerpo: PedidoRealCancelarCuerpo;
+}
+
+/** Cancela un pedido real (suave) e invalida la lista de reales del pedido. */
+export function useCancelarPedidoReal(): UseMutationResult<
+  PedidoReal,
+  ErrorDeApi,
+  ArgsCancelarPedidoReal
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idReal, cuerpo }: ArgsCancelarPedidoReal) => cancelarPedidoReal(idReal, cuerpo),
     onSuccess: (_resultado, variables) => invalidarReales(queryClient, variables.idPedido),
   });
 }

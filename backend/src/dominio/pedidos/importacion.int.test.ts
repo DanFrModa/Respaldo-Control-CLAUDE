@@ -341,3 +341,75 @@ describe('confirmar importación (alta transaccional)', () => {
     expect(await cliente.pedido.count()).toBe(0);
   });
 });
+
+/**
+ * ⭐ V1-E4 punto 1 — la misma defensa que el importador por PDF, del lado del EXCEL. Aquí la
+ * identidad del papel es la OC capturada (`Pedido.ocCliente`), no el nº de orden de cada OP.
+ */
+describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
+  /** Confirma la importación del archivo demo con la OC indicada. */
+  async function importar(ocCliente: string | null): ReturnType<typeof confirmarImportacion> {
+    const archivoBase64 = await construirXlsxBase64(FILAS_DEMO);
+    return confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC C&A julio.xlsx',
+        archivoBase64,
+        mapeo: MAPEO_DEMO,
+        ...(ocCliente === null ? {} : { ocCliente }),
+        resoluciones: [],
+      },
+      bd(),
+    );
+  }
+
+  beforeEach(async () => {
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    await sembrarDesarrollo('DEV-115', 'CA-KM-115');
+  });
+
+  it('re-importar la MISMA OC no crea un segundo pedido (ni sus OPs)', async () => {
+    await importar('OC-CA-4471');
+    expect(await cliente.pedido.count()).toBe(1);
+
+    await expect(importar('OC-CA-4471')).rejects.toBeInstanceOf(ErrorConflicto);
+
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.orden.count()).toBe(2); // las 2 de la primera importación, ni una más
+  });
+
+  it('la comparación no se deja engañar por espacios/mayúsculas del mismo número', async () => {
+    await importar('OC-CA-4471');
+    await expect(importar('  oc-ca-4471  ')).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.pedido.count()).toBe(1);
+  });
+
+  it('otra OC distinta del mismo cliente sí entra', async () => {
+    await importar('OC-CA-4471');
+    const segunda = await importar('OC-CA-4472');
+    expect(segunda.ordenes).toHaveLength(2);
+    expect(await cliente.pedido.count()).toBe(2);
+  });
+
+  it('si el pedido anterior se CANCELÓ, re-importar esa OC se permite', async () => {
+    const primera = await importar('OC-CA-4471');
+    await cliente.pedido.update({
+      where: { id: primera.idPedido },
+      data: { pedCancelado: true },
+    });
+
+    const segunda = await importar('OC-CA-4471');
+
+    expect(segunda.ordenes).toHaveLength(2);
+    expect(await cliente.pedido.count({ where: { pedCancelado: false } })).toBe(1);
+  });
+
+  it('LÍMITE CONOCIDO: sin OC capturada no hay identidad, así que sí se puede repetir', async () => {
+    await importar(null);
+    await importar(null);
+    // Documentado a propósito (ver `exigirOcNoImportada`): inventar una identidad bloquearía
+    // importaciones legítimas del mismo cliente el mismo día.
+    expect(await cliente.pedido.count()).toBe(2);
+  });
+});

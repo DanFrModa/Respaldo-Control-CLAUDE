@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del módulo ÓRDENES (rediseño R2/R3) contra el stack real:
@@ -28,7 +28,7 @@ async function crearPedidoF2(
   await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible();
   await page.getByTestId('nuevo-pedido').click();
   const dialogoPedido = page.getByRole('dialog');
-  await dialogoPedido.getByLabel('Cliente').selectOption({ label: nombres.cliente });
+  await elegirCliente(page, dialogoPedido, nombres.cliente, 'pedido-cliente');
   for (let i = 0; i < renglones; i++) {
     await dialogoPedido.getByTestId('agregar-renglon').click();
     const filaRenglon = dialogoPedido.getByTestId('fila-renglon').nth(i);
@@ -60,7 +60,10 @@ async function generarOp(
   await expect(panelOp.getByRole('heading', { name: /Generar OP/ })).toBeVisible();
   const matriz = panelOp.getByTestId('matriz-op');
   await matriz.getByTestId('matriz-op-agregar-talla').selectOption({ label: nombres.talla });
-  await matriz.getByTestId('matriz-op-agregar-color').selectOption({ label: nombres.color });
+  // V1-E4 (punto 7): el color se busca TECLEANDO (combobox server-side), no en un `<select>`
+  // topado a la primera página del catálogo.
+  await matriz.getByTestId('matriz-color-al-vuelo-input').fill(nombres.color);
+  await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
   await matriz.getByTestId('matriz-op-celda').first().fill(piezas);
   await page.getByTestId('confirmar-generar-op').click();
 
