@@ -2309,11 +2309,30 @@ compone solo (tipo + posición + consecutivo, p. ej. *"Bordado frente 1"*) o des
 **2. Falta decir si va en el FRENTE o la ESPALDA.**
 > *"Creo que es importante definir si va en el frente o la espalda."*
 
-Campo nuevo. No existe hoy. *(Al construir: confirmar si son solo esas dos o hay más — manga, costado.)*
+Campo nuevo. No existe hoy.
 
-**3. El selector de proveedores debe mostrar SOLO los de arte.** Hoy muestra **todos**. `Proveedor.tipo`
-ya existe (`TELAS`/`AVIOS`/`SERVICIOS`/`SIN_CLASIFICAR`) pero **no hay un tipo de arte**: hay que
-decidir si se agrega uno o se usa `SERVICIOS`.
+✅ **CERRADO (Daniel, 16-ago-2026): CAMPO ABIERTO, no catálogo.** Preguntado si eran solo frente y
+espalda o convenía un catálogo chico para agregar posiciones sin tocar el programa: *"puede ser un
+campo abierto. Porque a veces son cosas muy específicas, que no tendría caso tenerlas en un
+catálogo."* **Texto libre.** Más simple que la propuesta del lead y mejor para el caso real.
+
+**3. El selector de proveedores debe mostrar SOLO los de arte.** Hoy muestra **todos**.
+
+> Daniel: *"Tengo entendido que los proveedores se pueden clasificar mediante un catálogo de tipos de
+> proveedores. Creo que ahí hay que ponerle que son de arte."*
+
+⚠️ **Corrección al entendido de Daniel, verificada en código:** `Proveedor.tipo` **NO es un catálogo**,
+es un **enum grabado en el programa** (`TELAS`/`AVIOS`/`SERVICIOS`/`SIN_CLASIFICAR`, `schema.prisma:547`).
+Desde la pantalla se ve igual que un catálogo, pero agregar un tipo exige **migración y despliegue**.
+
+✅ **CERRADO (Daniel, 16-ago-2026):** se le explicaron los dos caminos —agregar `ARTE` al enum (chico) o
+convertirlo en catálogo administrable (etapa aparte)— y aceptó la recomendación del lead:
+**se agrega `ARTE` al enum ahora**; la conversión a catálogo queda para cuando estorbe de verdad.
+
+⚠️ **Consecuencia operativa, dicha de frente:** hoy la mayoría de los proveedores está en
+`SIN_CLASIFICAR`, así que **alguien tendrá que reclasificarlos una vez** para que el filtro sirva. Si
+nadie lo hace, el selector del arte saldría casi vacío — **peor que mostrarlos todos**. Al construir:
+que el filtro **no esconda** a los `SIN_CLASIFICAR` mientras la reclasificación no ocurra, o que avise.
 
 **4. ⭐ El TIPO de arte debe ser un CATÁLOGO, no una lista fija.**
 > *"Aparte de bordado y estampado, podríamos tener lavados, embosado, etc. Creo que hay que tener un
@@ -2330,9 +2349,13 @@ Hoy `ModeloArte.idArchivoFoto` es **UNA sola** foto. Pasa a colección, como `Mo
 **6. Las PUNTADAS se van.**
 > *"Las puntadas solo aplica para bordados. Yo quitaría ese campo."*
 
-⚠️ **Al construir, decidir con cuidado:** quitar la columna **borra el dato de los bordados que sí lo
-tienen** (D3: nada se destruye en silencio). Alternativas: dejarlo como atributo del **tipo de arte**
-(punto 4) para que solo aparezca en bordado, o conservarlo oculto. **No se borra sin decidirlo.**
+⚠️ Quitar la columna **borraría el dato de los bordados que sí lo tienen** (D3: nada se destruye en
+silencio).
+
+✅ **CERRADO (Daniel, 16-ago-2026): NO se borra — se ATA AL TIPO.** El lead propuso que el campo
+dependa del tipo de arte (punto 4): que aparezca en bordado y desaparezca en estampado, lavado o
+embosado. Daniel: *"Ok como tú lo dices."* Consigue lo que pedía —no ver un campo que no aplica— sin
+tirar la historia de los bordados existentes.
 
 **7. ⭐ El proveedor se busca por CUALQUIER PALABRA — y esto ya estaba acordado.**
 > *"El proveedor debe de buscarse por cualquier palabra. No solo por la primera letra de la primera
@@ -2369,4 +2392,42 @@ recorrer también la receta congelada de la orden**, su copia y su comparador de
 - **Aplica en:** etapa propia — **`V1-E3f`**, después de V1-E4. **REQUIERE MIGRACIÓN** (nombre,
   posición, catálogo de tipos, fotos múltiples, puntadas) y probablemente **seed** (los tipos de arte
   iniciales). Permisos: reusar los de catálogos.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.53) — Las fotos masivas se cargan por el NOMBRE del archivo, y el respaldo se adelanta (DANIEL, 16-ago-2026)
+
+**1. Cómo llegan las fotos del sistema viejo — confirmado por Daniel y verificado en el código.**
+
+> Daniel: *"En control viejo, cada orden lleva un modelo y dentro de ese modelo hay dos campos con los
+> nombres de las fotos (jpg): si un archivo es `51001.jpg`, el campo dice `51001`. Eso para fotos de
+> modelos… y de artes es similar. Hay un catálogo de artes y las fotos funcionan de la misma manera.
+> ¿Sí vas a poder subir las fotos con esa referencia?"*
+
+✅ **Sí, y ya está construido exactamente así** desde F1-E7 (`migracion/loaders/fotos-modelos.ts`),
+esperando únicamente la carpeta física:
+
+- `Foto1` = **frente**, `Foto2` = **espalda**. El loader busca en el directorio el archivo cuyo
+  **nombre-base sin extensión** coincida con el valor del campo, **sin importar mayúsculas**, y acepta
+  `.jpg .jpeg .png .gif .bmp .webp`. Es **idempotente**: re-correrlo no duplica.
+- **Los artes igual**, desde la columna `Foto` de `Bordados.csv`. ⭐ Y el loader **ya está al día con
+  V1-E3d pieza A**: como los artes compartidos **se duplicaron** al mudarse al modelo, sube la foto
+  **una vez** y la liga a **todas** las copias de ese arte (vía `mapeo_migracion`), en vez de apuntar a
+  la tabla `Bordado` que ya no existe.
+- **Las órdenes NO necesitan carga propia:** la foto vive en el **modelo** y cada orden la muestra por
+  su modelo. Cargar los modelos deja a todas las órdenes con foto.
+
+**2. Se pide una MUESTRA antes del go-live.** El loader está probado contra datos **inventados**, nunca
+contra los nombres reales. Daniel ofreció subir un ejemplo (*"¿quieres que te suba un ejemplo para ir
+construyendo algo?"*) y el lead lo aceptó: **10–15 archivos de modelos y otros tantos de artes, con sus
+nombres originales**, para cazar hoy lo que si no aparece el día de la migración — acentos, espacios al
+final, extensiones en mayúsculas, o la convención `código-P` de la foto de espalda. **La carpeta
+completa y los datos correctos llegan hasta el go-live**, como Daniel indicó.
+
+**3. El respaldo diario cifrado se ADELANTA.** Preguntado si convenía sacarlo de V1-E6 y hacerlo en
+cuanto cierre V1-E4 —porque **hoy no existe** un respaldo propio del sistema y es lo único de la lista
+que expone de verdad al empezar a capturar trabajo real—: *"Sí ok."* **Se construye antes que el resto
+de E6.**
+
+- **Aplica en:** el punto 1 no requiere construir nada (ya existe); el punto 2 es un insumo de Daniel;
+  el punto 3 reordena V1-E6.
 - **Fecha:** 2026-08-16.
