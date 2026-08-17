@@ -2778,3 +2778,57 @@ justamente de eso.
 - **Aplica en:** por decidir con Daniel. Si es (a), es chico y cabe en la etapa de proveedores/arte. Si
   es (b), **etapa propia** con su ETL de saldos en tránsito.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.61) — ⭐ Opción (b): el envío a proceso SACA del almacén, porque si no, los faltantes y las segundas no tienen dónde caer (DANIEL, 16-ago-2026)
+
+> Daniel, eligiendo entre avisar (a) o modelar el tránsito (b): *"Pensaría que B. O si no, ¿de qué
+> manera manejamos los faltantes o segundas?"*
+
+**Su pregunta es el argumento decisivo, y mejor que el que había dado el lead.** El lead defendía (b)
+por exactitud —*"el inventario miente sobre dónde están las prendas"*—. Daniel señaló algo más duro:
+**con (a) no hay dónde registrar lo que no vuelve, ni lo que vuelve peor de como salió.**
+
+**Verificado en código:** el recibo **ya captura primeras y segundas** por color×talla
+(`recibos.ts:161-202`) y, cuando `generaEntradaPt`, las manda a **sus almacenes respectivos**
+(`:15`). Pero en un proceso **después de costura** (`generaEntradaPt: false`) ese desglose se queda
+**sólo en el WIP**: no mueve inventario.
+
+**El escenario que hoy no tiene salida:**
+
+| | |
+|---|---|
+| Se mandan **100** al estampador | el almacén dice 100 primeras |
+| Vuelven **95 primeras, 3 segundas, faltan 2** | el almacén **sigue diciendo 100 primeras** |
+
+Las 3 segundas **no existen en ningún lado** y los 2 faltantes tampoco. Y no es que esté mal
+registrado: **no hay movimiento donde registrarlo**.
+
+**Lo que se construye (opción b):**
+
+| Momento | Movimiento |
+|---|---|
+| Envío de prendas **ya terminadas** | **SALIDA** de PT → saldo «en proceso» con ese tercero (por orden y proceso) |
+| Recibo de primeras | **ENTRADA** al almacén de primeras |
+| Recibo de segundas | **ENTRADA** al almacén de segundas |
+| Diferencia (enviado − recibido) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+
+⭐ **El faltante NO se absorbe en silencio** (D3): queda como saldo pendiente del maquilero — que es
+justo lo que se necesita para reclamárselo. Y resuelve de paso un caso que hoy tampoco tiene salida:
+**la prenda que salió primera y vuelve segunda** es una **reclasificación** (salida de primeras +
+entrada a segundas), expresable con movimientos sin editar saldos.
+
+**Y arregla el problema de nivel de §Post-F9.59:** con el envío sacando de verdad, `generaEntradaPt`
+deja de "cuadrar por compensación". El recibo mete a PT **según dónde va el proceso**, no según el tipo.
+
+⚠️ **Costo, dicho de frente:** toca el **motor de kardex**, la pieza más delicada del sistema (D3:
+existencia = suma de movimientos bajo lock, nunca un saldo editado). **Es etapa propia, no un ajuste.**
+Pero es **más barato AHORA que después**: con meses de movimientos capturados bajo la mecánica vieja,
+corregirlo obliga a reconstruir historia.
+
+**A resolver al construir:** ¿el saldo «en proceso» es un almacén más (y entonces el traspaso ya
+existente sirve) o un estado del kardex de PT? El repo ya tiene almacenes y traspasos entre ellos —
+**mirar eso antes de inventar una entidad nueva**.
+
+- **Aplica en:** etapa propia del track V1, **antes de que Daniel empiece a capturar inventario real**
+  (ya manda estampados después de costura, §Post-F9.60). Requiere migración y toca kardex.
+- **Fecha:** 2026-08-16.
