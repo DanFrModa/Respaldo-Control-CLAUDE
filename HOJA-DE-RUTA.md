@@ -416,9 +416,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **`Almacen.esTransitoProceso` solo la administra el seed, no hay pantalla (V1-E4b):** es el mismo patrón
   de los `TipoMovimientoInventario` por código (`entrada-maquila`, `transferencia-salida`) — filas de
   catálogo críticas que la UI no toca. **Consecuencia:** si el estado queda inválido, se arregla con SQL a
-  mano o re-sembrando. Se consideró `ConfiguracionEmpresa.idAlmacenTransito` (lo habría dejado dentro del
-  alcance de la aplicación) y se prefirió la bandera porque el almacén **ya existía** en el catálogo y no
-  pedía pantalla de configuración nueva; el precedente en el repo es `Almacen.idCortador` (§Post-F9.13).
+  mano o re-sembrando —aunque desde V1-E4b la base **impide** que haya dos (índice único parcial), así que
+  el estado inválido que antes solo se detectaba ahora es imposible—. Se consideró
+  `ConfiguracionEmpresa.idAlmacenTransito` (lo habría dejado dentro del alcance de la aplicación) y se
+  prefirió la bandera porque el almacén **ya existía** en el catálogo y no pedía pantalla de configuración
+  nueva. *(Corrección: la primera redacción de esta deuda citaba `Almacen.idCortador` como precedente de
+  "campo del almacén que la UI no toca". **Es falso** — `DialogoAlmacen.tsx:179` lo pinta como select y lo
+  manda al crear y al editar. El precedente válido es el otro: los `TipoMovimientoInventario` por código.)*
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

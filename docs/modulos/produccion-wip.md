@@ -131,6 +131,15 @@ faltantes o segundas?"* (§Post-F9.61). Su baja es un movimiento manual de PT co
 en el piso?"*; el **WIP** responde *"¿de quién son?"* (`wip.ts` `pendientePorMaquilero`, saldo por tercero).
 Por eso el Tránsito es **uno solo** y no uno por maquilero.
 
+### Qué se puede cancelar a mano, y qué no
+
+`cancelarMovimientoPt` **solo acepta movimientos capturados a mano** (`origenTipo = movimiento-manual`).
+Todo lo demás —recibo, entrega, envío a proceso, traspaso, cíclico, migración— es el **efecto** de un
+hecho que tiene su propio estado: anular el movimiento suelto arreglaba el inventario **dejando el hecho
+en pie**, y el maquilero seguía debiendo prendas que el kardex ya no tenía. El mensaje manda al hecho
+correcto según el origen. *(Consecuencia: el **traspaso manual de PT ya no se cancela** — se corrige con
+el traspaso inverso. Alinea PT con tela, donde la regla existe desde F4-E1.)*
+
 ### El bucket de orden — de qué stock salen las piezas
 
 La existencia de PT no se lleva sólo por artículo y almacén: se lleva **por orden**, y hay un bucket
