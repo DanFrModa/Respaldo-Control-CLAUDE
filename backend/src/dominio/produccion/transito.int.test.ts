@@ -25,6 +25,8 @@ import type {
   TipoProceso,
 } from '../../datos/index.js';
 import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
+import { registrarMovimientoPt as registrarMovimientoPtMotor } from '../../comun/kardex.js';
+import { ORIGEN } from '../../comun/origenes.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -1104,5 +1106,52 @@ describe('H6 · la bitácora del recibo dice la verdad de cada campo', () => {
       stockSinOrden: true,
       idAlmacenOrigen: almPrimeras.id,
     });
+  });
+});
+
+/**
+ * F1 del reviewer — EL MENSAJE NO PUEDE MANDAR A UNA PUERTA CERRADA CON LLAVE.
+ *
+ * El guard de H2 rechaza cancelar a mano lo que generó un hecho y le dice al usuario dónde SÍ. Para
+ * el ajuste de un inventario cíclico esa frase decía "se corrige desde el cíclico", y es falso: el
+ * ajuste deja el conteo en `cerrado` y `cancelarInventarioCiclico` rechaza justo ese estado, así
+ * que el único momento en el que existe un movimiento `ajuste-ciclico` es el momento en el que el
+ * cíclico se niega. La salida real es un movimiento manual NUEVO — igual que con lo migrado.
+ */
+describe('F1 · el mensaje de "dónde sí se cancela" tiene que ser cierto', () => {
+  it('el ajuste de un cíclico NO manda al cíclico: manda a un movimiento manual nuevo', async () => {
+    const tipoEntrada = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+      where: { codigo: 'ajuste-entrada' },
+    });
+    // Se registra por el MOTOR para poder sellar el origen del cíclico sin montar un conteo entero
+    // (el dominio manual siempre sella `movimiento-manual`).
+    const mov = await registrarMovimientoPtMotor(
+      sesion(),
+      {
+        idEmpresa: empresa.id,
+        idTipoMov: tipoEntrada.id,
+        idAlmacen: almPrimeras.id,
+        fecha: new Date('2026-08-17T00:00:00.000Z'),
+        origenTipo: ORIGEN.ajusteCiclico,
+        origenId: '1',
+        lineas: [
+          {
+            idModelo: modelo.id,
+            idColor: colorRojo.id,
+            idTalla: tallaCH.id,
+            idOrden,
+            cantidad: 5,
+          },
+        ],
+      },
+      bd(),
+    );
+
+    const fallo = cancelarMovimientoPtManual(sesion(), mov.id, { motivo: 'estuvo mal' }, bd());
+    await expect(fallo).rejects.toBeInstanceOf(ErrorConflicto);
+    // Dice que no hay marcha atrás y a dónde ir…
+    await expect(fallo).rejects.toThrowError(/movimiento manual NUEVO/);
+    // …y NO manda de vuelta al cíclico, que rechazaría por estar cerrado.
+    await expect(fallo).rejects.not.toThrowError(/se corrige desde el cíclico/);
   });
 });
