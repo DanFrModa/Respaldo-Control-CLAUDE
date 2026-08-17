@@ -1319,7 +1319,10 @@ export async function agregarRenglonReceta(
               },
               select: SELECT_ARTE,
             });
-      exigirNoEstaVivo(previo, `El arte "${datos.descripcion ?? delModeloArte?.descripcion ?? ''}"`);
+      exigirNoEstaVivo(
+        previo,
+        `El arte "${datos.descripcion ?? delModeloArte?.descripcion ?? ''}"`,
+      );
 
       const idTipoArte = datos.idTipoArte ?? delModeloArte?.idTipoArte;
       const descripcion = datos.descripcion ?? delModeloArte?.descripcion;

@@ -918,7 +918,13 @@ export async function listarFotosArte(
           id: true,
           orden: true,
           archivo: {
-            select: { id: true, key: true, nombreOriginal: true, tipoMime: true, tamanoBytes: true },
+            select: {
+              id: true,
+              key: true,
+              nombreOriginal: true,
+              tipoMime: true,
+              tamanoBytes: true,
+            },
           },
         },
         orderBy: [...ORDEN_FOTOS],

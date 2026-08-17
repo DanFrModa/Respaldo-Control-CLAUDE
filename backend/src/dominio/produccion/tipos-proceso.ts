@@ -264,7 +264,14 @@ export async function actualizarTipoProceso(
 
       const tipo = await tx.tipoProceso.update({ where: { id: datos.id }, data: cambios });
 
-      if (cambiaCodigo || cambiaNombre || cambiaBandera || cambiaEsArte || cambiaPuntadas || reactiva) {
+      if (
+        cambiaCodigo ||
+        cambiaNombre ||
+        cambiaBandera ||
+        cambiaEsArte ||
+        cambiaPuntadas ||
+        reactiva
+      ) {
         await registrarBitacora(tx, sesion, {
           entidad: 'TipoProceso',
           idEntidad: tipo.id,

@@ -3,7 +3,6 @@ import { useState } from 'react';
 
 import { imprimirAuditoria, useHistorialMaquilero } from '@/api/calidad';
 import { ETIQUETAS_TIPO_AUDITORIA } from '@/api/esquemas';
-import { useProveedores } from '@/api/proveedores';
 import type { HistorialMaquileroQuery } from '@/api/tipos';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -17,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import { ResultadoBadge } from './ConsultaAuditoriasPagina';
 
@@ -29,10 +28,11 @@ import { ResultadoBadge } from './ConsultaAuditoriasPagina';
  */
 export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
   const [idMaquilero, setIdMaquilero] = useState<number | undefined>(undefined);
+  /** Nombre del maquilero elegido (el combobox busca en servidor: puede no estar en la 1ª página). */
+  const [nombreMaquilero, setNombreMaquilero] = useState<string | undefined>(undefined);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
 
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const query: HistorialMaquileroQuery = {
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
@@ -96,21 +96,22 @@ export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
       <div className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="hist-maquilero">Maquilero</FieldLabel>
-          <SelectNativo
-            id="hist-maquilero"
-            value={idMaquilero === undefined ? '' : String(idMaquilero)}
-            onChange={(e) =>
-              setIdMaquilero(e.target.value === '' ? undefined : Number(e.target.value))
-            }
-            data-testid="historial-maquilero"
-          >
-            <option value="">Elige un maquilero…</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E3f (§Post-F9.52 punto 7): buscador en el SERVIDOR, no un `<select>` con tope
+              de 100 — con más de cien proveedores el maquilero buscado no aparecía. */}
+          <SelectorProveedor
+            idInput="hist-maquilero"
+            idSeleccionado={idMaquilero}
+            nombreSeleccionado={nombreMaquilero}
+            alSeleccionar={(p) => {
+              setIdMaquilero(p.id);
+              setNombreMaquilero(p.nombre);
+            }}
+            alLimpiar={() => {
+              setIdMaquilero(undefined);
+              setNombreMaquilero(undefined);
+            }}
+            testid="historial-maquilero"
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="hist-desde">Desde</FieldLabel>

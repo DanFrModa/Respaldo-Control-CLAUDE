@@ -209,7 +209,9 @@ describe('fotos COMPARTIDAS por varios artes (borrarArchivoSiQuedoHuerfano)', ()
     expect(await archivosDelArte(arte.id)).toEqual([primera.idArchivo, segunda.idArchivo]);
     // Las DOS filas `Archivo` siguen vivas: subir la segunda no borró la primera.
     expect(
-      await cliente.archivo.count({ where: { id: { in: [primera.idArchivo, segunda.idArchivo] } } }),
+      await cliente.archivo.count({
+        where: { id: { in: [primera.idArchivo, segunda.idArchivo] } },
+      }),
     ).toBe(2);
 
     const conUrl = await listarFotosArte(sesion(), idModelo, arte.id, bd(), archivosFalsos());
@@ -294,7 +296,12 @@ describe('D3 — el arte borrado deja rastro COMPLETO (ya no hay catálogo del q
   }> {
     const idOrigen = await crearModelo('MOD-ORIGEN');
     const idDestino = await crearModelo('MOD-DESTINO');
-    await crearArte(sesion(), idOrigen, { descripcion: 'Del origen', idTipoArte, precio: 10 }, bd());
+    await crearArte(
+      sesion(),
+      idOrigen,
+      { descripcion: 'Del origen', idTipoArte, precio: 10 },
+      bd(),
+    );
 
     const proveedor = await cliente.proveedor.create({ data: { nombre: 'Bordados SA' } });
     const victima = await crearArte(

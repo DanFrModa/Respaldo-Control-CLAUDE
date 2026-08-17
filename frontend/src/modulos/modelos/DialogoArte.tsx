@@ -165,7 +165,8 @@ export function DialogoArte({
     (artesDelModelo.data?.datos ?? []).some(
       (a) =>
         a.id !== arte?.id &&
-        a.descripcion.trim().toLocaleLowerCase() === descripcionCapturada.trim().toLocaleLowerCase(),
+        a.descripcion.trim().toLocaleLowerCase() ===
+          descripcionCapturada.trim().toLocaleLowerCase(),
     );
 
   function alEnviar(datos: DatosArteFormulario): void {

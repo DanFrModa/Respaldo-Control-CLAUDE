@@ -29,7 +29,6 @@ import {
   esquemaArteCopiarCuerpo,
   esquemaArteCrear,
   esquemaArteFotoCrear,
-  esquemaArteFotoSalida,
   esquemaArteFotosLista,
   esquemaArteFotoSubida,
   esquemaArtePatchCuerpo,
@@ -38,6 +37,8 @@ import {
   esquemaGaleriaArtePagina,
   esquemaGaleriaArteQuery,
 } from '../../contrato/esquemas/arte.js';
+// Solo se usa como TIPO: la RUTA de la lista es la que valida (`esquemaArteFotosLista`).
+import type { esquemaArteFotoSalida } from '../../contrato/esquemas/arte.js';
 import { esquemaErrorApi } from '../../contrato/esquemas/error.js';
 import type { esquemaModeloFotoSalida } from '../../contrato/esquemas/modelo.js';
 import {
@@ -743,12 +744,7 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      await quitarFotoArte(
-        sesion,
-        request.params.id,
-        request.params.idArte,
-        request.params.idFoto,
-      );
+      await quitarFotoArte(sesion, request.params.id, request.params.idArte, request.params.idFoto);
       return reply.code(204).send(null);
     },
   });

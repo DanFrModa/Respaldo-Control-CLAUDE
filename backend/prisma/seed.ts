@@ -424,7 +424,13 @@ const TIPOS_PROCESO_BASE: {
   esArte: boolean;
   usaPuntadas: boolean;
 }[] = [
-  { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true, esArte: false, usaPuntadas: false },
+  {
+    codigo: 'costura',
+    nombre: 'Costura',
+    generaEntradaPt: true,
+    esArte: false,
+    usaPuntadas: false,
+  },
   {
     codigo: 'estampado',
     nombre: 'Estampado',

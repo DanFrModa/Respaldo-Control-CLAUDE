@@ -52,6 +52,10 @@ vi.mock('@/api/tallas', () => ({
 }));
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [] }, isPending: false }),
+  // V1-E3f (§Post-F9.52 punto 7): los selectores de proveedor pasaron al `ComboboxBuscable` con
+  // búsqueda en el SERVIDOR, que consume estos dos hooks.
+  useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useRolesProveedor: () => ({ data: [], isPending: false }),
 }));
 vi.mock('@/api/etiquetas-marca', () => ({
   useEtiquetasMarca: () => ({ data: { datos: [] }, isPending: false }),

@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 
 import { useEtiquetasMarca } from '@/api/etiquetas-marca';
 import { useActualizarOrden } from '@/api/ordenes';
-import { useProveedores } from '@/api/proveedores';
 import type { Orden, OrdenEditar } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
@@ -21,18 +20,12 @@ import {
   textoACuerpo,
   type DatosOrdenFormulario,
 } from './esquemas';
+import { SelectorProveedor } from '../cxp/SelectorProveedor';
 import { SelectorTela } from '../inventarios/SelectorTela';
 
 import { useReinicioBloqueado, useSeccionGuardable, type EjecutorGuardado } from './guardado-orden';
 
 /** Tope alto: catálogos activos para los selectores del encabezado. */
-const QUERY_PROVEEDORES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 const QUERY_ETIQUETAS = {
   pagina: 1,
   porPagina: 100,
@@ -97,7 +90,6 @@ export function EditorEncabezadoOrden({
   const soloLectura = orden.estado === 'cancelada' || !puedeAdministrar;
   const actualizar = useActualizarOrden();
 
-  const proveedores = useProveedores(QUERY_PROVEEDORES);
   const etiquetas = useEtiquetasMarca(QUERY_ETIQUETAS);
 
   const formulario = useForm<DatosOrdenFormulario>({
@@ -167,6 +159,7 @@ export function EditorEncabezadoOrden({
   // La tela del encabezado se elige con el combobox buscable: su valor sigue en el formulario
   // (string vacío = sin asignar), y aquí se lee como número para el selector.
   const idTelaFormulario = formulario.watch('idTela');
+  const idMaquileroFormulario = formulario.watch('idMaquilero');
   const idTelaSeleccionada =
     idTelaFormulario === undefined || idTelaFormulario === ''
       ? undefined
@@ -224,14 +217,22 @@ export function EditorEncabezadoOrden({
 
         <Field>
           <FieldLabel htmlFor="orden-maquilero">Maquilero</FieldLabel>
-          <SelectNativo id="orden-maquilero" disabled={soloLectura} {...registrar('idMaquilero')}>
-            <option value="">Sin asignar</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E3f (§Post-F9.52 punto 7): buscador en el SERVIDOR, acotado a los talleres de
+              costura. Antes era un `<select>` con tope de 100 (el mismo defecto de la tela, que
+              ya se había arreglado justo arriba). */}
+          <SelectorProveedor
+            idInput="orden-maquilero"
+            idSeleccionado={idMaquileroFormulario === '' ? undefined : Number(idMaquileroFormulario)}
+            nombreSeleccionado={orden.maquilero ?? undefined}
+            alSeleccionar={(p) =>
+              setValue('idMaquilero', String(p.id), { shouldDirty: true, shouldValidate: true })
+            }
+            alLimpiar={() =>
+              setValue('idMaquilero', '', { shouldDirty: true, shouldValidate: true })
+            }
+            rol="maquila-costura"
+            testid="orden-maquilero"
+          />
         </Field>
         {/* Composición: la fuente es la ficha del MODELO (Daniel 24-jul-2026); esto es el
             override de ESTA orden. Vaciar el campo la devuelve a la del modelo. */}

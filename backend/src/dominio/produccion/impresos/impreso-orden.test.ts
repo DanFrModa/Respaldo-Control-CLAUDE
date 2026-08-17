@@ -72,7 +72,12 @@ function arteBom(over: {
     usaPuntadas: over.tipo !== 'ESTAMPADO',
     idProveedor: null,
     proveedor: null,
-    fotos: keys.map((key, i) => ({ idFoto: over.id * 100 + i, idArchivo: `arch-${key}`, orden: i, key })),
+    fotos: keys.map((key, i) => ({
+      idFoto: over.id * 100 + i,
+      idArchivo: `arch-${key}`,
+      orden: i,
+      key,
+    })),
     orden: 0,
     creadoEn: new Date('2026-01-01T00:00:00Z'),
     creadoPorId: null,

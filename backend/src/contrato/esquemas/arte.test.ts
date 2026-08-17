@@ -45,9 +45,9 @@ describe('esquemaArteCrear', () => {
 
   it('rechaza descripción vacía, precio negativo, tipo y proveedor no positivos', () => {
     expect(esquemaArteCrear.safeParse({ descripcion: '   ', idTipoArte: 1 }).success).toBe(false);
-    expect(esquemaArteCrear.safeParse({ descripcion: 'X', idTipoArte: 1, precio: -1 }).success).toBe(
-      false,
-    );
+    expect(
+      esquemaArteCrear.safeParse({ descripcion: 'X', idTipoArte: 1, precio: -1 }).success,
+    ).toBe(false);
     expect(esquemaArteCrear.safeParse({ descripcion: 'X', idTipoArte: 0 }).success).toBe(false);
     expect(
       esquemaArteCrear.safeParse({ descripcion: 'X', idTipoArte: 1, idProveedor: 0 }).success,

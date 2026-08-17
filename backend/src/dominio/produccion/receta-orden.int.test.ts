@@ -577,14 +577,7 @@ describe('Restaurar y desalineación (§Post-F9.43(f))', () => {
     });
 
     // Se le ajusta el precio EN ESTA ORDEN y se quita (queda lápida, no se borra).
-    await editarRenglonReceta(
-      sesion(),
-      ordenA,
-      'arte',
-      congelado?.id ?? 0,
-      { precio: 44 },
-      bd(),
-    );
+    await editarRenglonReceta(sesion(), ordenA, 'arte', congelado?.id ?? 0, { precio: 44 }, bd());
     await quitarRenglonReceta(sesion(), ordenA, 'arte', congelado?.id ?? 0, {}, bd());
 
     // Re-agregarlo REVIVE la misma fila y NO pisa su precio ajustado (el cuerpo no lo trae).
@@ -598,6 +591,37 @@ describe('Restaurar y desalineación (§Post-F9.43(f))', () => {
     expect(revivido?.id).toBe(congelado?.id);
     expect(revivido?.excluido).toBe(false);
     expect(revivido?.precio).toBe(44);
+  });
+
+  it('el arte de la orden se casa con el del modelo por la TRAZA, no "por el que haya"', async () => {
+    // El modelo tiene UN arte y la orden lleva otro AGREGADO A MANO (sin traza). Son cosas
+    // distintas y la receta tiene que decirlo: el de la orden NO está en el modelo, y el del
+    // modelo aparece como FALTANTE. Si el casamiento ignorara la traza —p. ej. tomando "el primer
+    // arte del modelo"— los dos saldrían alineados y el aviso de desalineación se quedaría mudo,
+    // que es justo lo que la etapa vino a evitar (§Post-F9.52 punto 1: sin nombre, la traza ES la
+    // identidad).
+    const delModelo = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Escudo del modelo', idTipoArte, precio: 30 },
+    });
+    const receta = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', descripcion: 'Parche solo de esta orden', idTipoArte, precio: 5 },
+      bd(),
+    );
+
+    const aMano = receta.artes.find((a) => a.descripcion === 'Parche solo de esta orden');
+    expect(aMano?.idModeloArte).toBeNull();
+    expect(aMano?.enElModelo).toBe(false);
+    expect(aMano?.precioModelo).toBeNull();
+
+    // Y el arte del MODELO, que esta orden no lleva, se reporta como agregado por el modelo.
+    expect(
+      receta.desalineacion.cambios.some(
+        (c) => c.tipo === 'arte' && c.material === 'Escudo del modelo' && c.que === 'agregado',
+      ),
+    ).toBe(true);
+    expect(delModelo.id).toBeGreaterThan(0);
   });
 
   it('agregar por una traza que NO es del modelo de la orden → ErrorNoEncontrado', async () => {
