@@ -7023,3 +7023,87 @@ model DirectorioTerceroV1 {
   @@index([ultimaActividad])
   @@map("directorio_tercero_v1")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEGUNDO respaldo: copia cifrada a R2 (V1-E6a — PLANMAESTRO §2.2 "respaldo doble" y
+// §11, mitigación #1 de la tabla de riesgos). El job de pg-boss vuelca la base con
+// `pg_dump`, cifra el volcado (AES-256-GCM) y lo sube a R2. Corre MENSUAL: los
+// respaldos diarios de Railway ya cubren el día a día, y esta copia cubre el caso que
+// ellos NO pueden cubrir — que el problema SEA Railway.
+//
+// Esta tabla es el RASTRO de cada corrida: un respaldo que falla callado es peor que
+// no tener respaldo, porque genera confianza falsa — aquí queda por escrito si subió,
+// cuánto pesó y, si tronó, en qué paso y con qué error. Con corridas mensuales el
+// rastro pesa MÁS: un fallo de enero no se nota hasta que hace falta en junio.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Cómo terminó una corrida del respaldo. Solo dos estados: o el objeto quedó
+/// VERIFICADO en R2 (EXITO) o no (FALLO) — no hay medias tintas.
+enum EstadoRespaldo {
+  EXITO
+  FALLO
+
+  @@map("estado_respaldo")
+}
+
+/// En qué paso del respaldo se estaba (sirve para saber DÓNDE tronó sin leer el texto
+/// del error). Se guarda también en las corridas exitosas (`RETENCION`, el último paso).
+enum PasoRespaldo {
+  /// Faltó configuración (llave de cifrado, credenciales R2 reales…): ni se intentó.
+  CONFIGURACION
+  /// `pg_dump` del Postgres del sistema.
+  VOLCADO
+  /// Cifrado del volcado (AES-256-GCM).
+  CIFRADO
+  /// Subida del archivo cifrado a R2.
+  SUBIDA
+  /// Comprobación de que el objeto QUEDÓ en R2 con el tamaño esperado (HeadObject).
+  VERIFICACION
+  /// Borrado de los respaldos que ya pasaron la retención.
+  RETENCION
+
+  @@map("paso_respaldo")
+}
+
+/// Una corrida del respaldo a R2 (V1-E6a). Se escribe SIEMPRE, salga bien o mal;
+/// es lo que hace consultable el respaldo sin entrar a R2. Cada corrida deja además
+/// un renglón de `Bitacora` (entidad `RespaldoBd`) para que se vea en la pantalla de
+/// auditoría que ya existe, sin construir pantalla nueva.
+model RespaldoCorrida {
+  id BigInt @id @default(autoincrement())
+
+  /// Cuándo arrancó la corrida.
+  iniciadoEn  DateTime  @default(now()) @map("iniciado_en")
+  /// Cuándo terminó (con éxito o con error).
+  terminadoEn DateTime? @map("terminado_en")
+
+  /// Cómo terminó.
+  estado EstadoRespaldo
+  /// Paso alcanzado: el ÚLTIMO que se completó si salió bien, o el que tronó si falló.
+  paso   PasoRespaldo
+
+  /// Bucket R2 destino (NULL si ni se llegó a intentar la subida).
+  bucket String?
+  /// Key del objeto en R2 (NULL si no se subió). Es lo que se le pasa al script de
+  /// restauración: `npx tsx --env-file=.env scripts/restaurar-respaldo.ts --key <key>`.
+  key    String?
+
+  /// Tamaño del volcado SIN cifrar, en bytes (útil para ver crecer la base).
+  tamanoDumpBytes   BigInt? @map("tamano_dump_bytes")
+  /// Tamaño del objeto CIFRADO tal como lo confirmó R2 (HeadObject), en bytes.
+  /// Es la prueba de que el objeto quedó: se compara contra el archivo local.
+  tamanoSubidoBytes BigInt? @map("tamano_subido_bytes")
+
+  /// Cuántos respaldos viejos borró la retención en esta corrida (los que sobran del tope).
+  objetosBorrados Int @default(0) @map("objetos_borrados")
+
+  /// Cuánto tardó la corrida completa, en milisegundos.
+  duracionMs Int? @map("duracion_ms")
+
+  /// El error, en texto, cuando `estado = FALLO`. NULL si salió bien.
+  error String?
+
+  @@index([iniciadoEn])
+  @@index([estado, iniciadoEn])
+  @@map("respaldo_corrida")
+}

@@ -35,7 +35,26 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+# openssl: lo necesita el motor de Prisma.
+#
+# postgresql-client-17: lo necesita el SEGUNDO RESPALDO cifrado a R2 (V1-E6a) — `pg_dump` para
+# volcar la base cada mes y `pg_restore`/`psql` para el script de restauración
+# (`scripts/restaurar-respaldo.ts`). NO viene en node:22-slim, así que sin esto el respaldo
+# fallaría en cada corrida.
+#
+# ⚠️ POR QUÉ LA 17 Y NO LA DEL REPO DE DEBIAN (que es la 15): **pg_dump se NIEGA a volcar un
+# servidor MÁS NUEVO que él**. El Postgres de Railway es 17, así que un cliente 15 o 16 no falla a
+# medias: no dumpea nada. Por eso se agrega el repositorio oficial de PostgreSQL (PGDG), que es de
+# donde salen los clientes por major. **Si algún día se sube la major del servidor en Railway, hay
+# que subir este número también** — el job lo detecta y lo dice con todas sus letras en el rastro de
+# la corrida (`comun/respaldo/pg-dump.ts`), pero para entonces ya se habrán perdido corridas.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl curl ca-certificates \
+  && install -d /usr/share/postgresql-common/pgdg \
+  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
   && rm -rf /var/lib/apt/lists/*
 
 # node_modules (incluye prisma CLI + tsx para migrar/sembrar al arrancar),

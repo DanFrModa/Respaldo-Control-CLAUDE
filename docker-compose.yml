@@ -57,7 +57,14 @@ services:
       # PutObject real fallaria. En modo local se salta la red y solo devuelve la
       # key. En produccion (Railway) NO se setea -> subida real a R2.
       R2_SUBIDA_LOCAL: 'true'
-    # Healthcheck con node (la imagen no trae curl): solo pasa a "healthy" cuando
+      # Segundo respaldo cifrado a R2 (V1-E6a): APAGADO en local/CI a proposito. No
+      # hay un R2 real donde subir (las credenciales de arriba son dummy) y volcar
+      # la base en cada `docker compose up` no aporta nada. Con esto el arranque lo
+      # dice una vez y sigue; sin esto, el guard lo dejaria anotado como fallo de
+      # configuracion en cada arranque. En Railway NO se setea (o se pone "true") y
+      # ahi si se exigen RESPALDO_LLAVE y las credenciales R2 reales.
+      RESPALDO_ACTIVO: 'false'
+    # Healthcheck con node (no depende de herramientas del sistema): solo pasa a "healthy" cuando
     # /api/health responde 200. Durante migrate deploy + seed (corren ANTES de
     # arrancar el server) la sonda recibe conexion rechazada porque el server aun
     # no escucha -> exit 1 -> "starting"; el 503 de /api/health solo aplica cuando

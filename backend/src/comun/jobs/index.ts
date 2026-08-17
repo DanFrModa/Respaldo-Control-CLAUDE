@@ -41,6 +41,14 @@ export const COLAS_JOBS = {
    * `POST /api/indicadores/refrescar`. El handler vive en `comun/jobs/refrescar-kpis.ts`.
    */
   refrescarKpis: 'kpi-refrescar',
+  /**
+   * SEGUNDO RESPALDO de la base, cifrado y subido a R2 (V1-E6a, plan §2.2 "respaldo doble"): el único
+   * respaldo PROPIO del sistema. Los diarios de Railway ya cubren el día a día; éste cubre el caso en
+   * que el problema SEA Railway (cuenta suspendida, servicio borrado, mudanza de proveedor), y por eso
+   * corre MENSUAL. Lo programa el bootstrap con `schedule` (cron configurable) y el handler vive en
+   * `comun/jobs/respaldo-bd.ts`.
+   */
+  respaldoBd: 'respaldo-bd',
 } as const;
 
 /** Nombre válido de cola de jobs. */
