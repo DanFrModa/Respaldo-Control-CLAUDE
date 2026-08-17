@@ -57,6 +57,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl curl ca
   && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
   && rm -rf /var/lib/apt/lists/*
 
+# ⚠️ SE APUNTA AL BINARIO REAL, NO AL WRAPPER — y esto NO sobra (viene del CI rojo del PR #184).
+#
+# `/usr/bin/pg_dump` no es el ejecutable: es un WRAPPER de `postgresql-client-common` que elige la
+# versión según el clúster/versión por defecto del sistema. En el runner de CI, con la 16
+# preinstalada y la 17 recién puesta, el wrapper se quedaba con la 16 y el ensayo de restauración
+# reventaba con "pg_dump 16.14 es más viejo que el servidor 17.11".
+#
+# Hoy, en ESTA imagen, el wrapper acertaría: `node:22-slim` no trae ningún cliente, así que la 17 es
+# la única instalada. Se fija de todos modos porque el día que la imagen base traiga otro cliente el
+# respaldo empezaría a fallar por esta misma trampa, y **en producción no hay CI que la cace**: sólo
+# el rastro de una corrida MENSUAL. En el peor caso se descubriría el día que haya que restaurar.
+# Una línea apaga ese riesgo; en una etapa cuyo requisito rector es "que no falle en silencio",
+# dejarlo dormido sería incoherente.
+#
+# `RESPALDO_PG_DUMP` ya existe en el dominio (`comun/respaldo/config.ts`): si algún día cambia la
+# major, hay que mover ESTA ruta junto con el `postgresql-client-NN` de arriba.
+ENV RESPALDO_PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump
+
 # node_modules (incluye prisma CLI + tsx para migrar/sembrar al arrancar),
 # el build compilado, las fuentes (el seed corre con tsx sobre src/), el schema
 # y migraciones, la config de Prisma y el entrypoint. Todo con dueño `node`.

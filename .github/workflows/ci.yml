@@ -111,10 +111,21 @@ jobs:
       # de GitHub trae el 16). Sin este paso, el ENSAYO DE RESTAURACION se salta con aviso y nadie
       # verifica que el respaldo se pueda restaurar — que es la mitad del valor de esa etapa. Es el
       # mismo paquete que instala la imagen de produccion (backend/Dockerfile).
+      #
       # Con REINTENTOS (3 intentos, espera creciente): este repo ya carga cicatrices de CI rojo
       # cronico, y un hipo de apt.postgresql.org no puede bloquear PRs ajenos. Si tras los tres
       # intentos sigue sin instalarse, el job SI falla: las pruebas del respaldo estan configuradas
       # para caer (no para saltarse) cuando corren en CI sin cliente compatible.
+      #
+      # ⚠️ INSTALAR LA 17 NO BASTA — LA TRAMPA DEL WRAPPER DE DEBIAN (PR #184, CI en rojo):
+      # `/usr/bin/pg_dump` NO es el binario, es un WRAPPER de `postgresql-client-common` que elige
+      # la version segun el cluster/version por defecto. Con la 16 (preinstalada en el runner) y la
+      # 17 (recien puesta) conviviendo, el wrapper se quedaba con la 16 aunque los binarios de la 17
+      # estuvieran en /usr/lib/postgresql/17/bin: las pruebas caian con "pg_dump 16.14 es mas viejo
+      # que el servidor 17.11". Por eso se antepone el directorio de la 17 al PATH del job. Y por eso
+      # el `pg_dump --version` que cerraba este paso NO delataba nada: el wrapper contestaba 16 y el
+      # paso salia con exito — la misma clase de "verificacion que no verifica" que esta etapa vino
+      # a eliminar. Ahora se COMPRUEBA la major y, si no es 17, el paso falla diciendo por que.
       - name: Cliente PostgreSQL 17 (pruebas de respaldo/restauracion)
         run: |
           set -e
@@ -143,7 +154,53 @@ jobs:
             echo "No se pudo instalar postgresql-client-17 tras 3 intentos."
             exit 1
           fi
+
+          # Los binarios REALES de la 17, sin pasar por el wrapper.
+          BIN17=/usr/lib/postgresql/17/bin
+          if [ ! -x "$BIN17/pg_dump" ]; then
+            echo "postgresql-client-17 se instalo pero no existe $BIN17/pg_dump."
+            exit 1
+          fi
+          # Comprobacion REAL de la major (antes solo se imprimia y siempre pasaba).
+          mayor="$("$BIN17/pg_dump" --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+          if [ "$mayor" != "17" ]; then
+            echo "Se esperaba pg_dump 17 en $BIN17 y se encontro la $mayor:"
+            "$BIN17/pg_dump" --version
+            exit 1
+          fi
+
+          # Se antepone al PATH del JOB (afecta a los pasos SIGUIENTES, no a este) para que
+          # `pg_dump`, `pg_restore` y `psql` resuelvan a la 17 y no al wrapper que elige la 16.
+          echo "$BIN17" >> "$GITHUB_PATH"
+          echo "Instalado y verificado: $("$BIN17/pg_dump" --version)"
+
+      # El estado que de verdad importa: que `pg_dump` A SECAS —tal como lo invoca el codigo del
+      # respaldo— sea la 17 en los pasos siguientes. Va en su propio paso porque `GITHUB_PATH` no
+      # aplica al paso que lo escribe. Si el wrapper volviera a ganar, esto falla AQUI, con el
+      # diagnostico servido, en vez de reventar mas tarde dentro de la suite.
+      - name: Verificar que `pg_dump` del PATH es la 17
+        run: |
+          set -e
+          echo "which pg_dump  -> $(which pg_dump)"
           pg_dump --version
+          mayor="$(pg_dump --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+          if [ "$mayor" != "17" ]; then
+            echo "⛔ El pg_dump del PATH es la $mayor, no la 17: el wrapper de Debian"
+            echo "   (/usr/bin/pg_dump) esta ganando y el ENSAYO DE RESTAURACION fallaria."
+            echo "   Revisa que el paso anterior haya escrito /usr/lib/postgresql/17/bin en GITHUB_PATH."
+            exit 1
+          fi
+          # pg_restore y psql los usa el script de restauracion: se comprueba su VERSION, no su
+          # ruta. Afirmar la ruta seria fragil (ata la prueba a donde instale hoy el paquete) y
+          # ademas no es lo que importa — lo que rompe el ensayo es la major, no el directorio.
+          for herramienta in pg_restore psql; do
+            suya="$($herramienta --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+            if [ "$suya" != "17" ]; then
+              echo "⛔ $herramienta del PATH es la $suya, no la 17 ($(which $herramienta))."
+              exit 1
+            fi
+            echo "$herramienta -> $(which $herramienta) (major $suya)"
+          done
 
       # `test` corre los dos proyectos de vitest: "unit" (sin BD) e "integracion"
       # (Postgres 17 efimero via testcontainers, usando el Docker del runner).
