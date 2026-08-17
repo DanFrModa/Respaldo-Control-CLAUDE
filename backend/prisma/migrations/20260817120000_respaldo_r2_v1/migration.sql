@@ -18,10 +18,14 @@
 -- renglón de `bitacora` (entidad `RespaldoBd`), que ya tiene pantalla de consulta desde F6-E1.
 
 -- CreateEnum
-CREATE TYPE "estado_respaldo" AS ENUM ('EXITO', 'FALLO');
+-- EN_CURSO: la fila se escribe al EMPEZAR la corrida y se actualiza al terminar, para que una
+-- corrida que MUERE A MEDIA (redeploy, OOM, SIGKILL durante el pg_dump) deje huella en vez de nada.
+CREATE TYPE "estado_respaldo" AS ENUM ('EN_CURSO', 'EXITO', 'FALLO');
 
 -- CreateEnum
-CREATE TYPE "paso_respaldo" AS ENUM ('CONFIGURACION', 'VOLCADO', 'CIFRADO', 'SUBIDA', 'VERIFICACION', 'RETENCION');
+-- PROGRAMACION: la configuración estaba bien pero el respaldo no se pudo dejar programado (el motor
+-- de jobs no levantó). El sistema queda sin respaldo aunque no falte ninguna variable.
+CREATE TYPE "paso_respaldo" AS ENUM ('CONFIGURACION', 'PROGRAMACION', 'VOLCADO', 'CIFRADO', 'SUBIDA', 'VERIFICACION', 'RETENCION');
 
 -- CreateTable
 CREATE TABLE "respaldo_corrida" (
@@ -34,6 +38,7 @@ CREATE TABLE "respaldo_corrida" (
     "key" TEXT,
     "tamano_dump_bytes" BIGINT,
     "tamano_subido_bytes" BIGINT,
+    "sha256" VARCHAR(64),
     "objetos_borrados" INTEGER NOT NULL DEFAULT 0,
     "duracion_ms" INTEGER,
     "error" TEXT,

@@ -34,7 +34,7 @@
  * La etiqueta de autenticación (GCM) va AL FINAL porque solo se conoce cuando terminó de cifrarse
  * todo; al descifrar se leen esos últimos 16 bytes primero y se le pasan al descifrador.
  */
-import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt } from 'node:crypto';
 import { createReadStream, createWriteStream, type WriteStream } from 'node:fs';
 import { open, rm, stat } from 'node:fs/promises';
 
@@ -121,43 +121,78 @@ async function cerrar(salida: WriteStream): Promise<void> {
   });
 }
 
+/** Lo que deja {@link cifrarArchivo}: cuánto pesa el archivo cifrado y su huella SHA-256. */
+export interface ArchivoCifrado {
+  /** Tamaño en bytes del archivo cifrado (lo que debe pesar el objeto en R2). */
+  bytes: number;
+  /**
+   * SHA-256 (hex) del archivo cifrado, calculado AL VUELO mientras se escribe (no cuesta una
+   * segunda lectura del disco). Sirve para comprobar un respaldo bajado de R2 **sin la llave** y
+   * **antes** de necesitarlo: el tamaño que confirma R2 caza una subida truncada, pero no una
+   * corrupción del mismo largo — ésa sólo la cazaría GCM al descifrar, o sea el día del desastre.
+   */
+  sha256: string;
+}
+
 /**
  * Cifra `origen` en `destino` con AES-256-GCM y una llave derivada de `frase`. Escribe la cabecera
- * (magia + versión + sal + iv), el texto cifrado y la etiqueta de autenticación al final.
+ * (magia + versión + sal + iv), el texto cifrado y la etiqueta de autenticación al final, y calcula
+ * de paso el SHA-256 de todo lo que escribió.
  *
  * Si algo truena a media escritura, BORRA el `destino` a medias: un respaldo parcial que parece
  * archivo es justo la clase de mentira que esta etapa existe para evitar.
- *
- * @returns el tamaño en bytes del archivo cifrado (lo que debe pesar el objeto en R2).
  */
 export async function cifrarArchivo(
   origen: string,
   destino: string,
   frase: string,
-): Promise<number> {
+): Promise<ArchivoCifrado> {
   const sal = randomBytes(BYTES_SAL);
   const iv = randomBytes(BYTES_IV);
   const llave = await derivarLlave(frase, sal);
   const cifrador = createCipheriv('aes-256-gcm', llave, iv);
 
-  const salida = createWriteStream(destino);
+  // El hash se alimenta con CADA trozo que se escribe, en el mismo paso: la huella sale gratis.
+  const huella = createHash('sha256');
+  const salidaCifrada = createWriteStream(destino);
+  /** Escribe en el archivo y alimenta la huella con lo mismo (nunca uno sin el otro). */
+  const volcar = async (datos: Buffer): Promise<void> => {
+    if (datos.length === 0) {
+      return;
+    }
+    huella.update(datos);
+    await escribir(salidaCifrada, datos);
+  };
   try {
-    await escribir(salida, Buffer.concat([MAGIA, Buffer.from([VERSION_FORMATO]), sal, iv]));
+    await volcar(Buffer.concat([MAGIA, Buffer.from([VERSION_FORMATO]), sal, iv]));
     const entrada = createReadStream(origen, { highWaterMark: TROZO_BYTES });
     for await (const trozo of entrada) {
-      await escribir(salida, cifrador.update(trozo as Buffer));
+      await volcar(cifrador.update(trozo as Buffer));
     }
-    await escribir(salida, cifrador.final());
-    await escribir(salida, cifrador.getAuthTag());
-    await cerrar(salida);
+    await volcar(cifrador.final());
+    await volcar(cifrador.getAuthTag());
+    await cerrar(salidaCifrada);
   } catch (error) {
-    salida.destroy();
+    salidaCifrada.destroy();
     await rm(destino, { force: true });
     throw error;
   }
 
   const info = await stat(destino);
-  return info.size;
+  return { bytes: info.size, sha256: huella.digest('hex') };
+}
+
+/**
+ * SHA-256 (hex) de un archivo del disco, en streaming. Es la comprobación que puede hacer quien
+ * RESTAURA sin tener la llave: se contrasta contra el `sha256` que guardó la corrida en
+ * `RespaldoCorrida` (equivale a `sha256sum archivo`).
+ */
+export async function sha256Archivo(ruta: string): Promise<string> {
+  const huella = createHash('sha256');
+  for await (const trozo of createReadStream(ruta, { highWaterMark: TROZO_BYTES })) {
+    huella.update(trozo as Buffer);
+  }
+  return huella.digest('hex');
 }
 
 /**

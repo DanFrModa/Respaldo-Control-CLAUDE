@@ -30,9 +30,14 @@
  *     riesgo de la RC hace lo mismo).
  *   • Y un `log.error` en el log del servicio de Railway.
  *   • Un fallo se PROPAGA al worker de pg-boss, que reintenta: cada reintento vuelve a dejar rastro.
- *   • Si el respaldo ni siquiera se puede PROGRAMAR (falta la llave, el R2 de este ambiente es de
- *     relleno), el arranque deja una corrida en FALLO con paso `CONFIGURACION`. La ausencia de
- *     respaldo también se ve, en el mismo lugar donde se ven los fallos.
+ *   • **La fila se abre AL EMPEZAR (`EN_CURSO`) y se cierra al terminar.** Una corrida que muere a
+ *     media —redeploy, OOM, `SIGKILL` durante el `pg_dump`, que es el paso largo— deja una fila
+ *     colgada que se ve, y la corrida siguiente la cierra como `FALLO`. Sin eso, esa muerte no
+ *     dejaba ni una línea y el mes siguiente todo parecía normal.
+ *   • **Si el respaldo ni siquiera se puede PROGRAMAR, también hay rastro**, y en los TRES modos de
+ *     no programarse: falta configuración (`CONFIGURACION`), el motor de jobs no levantó
+ *     (`PROGRAMACION`) o el `schedule` tronó (`PROGRAMACION`). El único caso sin rastro es apagarlo
+ *     a propósito con `RESPALDO_ACTIVO=false`, que es una decisión y no un fallo.
  *
  * ⚠️ Esto es AVISO PASIVO: alguien tiene que ir a mirar. No hay correo ni push (el plan los difirió
  * a una fase posterior). Con corridas MENSUALES eso pesa más, no menos: si falla en enero y nadie
@@ -46,7 +51,7 @@ import { join } from 'node:path';
 import { PasoRespaldo, type Prisma } from '../../datos/index.js';
 import { configR2DesdeEnv, servicioArchivos } from '../archivos.js';
 import { registrarBitacora } from '../auditoria.js';
-import { cifrarArchivo } from '../respaldo/cifrado.js';
+import { cifrarArchivo, type ArchivoCifrado } from '../respaldo/cifrado.js';
 import {
   decidirArranqueRespaldo,
   type ConfigRespaldo,
@@ -85,6 +90,8 @@ export interface RegistroCorrida {
   key?: string;
   tamanoDumpBytes?: number;
   tamanoSubidoBytes?: number;
+  /** SHA-256 (hex) del archivo cifrado que se subió. */
+  sha256?: string;
   objetosBorrados: number;
   duracionMs: number;
   error?: string;
@@ -99,14 +106,24 @@ export interface DepsRespaldo {
   // (`const cifrar = deps.cifrar ?? …`) y la forma de método las ata a un `this` que aquí no existe.
   /** Genera el volcado en `destino` y devuelve su tamaño en bytes. */
   generarVolcado: (destino: string) => Promise<number>;
-  /** Cifra `origen` en `destino` y devuelve el tamaño del cifrado. */
-  cifrar?: (origen: string, destino: string, frase: string) => Promise<number>;
+  /** Cifra `origen` en `destino` y devuelve su tamaño y su huella SHA-256. */
+  cifrar?: (origen: string, destino: string, frase: string) => Promise<ArchivoCifrado>;
   /** Reloj (las pruebas lo fijan para razonar sobre la retención). */
   ahora?: () => Date;
   /** Directorio base para los temporales (por defecto el del sistema). */
   dirTemporal?: string;
-  /** Persiste el rastro de la corrida. Por defecto escribe en `RespaldoCorrida` + `Bitacora`. */
-  persistir?: (registro: RegistroCorrida) => Promise<void>;
+  /**
+   * ABRE el rastro: deja la fila `EN_CURSO` ANTES de empezar y devuelve su id. Es lo que hace que
+   * una corrida que MUERE A MEDIA (redeploy, OOM, SIGKILL durante el `pg_dump`) deje huella.
+   * Devolver `null` significa "no se pudo abrir"; la corrida sigue igual (el respaldo importa más
+   * que su bitácora) y al cerrar se creará la fila entera.
+   */
+  iniciarRastro?: (iniciadoEn: Date) => Promise<bigint | null>;
+  /**
+   * CIERRA el rastro: actualiza la fila abierta (o la crea, si no hubo) y escribe la bitácora.
+   * Por defecto, `persistirCorrida`.
+   */
+  persistir?: (registro: RegistroCorrida, idAbierto: bigint | null) => Promise<void>;
   /** Hook de log (el servidor inyecta el suyo). */
   registrarError?: (mensaje: string, error: unknown) => void;
 }
@@ -114,52 +131,130 @@ export interface DepsRespaldo {
 /** Resultado de una corrida (lo mismo que se persiste, para que el llamador decida si relanza). */
 export type ResultadoRespaldo = RegistroCorrida;
 
+/** Campos de `RespaldoCorrida` comunes al alta y a la actualización. */
+function datosDeCorrida(registro: RegistroCorrida): {
+  terminadoEn: Date;
+  estado: RegistroCorrida['estado'];
+  paso: PasoRespaldo;
+  bucket: string | null;
+  key: string | null;
+  tamanoDumpBytes: bigint | null;
+  tamanoSubidoBytes: bigint | null;
+  sha256: string | null;
+  objetosBorrados: number;
+  duracionMs: number;
+  error: string | null;
+} {
+  return {
+    terminadoEn: registro.terminadoEn,
+    estado: registro.estado,
+    paso: registro.paso,
+    bucket: registro.bucket ?? null,
+    key: registro.key ?? null,
+    tamanoDumpBytes:
+      registro.tamanoDumpBytes === undefined ? null : BigInt(registro.tamanoDumpBytes),
+    tamanoSubidoBytes:
+      registro.tamanoSubidoBytes === undefined ? null : BigInt(registro.tamanoSubidoBytes),
+    sha256: registro.sha256 ?? null,
+    objetosBorrados: registro.objetosBorrados,
+    duracionMs: registro.duracionMs,
+    error: registro.error ?? null,
+  };
+}
+
 /**
- * Escribe el rastro de una corrida: la fila estructurada en `RespaldoCorrida` **y** el renglón de
- * `Bitacora` (entidad `RespaldoBd`), los dos en la MISMA transacción (A2/A7) para que no pueda
- * quedar uno sin el otro. `sesion` va en `null`: es un proceso del sistema, igual que el barrido de
- * riesgo de la RC.
+ * ABRE el rastro de una corrida: deja la fila en `EN_CURSO` **antes** de empezar a trabajar, y de
+ * paso cierra como `FALLO` las corridas que quedaron abiertas de veces anteriores.
+ *
+ * POR QUÉ SE ESCRIBE AL EMPEZAR Y NO SÓLO AL TERMINAR: el `pg_dump` es el paso largo. Un redeploy,
+ * un OOM o un `SIGKILL` a media corrida no dejarían NI UNA LÍNEA si la fila se escribiera al final —
+ * y el mes siguiente todo parecería normal. Con la fila abierta, esa muerte se ve: primero como una
+ * corrida `EN_CURSO` que lleva horas, y después como el `FALLO` que le pone la siguiente corrida.
+ *
+ * Las corridas huérfanas se cierran con su bitácora, para que aparezcan donde se mira.
+ */
+export async function iniciarCorrida(iniciadoEn: Date, bd?: ContextoBd): Promise<bigint> {
+  return enTransaccion(async (tx) => {
+    const huerfanas = await tx.respaldoCorrida.findMany({
+      where: { estado: 'EN_CURSO' },
+      select: { id: true, iniciadoEn: true },
+    });
+    for (const huerfana of huerfanas) {
+      await tx.respaldoCorrida.update({
+        where: { id: huerfana.id },
+        data: {
+          estado: 'FALLO',
+          terminadoEn: iniciadoEn,
+          error:
+            'La corrida quedó SIN TERMINAR (el proceso murió a media: redeploy, falta de memoria o ' +
+            'apagado del contenedor). Se cerró al arrancar la corrida siguiente.',
+        },
+      });
+      await registrarBitacora(tx, null, {
+        entidad: 'RespaldoBd',
+        idEntidad: huerfana.id,
+        accion: 'OTRO',
+        datos: { estado: 'FALLO', motivo: 'corrida-sin-terminar' },
+      });
+    }
+
+    const fila = await tx.respaldoCorrida.create({
+      data: { iniciadoEn, estado: 'EN_CURSO', paso: PasoRespaldo.VOLCADO, objetosBorrados: 0 },
+      select: { id: true },
+    });
+    return fila.id;
+  }, bd);
+}
+
+/**
+ * CIERRA el rastro de una corrida: actualiza la fila abierta —o la crea entera si no la hubo, que
+ * es el caso de los fallos de arranque— **y** escribe el renglón de `Bitacora` (entidad
+ * `RespaldoBd`), los dos en la MISMA transacción (A2/A7) para que no pueda quedar uno sin el otro.
+ * `sesion` va en `null`: es un proceso del sistema, igual que el barrido de riesgo de la RC.
  *
  * La acción de bitácora distingue de un vistazo: `CREAR` cuando el respaldo se creó de verdad,
  * `OTRO` cuando la corrida terminó en fallo (no se creó nada).
  */
-export async function persistirCorrida(registro: RegistroCorrida, bd?: ContextoBd): Promise<void> {
+export async function persistirCorrida(
+  registro: RegistroCorrida,
+  idAbierto: bigint | null = null,
+  bd?: ContextoBd,
+): Promise<void> {
   await enTransaccion(async (tx) => {
-    const fila = await tx.respaldoCorrida.create({
-      data: {
-        iniciadoEn: registro.iniciadoEn,
-        terminadoEn: registro.terminadoEn,
-        estado: registro.estado,
-        paso: registro.paso,
-        bucket: registro.bucket ?? null,
-        key: registro.key ?? null,
-        tamanoDumpBytes:
-          registro.tamanoDumpBytes === undefined ? null : BigInt(registro.tamanoDumpBytes),
-        tamanoSubidoBytes:
-          registro.tamanoSubidoBytes === undefined ? null : BigInt(registro.tamanoSubidoBytes),
-        objetosBorrados: registro.objetosBorrados,
-        duracionMs: registro.duracionMs,
-        error: registro.error ?? null,
-      },
-      select: { id: true },
-    });
+    const datos = datosDeCorrida(registro);
+    const id =
+      idAbierto === null
+        ? (
+            await tx.respaldoCorrida.create({
+              data: { iniciadoEn: registro.iniciadoEn, ...datos },
+              select: { id: true },
+            })
+          ).id
+        : (
+            await tx.respaldoCorrida.update({
+              where: { id: idAbierto },
+              data: datos,
+              select: { id: true },
+            })
+          ).id;
 
-    const datos: Prisma.InputJsonValue = {
+    const datosBitacora: Prisma.InputJsonValue = {
       estado: registro.estado,
       paso: registro.paso,
       bucket: registro.bucket ?? null,
       key: registro.key ?? null,
       tamanoDumpBytes: registro.tamanoDumpBytes ?? null,
       tamanoSubidoBytes: registro.tamanoSubidoBytes ?? null,
+      sha256: registro.sha256 ?? null,
       objetosBorrados: registro.objetosBorrados,
       duracionMs: registro.duracionMs,
       error: registro.error ?? null,
     };
     await registrarBitacora(tx, null, {
       entidad: 'RespaldoBd',
-      idEntidad: fila.id,
+      idEntidad: id,
       accion: registro.estado === 'EXITO' ? 'CREAR' : 'OTRO',
-      datos,
+      datos: datosBitacora,
     });
   }, bd);
 }
@@ -180,7 +275,10 @@ export async function persistirCorrida(registro: RegistroCorrida, bd?: ContextoB
 export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoRespaldo> {
   const reloj = deps.ahora ?? ((): Date => new Date());
   const cifrar = deps.cifrar ?? cifrarArchivo;
-  const persistir = deps.persistir ?? persistirCorrida;
+  const iniciar = deps.iniciarRastro ?? ((momento: Date) => iniciarCorrida(momento));
+  const persistir =
+    deps.persistir ??
+    ((registro: RegistroCorrida, id: bigint | null) => persistirCorrida(registro, id));
   const registrarError =
     deps.registrarError ??
     ((mensaje, error): void => {
@@ -192,20 +290,38 @@ export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoR
   let paso: PasoRespaldo = PasoRespaldo.VOLCADO;
   let tamanoDumpBytes: number | undefined;
   let tamanoSubidoBytes: number | undefined;
+  let sha256: string | undefined;
   let key: string | undefined;
   let objetosBorrados = 0;
+  // `carpeta` se declara FUERA del try para que el `finally` pueda borrarla, pero se CREA DENTRO:
+  // `mkdtemp` puede fallar (disco lleno, TMPDIR mal puesto) y si estuviera fuera del try esa
+  // excepción se saltaría el rastro y subiría al worker — rompiendo el contrato de esta función
+  // ("NO lanza") justo en el único escenario de la lista que se perdía.
+  let carpeta: string | undefined;
 
-  const carpeta = await mkdtemp(join(deps.dirTemporal ?? tmpdir(), 'control-respaldo-'));
+  // El rastro se ABRE antes de trabajar: si el proceso muere a media (el `pg_dump` es el paso
+  // largo), queda una fila EN_CURSO en vez de ningún registro. Si ni esto se puede escribir, la
+  // corrida sigue igual: el respaldo importa más que su bitácora.
+  let idAbierto: bigint | null = null;
   try {
+    idAbierto = (await iniciar(iniciadoEn)) ?? null;
+  } catch (error) {
+    registrarError('Respaldo: no se pudo abrir el rastro de la corrida (la corrida sigue).', error);
+  }
+
+  try {
+    carpeta = await mkdtemp(join(deps.dirTemporal ?? tmpdir(), 'control-respaldo-'));
     const rutaVolcado = join(carpeta, 'control.dump');
     const rutaCifrada = join(carpeta, 'control.dump.enc');
 
     // 1. Volcado.
     tamanoDumpBytes = await deps.generarVolcado(rutaVolcado);
 
-    // 2. Cifrado.
+    // 2. Cifrado (deja de paso la huella SHA-256 de lo que se va a subir).
     paso = PasoRespaldo.CIFRADO;
-    const tamanoCifrado = await cifrar(rutaVolcado, rutaCifrada, deps.config.frase);
+    const cifrado = await cifrar(rutaVolcado, rutaCifrada, deps.config.frase);
+    const tamanoCifrado = cifrado.bytes;
+    sha256 = cifrado.sha256;
 
     // 3. Subida.
     paso = PasoRespaldo.SUBIDA;
@@ -263,10 +379,11 @@ export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoR
       key,
       tamanoDumpBytes,
       tamanoSubidoBytes,
+      ...(sha256 === undefined ? {} : { sha256 }),
       objetosBorrados,
       duracionMs: Date.now() - arranque,
     };
-    await persistir(resultado);
+    await persistir(resultado, idAbierto);
     return resultado;
   } catch (error) {
     const resultado: ResultadoRespaldo = {
@@ -278,6 +395,7 @@ export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoR
       ...(key === undefined ? {} : { key }),
       ...(tamanoDumpBytes === undefined ? {} : { tamanoDumpBytes }),
       ...(tamanoSubidoBytes === undefined ? {} : { tamanoSubidoBytes }),
+      ...(sha256 === undefined ? {} : { sha256 }),
       objetosBorrados,
       duracionMs: Date.now() - arranque,
       error: error instanceof Error ? error.message : String(error),
@@ -285,7 +403,7 @@ export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoR
     registrarError(`⛔ RESPALDO A R2 FALLIDO en el paso ${paso}. LA BASE NO SE RESPALDÓ.`, error);
     // El rastro es lo último que puede fallar, y si falla NO puede tapar el error original.
     try {
-      await persistir(resultado);
+      await persistir(resultado, idAbierto);
     } catch (errorRastro) {
       registrarError(
         '⛔ RESPALDO A R2: además, no se pudo guardar el rastro de la corrida fallida.',
@@ -294,7 +412,9 @@ export async function ejecutarRespaldoBd(deps: DepsRespaldo): Promise<ResultadoR
     }
     return resultado;
   } finally {
-    await rm(carpeta, { recursive: true, force: true });
+    if (carpeta !== undefined) {
+      await rm(carpeta, { recursive: true, force: true });
+    }
   }
 }
 
@@ -330,17 +450,20 @@ export function depsRespaldoDesdeEnv(
 }
 
 /**
- * Deja el rastro ROJO de "el respaldo NO está programado" (falta configuración). Se llama en el
- * arranque: la AUSENCIA de respaldo tiene que verse en el mismo sitio donde se ven sus fallos, no
- * solo en un log que se pierde entre miles de líneas.
+ * Deja el rastro ROJO de "el respaldo NO quedó programado". Se llama en el arranque: la AUSENCIA de
+ * respaldo tiene que verse en el MISMO sitio donde se ven sus fallos, no sólo en un log que se
+ * pierde entre miles de líneas.
+ *
+ * @param paso `CONFIGURACION` si falta una variable; `PROGRAMACION` si la configuración estaba bien
+ *   pero no se pudo dejar programado (el motor de jobs no levantó, o `schedule` falló).
  */
-async function registrarFaltaDeConfiguracion(mensaje: string): Promise<void> {
+async function registrarNoProgramado(mensaje: string, paso: PasoRespaldo): Promise<void> {
   const ahora = new Date();
   await persistirCorrida({
     iniciadoEn: ahora,
     terminadoEn: ahora,
     estado: 'FALLO',
-    paso: PasoRespaldo.CONFIGURACION,
+    paso,
     objetosBorrados: 0,
     duracionMs: 0,
     error: mensaje,
@@ -349,13 +472,24 @@ async function registrarFaltaDeConfiguracion(mensaje: string): Promise<void> {
 
 /**
  * Cablea el respaldo a pg-boss: registra el WORKER de la cola y programa su cron (mensual por
- * defecto). Espejo de
- * `riesgo-rc.ts` / `refrescar-kpis.ts`. Idempotente (re-programar la misma cola/cron reemplaza el
- * schedule). NO-OP si el motor de jobs está inactivo (tests/CI: `JOBS_ACTIVOS=false`) — lo testeable
- * sin pg-boss es el CUERPO (`ejecutarRespaldoBd`), que se invoca directo con sus dependencias.
+ * defecto). Espejo de `riesgo-rc.ts` / `refrescar-kpis.ts`. Idempotente (re-programar la misma
+ * cola/cron reemplaza el schedule).
  *
- * Si la configuración NO alcanza, **no se programa nada** y se deja constancia (log + fila en
- * FALLO). Nunca se programa "a medias" ni se calla.
+ * ⚠️ EL ORDEN IMPORTA, Y ES DELIBERADO: se DECIDE primero y se mira el motor de jobs después. Al
+ * revés —que es como nació— un motor caído hacía salir la función sin log, sin fila y sin bitácora:
+ * el sistema se quedaba sin respaldo y el lugar designado para enterarse estaba VACÍO. Y no es
+ * hipotético aquí: el backend arranca antes de que `postgres.railway.internal` responda,
+ * `iniciarMotorJobs` cae en su `catch`, deja `boss = null` y la app SIGUE SIRVIENDO (la cicatriz de
+ * `CLAUDE.md` §8, "arranque resiliente a la BD"). Desde ese momento no habría respaldo, en silencio.
+ *
+ * Los cuatro desenlaces, todos con rastro salvo el que es una decisión:
+ *  • apagado a propósito (`RESPALDO_ACTIVO=false`) → log, SIN fila (no es un problema).
+ *  • falta configuración                          → log + fila `FALLO`/`CONFIGURACION`.
+ *  • configuración OK pero sin motor de jobs      → log + fila `FALLO`/`PROGRAMACION`.
+ *  • `schedule` truena                            → log + fila `FALLO`/`PROGRAMACION`.
+ *
+ * Seguro para local/CI: ahí `RESPALDO_ACTIVO=false` (`docker-compose.yml`), que cae en "apagado" y
+ * no escribe nada.
  *
  * @param registrarError hook para logear (el servidor inyecta el suyo).
  */
@@ -364,33 +498,51 @@ export async function registrarRespaldoPeriodico(
     console.error(msg, err);
   },
 ): Promise<void> {
-  const boss = motorJobs();
-  if (boss === null) {
-    return; // motor inactivo (tests/CI): nada que programar.
+  const decision = decidirArranqueRespaldo();
+
+  // Apagado a propósito: se avisa y punto. No deja rastro rojo porque no es un fallo, es una
+  // decisión de quien configuró el ambiente.
+  if (decision.accion === 'apagado') {
+    registrarError(`⛔ ${decision.mensaje ?? 'Respaldo a R2 apagado.'}`, undefined);
+    return;
   }
 
-  const decision = decidirArranqueRespaldo();
-  // Se exige la configuración RESUELTA, no solo la etiqueta: un `programar` sin config sería un bug
+  /** Loguea y deja la fila roja; si ni la fila se puede escribir, al menos queda el log. */
+  const dejarRastroRojo = async (mensaje: string, paso: PasoRespaldo): Promise<void> => {
+    registrarError(`⛔ ${mensaje}`, undefined);
+    try {
+      await registrarNoProgramado(mensaje, paso);
+    } catch (error) {
+      registrarError('Respaldo: además, no se pudo registrar que NO quedó programado.', error);
+    }
+  };
+
+  // Se exige la configuración RESUELTA, no sólo la etiqueta: un `programar` sin config sería un bug
   // de la decisión, y ante la duda se trata como "no configurado" (deja rastro) en vez de arrancar a
   // ciegas o tumbar el proceso con un cast optimista.
   const config = decision.accion === 'programar' ? decision.config : undefined;
   if (config === undefined) {
-    const mensaje = decision.mensaje ?? 'Respaldo a R2 no programado (configuración no resuelta).';
-    registrarError(`⛔ ${mensaje}`, undefined);
-    if (decision.accion !== 'apagado') {
-      // Apagado a propósito NO deja rastro rojo (es una decisión, no un problema). Cualquier otro
-      // caso sí: la AUSENCIA de respaldo tiene que verse donde se ven sus fallos.
-      try {
-        await registrarFaltaDeConfiguracion(mensaje);
-      } catch (error) {
-        registrarError('Respaldo: no se pudo registrar la falta de configuración.', error);
-      }
-    }
+    await dejarRastroRojo(
+      decision.mensaje ?? 'Respaldo a R2 NO programado (configuración no resuelta).',
+      PasoRespaldo.CONFIGURACION,
+    );
     return;
   }
 
-  // Aviso temprano y barato: si `pg_dump` no está en la imagen, se sabe AL ARRANCAR y no a las 2 de
-  // la mañana. No impide programar (el fallo real quedará con su rastro), pero el log lo dice.
+  const boss = motorJobs();
+  if (boss === null) {
+    await dejarRastroRojo(
+      'Respaldo a R2 NO programado: la configuración está COMPLETA pero el motor de jobs (pg-boss) ' +
+        'no está disponible — no levantó al arrancar, o JOBS_ACTIVOS=false. El sistema se queda SIN ' +
+        'segundo respaldo hasta que se reinicie el backend con la base alcanzable.',
+      PasoRespaldo.PROGRAMACION,
+    );
+    return;
+  }
+
+  // Aviso temprano y barato: si `pg_dump` no está en la imagen, se sabe AL ARRANCAR y no la
+  // madrugada de la corrida. No impide programar (el fallo real quedará con su rastro), pero el log
+  // lo dice.
   const version = await versionPgDump(config.pgDump);
   if (version === null) {
     registrarError(
@@ -412,9 +564,13 @@ export async function registrarRespaldoPeriodico(
     });
     await boss.schedule(COLAS_JOBS.respaldoBd, config.cron);
   } catch (error) {
-    registrarError(
-      '⛔ No se pudo programar el respaldo a R2 (la app sigue SIN segundo respaldo):',
-      error,
+    // Mismo rastro rojo que un motor ausente: el resultado para el negocio es idéntico —no hay
+    // respaldo programado— y antes esto sólo dejaba un `log.error`.
+    await dejarRastroRojo(
+      'Respaldo a R2 NO programado: la configuración está completa pero falló al registrar el job ' +
+        `en la cola (${error instanceof Error ? error.message : String(error)}). El sistema se ` +
+        'queda SIN segundo respaldo.',
+      PasoRespaldo.PROGRAMACION,
     );
   }
 }

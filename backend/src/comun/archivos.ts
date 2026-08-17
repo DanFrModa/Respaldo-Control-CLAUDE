@@ -336,7 +336,7 @@ export interface OperacionesObjetoR2 {
    * `RespaldoCorrida`.
    *
    * @returns los bytes que se enviaron (los del archivo en disco), para contrastarlos luego contra
-   *   lo que reporte {@link ServicioArchivos.tamanoObjeto}.
+   *   lo que reporte {@link OperacionesObjetoR2.tamanoObjeto}.
    */
   subirArchivoDesdeRuta(key: string, ruta: string, tipoMime: string): Promise<number>;
 
@@ -345,6 +345,9 @@ export interface OperacionesObjetoR2 {
    * COMPROBACIÓN de que una subida quedó: que un `PutObject` no haya lanzado no prueba que el
    * objeto esté ahí (proxies, reintentos, cortes a media transferencia). Verificar cuesta una
    * llamada y evita descubrir el hueco el día que haya que restaurar.
+   *
+   * OJO con su alcance: el tamaño caza una subida TRUNCADA, no una corrupción del mismo largo. Por
+   * eso el respaldo guarda además el SHA-256 de lo que subió (`RespaldoCorrida.sha256`).
    */
   tamanoObjeto(key: string): Promise<number | null>;
 
@@ -353,8 +356,8 @@ export interface OperacionesObjetoR2 {
    * retención del respaldo para saber qué hay guardado y desde cuándo. Devuelve key, tamaño y
    * `LastModified`.
    *
-   * @param maxObjetos tope de seguridad: corta el paginado para no traerse un bucket entero si el
-   *   prefijo estuviera mal puesto.
+   * @param maxObjetos tope DURO de seguridad: corta el paginado para no traerse un bucket entero si
+   *   el prefijo estuviera mal puesto. El resultado nunca lo excede (se recorta al llegar).
    */
   listarObjetos(
     prefijo: string,
@@ -560,7 +563,9 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivosCompl
         }
         continuacion = respuesta.IsTruncated === true ? respuesta.NextContinuationToken : undefined;
       } while (continuacion !== undefined && objetos.length < maxObjetos);
-      return objetos;
+      // El tope se comprobaba SOLO como condición del bucle, así que la última página podía
+      // rebasarlo (hasta 1000 objetos de más). Se recorta al salir: `maxObjetos` es un tope duro.
+      return objetos.slice(0, maxObjetos);
     },
 
     async eliminarObjeto(key) {

@@ -18,6 +18,7 @@ import {
   descifrarArchivo,
   ErrorRespaldoIlegible,
   MAGIA,
+  sha256Archivo,
 } from './cifrado.js';
 
 const FRASE = 'frase-de-pruebas-suficientemente-larga-2026';
@@ -50,18 +51,30 @@ async function huellaDe(ruta: string): Promise<string> {
 }
 
 describe('cifrado del respaldo', () => {
+  it('la huella SHA-256 que devuelve es la del archivo cifrado en disco', async () => {
+    // Es la huella que se guarda en `RespaldoCorrida.sha256` y con la que se comprueba un respaldo
+    // bajado de R2 SIN la llave (equivale a `sha256sum`). Si se calculara sobre otra cosa, la
+    // comprobación del día del desastre fallaría siempre.
+    const { ruta } = await archivoAleatorio('huella.bin', 20_000);
+    const cifrado = join(carpeta, 'huella.enc');
+    const resultado = await cifrarArchivo(ruta, cifrado, FRASE);
+    expect(resultado.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(resultado.sha256).toBe(await sha256Archivo(cifrado));
+    expect(resultado.sha256).not.toBe(await sha256Archivo(ruta)); // no es la del claro
+  });
+
   it('ida y vuelta: lo descifrado es IDÉNTICO al original', async () => {
     const { ruta, huella } = await archivoAleatorio('original.bin', 300_000);
     const cifrado = join(carpeta, 'ida.enc');
     const vuelta = join(carpeta, 'vuelta.bin');
 
-    const tamanoCifrado = await cifrarArchivo(ruta, cifrado, FRASE);
+    const cifradoInfo = await cifrarArchivo(ruta, cifrado, FRASE);
     const tamanoVuelta = await descifrarArchivo(cifrado, vuelta, FRASE);
 
     expect(await huellaDe(vuelta)).toBe(huella);
     expect(tamanoVuelta).toBe(300_000);
     // El cifrado pesa el original + cabecera + etiqueta (GCM no infla el texto cifrado).
-    expect(tamanoCifrado).toBe(300_000 + BYTES_CABECERA + BYTES_ETIQUETA);
+    expect(cifradoInfo.bytes).toBe(300_000 + BYTES_CABECERA + BYTES_ETIQUETA);
   });
 
   it('funciona con archivos que no son múltiplo del bloque ni del trozo de lectura', async () => {

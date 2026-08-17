@@ -7037,9 +7037,14 @@ model DirectorioTerceroV1 {
 // rastro pesa MÁS: un fallo de enero no se nota hasta que hace falta en junio.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Cómo terminó una corrida del respaldo. Solo dos estados: o el objeto quedó
-/// VERIFICADO en R2 (EXITO) o no (FALLO) — no hay medias tintas.
+/// Cómo va (o cómo terminó) una corrida del respaldo.
+///
+/// `EN_CURSO` existe para que una corrida que MUERE A MEDIA deje huella: la fila se escribe al
+/// EMPEZAR y se actualiza al terminar, así que un redeploy, un OOM o un SIGKILL durante el
+/// `pg_dump` —el paso largo— dejan una fila colgada en `EN_CURSO` en vez de no dejar nada. La
+/// siguiente corrida las cierra como `FALLO` con su motivo (ver `iniciarCorrida`).
 enum EstadoRespaldo {
+  EN_CURSO
   EXITO
   FALLO
 
@@ -7051,6 +7056,9 @@ enum EstadoRespaldo {
 enum PasoRespaldo {
   /// Faltó configuración (llave de cifrado, credenciales R2 reales…): ni se intentó.
   CONFIGURACION
+  /// La configuración estaba BIEN pero el respaldo no se pudo dejar programado (el motor de jobs
+  /// no levantó, o `schedule` falló). El sistema queda sin respaldo aunque nada esté mal escrito.
+  PROGRAMACION
   /// `pg_dump` del Postgres del sistema.
   VOLCADO
   /// Cifrado del volcado (AES-256-GCM).
@@ -7093,6 +7101,13 @@ model RespaldoCorrida {
   /// Tamaño del objeto CIFRADO tal como lo confirmó R2 (HeadObject), en bytes.
   /// Es la prueba de que el objeto quedó: se compara contra el archivo local.
   tamanoSubidoBytes BigInt? @map("tamano_subido_bytes")
+
+  /// SHA-256 (hex) del archivo CIFRADO tal como se subió. El tamaño que confirma R2 caza una
+  /// subida TRUNCADA, pero no una corrupción del mismo largo; el cifrado GCM sí la caza, aunque
+  /// sólo al descifrar —o sea, el día del desastre—. Con esta huella se puede comprobar un
+  /// respaldo bajado de R2 ANTES de necesitarlo, y SIN la llave:
+  /// `sha256sum respaldo.dump.enc`, o `restaurar-respaldo.ts --sha256 <hex>`.
+  sha256 String? @db.VarChar(64)
 
   /// Cuántos respaldos viejos borró la retención en esta corrida (los que sobran del tope).
   objetosBorrados Int @default(0) @map("objetos_borrados")

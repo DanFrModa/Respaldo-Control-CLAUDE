@@ -24,6 +24,23 @@
  *     --key respaldos/bd/2026/control-2026-08-17T080000Z.dump.enc \
  *     --destino postgresql://usuario:clave@host:5432/ensayo_restauracion
  *
+ *   # 4) Comprobar de paso que el archivo es EL QUE SE SUBIÓ (huella de `respaldo_corrida.sha256`):
+ *   npx tsx --env-file=.env scripts/restaurar-respaldo.ts --key <key> --sha256 <hex> --destino <URL>
+ *
+ * Dentro del contenedor del backend en Railway las variables ya están en el entorno, así que ahí va
+ * SIN `--env-file`:  `npx tsx scripts/restaurar-respaldo.ts --listar`.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────────────
+ * DÓNDE SE CORRE (dos vías, según qué se haya roto)
+ *
+ *  • **Railway sigue en pie** (te cargaste datos, una migración salió mal): córrelo **dentro del
+ *    contenedor del backend**. Ahí ya están el cliente de PostgreSQL 17, este script y las
+ *    credenciales R2 del ambiente. La imagen lo lleva (`COPY scripts ./scripts` en el Dockerfile).
+ *  • **Railway ya NO está** (cuenta suspendida, servicio borrado, mudanza): entonces el contenedor
+ *    tampoco está. Córrelo desde un **checkout del repo** en cualquier máquina con **cliente
+ *    PostgreSQL ≥ 17** y Node 22, exportando a mano `RESPALDO_LLAVE` y las `R2_*`. Éste es el
+ *    escenario para el que existe este segundo respaldo, así que es el que hay que ensayar.
+ *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
  * ⚠️ TRES ADVERTENCIAS QUE NO SON DECORATIVAS
  *
@@ -32,7 +49,14 @@
  *  • **`--destino` DEBE ser una base de ensayo, vacía.** El script exige `--si-estoy-seguro` para
  *    tocar una base que ya tenga tablas, y aun así `pg_restore --clean` BORRA lo que haya.
  *  • **El volcado no trae el esquema `pgboss`** (la cola de jobs): es estado transitorio y pg-boss lo
- *    vuelve a crear solo al arrancar. No es un dato faltante, es una exclusión deliberada.
+ *    vuelve a crear solo al arrancar. No es un dato faltante, es una exclusión deliberada. Los
+ *    eventos de negocio NO se pierden: viven en `evento_outbox` (esquema `public`, sí incluido) y el
+ *    relay sólo publica los que tienen `publicadoEn = null`, así que al levantar la base restaurada
+ *    no se re-disparan los ya publicados. **El hueco fino, dicho con todas sus letras:** un evento
+ *    que YA se había publicado a pg-boss pero que ningún worker había consumido todavía se pierde al
+ *    excluir ese esquema. Es una ventana de segundos y afecta a automatismos (auto-avance de la RC,
+ *    refresco de KPIs), no a datos capturados; tras restaurar, conviene revisar la Ruta Crítica de
+ *    las órdenes que se movieron ese día.
  *
  * Esta cabecera ES el procedimiento de restauración: se mantiene junto al código para que no pueda
  * quedarse desactualizada respecto de las banderas que el script realmente usa. La parte de
@@ -49,15 +73,17 @@ import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 
 import { configR2DesdeEnv, crearClienteR2, servicioArchivos } from '../src/comun/archivos.js';
-import { descifrarArchivo } from '../src/comun/respaldo/cifrado.js';
+import { ErrorValidacion } from '../src/comun/errores.js';
+import { descifrarArchivo, sha256Archivo } from '../src/comun/respaldo/cifrado.js';
 import { configRespaldoDesdeEnv, PREFIJO_DEFECTO } from '../src/comun/respaldo/config.js';
-import { variablesLibpq } from '../src/comun/respaldo/pg-dump.js';
+import { variablesLibpq, type VariablesLibpq } from '../src/comun/respaldo/pg-dump.js';
 
 /** Opciones que acepta el script, ya interpretadas. */
 interface Opciones {
@@ -66,6 +92,7 @@ interface Opciones {
   archivo?: string;
   salida?: string;
   destino?: string;
+  sha256?: string;
   siEstoySeguro: boolean;
 }
 
@@ -97,6 +124,9 @@ function leerArgumentos(argv: readonly string[]): Opciones {
       case '--destino':
         opciones.destino = valor();
         break;
+      case '--sha256':
+        opciones.sha256 = valor().trim().toLowerCase();
+        break;
       case '--si-estoy-seguro':
         opciones.siEstoySeguro = true;
         break;
@@ -119,15 +149,44 @@ Restauración de un respaldo cifrado de CONTROL (V1-E6a).
   --archivo <ruta>        Respaldo ya descargado en disco (alternativa a --key).
   --salida <ruta>         Dónde dejar el volcado DESCIFRADO (por defecto, un temporal que se borra).
   --destino <URL>         Base donde restaurar (pg_restore). Sin esto, solo descifra.
+  --sha256 <hex>          Comprueba la huella del archivo cifrado ANTES de descifrar (la huella
+                          la guarda cada corrida en respaldo_corrida.sha256). Detecta corrupción
+                          sin necesitar la llave.
   --si-estoy-seguro       Permite restaurar sobre una base que YA tiene tablas (las borra).
 
 Variables necesarias: RESPALDO_LLAVE (la misma con la que se cifró) y las R2_* del ambiente.
 Correr SIEMPRE desde backend/ y con --env-file=.env.
 `.trim();
 
+/**
+ * Configuración de R2, con un error que DICE QUÉ FALTA. Sin esto, `--listar` —el PRIMER comando que
+ * alguien teclea el día del desastre— moría con el genérico "Los datos capturados no son válidos",
+ * que no nombra ni una variable. El mensaje de `RESPALDO_LLAVE` ya era explícito; éste ahora también.
+ */
+function configR2OExplicar(): ReturnType<typeof configR2DesdeEnv> {
+  try {
+    return configR2DesdeEnv();
+  } catch (error) {
+    const detalle = error instanceof ErrorValidacion ? error.message : String(error);
+    throw new Error(
+      'Faltan las credenciales de Cloudflare R2 para leer los respaldos. Necesitas las CUATRO ' +
+        'variables del ambiente donde vive el bucket:\n' +
+        '    R2_ACCOUNT_ID       id de la cuenta de Cloudflare\n' +
+        '    R2_ACCESS_KEY_ID    token S3 del bucket (con permiso de lectura)\n' +
+        '    R2_SECRET_ACCESS_KEY  secreto de ese token\n' +
+        '    R2_BUCKET           nombre del bucket (p. ej. control-v2-prod)\n' +
+        '  Están en las variables del servicio backend en Railway. Corre este script desde ' +
+        `backend/ con --env-file=.env, o expórtalas a mano.\n  Detalle: ${detalle}`,
+      // Se conserva el error original como `cause`: el mensaje de arriba es para el humano, y esto
+      // deja el rastro técnico intacto para `RESPALDO_DEBUG=true`.
+      { cause: error },
+    );
+  }
+}
+
 /** Baja un objeto de R2 a disco, en streaming (el respaldo puede pesar cientos de MB). */
 async function descargarDeR2(key: string, destino: string): Promise<number> {
-  const config = configR2DesdeEnv();
+  const config = configR2OExplicar();
   const cliente = crearClienteR2(config);
   const respuesta = await cliente.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
   if (respuesta.Body === undefined) {
@@ -139,13 +198,16 @@ async function descargarDeR2(key: string, destino: string): Promise<number> {
 }
 
 /** Corre `pg_restore` contra la base destino, mostrando su salida tal cual. */
-async function restaurar(volcado: string, urlDestino: string): Promise<void> {
-  const variables = variablesLibpq(urlDestino);
-  const argumentos = [
-    // ⚠️ `--dbname` va EXPLÍCITO: a diferencia de `psql` y `pg_dump`, `pg_restore` NO toma la base
-    // de `PGDATABASE` y aborta con "one of -d/--dbname and -f/--file must be specified". (Lo
-    // descubrió la prueba de integración del ensayo de restauración; sin ella, el script habría
-    // fallado justo el día que hiciera falta usarlo.) La CONTRASEÑA sigue viajando por entorno.
+/**
+ * Argumentos EXACTOS con los que este script invoca `pg_restore`. Se expone aparte —y la prueba de
+ * integración la llama a ELLA, no a una copia— porque la lección ya se pagó una vez: `--dbname` es
+ * obligatorio (a diferencia de `psql` y `pg_dump`, `pg_restore` NO lee `PGDATABASE`) y una prueba
+ * que se limitaba a repetir la lista de argumentos dejaba pasar su borrado sin quejarse.
+ */
+export function argumentosPgRestore(volcado: string, variables: VariablesLibpq): string[] {
+  return [
+    // ⚠️ `--dbname` va EXPLÍCITO: `pg_restore` NO toma la base de `PGDATABASE` y aborta con
+    // "one of -d/--dbname and -f/--file must be specified". La CONTRASEÑA sigue por entorno.
     '--dbname',
     variables.PGDATABASE,
     '--clean',
@@ -156,6 +218,16 @@ async function restaurar(volcado: string, urlDestino: string): Promise<void> {
     // vacía: sin --exit-on-error, pg_restore los reporta y sigue.
     volcado,
   ];
+}
+
+/**
+ * Restaura `volcado` en la base de `urlDestino` con `pg_restore`. Exportada para que el ENSAYO de
+ * restauración (`src/comun/jobs/respaldo-bd.int.test.ts`) ejecute ESTA función y no una imitación:
+ * si alguien le quita `--dbname`, el ensayo se cae.
+ */
+export async function restaurar(volcado: string, urlDestino: string): Promise<void> {
+  const variables = variablesLibpq(urlDestino);
+  const argumentos = argumentosPgRestore(volcado, variables);
   await new Promise<void>((resolver, rechazar) => {
     const proceso = spawn('pg_restore', argumentos, {
       env: { ...process.env, ...variables },
@@ -219,6 +291,7 @@ async function principal(): Promise<void> {
 
   if (opciones.listar) {
     const prefijo = process.env.RESPALDO_PREFIJO ?? PREFIJO_DEFECTO;
+    configR2OExplicar(); // valida y explica ANTES de que el servicio truene con el mensaje genérico
     const objetos = await servicioArchivos().listarObjetos(prefijo);
     if (objetos.length === 0) {
       console.log(`No hay ningún respaldo bajo "${prefijo}" en el bucket. ⚠️ Eso NO es normal.`);
@@ -277,6 +350,19 @@ async function principal(): Promise<void> {
       throw new Error('No se indicó qué respaldo restaurar (--key o --archivo).');
     }
 
+    if (opciones.sha256 !== undefined) {
+      console.log('Comprobando la huella SHA-256 del archivo cifrado...');
+      const real = await sha256Archivo(cifrado);
+      if (real !== opciones.sha256) {
+        throw new Error(
+          'La huella SHA-256 NO coincide: el archivo NO es el que se subió, o llegó corrupto.\n' +
+            `    esperada: ${opciones.sha256}\n    real:     ${real}\n` +
+            '  Baja el respaldo otra vez; si vuelve a no coincidir, usa el respaldo del mes anterior.',
+        );
+      }
+      console.log('  Huella correcta.');
+    }
+
     const volcado = opciones.salida ?? join(carpeta, 'control.dump');
     console.log('Descifrando (AES-256-GCM)...');
     const bytes = await descifrarArchivo(cifrado, volcado, frase);
@@ -305,17 +391,27 @@ async function principal(): Promise<void> {
   }
 }
 
-// Este script se corre bajo presión (y probablemente de madrugada): un volcado de stack de Node no
-// le sirve a nadie. Cualquier error sale como UNA línea legible, y el detalle técnico solo si se
-// pide con RESPALDO_DEBUG=true.
-try {
-  await principal();
-} catch (error) {
-  console.error(`\n⛔ ${error instanceof Error ? error.message : String(error)}`);
-  if (process.env.RESPALDO_DEBUG === 'true') {
-    console.error(error);
-  } else {
-    console.error('   (para ver el detalle técnico: RESPALDO_DEBUG=true)');
+/**
+ * ¿Se está EJECUTANDO este archivo, o sólo se está IMPORTANDO? El ensayo de restauración importa
+ * `restaurar` de aquí (para probar el código de verdad y no una copia); sin este guard, importarlo
+ * dispararía además el CLI entero.
+ */
+const ejecutadoDirecto =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (ejecutadoDirecto) {
+  // Este script se corre bajo presión (y probablemente de madrugada): un volcado de stack de Node no
+  // le sirve a nadie. Cualquier error sale como UNA línea legible, y el detalle técnico solo si se
+  // pide con RESPALDO_DEBUG=true.
+  try {
+    await principal();
+  } catch (error) {
+    console.error(`\n⛔ ${error instanceof Error ? error.message : String(error)}`);
+    if (process.env.RESPALDO_DEBUG === 'true') {
+      console.error(error);
+    } else {
+      console.error('   (para ver el detalle técnico: RESPALDO_DEBUG=true)');
+    }
+    process.exitCode = 1;
   }
-  process.exitCode = 1;
 }

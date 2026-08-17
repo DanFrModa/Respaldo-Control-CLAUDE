@@ -111,15 +111,38 @@ jobs:
       # de GitHub trae el 16). Sin este paso, el ENSAYO DE RESTAURACION se salta con aviso y nadie
       # verifica que el respaldo se pueda restaurar — que es la mitad del valor de esa etapa. Es el
       # mismo paquete que instala la imagen de produccion (backend/Dockerfile).
+      # Con REINTENTOS (3 intentos, espera creciente): este repo ya carga cicatrices de CI rojo
+      # cronico, y un hipo de apt.postgresql.org no puede bloquear PRs ajenos. Si tras los tres
+      # intentos sigue sin instalarse, el job SI falla: las pruebas del respaldo estan configuradas
+      # para caer (no para saltarse) cuando corren en CI sin cliente compatible.
       - name: Cliente PostgreSQL 17 (pruebas de respaldo/restauracion)
         run: |
+          set -e
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          for intento in 1 2 3; do
+            if sudo curl -fsSL --retry 3 --retry-delay 5 \
+                 https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+                 -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc; then
+              break
+            fi
+            echo "Descarga de la llave PGDG fallida (intento $intento/3); reintento..."
+            sleep $((intento * 10))
+          done
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          instalado=0
+          for intento in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-17; then
+              instalado=1
+              break
+            fi
+            echo "apt fallo (intento $intento/3); reintento..."
+            sleep $((intento * 15))
+          done
+          if [ "$instalado" -ne 1 ]; then
+            echo "No se pudo instalar postgresql-client-17 tras 3 intentos."
+            exit 1
+          fi
           pg_dump --version
 
       # `test` corre los dos proyectos de vitest: "unit" (sin BD) e "integracion"

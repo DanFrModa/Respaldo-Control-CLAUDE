@@ -112,12 +112,20 @@ function almacenFalso(opciones?: {
 function deps(
   almacen: AlmacenRespaldos,
   extra?: Partial<DepsRespaldo>,
-): DepsRespaldo & { rastro: RegistroCorrida[] } {
+): DepsRespaldo & {
+  rastro: RegistroCorrida[];
+  abiertos: Date[];
+  cerradosSobre: (bigint | null)[];
+} {
   const rastro: RegistroCorrida[] = [];
+  const abiertos: Date[] = [];
+  const cerradosSobre: (bigint | null)[] = [];
   return {
     config: CONFIG,
     almacen,
     rastro,
+    abiertos,
+    cerradosSobre,
     dirTemporal: carpeta,
     ahora: () => AHORA,
     generarVolcado: async (destino) => {
@@ -125,8 +133,13 @@ function deps(
       const info = await stat(destino);
       return info.size;
     },
-    persistir: (registro) => {
+    iniciarRastro: () => {
+      abiertos.push(AHORA);
+      return Promise.resolve(77n);
+    },
+    persistir: (registro, idAbierto) => {
       rastro.push(registro);
+      cerradosSobre.push(idAbierto);
       return Promise.resolve();
     },
     registrarError: () => {
@@ -153,13 +166,22 @@ describe('respaldo · camino feliz', () => {
     expect(dependencias.rastro[0]).toStrictEqual(resultado);
   });
 
-  it('lo subido es el archivo CIFRADO, no el volcado en claro', async () => {
+  it('lo subido es el archivo CIFRADO, no el volcado en claro, y queda su huella', async () => {
     const almacen = almacenFalso();
     const resultado = await ejecutarRespaldoBd(deps(almacen));
     const subido = almacen.subidos.get(resultado.key as string) as number;
     // El cifrado pesa el volcado + cabecera (37 bytes) + etiqueta (16).
     expect(subido).toBe((resultado.tamanoDumpBytes as number) + 53);
     expect(resultado.tamanoSubidoBytes).toBe(subido);
+    // SHA-256 del archivo cifrado: permite comprobar el respaldo SIN la llave y ANTES del desastre.
+    expect(resultado.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('ABRE el rastro antes de trabajar y lo CIERRA sobre esa misma fila', async () => {
+    const dependencias = deps(almacenFalso());
+    await ejecutarRespaldoBd(dependencias);
+    expect(dependencias.abiertos).toHaveLength(1); // fila EN_CURSO al empezar
+    expect(dependencias.cerradosSobre).toStrictEqual([77n]); // se actualizó ESA fila, no otra nueva
   });
 
   it('no deja temporales tirados en el disco (ni el volcado en claro)', async () => {
@@ -235,6 +257,36 @@ describe('respaldo · que NO falle en silencio', () => {
     expect(resultado.estado).toBe('FALLO');
     expect(resultado.paso).toBe(PasoRespaldo.CIFRADO);
     expect(almacen.subidos.size).toBe(0);
+  });
+
+  it('⭐ si NI SIQUIERA se puede crear el directorio temporal, NO lanza y deja rastro', async () => {
+    // Escenario "disco lleno / TMPDIR mal puesto". Era el único de la lista que se perdía: el
+    // `mkdtemp` estaba FUERA del try, así que su excepción se saltaba el rastro y subía al worker,
+    // rompiendo el contrato ("NO lanza") del que depende quien lo llama. El job quedaba anotado
+    // sólo dentro del esquema `pgboss`… que es justo el que este respaldo EXCLUYE del volcado.
+    const dependencias = deps(almacenFalso(), {
+      dirTemporal: join(carpeta, 'ruta', 'que', 'no', 'existe'),
+    });
+
+    const resultado = await ejecutarRespaldoBd(dependencias);
+
+    expect(resultado.estado).toBe('FALLO');
+    expect(resultado.paso).toBe(PasoRespaldo.VOLCADO);
+    expect(resultado.error).toMatch(/ENOENT|no such file/i);
+    expect(dependencias.rastro).toHaveLength(1);
+    expect(dependencias.rastro[0]?.estado).toBe('FALLO');
+  });
+
+  it('si no se puede ABRIR el rastro, la corrida sigue igual (el respaldo importa más)', async () => {
+    const dependencias = deps(almacenFalso(), {
+      iniciarRastro: () => Promise.reject(new Error('la base no responde')),
+    });
+
+    const resultado = await ejecutarRespaldoBd(dependencias);
+
+    expect(resultado.estado).toBe('EXITO');
+    // Al cerrar sin fila abierta se crea la fila entera (idAbierto = null).
+    expect(dependencias.cerradosSobre).toStrictEqual([null]);
   });
 
   it('el cuerpo NUNCA lanza: devuelve el fallo para que el llamador decida', async () => {

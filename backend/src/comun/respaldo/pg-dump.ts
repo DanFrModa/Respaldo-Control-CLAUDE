@@ -82,15 +82,41 @@ export function variablesLibpq(url: string): VariablesLibpq {
 /** Esquemas que NO entran al volcado (estado transitorio de la cola de jobs). */
 export const ESQUEMAS_EXCLUIDOS = ['pgboss'] as const;
 
+/**
+ * Minutos máximos que puede tardar un volcado antes de darlo por COLGADO. `pg_dump` puede quedarse
+ * esperando para siempre (un lock que nadie suelta, una red que se cae a media transferencia sin
+ * cerrar el socket), y una corrida colgada no falla: simplemente NUNCA termina — que es la forma más
+ * silenciosa de no tener respaldo. Al vencer, se mata el proceso y la corrida falla con su rastro.
+ * Configurable por `RESPALDO_TIMEOUT_MIN`; 3 horas de default dan margen de sobra a esta base.
+ */
+export const TIMEOUT_VOLCADO_MIN_DEFECTO = 180;
+
+/** Minutos de tope para el volcado, leídos del entorno (con el default de arriba si no vienen). */
+export function timeoutVolcadoMinutos(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const crudo = Number(env.RESPALDO_TIMEOUT_MIN);
+  return Number.isFinite(crudo) && crudo > 0 ? crudo : TIMEOUT_VOLCADO_MIN_DEFECTO;
+}
+
 /** Corre un proceso y devuelve su código de salida junto con lo que escribió en stderr. */
 async function correr(
   ejecutable: string,
   argumentos: readonly string[],
   entorno: NodeJS.ProcessEnv,
-): Promise<{ codigo: number | null; stderr: string }> {
+  timeoutMs: number,
+): Promise<{ codigo: number | null; stderr: string; expirado: boolean }> {
   return new Promise((resolver, rechazar) => {
     const proceso = spawn(ejecutable, argumentos, { env: entorno });
     let stderr = '';
+    let expirado = false;
+    // Primero SIGTERM (deja a pg_dump cerrar su conexión); si ni así se muere, SIGKILL.
+    const reloj = setTimeout(() => {
+      expirado = true;
+      proceso.kill('SIGTERM');
+      setTimeout(() => proceso.kill('SIGKILL'), 10_000).unref();
+    }, timeoutMs);
+    reloj.unref();
     proceso.stderr.on('data', (trozo: Buffer) => {
       // Se acota: un pg_dump que falla en bucle podría escribir megas de texto.
       stderr = `${stderr}${trozo.toString('utf8')}`.slice(-4000);
@@ -109,7 +135,8 @@ async function correr(
       rechazar(error);
     });
     proceso.on('close', (codigo) => {
-      resolver({ codigo, stderr: stderr.trim() });
+      clearTimeout(reloj);
+      resolver({ codigo, stderr: stderr.trim(), expirado });
     });
   });
 }
@@ -124,6 +151,8 @@ export async function generarVolcado(opciones: {
   url: string;
   destino: string;
   ejecutable?: string;
+  /** Tope en minutos antes de matar el proceso (por defecto, {@link timeoutVolcadoMinutos}). */
+  timeoutMinutos?: number;
 }): Promise<number> {
   const ejecutable = opciones.ejecutable ?? 'pg_dump';
   const argumentos = [
@@ -135,10 +164,22 @@ export async function generarVolcado(opciones: {
     opciones.destino,
   ];
 
-  const { codigo, stderr } = await correr(ejecutable, argumentos, {
-    ...process.env,
-    ...variablesLibpq(opciones.url),
-  });
+  const minutos = opciones.timeoutMinutos ?? timeoutVolcadoMinutos();
+  const { codigo, stderr, expirado } = await correr(
+    ejecutable,
+    argumentos,
+    { ...process.env, ...variablesLibpq(opciones.url) },
+    minutos * 60 * 1000,
+  );
+
+  if (expirado) {
+    throw new ErrorVolcado(
+      `pg_dump se pasó del tope de ${String(minutos)} minutos y se dio por COLGADO (se mató el ` +
+        'proceso). Una corrida colgada nunca falla sola: sería un respaldo que no existe y que ' +
+        'nadie ve fallar. Sube RESPALDO_TIMEOUT_MIN si la base creció, o revisa si hay un lock ' +
+        `atorado. Detalle: ${stderr === '' ? '(sin detalle)' : stderr}`,
+    );
+  }
 
   if (codigo !== 0) {
     // El fallo más traicionero: un pg_dump más viejo que el servidor se NIEGA a volcar (no degrada,

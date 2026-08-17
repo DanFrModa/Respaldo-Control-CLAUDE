@@ -100,28 +100,33 @@ describe('seleccionarObsoletos', () => {
     expect(aBorrar).toHaveLength(17);
   });
 
-  it('NUNCA borra el respaldo recién subido, aunque el tope sea 1', () => {
-    const recien = { key: claveRespaldo(PREFIJO_DEFECTO, AHORA), ultimaModificacion: AHORA };
-    const viejo = haceDias(400);
-    const aBorrar = seleccionarObsoletos([recien, viejo], PREFIJO_DEFECTO, {
-      retencion: 1,
-      ahora: AHORA,
-      keyProtegida: recien.key,
-    });
-    expect(aBorrar).toEqual([viejo.key]);
-    expect(aBorrar).not.toContain(recien.key);
-  });
-
-  it('protege la key recién subida incluso si el reloj la hiciera parecer antiquísima', () => {
-    // Escenario paranoico: el reloj del servidor va adelantado un año respecto del `LastModified`
-    // que puso R2. Sin la regla 1, el respaldo de HOY se borraría a sí mismo.
+  it('⭐ NUNCA borra el respaldo recién subido, aunque el reloj lo haga parecer antiquísimo', () => {
+    // ⚠️ ESTA PRUEBA TIENE QUE PONER `keyProtegida` EN UN OBJETO QUE, DE OTRO MODO, SÍ SE BORRARÍA.
+    // La versión anterior lo ponía como el MÁS NUEVO con tope 1, así que el `slice` del tope ya lo
+    // excluía y la guarda no se ejercía: borrarla del código dejaba las 31 pruebas en verde.
+    //
+    // Escenario real: el `LastModified` que puso R2 quedó desfasado (reloj del servidor adelantado,
+    // o el objeto se subió con fecha vieja), así que el respaldo de HOY parece el más viejo de
+    // todos y cae de lleno fuera del tope y del piso de días. Sin la regla 1 se borraría a sí mismo.
     const recien = haceDias(400);
-    const aBorrar = seleccionarObsoletos([recien, haceDias(500), haceDias(600)], PREFIJO_DEFECTO, {
-      retencion: 1,
+    const masNuevos = [haceDias(1), haceDias(40), haceDias(80), haceDias(120)];
+
+    const sinProteger = seleccionarObsoletos([recien, ...masNuevos], PREFIJO_DEFECTO, {
+      retencion: 2,
+      ahora: AHORA,
+    });
+    // Contraprueba: sin la protección, ESE objeto sí es candidato — o sea que la prueba de abajo
+    // realmente ejerce la guarda y no un camino que ya estaba cubierto por el tope.
+    expect(sinProteger).toContain(recien.key);
+
+    const protegido = seleccionarObsoletos([recien, ...masNuevos], PREFIJO_DEFECTO, {
+      retencion: 2,
       ahora: AHORA,
       keyProtegida: recien.key,
     });
-    expect(aBorrar).not.toContain(recien.key);
+    expect(protegido).not.toContain(recien.key);
+    // Y los demás candidatos siguen muriendo: proteger uno no indulta a los otros.
+    expect(protegido).toContain(masNuevos[3]?.key);
   });
 
   it('conserva el MÁS NUEVO aunque el tope fuera 0-ish (mejor viejo que ninguno)', () => {

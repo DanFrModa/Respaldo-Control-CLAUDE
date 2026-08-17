@@ -64,6 +64,13 @@ COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/dist ./dist
 COPY --chown=node:node --from=builder /app/src ./src
 COPY --chown=node:node --from=builder /app/prisma ./prisma
+# scripts/: el de RESTAURACIÓN del respaldo (V1-E6a) tiene que existir DENTRO de la imagen, porque
+# es donde ya están el cliente de PostgreSQL 17 y las credenciales R2 del ambiente. Sin esto, el
+# comentario de arriba prometía una herramienta que el contenedor no tenía.
+# ⚠️ Ojo: si el escenario del desastre es "Railway ya no está", este contenedor tampoco está — para
+# ESE caso hay que correr el script desde un checkout del repo con cliente PostgreSQL ≥ 17. Lo dicen
+# las dos vías en la cabecera de scripts/restaurar-respaldo.ts.
+COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node package.json package-lock.json prisma.config.ts tsconfig.json ./
 COPY --chown=node:node docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh

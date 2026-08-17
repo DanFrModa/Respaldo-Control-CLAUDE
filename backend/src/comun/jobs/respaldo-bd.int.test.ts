@@ -24,13 +24,23 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { inject } from 'vitest';
 
 import { PasoRespaldo, type PrismaClient } from '../../datos/index.js';
+// El ENSAYO invoca la función REAL del script de restauración (no una copia de sus argumentos):
+// si alguien le quita `--dbname`, esta prueba se cae. El script sólo corre su CLI cuando se ejecuta
+// directamente, así que importarlo aquí es seguro.
+import { argumentosPgRestore, restaurar } from '../../../scripts/restaurar-respaldo.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { cifrarArchivo, descifrarArchivo } from '../respaldo/cifrado.js';
 import type { ConfigRespaldo } from '../respaldo/config.js';
 import { generarVolcado, versionPgDump } from '../respaldo/pg-dump.js';
 import { claveRespaldo } from '../respaldo/retencion.js';
 
-import { ejecutarRespaldoBd, persistirCorrida, type AlmacenRespaldos } from './respaldo-bd.js';
+import {
+  ejecutarRespaldoBd,
+  iniciarCorrida,
+  persistirCorrida,
+  registrarRespaldoPeriodico,
+  type AlmacenRespaldos,
+} from './respaldo-bd.js';
 
 const FRASE = 'frase-de-pruebas-suficientemente-larga-2026';
 
@@ -76,12 +86,23 @@ const { hayHerramientas, motivoSalto } = await (async (): Promise<{
   }
 })();
 
+// ⚠️ EN CI NO SE SALTA: SE CAE. Si el ensayo de restauración puede saltarse en silencio, la
+// garantía de esta etapa depende de que alguien recuerde mantener el paso que instala el cliente de
+// PostgreSQL — y el día que ese paso se caiga o se borre, el CI seguiría verde sin que nadie
+// verifique que el respaldo se puede restaurar. Fuera de CI (la máquina de alguien sin cliente
+// instalado) sí se salta, con aviso ruidoso.
 if (!hayHerramientas) {
-  console.warn(
-    `⚠️  Respaldo (V1-E6a): se SALTA el ciclo real de volcado/restauración porque ${motivoSalto}. ` +
-      'Instala el cliente de PostgreSQL de la major del servidor para ejercitarlo (en CI lo hace el ' +
-      'paso "Cliente PostgreSQL 17" de .github/workflows/ci.yml).',
-  );
+  const aviso =
+    `Respaldo (V1-E6a): NO se puede ejercitar el ciclo real de volcado/restauración porque ${motivoSalto}. ` +
+    'Instala el cliente de PostgreSQL de la major del servidor (en CI lo hace el paso ' +
+    '"Cliente PostgreSQL 17" de .github/workflows/ci.yml).';
+  if (process.env.CI !== undefined && process.env.CI !== '' && process.env.CI !== 'false') {
+    throw new Error(
+      `⛔ ${aviso}\n   En CI esto es un FALLO, no un salto: sin este ensayo nadie comprueba que el ` +
+        'respaldo se pueda RESTAURAR, que es la mitad del valor de la etapa.',
+    );
+  }
+  console.warn(`⚠️  ${aviso}`);
 }
 
 let cliente: PrismaClient;
@@ -135,6 +156,7 @@ describe('rastro de la corrida (lo que hace que un fallo NO pase inadvertido)', 
         objetosBorrados: 2,
         duracionMs: 60_000,
       },
+      null,
       { cliente },
     );
 
@@ -168,6 +190,7 @@ describe('rastro de la corrida (lo que hace que un fallo NO pase inadvertido)', 
         duracionMs: 900,
         error: 'AccessDenied: el token S3 no tiene permiso de escritura',
       },
+      null,
       { cliente },
     );
 
@@ -197,6 +220,7 @@ describe('rastro de la corrida (lo que hace que un fallo NO pase inadvertido)', 
           duracionMs: 1_000,
           ...(dia === 3 ? { error: 'R2 no respondió' } : {}),
         },
+        null,
         { cliente },
       );
     }
@@ -219,7 +243,8 @@ describe('respaldo completo contra la base real', () => {
         almacen: almacenFalso(),
         dirTemporal: carpeta,
         generarVolcado: (destino) => generarVolcado({ url, destino }),
-        persistir: (registro) => persistirCorrida(registro, { cliente }),
+        iniciarRastro: (momento) => iniciarCorrida(momento, { cliente }),
+        persistir: (registro, id) => persistirCorrida(registro, id, { cliente }),
         registrarError: () => {
           /* silenciado */
         },
@@ -245,7 +270,8 @@ describe('respaldo completo contra la base real', () => {
         almacen: almacenFalso({ tragaSubidas: true }),
         dirTemporal: carpeta,
         generarVolcado: (destino) => generarVolcado({ url, destino }),
-        persistir: (registro) => persistirCorrida(registro, { cliente }),
+        iniciarRastro: (momento) => iniciarCorrida(momento, { cliente }),
+        persistir: (registro, id) => persistirCorrida(registro, id, { cliente }),
         registrarError: () => {
           /* silenciado */
         },
@@ -258,6 +284,144 @@ describe('respaldo completo contra la base real', () => {
     },
     120_000,
   );
+});
+
+describe('⭐ arranque: la AUSENCIA de respaldo también deja rastro', () => {
+  /** Entorno con TODO bien configurado (llave larga y credenciales R2 que parecen reales). */
+  const ENV_BUENO: Record<string, string> = {
+    RESPALDO_LLAVE: 'Xk8sMq2vPz7RtL5nWc3bYh9jFd6gA4eU',
+    R2_ACCOUNT_ID: 'cuenta-real-de-cloudflare',
+    R2_ACCESS_KEY_ID: 'AKIAREALREALREAL',
+    R2_SECRET_ACCESS_KEY: 'secreto-real-de-verdad-largo',
+    R2_BUCKET: 'control-v2-prueba',
+  };
+
+  /** Corre el arranque con un entorno dado y devuelve las filas de rastro que dejó. */
+  async function arrancarCon(env: Record<string, string | undefined>): Promise<{
+    corridas: { estado: string; paso: string; error: string | null }[];
+    bitacora: number;
+  }> {
+    const previo = { ...process.env };
+    // Sin motor de jobs (en pruebas nunca se inicia pg-boss): es EXACTAMENTE el escenario en que
+    // el backend arranca antes de que la BD responda, `iniciarMotorJobs` cae en su catch y la app
+    // sigue sirviendo — la cicatriz de CLAUDE.md §8.
+    try {
+      for (const clave of Object.keys(ENV_BUENO)) {
+        delete process.env[clave];
+      }
+      delete process.env.RESPALDO_ACTIVO;
+      delete process.env.R2_SUBIDA_LOCAL;
+      Object.assign(process.env, env);
+      await registrarRespaldoPeriodico(() => {
+        /* el log se silencia: lo que se afirma aquí es el RASTRO, no la línea de log */
+      });
+    } finally {
+      for (const clave of Object.keys(process.env)) {
+        if (!(clave in previo)) {
+          delete process.env[clave];
+        }
+      }
+      Object.assign(process.env, previo);
+    }
+    const corridas = await cliente.respaldoCorrida.findMany({
+      select: { estado: true, paso: true, error: true },
+    });
+    const bitacora = await cliente.bitacora.count({ where: { entidad: 'RespaldoBd' } });
+    return { corridas, bitacora };
+  }
+
+  it('⭐ configuración PERFECTA pero sin motor de jobs: deja fila ROJA (antes: cero rastro)', async () => {
+    // Éste era el agujero: se salía ANTES de decidir nada, así que el sistema se quedaba sin
+    // respaldo y el lugar designado para enterarse estaba vacío. Ni log, ni fila, ni bitácora.
+    const { corridas, bitacora } = await arrancarCon(ENV_BUENO);
+
+    expect(corridas).toHaveLength(1);
+    expect(corridas[0]?.estado).toBe('FALLO');
+    expect(corridas[0]?.paso).toBe('PROGRAMACION');
+    expect(corridas[0]?.error).toMatch(/motor de jobs/i);
+    expect(bitacora).toBe(1); // y se ve en la pantalla de bitácora que ya existe
+  });
+
+  it('falta la llave: fila roja con paso CONFIGURACION', async () => {
+    const { corridas, bitacora } = await arrancarCon({ ...ENV_BUENO, RESPALDO_LLAVE: undefined });
+    expect(corridas[0]?.estado).toBe('FALLO');
+    expect(corridas[0]?.paso).toBe('CONFIGURACION');
+    expect(corridas[0]?.error).toMatch(/RESPALDO_LLAVE/);
+    expect(bitacora).toBe(1);
+  });
+
+  it('credenciales R2 de relleno: fila roja con paso CONFIGURACION', async () => {
+    const { corridas } = await arrancarCon({ ...ENV_BUENO, R2_ACCESS_KEY_ID: 'dev' });
+    expect(corridas[0]?.paso).toBe('CONFIGURACION');
+    expect(corridas[0]?.error).toMatch(/relleno/i);
+  });
+
+  it('apagado a propósito: NO deja rastro rojo (es una decisión, no un fallo)', async () => {
+    const { corridas, bitacora } = await arrancarCon({ ...ENV_BUENO, RESPALDO_ACTIVO: 'false' });
+    expect(corridas).toStrictEqual([]);
+    expect(bitacora).toBe(0);
+  });
+});
+
+describe('corridas que mueren a media', () => {
+  it('⭐ una corrida abierta y nunca cerrada se ve, y la siguiente la cierra como FALLO', async () => {
+    // Simula el redeploy/OOM/SIGKILL durante el `pg_dump`: la fila queda EN_CURSO.
+    const muerta = await iniciarCorrida(new Date('2026-07-01T08:00:00.000Z'), { cliente });
+    const enCurso = await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: muerta } });
+    expect(enCurso.estado).toBe('EN_CURSO');
+    expect(enCurso.terminadoEn).toBeNull(); // se ve "lleva horas corriendo"
+
+    // La corrida del mes siguiente la encuentra y la cierra.
+    const nueva = await iniciarCorrida(new Date('2026-08-01T08:00:00.000Z'), { cliente });
+
+    const cerrada = await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: muerta } });
+    expect(cerrada.estado).toBe('FALLO');
+    expect(cerrada.error).toMatch(/SIN TERMINAR/i);
+    expect(await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: nueva } })).toMatchObject(
+      {
+        estado: 'EN_CURSO',
+      },
+    );
+    // Y la muerte quedó anotada donde se mira.
+    expect(
+      await cliente.bitacora.count({ where: { entidad: 'RespaldoBd', idEntidad: String(muerta) } }),
+    ).toBe(1);
+  });
+
+  it('el cierre ACTUALIZA la fila abierta, no crea una segunda', async () => {
+    const id = await iniciarCorrida(new Date('2026-08-01T08:00:00.000Z'), { cliente });
+    await persistirCorrida(
+      {
+        iniciadoEn: new Date('2026-08-01T08:00:00.000Z'),
+        terminadoEn: new Date('2026-08-01T08:05:00.000Z'),
+        estado: 'EXITO',
+        paso: PasoRespaldo.RETENCION,
+        bucket: 'b',
+        key: 'k',
+        sha256: 'a'.repeat(64),
+        objetosBorrados: 0,
+        duracionMs: 300_000,
+      },
+      id,
+      { cliente },
+    );
+    const corridas = await cliente.respaldoCorrida.findMany();
+    expect(corridas).toHaveLength(1);
+    expect(corridas[0]?.estado).toBe('EXITO');
+    expect(corridas[0]?.sha256).toBe('a'.repeat(64));
+  });
+});
+
+describe('argumentos de pg_restore del script (la cicatriz de --dbname)', () => {
+  it('incluye --dbname con la base destino: pg_restore NO lo toma de PGDATABASE', () => {
+    const argumentos = argumentosPgRestore('/tmp/x.dump', {
+      PGHOST: 'host',
+      PGDATABASE: 'ensayo_restauracion',
+    });
+    expect(argumentos).toContain('--dbname');
+    expect(argumentos[argumentos.indexOf('--dbname') + 1]).toBe('ensayo_restauracion');
+    expect(argumentos.at(-1)).toBe('/tmp/x.dump');
+  });
 });
 
 describe('⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no es un respaldo)', () => {
@@ -278,6 +442,7 @@ describe('⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no e
           objetosBorrados: 7,
           duracionMs: 4_242,
         },
+        null,
         { cliente },
       );
 
@@ -299,39 +464,10 @@ describe('⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no e
       urlDestino.pathname = `/${nombreDestino}`;
 
       try {
-        // 5. pg_restore, con las MISMAS banderas que documenta el script de restauración.
-        const { spawn } = await import('node:child_process');
-        const { variablesLibpq } = await import('../respaldo/pg-dump.js');
-        const variables = variablesLibpq(urlDestino.toString());
-        const { codigo, stderr } = await new Promise<{ codigo: number | null; stderr: string }>(
-          (resolver, rechazar) => {
-            const proceso = spawn(
-              'pg_restore',
-              // EXACTAMENTE los argumentos que arma `scripts/restaurar-respaldo.ts`, para que esta
-              // prueba ejercite el procedimiento documentado y no una variante suya.
-              [
-                '--dbname',
-                variables.PGDATABASE,
-                '--clean',
-                '--if-exists',
-                '--no-owner',
-                '--no-privileges',
-                recuperado,
-              ],
-              { env: { ...process.env, ...variables } },
-            );
-            let texto = '';
-            proceso.stderr.on('data', (trozo: Buffer) => {
-              texto += trozo.toString('utf8');
-            });
-            proceso.on('error', rechazar);
-            proceso.on('close', (salida) => {
-              resolver({ codigo: salida, stderr: texto });
-            });
-          },
-        );
-        expect(stderr).toBe('');
-        expect(codigo).toBe(0);
+        // 5. pg_restore — invocando la FUNCIÓN REAL del script de restauración, no una copia de sus
+        //    argumentos. Que la prueba repitiera la lista era una red decorativa: borrarle
+        //    `--dbname` al script no rompía nada. Ahora sí.
+        await restaurar(recuperado, urlDestino.toString());
 
         // 6. LA PRUEBA DE FUEGO: el dato está del otro lado, íntegro.
         const { crearClientePrisma } = await import('../../datos/index.js');

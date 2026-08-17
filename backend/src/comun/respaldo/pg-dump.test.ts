@@ -11,7 +11,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ErrorVolcado, variablesLibpq } from './pg-dump.js';
+import {
+  ErrorVolcado,
+  TIMEOUT_VOLCADO_MIN_DEFECTO,
+  timeoutVolcadoMinutos,
+  variablesLibpq,
+} from './pg-dump.js';
 
 describe('variablesLibpq', () => {
   it('traduce una URL completa a las variables de libpq', () => {
@@ -70,5 +75,26 @@ describe('variablesLibpq', () => {
     expect(() => variablesLibpq('postgresql://u:c@host:5432/')).toThrow(
       /no incluye el nombre de la base/i,
     );
+  });
+});
+
+describe('timeoutVolcadoMinutos', () => {
+  it('usa 180 minutos por defecto', () => {
+    expect(timeoutVolcadoMinutos({})).toBe(TIMEOUT_VOLCADO_MIN_DEFECTO);
+    expect(TIMEOUT_VOLCADO_MIN_DEFECTO).toBe(180);
+  });
+
+  it('respeta el tope configurado por entorno', () => {
+    expect(timeoutVolcadoMinutos({ RESPALDO_TIMEOUT_MIN: '30' })).toBe(30);
+  });
+
+  it('ignora valores absurdos y cae al default (nunca deja el volcado sin tope)', () => {
+    // Un tope de 0 o negativo mataría el volcado al instante; un texto daría NaN y el setTimeout
+    // dispararía de inmediato. En los tres casos vale más el default que un respaldo imposible.
+    for (const crudo of ['0', '-5', 'muchos', '']) {
+      expect(timeoutVolcadoMinutos({ RESPALDO_TIMEOUT_MIN: crudo })).toBe(
+        TIMEOUT_VOLCADO_MIN_DEFECTO,
+      );
+    }
   });
 });
