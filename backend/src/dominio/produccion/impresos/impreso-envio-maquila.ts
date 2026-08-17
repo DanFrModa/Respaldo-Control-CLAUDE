@@ -257,8 +257,7 @@ function tablaMatriz(datos: DatosImpresoEnvio): ReactElement {
  */
 export function queSeEntrega(datos: DatosImpresoEnvio): string | null {
   if (!datos.prendaTerminada) return null;
-  const deDonde =
-    datos.almacenOrigen === null ? '' : ` (salen del almacén ${datos.almacenOrigen}`;
+  const deDonde = datos.almacenOrigen === null ? '' : ` (salen del almacén ${datos.almacenOrigen}`;
   const bucket = datos.stockSinOrden ? ', stock sin orden asignada' : '';
   const cierre = deDonde === '' ? '' : `${bucket})`;
   return `PRENDAS YA TERMINADAS${deDonde}${cierre}`;
