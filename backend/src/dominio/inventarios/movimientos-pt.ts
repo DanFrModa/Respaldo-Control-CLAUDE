@@ -486,7 +486,15 @@ const DONDE_CANCELAR: Record<string, string> = {
     'lo generó una ENTREGA de prendas a proceso: cancélala desde la entrega (así regresan del ' +
     'tránsito y el pendiente del maquilero se cierra con ella)',
   [ORIGEN.entregaCliente]: 'lo generó una ENTREGA A CLIENTE: cancélala desde la entrega',
-  [ORIGEN.ajusteCiclico]: 'lo generó un INVENTARIO CÍCLICO: se corrige desde el cíclico',
+  // ⚠️ El cíclico NO es una puerta de vuelta: `generarAjusteCiclico` deja el conteo en `cerrado`
+  // (`inventario-ciclico.ts`) y `cancelarInventarioCiclico` rechaza justo ese estado ("ya está
+  // cerrado (con ajuste): no se cancela"). O sea que el ÚNICO estado en el que existe un movimiento
+  // `ajuste-ciclico` es el estado en el que el cíclico se niega a deshacerse. Mandar ahí al usuario
+  // sería mandarlo a una puerta cerrada con llave — misma redacción que `migracion`, que es el otro
+  // caso sin marcha atrás.
+  [ORIGEN.ajusteCiclico]:
+    'lo generó el AJUSTE de un INVENTARIO CÍCLICO ya cerrado, que no tiene marcha atrás. Si el ' +
+    'conteo estuvo mal, corrige la existencia con un movimiento manual NUEVO, no anulando el ajuste',
   [ORIGEN.cancelacion]:
     'YA ES el inverso de otro movimiento (una cancelación): cancelar una cancelación no revierte ' +
     'nada, solo enreda la historia',

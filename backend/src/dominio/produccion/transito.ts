@@ -114,6 +114,11 @@ export async function almacenDeTransito(
         'No se puede continuar.',
     );
   }
+  // ⚠️ Esta precedencia (el propio de la empresa gana al global) es HOY INALCANZABLE y se conserva
+  // solo por si el modelo cambia: el índice único parcial `almacen_transito_unico` es sobre TODA la
+  // tabla, no por empresa, así que no puede haber un tránsito global Y otro de empresa a la vez —
+  // ni dos de empresas distintas. Que nadie lo lea como "cada empresa puede tener el suyo": hoy el
+  // tránsito es UNO en todo el sistema. Cambiar eso pide cambiar el índice, no este código.
   const propios = candidatos.filter((a) => a.idEmpresa !== null);
   const elegibles = propios.length > 0 ? propios : candidatos;
   if (elegibles.length > 1) {
