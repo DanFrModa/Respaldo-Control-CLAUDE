@@ -185,6 +185,43 @@ export async function existenciaPtBloqueada(
 }
 
 /**
+ * Existencia del MISMO artículo en el almacén pero en los DEMÁS buckets de orden (todo lo que no es
+ * `idOrden`). Solo se usa para REDACTAR el error de "no alcanza": el saldo por bucket es correcto,
+ * pero un `0` a secas es indistinguible de "no hay nada en el almacén" — y con el histórico migrado
+ * y el inventario de arranque viviendo en el bucket «sin orden», ese es el caso COMÚN, no el raro.
+ * No toma lock (es informativa y corre cuando la operación ya va a fallar).
+ */
+async function existenciaPtOtrosBuckets(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  idColor: number,
+  idTalla: number,
+  idOrden: number | null,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: bigint | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0)::bigint AS existencia
+    FROM "movimiento_det_pt" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_modelo" = ${idModelo}
+      AND d."id_color" = ${idColor}
+      AND d."id_talla" = ${idTalla}
+      AND d."id_orden" IS DISTINCT FROM ${idOrden}
+  `;
+  return Number(filas[0]?.existencia ?? 0n);
+}
+
+/**
  * Valida, BAJO BLOQUEO, que sacar `lineas` del almacén `idAlmacen` (todas del mismo `idModelo`) no
  * deje la existencia negativa (D3). Toma {@link bloquearArticuloPt} + {@link existenciaPtBloqueada}
  * por cada artículo DENTRO de la transacción: la lectura es una suma DIRECTA de `MovimientoDetPt`
@@ -224,9 +261,28 @@ export async function exigirExistenciaPt(
     if (existencia - c.cantidad < 0) {
       const deQueOrden =
         idOrden === null ? 'del bucket «sin orden»' : `de la orden ${String(idOrden)}`;
+      // El saldo se lleva POR BUCKET DE ORDEN (F6-E2), y eso hace que un "0 en existencia" sea
+      // desconcertante cuando la pantalla muestra piezas: están, pero en OTRO bucket (típicamente
+      // el «sin orden», donde cae todo lo migrado y el inventario físico de arranque). Se dice, en
+      // vez de dejar al operador peleado con un cero que su almacén contradice.
+      const enOtrosBuckets = await existenciaPtOtrosBuckets(
+        tx,
+        idEmpresa,
+        idAlmacen,
+        idModelo,
+        c.idColor,
+        c.idTalla,
+        idOrden,
+      );
+      const pista =
+        enOtrosBuckets === 0
+          ? ''
+          : idOrden === null
+            ? ` (hay ${enOtrosBuckets} pza(s) del mismo artículo asignadas a alguna orden: ésas no salen por aquí)`
+            : ` (hay ${enOtrosBuckets} pza(s) del mismo artículo en otros buckets —sin orden asignada o de otra orden—: si son éstas las que salen, indícalo al capturar)`;
       throw new ErrorConflicto(
         `No hay existencia suficiente ${deQueOrden}: se intenta sacar ${c.cantidad} pza(s) de un ` +
-          `artículo con ${existencia} en existencia (no se permite dejar el inventario en negativo).`,
+          `artículo con ${existencia} en existencia${pista} (no se permite dejar el inventario en negativo).`,
       );
     }
   }

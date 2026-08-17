@@ -124,6 +124,12 @@ export const esquemaEnvioCrear = z
       .positive({ error: 'El id del almacén debe ser positivo' })
       .optional()
       .describe('Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`.'),
+    stockSinOrden: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Las prendas salen del bucket de existencia «sin orden asignada» (`id_orden = NULL`: histórico migrado e inventario físico de arranque) en vez del bucket de su orden. Solo aplica con `prendaTerminada`.',
+      ),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaEtapaMatriz,
   })
@@ -199,6 +205,11 @@ export const esquemaEtapaSalida = z
       .nullable()
       .describe('Almacén de PT del que salieron las prendas (solo envíos de prenda terminada).'),
     almacenOrigen: z.string().nullable().describe('Nombre del almacén de origen o null.'),
+    stockSinOrden: z
+      .boolean()
+      .describe(
+        'Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto.',
+      ),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si la etapa está cancelada (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),

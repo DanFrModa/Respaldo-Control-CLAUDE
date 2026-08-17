@@ -409,6 +409,7 @@ function aEtapaSalida(
     prendaTerminada: etapa.prendaTerminada,
     idAlmacenOrigen: etapa.idAlmacenOrigen,
     almacenOrigen: etapa.almacenOrigen?.nombre ?? null,
+    stockSinOrden: etapa.stockSinOrden,
     observaciones: etapa.observaciones,
     cancelado: etapa.canceladoEn !== null,
     canceladoEn: etapa.canceladoEn === null ? null : etapa.canceladoEn.toISOString(),
@@ -606,6 +607,13 @@ export async function registrarEnvioMaquila(
             'terminado; las prendas terminadas solo pueden salir de un almacén de PT.',
         );
       }
+    } else if (datos.stockSinOrden) {
+      // Sin sacar del almacén, el bucket de existencia no significa nada: decirlo es mejor que
+      // guardarlo mudo y que alguien crea que el envío descontó de algún lado.
+      throw new ErrorValidacion(
+        'El bucket de existencia («sin orden asignada») solo aplica a los envíos de prendas ya ' +
+          'terminadas: los bultos cortados no salen del inventario de producto terminado.',
+      );
     } else if (datos.idAlmacenOrigen !== undefined) {
       // Un almacén origen sin la bandera no significa nada y no se persiste: decirlo es mejor que
       // guardarlo mudo y que el usuario crea que el envío descontó inventario.
@@ -622,23 +630,39 @@ export async function registrarEnvioMaquila(
     // Coherencia de la bandera dentro de orden+proceso (bajo el mismo lock que la valida): el
     // recibo deriva de aquí si tiene que devolver mercancía del tránsito, y con envíos mezclados
     // esa pregunta no tendría UNA respuesta.
+    // Se comparan AMBAS banderas: el recibo deriva de aquí si devuelve mercancía del tránsito Y a
+    // qué bucket la devuelve, y con envíos mezclados ninguna de las dos preguntas tendría UNA
+    // respuesta. `stockSinOrden` solo se compara cuando el envío saca del almacén (si no, es
+    // siempre false y no distingue nada).
     const envioContrario = await tx.etapaMovimiento.findFirst({
       where: {
         idOrden: datos.idOrden,
         idTipoProceso: datos.idTipoProceso,
         tipo: TipoEtapaMovimiento.envio_maquila,
         canceladoEn: null,
-        prendaTerminada: !esPrendaTerminada,
+        ...(esPrendaTerminada
+          ? {
+              OR: [
+                { prendaTerminada: false },
+                { prendaTerminada: true, stockSinOrden: !datos.stockSinOrden },
+              ],
+            }
+          : { prendaTerminada: true }),
       },
-      select: { folio: true },
+      select: { folio: true, prendaTerminada: true, stockSinOrden: true },
     });
     if (envioContrario !== null) {
+      const comoQuedo = !envioContrario.prendaTerminada
+        ? 'bultos cortados'
+        : envioContrario.stockSinOrden
+          ? 'prendas ya terminadas del stock SIN orden asignada'
+          : 'prendas ya terminadas del stock de la orden';
       throw new ErrorConflicto(
         `La orden ya tiene una entrega viva de "${proceso.nombre}" (folio ` +
-          `${String(Number(envioContrario.folio))}) capturada como ` +
-          `${esPrendaTerminada ? 'bultos cortados' : 'prendas ya terminadas'}: no se pueden ` +
-          'mezclar las dos formas en el mismo proceso de una orden. Corrige la que esté mal ' +
-          'capturada (cancélala y recaptúrala) antes de seguir.',
+          `${String(Number(envioContrario.folio))}) capturada como ${comoQuedo}: no se pueden ` +
+          'mezclar dos formas distintas en el mismo proceso de una orden (el recibo no sabría de ' +
+          'dónde salieron las piezas ni a dónde regresarlas). Corrige la que esté mal capturada ' +
+          '(cancélala y recaptúrala) antes de seguir.',
       );
     }
     const cortado = await sumarCeldas(tx, datos.idOrden, { tipo: TipoEtapaMovimiento.corte });
@@ -676,6 +700,7 @@ export async function registrarEnvioMaquila(
           : { fechaCompromiso: aDateColumna(datos.fechaCompromiso) }),
         ...(datos.precioPactado == null ? {} : { precioPactado: datos.precioPactado }),
         prendaTerminada: esPrendaTerminada,
+        stockSinOrden: esPrendaTerminada && datos.stockSinOrden,
         ...(esPrendaTerminada && datos.idAlmacenOrigen !== undefined
           ? { idAlmacenOrigen: datos.idAlmacenOrigen }
           : {}),
@@ -699,7 +724,7 @@ export async function registrarEnvioMaquila(
         idEmpresa: orden.idEmpresa,
         idAlmacenOrigen: datos.idAlmacenOrigen,
         idModelo: orden.idModelo,
-        idOrden: datos.idOrden,
+        idOrdenBucket: datos.stockSinOrden ? null : datos.idOrden,
         fecha: aDateColumna(datos.fecha),
         origenTipo: ORIGEN.envioMaquila,
         origenId: String(etapa.id),
@@ -718,6 +743,7 @@ export async function registrarEnvioMaquila(
         idTipoProceso: datos.idTipoProceso,
         idMaquilero: datos.idMaquilero,
         prendaTerminada: esPrendaTerminada,
+        stockSinOrden: esPrendaTerminada && datos.stockSinOrden,
         idAlmacenOrigen: datos.idAlmacenOrigen ?? null,
         celdas: celdas.length,
         totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),

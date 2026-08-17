@@ -33,7 +33,10 @@ import { cancelarEtapaMovimiento, registrarCorte, registrarEnvioMaquila } from '
 import { cancelarReciboMaquila, pendientesPorRecibir, registrarReciboMaquila } from './recibos.js';
 import { wipDeOrden } from './wip.js';
 import { registrarEntregaCliente } from './entregas-cliente.js';
-import { registrarMovimientoPt } from '../inventarios/movimientos-pt.js';
+import {
+  cancelarMovimientoPt as cancelarMovimientoPtManual,
+  registrarMovimientoPt,
+} from '../inventarios/movimientos-pt.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -162,10 +165,32 @@ async function meterAPt(almacen: Almacen, cantidad: number): Promise<void> {
   );
 }
 
+/**
+ * Mete `cantidad` piezas de Rojo/CH al almacén dado en el bucket «SIN ORDEN ASIGNADA» (`idOrden`
+ * NULL): así entra TODO el histórico migrado (`migracion/loaders/ipt-kardex.ts` no etiqueta orden)
+ * y así va a entrar el inventario físico de arranque de Daniel. Es el stock que existe el día uno.
+ */
+async function meterAPtSinOrden(almacen: Almacen, cantidad: number): Promise<void> {
+  const tipo = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+    where: { codigo: 'ajuste-entrada' },
+  });
+  await registrarMovimientoPt(
+    sesion(),
+    {
+      idTipoMov: tipo.id,
+      idAlmacen: almacen.id,
+      idModelo: modelo.id,
+      fecha: '2026-08-17',
+      lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+    },
+    bd(),
+  );
+}
+
 /** Envía piezas al estampador. `prendaTerminada` decide si sale del almacén (V1-E4b). */
 async function enviarAEstampado(
   cantidad: number,
-  opciones: { prendaTerminada?: boolean; idAlmacenOrigen?: number } = {},
+  opciones: { prendaTerminada?: boolean; idAlmacenOrigen?: number; stockSinOrden?: boolean } = {},
 ): Promise<{ id: number }> {
   return registrarEnvioMaquila(
     sesion(),
@@ -177,6 +202,7 @@ async function enviarAEstampado(
       ...(opciones.prendaTerminada === undefined
         ? {}
         : { prendaTerminada: opciones.prendaTerminada }),
+      ...(opciones.stockSinOrden === undefined ? {} : { stockSinOrden: opciones.stockSinOrden }),
       ...(opciones.idAlmacenOrigen === undefined
         ? {}
         : { idAlmacenOrigen: opciones.idAlmacenOrigen }),
@@ -199,6 +225,20 @@ async function existencia(almacen: Almacen): Promise<number> {
     JOIN "movimientos" m ON m."id" = d."id_movimiento"
     JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
     WHERE m."id_almacen" = ${almacen.id} AND d."id_orden" = ${idOrden}
+  `;
+  return Number(filas[0]?.total ?? 0n);
+}
+
+/** Lo mismo pero del bucket «SIN ORDEN ASIGNADA» (`id_orden IS NULL`). */
+async function existenciaSinOrden(almacen: Almacen): Promise<number> {
+  const filas = await cliente.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion" WHEN 'entrada' THEN 1 WHEN 'salida' THEN -1 ELSE 0 END
+    ), 0)::bigint AS total
+    FROM "movimiento_det_pt" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_almacen" = ${almacen.id} AND d."id_orden" IS NULL
   `;
   return Number(filas[0]?.total ?? 0n);
 }
@@ -400,17 +440,20 @@ describe('Reglas del envío de prendas terminadas', () => {
     expect(await existencia(almPrimeras)).toBe(10);
   });
 
-  it('con DOS almacenes marcados como tránsito, el envío NO adivina: falla y lo dice', async () => {
-    await cliente.almacen.create({
-      data: { nombre: 'Tránsito 2', tipo: 'PT', esTransitoProceso: true },
-    });
+  it('la BASE impide que existan DOS almacenes de tránsito (índice único parcial, H7)', async () => {
+    // Antes esto solo se DETECTABA al enviar; y como la bandera la pone el seed y no hay pantalla
+    // para moverla, un segundo tránsito solo se arreglaba con SQL a mano. Ahora es imposible.
+    await expect(
+      cliente.almacen.create({
+        data: { nombre: 'Tránsito 2', tipo: 'PT', esTransitoProceso: true },
+      }),
+    ).rejects.toThrowError(/almacen_transito_unico|[Uu]nique/);
+
+    // Y el flujo sigue funcionando con el único que hay.
     await cortar100();
     await meterAPt(almPrimeras, 10);
-
-    await expect(
-      enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id }),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
-    expect(await existencia(almPrimeras)).toBe(10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    expect(await existencia(almTransito)).toBe(10);
   });
 
   it('REGRESIÓN — el envío de bultos cortados (el flujo de siempre) NO toca el kardex', async () => {
@@ -666,5 +709,276 @@ describe('Cancelaciones (D3: inverso auditado, jamás edición)', () => {
     expect(await existencia(almPrimeras)).toBe(0);
     const reciboBd = await cliente.etapaMovimiento.findUniqueOrThrow({ where: { id: recibo.id } });
     expect(reciboBd.canceladoEn).toBeNull();
+  });
+});
+
+/**
+ * ⭐ H1 del reviewer — EL STOCK DEL BUCKET «SIN ORDEN ASIGNADA».
+ *
+ * La existencia de PT es por modelo×color×talla×**ORDEN**×almacén (F6-E2). El bucket `id_orden =
+ * NULL` es donde cae TODO el histórico migrado (`migracion/loaders/ipt-kardex.ts` no etiqueta
+ * orden) y TODO lo que Daniel capture en el inventario físico de arranque: o sea, es el stock que
+ * hay el DÍA UNO. Sin poder elegirlo, el envío de prendas terminadas chocaba contra un saldo de 0
+ * mientras la pantalla de existencias mostraba las piezas.
+ */
+describe('H1 · el envío puede sacar del bucket «sin orden asignada»', () => {
+  it('con el stock SIN orden, el envío del bucket de la orden falla y el error DICE dónde están', async () => {
+    await cortar100();
+    await meterAPtSinOrden(almPrimeras, 100);
+    expect(await existenciaSinOrden(almPrimeras)).toBe(100);
+    expect(await existencia(almPrimeras)).toBe(0);
+
+    // El default (stock de la orden) no alcanza…
+    await expect(
+      enviarAEstampado(100, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id }),
+    ).rejects.toThrowError(/otros buckets/);
+    // …y el mensaje dice CUÁNTAS hay en el otro bucket, en vez de un "0" que el almacén contradice.
+    await expect(
+      enviarAEstampado(100, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id }),
+    ).rejects.toThrowError(/100 pza\(s\) del mismo artículo/);
+  });
+
+  it('eligiendo el bucket «sin orden», el envío SÍ sale y el recibo lo devuelve al MISMO bucket', async () => {
+    await cortar100();
+    await meterAPtSinOrden(almPrimeras, 100);
+
+    await enviarAEstampado(100, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+      stockSinOrden: true,
+    });
+    expect(await existenciaSinOrden(almPrimeras)).toBe(0);
+    expect(await existenciaSinOrden(almTransito)).toBe(100);
+    // No se reetiquetó nada al bucket de la orden por el camino.
+    expect(await existencia(almTransito)).toBe(0);
+
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        idAlmacenSegundas: almSegundas.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 98, cantidadPrimeras: 95, cantidadSegundas: 3 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    // Vuelven al MISMO bucket del que salieron: el tránsito no reetiqueta mercancía.
+    expect(await existenciaSinOrden(almPrimeras)).toBe(95);
+    expect(await existenciaSinOrden(almSegundas)).toBe(3);
+    expect(await existenciaSinOrden(almTransito)).toBe(2);
+    expect(await existencia(almPrimeras)).toBe(0);
+    expect(await existencia(almSegundas)).toBe(0);
+  });
+
+  it('el WIP/pendientes publican de qué bucket salió, para que la captura no lo adivine', async () => {
+    await cortar100();
+    await meterAPtSinOrden(almPrimeras, 10);
+    await enviarAEstampado(10, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+      stockSinOrden: true,
+    });
+
+    const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
+    const proc = pend.porRecibir.find((p) => p.idTipoProceso === procesoEstampado.id);
+    expect(proc?.devuelveAPt).toBe(true);
+    expect(proc?.stockSinOrden).toBe(true);
+
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    expect(wip.porRecibir.find((p) => p.idTipoProceso === procesoEstampado.id)?.stockSinOrden).toBe(
+      true,
+    );
+  });
+
+  it('no deja MEZCLAR buckets distintos en la misma orden+proceso', async () => {
+    await cortar100();
+    await meterAPtSinOrden(almPrimeras, 10);
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+      stockSinOrden: true,
+    });
+
+    await expect(
+      enviarAEstampado(5, {
+        prendaTerminada: true,
+        idAlmacenOrigen: almPrimeras.id,
+        stockSinOrden: false,
+      }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('el bucket «sin orden» solo aplica a prendas terminadas (con bultos cortados se rechaza)', async () => {
+    await cortar100();
+    await expect(
+      enviarAEstampado(10, { prendaTerminada: false, stockSinOrden: true }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+/**
+ * ⭐ H4 del reviewer — el NO-NEGATIVO de la pata de VUELTA tenía cobertura cero. Es un invariante
+ * D3: si alguien saca piezas del tránsito por otro lado, el recibo no puede devolver más de las que
+ * quedan (dejaría el tránsito negativo y el faltante dejaría de cuadrar).
+ */
+describe('H4 · el recibo no puede devolver más de lo que queda en tránsito', () => {
+  it('con el tránsito vaciado a mano, el recibo se rechaza y no deja nada a medias', async () => {
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    expect(await existencia(almTransito)).toBe(10);
+
+    // Alguien da de baja 6 piezas del tránsito con un movimiento manual (la vía legítima del
+    // faltante que ya no va a volver).
+    const tipoSalida = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+      where: { codigo: 'ajuste-salida' },
+    });
+    await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tipoSalida.id,
+        idAlmacen: almTransito.id,
+        idModelo: modelo.id,
+        fecha: '2026-08-19',
+        lineas: [
+          { idColor: colorRojo.id, idOrden, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] },
+        ],
+      },
+      bd(),
+    );
+    expect(await existencia(almTransito)).toBe(4);
+
+    // El WIP todavía cree que el maquilero debe 10, así que el recibo de 10 pasa sus validaciones
+    // de WIP… y lo detiene el kardex: en tránsito solo quedan 4.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoEstampado.id,
+          idMaquilero: estampador.id,
+          fecha: '2026-08-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Atomicidad (A2): ni recibo, ni movimientos, ni cargo EsMa a medias.
+    expect(await existencia(almTransito)).toBe(4);
+    expect(await existencia(almPrimeras)).toBe(0);
+    expect(await cliente.etapaMovimiento.count({ where: { tipo: 'recibo_maquila' } })).toBe(0);
+
+    // Y recibir lo que SÍ queda pasa sin problema.
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+    expect(await existencia(almTransito)).toBe(0);
+    expect(await existencia(almPrimeras)).toBe(4);
+  });
+});
+
+/**
+ * ⭐ H2 del reviewer — LA PUERTA DE ATRÁS. Cancelando desde Inventarios UNA sola pata del traspaso
+ * que hace el envío, quedaban `primeras = 0` y `tránsito = 0` mientras el WIP seguía reclamándole
+ * 100 piezas al estampador: cien prendas desaparecidas del kardex, que es exactamente la enfermedad
+ * que esta etapa vino a curar. Ahora a mano solo se cancela lo que se capturó a mano.
+ */
+describe('H2 · los movimientos que generó un hecho no se cancelan sueltos', () => {
+  it('no se puede cancelar a mano una pata del traspaso del envío (y dice dónde sí)', async () => {
+    await cortar100();
+    await meterAPt(almPrimeras, 100);
+    const envio = await enviarAEstampado(100, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+    });
+
+    const patas = await cliente.movimiento.findMany({
+      where: { origenTipo: 'envio-maquila', origenId: String(envio.id) },
+      select: { id: true, idAlmacen: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(patas).toHaveLength(2);
+
+    for (const pata of patas) {
+      await expect(
+        cancelarMovimientoPtManual(sesion(), pata.id, { motivo: 'me equivoqué' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    }
+    await expect(
+      cancelarMovimientoPtManual(sesion(), patas[0]?.id ?? 0, { motivo: 'me equivoqué' }, bd()),
+    ).rejects.toThrowError(/ENTREGA de prendas a proceso/);
+
+    // El inventario quedó intacto: nada desapareció por la puerta de atrás.
+    expect(await existencia(almPrimeras)).toBe(0);
+    expect(await existencia(almTransito)).toBe(100);
+
+    // Y la vía correcta —cancelar la ENTREGA— sí regresa las piezas.
+    await cancelarEtapaMovimiento(sesion(), envio.id, { motivo: 'se capturó mal' }, bd());
+    expect(await existencia(almPrimeras)).toBe(100);
+    expect(await existencia(almTransito)).toBe(0);
+  });
+
+  it('tampoco se cancela suelto lo que generó un RECIBO (va por el recibo)', async () => {
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const mov = await cliente.movimiento.findFirstOrThrow({
+      where: { origenTipo: 'recibo-maquila', origenId: String(recibo.id) },
+      select: { id: true },
+    });
+    await expect(
+      cancelarMovimientoPtManual(sesion(), mov.id, { motivo: 'a mano no' }, bd()),
+    ).rejects.toThrowError(/RECIBO de maquila/);
+  });
+
+  it('el movimiento MANUAL sí se sigue cancelando a mano (no se rompió lo que funcionaba)', async () => {
+    await meterAPt(almPrimeras, 10);
+    const manual = await cliente.movimiento.findFirstOrThrow({
+      where: { origenTipo: 'movimiento-manual' },
+      select: { id: true },
+    });
+    const cancelado = await cancelarMovimientoPtManual(
+      sesion(),
+      manual.id,
+      { motivo: 'captura equivocada' },
+      bd(),
+    );
+    expect(cancelado.cancelado).toBe(true);
+    expect(await existencia(almPrimeras)).toBe(0);
   });
 });

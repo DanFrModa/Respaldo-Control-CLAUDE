@@ -3309,6 +3309,17 @@ model EtapaMovimiento {
   idAlmacenOrigen Int?     @map("id_almacen_origen")
   almacenOrigen   Almacen? @relation("EnvioAlmacenOrigen", fields: [idAlmacenOrigen], references: [id], onDelete: Restrict)
 
+  /// De QUÉ BUCKET de existencia salieron las prendas de un envío con `prendaTerminada` (V1-E4b).
+  /// La existencia de PT es por modelo×color×talla×**ORDEN**×almacén (F6-E2 "PT por orden"), y el
+  /// bucket `id_orden = NULL` —"sin orden asignada"— es donde cae TODO lo capturado a mano en el
+  /// arranque y TODO el histórico migrado (`migracion/loaders/ipt-kardex.ts` no etiqueta orden).
+  ///
+  /// `false` (default) = las piezas salen del bucket de SU orden. `true` = salen del bucket «sin
+  /// orden». Sin este dato, un envío solo podía sacar del bucket de la orden y el stock de arranque
+  /// de Daniel —que es el que hay el día uno— era inalcanzable. El recibo DEVUELVE al MISMO bucket
+  /// del que salió: el tránsito no reetiqueta mercancía a espaldas de nadie.
+  stockSinOrden Boolean @default(false) @map("stock_sin_orden")
+
   /// Cancelación SUAVE (plan §4): la etapa nunca se borra ni se edita; se cancela con motivo
   /// y queda en el historial (A7). El kardex/efectos se revierten con movimiento inverso (E4/E5).
   canceladoEn       DateTime? @map("cancelado_en")

@@ -2088,6 +2088,10 @@
                             ],
                             "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                           },
+                          "esTransitoProceso": {
+                            "type": "boolean",
+                            "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -2131,6 +2135,7 @@
                           "idEmpresa",
                           "idCortador",
                           "cortador",
+                          "esTransitoProceso",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -2450,6 +2455,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -2493,6 +2502,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -2744,6 +2754,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -2787,6 +2801,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -3081,6 +3096,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -3124,6 +3143,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -3373,6 +3393,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -3416,6 +3440,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -105202,6 +105227,10 @@
                       ],
                       "description": "Nombre del almacén de origen o null."
                     },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105367,6 +105396,7 @@
                     "prendaTerminada",
                     "idAlmacenOrigen",
                     "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -105728,6 +105758,10 @@
                       ],
                       "description": "Nombre del almacén de origen o null."
                     },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105893,6 +105927,7 @@
                     "prendaTerminada",
                     "idAlmacenOrigen",
                     "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106130,6 +106165,11 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "stockSinOrden": {
+                    "default": false,
+                    "description": "Las prendas salen del bucket de existencia «sin orden asignada» (`id_orden = NULL`: histórico migrado e inventario físico de arranque) en vez del bucket de su orden. Solo aplica con `prendaTerminada`.",
+                    "type": "boolean"
+                  },
                   "observaciones": {
                     "type": "string",
                     "maxLength": 1000
@@ -106346,6 +106386,10 @@
                       ],
                       "description": "Nombre del almacén de origen o null."
                     },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -106511,6 +106555,7 @@
                     "prendaTerminada",
                     "idAlmacenOrigen",
                     "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106872,6 +106917,10 @@
                       ],
                       "description": "Nombre del almacén de origen o null."
                     },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -107037,6 +107086,7 @@
                     "prendaTerminada",
                     "idAlmacenOrigen",
                     "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -107744,6 +107794,10 @@
                             ],
                             "description": "Nombre del almacén de origen o null."
                           },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                          },
                           "observaciones": {
                             "anyOf": [
                               {
@@ -107909,6 +107963,7 @@
                           "prendaTerminada",
                           "idAlmacenOrigen",
                           "almacenOrigen",
+                          "stockSinOrden",
                           "observaciones",
                           "cancelado",
                           "canceladoEn",
@@ -110041,6 +110096,10 @@
                             "type": "boolean",
                             "description": "Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT."
                           },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b)."
+                          },
                           "celdas": {
                             "type": "array",
                             "items": {
@@ -110179,6 +110238,7 @@
                           "codigoProceso",
                           "generaEntradaPt",
                           "devuelveAPt",
+                          "stockSinOrden",
                           "celdas",
                           "totalPendiente",
                           "porMaquilero"
@@ -113630,6 +113690,10 @@
                             "type": "boolean",
                             "description": "Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT."
                           },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar."
+                          },
                           "porMaquilero": {
                             "type": "array",
                             "items": {
@@ -113721,6 +113785,7 @@
                           "celdas",
                           "totalPendiente",
                           "devuelveAPt",
+                          "stockSinOrden",
                           "porMaquilero"
                         ],
                         "additionalProperties": false

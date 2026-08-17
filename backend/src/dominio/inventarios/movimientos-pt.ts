@@ -55,7 +55,7 @@ import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   exigirExistenciaPt,
@@ -473,6 +473,59 @@ export async function registrarTraspasoPt(
 }
 
 /**
+ * Cómo se le dice al usuario dónde SÍ se cancela cada movimiento que no nació a mano. La clave es el
+ * `origenTipo`; el valor, la frase que se le pone al mensaje.
+ */
+const DONDE_CANCELAR: Record<string, string> = {
+  [ORIGEN.traspaso]:
+    'es una de las DOS patas de un traspaso entre almacenes: cancelar solo una dejaría el ' +
+    'inventario descuadrado entre los dos almacenes. Revierte el traspaso con otro traspaso, del ' +
+    'destino al origen',
+  [ORIGEN.reciboMaquila]: 'lo generó un RECIBO de maquila: cancélalo desde el recibo',
+  [ORIGEN.envioMaquila]:
+    'lo generó una ENTREGA de prendas a proceso: cancélala desde la entrega (así regresan del ' +
+    'tránsito y el pendiente del maquilero se cierra con ella)',
+  [ORIGEN.entregaCliente]: 'lo generó una ENTREGA A CLIENTE: cancélala desde la entrega',
+  [ORIGEN.ajusteCiclico]: 'lo generó un INVENTARIO CÍCLICO: se corrige desde el cíclico',
+  [ORIGEN.cancelacion]:
+    'YA ES el inverso de otro movimiento (una cancelación): cancelar una cancelación no revierte ' +
+    'nada, solo enreda la historia',
+  [ORIGEN.migracion]:
+    'lo cargó la MIGRACIÓN del sistema viejo: corregirlo a mano descuadraría el histórico. Ajusta ' +
+    'la existencia con un movimiento nuevo, no anulando el migrado',
+};
+
+/**
+ * ⭐ Solo se cancelan A MANO los movimientos que se capturaron A MANO (V1-E4b, hallazgo H2 del
+ * reviewer). Todos los demás son el EFECTO de un hecho de negocio —un recibo, una entrega, un envío
+ * de prendas a proceso, un cíclico— que además tiene su propio estado (etapa viva, cargo EsMa,
+ * pendiente del maquilero). Anular el movimiento suelto revierte el inventario y deja el hecho en
+ * pie: el kardex y el WIP quedan contándose historias distintas.
+ *
+ * El caso que lo destapó: tras un envío de 100 prendas al estampador, cancelando desde Inventarios
+ * SOLO la pata de entrada al tránsito quedaban `primeras = 0` y `tránsito = 0` mientras el WIP
+ * seguía reclamándole 100 al maquilero — cien prendas desaparecidas del kardex, que es exactamente
+ * la enfermedad que esta etapa vino a curar. La raíz es anterior a V1-E4b (el traspaso manual tenía
+ * el mismo hueco, y `cancelarMovimientoMaterial` ya lo cerraba para tela/avío), pero el tránsito la
+ * vuelve grave porque ahora ese saldo SOSTIENE la historia del faltante.
+ *
+ * El mensaje no dice "no se puede": dice dónde sí (`DONDE_CANCELAR`).
+ */
+function exigirMovimientoCancelableAMano(origenTipo: string | null, origenId: string | null): void {
+  if (origenTipo === ORIGEN.movimientoManual) {
+    return;
+  }
+  const donde =
+    (origenTipo === null ? undefined : DONDE_CANCELAR[origenTipo]) ??
+    `lo generó otro proceso del sistema (${origenTipo ?? 'sin origen'}): cancélalo desde ahí`;
+  const cual = origenId === null ? '' : ` (folio/id de origen: ${origenId})`;
+  throw new ErrorConflicto(
+    `Este movimiento no se capturó a mano: ${donde}${cual}. Anularlo aquí dejaría el ` +
+      'inventario y el avance de producción contando historias distintas.',
+  );
+}
+
+/**
  * CANCELA un movimiento de PT generando su INVERSO auditado (D3/A7): NUNCA edita ni borra el original.
  * Reemplaza la práctica vieja de "Error de Entrada/Salida": lee la dirección del original y elige el
  * tipo inverso — original `entrada` → `error-entrada` (saca lo que entró); original `salida` →
@@ -497,6 +550,8 @@ export async function cancelarMovimientoPt(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
+        origenId: true,
         tipoMov: { select: { direccion: true } },
         detallesPt: { select: { id: true } },
       },
@@ -507,6 +562,7 @@ export async function cancelarMovimientoPt(
     if (original.detallesPt.length === 0) {
       throw new ErrorValidacion('Solo se pueden cancelar movimientos de producto terminado en F3.');
     }
+    exigirMovimientoCancelableAMano(original.origenTipo, original.origenId);
 
     // entrada → inverso de SALIDA (error-entrada); salida → inverso de ENTRADA (error-salida).
     const codigoInverso =

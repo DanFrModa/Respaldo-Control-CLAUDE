@@ -994,6 +994,13 @@ function CapturaMovimiento({
   const [prendaTerminadaElegida, setPrendaTerminadaElegida] = useState<boolean | null>(null);
   const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
   /**
+   * V1-E4b (hallazgo H1) — de QUÉ BUCKET de existencia salen las prendas. El inventario de PT se
+   * lleva por modelo×color×talla×ORDEN×almacén, y el bucket «sin orden asignada» es donde vive TODO
+   * el histórico migrado y TODO lo que se capture en el inventario físico de arranque. Sin poder
+   * elegirlo, ese stock —que es el que hay el día uno— era inalcanzable desde esta pantalla.
+   */
+  const [stockSinOrdenElegido, setStockSinOrdenElegido] = useState<boolean | null>(null);
+  /**
    * PRECIO PACTADO y FECHA COMPROMISO (migrados de las pantallas retiradas en V1-E3a): el precio de
    * maquila de ESTE movimiento — sin él el cargo EsMa nace sin precio y hay que teclearlo aparte, la
    * doble captura que v2 elimina. El campo se esconde sin `ordenes.ver-precio-real-maquila` porque
@@ -1104,7 +1111,14 @@ function CapturaMovimiento({
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
+  // El almacén de TRÁNSITO se EXCLUYE de TODOS los selectores (V1-E4b, hallazgo H5 del reviewer):
+  // guarda lo que está físicamente en el taller de un tercero, y el servidor lo rechaza tanto de
+  // origen (entrega a cliente) como de destino (recibo). Ofrecerlo solo servía para cosechar un 400
+  // con la matriz ya tecleada. Las prendas que no vuelvan salen de ahí por un movimiento manual de
+  // inventario, con su motivo — no por estas pantallas.
+  const almacenesPt = (almacenes.data?.datos ?? []).filter(
+    (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
+  );
 
   // ── V1-E4b · el tránsito de prendas a proceso (§Post-F9.61) ────────────────────────────────────
   // Cuando un proceso de ARTE va DESPUÉS de la costura, lo que se manda ya es producto terminado:
@@ -1130,6 +1144,14 @@ function CapturaMovimiento({
       : prendaTerminadaFijada
         ? devuelveAPt
         : (prendaTerminadaElegida ?? wip.recibidoCostura > 0);
+  // El bucket también queda FIJADO por las entregas vivas del proceso (el servidor no deja mezclar
+  // dos formas distintas: el recibo no sabría a qué bucket regresar las piezas). Default: el de la
+  // orden, que es lo correcto para todo lo que este sistema produjo.
+  const stockSinOrden =
+    prendaTerminada &&
+    (prendaTerminadaFijada
+      ? procesoYaEnviado?.stockSinOrden === true
+      : (stockSinOrdenElegido ?? false));
 
   const requiereAlmacen = etapa === 'recibo-maquila' || (esRecibo && devuelveAPt);
 
@@ -1419,6 +1441,7 @@ function CapturaMovimiento({
         ...(fechaCompromiso === '' ? {} : { fechaCompromiso }),
         // V1-E4b: prendas YA TERMINADAS ⇒ el envío las saca de este almacén hacia el tránsito.
         prendaTerminada,
+        stockSinOrden,
         ...(prendaTerminada && idAlmacenOrigen !== ''
           ? { idAlmacenOrigen: Number(idAlmacenOrigen) }
           : {}),
@@ -1634,6 +1657,25 @@ function CapturaMovimiento({
               </SelectNativo>
             </Field>
           ) : null}
+          {/* BUCKET de existencia (V1-E4b, H1): el inventario de PT se lleva por ORDEN, y el
+              histórico migrado + el inventario físico de arranque viven en el bucket «sin orden
+              asignada». Si las piezas que se mandan son de ese stock hay que decirlo, o el envío
+              choca contra un saldo de 0 mientras la pantalla de existencias muestra piezas. */}
+          {prendaTerminada ? (
+            <Field>
+              <FieldLabel htmlFor="avance-bucket-stock">De qué stock salen</FieldLabel>
+              <SelectNativo
+                id="avance-bucket-stock"
+                value={stockSinOrden ? 'sin-orden' : 'orden'}
+                disabled={prendaTerminadaFijada}
+                onChange={(e) => setStockSinOrdenElegido(e.target.value === 'sin-orden')}
+                data-testid="avance-bucket-stock"
+              >
+                <option value="orden">Del stock de esta orden</option>
+                <option value="sin-orden">Del stock sin orden asignada (migrado / inicial)</option>
+              </SelectNativo>
+            </Field>
+          ) : null}
         </div>
       ) : null}
 
@@ -1829,7 +1871,14 @@ function CapturaEntregaCliente({
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
+  // El almacén de TRÁNSITO se EXCLUYE de TODOS los selectores (V1-E4b, hallazgo H5 del reviewer):
+  // guarda lo que está físicamente en el taller de un tercero, y el servidor lo rechaza tanto de
+  // origen (entrega a cliente) como de destino (recibo). Ofrecerlo solo servía para cosechar un 400
+  // con la matriz ya tecleada. Las prendas que no vuelvan salen de ahí por un movimiento manual de
+  // inventario, con su motivo — no por estas pantallas.
+  const almacenesPt = (almacenes.data?.datos ?? []).filter(
+    (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
+  );
 
   // Seguimiento DERIVADO (pedido − entregado) + `disponible` del almacén elegido, para acotar.
   const seguimiento = useSeguimientoEntrega(

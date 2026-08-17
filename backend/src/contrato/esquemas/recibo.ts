@@ -258,6 +258,9 @@ const esquemaPendienteRecibirProceso = z.object({
     .describe(
       'Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT.',
     ),
+  stockSinOrden: z
+    .boolean()
+    .describe('Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
     .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),

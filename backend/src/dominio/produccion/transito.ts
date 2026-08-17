@@ -86,6 +86,12 @@ async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nomb
  * inventario quedaría partido entre dos buckets sin que nadie lo note. El propio de la empresa gana
  * al global si existieran ambos (mismo criterio de precedencia que el resto de los catálogos A9);
  * la ambigüedad que se rechaza es tener DOS del mismo alcance.
+ *
+ * ⚠️ Desde el hallazgo H7 del reviewer, tener dos es **imposible en la base**: el índice único
+ * PARCIAL `almacen_transito_unico` (migración `20260817160000`) lo prohíbe. La verificación de aquí
+ * se conserva a propósito como segunda línea —si alguien dropea el índice a mano, el flujo falla
+ * con un mensaje claro en vez de elegir un almacén a la suerte y partir el inventario—, pero por
+ * eso su rama de "hay más de uno" ya no es alcanzable desde la aplicación.
  */
 export async function almacenDeTransito(
   tx: Tx,
@@ -162,10 +168,18 @@ export interface LineaTransito {
   cantidad: number;
 }
 
-/** Convierte celdas color×talla a líneas del kardex, etiquetadas con su modelo y su ORDEN (F6-E2). */
+/**
+ * Convierte celdas color×talla a líneas del kardex, etiquetadas con su modelo y con el BUCKET de
+ * existencia del que salen / al que vuelven (F6-E2 "PT por orden").
+ *
+ * `idOrdenBucket` NO es siempre la orden del envío: `null` es el bucket «sin orden asignada», donde
+ * vive TODO el histórico migrado (`migracion/loaders/ipt-kardex.ts` no etiqueta orden) y TODO lo que
+ * se capture en el inventario físico de arranque. Sin poder elegirlo, el envío de prendas
+ * terminadas no alcanzaba justo el stock que hay el día uno.
+ */
 function aLineasKardex(
   idModelo: number,
-  idOrden: number,
+  idOrdenBucket: number | null,
   celdas: LineaTransito[],
 ): LineaMovimientoPt[] {
   return celdas
@@ -174,7 +188,7 @@ function aLineasKardex(
       idModelo,
       idColor: c.idColor,
       idTalla: c.idTalla,
-      idOrden,
+      idOrden: idOrdenBucket,
       cantidad: c.cantidad,
     }));
 }
@@ -195,14 +209,15 @@ export async function traspasarPrendasATransito(
     idEmpresa: number;
     idAlmacenOrigen: number;
     idModelo: number;
-    idOrden: number;
+    /** Bucket de existencia del que salen: la orden, o `null` = «sin orden asignada». */
+    idOrdenBucket: number | null;
     fecha: Date;
     origenTipo: OrigenMovimiento;
     origenId: string;
     celdas: LineaTransito[];
   },
 ): Promise<void> {
-  const lineas = aLineasKardex(datos.idModelo, datos.idOrden, datos.celdas);
+  const lineas = aLineasKardex(datos.idModelo, datos.idOrdenBucket, datos.celdas);
   if (lineas.length === 0) return;
 
   const transito = await almacenDeTransito(tx, datos.idEmpresa);
@@ -247,14 +262,15 @@ export async function devolverPrendasDeTransito(
     idEmpresa: number;
     idAlmacenDestino: number;
     idModelo: number;
-    idOrden: number;
+    /** Bucket al que VUELVEN: el MISMO del que salieron (nunca se reetiqueta mercancía). */
+    idOrdenBucket: number | null;
     fecha: Date;
     origenTipo: OrigenMovimiento;
     origenId: string;
     celdas: LineaTransito[];
   },
 ): Promise<void> {
-  const lineas = aLineasKardex(datos.idModelo, datos.idOrden, datos.celdas);
+  const lineas = aLineasKardex(datos.idModelo, datos.idOrdenBucket, datos.celdas);
   if (lineas.length === 0) return;
 
   const transito = await almacenDeTransito(tx, datos.idEmpresa);
@@ -362,21 +378,29 @@ export async function revertirMovimientosDeHecho(
   return revertidos;
 }
 
+/** Cómo salieron las prendas de un envío vivo: si salieron del almacén y de qué bucket. */
+export interface FormaDelEnvio {
+  /** El envío sacó producto TERMINADO del almacén hacia el tránsito (§Post-F9.61). */
+  prendaTerminada: boolean;
+  /** Salió del bucket «sin orden asignada» (`id_orden = NULL`) en vez del bucket de su orden. */
+  stockSinOrden: boolean;
+}
+
 /**
- * ¿Los envíos VIVOS de esta orden+proceso son de PRENDAS YA TERMINADAS? Es lo que decide si el
- * recibo devuelve mercancía del tránsito o no — o sea, la propiedad de POSICIÓN que §Post-F9.59
- * pedía sacar de `TipoProceso.generaEntradaPt` (el mismo estampado va antes de la costura en una
- * orden y después en otra; la bandera del tipo no puede saberlo).
+ * ¿CÓMO salieron las prendas de los envíos VIVOS de esta orden+proceso? Es lo que decide si el
+ * recibo devuelve mercancía del tránsito —o sea, la propiedad de POSICIÓN que §Post-F9.59 pedía
+ * sacar de `TipoProceso.generaEntradaPt` (el mismo estampado va antes de la costura en una orden y
+ * después en otra; la bandera del tipo no puede saberlo)— y a QUÉ bucket de existencia devolverla.
  *
  * Se mira por orden+proceso (no por maquilero): el WIP agrega los pendientes por proceso y el envío
- * exige que todos los de la misma orden+proceso coincidan, así que aquí la respuesta es única.
- * `null` = no hay envíos vivos (el recibo decidirá con las reglas de siempre).
+ * exige que todos los de la misma orden+proceso coincidan en AMBAS banderas, así que aquí la
+ * respuesta es única. `null` = no hay envíos vivos (el recibo decide con las reglas de siempre).
  */
-export async function envioEsDePrendaTerminada(
+export async function formaDelEnvioVivo(
   tx: Tx,
   idOrden: number,
   idTipoProceso: number,
-): Promise<boolean | null> {
+): Promise<FormaDelEnvio | null> {
   const envios = await tx.etapaMovimiento.findMany({
     where: {
       idOrden,
@@ -384,17 +408,21 @@ export async function envioEsDePrendaTerminada(
       tipo: 'envio_maquila',
       canceladoEn: null,
     },
-    select: { prendaTerminada: true },
-    distinct: ['prendaTerminada'],
+    select: { prendaTerminada: true, stockSinOrden: true },
+    distinct: ['prendaTerminada', 'stockSinOrden'],
   });
   if (envios.length === 0) return null;
   if (envios.length > 1) {
     // No debería pasar (el envío lo impide), pero si el dato viejo lo trae mezclado hay que decirlo
     // en vez de elegir uno a la suerte y mover inventario por la mitad.
     throw new ErrorConflicto(
-      'Esta orden tiene envíos vivos MEZCLADOS de este proceso: unos de prendas ya terminadas y ' +
-        'otros de bultos cortados. Cancela los que estén mal capturados antes de recibir.',
+      'Esta orden tiene entregas vivas MEZCLADAS de este proceso: no todas salieron del almacén de ' +
+        'la misma forma (unas como prendas ya terminadas y otras como bultos cortados, o de buckets ' +
+        'de existencia distintos). Cancela las que estén mal capturadas antes de recibir.',
     );
   }
-  return envios[0]?.prendaTerminada ?? null;
+  const forma = envios[0];
+  /* c8 ignore next 3 -- inalcanzable: `envios.length` es 1 aquí (narrowing que TS no hace). */
+  if (forma === undefined) return null;
+  return { prendaTerminada: forma.prendaTerminada, stockSinOrden: forma.stockSinOrden };
 }

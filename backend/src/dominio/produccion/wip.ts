@@ -709,12 +709,16 @@ export async function wipDeOrden(
       prendaTerminada: true,
       idTipoProceso: { not: null },
     },
-    select: { idTipoProceso: true },
+    select: { idTipoProceso: true, stockSinOrden: true },
     distinct: ['idTipoProceso'],
   });
-  const procesosQueDevuelven = new Set(
-    enviosPrendaTerminada.map((e) => e.idTipoProceso).filter((id): id is number => id !== null),
-  );
+  // Además de QUIÉN devuelve, de qué BUCKET salió (V1-E4b/H1): la captura del siguiente envío queda
+  // fijada por él (el servidor no deja mezclar buckets en la misma orden+proceso).
+  const bucketPorProceso = new Map<number, boolean>();
+  for (const e of enviosPrendaTerminada) {
+    if (e.idTipoProceso !== null) bucketPorProceso.set(e.idTipoProceso, e.stockSinOrden);
+  }
+  const procesosQueDevuelven = new Set(bucketPorProceso.keys());
 
   // porCortar = pedido − cortado, por celda (incluye celdas con sobre-corte → negativo).
   const clavesCorte = new Set<string>([...pedido.keys(), ...cortado.keys()]);
@@ -783,6 +787,7 @@ export async function wipDeOrden(
     porRecibir.push({
       ...datosProceso,
       devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
+      stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas: celdasRecibir,
       totalPendiente:
         [...enviado.values()].reduce((s, v) => s + v, 0) -

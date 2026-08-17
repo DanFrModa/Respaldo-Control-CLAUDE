@@ -23,15 +23,28 @@
 --      costura). Es la propiedad de POSICIÓN que §Post-F9.59 pedía sacar de `TipoProceso`.
 --   3. `etapa_movimiento.id_almacen_origen` — de qué almacén de PT salen esas prendas (obligatorio
 --      en el dominio cuando `prenda_terminada`, NULL en todo lo demás).
+--   4. `etapa_movimiento.stock_sin_orden` — de qué BUCKET de existencia salen. La existencia de PT
+--      es por modelo×color×talla×ORDEN×almacén (F6-E2), y el bucket `id_orden = NULL` es donde cae
+--      TODO lo migrado y TODO lo que Daniel capture en el inventario de arranque. Sin esta columna
+--      el envío solo podía sacar del bucket de su orden y ese stock era inalcanzable.
 --
--- Índice: solo el de `id_almacen_origen` (FK que se consulta al listar/validar). `prenda_terminada`
--- NO lleva índice: siempre se lee junto a `id_orden`/`id_tipo_proceso`, que ya tienen el suyo.
+-- Índices:
+--   • `id_almacen_origen` — FK que se consulta al listar/validar.
+--   • `almacen_transito_unico` — índice único PARCIAL: **a lo más UN almacén de tránsito**. La
+--     bandera la pone el seed y no hay pantalla para moverla, así que un segundo tránsito solo se
+--     arreglaría con SQL a mano; mejor que la base lo haga IMPOSIBLE y no que el dominio lo detecte
+--     en cada envío. Va en SQL crudo porque Prisma no modela índices parciales (mismo caso que
+--     `hito_orden_vivo_unico`, migración 20260710250000) — `prisma migrate diff` no los ve, así que
+--     el esquema y las migraciones siguen cuadrando.
+--   • `prenda_terminada`/`stock_sin_orden` NO llevan índice: siempre se leen junto a
+--     `id_orden`/`id_tipo_proceso`, que ya tienen el suyo.
 
 ALTER TABLE "almacenes"
   ADD COLUMN "es_transito_proceso" BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE "etapa_movimiento"
   ADD COLUMN "prenda_terminada" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "stock_sin_orden" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN "id_almacen_origen" INTEGER;
 
 ALTER TABLE "etapa_movimiento"
@@ -39,3 +52,6 @@ ALTER TABLE "etapa_movimiento"
   FOREIGN KEY ("id_almacen_origen") REFERENCES "almacenes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE INDEX "etapa_movimiento_id_almacen_origen_idx" ON "etapa_movimiento"("id_almacen_origen");
+
+-- A lo más UN almacén de tránsito a proceso externo (índice parcial: solo cuenta los marcados).
+CREATE UNIQUE INDEX "almacen_transito_unico" ON "almacenes"(("es_transito_proceso")) WHERE "es_transito_proceso";

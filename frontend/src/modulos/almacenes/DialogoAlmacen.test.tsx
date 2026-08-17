@@ -38,6 +38,7 @@ function almacenDePrueba(sobrescribir: Record<string, unknown> = {}) {
     idEmpresa: 1,
     idCortador: 99,
     cortador: 'Taller Montaño',
+    esTransitoProceso: false,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',

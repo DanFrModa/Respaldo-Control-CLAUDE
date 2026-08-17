@@ -35,7 +35,13 @@ vi.mock('@/api/proveedores', () => ({
 }));
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => ({
-    data: { datos: [{ id: 1, nombre: 'Primeras', tipo: 'PT', activo: true }] },
+    data: {
+      datos: [
+        { id: 1, nombre: 'Primeras', tipo: 'PT', activo: true, esTransitoProceso: false },
+        // V1-E4b (H5): el catálogo SÍ trae el almacén de tránsito; la pantalla NO debe ofrecerlo.
+        { id: 4, nombre: 'Tránsito', tipo: 'PT', activo: true, esTransitoProceso: true },
+      ],
+    },
     isError: false,
     refetch: vi.fn(),
   }),
@@ -1194,5 +1200,112 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
 
     // El proceso NO crea PT, pero las prendas están en tránsito: hay que decir a dónde regresan.
     expect(screen.getByTestId('avance-almacen-primeras')).toBeInTheDocument();
+  });
+});
+
+/**
+ * V1-E4b · hallazgos H5 y H1 del reviewer, del lado de la pantalla.
+ *  • H5 — el almacén de TRÁNSITO no puede aparecer en NINGÚN selector: el servidor lo rechaza como
+ *    origen y como destino, así que ofrecerlo solo servía para cosechar un 400 con la matriz ya
+ *    tecleada.
+ *  • H1 — el BUCKET de existencia («de esta orden» vs «sin orden asignada») tiene que poder
+ *    elegirse: el histórico migrado y el inventario de arranque viven en el segundo.
+ */
+describe('Captura del avance · tránsito y bucket de existencia (V1-E4b, H5/H1)', () => {
+  function wipConPt(): WipOrden {
+    const base = wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]);
+    return {
+      ...base,
+      recibidoCostura: 10,
+      recibido: 10,
+      porRecibir: [],
+      cortadoPorEnviar: [],
+    };
+  }
+
+  it('H5 — el almacén de TRÁNSITO no se ofrece ni como origen del envío ni como destino del recibo', async () => {
+    useWipOrden.mockReturnValue({ data: wipConPt(), isPending: false });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    const origen = screen.getByTestId('avance-almacen-origen');
+    expect(origen).toHaveTextContent('Primeras');
+    expect(origen).not.toHaveTextContent('Tránsito');
+
+    // Y en el recibo de costura (destino), lo mismo.
+    useWipOrden.mockReturnValue({
+      data: wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 6 }]),
+      isPending: false,
+    });
+    pintar();
+    const capturas = screen.getAllByTestId('avance-stepper-recibo-maquila');
+    await usuario.click(capturas[capturas.length - 1] as HTMLElement);
+    const botones = screen.getAllByTestId('avance-abrir-captura');
+    await usuario.click(botones[botones.length - 1] as HTMLElement);
+    const destinos = screen.getAllByTestId('avance-almacen-primeras');
+    const destino = destinos[destinos.length - 1] as HTMLElement;
+    expect(destino).toHaveTextContent('Primeras');
+    expect(destino).not.toHaveTextContent('Tránsito');
+  });
+
+  it('H1 — se puede mandar el stock SIN orden asignada, y viaja en el cuerpo del envío', async () => {
+    useWipOrden.mockReturnValue({ data: wipConPt(), isPending: false });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    // Default: el stock de la orden.
+    expect(screen.getByTestId('avance-bucket-stock')).toHaveValue('orden');
+
+    await usuario.selectOptions(screen.getByTestId('avance-bucket-stock'), 'sin-orden');
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-origen'), '1');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '10');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    const cuerpo = crearEnvio.mock.calls[0]?.[0] as {
+      prendaTerminada: boolean;
+      stockSinOrden: boolean;
+      idAlmacenOrigen?: number;
+    };
+    expect(cuerpo.prendaTerminada).toBe(true);
+    expect(cuerpo.stockSinOrden).toBe(true);
+    expect(cuerpo.idAlmacenOrigen).toBe(1);
+  });
+
+  it('H1 — con entregas vivas, el bucket queda FIJADO por ellas (no se puede mezclar)', async () => {
+    const base = wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 4 }]);
+    useWipOrden.mockReturnValue({
+      data: {
+        ...base,
+        recibidoCostura: 10,
+        porRecibir: [
+          {
+            idTipoProceso: 6,
+            tipoProceso: 'Estampado',
+            codigoProceso: 'estampado',
+            generaEntradaPt: false,
+            devuelveAPt: true,
+            stockSinOrden: true,
+            celdas: [],
+            totalPendiente: 4,
+            porMaquilero: [],
+          },
+        ],
+      } as unknown as WipOrden,
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    const bucket = screen.getByTestId('avance-bucket-stock');
+    expect(bucket).toHaveValue('sin-orden');
+    expect(bucket).toBeDisabled();
   });
 });

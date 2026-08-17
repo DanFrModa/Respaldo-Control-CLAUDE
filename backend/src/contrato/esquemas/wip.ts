@@ -198,6 +198,11 @@ const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
     .describe(
       'Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT.',
     ),
+  stockSinOrden: z
+    .boolean()
+    .describe(
+      'Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar.',
+    ),
   porMaquilero: z
     .array(esquemaWipMaquileroPendiente)
     .describe(

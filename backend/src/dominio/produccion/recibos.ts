@@ -79,7 +79,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
 import {
   devolverPrendasDeTransito,
-  envioEsDePrendaTerminada,
+  formaDelEnvioVivo,
   rechazarAlmacenDeTransito,
   revertirMovimientosDeHecho,
 } from './transito.js';
@@ -591,8 +591,12 @@ export async function registrarReciboMaquila(
     //   • `creaPt`      — el proceso las CREA (costura): entrada nueva al kardex.
     // Se lee bajo el lock de la orden, que ya está tomado arriba.
     const creaPt = proceso.generaEntradaPt;
-    const devuelveAPt =
-      (await envioEsDePrendaTerminada(tx, datos.idOrden, datos.idTipoProceso)) === true;
+    const formaEnvio = await formaDelEnvioVivo(tx, datos.idOrden, datos.idTipoProceso);
+    const devuelveAPt = formaEnvio?.prendaTerminada === true;
+    // Al bucket del que SALIERON: si el envío sacó del «sin orden» (histórico migrado / inventario
+    // de arranque), ahí vuelven. Reetiquetarlas a la orden al regresar sería mover saldo entre
+    // buckets sin que nadie lo pidiera.
+    const idOrdenBucket = formaEnvio?.stockSinOrden === true ? null : datos.idOrden;
     // Almacenes destino: solo aplican si el recibo mete a PT (por creación o por devolución). Si
     // vienen para un recibo que no lo hace, se ignoran (no se persisten).
     const meteAPt = creaPt || devuelveAPt;
@@ -692,7 +696,7 @@ export async function registrarReciboMaquila(
             idEmpresa: orden.idEmpresa,
             idAlmacenDestino,
             idModelo,
-            idOrden: datos.idOrden,
+            idOrdenBucket,
             fecha: aDateColumna(datos.fecha),
             origenTipo: ORIGEN.reciboMaquila,
             origenId: String(recibo.id),
@@ -767,7 +771,13 @@ export async function registrarReciboMaquila(
         idOrden: datos.idOrden,
         idTipoProceso: datos.idTipoProceso,
         idMaquilero: datos.idMaquilero,
-        generaEntradaPt: meteAPt,
+        // A7 — cada campo dice EXACTAMENTE lo suyo (hallazgo H6 del reviewer): `generaEntradaPt` es
+        // la bandera del TipoProceso y no puede llevar otro valor; que el recibo haya movido
+        // inventario es una cosa distinta desde V1-E4b (puede devolverlo del tránsito sin que el
+        // proceso cree PT).
+        generaEntradaPt: creaPt,
+        devuelveDeTransito: devuelveAPt,
+        meteAInventario: meteAPt,
         celdas: celdas.length,
         totalRecibido,
         totalSegundas,
@@ -1036,12 +1046,14 @@ export async function pendientesPorRecibir(
       prendaTerminada: true,
       idTipoProceso: { not: null },
     },
-    select: { idTipoProceso: true },
+    select: { idTipoProceso: true, stockSinOrden: true },
     distinct: ['idTipoProceso'],
   });
-  const procesosQueDevuelven = new Set(
-    enviosPrendaTerminada.map((e) => e.idTipoProceso).filter((id): id is number => id !== null),
-  );
+  const bucketPorProceso = new Map<number, boolean>();
+  for (const e of enviosPrendaTerminada) {
+    if (e.idTipoProceso !== null) bucketPorProceso.set(e.idTipoProceso, e.stockSinOrden);
+  }
+  const procesosQueDevuelven = new Set(bucketPorProceso.keys());
 
   const porRecibir = [];
   for (const proc of procesosEnviados) {
@@ -1084,6 +1096,7 @@ export async function pendientesPorRecibir(
       codigoProceso: proc.tipoProceso?.codigo ?? '',
       generaEntradaPt: proc.tipoProceso?.generaEntradaPt ?? false,
       devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
+      stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas,
       totalPendiente,
       porMaquilero,
