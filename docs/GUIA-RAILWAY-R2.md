@@ -229,6 +229,98 @@ environment) → arranque → healthcheck `/api/health`.
 6. No hay que configurar endpoint en ningún dashboard: el backend lo arma como
    `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`.
 
+## 7.1. ⭐ El respaldo MENSUAL cifrado a R2 (V1-E6a)
+
+> **Por qué existe habiendo backups de Railway.** Los de Railway están **encendidos** y cubren el día
+> a día. Éste es el **segundo** respaldo que exige `PLANMAESTRO.md` §91 (*"además de los backups de
+> Railway"*), y su único valor es el caso en que **el problema SEA Railway**: cuenta suspendida,
+> servicio borrado por error, caída larga del proveedor, o mudarse. Un respaldo que vive dentro de
+> Railway se va con el barco. **Cadencia mensual** por decisión de Gabriel (17-ago-2026).
+
+### Las variables (backend, en cada environment)
+
+| Variable | Obligatoria | Qué pasa si falta |
+| --- | --- | --- |
+| **`RESPALDO_LLAVE`** | **SÍ** (≥24 chars) | El job **no se programa** y queda una corrida en `FALLO`/`CONFIGURACION` + log. **No hay respaldo.** |
+| `RESPALDO_RETENCION` | no (def. **12**) | Conserva 12 copias = un año de respaldos mensuales |
+| `RESPALDO_CRON` | no (def. `0 8 1 * *` UTC) | Día 1 de cada mes, 02:00 hora del centro de México |
+| `RESPALDO_TIMEOUT_MIN` | no (def. **180**) | Si el `pg_dump` se cuelga, lo corta a las 3 h y deja la corrida en `FALLO` |
+| `RESPALDO_ACTIVO=false` | no | Lo apaga **a propósito**: avisa y **no** deja rastro rojo |
+| `R2_*` reales | SÍ | Con credenciales dummy **no se programa** y deja rastro rojo |
+
+Generar la llave: `openssl rand -base64 32`
+
+### 🔑 La llave: guárdala TAMBIÉN fuera de Railway
+
+**En el gestor de contraseñas de Gabriel y de Daniel.** Si se pierde, **los respaldos son
+irrecuperables: no hay puerta trasera**, y eso es por diseño — una puerta trasera al respaldo es una
+puerta trasera a todo el negocio.
+
+⚠️ Guardar la llave **sólo** en Railway anula el sentido del respaldo: en el escenario para el que
+existe —Railway no está— te quedarías con los archivos cifrados y sin con qué abrirlos.
+
+### Cómo saber si está funcionando
+
+**Administración › Bitácora**, filtro de entidad **`RespaldoBd`** (permiso `admin.ver-bitacora`):
+acción `CREAR` = respaldo hecho; `OTRO` = corrida fallida, con el paso y el error en el detalle.
+También en la tabla `respaldo_corrida` y en el log de Railway (prefijo `⛔ RESPALDO A R2 FALLIDO`).
+
+⚠️ **El aviso es PASIVO: no hay correo ni notificación.** Con corridas mensuales eso pesa más, no
+menos — **si falla en enero, nadie lo nota hasta junio**. Revisar esa bitácora tiene que ser parte del
+procedimiento mensual hasta que exista notificación activa.
+
+### Restaurar (desde `backend/`, siempre con `--env-file=.env`)
+
+```bash
+# 1. ¿Qué respaldos hay?
+npx tsx --env-file=.env scripts/restaurar-respaldo.ts --listar
+
+# 2. SIEMPRE a una base NUEVA y vacía — nunca encima de producción
+npx tsx --env-file=.env scripts/restaurar-respaldo.ts \
+  --key respaldos/bd/2026/control-2026-09-01T080000Z.dump.enc \
+  --destino postgresql://usuario:clave@host:5432/ensayo_restauracion
+```
+
+Baja de R2 → descifra (verifica integridad: llave equivocada o archivo corrupto dan **error claro y
+sin dejar volcado a medias**) → `pg_restore`. Si la base destino ya tiene tablas **se niega**, salvo
+`--si-estoy-seguro`.
+
+**Comprobar el archivo ANTES de descifrar** (útil si se sospecha corrupción, y **no necesita la
+llave**): cada corrida guarda el **SHA-256 del archivo cifrado** en `respaldo_corrida.sha256`; pásalo
+con `--sha256 <hex>` y el script verifica la huella antes de tocar nada.
+
+```bash
+# Forma CANÓNICA de auditar un respaldo sin tener la llave a mano:
+npx tsx --env-file=.env scripts/restaurar-respaldo.ts \
+  --archivo control-2026-09-01T080000Z.dump.enc --sha256 <hex> --solo-verificar
+```
+
+Responde si el archivo está **íntegro** y **no descifra nada**. Si la huella no cuadra, reporta **la
+huella** (esperada contra real), no un error de configuración. *(Sin `--sha256`, el script sigue
+exigiendo `RESPALDO_LLAVE` de entrada, a propósito: así no se bajan cientos de MB para morir al
+final.)*
+
+**Dos vías para correrlo, según el escenario:**
+
+| Escenario | Cómo |
+| --- | --- |
+| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 17 |
+| **Railway ya no está** ← *el escenario para el que existe este respaldo* | Desde un **checkout del repo**, en cualquier máquina con Node 22 y cliente **PostgreSQL ≥ 17** |
+
+⚠️ El cliente debe ser **≥ 17**: `pg_dump`/`pg_restore` se niegan a trabajar contra un servidor más
+nuevo que ellos, y Railway es PG17. Que la segunda vía no dependa de la plataforma caída es
+deliberado — un procedimiento de emergencia que exige que la plataforma siga en pie no sirve de nada.
+
+**Qué NO trae el volcado:** el esquema `pgboss` se excluye a propósito (estado transitorio: restaurarlo
+re-dispararía trabajos de fechas pasadas). Consecuencia asumida: un evento ya publicado a la cola pero
+aún no consumido se pierde — es recuperable re-disparándolo, y se prefiere eso a revivir trabajos
+viejos. `evento_outbox` **sí** entra completo, y los ya procesados **no** se re-disparan (el publicador
+filtra por `publicadoEn: null`).
+
+**Prueba de restauración periódica** (`PLANMAESTRO` §91 la exige): repetir el paso 2 contra una base de
+ensayo y comprobar que aparecen las tablas y datos esperados. Hay un ensayo automático en la suite de
+integración, pero **eso valida el código, no el respaldo real de producción**.
+
 ## 8. Verificación final (checklist)
 
 En **ambos** environments:

@@ -6,6 +6,7 @@ import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
 import { registrarAutoAvanceRc } from './dominio/ruta-critica/autoAvance.js';
 import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
 import { registrarRefrescoKpis } from './comun/jobs/refrescar-kpis.js';
+import { registrarRespaldoPeriodico } from './comun/jobs/respaldo-bd.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -77,6 +78,16 @@ await registrarBarridoRiesgoRc((mensaje, error) => {
 // schedule cron. La captura NUNCA espera el recálculo (plan §11). NO-OP si el motor está inactivo
 // (tests/CI). Best-effort: si falla, la app sigue (el refresco se puede re-disparar).
 await registrarRefrescoKpis((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra el SEGUNDO RESPALDO cifrado a R2 (V1-E6a; plan §2.2 "respaldo doble", mitigación #1 de la
+// tabla de riesgos): worker de la cola `respaldo-bd` + schedule cron MENSUAL (los respaldos diarios
+// de Railway ya cubren el día a día; esta copia cubre que el problema SEA Railway). Si falta la
+// configuración (llave de cifrado, credenciales R2 reales), NO se programa y queda constancia ROJA
+// en el log y en el rastro de corridas — la ausencia de respaldo nunca se calla. NO-OP si el motor
+// de jobs está inactivo (tests/CI).
+await registrarRespaldoPeriodico((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 

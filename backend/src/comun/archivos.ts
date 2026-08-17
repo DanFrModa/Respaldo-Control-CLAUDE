@@ -21,10 +21,14 @@
  * esos permisos.
  */
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -305,8 +309,67 @@ export interface ServicioArchivos {
   eliminarObjeto(key: string): Promise<void>;
 }
 
+/**
+ * Operaciones de OBJETO CRUDO sobre el bucket (V1-E6a). Van en una interfaz APARTE de
+ * {@link ServicioArchivos} a propósito: aquélla modela los ADJUNTOS de negocio (registro `Archivo`,
+ * URLs prefirmadas para el navegador, keys con UUID) y la implementan a mano una docena de dobles de
+ * prueba; esto de aquí es el bucket pelón, y hoy lo usa un solo cliente —el respaldo—, que no
+ * adjunta nada a ninguna entidad. Separarlas evita obligar a esos dobles a fingir operaciones que su
+ * módulo jamás llama.
+ */
+export interface OperacionesObjetoR2 {
+  /**
+   * Sube un ARCHIVO DEL DISCO a una key EXACTA, en streaming (V1-E6a, respaldo). Se
+   * distingue de `subirContenido` en tres cosas que el respaldo necesita y los adjuntos no:
+   *
+   *  1. **No pasa por memoria**: manda un `ReadStream`, no un `Buffer`. El volcado de la base puede
+   *     pesar cientos de MB y el contenedor de Railway tiene RAM contada — `subirContenido` además
+   *     tiene un tope duro de 50 MB heredado del validador de adjuntos.
+   *  2. **La key la manda el llamador**, sin UUID ni saneado: la retención necesita keys
+   *     PREDECIBLES y ordenables por fecha, no aleatorias.
+   *  3. **IGNORA `subidaLocal`**: sube de verdad, siempre. El modo no-op de dev/CI existe para no
+   *     exigir un R2 real en las pruebas; aplicado a un respaldo produciría exactamente la mentira
+   *     que el respaldo debe evitar ("subió bien" sin que exista el objeto). Quien no deba respaldar
+   *     apaga el JOB, no la subida.
+   *
+   * No crea registro `Archivo`: un respaldo no es un adjunto de negocio, su rastro es
+   * `RespaldoCorrida`.
+   *
+   * @returns los bytes que se enviaron (los del archivo en disco), para contrastarlos luego contra
+   *   lo que reporte {@link OperacionesObjetoR2.tamanoObjeto}.
+   */
+  subirArchivoDesdeRuta(key: string, ruta: string, tipoMime: string): Promise<number>;
+
+  /**
+   * Pregunta a R2 por el TAMAÑO de un objeto (`HeadObjectCommand`); `null` si no existe. Es la
+   * COMPROBACIÓN de que una subida quedó: que un `PutObject` no haya lanzado no prueba que el
+   * objeto esté ahí (proxies, reintentos, cortes a media transferencia). Verificar cuesta una
+   * llamada y evita descubrir el hueco el día que haya que restaurar.
+   *
+   * OJO con su alcance: el tamaño caza una subida TRUNCADA, no una corrupción del mismo largo. Por
+   * eso el respaldo guarda además el SHA-256 de lo que subió (`RespaldoCorrida.sha256`).
+   */
+  tamanoObjeto(key: string): Promise<number | null>;
+
+  /**
+   * Lista los objetos bajo un prefijo (`ListObjectsV2Command`, paginando hasta agotar). Lo usa la
+   * retención del respaldo para saber qué hay guardado y desde cuándo. Devuelve key, tamaño y
+   * `LastModified`.
+   *
+   * @param maxObjetos tope DURO de seguridad: corta el paginado para no traerse un bucket entero si
+   *   el prefijo estuviera mal puesto. El resultado nunca lo excede (se recorta al llegar).
+   */
+  listarObjetos(
+    prefijo: string,
+    maxObjetos?: number,
+  ): Promise<{ key: string; tamanoBytes?: number; ultimaModificacion?: Date }[]>;
+}
+
+/** El servicio completo: adjuntos de negocio + operaciones de objeto crudo sobre el mismo bucket. */
+export type ServicioArchivosCompleto = ServicioArchivos & OperacionesObjetoR2;
+
 /** Construye el servicio con dependencias explícitas (producción y tests usan la misma vía). */
-export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
+export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivosCompleto {
   return {
     async solicitarSubida(tx, sesion, solicitud) {
       const datos = validarEntrada(esquemaSolicitudSubida, solicitud);
@@ -434,6 +497,77 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
       return bytes;
     },
 
+    async subirArchivoDesdeRuta(key, ruta, tipoMime) {
+      if (key.trim() === '') {
+        throw new ErrorValidacion('La key del archivo es obligatoria.');
+      }
+      const info = await stat(ruta);
+      // `ContentLength` explícito: con un stream el SDK no puede deducir el tamaño, y sin él usaría
+      // `Transfer-Encoding: chunked`, que R2 rechaza en PutObject simple.
+      await deps.cliente.send(
+        new PutObjectCommand({
+          Bucket: deps.bucket,
+          Key: key,
+          Body: createReadStream(ruta),
+          ContentLength: info.size,
+          ContentType: tipoMime,
+        }),
+      );
+      return info.size;
+    },
+
+    async tamanoObjeto(key) {
+      if (key.trim() === '') {
+        throw new ErrorValidacion('La key del archivo es obligatoria.');
+      }
+      try {
+        const respuesta = await deps.cliente.send(
+          new HeadObjectCommand({ Bucket: deps.bucket, Key: key }),
+        );
+        return respuesta.ContentLength ?? null;
+      } catch (error) {
+        // "No existe" es una RESPUESTA, no un fallo: se distingue de un error de red o de permisos
+        // (que sí deben propagar, porque significan que no sabemos si el objeto está o no).
+        const nombre = (error as { name?: string }).name;
+        const codigo = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode;
+        if (nombre === 'NotFound' || nombre === 'NoSuchKey' || codigo === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+
+    async listarObjetos(prefijo, maxObjetos = 10_000) {
+      const objetos: { key: string; tamanoBytes?: number; ultimaModificacion?: Date }[] = [];
+      let continuacion: string | undefined;
+      do {
+        const respuesta = await deps.cliente.send(
+          new ListObjectsV2Command({
+            Bucket: deps.bucket,
+            Prefix: prefijo,
+            ContinuationToken: continuacion,
+          }),
+        );
+        for (const objeto of respuesta.Contents ?? []) {
+          if (objeto.Key === undefined) {
+            continue;
+          }
+          objetos.push({
+            key: objeto.Key,
+            ...(objeto.Size === undefined ? {} : { tamanoBytes: objeto.Size }),
+            ...(objeto.LastModified === undefined
+              ? {}
+              : { ultimaModificacion: objeto.LastModified }),
+          });
+        }
+        continuacion = respuesta.IsTruncated === true ? respuesta.NextContinuationToken : undefined;
+      } while (continuacion !== undefined && objetos.length < maxObjetos);
+      // El tope se comprobaba SOLO como condición del bucle, así que la última página podía
+      // rebasarlo (hasta 1000 objetos de más). Se recorta al salir: `maxObjetos` es un tope duro.
+      return objetos.slice(0, maxObjetos);
+    },
+
     async eliminarObjeto(key) {
       if (key.trim() === '') {
         throw new ErrorValidacion('La key del archivo es obligatoria.');
@@ -443,14 +577,14 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
   };
 }
 
-let servicioDesdeEnv: ServicioArchivos | undefined;
+let servicioDesdeEnv: ServicioArchivosCompleto | undefined;
 
 /**
  * Servicio de archivos del proceso, armado desde las variables `R2_*` la
  * primera vez que se pide (lazy: importar dominio no exige tener R2 configurado,
  * p. ej. en jobs que no tocan archivos).
  */
-export function servicioArchivos(): ServicioArchivos {
+export function servicioArchivos(): ServicioArchivosCompleto {
   if (servicioDesdeEnv === undefined) {
     const config = configR2DesdeEnv();
     servicioDesdeEnv = crearServicioArchivos({
@@ -486,8 +620,11 @@ const CREDENCIALES_R2_DUMMY = new Set(['', 'dev', 'dummy', 'local', 'test']);
  * ¿Las credenciales R2 del entorno son placeholders (dev/CI) y no un R2 real? Se mira el access-key y el
  * secret: si CUALQUIERA es dummy/vacío, no hay un R2 real disponible. (Criterio propio: el presign
  * nunca necesitó distinguirlos porque firmar es local; la subida server-side sí lo requiere.)
+ *
+ * Exportada desde V1-E6a: el guard de arranque del RESPALDO diario la reusa para no programar un job
+ * que subiría cada noche a una cuenta que no existe (`comun/respaldo/config.ts`).
  */
-function credencialesR2SonDummy(env: Record<string, string | undefined>): boolean {
+export function credencialesR2SonDummy(env: Record<string, string | undefined>): boolean {
   const accessKey = (env.R2_ACCESS_KEY_ID ?? '').trim().toLowerCase();
   const secret = (env.R2_SECRET_ACCESS_KEY ?? '').trim().toLowerCase();
   return CREDENCIALES_R2_DUMMY.has(accessKey) || CREDENCIALES_R2_DUMMY.has(secret);
