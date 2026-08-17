@@ -982,3 +982,127 @@ describe('H2 · los movimientos que generó un hecho no se cancelan sueltos', ()
     expect(await existencia(almPrimeras)).toBe(0);
   });
 });
+
+/**
+ * ⭐ H6 del reviewer — LA BITÁCORA NO PUEDE MENTIR (A7: auditoría uniforme).
+ *
+ * Antes de V1-E4b, "el recibo metió a inventario" y "el TipoProceso genera entrada a PT" eran la
+ * misma cosa, y la bitácora anotaba `generaEntradaPt: meteAPt` sin conflicto. Ya no lo son: un
+ * estampado DESPUÉS de costura mete mercancía a inventario (la devuelve del tránsito) con su
+ * `TipoProceso.generaEntradaPt` en `false`. Un campo llamado `generaEntradaPt` no puede llevar otro
+ * valor que el de la bandera; por eso ahora son tres campos y cada uno dice lo suyo.
+ *
+ * (El patrón de aserción es el mismo que ya usan `admin/almacenes.int.test.ts:151`,
+ * `modelos/arte-modelo.int.test.ts:207` y varios más: `expect(bitacora.datos).toMatchObject({…})`.)
+ */
+describe('H6 · la bitácora del recibo dice la verdad de cada campo', () => {
+  it('estampado DESPUÉS de costura: generaEntradaPt=false, devuelveDeTransito=true, meteAInventario=true', async () => {
+    await cortar100();
+    await meterAPt(almPrimeras, 10);
+    await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'EtapaMovimiento', idEntidad: String(recibo.id), accion: 'CREAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      tipo: 'recibo_maquila',
+      // El valor REAL de la bandera del TipoProceso, no "si metió a inventario".
+      generaEntradaPt: false,
+      devuelveDeTransito: true,
+      meteAInventario: true,
+    });
+  });
+
+  it('recibo de COSTURA: generaEntradaPt=true y devuelveDeTransito=false (no se invirtió el sentido)', async () => {
+    await cortar100();
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-08-17',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-08-18',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'EtapaMovimiento', idEntidad: String(recibo.id), accion: 'CREAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      generaEntradaPt: true,
+      devuelveDeTransito: false,
+      meteAInventario: true,
+    });
+  });
+
+  it('estampado ANTES de costura: no mete nada a inventario y la bitácora lo dice', async () => {
+    await cortar100();
+    await enviarAEstampado(10);
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-08-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'EtapaMovimiento', idEntidad: String(recibo.id), accion: 'CREAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      generaEntradaPt: false,
+      devuelveDeTransito: false,
+      meteAInventario: false,
+    });
+  });
+
+  it('el ENVÍO de prendas terminadas también deja el bucket en su bitácora', async () => {
+    await cortar100();
+    await meterAPtSinOrden(almPrimeras, 10);
+    const envio = await enviarAEstampado(10, {
+      prendaTerminada: true,
+      idAlmacenOrigen: almPrimeras.id,
+      stockSinOrden: true,
+    });
+
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'EtapaMovimiento', idEntidad: String(envio.id), accion: 'CREAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      tipo: 'envio_maquila',
+      prendaTerminada: true,
+      stockSinOrden: true,
+      idAlmacenOrigen: almPrimeras.id,
+    });
+  });
+});
