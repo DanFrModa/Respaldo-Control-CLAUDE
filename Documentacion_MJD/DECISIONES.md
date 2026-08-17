@@ -2587,3 +2587,57 @@ viejas a roles automáticamente o se reclasifica a mano?
 - **Aplica en:** la etapa de **proveedores** (junto con §Post-F9.54 y §Post-F9.55). **Requiere
   migración** (contactos; retiro del tipo). El punto 6 queda **diferido** por decisión de Daniel.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.57) — Cierre de las tres preguntas de proveedores, y el punto 6 SÍ entra (DANIEL, 16-ago-2026)
+
+**(1) Contactos: tabla sí, puesto CAMPO ABIERTO.**
+> *"O sea, sí un catálogo de contactos, pero deja el campo abierto qué rol tiene cada persona."*
+
+Tabla de contactos por proveedor (N por proveedor), y el **puesto en texto libre** — no catálogo.
+Mismo criterio que la posición del arte (§Post-F9.52 punto 2): Daniel prefiere abierto donde la
+realidad es variada.
+
+**(2) ⭐ Los dos campos cortos se FUSIONAN en uno solo.**
+> *"Tanto para proveedores como para talleres necesitamos el campo corto. Podría ser el mismo campo. En
+> la migración hay que meter el que ya está ahorita como campo corto de los maquileros."*
+
+Se retira la duplicidad: **un solo campo corto**, válido para proveedor comercial y para taller. La
+**migración lo siembra con el `corto` actual de los maquileros**.
+
+⚠️ **Lo que hay que decidir al construir, porque los dos campos NO se comportan igual:** `corto` es
+**`@unique` global** y `nombreCorto` **no tiene unicidad**. Al fusionarlos hay que elegir:
+- **mantener la unicidad** (es una clave corta de uso diario; dos proveedores con la misma confunden
+  al operar) — y entonces la migración puede **chocar** si dos registros comparten valor;
+- o **soltarla**, y perder la garantía que el taller usaba.
+
+**Recomendación del lead:** mantenerla **única**, y que la migración **REPORTE las colisiones** en vez
+de resolverlas en silencio (D3: nada se decide callado). → **pregunta abierta (1)**.
+
+**(3) Las clasificaciones viejas se TRADUCEN solas.**
+> *"Sí, tradúcelo automáticamente."*
+
+Al retirar `Proveedor.tipo`, su valor se convierte en rol: `TELAS` → *Telas*, `AVIOS` → *Avíos*,
+`SERVICIOS` → *Otros servicios*, `SIN_CLASIFICAR` → sin rol. **Aditivo**: no pisa los roles que el
+proveedor ya tenga marcados.
+
+**⭐ Y el punto 6 (§Post-F9.56) DEJA DE ESTAR DIFERIDO.**
+> *"En el punto 6 dijiste que lo dejamos para después, pero si quieres de una vez… hay proveedores de
+> avíos o de telas que puede pasar que algunas cosas sean con factura y otras sin factura."*
+
+Esto **cambia el alcance**: la segmentación con-factura / sin-factura deja de ser un asunto de
+**talleres (EsMa)** y pasa a ser **general del proveedor**. Un proveedor de material puede surtir unas
+cosas facturadas y otras no, así que **CxP necesita la misma partición** que EsMa ya tiene: el
+movimiento se marca, el saldo se separa y el estado de cuenta se consulta por segmento.
+
+**Lo que ya existe y se reusa** (no se inventa): `Proveedor.modalidadFacturacion` con
+`solo_con`/`solo_sin`/**`ambos`**, el marcado por movimiento (`dominio/esma/cargos.ts:216`) y el filtro
+por segmento (`dominio/esma/estado-cuenta.ts:48`). **Lo que falta:** llevarlo a `dominio/cxp/`.
+
+⚠️ **Los REPORTES de saldos por separado siguen diferidos** — Daniel los pidió *"solo para que lo
+consideres… pero eso será después"*. Se construye el **motor** (marcado + saldo segmentado); la
+**relación de proveedores con sus saldos partida en dos consultas** viene después, y con el motor
+puesto es barata.
+
+- **Aplica en:** la etapa de proveedores. **Requiere migración** (contactos, fusión del campo corto,
+  retiro del tipo con traducción a roles, segmentación en CxP).
+- **Fecha:** 2026-08-16.
