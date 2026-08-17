@@ -260,6 +260,21 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
 
+- **⚠️ RIESGO DECLARADO — 8 pruebas de la defensa anti-duplicado fallaron UNA vez en la suite completa,
+  y la causa NO se identificó (V1-E4, 16-ago-2026).** En una corrida de los 133 archivos de
+  integración, `importacion-pdf.int.test.ts` e `importacion.int.test.ts` dieron **8 rojas** con una
+  firma inequívoca: **fallaban todas las que exigen BLOQUEAR y pasaban todas las que exigen dejar
+  pasar** (`cargarOcYaImportadas` devolviendo vacío). **No es reproducible.** Se descartaron
+  **ejecutando** las tres hipótesis con nombre: secuencia no reiniciada (se sembró
+  `numero_produccion_seq` en 65 con el `contexto.ts` original → 34/34 verde), crash aguas arriba
+  (62/62 verde), y locale del cluster (34/34 verde); y los 133 archivos se cubrieron por bloques sobre
+  bases compartidas, todo verde. Se arregló **un defecto de aislamiento REAL** —`TRUNCATE … RESTART
+  IDENTITY` no reinicia las secuencias independientes, y `numero_produccion_seq` sobrevivía la corrida
+  entera— pero el reviewer **probó que NO es la causa** de los 8. **Queda como riesgo, no como
+  resuelto.** Reproducción a vigilar: una corrida única de los 133 archivos. ⚠️ La verificación local
+  fue **PG16 nativo**; el **CI usa postgres:17** y es el único juez. Si vuelve a aparecer, ya está la
+  firma exacta identificada.
+
 - **⚠️ Deuda técnica ACTIVA — el typecheck del backend está al filo de la memoria del runner
   (16-ago-2026).** `tsc --noEmit` murió en CI con **OOM (exit 134)** y se destrabó subiéndole el heap
   a 6 GB en `.github/workflows/ci.yml`, **la misma venda que el lint ya llevaba desde el 6-ago** — en

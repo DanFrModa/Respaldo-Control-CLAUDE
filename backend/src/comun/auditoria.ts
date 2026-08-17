@@ -81,6 +81,56 @@ export async function registrarBitacora(
 }
 
 /**
+ * Convierte una fila de Prisma al JSON del campo `datos` de la bitácora SIN perder información: un
+ * `antes` mutilado no serviría para reconstruir lo borrado (D3).
+ *
+ *  • `Prisma.Decimal` → NÚMERO (importes legibles y comparables, no cadenas).
+ *  • `Date` → ISO 8601.
+ *  • `BigInt` → cadena (los folios no caben en un `number` sin riesgo).
+ *  • `undefined` dentro de un objeto → se OMITE (igual que `JSON.stringify`), para que el llamador
+ *    pueda podar campos que no quiere en la bitácora.
+ *
+ * ⚠️ POR QUÉ SE RECORRE A MANO Y NO CON EL `replacer` DE `JSON.stringify`: el replacer recibe el
+ * valor DESPUÉS de que `JSON.stringify` llamó a su `toJSON()`. `Prisma.Decimal` y `Date` TIENEN
+ * `toJSON`, así que al replacer le llegaba ya una cadena y las ramas de Decimal/Date eran CÓDIGO
+ * MUERTO: los importes terminaban en la bitácora como `"40"` en vez de `40`. Recorriendo el objeto
+ * antes de serializar, la conversión sí ocurre.
+ */
+export function aJsonBitacora(fila: unknown): Prisma.InputJsonValue {
+  return normalizarJson(fila) as Prisma.InputJsonValue;
+}
+
+/** Recorre el valor convirtiendo Decimal/Date/BigInt ANTES de que intervenga `JSON.stringify`. */
+function normalizarJson(valor: unknown): unknown {
+  if (valor === null || valor === undefined) return null;
+  if (typeof valor === 'bigint') return valor.toString();
+  // ⚠️ EL FILTRO DE `object` VA ANTES QUE CUALQUIER INSPECCIÓN DE PROPIEDADES. `esDecimal` usa el
+  // operador `in`, que sobre un PRIMITIVO no devuelve `false`: LANZA `TypeError`. Con el orden
+  // invertido, `aJsonBitacora` reventaba con cualquier fila de Prisma (todas traen `id: number`),
+  // y con ella la operación entera. Los primitivos (number/string/boolean) se devuelven tal cual.
+  if (typeof valor !== 'object') return valor;
+  if (valor instanceof Date) return valor.toISOString();
+  if (Array.isArray(valor)) return valor.map((elemento) => normalizarJson(elemento));
+  if (esDecimal(valor)) return Number(valor.toString());
+
+  const salida: Record<string, unknown> = {};
+  for (const [clave, v] of Object.entries(valor)) {
+    if (v === undefined) continue;
+    salida[clave] = normalizarJson(v);
+  }
+  return salida;
+}
+
+/**
+ * ¿El valor es un `Prisma.Decimal`? Se detecta por FORMA (`toFixed`); los internos `d`/`s`/`e` no
+ * son estables entre versiones, y es lo único disponible sin importar el runtime de Prisma aquí.
+ * SOLO se puede llamar con un `object` ya comprobado (ver el aviso de `normalizarJson`).
+ */
+function esDecimal(valor: object): valor is { toFixed: () => string; toString: () => string } {
+  return 'toFixed' in valor && typeof valor.toFixed === 'function';
+}
+
+/**
  * Inserta VARIOS renglones de bitácora de una sola vez, en la misma transacción (A7).
  *
  * Mismo contrato que {@link registrarBitacora}, pero con un `createMany`: lo usan las operaciones

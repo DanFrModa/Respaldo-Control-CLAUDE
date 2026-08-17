@@ -886,6 +886,65 @@ Lo peor que puede pasar en producción no es que algo truene: es que corrompa da
 **Criterio de cierre:** cada uno con su prueba de regresión. Sin prueba no cuenta: son defectos que
 por definición nadie nota al probar a mano.
 
+### Nota de cierre — ✅ HECHA (16-ago-2026)
+
+**Los siete, verificados contra el código antes de tocarlos.** Dos resultaron **peores** que la ficha:
+el punto 4 no era *"queda atrapado"* sino **para siempre** (el `@@unique([idDesarrollo])` impedía que
+ese desarrollo entrara **nunca** a otra lista), y el punto 7 no era una pantalla sino **doce**.
+
+**Qué quedó:** defensa anti-duplicado en los **dos** importadores (identidad `ocCliente`+cliente,
+**excluyendo canceladas**, con re-verificación dentro de la tx bajo `pg_advisory_xact_lock`) ·
+precosto que ya no se congela en cero · resurtido creable desde la pantalla · renglón y lista de
+precios liberables **con el objeto íntegro en bitácora** · «Cancelar pedido» que dice la verdad y
+puede cancelar en cascada con motivo · Pedido Real cancelable (cierra el TODO de F2-E1) · y el
+buscador server-side en las 12 pantallas de cliente. Reglas de negocio en **§Post-F9.51**.
+
+**TRES rondas de revisión. Lo que cazó el reviewer, y cómo:**
+
+- **⭐ Ronda 1 — cuatro de las pruebas de la propia etapa estaban ROJAS.** Se habían reportado como
+  *"escritas, no verificadas"* porque la integración exige testcontainers (prohibidos). El reviewer
+  demostró que **sí se pueden correr**: Postgres nativo desechable, y ahí aparecieron. El código de
+  producción era correcto; **el arnés no**. Un fake reiniciaba su contador en cada llamada y la 2ª
+  importación chocaba por `unique` **antes** de llegar a su aserción — o sea que los dos casos ⭐ que
+  blindan la defensa **no los verificaba nadie**.
+- **⭐ Ronda 2 — el punto 4 NO FUNCIONABA: reventaba en el 100 % de las llamadas.** `esDecimal` usaba
+  el operador `in` sobre un primitivo → `TypeError` con **cualquier** fila (todas traen `id: number`).
+  «Quitar renglón» y «Borrar lista» daban toast rojo **siempre**: la trampa que la etapa venía a abrir
+  seguía cerrada. **Lo introdujo la corrección de la ronda 1** — sexta vez en el proyecto que un
+  arreglo mete un defecto nuevo, y la causa fue exactamente que **esa corrección no llevó prueba**.
+- **Dos regresiones de UI las introdujo el arreglo del punto 7**: un diálogo perdió su candado de
+  edición, y **la selección precargada se veía VACÍA** (con búsqueda server-side el combobox sólo
+  conoce 10 clientes; al editar un pedido de cualquiera de los otros ~107, el campo obligatorio salía
+  en blanco). Una tercera, la peor, sobrevivió a la ronda 2: la Consulta de órdenes mostraba
+  **«Todos los clientes»** mientras filtraba por uno — **la pantalla mintiendo sobre su propio
+  filtro**, en la etapa que trata de eso.
+
+**⚠️ RIESGO RESIDUAL DECLARADO — B2, no cerrado.** En una corrida de la **suite completa**, el reviewer
+vio **8 pruebas rojas** de la defensa anti-duplicado (fallaban todas las que exigen bloquear, pasaban
+todas las que exigen dejar pasar). **No es reproducible y su causa NO se identificó.** Se descartaron
+**ejecutando** las tres hipótesis con nombre —secuencia no reiniciada, crash aguas arriba, locale del
+cluster— y los 133 archivos se cubrieron por bloques en verde. El coder encontró y arregló **un defecto
+de aislamiento real** (`TRUNCATE … RESTART IDENTITY` no reinicia las secuencias independientes;
+`numero_produccion_seq` sobrevivía toda la corrida), pero el reviewer **probó que ese arreglo NO es la
+causa** de los 8. Se anota como riesgo, **no como resuelto**: cambiar un *"no sé"* por un *"ya está"*
+es la mentira cómoda que esta etapa vino a erradicar. **El CI es el juez** (usa postgres:17; la
+verificación local fue PG16). Detalle en `HOJA-DE-RUTA.md` §4.
+
+**Lo bien hecho, acreditado por el reviewer:** la defensa central es *"correcta, race-free y bien
+razonada"* — la **prueba de concurrencia es real** (quitó el candado y la carrera pasó a 2 ganadores);
+la identidad elegida **no produce falsos positivos** (el resurtido legítimo se atiende por su botón, no
+re-importando); **M2 quedó cerrado, no documentado** (`oc-duplicada.ts` consulta las dos puertas, así
+que una OC entrada por PDF bloquea la de Excel); el multi-PDF recuperado **prueba dos OC en una sola
+transacción**; y el punto 4 respeta **D3** de verdad — el `antes` va íntegro con sus
+`NegociacionEvento`, no un conteo.
+
+**Límites conocidos, escritos como límites y no como olvidos:** un Excel **sin OC capturada** no se
+puede deduplicar (inventar una identidad bloquearía importaciones legítimas), y la puerta de Desarrollo
+controla **qué** se compra, no **cuánto**.
+
+**Nota de despliegue:** **una migración** (`20260816120000_cancelar_pedido_real`). **CERO permisos
+nuevos, CERO seed** → no requiere `SEED_ON_START`.
+
 ---
 
 ## V1-E5 · Que los números sean los tuyos

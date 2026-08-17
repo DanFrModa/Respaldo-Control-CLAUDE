@@ -50,6 +50,15 @@ function leerEnteroState(state: unknown, clave: string): number | null {
   return typeof valor === 'number' && Number.isInteger(valor) && valor > 0 ? valor : null;
 }
 
+/** Lee de forma defensiva un texto NO vacío del `state` de navegación (deep-link del tablero). */
+function leerTextoState(state: unknown, clave: string): string | undefined {
+  if (typeof state !== 'object' || state === null || !(clave in state)) {
+    return undefined;
+  }
+  const valor = (state as Record<string, unknown>)[clave];
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
+}
+
 /**
  * CONSULTA de Órdenes (F2-E4): la operación diaria de localizar/imprimir órdenes. Tabla LIGERA
  * (servidor) con filtros (cliente/año/modelo/estado/canceladas) + búsqueda combinada (folio, modelo,
@@ -70,6 +79,12 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [idCliente, setIdCliente] = useState<number | null>(() =>
     leerEnteroState(estadoNavegacion, 'idCliente'),
+  );
+  // Nombre del cliente que viene en el deep-link. Sin él la pantalla MENTIRÍA sobre su propio
+  // filtro: con búsqueda server-side el combobox sólo conoce 10 clientes, así que enseñaría
+  // «Todos los clientes» mientras la consulta sí está filtrada por ese cliente.
+  const [nombreClienteInicial] = useState<string | undefined>(() =>
+    leerTextoState(estadoNavegacion, 'nombreCliente'),
   );
   const [anio, setAnio] = useState<number | null>(() => leerEnteroState(estadoNavegacion, 'anio'));
   const [estado, setEstado] = useState<EstadoOrden | null>(null);
@@ -192,6 +207,7 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
           {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
           <FiltroCliente
             idCliente={idCliente}
+            nombreInicial={nombreClienteInicial}
             alCambiar={(c) => {
               setIdCliente(c?.id ?? null);
               reiniciar();

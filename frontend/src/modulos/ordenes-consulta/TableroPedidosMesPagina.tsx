@@ -38,6 +38,10 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const [anio, setAnio] = useState<number | null>(new Date().getFullYear());
   const [idCliente, setIdCliente] = useState<number | null>(null);
+  // El NOMBRE del cliente se conserva —no sólo su id— porque viaja en el deep-link: la Consulta
+  // llega con el filtro puesto y, con búsqueda server-side, sin el nombre no tendría cómo
+  // mostrarlo (enseñaría "Todos los clientes" estando filtrada).
+  const [nombreCliente, setNombreCliente] = useState<string | null>(null);
 
   const query: TableroPedidosMesQuery = {
     ...(anio !== null ? { anio } : {}),
@@ -50,7 +54,7 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
   /** Salta a la Consulta de órdenes filtrada por el año/cliente del tablero. */
   function saltarAConsulta(fila: TableroPedidosMesFila): void {
     void navigate('/produccion/consulta', {
-      state: { anio: fila.anio, idCliente },
+      state: { anio: fila.anio, idCliente, nombreCliente },
     });
   }
 
@@ -87,7 +91,10 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
               ~117 clientes los del final del alfabeto NO aparecían. */}
           <FiltroCliente
             idCliente={idCliente}
-            alCambiar={(c) => setIdCliente(c?.id ?? null)}
+            alCambiar={(c) => {
+              setIdCliente(c?.id ?? null);
+              setNombreCliente(c?.nombre ?? null);
+            }}
             testid="filtro-cliente"
           />
         </div>
