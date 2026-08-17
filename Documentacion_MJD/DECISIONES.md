@@ -2732,3 +2732,49 @@ de arte se deriva de la misma marca.
   **puede ser etapa propia** si al trazar el flujo resulta que toca el kardex de PT — se dimensiona al
   arrancar.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.60) — Procesos DESPUÉS de costura: no hay fuga, hay inventario que MIENTE sobre lo que está físicamente (16-ago-2026)
+
+> Daniel, preguntado si esto ya pasa o es a futuro: *"Sí sucede desde ahorita. En varias ocasiones se
+> manda un estampado después de costura o algún otro proceso."*
+
+**⚠️ CORRECCIÓN DEL LEAD a §Post-F9.59.** Ahí se advirtió que *"las piezas desaparecen del almacén"*.
+**Eso era FALSO** y se dijo antes de trazar el flujo (el propio texto avisaba que no se había trazado).
+Trazado ahora:
+
+- **El ENVÍO no toca el kardex de PT.** Textual en `dominio/produccion/etapas.ts:7-9`: *"el corte y el
+  envío NO tocan el kardex PT (no son entrada/salida de existencia). Escriben `EtapaMovimiento` +
+  `EtapaMovimientoDet`. El kardex PT entra hasta el recibo de costura y la entrega."*
+- **El RECIBO mete a PT sólo si `generaEntradaPt`** (`recibos.ts:14`, `:463`), o sea sólo costura.
+
+**Qué pasa hoy con un estampado DESPUÉS de costura:** (1) el recibo de costura mete las prendas al
+almacén; (2) el envío al estampador **no las saca**; (3) el recibo del estampado **no las mete**
+(nunca salieron). **El saldo cuadra.** No hay fuga.
+
+**⭐ El problema REAL es el contrario, y sí importa:** mientras las prendas están **físicamente en el
+estampador**, el inventario dice que **están en el almacén**. Dos consecuencias concretas:
+
+1. Se puede **comprometer o entregar** mercancía que no está en el piso.
+2. El **inventario cíclico** (F7-E5) reportará diferencias **sin explicación**: el conteo físico no
+   cuadra con el teórico y nada dice por qué.
+
+Y una tercera, de diseño: `generaEntradaPt` **sigue estando en el nivel equivocado** (§Post-F9.59). Hoy
+no muerde **porque el envío tampoco saca** — el saldo cuadra por compensación, no porque el modelo sea
+correcto. Si algún día el envío empieza a sacar, aparece la fuga que se temía.
+
+**Las dos salidas, para decidir con Daniel:**
+
+- **(a) Dejarlo así en la v1**, y que la pantalla **avise** cuántas piezas de esa orden están fuera en
+  proceso. Barato; el saldo sigue cuadrando; el conteo cíclico necesita saber leer ese aviso.
+- **(b) Modelarlo de verdad:** el envío de prendas **ya terminadas** saca de PT hacia un bucket «en
+  proceso externo», y el recibo las devuelve. El inventario diría la verdad física y el cíclico
+  cuadraría solo. Más trabajo, toca el kardex (D3: movimientos, nunca edición de saldos).
+
+**Recomendación del lead: (a) para la primera versión**, con el aviso visible — Daniel quiere arrancar,
+el saldo no está mal, y (b) se puede construir después sin deshacer nada. Pero **(a) sólo es honesto si
+el aviso existe**: dejarlo mudo es que el inventario mienta sin decirlo, y esta etapa (V1-E4) trata
+justamente de eso.
+
+- **Aplica en:** por decidir con Daniel. Si es (a), es chico y cabe en la etapa de proveedores/arte. Si
+  es (b), **etapa propia** con su ETL de saldos en tránsito.
+- **Fecha:** 2026-08-16.
