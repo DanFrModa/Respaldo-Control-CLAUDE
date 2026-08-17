@@ -23,8 +23,9 @@ parametrizado por `TipoProceso` (D8 — unifica costura `Entregas`/`Recibos` y e
 
 `EtapaMovimiento` es el encabezado de cada captura (corte/envío/recibo/entrega); su detalle color×talla
 cuelga en `EtapaMovimientoDet`. **NO es el kardex:** el kardex PT (entrada/salida real de existencia) lo
-generan SOLO el **recibo de costura** (`TipoProceso.generaEntradaPt`) y la **entrega**, vía un `Movimiento`
-aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
+generan el **recibo de costura** (`TipoProceso.generaEntradaPt`), la **entrega**, y —desde V1-E4b— el
+**envío y el recibo de prenda ya terminada**, que la mueven contra el almacén de **Tránsito** (ver abajo).
+Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
 
 ## Servicios de dominio
 
@@ -88,13 +89,47 @@ cargarle a uno lo que devolvió el otro y falseaba EsMa y las existencias en pod
 `produccion.corte` · `produccion.envio` · `produccion.recibo` · `produccion.entrega` ·
 `produccion.cancelar` · `produccion.wip-ver` · `esma.cargo-validar`.
 
-## El `generaEntradaPt` — la bisagra del kardex
+## El `generaEntradaPt` — qué decide, y qué NO decide
 
-`TipoProceso.generaEntradaPt` es la bandera que decide si un recibo METE prenda al inventario de PT. Solo
-**costura** la tiene: el recibo de costura es lo que convierte WIP en producto terminado (entra a PT). El
-estampado/bordado/lavado son pasos intermedios sobre la MISMA pieza — su recibo sube el WIP "recibido"
-(para el cuadre del envío) pero **NO** toca el kardex. Esto reemplaza el `MeterInventario` / bandera
+`TipoProceso.generaEntradaPt` decide si un proceso **CREA** producto terminado. Solo **costura** la tiene:
+su recibo es lo que convierte WIP en prenda terminada. Esto reemplaza el `MeterInventario` / bandera
 `Inventariado` del viejo: recibir costura = ya queda en inventario en la misma transacción (mejora A1/D3).
+
+**Lo que esta bandera NO decide (corregido en V1-E4b):** si un recibo toca o no el kardex. Eso lo decide la
+**posición del proceso en el flujo**, y la posición **no es propiedad del tipo** — un mismo estampado va
+antes de costura en una orden y después en otra. Por eso la lleva el **envío** (`prendaTerminada`), no el
+catálogo. Ver §Post-F9.59 de `DECISIONES.md`.
+
+| Cuándo | Qué hace el recibo |
+|---|---|
+| Proceso con `generaEntradaPt` (costura) | **Crea** PT: entrada al almacén de primeras/segundas |
+| Proceso **antes** de costura (envío sin `prendaTerminada`) | Solo sube el WIP "recibido"; **NO** toca el kardex |
+| Proceso **después** de costura (envío con `prendaTerminada`) | **Devuelve** del Tránsito al almacén; no crea nada nuevo |
+
+## El Tránsito — dónde está la prenda que salió a proceso (V1-E4b)
+
+Una prenda ya terminada que se manda a estampar/lavar/aplicar **no está en el piso**, y el inventario no
+puede decir que sí. Se mueve al almacén **«Tránsito»** (`Almacen.esTransitoProceso`), que ya existía
+sembrado desde F3-E1 —heredado de `IPT_Almacenes` del Access, nunca usado— y que el envío resuelve por esa
+bandera, **jamás por nombre**. El traspaso reusa `registrarTraspasoPt`: dos patas en una transacción.
+
+```
+envío  (prendaTerminada)   almacén → Tránsito
+recibo, primeras           Tránsito → almacén de primeras
+recibo, segundas           Tránsito → almacén de segundas     ← la reclasificación, como movimiento real
+la diferencia              SE QUEDA VIVA en Tránsito
+```
+
+Ese saldo vivo **es** el faltante, y existe porque Daniel lo pidió así: *"¿de qué manera manejamos los
+faltantes o segundas?"* (§Post-F9.61). Su baja es un movimiento manual de PT con motivo y auditoría.
+
+**Dos cuentas, dos preguntas distintas — y no se duplican:** el kardex responde *"¿cuántas piezas no están
+en el piso?"*; el **WIP** responde *"¿de quién son?"* (`wip.ts` `pendientePorMaquilero`, saldo por tercero).
+Por eso el Tránsito es **uno solo** y no uno por maquilero.
+
+⚠️ **Lo que NO cierra:** dar de baja el faltante en el kardex **no** cierra el pendiente del WIP contra el
+maquilero — eso exigiría un `TipoEtapaMovimiento` nuevo y rehacer la aritmética de pendientes. Es una
+limitación **preexistente** (hoy tampoco se puede cerrar un pendiente sin recibir), anotada como deuda.
 
 ## Eventos que entrega a F5 (Ruta Crítica)
 
