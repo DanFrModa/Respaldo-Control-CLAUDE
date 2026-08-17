@@ -8,6 +8,7 @@ import {
   armarTablaEtapa,
   generarPdfEnvio,
   generarPdfFichaEstampado,
+  queSeEntrega,
   type DatosImpresoEnvio,
 } from './impreso-envio-maquila.js';
 
@@ -57,6 +58,9 @@ const DATOS: DatosImpresoEnvio = {
   proceso: 'Costura',
   folioOrden: 42,
   precioPactado: 12.5,
+  prendaTerminada: false,
+  almacenOrigen: null,
+  stockSinOrden: false,
   observaciones: 'Coser con hilo rojo',
   cancelado: false,
   tallas: ['CH', 'M'],
@@ -76,5 +80,39 @@ describe('generación de PDFs (F3-E2)', () => {
     const buffer = await generarPdfFichaEstampado({ ...DATOS, proceso: 'Estampado' });
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
+  });
+});
+
+/**
+ * V1-E4b — el papel que FIRMA el maquilero tiene que decir QUÉ se le entrega. No es cosmética: no
+ * es lo mismo recibir bultos cortados que prendas ya terminadas (cambia lo que se le reclama si no
+ * vuelven), y esas piezas salieron de un almacén concreto que también se imprime.
+ */
+describe('queSeEntrega — la declaración de prendas terminadas del impreso', () => {
+  it('con bultos cortados no dice nada (el papel de siempre)', () => {
+    expect(queSeEntrega({ ...DATOS, prendaTerminada: false })).toBeNull();
+  });
+
+  it('con prendas terminadas lo DICE y nombra el almacén del que salieron', () => {
+    const texto = queSeEntrega({
+      ...DATOS,
+      prendaTerminada: true,
+      almacenOrigen: 'Primeras',
+      stockSinOrden: false,
+    });
+    expect(texto).toContain('PRENDAS YA TERMINADAS');
+    expect(texto).toContain('Primeras');
+    expect(texto).not.toContain('sin orden');
+  });
+
+  it('si salieron del stock sin orden asignada, también lo dice', () => {
+    const texto = queSeEntrega({
+      ...DATOS,
+      prendaTerminada: true,
+      almacenOrigen: 'Primeras',
+      stockSinOrden: true,
+    });
+    expect(texto).toContain('PRENDAS YA TERMINADAS');
+    expect(texto).toContain('stock sin orden asignada');
   });
 });

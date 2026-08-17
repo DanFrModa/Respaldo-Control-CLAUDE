@@ -255,7 +255,7 @@ function tablaMatriz(datos: DatosImpresoEnvio): ReactElement {
  * terminada devuelve `null` y el campo ni se imprime: el envío de bultos cortados es el de siempre
  * y no hay nada nuevo que decir.
  */
-function queSeEntrega(datos: DatosImpresoEnvio): string | null {
+export function queSeEntrega(datos: DatosImpresoEnvio): string | null {
   if (!datos.prendaTerminada) return null;
   const deDonde =
     datos.almacenOrigen === null ? '' : ` (salen del almacén ${datos.almacenOrigen}`;
