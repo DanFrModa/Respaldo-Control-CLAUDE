@@ -93,7 +93,14 @@ export function EntregaClientePagina(): React.JSX.Element {
    * pantalla listaba TODOS, así que un almacén de PT mal tipificado se podía elegir aquí y no allá
    * (y al revés): dos puertas al mismo acto ofreciendo destinos distintos.
    */
-  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
+  // El almacén de TRÁNSITO se EXCLUYE de TODOS los selectores (V1-E4b, hallazgo H5 del reviewer):
+  // guarda lo que está físicamente en el taller de un tercero, y el servidor lo rechaza tanto de
+  // origen (entrega a cliente) como de destino (recibo). Ofrecerlo solo servía para cosechar un 400
+  // con la matriz ya tecleada. Las prendas que no vuelvan salen de ahí por un movimiento manual de
+  // inventario, con su motivo — no por estas pantallas.
+  const almacenesPt = (almacenes.data?.datos ?? []).filter(
+    (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
+  );
 
   // Seguimiento del pedido (pedido − entregado) con el disponible del almacén elegido (si hay).
   const seguimiento = useSeguimientoEntrega(

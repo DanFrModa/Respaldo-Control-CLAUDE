@@ -91,6 +91,11 @@ export const esquemaAlmacenSalida = z
       .string()
       .nullable()
       .describe('Nombre del cortador ligado (para pintarlo sin otra consulta), o null.'),
+    esTransitoProceso: z
+      .boolean()
+      .describe(
+        'Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable).',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),

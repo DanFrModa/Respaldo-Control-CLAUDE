@@ -193,6 +193,16 @@ export type WipMaquileroPendiente = z.infer<typeof esquemaWipMaquileroPendiente>
 
 /** Pendiente POR RECIBIR de un proceso, con su desglose por maquilero. */
 const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
+  devuelveAPt: z
+    .boolean()
+    .describe(
+      'Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT.',
+    ),
+  stockSinOrden: z
+    .boolean()
+    .describe(
+      'Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar.',
+    ),
   porMaquilero: z
     .array(esquemaWipMaquileroPendiente)
     .describe(

@@ -663,6 +663,13 @@ async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
  */
 const ALMACENES_PT_BASE: string[] = ['Primeras', 'Segundas', 'Tránsito'];
 
+/**
+ * Nombre del almacén de PT que hace de TRÁNSITO A PROCESO EXTERNO (V1-E4b, §Post-F9.61). El nombre
+ * solo se usa AQUÍ, para saber a cuál ponerle la bandera la primera vez; de ahí en adelante el
+ * dominio lo resuelve SIEMPRE por `esTransitoProceso` (renombrar el almacén no rompe nada).
+ */
+const NOMBRE_ALMACEN_TRANSITO = 'Tránsito';
+
 async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
   for (const nombre of ALMACENES_PT_BASE) {
     // Idempotente por (nombre, tipo PT, global): si ya existe NO se crea otro (el @@unique de
@@ -673,7 +680,30 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
       select: { id: true },
     });
     if (existente === null) {
-      await prisma.almacen.create({ data: { nombre, tipo: 'PT', idEmpresa: null } });
+      await prisma.almacen.create({
+        data: {
+          nombre,
+          tipo: 'PT',
+          idEmpresa: null,
+          esTransitoProceso: nombre === NOMBRE_ALMACEN_TRANSITO,
+        },
+      });
+    }
+  }
+
+  // V1-E4b: enciende la bandera del tránsito en las bases que YA tenían el almacén sembrado (F3-E1).
+  // Solo si NINGUNO la trae: si alguien la movió a otro almacén a propósito, el seed no se la quita.
+  const yaHayTransito = await prisma.almacen.count({ where: { esTransitoProceso: true } });
+  if (yaHayTransito === 0) {
+    const transito = await prisma.almacen.findFirst({
+      where: { nombre: NOMBRE_ALMACEN_TRANSITO, tipo: 'PT', idEmpresa: null },
+      select: { id: true },
+    });
+    if (transito !== null) {
+      await prisma.almacen.update({
+        where: { id: transito.id },
+        data: { esTransitoProceso: true },
+      });
     }
   }
 }

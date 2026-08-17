@@ -46,6 +46,7 @@ function aAlmacenSalida(almacen: AlmacenConCortador): z.infer<typeof esquemaAlma
     idEmpresa: almacen.idEmpresa,
     idCortador: almacen.idCortador,
     cortador: almacen.cortador?.nombre ?? null,
+    esTransitoProceso: almacen.esTransitoProceso,
     creadoEn: almacen.creadoEn.toISOString(),
     creadoPorId: almacen.creadoPorId,
     modificadoEn: almacen.modificadoEn.toISOString(),

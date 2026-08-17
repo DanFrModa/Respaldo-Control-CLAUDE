@@ -57,9 +57,8 @@ import { z } from 'zod';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
-  bloquearArticuloPt,
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
-  existenciaPtBloqueada,
+  exigirExistenciaPt,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   registrarTraspasoPt as registrarTraspasoPtMotor,
   type LineaMovimientoPt,
@@ -215,10 +214,13 @@ async function tipoPorCodigo(
 
 /**
  * Valida, bajo bloqueo, que SACAR `celdas` del almacén `idAlmacen` (artículos del `idModelo`) no deje
- * la existencia negativa (D3). Toma `bloquearArticuloPt` + `existenciaPtBloqueada` por cada artículo
- * DENTRO de la transacción (concurrencia: dos salidas del mismo artículo no se cuelan entre la
- * lectura y la escritura — base de "no entregar lo que no existe"). Suma directa de `MovimientoDetPt`,
+ * la existencia negativa (D3). La regla vive en el MOTOR ({@link exigirExistenciaPt}): la comparten
+ * los movimientos manuales/traspasos de aquí y el envío de prendas terminadas al tránsito (V1-E4b),
+ * y tiene que ser la misma letra por letra. Suma directa de `MovimientoDetPt` bajo advisory lock,
  * NUNCA la vista (ADR-0010 §3).
+ *
+ * §Post-F9.40 — cada celda valida contra el bucket de SU orden (F6-E2 "PT por orden"): el bucket
+ * «sin orden» (`idOrden = null`, lo capturado a mano y lo migrado) es uno más, no el único.
  */
 async function validarNoNegativo(
   tx: Tx,
@@ -227,34 +229,7 @@ async function validarNoNegativo(
   idModelo: number,
   celdas: Celda[],
 ): Promise<void> {
-  // Toma los locks en un orden DETERMINISTA (por color, talla y ORDEN) para que dos operaciones que
-  // compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden: elimina el riesgo
-  // teórico de deadlock entre dos traspasos cruzados. No copia/ordena `celdas` (caller la usa luego).
-  // §Post-F9.40 — cada celda valida contra el bucket de SU orden (F6-E2 "PT por orden"): el bucket
-  // «sin orden» (`idOrden = null`, lo capturado a mano y lo migrado) es uno más, no el único.
-  const ordenadas = [...celdas].sort(
-    (a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla || (a.idOrden ?? 0) - (b.idOrden ?? 0),
-  );
-  for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, c.idOrden);
-    const existencia = await existenciaPtBloqueada(
-      tx,
-      idEmpresa,
-      idAlmacen,
-      idModelo,
-      c.idColor,
-      c.idTalla,
-      c.idOrden,
-    );
-    if (existencia - c.cantidad < 0) {
-      const deQueOrden =
-        c.idOrden === null ? 'del bucket «sin orden»' : `de la orden ${String(c.idOrden)}`;
-      throw new ErrorConflicto(
-        `No hay existencia suficiente ${deQueOrden}: se intenta sacar ${c.cantidad} pza(s) de un ` +
-          `artículo con ${existencia} en existencia (no se permite dejar el inventario en negativo).`,
-      );
-    }
-  }
+  await exigirExistenciaPt(tx, idEmpresa, idAlmacen, idModelo, celdas);
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
@@ -498,6 +473,67 @@ export async function registrarTraspasoPt(
 }
 
 /**
+ * Cómo se le dice al usuario dónde SÍ se cancela cada movimiento que no nació a mano. La clave es el
+ * `origenTipo`; el valor, la frase que se le pone al mensaje.
+ */
+const DONDE_CANCELAR: Record<string, string> = {
+  [ORIGEN.traspaso]:
+    'es una de las DOS patas de un traspaso entre almacenes: cancelar solo una dejaría el ' +
+    'inventario descuadrado entre los dos almacenes. Revierte el traspaso con otro traspaso, del ' +
+    'destino al origen',
+  [ORIGEN.reciboMaquila]: 'lo generó un RECIBO de maquila: cancélalo desde el recibo',
+  [ORIGEN.envioMaquila]:
+    'lo generó una ENTREGA de prendas a proceso: cancélala desde la entrega (así regresan del ' +
+    'tránsito y el pendiente del maquilero se cierra con ella)',
+  [ORIGEN.entregaCliente]: 'lo generó una ENTREGA A CLIENTE: cancélala desde la entrega',
+  // ⚠️ El cíclico NO es una puerta de vuelta: `generarAjusteCiclico` deja el conteo en `cerrado`
+  // (`inventario-ciclico.ts`) y `cancelarInventarioCiclico` rechaza justo ese estado ("ya está
+  // cerrado (con ajuste): no se cancela"). O sea que el ÚNICO estado en el que existe un movimiento
+  // `ajuste-ciclico` es el estado en el que el cíclico se niega a deshacerse. Mandar ahí al usuario
+  // sería mandarlo a una puerta cerrada con llave — misma redacción que `migracion`, que es el otro
+  // caso sin marcha atrás.
+  [ORIGEN.ajusteCiclico]:
+    'lo generó el AJUSTE de un INVENTARIO CÍCLICO ya cerrado, que no tiene marcha atrás. Si el ' +
+    'conteo estuvo mal, corrige la existencia con un movimiento manual NUEVO, no anulando el ajuste',
+  [ORIGEN.cancelacion]:
+    'YA ES el inverso de otro movimiento (una cancelación): cancelar una cancelación no revierte ' +
+    'nada, solo enreda la historia',
+  [ORIGEN.migracion]:
+    'lo cargó la MIGRACIÓN del sistema viejo: corregirlo a mano descuadraría el histórico. Ajusta ' +
+    'la existencia con un movimiento nuevo, no anulando el migrado',
+};
+
+/**
+ * ⭐ Solo se cancelan A MANO los movimientos que se capturaron A MANO (V1-E4b, hallazgo H2 del
+ * reviewer). Todos los demás son el EFECTO de un hecho de negocio —un recibo, una entrega, un envío
+ * de prendas a proceso, un cíclico— que además tiene su propio estado (etapa viva, cargo EsMa,
+ * pendiente del maquilero). Anular el movimiento suelto revierte el inventario y deja el hecho en
+ * pie: el kardex y el WIP quedan contándose historias distintas.
+ *
+ * El caso que lo destapó: tras un envío de 100 prendas al estampador, cancelando desde Inventarios
+ * SOLO la pata de entrada al tránsito quedaban `primeras = 0` y `tránsito = 0` mientras el WIP
+ * seguía reclamándole 100 al maquilero — cien prendas desaparecidas del kardex, que es exactamente
+ * la enfermedad que esta etapa vino a curar. La raíz es anterior a V1-E4b (el traspaso manual tenía
+ * el mismo hueco, y `cancelarMovimientoMaterial` ya lo cerraba para tela/avío), pero el tránsito la
+ * vuelve grave porque ahora ese saldo SOSTIENE la historia del faltante.
+ *
+ * El mensaje no dice "no se puede": dice dónde sí (`DONDE_CANCELAR`).
+ */
+function exigirMovimientoCancelableAMano(origenTipo: string | null, origenId: string | null): void {
+  if (origenTipo === ORIGEN.movimientoManual) {
+    return;
+  }
+  const donde =
+    (origenTipo === null ? undefined : DONDE_CANCELAR[origenTipo]) ??
+    `lo generó otro proceso del sistema (${origenTipo ?? 'sin origen'}): cancélalo desde ahí`;
+  const cual = origenId === null ? '' : ` (folio/id de origen: ${origenId})`;
+  throw new ErrorConflicto(
+    `Este movimiento no se capturó a mano: ${donde}${cual}. Anularlo aquí dejaría el ` +
+      'inventario y el avance de producción contando historias distintas.',
+  );
+}
+
+/**
  * CANCELA un movimiento de PT generando su INVERSO auditado (D3/A7): NUNCA edita ni borra el original.
  * Reemplaza la práctica vieja de "Error de Entrada/Salida": lee la dirección del original y elige el
  * tipo inverso — original `entrada` → `error-entrada` (saca lo que entró); original `salida` →
@@ -522,6 +558,8 @@ export async function cancelarMovimientoPt(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
+        origenId: true,
         tipoMov: { select: { direccion: true } },
         detallesPt: { select: { id: true } },
       },
@@ -532,6 +570,7 @@ export async function cancelarMovimientoPt(
     if (original.detallesPt.length === 0) {
       throw new ErrorValidacion('Solo se pueden cancelar movimientos de producto terminado en F3.');
     }
+    exigirMovimientoCancelableAMano(original.origenTipo, original.origenId);
 
     // entrada → inverso de SALIDA (error-entrada); salida → inverso de ENTRADA (error-salida).
     const codigoInverso =

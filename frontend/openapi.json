@@ -2088,6 +2088,10 @@
                             ],
                             "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                           },
+                          "esTransitoProceso": {
+                            "type": "boolean",
+                            "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -2131,6 +2135,7 @@
                           "idEmpresa",
                           "idCortador",
                           "cortador",
+                          "esTransitoProceso",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -2450,6 +2455,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -2493,6 +2502,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -2744,6 +2754,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -2787,6 +2801,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -3081,6 +3096,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -3124,6 +3143,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -3373,6 +3393,10 @@
                       ],
                       "description": "Nombre del cortador ligado (para pintarlo sin otra consulta), o null."
                     },
+                    "esTransitoProceso": {
+                      "type": "boolean",
+                      "description": "Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable)."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -3416,6 +3440,7 @@
                     "idEmpresa",
                     "idCortador",
                     "cortador",
+                    "esTransitoProceso",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -105174,6 +105199,38 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105336,6 +105393,10 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -105669,6 +105730,38 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105831,6 +105924,10 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106057,6 +106154,22 @@
                       }
                     ]
                   },
+                  "prendaTerminada": {
+                    "default": false,
+                    "description": "Las prendas que se mandan YA son producto terminado (proceso DESPUÉS de costura, §Post-F9.61): el envío las SACA de `idAlmacenOrigen` hacia el almacén de tránsito y su recibo las devuelve.",
+                    "type": "boolean"
+                  },
+                  "idAlmacenOrigen": {
+                    "description": "Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "stockSinOrden": {
+                    "default": false,
+                    "description": "Las prendas salen del bucket de existencia «sin orden asignada» (`id_orden = NULL`: histórico migrado e inventario físico de arranque) en vez del bucket de su orden. Solo aplica con `prendaTerminada`.",
+                    "type": "boolean"
+                  },
                   "observaciones": {
                     "type": "string",
                     "maxLength": 1000
@@ -106245,6 +106358,38 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -106407,6 +106552,10 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106740,6 +106889,38 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
+                    "stockSinOrden": {
+                      "type": "boolean",
+                      "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -106902,6 +107083,10 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
+                    "stockSinOrden",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -107581,6 +107766,38 @@
                             ],
                             "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                           },
+                          "prendaTerminada": {
+                            "type": "boolean",
+                            "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                          },
+                          "idAlmacenOrigen": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                          },
+                          "almacenOrigen": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del almacén de origen o null."
+                          },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto."
+                          },
                           "observaciones": {
                             "anyOf": [
                               {
@@ -107743,6 +107960,10 @@
                           "fecha",
                           "fechaCompromiso",
                           "precioPactado",
+                          "prendaTerminada",
+                          "idAlmacenOrigen",
+                          "almacenOrigen",
+                          "stockSinOrden",
                           "observaciones",
                           "cancelado",
                           "canceladoEn",
@@ -109869,7 +110090,15 @@
                           },
                           "generaEntradaPt": {
                             "type": "boolean",
-                            "description": "Si el recibo de este proceso mete a PT."
+                            "description": "Si el recibo de este proceso CREA producto terminado."
+                          },
+                          "devuelveAPt": {
+                            "type": "boolean",
+                            "description": "Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT."
+                          },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b)."
                           },
                           "celdas": {
                             "type": "array",
@@ -110008,6 +110237,8 @@
                           "tipoProceso",
                           "codigoProceso",
                           "generaEntradaPt",
+                          "devuelveAPt",
+                          "stockSinOrden",
                           "celdas",
                           "totalPendiente",
                           "porMaquilero"
@@ -113455,6 +113686,14 @@
                             "maximum": 9007199254740991,
                             "description": "Total pendiente de este proceso (derivado)."
                           },
+                          "devuelveAPt": {
+                            "type": "boolean",
+                            "description": "Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT."
+                          },
+                          "stockSinOrden": {
+                            "type": "boolean",
+                            "description": "Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar."
+                          },
                           "porMaquilero": {
                             "type": "array",
                             "items": {
@@ -113545,6 +113784,8 @@
                           "generaEntradaPt",
                           "celdas",
                           "totalPendiente",
+                          "devuelveAPt",
+                          "stockSinOrden",
                           "porMaquilero"
                         ],
                         "additionalProperties": false

@@ -11,10 +11,18 @@
  *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores).
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
  *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista.
- *  3. SOLO si `TipoProceso.generaEntradaPt` (costura): la ENTRADA al kardex PT vía el motor —
- *     primeras → almacén de primeras, segundas → almacén de segundas (tipo `entrada-maquila`,
- *     origen recibo, costoUnit NULL D1/D2). Reemplaza el viejo `MeterInventario`/bandera
- *     "Inventariado": recibir = ya queda en inventario en la MISMA transacción (mejora A1).
+ *  3. El efecto sobre el kardex de PT, que desde V1-E4b (§Post-F9.61) tiene DOS formas — y cuál
+ *     aplica lo decide DÓNDE VA EL PROCESO en esta orden, no el tipo de proceso (§Post-F9.59):
+ *       a) el proceso CREA producto terminado (`TipoProceso.generaEntradaPt`, la costura) ⇒ ENTRADA
+ *          nueva al kardex (tipo `entrada-maquila`): primeras → almacén de primeras, segundas →
+ *          almacén de segundas. Reemplaza el viejo `MeterInventario`/bandera "Inventariado":
+ *          recibir = ya queda en inventario en la MISMA transacción (mejora A1);
+ *       b) el envío fue de PRENDAS YA TERMINADAS (`EtapaMovimiento.prendaTerminada`, un proceso
+ *          DESPUÉS de la costura) ⇒ las prendas VUELVEN del almacén de TRÁNSITO a primeras y
+ *          segundas (traspaso). Aquí es donde la prenda que salió PRIMERA y vuelve SEGUNDA se
+ *          reclasifica de verdad, y donde lo que no vuelve se queda vivo en tránsito;
+ *       c) ninguna de las dos (estampado ANTES de costura, sobre bultos cortados) ⇒ no toca kardex.
+ *     `costoUnit` queda NULL en los tres casos (D1/D2).
  *  4. `EsMaCargo(propuesto)` para TODO proceso (costura Y estampado): cantidad recibida × precio
  *     del envío (el precio puede nacer NULL — por eso la validación del admin es obligatoria, F3-E4).
  *  5. Evento `recibo-registrado` post-commit (gancho RC F5, sin consumidores hoy).
@@ -54,7 +62,6 @@ import {
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
 import {
-  cancelarMovimientoPt as cancelarMovimientoPtMotor,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   type LineaMovimientoPt,
 } from '../../comun/kardex.js';
@@ -70,12 +77,16 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import {
+  devolverPrendasDeTransito,
+  formaDelEnvioVivo,
+  rechazarAlmacenDeTransito,
+  revertirMovimientosDeHecho,
+} from './transito.js';
 import { pendientePorMaquilero, type MetaCelda } from './wip.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
-/** Tipo inverso (salida) para revertir la entrada del recibo al cancelar (dirección salida). */
-const COD_ERROR_ENTRADA = 'error-entrada';
 
 /**
  * MAPEO `TipoProceso.codigo` → `RolProveedor.codigo` (fusión de terceros, D12/R15; espejo del de
@@ -572,17 +583,34 @@ export async function registrarReciboMaquila(
       }
     }
 
-    // Almacenes destino: solo aplican si el proceso mete a PT (costura). Si vienen para un proceso
-    // que NO mete a PT, se ignoran (no se persisten): recibir estampado no toca inventario.
-    const meteAPt = proceso.generaEntradaPt;
+    // ── ¿Este recibo mete mercancía a PT, y de qué forma? (V1-E4b, §Post-F9.59/§Post-F9.61) ─────
+    // La pregunta ya NO se contesta solo con `TipoProceso.generaEntradaPt`: el MISMO estampado
+    // devuelve producto terminado cuando va después de la costura y no lo devuelve cuando va antes.
+    // La posición la lleva el ENVÍO (`prendaTerminada`), y de ahí se deriva:
+    //   • `devuelveAPt` — las prendas ya existían y vuelven del TRÁNSITO (traspaso);
+    //   • `creaPt`      — el proceso las CREA (costura): entrada nueva al kardex.
+    // Se lee bajo el lock de la orden, que ya está tomado arriba.
+    const creaPt = proceso.generaEntradaPt;
+    const formaEnvio = await formaDelEnvioVivo(tx, datos.idOrden, datos.idTipoProceso);
+    const devuelveAPt = formaEnvio?.prendaTerminada === true;
+    // Al bucket del que SALIERON: si el envío sacó del «sin orden» (histórico migrado / inventario
+    // de arranque), ahí vuelven. Reetiquetarlas a la orden al regresar sería mover saldo entre
+    // buckets sin que nadie lo pidiera.
+    const idOrdenBucket = formaEnvio?.stockSinOrden === true ? null : datos.idOrden;
+    // Almacenes destino: solo aplican si el recibo mete a PT (por creación o por devolución). Si
+    // vienen para un recibo que no lo hace, se ignoran (no se persisten).
+    const meteAPt = creaPt || devuelveAPt;
     const totalSegundas = celdas.reduce((s, c) => s + c.segundas, 0);
 
-    // Para costura, el almacén de primeras es OBLIGATORIO (las primeras deben tener destino). El de
-    // segundas solo se exige si hubo segundas.
+    // Con destino a PT, el almacén de primeras es OBLIGATORIO (las primeras deben tener destino).
+    // El de segundas solo se exige si hubo segundas.
     if (meteAPt) {
       if (datos.idAlmacenPrimeras === undefined) {
         throw new ErrorValidacion(
-          'El recibo de costura necesita un almacén destino para las primeras (mete a inventario).',
+          creaPt
+            ? 'El recibo de costura necesita un almacén destino para las primeras (mete a inventario).'
+            : 'Estas prendas salieron del almacén al mandarlas a proceso: el recibo necesita un ' +
+                'almacén destino para las primeras que regresan.',
         );
       }
       if (totalSegundas > 0 && datos.idAlmacenSegundas === undefined) {
@@ -591,8 +619,10 @@ export async function registrarReciboMaquila(
         );
       }
       await exigirAlmacen(tx, datos.idAlmacenPrimeras, orden.idEmpresa);
+      await rechazarAlmacenDeTransito(tx, datos.idAlmacenPrimeras, 'recibe');
       if (datos.idAlmacenSegundas !== undefined) {
         await exigirAlmacen(tx, datos.idAlmacenSegundas, orden.idEmpresa);
+        await rechazarAlmacenDeTransito(tx, datos.idAlmacenSegundas, 'recibe');
       }
     }
 
@@ -627,11 +657,16 @@ export async function registrarReciboMaquila(
       },
     });
 
-    // (3) ENTRADA al kardex PT — SOLO si el proceso mete a PT (costura). Primeras → almacén primeras;
-    // segundas → almacén segundas. El motor abre el movimiento dentro de ESTA transacción ({ tx }).
+    // (3) EFECTO SOBRE EL KARDEX DE PT. Dos formas, según de dónde vengan las prendas (V1-E4b):
+    //   • `devuelveAPt` — ya existían y estaban en TRÁNSITO (el envío las sacó del almacén porque el
+    //     proceso va después de la costura): vuelven con un TRASPASO tránsito → primeras/segundas.
+    //     Las que no vuelvan se quedan en tránsito, vivas, a cargo del maquilero (§Post-F9.61).
+    //   • `creaPt` — el proceso las CREA (costura): ENTRADA nueva al kardex.
+    // En ambas, primeras y segundas van a SU almacén (la reclasificación es un movimiento, no una
+    // edición de saldo — D3) y el motor abre todo dentro de ESTA transacción ({ tx }).
     if (meteAPt) {
       const idModelo = await modeloDeLaOrden(tx, datos.idOrden);
-      // PT por orden (F6-E2): la entrada de PT queda etiquetada con la orden del recibo.
+      // PT por orden (F6-E2): lo que entra queda etiquetado con la orden del recibo.
       const lineasPrimeras = celdas
         .filter((c) => c.primeras > 0)
         .map<LineaMovimientoPt>((c) => ({
@@ -650,37 +685,62 @@ export async function registrarReciboMaquila(
           idOrden: datos.idOrden,
           cantidad: c.segundas,
         }));
-      const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);
 
-      if (lineasPrimeras.length > 0 && idAlmacenPrimeras !== null) {
-        await registrarMovimientoPtMotor(
-          sesion,
-          {
+      if (devuelveAPt) {
+        const devolver = async (
+          idAlmacenDestino: number | null,
+          lineas: LineaMovimientoPt[],
+        ): Promise<void> => {
+          if (lineas.length === 0 || idAlmacenDestino === null) return;
+          await devolverPrendasDeTransito(sesion, tx, {
             idEmpresa: orden.idEmpresa,
-            idTipoMov: tipoEntrada.id,
-            idAlmacen: idAlmacenPrimeras,
+            idAlmacenDestino,
+            idModelo,
+            idOrdenBucket,
             fecha: aDateColumna(datos.fecha),
             origenTipo: ORIGEN.reciboMaquila,
             origenId: String(recibo.id),
-            lineas: lineasPrimeras,
-          },
-          { tx },
-        );
-      }
-      if (lineasSegundas.length > 0 && idAlmacenSegundas !== null) {
-        await registrarMovimientoPtMotor(
-          sesion,
-          {
-            idEmpresa: orden.idEmpresa,
-            idTipoMov: tipoEntrada.id,
-            idAlmacen: idAlmacenSegundas,
-            fecha: aDateColumna(datos.fecha),
-            origenTipo: ORIGEN.reciboMaquila,
-            origenId: String(recibo.id),
-            lineas: lineasSegundas,
-          },
-          { tx },
-        );
+            celdas: lineas.map((l) => ({
+              idColor: l.idColor,
+              idTalla: l.idTalla,
+              cantidad: l.cantidad,
+            })),
+          });
+        };
+        await devolver(idAlmacenPrimeras, lineasPrimeras);
+        await devolver(idAlmacenSegundas, lineasSegundas);
+      } else {
+        const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);
+        if (lineasPrimeras.length > 0 && idAlmacenPrimeras !== null) {
+          await registrarMovimientoPtMotor(
+            sesion,
+            {
+              idEmpresa: orden.idEmpresa,
+              idTipoMov: tipoEntrada.id,
+              idAlmacen: idAlmacenPrimeras,
+              fecha: aDateColumna(datos.fecha),
+              origenTipo: ORIGEN.reciboMaquila,
+              origenId: String(recibo.id),
+              lineas: lineasPrimeras,
+            },
+            { tx },
+          );
+        }
+        if (lineasSegundas.length > 0 && idAlmacenSegundas !== null) {
+          await registrarMovimientoPtMotor(
+            sesion,
+            {
+              idEmpresa: orden.idEmpresa,
+              idTipoMov: tipoEntrada.id,
+              idAlmacen: idAlmacenSegundas,
+              fecha: aDateColumna(datos.fecha),
+              origenTipo: ORIGEN.reciboMaquila,
+              origenId: String(recibo.id),
+              lineas: lineasSegundas,
+            },
+            { tx },
+          );
+        }
       }
     }
 
@@ -711,7 +771,13 @@ export async function registrarReciboMaquila(
         idOrden: datos.idOrden,
         idTipoProceso: datos.idTipoProceso,
         idMaquilero: datos.idMaquilero,
-        generaEntradaPt: meteAPt,
+        // A7 — cada campo dice EXACTAMENTE lo suyo (hallazgo H6 del reviewer): `generaEntradaPt` es
+        // la bandera del TipoProceso y no puede llevar otro valor; que el recibo haya movido
+        // inventario es una cosa distinta desde V1-E4b (puede devolverlo del tránsito sin que el
+        // proceso cree PT).
+        generaEntradaPt: creaPt,
+        devuelveDeTransito: devuelveAPt,
+        meteAInventario: meteAPt,
         celdas: celdas.length,
         totalRecibido,
         totalSegundas,
@@ -816,21 +882,15 @@ export async function cancelarReciboMaquila(
       verificarPermiso(sesion, 'esma.cargo-validar');
     }
 
-    // (b) Revierte la(s) ENTRADA(s) a PT que generó el recibo (si las generó) con inverso(s).
-    const movimientos = await tx.movimiento.findMany({
-      where: {
-        origenTipo: ORIGEN.reciboMaquila,
-        origenId: String(idRecibo),
-        idMovimientoInverso: null, // los inversos no se re-cancelan
-      },
-      select: { id: true, anuladoPor: { select: { id: true } } },
+    // (b) Revierte TODO el kardex que generó el recibo con movimiento(s) INVERSO(s) auditados (D3):
+    // la entrada del recibo de costura, o las DOS patas del traspaso de vuelta del tránsito
+    // (V1-E4b) — en cuyo caso las prendas regresan al tránsito, que es donde estaban. El helper
+    // elige el tipo inverso por la DIRECCIÓN de cada movimiento y valida existencia antes de sacar
+    // (cancelar un recibo cuyas prendas ya se entregaron no puede dejar el almacén en negativo).
+    const movimientosRevertidos = await revertirMovimientosDeHecho(sesion, tx, {
+      origenTipo: ORIGEN.reciboMaquila,
+      origenId: String(idRecibo),
     });
-    const tipoInverso = await tipoPorCodigo(tx, COD_ERROR_ENTRADA);
-    for (const mov of movimientos) {
-      if (mov.anuladoPor.length > 0) continue; // ya estaba anulado (defensivo)
-      // El motor crea el inverso (salida) enlazado al original; existencia se neutraliza (D3).
-      await cancelarMovimientoPtMotor(sesion, mov.id, tipoInverso.id, { tx });
-    }
 
     // (c) Cancela el cargo EsMa (esté propuesto o validado-con-permiso).
     if (cargo !== null) {
@@ -865,7 +925,7 @@ export async function cancelarReciboMaquila(
         tipo: 'recibo_maquila',
         folio: Number(recibo.folio),
         motivo: datos.motivo,
-        movimientosRevertidos: movimientos.length,
+        movimientosRevertidos,
       },
     });
 
@@ -975,6 +1035,26 @@ export async function pendientesPorRecibir(
     distinct: ['idTipoProceso'],
   });
 
+  // ¿Qué procesos de esta orden se enviaron como PRENDA YA TERMINADA? (V1-E4b) Su recibo devuelve
+  // mercancía del tránsito y por lo tanto SÍ pide almacenes destino, aunque el proceso no sea el
+  // que crea el PT. Se resuelve en UNA consulta para todos los procesos, no uno por uno.
+  const enviosPrendaTerminada = await cliente.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+      prendaTerminada: true,
+      idTipoProceso: { not: null },
+    },
+    select: { idTipoProceso: true, stockSinOrden: true },
+    distinct: ['idTipoProceso'],
+  });
+  const bucketPorProceso = new Map<number, boolean>();
+  for (const e of enviosPrendaTerminada) {
+    if (e.idTipoProceso !== null) bucketPorProceso.set(e.idTipoProceso, e.stockSinOrden);
+  }
+  const procesosQueDevuelven = new Set(bucketPorProceso.keys());
+
   const porRecibir = [];
   for (const proc of procesosEnviados) {
     if (proc.idTipoProceso === null) continue;
@@ -1015,6 +1095,8 @@ export async function pendientesPorRecibir(
       tipoProceso: proc.tipoProceso?.nombre ?? '',
       codigoProceso: proc.tipoProceso?.codigo ?? '',
       generaEntradaPt: proc.tipoProceso?.generaEntradaPt ?? false,
+      devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
+      stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas,
       totalPendiente,
       porMaquilero,

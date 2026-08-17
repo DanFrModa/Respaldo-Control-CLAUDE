@@ -788,6 +788,8 @@ export interface paths {
                 idCortador: number | null;
                 /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
                 cortador: string | null;
+                /** @description Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable). */
+                esTransitoProceso: boolean;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -941,6 +943,8 @@ export interface paths {
               idCortador: number | null;
               /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
               cortador: string | null;
+              /** @description Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable). */
+              esTransitoProceso: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -1090,6 +1094,8 @@ export interface paths {
               idCortador: number | null;
               /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
               cortador: string | null;
+              /** @description Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable). */
+              esTransitoProceso: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -1228,6 +1234,8 @@ export interface paths {
               idCortador: number | null;
               /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
               cortador: string | null;
+              /** @description Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable). */
+              esTransitoProceso: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -1377,6 +1385,8 @@ export interface paths {
               idCortador: number | null;
               /** @description Nombre del cortador ligado (para pintarlo sin otra consulta), o null. */
               cortador: string | null;
+              /** @description Almacén de TRÁNSITO a proceso externo (V1-E4b, §Post-F9.61): guarda las prendas terminadas mientras están en el taller de un tercero. SOLO lo mueven el envío y el recibo; ningún flujo lo acepta como origen/destino y las pantallas no deben ofrecerlo. Lo marca el seed (no es editable). */
+              esTransitoProceso: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -41294,6 +41304,14 @@ export interface paths {
               fechaCompromiso: string | null;
               /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
               /** @description Observaciones o null. */
               observaciones: string | null;
               /** @description Si la etapa está cancelada (suave). */
@@ -41489,6 +41507,14 @@ export interface paths {
               fechaCompromiso: string | null;
               /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
               /** @description Observaciones o null. */
               observaciones: string | null;
               /** @description Si la etapa está cancelada (suave). */
@@ -41654,6 +41680,18 @@ export interface paths {
             fechaCompromiso?: string | null;
             /** @description Precio de maquila pactado (base del cargo EsMa), opcional. */
             precioPactado?: number | null;
+            /**
+             * @description Las prendas que se mandan YA son producto terminado (proceso DESPUÉS de costura, §Post-F9.61): el envío las SACA de `idAlmacenOrigen` hacia el almacén de tránsito y su recibo las devuelve.
+             * @default false
+             */
+            prendaTerminada?: boolean;
+            /** @description Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`. */
+            idAlmacenOrigen?: number;
+            /**
+             * @description Las prendas salen del bucket de existencia «sin orden asignada» (`id_orden = NULL`: histórico migrado e inventario físico de arranque) en vez del bucket de su orden. Solo aplica con `prendaTerminada`.
+             * @default false
+             */
+            stockSinOrden?: boolean;
             observaciones?: string;
             /** @description Matriz color×talla de la etapa (D4). */
             lineas: {
@@ -41704,6 +41742,14 @@ export interface paths {
               fechaCompromiso: string | null;
               /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
               /** @description Observaciones o null. */
               observaciones: string | null;
               /** @description Si la etapa está cancelada (suave). */
@@ -41899,6 +41945,14 @@ export interface paths {
               fechaCompromiso: string | null;
               /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
+              /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+              prendaTerminada: boolean;
+              /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+              idAlmacenOrigen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacenOrigen: string | null;
+              /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+              stockSinOrden: boolean;
               /** @description Observaciones o null. */
               observaciones: string | null;
               /** @description Si la etapa está cancelada (suave). */
@@ -42259,6 +42313,14 @@ export interface paths {
                 fechaCompromiso: string | null;
                 /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
                 precioPactado: number | null;
+                /** @description Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega. */
+                prendaTerminada: boolean;
+                /** @description Almacén de PT del que salieron las prendas (solo envíos de prenda terminada). */
+                idAlmacenOrigen: number | null;
+                /** @description Nombre del almacén de origen o null. */
+                almacenOrigen: string | null;
+                /** @description Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto. */
+                stockSinOrden: boolean;
                 /** @description Observaciones o null. */
                 observaciones: string | null;
                 /** @description Si la etapa está cancelada (suave). */
@@ -43234,8 +43296,12 @@ export interface paths {
                 tipoProceso: string;
                 /** @description Código del proceso (kebab-case). */
                 codigoProceso: string;
-                /** @description Si el recibo de este proceso mete a PT. */
+                /** @description Si el recibo de este proceso CREA producto terminado. */
                 generaEntradaPt: boolean;
+                /** @description Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT. */
+                devuelveAPt: boolean;
+                /** @description Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b). */
+                stockSinOrden: boolean;
                 /** @description enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0). */
                 celdas: {
                   /** @description Id del color. */
@@ -44792,6 +44858,10 @@ export interface paths {
                 }[];
                 /** @description Total pendiente de este proceso (derivado). */
                 totalPendiente: number;
+                /** @description Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT. */
+                devuelveAPt: boolean;
+                /** @description Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar. */
+                stockSinOrden: boolean;
                 /** @description enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso). */
                 porMaquilero: {
                   /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */

@@ -947,6 +947,80 @@ nuevos, CERO seed** → no requiere `SEED_ON_START`.
 
 ---
 
+## V1-E4b · El tránsito de las prendas enviadas a proceso después de costura ⭐ (17-ago-2026)
+
+> **Nace de una frase de Daniel, no de un plan:** *"Hay procesos que también son después de costura. O
+> sea, llega a producto terminado"* y *"en varias ocasiones se manda un estampado después de costura o
+> algún otro proceso"*. **Pasa HOY.** Decisiones en `DECISIONES.md` **§Post-F9.59 · .60 · .61**.
+
+### El hueco
+
+Una prenda ya terminada vive en el kardex de PT. Cuando se manda a estampar/lavar/aplicar con un tercero,
+**sale del piso pero el inventario sigue diciendo que está ahí**. El saldo global cuadraba por
+compensación —el envío no tocaba el kardex y el recibo tampoco, salvo en costura— así que el error no era
+un descuadre: era que **el inventario sobrestimaba la presencia física**. Daniel escogió la opción (b)
+—existencia localizada— con una razón que no era contable sino operativa: *"¿de qué manera manejamos los
+faltantes o segundas?"*
+
+### Qué entrega
+
+**No creó entidad nueva.** Reusó el almacén **«Tránsito»**, sembrado desde F3-E1, heredado de
+`IPT_Almacenes` del Access y **nunca usado**; lo único nuevo es la bandera `Almacen.esTransitoProceso`,
+para resolverlo por dato y jamás por nombre. El movimiento reusa `registrarTraspasoPt` (dos patas en una
+transacción). El detalle del mecanismo vive en `docs/modulos/produccion-wip.md`, no aquí.
+
+Con eso, **la segunda dejó de ser una edición de saldo y pasó a ser un movimiento real**, y el faltante
+—que antes no tenía dónde estar— **se queda vivo en Tránsito**. Verificado contra la base: 100 → envío →
+recibo de 95 primeras + 3 segundas deja **95 / 3 / 2 en tránsito**.
+
+**El nivel equivocado, corregido sin parche:** `generaEntradaPt` se queda significando *"este proceso crea
+producto terminado"* —que sí es propiedad del tipo, la costura— y la **posición** antes/después la lleva
+el **envío**, porque un mismo estampado va antes en una orden y después en otra (§Post-F9.59).
+
+### Nota de cierre — ⬜ EN CORRECCIÓN (17-ago-2026)
+
+**Primera vuelta: reviewer independiente RECHAZÓ**, y el rechazo fue útil. Lo que **sí** aguantó, probado
+rompiéndolo a propósito: seis envíos simultáneos sobre la misma existencia (5 pasan, 1 rechazado, suma
+exacta), carreras contra salidas manuales, dobles cancelaciones sin inversos duplicados. **D3 y A2 de
+pie.** Y el reviewer avaló el **modelo**: reusar el almacén estuvo bien, y confirmó **en el código** —no
+de palabra del coder— que el *"¿de quién son?"* lo responde `wip.ts:226` por tercero.
+
+**Los dos hallazgos que valían el rechazo, ambos verificados EJECUTANDO:**
+
+1. **⭐ El bucket «sin orden» no se podía mandar a proceso, y el error mentía.** Con 100 piezas de
+   `idOrden = null`, el envío tronaba con *"un artículo con 0 en existencia"*: la pantalla mostraba 100 y
+   el sistema decía 0. Y ese bucket es exactamente *"lo capturado a mano en el arranque y lo migrado"* —
+   o sea **todo el histórico de `prueba` y todo el conteo físico de arranque de Daniel**. Era la
+   limitación con más probabilidad de pegar el día uno, y **la única de las cuatro que no se declaró**.
+2. **⭐ Se podía cancelar UNA sola pata del traspaso.** Desde Inventarios, cancelando solo la entrada al
+   tránsito: `primeras=0, tránsito=0` y el **WIP seguía reclamando 100 al estampador**. Cien prendas
+   desaparecidas — *la misma enfermedad que la etapa vino a curar, entrando por la puerta de atrás*. La
+   raíz era **preexistente** (`cancelarMovimientoPt` nunca miró `origenTipo`), pero esta etapa la agrava
+   porque el saldo del tránsito pasa a **sostener** la historia del faltante.
+
+**Y una lección que se repite en toda esta tanda:** el coder reportó *"nueve mutaciones, todas cazadas"*;
+el reviewer quitó el `exigirExistenciaPt` de la pata de vuelta y `transito.int.test.ts` pasó **19/19 en
+verde**. Un invariante D3 con **cobertura cero** bajo una afirmación de cobertura total. **La verificación
+que no verifica** — tercera vez en esta tanda.
+
+*(Los otros cinco hallazgos —opciones de «Tránsito» que el servidor siempre rechaza, una etiqueta de
+bitácora que mentiría, y la falta de índice único parcial— van en la misma ronda: un defecto conocido no
+es "menor".)*
+
+**Ronda de corrección (17-ago), pendiente de segunda revisión.** Los siete cerrados. El arreglo de H1 dejó
+una pieza de modelo que vale más que el defecto que lo originó: la existencia de PT se lleva **por bucket
+de orden**, el envío **elige de cuál sale** (`stockSinOrden`) y el recibo devuelve **al mismo** —
+reetiquetar al regresar habría movido saldo entre buckets sin que nadie lo pidiera. H2 cerró la puerta de
+atrás en `cancelarMovimientoPt`, que ahora **solo acepta lo capturado a mano**: todo lo demás es el
+*efecto* de un hecho con su propio estado, y anular el movimiento suelto revertía el inventario dejando el
+hecho en pie. H7 pasó de **detectable a imposible** (índice único parcial). Integración **1846** (+9).
+
+**Declarado, no callado:** H6 (la etiqueta de bitácora) va **sin prueba propia** — cubrirla exigiría
+afirmar sobre el JSON de `Bitacora`, cosa que ninguna prueba del repo hace hoy, y se prefirió decirlo
+antes que escribir una prueba decorativa. Esta tanda ya destapó tres de ésas.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

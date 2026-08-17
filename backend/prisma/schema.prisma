@@ -402,6 +402,19 @@ model Almacen {
   idCortador Int?       @unique @map("id_cortador")
   cortador   Proveedor? @relation("AlmacenCortador", fields: [idCortador], references: [id], onDelete: Restrict)
 
+  /// ALMACÉN DE TRÁNSITO A PROCESO EXTERNO (V1-E4b, §Post-F9.61). Marca el almacén de PT donde
+  /// viven las prendas TERMINADAS mientras están físicamente en el taller de un tercero
+  /// (estampado/bordado/lavado DESPUÉS de costura). El envío de prendas ya terminadas las SACA
+  /// de su almacén y las mete aquí; el recibo las devuelve a Primeras/Segundas. Lo que no vuelve
+  /// se queda AQUÍ, vivo, hasta que llegue o se dé de baja con un movimiento manual (D3: nunca
+  /// se absorbe en silencio).
+  ///
+  /// Es una BANDERA y no un id en `ConfiguracionEmpresa` porque el almacén ya existía en el
+  /// catálogo desde F3-E1 ("Tránsito", heredado de `IPT_Almacenes`): marcarlo no pide pantalla de
+  /// configuración nueva, lo hace el seed. El dominio exige que haya EXACTAMENTE uno usable por la
+  /// empresa (global o propio) y lo resuelve por esta bandera, nunca por el nombre.
+  esTransitoProceso Boolean @default(false) @map("es_transito_proceso")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -417,6 +430,8 @@ model Almacen {
   recibosAlmacenPrimeras EtapaMovimiento[] @relation("ReciboAlmacenPrimeras")
   /// Recibos de maquila que mandan sus SEGUNDAS a este almacén (F3-E4). Restrict.
   recibosAlmacenSegundas EtapaMovimiento[] @relation("ReciboAlmacenSegundas")
+  /// Envíos de prendas YA TERMINADAS que salen de este almacén hacia el tránsito (V1-E4b). Restrict.
+  enviosAlmacenOrigen    EtapaMovimiento[] @relation("EnvioAlmacenOrigen")
 
   /// Recepciones de compra cuyo material entra a este almacén destino (F4-E3). Restrict.
   recepcionesCompra RecepcionCompra[]
@@ -3275,6 +3290,36 @@ model EtapaMovimiento {
   idAlmacenSegundas Int?     @map("id_almacen_segundas")
   almacenSegundas   Almacen? @relation("ReciboAlmacenSegundas", fields: [idAlmacenSegundas], references: [id], onDelete: Restrict)
 
+  /// ⭐ V1-E4b (§Post-F9.61) — ENVÍO DE PRENDAS YA TERMINADAS. `true` cuando lo que se manda al
+  /// tercero ya es producto terminado (un estampado/lavado DESPUÉS de la costura, que Daniel ya
+  /// hace hoy — §Post-F9.60). Solo aplica a `envio_maquila`.
+  ///
+  /// Es la propiedad que ARREGLA el problema de nivel de §Post-F9.59: si el proceso va antes o
+  /// después de la costura NO es del `TipoProceso` (el mismo estampado va antes en una orden y
+  /// después en otra), es de ESTE envío. Con la bandera puesta:
+  ///   • el envío SACA las prendas de `idAlmacenOrigen` y las mete al almacén de TRÁNSITO;
+  ///   • su recibo las DEVUELVE del tránsito a Primeras/Segundas (reclasificación incluida),
+  ///     sin importar `TipoProceso.generaEntradaPt` (que sigue significando "este proceso CREA
+  ///     producto terminado", que sí es del tipo: la costura).
+  /// `false` = flujo de siempre (bultos cortados): el envío no toca el kardex de PT.
+  prendaTerminada Boolean @default(false) @map("prenda_terminada")
+
+  /// Almacén de PT del que SALEN las prendas de un envío con `prendaTerminada` (V1-E4b).
+  /// OBLIGATORIO en ese caso (lo exige el dominio), NULL en todo lo demás. Restrict.
+  idAlmacenOrigen Int?     @map("id_almacen_origen")
+  almacenOrigen   Almacen? @relation("EnvioAlmacenOrigen", fields: [idAlmacenOrigen], references: [id], onDelete: Restrict)
+
+  /// De QUÉ BUCKET de existencia salieron las prendas de un envío con `prendaTerminada` (V1-E4b).
+  /// La existencia de PT es por modelo×color×talla×**ORDEN**×almacén (F6-E2 "PT por orden"), y el
+  /// bucket `id_orden = NULL` —"sin orden asignada"— es donde cae TODO lo capturado a mano en el
+  /// arranque y TODO el histórico migrado (`migracion/loaders/ipt-kardex.ts` no etiqueta orden).
+  ///
+  /// `false` (default) = las piezas salen del bucket de SU orden. `true` = salen del bucket «sin
+  /// orden». Sin este dato, un envío solo podía sacar del bucket de la orden y el stock de arranque
+  /// de Daniel —que es el que hay el día uno— era inalcanzable. El recibo DEVUELVE al MISMO bucket
+  /// del que salió: el tránsito no reetiqueta mercancía a espaldas de nadie.
+  stockSinOrden Boolean @default(false) @map("stock_sin_orden")
+
   /// Cancelación SUAVE (plan §4): la etapa nunca se borra ni se edita; se cancela con motivo
   /// y queda en el historial (A7). El kardex/efectos se revierten con movimiento inverso (E4/E5).
   canceladoEn       DateTime? @map("cancelado_en")
@@ -3300,6 +3345,7 @@ model EtapaMovimiento {
   @@index([idEtapaEnvio])
   @@index([idAlmacenPrimeras])
   @@index([idAlmacenSegundas])
+  @@index([idAlmacenOrigen])
   @@map("etapa_movimiento")
 }
 

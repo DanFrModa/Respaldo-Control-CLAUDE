@@ -987,6 +987,20 @@ function CapturaMovimiento({
   const [idAlmacenPrimeras, setIdAlmacenPrimeras] = useState<string>('');
   const [idAlmacenSegundas, setIdAlmacenSegundas] = useState<string>('');
   /**
+   * V1-E4b (§Post-F9.61) — ENVÍO DE PRENDAS YA TERMINADAS. `null` = "lo que sugiera la orden": el
+   * valor efectivo se deriva más abajo (`prendaTerminada`) y esto solo guarda la decisión EXPLÍCITA
+   * del usuario. Así el default puede seguir a la orden sin que un `useEffect` le pise la elección.
+   */
+  const [prendaTerminadaElegida, setPrendaTerminadaElegida] = useState<boolean | null>(null);
+  const [idAlmacenOrigen, setIdAlmacenOrigen] = useState<string>('');
+  /**
+   * V1-E4b (hallazgo H1) — de QUÉ BUCKET de existencia salen las prendas. El inventario de PT se
+   * lleva por modelo×color×talla×ORDEN×almacén, y el bucket «sin orden asignada» es donde vive TODO
+   * el histórico migrado y TODO lo que se capture en el inventario físico de arranque. Sin poder
+   * elegirlo, ese stock —que es el que hay el día uno— era inalcanzable desde esta pantalla.
+   */
+  const [stockSinOrdenElegido, setStockSinOrdenElegido] = useState<boolean | null>(null);
+  /**
    * PRECIO PACTADO y FECHA COMPROMISO (migrados de las pantallas retiradas en V1-E3a): el precio de
    * maquila de ESTE movimiento — sin él el cargo EsMa nace sin precio y hay que teclearlo aparte, la
    * doble captura que v2 elimina. El campo se esconde sin `ordenes.ver-precio-real-maquila` porque
@@ -1097,8 +1111,49 @@ function CapturaMovimiento({
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
-  const requiereAlmacen = etapa === 'recibo-maquila';
+  // El almacén de TRÁNSITO se EXCLUYE de TODOS los selectores (V1-E4b, hallazgo H5 del reviewer):
+  // guarda lo que está físicamente en el taller de un tercero, y el servidor lo rechaza tanto de
+  // origen (entrega a cliente) como de destino (recibo). Ofrecerlo solo servía para cosechar un 400
+  // con la matriz ya tecleada. Las prendas que no vuelvan salen de ahí por un movimiento manual de
+  // inventario, con su motivo — no por estas pantallas.
+  const almacenesPt = (almacenes.data?.datos ?? []).filter(
+    (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
+  );
+
+  // ── V1-E4b · el tránsito de prendas a proceso (§Post-F9.61) ────────────────────────────────────
+  // Cuando un proceso de ARTE va DESPUÉS de la costura, lo que se manda ya es producto terminado:
+  // el envío lo SACA del almacén hacia el tránsito y el recibo lo devuelve (primeras y segundas a
+  // su almacén; lo que no vuelve se queda vivo en tránsito). Aquí se resuelven las dos caras:
+  //
+  //  • ENVÍO: la bandera `prendaTerminada` + de qué almacén salen. El default SIGUE A LA ORDEN (si
+  //    ya hay envíos de ese proceso, el mismo valor que ellos —el servidor no deja mezclarlos—; si
+  //    no, "sí" en cuanto la orden ya tenga prendas recibidas de costura, que es justo el caso que
+  //    Daniel hace hoy). Dejarlo apagado por default sería volver al inventario que miente.
+  //  • RECIBO: si el envío sacó del almacén, este recibo DEVUELVE mercancía y por lo tanto pide
+  //    almacén destino, aunque el proceso no sea el que crea el PT (`devuelveAPt`, del servidor).
+  const procesoYaEnviado =
+    procesoElegido === undefined
+      ? undefined
+      : wip.porRecibir.find((p) => p.idTipoProceso === procesoElegido.id);
+  const devuelveAPt = procesoYaEnviado?.devuelveAPt === true;
+  /** ¿La bandera del envío ya está decidida por los envíos vivos del proceso? (no se puede mezclar) */
+  const prendaTerminadaFijada = procesoYaEnviado !== undefined;
+  const prendaTerminada =
+    etapa !== 'entrega-aplicacion'
+      ? false
+      : prendaTerminadaFijada
+        ? devuelveAPt
+        : (prendaTerminadaElegida ?? wip.recibidoCostura > 0);
+  // El bucket también queda FIJADO por las entregas vivas del proceso (el servidor no deja mezclar
+  // dos formas distintas: el recibo no sabría a qué bucket regresar las piezas). Default: el de la
+  // orden, que es lo correcto para todo lo que este sistema produjo.
+  const stockSinOrden =
+    prendaTerminada &&
+    (prendaTerminadaFijada
+      ? procesoYaEnviado?.stockSinOrden === true
+      : (stockSinOrdenElegido ?? false));
+
+  const requiereAlmacen = etapa === 'recibo-maquila' || (esRecibo && devuelveAPt);
 
   // Aviso REINTENTABLE de los catálogos de la captura (ver `AvisoCatalogos`). `proveedores` solo
   // cuenta cuando de verdad se consulta (en el recibo la lista sale del WIP y va deshabilitada).
@@ -1237,6 +1292,8 @@ function CapturaMovimiento({
     (!requiereAlmacen || idAlmacenPrimeras !== '') &&
     // Con segundas que entran a PT hay que decir a qué almacén van (igual que la pantalla vieja).
     (!requiereAlmacen || !capturarSegundas || totalSegundas === 0 || idAlmacenSegundas !== '') &&
+    // V1-E4b: si el envío saca prendas terminadas, hay que decir de qué almacén salen.
+    (!prendaTerminada || idAlmacenOrigen !== '') &&
     !segundasInvalidas &&
     // El sobre-corte SÍ se guarda (decisión (f)); el sobre-envío y el sobre-recibo, NO (decisión (g)).
     (etapa === 'corte' || excede === 0);
@@ -1382,6 +1439,12 @@ function CapturaMovimiento({
         idMaquilero: idProveedor,
         ...precioApi(),
         ...(fechaCompromiso === '' ? {} : { fechaCompromiso }),
+        // V1-E4b: prendas YA TERMINADAS ⇒ el envío las saca de este almacén hacia el tránsito.
+        prendaTerminada,
+        stockSinOrden,
+        ...(prendaTerminada && idAlmacenOrigen !== ''
+          ? { idAlmacenOrigen: Number(idAlmacenOrigen) }
+          : {}),
       },
       {
         onSuccess: (e) =>
@@ -1544,10 +1607,86 @@ function CapturaMovimiento({
         </div>
       ) : null}
 
+      {/* ── V1-E4b · ¿se mandan prendas YA TERMINADAS? (§Post-F9.61) ───────────────────────────
+          Si el proceso va DESPUÉS de la costura, las prendas están en el almacén y salen de él: el
+          envío las traspasa al tránsito y el recibo las devuelve. Sin esto, el almacén seguiría
+          diciendo que están en el piso y las segundas y los faltantes del recibo no tendrían dónde
+          caer. El interruptor se BLOQUEA cuando el proceso ya tiene entregas vivas: el servidor no
+          deja mezclar las dos formas en la misma orden+proceso, así que ofrecer el cambio solo
+          serviría para cosechar un 409. */}
+      {etapa === 'entrega-aplicacion' ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={prendaTerminada}
+                disabled={prendaTerminadaFijada}
+                onChange={(e) => {
+                  setPrendaTerminadaElegida(e.target.checked);
+                  if (!e.target.checked) setIdAlmacenOrigen('');
+                }}
+                className="size-4 rounded border-input"
+                data-testid="avance-prenda-terminada"
+              />
+              Son prendas ya terminadas (salen del almacén)
+            </label>
+            <p className="text-xs text-muted-foreground">
+              {prendaTerminadaFijada
+                ? `Lo fija la entrega que ya tiene esta orden en ${procesoElegido?.nombre ?? 'este proceso'}: no se pueden mezclar las dos formas.`
+                : prendaTerminada
+                  ? 'El envío las descuenta del almacén y las deja en tránsito con el proveedor; el recibo las regresa.'
+                  : 'Son bultos cortados: el envío no toca el inventario de producto terminado.'}
+            </p>
+          </div>
+          {prendaTerminada ? (
+            <Field>
+              <FieldLabel htmlFor="avance-almacen-origen">Salen del almacén</FieldLabel>
+              <SelectNativo
+                id="avance-almacen-origen"
+                value={idAlmacenOrigen}
+                onChange={(e) => setIdAlmacenOrigen(e.target.value)}
+                data-testid="avance-almacen-origen"
+              >
+                <option value="">Elige el almacén…</option>
+                {almacenesPt.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+            </Field>
+          ) : null}
+          {/* BUCKET de existencia (V1-E4b, H1): el inventario de PT se lleva por ORDEN, y el
+              histórico migrado + el inventario físico de arranque viven en el bucket «sin orden
+              asignada». Si las piezas que se mandan son de ese stock hay que decirlo, o el envío
+              choca contra un saldo de 0 mientras la pantalla de existencias muestra piezas. */}
+          {prendaTerminada ? (
+            <Field>
+              <FieldLabel htmlFor="avance-bucket-stock">De qué stock salen</FieldLabel>
+              <SelectNativo
+                id="avance-bucket-stock"
+                value={stockSinOrden ? 'sin-orden' : 'orden'}
+                disabled={prendaTerminadaFijada}
+                onChange={(e) => setStockSinOrdenElegido(e.target.value === 'sin-orden')}
+                data-testid="avance-bucket-stock"
+              >
+                <option value="orden">Del stock de esta orden</option>
+                <option value="sin-orden">Del stock sin orden asignada (migrado / inicial)</option>
+              </SelectNativo>
+            </Field>
+          ) : null}
+        </div>
+      ) : null}
+
       {requiereAlmacen ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="avance-almacen-primeras">Almacén de primeras</FieldLabel>
+            <FieldLabel htmlFor="avance-almacen-primeras">
+              {devuelveAPt && etapa !== 'recibo-maquila'
+                ? 'Regresan al almacén (primeras)'
+                : 'Almacén de primeras'}
+            </FieldLabel>
             <SelectNativo
               id="avance-almacen-primeras"
               value={idAlmacenPrimeras}
@@ -1732,7 +1871,14 @@ function CapturaEntregaCliente({
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const almacenesPt = (almacenes.data?.datos ?? []).filter((a) => a.tipo === 'PT' && a.activo);
+  // El almacén de TRÁNSITO se EXCLUYE de TODOS los selectores (V1-E4b, hallazgo H5 del reviewer):
+  // guarda lo que está físicamente en el taller de un tercero, y el servidor lo rechaza tanto de
+  // origen (entrega a cliente) como de destino (recibo). Ofrecerlo solo servía para cosechar un 400
+  // con la matriz ya tecleada. Las prendas que no vuelvan salen de ahí por un movimiento manual de
+  // inventario, con su motivo — no por estas pantallas.
+  const almacenesPt = (almacenes.data?.datos ?? []).filter(
+    (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
+  );
 
   // Seguimiento DERIVADO (pedido − entregado) + `disponible` del almacén elegido, para acotar.
   const seguimiento = useSeguimientoEntrega(

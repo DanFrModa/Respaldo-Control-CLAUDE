@@ -185,6 +185,110 @@ export async function existenciaPtBloqueada(
 }
 
 /**
+ * Existencia del MISMO artículo en el almacén pero en los DEMÁS buckets de orden (todo lo que no es
+ * `idOrden`). Solo se usa para REDACTAR el error de "no alcanza": el saldo por bucket es correcto,
+ * pero un `0` a secas es indistinguible de "no hay nada en el almacén" — y con el histórico migrado
+ * y el inventario de arranque viviendo en el bucket «sin orden», ese es el caso COMÚN, no el raro.
+ * No toma lock (es informativa y corre cuando la operación ya va a fallar).
+ */
+async function existenciaPtOtrosBuckets(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  idColor: number,
+  idTalla: number,
+  idOrden: number | null,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: bigint | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0)::bigint AS existencia
+    FROM "movimiento_det_pt" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_modelo" = ${idModelo}
+      AND d."id_color" = ${idColor}
+      AND d."id_talla" = ${idTalla}
+      AND d."id_orden" IS DISTINCT FROM ${idOrden}
+  `;
+  return Number(filas[0]?.existencia ?? 0n);
+}
+
+/**
+ * Valida, BAJO BLOQUEO, que sacar `lineas` del almacén `idAlmacen` (todas del mismo `idModelo`) no
+ * deje la existencia negativa (D3). Toma {@link bloquearArticuloPt} + {@link existenciaPtBloqueada}
+ * por cada artículo DENTRO de la transacción: la lectura es una suma DIRECTA de `MovimientoDetPt`
+ * (nunca la vista) y el lock impide que dos salidas del mismo artículo se cuelen entre la lectura y
+ * la escritura.
+ *
+ * Los locks se toman en un orden DETERMINISTA (color, talla, orden) para que dos operaciones que
+ * compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden (elimina el riesgo
+ * teórico de deadlock entre dos traspasos cruzados). NO muta el arreglo recibido.
+ *
+ * Vive en el motor porque la usan varios flujos (movimiento manual/traspaso de F3-E3, envío de
+ * prendas terminadas a tránsito de V1-E4b): la regla de "no dejar el inventario en negativo" tiene
+ * que ser LA MISMA en todos, letra por letra.
+ */
+export async function exigirExistenciaPt(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  lineas: { idColor: number; idTalla: number; idOrden?: number | null; cantidad: number }[],
+): Promise<void> {
+  const ordenadas = [...lineas].sort(
+    (a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla || (a.idOrden ?? 0) - (b.idOrden ?? 0),
+  );
+  for (const c of ordenadas) {
+    const idOrden = c.idOrden ?? null;
+    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, idOrden);
+    const existencia = await existenciaPtBloqueada(
+      tx,
+      idEmpresa,
+      idAlmacen,
+      idModelo,
+      c.idColor,
+      c.idTalla,
+      idOrden,
+    );
+    if (existencia - c.cantidad < 0) {
+      const deQueOrden =
+        idOrden === null ? 'del bucket «sin orden»' : `de la orden ${String(idOrden)}`;
+      // El saldo se lleva POR BUCKET DE ORDEN (F6-E2), y eso hace que un "0 en existencia" sea
+      // desconcertante cuando la pantalla muestra piezas: están, pero en OTRO bucket (típicamente
+      // el «sin orden», donde cae todo lo migrado y el inventario físico de arranque). Se dice, en
+      // vez de dejar al operador peleado con un cero que su almacén contradice.
+      const enOtrosBuckets = await existenciaPtOtrosBuckets(
+        tx,
+        idEmpresa,
+        idAlmacen,
+        idModelo,
+        c.idColor,
+        c.idTalla,
+        idOrden,
+      );
+      const pista =
+        enOtrosBuckets === 0
+          ? ''
+          : idOrden === null
+            ? ` (hay ${enOtrosBuckets} pza(s) del mismo artículo asignadas a alguna orden: ésas no salen por aquí)`
+            : ` (hay ${enOtrosBuckets} pza(s) del mismo artículo en otros buckets —sin orden asignada o de otra orden—: si son éstas las que salen, indícalo al capturar)`;
+      throw new ErrorConflicto(
+        `No hay existencia suficiente ${deQueOrden}: se intenta sacar ${c.cantidad} pza(s) de un ` +
+          `artículo con ${existencia} en existencia${pista} (no se permite dejar el inventario en negativo).`,
+      );
+    }
+  }
+}
+
+/**
  * Registra UN movimiento de PT (encabezado + detalle + bitácora) en UNA transacción (A2), con
  * folio atómico (A3). Es el primitivo que usan los servicios de dominio (movimiento manual de
  * E3, entrada del recibo de E4, salida de la entrega de E5). NO valida pendientes ni existencia:
@@ -271,6 +375,15 @@ export interface EntradaTraspasoPt {
   fecha: Date;
   lineas: LineaMovimientoPt[];
   observaciones?: string;
+  /**
+   * Origen del HECHO que provoca el traspaso (V1-E4b). Por defecto `ORIGEN.traspaso` (el traspaso
+   * manual entre almacenes de F3-E3). Un flujo que traspasa por otra razón —el envío de prendas
+   * terminadas al tránsito, o su devolución en el recibo— pasa AQUÍ su propio origen + el id de la
+   * etapa, para que la cancelación de ese hecho encuentre sus DOS patas y las revierta juntas.
+   */
+  origenTipo?: OrigenMovimiento;
+  /** Id de la fila de origen (texto). Se sella en las DOS patas cuando viene. */
+  origenId?: string;
 }
 
 /**
@@ -313,6 +426,13 @@ export async function registrarTraspasoPt(
       );
     }
 
+    // El traspaso manual (F3-E3) se sella con `origenTipo = traspaso` y enlaza la entrada con su
+    // pata de salida por el `origenId`. Cuando el traspaso lo provoca OTRO hecho (V1-E4b: el envío
+    // de prendas terminadas al tránsito, o su devolución en el recibo), las DOS patas llevan el
+    // origen de ESE hecho — así su cancelación las encuentra juntas con un solo `findMany`.
+    const origenTipo = entrada.origenTipo ?? ORIGEN.traspaso;
+    const origenId = entrada.origenId;
+
     const salida = await registrarMovimientoPt(
       sesion,
       {
@@ -320,7 +440,8 @@ export async function registrarTraspasoPt(
         idTipoMov: entrada.idTipoMovSalida,
         idAlmacen: entrada.idAlmacenOrigen,
         fecha: entrada.fecha,
-        origenTipo: ORIGEN.traspaso,
+        origenTipo,
+        ...(origenId === undefined ? {} : { origenId }),
         lineas: entrada.lineas,
         ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
       },
@@ -334,8 +455,8 @@ export async function registrarTraspasoPt(
         idTipoMov: entrada.idTipoMovEntrada,
         idAlmacen: entrada.idAlmacenDestino,
         fecha: entrada.fecha,
-        origenTipo: ORIGEN.traspaso,
-        origenId: String(salida.id), // enlaza la entrada con su pata de salida (informativo)
+        origenTipo,
+        origenId: origenId ?? String(salida.id),
         lineas: entrada.lineas,
         ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
       },

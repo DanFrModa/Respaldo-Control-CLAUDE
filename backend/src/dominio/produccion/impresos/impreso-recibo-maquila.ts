@@ -46,6 +46,14 @@ export interface DatosImpresoRecibo {
   maquilero: string | null;
   proceso: string | null;
   generaEntradaPt: boolean;
+  /**
+   * El recibo DEVOLVIÓ prendas que estaban en TRÁNSITO (V1-E4b, §Post-F9.61): el envío las había
+   * sacado del almacén porque el proceso va DESPUÉS de la costura. Ese recibo también deja
+   * mercancía en inventario, aunque el proceso no sea el que la crea — decir "No mete a inventario"
+   * ahí sería falso. Se deriva de que el recibo traiga almacén destino sin ser de costura (los
+   * almacenes solo se persisten cuando el recibo mueve inventario).
+   */
+  devuelveDeTransito: boolean;
   almacenPrimeras: string | null;
   almacenSegundas: string | null;
   folioOrden: number;
@@ -115,6 +123,7 @@ export async function armarDatosImpresoRecibo(
     maquilero: recibo.tercero,
     proceso: recibo.tipoProceso,
     generaEntradaPt: recibo.generaEntradaPt,
+    devuelveDeTransito: !recibo.generaEntradaPt && recibo.idAlmacenPrimeras !== null,
     almacenPrimeras: recibo.almacenPrimeras,
     almacenSegundas: recibo.almacenSegundas,
     folioOrden: recibo.folioOrden,
@@ -227,12 +236,13 @@ function pesos(valor: number | null): string | null {
 
 /** Una página del documento de RECIBO de maquila. */
 function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
-  const camposAlmacen = datos.generaEntradaPt
-    ? [
-        campo('Almacén primeras', datos.almacenPrimeras),
-        campo('Almacén segundas', datos.almacenSegundas),
-      ]
-    : [];
+  const camposAlmacen =
+    datos.generaEntradaPt || datos.devuelveDeTransito
+      ? [
+          campo('Almacén primeras', datos.almacenPrimeras),
+          campo('Almacén segundas', datos.almacenSegundas),
+        ]
+      : [];
 
   const hijos: (ReactElement | null)[] = [
     EncabezadoDocumento({
@@ -249,7 +259,14 @@ function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
       campo('Orden', String(datos.folioOrden)),
       campo('Fecha de recibo', datos.fecha),
       campo('Precio pactado', pesos(datos.precioPactado)),
-      campo('Mete a inventario', datos.generaEntradaPt ? 'Sí (costura)' : 'No'),
+      campo(
+        'Mete a inventario',
+        datos.generaEntradaPt
+          ? 'Sí (costura)'
+          : datos.devuelveDeTransito
+            ? 'Sí (regresa de proceso)'
+            : 'No',
+      ),
       ...camposAlmacen,
     ),
     datos.observaciones
