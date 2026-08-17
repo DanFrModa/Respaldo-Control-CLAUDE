@@ -56,6 +56,17 @@ export interface DatosImpresoEnvio {
   proceso: string | null;
   folioOrden: number;
   precioPactado: number | null;
+  /**
+   * ⭐ V1-E4b — lo que se entrega YA ES PRODUCTO TERMINADO (proceso después de costura,
+   * §Post-F9.61). Este papel lo FIRMA el maquilero: tiene que decirlo, porque no es lo mismo
+   * recibir bultos cortados que prendas terminadas —cambia lo que se le reclama si no vuelven— y
+   * porque esas piezas salieron de un almacén concreto, que también se imprime.
+   */
+  prendaTerminada: boolean;
+  /** Almacén de PT del que salieron (solo cuando son prendas terminadas). */
+  almacenOrigen: string | null;
+  /** Salieron del stock «sin orden asignada» (histórico migrado / inventario de arranque). */
+  stockSinOrden: boolean;
   observaciones: string | null;
   cancelado: boolean;
   /** Columnas: etiquetas de talla en el orden en que aparecen en la matriz. */
@@ -133,6 +144,9 @@ export async function armarDatosImpresoEnvio(
     proceso: etapa.tipoProceso,
     folioOrden: etapa.folioOrden,
     precioPactado: etapa.precioPactado,
+    prendaTerminada: etapa.prendaTerminada,
+    almacenOrigen: etapa.almacenOrigen,
+    stockSinOrden: etapa.stockSinOrden,
     observaciones: etapa.observaciones,
     cancelado: etapa.cancelado,
     ...tabla,
@@ -236,6 +250,20 @@ function tablaMatriz(datos: DatosImpresoEnvio): ReactElement {
   );
 }
 
+/**
+ * QUÉ se entrega, en una línea, para el papel que firma el maquilero (V1-E4b). Sin prenda
+ * terminada devuelve `null` y el campo ni se imprime: el envío de bultos cortados es el de siempre
+ * y no hay nada nuevo que decir.
+ */
+function queSeEntrega(datos: DatosImpresoEnvio): string | null {
+  if (!datos.prendaTerminada) return null;
+  const deDonde =
+    datos.almacenOrigen === null ? '' : ` (salen del almacén ${datos.almacenOrigen}`;
+  const bucket = datos.stockSinOrden ? ', stock sin orden asignada' : '';
+  const cierre = deDonde === '' ? '' : `${bucket})`;
+  return `PRENDAS YA TERMINADAS${deDonde}${cierre}`;
+}
+
 /** Pesos en MXN sin redondear (precio pactado). */
 function pesos(valor: number | null): string | null {
   if (valor === null) return null;
@@ -260,6 +288,9 @@ function paginaEnvio(datos: DatosImpresoEnvio, clave: string): ReactElement {
       campo('Fecha de envío', datos.fecha),
       campo('Fecha compromiso', datos.fechaCompromiso),
       campo('Precio pactado', pesos(datos.precioPactado)),
+      // Solo aparece cuando SÍ son prendas terminadas (V1-E4b): en el envío de bultos cortados no
+      // hay nada nuevo que declarar y el papel se queda como siempre.
+      campo('Qué se entrega', queSeEntrega(datos), true),
     ),
     datos.observaciones
       ? h(
@@ -299,6 +330,9 @@ function paginaFichaEstampado(datos: DatosImpresoEnvio, clave: string): ReactEle
       campo('Fecha de envío', datos.fecha),
       campo('Fecha compromiso', datos.fechaCompromiso),
       campo('Precio pactado', pesos(datos.precioPactado)),
+      // Solo aparece cuando SÍ son prendas terminadas (V1-E4b): en el envío de bultos cortados no
+      // hay nada nuevo que declarar y el papel se queda como siempre.
+      campo('Qué se entrega', queSeEntrega(datos), true),
     ),
     tablaMatriz(datos),
     h(
