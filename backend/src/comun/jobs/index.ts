@@ -54,6 +54,18 @@ export const COLAS_JOBS = {
 /** Nombre válido de cola de jobs. */
 export type NombreColaJob = (typeof COLAS_JOBS)[keyof typeof COLAS_JOBS];
 
+/**
+ * Opciones por cola aplicadas al crearla. El default de `expireInSeconds` de pg-boss son 15 minutos:
+ * pasado ese rato marca el job como expirado y lo REINTENTA **sin detener al que sigue corriendo**.
+ * Para un respaldo de una base grande eso significa dos corridas solapadas; por eso su cola declara
+ * una ventana acorde (la misma que usa el propio respaldo, `ventanaCorridaMinutos`, y que su
+ * `schedule` vuelve a pasar a nivel de job).
+ */
+const OPCIONES_POR_COLA: Partial<Record<NombreColaJob, { expireInSeconds: number }>> = {
+  // La clave es el NOMBRE de la cola, no el alias del objeto.
+  [COLAS_JOBS.respaldoBd]: { expireInSeconds: (180 + 60) * 60 },
+};
+
 /** Carga del job de recálculo de la RC de una orden (lo mínimo: el consumidor relee la BD, E4). */
 export interface PayloadRecalcularRuta {
   /** Orden cuya ruta hay que (re)calcular. */
@@ -130,7 +142,13 @@ export async function iniciarMotorJobs(
     });
     await instancia.start();
     for (const cola of Object.values(COLAS_JOBS)) {
-      await instancia.createQueue(cola);
+      // Opciones POR COLA (heredadas por sus jobs salvo que el productor las pise). Hoy sólo el
+      // respaldo necesita una: su corrida puede durar horas y el default de pg-boss (15 min de
+      // `expireInSeconds`) la daría por expirada y la reintentaría ENCIMA de la que sigue viva.
+      const opciones = OPCIONES_POR_COLA[cola];
+      await (opciones === undefined
+        ? instancia.createQueue(cola)
+        : instancia.createQueue(cola, opciones));
     }
     boss = instancia;
   } catch (error) {

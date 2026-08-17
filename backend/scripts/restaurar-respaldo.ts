@@ -93,11 +93,12 @@ interface Opciones {
   salida?: string;
   destino?: string;
   sha256?: string;
+  soloVerificar: boolean;
   siEstoySeguro: boolean;
 }
 
 function leerArgumentos(argv: readonly string[]): Opciones {
-  const opciones: Opciones = { listar: false, siEstoySeguro: false };
+  const opciones: Opciones = { listar: false, soloVerificar: false, siEstoySeguro: false };
   for (let indice = 0; indice < argv.length; indice += 1) {
     const argumento = argv[indice];
     const valor = (): string => {
@@ -127,6 +128,9 @@ function leerArgumentos(argv: readonly string[]): Opciones {
       case '--sha256':
         opciones.sha256 = valor().trim().toLowerCase();
         break;
+      case '--solo-verificar':
+        opciones.soloVerificar = true;
+        break;
       case '--si-estoy-seguro':
         opciones.siEstoySeguro = true;
         break;
@@ -152,6 +156,8 @@ Restauración de un respaldo cifrado de CONTROL (V1-E6a).
   --sha256 <hex>          Comprueba la huella del archivo cifrado ANTES de descifrar (la huella
                           la guarda cada corrida en respaldo_corrida.sha256). Detecta corrupción
                           sin necesitar la llave.
+  --solo-verificar        Comprueba la huella y TERMINA, sin descifrar ni restaurar. No necesita
+                          RESPALDO_LLAVE: sirve para auditar un respaldo sin tenerla a mano.
   --si-estoy-seguro       Permite restaurar sobre una base que YA tiene tablas (las borra).
 
 Variables necesarias: RESPALDO_LLAVE (la misma con la que se cifró) y las R2_* del ambiente.
@@ -317,8 +323,19 @@ async function principal(): Promise<void> {
     return;
   }
 
-  // La llave es lo único imprescindible para descifrar: se valida ANTES de bajar nada.
-  const { frase } = configRespaldoDesdeEnv();
+  // LA LLAVE SE PIDE CUANDO DE VERDAD HACE FALTA, no antes.
+  //
+  // Comprobar la HUELLA de un respaldo no necesita la llave —ése es medio sentido de guardarla— y
+  // exigirla por adelantado hacía imposible justo eso: el script moría pidiendo `RESPALDO_LLAVE`
+  // antes de llegar a la comprobación. Ahora:
+  //   • con `--solo-verificar` NUNCA se pide (se comprueba la huella y se termina);
+  //   • con `--sha256` se pide DESPUÉS de comprobarla (un archivo corrupto se reporta como tal, no
+  //     como "te falta una variable");
+  //   • sin ninguno de los dos se valida YA, para no bajar cientos de MB y fallar al final.
+  const obtenerFrase = (): string => configRespaldoDesdeEnv().frase;
+  if (opciones.sha256 === undefined && !opciones.soloVerificar) {
+    obtenerFrase();
+  }
 
   // Y la base destino se revisa ANTES de bajar y descifrar cientos de MB: si el comando se va a
   // rechazar por seguridad, que sea en el primer segundo y no en el quinto minuto.
@@ -363,9 +380,19 @@ async function principal(): Promise<void> {
       console.log('  Huella correcta.');
     }
 
+    if (opciones.soloVerificar) {
+      console.log(
+        opciones.sha256 === undefined
+          ? '\nSólo se pidió verificar, pero no se dio ninguna huella con --sha256: no se comprobó nada.'
+          : '\n✅ El archivo cifrado está ÍNTEGRO (coincide con la huella de la corrida). No se ' +
+              'descifró nada: para eso hace falta RESPALDO_LLAVE.',
+      );
+      return;
+    }
+
     const volcado = opciones.salida ?? join(carpeta, 'control.dump');
     console.log('Descifrando (AES-256-GCM)...');
-    const bytes = await descifrarArchivo(cifrado, volcado, frase);
+    const bytes = await descifrarArchivo(cifrado, volcado, obtenerFrase());
     console.log(
       `  Volcado descifrado y VERIFICADO: ${(bytes / 1024 / 1024).toFixed(1)} MB → ${volcado}`,
     );

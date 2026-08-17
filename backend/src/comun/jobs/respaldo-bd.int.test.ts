@@ -356,6 +356,29 @@ describe('⭐ arranque: la AUSENCIA de respaldo también deja rastro', () => {
     expect(corridas[0]?.error).toMatch(/relleno/i);
   });
 
+  it('⭐ el MISMO fallo repetido no llena la bitácora: refresca la fila, no la duplica', async () => {
+    // `RESPALDO_LLAVE` es variable nueva: hasta que Gabriel la ponga, CADA reinicio del contenedor
+    // escribiría otra fila y otra línea de bitácora. El aviso es cierto, pero el goteo es lo que
+    // entrena a ignorar la bitácora — y esta etapa vive de que se le crea.
+    const sinLlave = { ...ENV_BUENO, RESPALDO_LLAVE: undefined };
+    await arrancarCon(sinLlave);
+    await arrancarCon(sinLlave);
+    const { corridas, bitacora } = await arrancarCon(sinLlave);
+
+    expect(corridas).toHaveLength(1); // tres arranques, UNA fila
+    expect(bitacora).toBe(1); // y UNA línea de bitácora
+    expect(corridas[0]?.paso).toBe('CONFIGURACION');
+  });
+
+  it('pero un fallo DISTINTO sí se anota aparte (no se traga avisos nuevos)', async () => {
+    await arrancarCon({ ...ENV_BUENO, RESPALDO_LLAVE: undefined });
+    const { corridas, bitacora } = await arrancarCon(ENV_BUENO); // ahora falta el motor de jobs
+
+    expect(corridas).toHaveLength(2);
+    expect(corridas.map((c) => c.paso).sort()).toStrictEqual(['CONFIGURACION', 'PROGRAMACION']);
+    expect(bitacora).toBe(2);
+  });
+
   it('apagado a propósito: NO deja rastro rojo (es una decisión, no un fallo)', async () => {
     const { corridas, bitacora } = await arrancarCon({ ...ENV_BUENO, RESPALDO_ACTIVO: 'false' });
     expect(corridas).toStrictEqual([]);
@@ -385,6 +408,49 @@ describe('corridas que mueren a media', () => {
     // Y la muerte quedó anotada donde se mira.
     expect(
       await cliente.bitacora.count({ where: { entidad: 'RespaldoBd', idEntidad: String(muerta) } }),
+    ).toBe(1);
+  });
+
+  it('⭐ dos corridas SOLAPADAS: la viva NO se cierra ni se anota como muerta', async () => {
+    // Éste es el defecto que nació al arreglar M1. pg-boss da un job por expirado a los 15 min y lo
+    // REINTENTA sin matar al que corre; con una base grande, la corrida B arrancaba mientras A
+    // seguía volcando, y el barrido de huérfanas cerraba a A como "murió a media". La fila de A
+    // acababa en EXITO (se cierra sola después), pero el renglón de BITÁCORA —que es INMUTABLE—
+    // quedaba para siempre diciendo que falló. Un rastro que miente por falso positivo enseña a no
+    // creerle, que es justo lo contrario de lo que persigue esta etapa.
+    const arranqueA = new Date('2026-08-01T08:00:00.000Z');
+    const idA = await iniciarCorrida(arranqueA, { cliente });
+
+    // B arranca 20 minutos después: MÁS que el expire por defecto de pg-boss (15 min), y MUCHO
+    // menos que la ventana real de una corrida.
+    const arranqueB = new Date(arranqueA.getTime() + 20 * 60 * 1000);
+    const idB = await iniciarCorrida(arranqueB, { cliente });
+
+    // A sigue viva: ni cerrada, ni difamada.
+    const a = await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: idA } });
+    expect(a.estado).toBe('EN_CURSO');
+    expect(a.error).toBeNull();
+    expect(a.terminadoEn).toBeNull();
+    expect(
+      await cliente.bitacora.count({ where: { entidad: 'RespaldoBd', idEntidad: String(idA) } }),
+    ).toBe(0); // ← antes aquí había un FALLO que jamás ocurrió
+    expect(await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: idB } })).toMatchObject({
+      estado: 'EN_CURSO',
+    });
+  });
+
+  it('pasada la ventana completa, SÍ se cierra (la guarda no desactiva el barrido)', async () => {
+    const arranqueA = new Date('2026-08-01T08:00:00.000Z');
+    const idA = await iniciarCorrida(arranqueA, { cliente }, { ventanaMinutos: 60 });
+    // Cuatro horas después: rebasa con creces la ventana, así que ahora sí está muerta.
+    const tarde = new Date(arranqueA.getTime() + 4 * 60 * 60 * 1000);
+    await iniciarCorrida(tarde, { cliente }, { ventanaMinutos: 60 });
+
+    const a = await cliente.respaldoCorrida.findUniqueOrThrow({ where: { id: idA } });
+    expect(a.estado).toBe('FALLO');
+    expect(a.error).toMatch(/SIN TERMINAR/i);
+    expect(
+      await cliente.bitacora.count({ where: { entidad: 'RespaldoBd', idEntidad: String(idA) } }),
     ).toBe(1);
   });
 

@@ -89,13 +89,20 @@ export function seleccionarObsoletos(
 
   const piso = opciones.ahora.getTime() - DIAS_INTOCABLES * 24 * 60 * 60 * 1000;
 
-  return candidatos
-    .slice(opciones.retencion) // se conservan los N más nuevos
-    .filter((objeto) => objeto.key !== opciones.keyProtegida) // regla 1
-    .filter((objeto) => objeto.key !== candidatos[0]?.key) // regla 2 (cinturón: nunca el más nuevo)
-    .filter((objeto) => objeto.ultimaModificacion.getTime() < piso) // piso de días intocables
-    .sort((uno, otro) => uno.ultimaModificacion.getTime() - otro.ultimaModificacion.getTime())
-    .map((objeto) => objeto.key);
+  return (
+    candidatos
+      .slice(opciones.retencion) // se conservan los N más nuevos
+      .filter((objeto) => objeto.key !== opciones.keyProtegida) // regla 1
+      // Regla 2, CINTURÓN REDUNDANTE y declarado como tal: hoy es INALCANZABLE, porque el `slice`
+      // de arriba ya excluye al más nuevo siempre que `retencion ≥ 1` —y `config.ts` lo exige—. Se
+      // queda por si algún día se afloja esa validación: un tope de 0 vaciaría el bucket entero, y
+      // esta línea sigue garantizando que quede el último. Ninguna prueba puede tumbarla mientras el
+      // mínimo sea 1; eso es esperado, no un hueco de cobertura.
+      .filter((objeto) => objeto.key !== candidatos[0]?.key)
+      .filter((objeto) => objeto.ultimaModificacion.getTime() < piso) // piso de días intocables
+      .sort((uno, otro) => uno.ultimaModificacion.getTime() - otro.ultimaModificacion.getTime())
+      .map((objeto) => objeto.key)
+  );
 }
 
 /**

@@ -56,6 +56,7 @@ import {
   decidirArranqueRespaldo,
   type ConfigRespaldo,
   configRespaldoDesdeEnv,
+  ventanaCorridaMinutos,
 } from '../respaldo/config.js';
 import { generarVolcado, versionPgDump } from '../respaldo/pg-dump.js';
 import { claveRespaldo, seleccionarObsoletos, type ObjetoRespaldo } from '../respaldo/retencion.js';
@@ -171,12 +172,28 @@ function datosDeCorrida(registro: RegistroCorrida): {
  * y el mes siguiente todo parecería normal. Con la fila abierta, esa muerte se ve: primero como una
  * corrida `EN_CURSO` que lleva horas, y después como el `FALLO` que le pone la siguiente corrida.
  *
+ * ⚠️ EL BARRIDO SÓLO TOCA LO QUE LLEVA MÁS DE UNA VENTANA COMPLETA ABIERTO. Sin esa guarda —y así
+ * nació— dos corridas solapadas se pisaban: la segunda cerraba a la PRIMERA como "murió a media"
+ * aunque siguiera trabajando, y dejaba en la bitácora —que es INMUTABLE (A7/D3)— un FALLO que jamás
+ * ocurrió. Un rastro que miente por FALSO POSITIVO es tan corrosivo como uno que calla: enseña a no
+ * creerle. La ventana sale de {@link ventanaCorridaMinutos}, la misma que limita el job en la cola.
+ *
  * Las corridas huérfanas se cierran con su bitácora, para que aparezcan donde se mira.
+ *
+ * @param opciones.ventanaMinutos ventana de gracia; por defecto {@link ventanaCorridaMinutos}.
  */
-export async function iniciarCorrida(iniciadoEn: Date, bd?: ContextoBd): Promise<bigint> {
+export async function iniciarCorrida(
+  iniciadoEn: Date,
+  bd?: ContextoBd,
+  opciones?: { ventanaMinutos?: number },
+): Promise<bigint> {
+  const ventanaMin = opciones?.ventanaMinutos ?? ventanaCorridaMinutos();
+  const corteHuerfanas = new Date(iniciadoEn.getTime() - ventanaMin * 60 * 1000);
   return enTransaccion(async (tx) => {
     const huerfanas = await tx.respaldoCorrida.findMany({
-      where: { estado: 'EN_CURSO' },
+      // `lt` y no `lte`: sólo lo ESTRICTAMENTE más viejo que la ventana. Una corrida que arrancó
+      // hace un minuto —o la de hace tres horas si la ventana es de cuatro— sigue viva y no se toca.
+      where: { estado: 'EN_CURSO', iniciadoEn: { lt: corteHuerfanas } },
       select: { id: true, iniciadoEn: true },
     });
     for (const huerfana of huerfanas) {
@@ -186,15 +203,21 @@ export async function iniciarCorrida(iniciadoEn: Date, bd?: ContextoBd): Promise
           estado: 'FALLO',
           terminadoEn: iniciadoEn,
           error:
-            'La corrida quedó SIN TERMINAR (el proceso murió a media: redeploy, falta de memoria o ' +
-            'apagado del contenedor). Se cerró al arrancar la corrida siguiente.',
+            `La corrida quedó SIN TERMINAR: llevaba más de ${String(ventanaMin)} minutos abierta ` +
+            '(el proceso murió a media: redeploy, falta de memoria o apagado del contenedor). Se ' +
+            'cerró al arrancar la corrida siguiente.',
         },
       });
       await registrarBitacora(tx, null, {
         entidad: 'RespaldoBd',
         idEntidad: huerfana.id,
         accion: 'OTRO',
-        datos: { estado: 'FALLO', motivo: 'corrida-sin-terminar' },
+        datos: {
+          estado: 'FALLO',
+          motivo: 'corrida-sin-terminar',
+          abiertaDesde: huerfana.iniciadoEn.toISOString(),
+          ventanaMinutos: ventanaMin,
+        },
       });
     }
 
@@ -457,17 +480,46 @@ export function depsRespaldoDesdeEnv(
  * @param paso `CONFIGURACION` si falta una variable; `PROGRAMACION` si la configuración estaba bien
  *   pero no se pudo dejar programado (el motor de jobs no levantó, o `schedule` falló).
  */
-async function registrarNoProgramado(mensaje: string, paso: PasoRespaldo): Promise<void> {
+async function registrarNoProgramado(
+  mensaje: string,
+  paso: PasoRespaldo,
+  bd?: ContextoBd,
+): Promise<void> {
   const ahora = new Date();
-  await persistirCorrida({
-    iniciadoEn: ahora,
-    terminadoEn: ahora,
-    estado: 'FALLO',
-    paso,
-    objetosBorrados: 0,
-    duracionMs: 0,
-    error: mensaje,
-  });
+  await enTransaccion(async (tx) => {
+    // NO SE REPITE EL MISMO ROJO EN CADA ARRANQUE. `RESPALDO_LLAVE` es variable nueva: hasta que
+    // esté puesta, cada reinicio del contenedor escribiría otra fila idéntica y otra línea de
+    // bitácora. El aviso sería CIERTO —no hay respaldo— pero el goteo es justo lo que entrena a
+    // ignorar la bitácora, y esta etapa vive de que se le crea. Si la última corrida ya es este
+    // mismo fallo, se le refresca la fecha (para ver "sigue así") en vez de duplicarla.
+    const ultima = await tx.respaldoCorrida.findFirst({
+      orderBy: { id: 'desc' },
+      select: { id: true, estado: true, paso: true, error: true },
+    });
+    if (ultima?.estado === 'FALLO' && ultima.paso === paso && ultima.error === mensaje) {
+      await tx.respaldoCorrida.update({ where: { id: ultima.id }, data: { terminadoEn: ahora } });
+      return;
+    }
+
+    const fila = await tx.respaldoCorrida.create({
+      data: {
+        iniciadoEn: ahora,
+        terminadoEn: ahora,
+        estado: 'FALLO',
+        paso,
+        objetosBorrados: 0,
+        duracionMs: 0,
+        error: mensaje,
+      },
+      select: { id: true },
+    });
+    await registrarBitacora(tx, null, {
+      entidad: 'RespaldoBd',
+      idEntidad: fila.id,
+      accion: 'OTRO',
+      datos: { estado: 'FALLO', paso, error: mensaje },
+    });
+  }, bd);
 }
 
 /**
@@ -562,7 +614,19 @@ export async function registrarRespaldoPeriodico(
         throw new Error(`Respaldo a R2 fallido (${resultado.paso}): ${resultado.error ?? ''}`);
       }
     });
-    await boss.schedule(COLAS_JOBS.respaldoBd, config.cron);
+    // ⚠️ `expireInSeconds` NO ES DECORATIVO. El default de pg-boss son 15 minutos: pasado ese rato
+    // da el job por expirado y lo REINTENTA **sin matar al que sigue corriendo**, así que con una
+    // base grande habría dos corridas a la vez —dos `pg_dump`, la misma key pisándose en R2, y el
+    // barrido cerrando como muerta una corrida viva—. Se alinea con la MISMA ventana que usa el
+    // barrido de huérfanas, para que los dos números no puedan volver a contradecirse.
+    // `singletonKey` es el cinturón: con clave fija, la cola no admite dos jobs de este respaldo en
+    // vuelo aunque algo más los produjera.
+    await boss.schedule(COLAS_JOBS.respaldoBd, config.cron, null, {
+      expireInSeconds: ventanaCorridaMinutos() * 60,
+      singletonKey: COLAS_JOBS.respaldoBd,
+      retryLimit: 2,
+      retryDelay: 15 * 60,
+    });
   } catch (error) {
     // Mismo rastro rojo que un motor ausente: el resultado para el negocio es idéntico —no hay
     // respaldo programado— y antes esto sólo dejaba un `log.error`.

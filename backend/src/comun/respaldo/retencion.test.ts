@@ -129,7 +129,12 @@ describe('seleccionarObsoletos', () => {
     expect(protegido).toContain(masNuevos[3]?.key);
   });
 
-  it('conserva el MÁS NUEVO aunque el tope fuera 0-ish (mejor viejo que ninguno)', () => {
+  it('con el tope MÍNIMO (1) conserva el más nuevo y borra el resto', () => {
+    // ⚠️ HONESTIDAD SOBRE LO QUE CUBRE ESTA PRUEBA: aquí el más nuevo se salva por el TOPE
+    // (`slice(1)` ya lo deja fuera), NO por la guarda "nunca el más nuevo" (regla 2). Esa guarda es
+    // INALCANZABLE mientras `RESPALDO_RETENCION` exija ≥ 1: vive en el código como cinturón por si
+    // alguien afloja esa validación, y por eso ninguna prueba puede tumbarla —ni finge hacerlo—.
+    // Si mañana se permitiera `retencion: 0`, esta prueba SÍ debería cubrirla.
     const objetos = [haceDias(60), haceDias(90), haceDias(120)];
     const aBorrar = seleccionarObsoletos(objetos, PREFIJO_DEFECTO, {
       retencion: 1,
