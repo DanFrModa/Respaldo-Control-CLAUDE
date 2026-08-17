@@ -698,6 +698,24 @@ export async function wipDeOrden(
     distinct: ['idTipoProceso'],
   });
 
+  // V1-E4b (§Post-F9.61): qué procesos se enviaron como PRENDA YA TERMINADA — sus prendas están en
+  // el almacén de TRÁNSITO y el recibo las DEVUELVE, así que la captura pide almacén destino aunque
+  // el proceso no sea el que crea el PT. Una sola consulta para todos los procesos de la orden.
+  const enviosPrendaTerminada = await cliente.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+      prendaTerminada: true,
+      idTipoProceso: { not: null },
+    },
+    select: { idTipoProceso: true },
+    distinct: ['idTipoProceso'],
+  });
+  const procesosQueDevuelven = new Set(
+    enviosPrendaTerminada.map((e) => e.idTipoProceso).filter((id): id is number => id !== null),
+  );
+
   // porCortar = pedido − cortado, por celda (incluye celdas con sobre-corte → negativo).
   const clavesCorte = new Set<string>([...pedido.keys(), ...cortado.keys()]);
   const porCortar = ordenarCeldas(
@@ -764,6 +782,7 @@ export async function wipDeOrden(
       .map(({ ordenTalla: _o, ...resto }) => resto);
     porRecibir.push({
       ...datosProceso,
+      devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
       celdas: celdasRecibir,
       totalPendiente:
         [...enviado.values()].reduce((s, v) => s + v, 0) -

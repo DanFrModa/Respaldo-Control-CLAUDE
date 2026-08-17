@@ -105174,6 +105174,34 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105336,6 +105364,9 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -105669,6 +105700,34 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -105831,6 +105890,9 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106057,6 +106119,17 @@
                       }
                     ]
                   },
+                  "prendaTerminada": {
+                    "default": false,
+                    "description": "Las prendas que se mandan YA son producto terminado (proceso DESPUÉS de costura, §Post-F9.61): el envío las SACA de `idAlmacenOrigen` hacia el almacén de tránsito y su recibo las devuelve.",
+                    "type": "boolean"
+                  },
+                  "idAlmacenOrigen": {
+                    "description": "Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "observaciones": {
                     "type": "string",
                     "maxLength": 1000
@@ -106245,6 +106318,34 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -106407,6 +106508,9 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -106740,6 +106844,34 @@
                       ],
                       "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
+                    "prendaTerminada": {
+                      "type": "boolean",
+                      "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                    },
+                    "idAlmacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                    },
+                    "almacenOrigen": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del almacén de origen o null."
+                    },
                     "observaciones": {
                       "anyOf": [
                         {
@@ -106902,6 +107034,9 @@
                     "fecha",
                     "fechaCompromiso",
                     "precioPactado",
+                    "prendaTerminada",
+                    "idAlmacenOrigen",
+                    "almacenOrigen",
                     "observaciones",
                     "cancelado",
                     "canceladoEn",
@@ -107581,6 +107716,34 @@
                             ],
                             "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                           },
+                          "prendaTerminada": {
+                            "type": "boolean",
+                            "description": "Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega."
+                          },
+                          "idAlmacenOrigen": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Almacén de PT del que salieron las prendas (solo envíos de prenda terminada)."
+                          },
+                          "almacenOrigen": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del almacén de origen o null."
+                          },
                           "observaciones": {
                             "anyOf": [
                               {
@@ -107743,6 +107906,9 @@
                           "fecha",
                           "fechaCompromiso",
                           "precioPactado",
+                          "prendaTerminada",
+                          "idAlmacenOrigen",
+                          "almacenOrigen",
                           "observaciones",
                           "cancelado",
                           "canceladoEn",
@@ -109869,7 +110035,11 @@
                           },
                           "generaEntradaPt": {
                             "type": "boolean",
-                            "description": "Si el recibo de este proceso mete a PT."
+                            "description": "Si el recibo de este proceso CREA producto terminado."
+                          },
+                          "devuelveAPt": {
+                            "type": "boolean",
+                            "description": "Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT."
                           },
                           "celdas": {
                             "type": "array",
@@ -110008,6 +110178,7 @@
                           "tipoProceso",
                           "codigoProceso",
                           "generaEntradaPt",
+                          "devuelveAPt",
                           "celdas",
                           "totalPendiente",
                           "porMaquilero"
@@ -113455,6 +113626,10 @@
                             "maximum": 9007199254740991,
                             "description": "Total pendiente de este proceso (derivado)."
                           },
+                          "devuelveAPt": {
+                            "type": "boolean",
+                            "description": "Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT."
+                          },
                           "porMaquilero": {
                             "type": "array",
                             "items": {
@@ -113545,6 +113720,7 @@
                           "generaEntradaPt",
                           "celdas",
                           "totalPendiente",
+                          "devuelveAPt",
                           "porMaquilero"
                         ],
                         "additionalProperties": false

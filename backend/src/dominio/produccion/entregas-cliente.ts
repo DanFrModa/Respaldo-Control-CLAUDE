@@ -78,6 +78,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { rechazarAlmacenDeTransito } from './transito.js';
 
 /** Tipo de movimiento de kardex para la SALIDA de PT de la entrega (seed, dirección salida). */
 const COD_ENTREGA_CLIENTE = 'entrega-cliente';
@@ -383,6 +384,10 @@ export async function registrarEntregaCliente(
     const celdas = aplanarYValidar(datos.lineas, orden);
 
     await exigirAlmacen(tx, datos.idAlmacen, orden.idEmpresa);
+    // V1-E4b: no se le entrega al cliente desde el almacén de TRÁNSITO — ahí está lo que sigue
+    // físicamente en el taller de un tercero. Antes esto no podía pasar (el tránsito nunca tenía
+    // existencia); desde que el envío de prendas terminadas lo alimenta, sí.
+    await rechazarAlmacenDeTransito(tx, datos.idAlmacen, 'entrega al cliente');
 
     // Concurrencia + decisión (b): bloquea por artículo y valida no-negativo por suma directa
     // (nunca la vista) DENTRO de la transacción → dos entregas del mismo artículo no dejan negativo.

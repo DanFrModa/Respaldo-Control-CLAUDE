@@ -193,6 +193,11 @@ export type WipMaquileroPendiente = z.infer<typeof esquemaWipMaquileroPendiente>
 
 /** Pendiente POR RECIBIR de un proceso, con su desglose por maquilero. */
 const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
+  devuelveAPt: z
+    .boolean()
+    .describe(
+      'Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT.',
+    ),
   porMaquilero: z
     .array(esquemaWipMaquileroPendiente)
     .describe(

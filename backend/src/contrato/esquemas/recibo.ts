@@ -252,7 +252,12 @@ const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
   tipoProceso: z.string().describe('Nombre del proceso.'),
   codigoProceso: z.string().describe('Código del proceso (kebab-case).'),
-  generaEntradaPt: z.boolean().describe('Si el recibo de este proceso mete a PT.'),
+  generaEntradaPt: z.boolean().describe('Si el recibo de este proceso CREA producto terminado.'),
+  devuelveAPt: z
+    .boolean()
+    .describe(
+      'Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT.',
+    ),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
     .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),

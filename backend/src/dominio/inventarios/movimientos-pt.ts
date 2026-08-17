@@ -55,11 +55,10 @@ import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
-  bloquearArticuloPt,
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
-  existenciaPtBloqueada,
+  exigirExistenciaPt,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   registrarTraspasoPt as registrarTraspasoPtMotor,
   type LineaMovimientoPt,
@@ -215,10 +214,13 @@ async function tipoPorCodigo(
 
 /**
  * Valida, bajo bloqueo, que SACAR `celdas` del almacén `idAlmacen` (artículos del `idModelo`) no deje
- * la existencia negativa (D3). Toma `bloquearArticuloPt` + `existenciaPtBloqueada` por cada artículo
- * DENTRO de la transacción (concurrencia: dos salidas del mismo artículo no se cuelan entre la
- * lectura y la escritura — base de "no entregar lo que no existe"). Suma directa de `MovimientoDetPt`,
+ * la existencia negativa (D3). La regla vive en el MOTOR ({@link exigirExistenciaPt}): la comparten
+ * los movimientos manuales/traspasos de aquí y el envío de prendas terminadas al tránsito (V1-E4b),
+ * y tiene que ser la misma letra por letra. Suma directa de `MovimientoDetPt` bajo advisory lock,
  * NUNCA la vista (ADR-0010 §3).
+ *
+ * §Post-F9.40 — cada celda valida contra el bucket de SU orden (F6-E2 "PT por orden"): el bucket
+ * «sin orden» (`idOrden = null`, lo capturado a mano y lo migrado) es uno más, no el único.
  */
 async function validarNoNegativo(
   tx: Tx,
@@ -227,34 +229,7 @@ async function validarNoNegativo(
   idModelo: number,
   celdas: Celda[],
 ): Promise<void> {
-  // Toma los locks en un orden DETERMINISTA (por color, talla y ORDEN) para que dos operaciones que
-  // compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden: elimina el riesgo
-  // teórico de deadlock entre dos traspasos cruzados. No copia/ordena `celdas` (caller la usa luego).
-  // §Post-F9.40 — cada celda valida contra el bucket de SU orden (F6-E2 "PT por orden"): el bucket
-  // «sin orden» (`idOrden = null`, lo capturado a mano y lo migrado) es uno más, no el único.
-  const ordenadas = [...celdas].sort(
-    (a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla || (a.idOrden ?? 0) - (b.idOrden ?? 0),
-  );
-  for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, c.idOrden);
-    const existencia = await existenciaPtBloqueada(
-      tx,
-      idEmpresa,
-      idAlmacen,
-      idModelo,
-      c.idColor,
-      c.idTalla,
-      c.idOrden,
-    );
-    if (existencia - c.cantidad < 0) {
-      const deQueOrden =
-        c.idOrden === null ? 'del bucket «sin orden»' : `de la orden ${String(c.idOrden)}`;
-      throw new ErrorConflicto(
-        `No hay existencia suficiente ${deQueOrden}: se intenta sacar ${c.cantidad} pza(s) de un ` +
-          `artículo con ${existencia} en existencia (no se permite dejar el inventario en negativo).`,
-      );
-    }
-  }
+  await exigirExistenciaPt(tx, idEmpresa, idAlmacen, idModelo, celdas);
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────

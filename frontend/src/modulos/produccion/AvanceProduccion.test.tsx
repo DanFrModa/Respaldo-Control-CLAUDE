@@ -36,6 +36,7 @@ const wipBase: WipOrden = {
       tipoProceso: 'Costura',
       codigoProceso: 'costura',
       generaEntradaPt: true,
+      devuelveAPt: false,
       celdas: [],
       totalPendiente: 226, // enviado costura 1726 − recibido costura 1500
       porMaquilero: [],
@@ -45,6 +46,7 @@ const wipBase: WipOrden = {
       tipoProceso: 'Estampado',
       codigoProceso: 'estampado',
       generaEntradaPt: false,
+      devuelveAPt: false,
       celdas: [],
       totalPendiente: 374,
       porMaquilero: [],

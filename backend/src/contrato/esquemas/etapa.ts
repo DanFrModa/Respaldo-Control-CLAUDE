@@ -112,6 +112,18 @@ export const esquemaEnvioCrear = z
       .min(0, { error: 'El precio pactado no puede ser negativo' })
       .nullish()
       .describe('Precio de maquila pactado (base del cargo EsMa), opcional.'),
+    prendaTerminada: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Las prendas que se mandan YA son producto terminado (proceso DESPUÉS de costura, §Post-F9.61): el envío las SACA de `idAlmacenOrigen` hacia el almacén de tránsito y su recibo las devuelve.',
+      ),
+    idAlmacenOrigen: z
+      .number({ error: 'El almacén de origen debe ser un número' })
+      .int({ error: 'El id del almacén debe ser entero' })
+      .positive({ error: 'El id del almacén debe ser positivo' })
+      .optional()
+      .describe('Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`.'),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaEtapaMatriz,
   })
@@ -176,6 +188,17 @@ export const esquemaEtapaSalida = z
       .describe(
         'Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa).',
       ),
+    prendaTerminada: z
+      .boolean()
+      .describe(
+        'Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega.',
+      ),
+    idAlmacenOrigen: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Almacén de PT del que salieron las prendas (solo envíos de prenda terminada).'),
+    almacenOrigen: z.string().nullable().describe('Nombre del almacén de origen o null.'),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si la etapa está cancelada (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),

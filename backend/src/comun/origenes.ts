@@ -25,6 +25,13 @@ export const ORIGEN = {
   cancelacion: 'cancelacion',
   /** Entrada a PT generada por un recibo de costura (`generaEntradaPt` — F3-E4). */
   reciboMaquila: 'recibo-maquila',
+  /**
+   * Traspaso de PT hacia el almacén de TRÁNSITO por un envío de prendas YA TERMINADAS a un proceso
+   * externo (V1-E4b, §Post-F9.61). El `origenId` es el id de la `EtapaMovimiento` del envío. Marca
+   * las DOS patas del traspaso (salida del almacén origen + entrada al tránsito), para que la
+   * cancelación del envío las encuentre y las revierta juntas.
+   */
+  envioMaquila: 'envio-maquila',
   /** Salida de PT por una entrega a cliente (F3-E5). */
   entregaCliente: 'entrega-cliente',
   /** Salida de TELA ligada a una orden de producción (F4-E1 — `Salidas.IdOrdenes`). El `origenId` es el id de la orden. */

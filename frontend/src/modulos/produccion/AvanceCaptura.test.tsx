@@ -1037,3 +1037,162 @@ describe('Captura del avance · descargar tela', () => {
     expect(screen.getByTestId('avance-abrir-captura')).toBeInTheDocument();
   });
 });
+
+/**
+ * V1-E4b · EL TRÁNSITO DE PRENDAS A PROCESO (§Post-F9.61). Cuando el proceso de arte va DESPUÉS de
+ * la costura, lo que se manda ya es producto terminado: el envío tiene que SACARLO del almacén (si
+ * no, el almacén sigue diciendo que está en el piso y los faltantes y las segundas del recibo no
+ * tienen dónde caer). Aquí se prueba la mitad de pantalla de esa regla: que el default siga a la
+ * orden, que se pida el almacén de origen y que las dos cosas viajen en el cuerpo del envío.
+ */
+describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () => {
+  /** WIP de una orden que YA tiene producto terminado de costura y aún nada enviado a estampado. */
+  function wipConPtRecibido(): WipOrden {
+    const base = wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]);
+    return {
+      ...base,
+      recibidoCostura: 10,
+      recibido: 10,
+      porRecibir: [],
+      cortadoPorEnviar: [],
+    };
+  }
+
+  beforeEach(() => {
+    useWipOrden.mockReturnValue({ data: wipConPtRecibido(), isPending: false });
+  });
+
+  it('con PT ya recibido, el envío a arte marca "prendas ya terminadas" por default y pide el almacén', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    expect(screen.getByTestId('avance-prenda-terminada')).toBeChecked();
+    expect(screen.getByTestId('avance-almacen-origen')).toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '10');
+    // Sin almacén de origen NO se puede guardar: el servidor lo rechazaría (400).
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-origen'), '1');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearEnvio).toHaveBeenCalledTimes(1);
+    const cuerpo = crearEnvio.mock.calls[0]?.[0] as {
+      prendaTerminada: boolean;
+      idAlmacenOrigen?: number;
+    };
+    expect(cuerpo.prendaTerminada).toBe(true);
+    expect(cuerpo.idAlmacenOrigen).toBe(1);
+  });
+
+  it('al desmarcarlo, se esconde el almacén y el envío va como bultos cortados', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+    await usuario.click(screen.getByTestId('avance-prenda-terminada'));
+
+    expect(screen.queryByTestId('avance-almacen-origen')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '10');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    const cuerpo = crearEnvio.mock.calls[0]?.[0] as {
+      prendaTerminada: boolean;
+      idAlmacenOrigen?: number;
+    };
+    expect(cuerpo.prendaTerminada).toBe(false);
+    expect(cuerpo.idAlmacenOrigen).toBeUndefined();
+  });
+
+  it('sin PT recibido, el default es "bultos cortados" (el flujo de siempre)', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    expect(screen.getByTestId('avance-prenda-terminada')).not.toBeChecked();
+    expect(screen.queryByTestId('avance-almacen-origen')).not.toBeInTheDocument();
+  });
+
+  it('si el proceso YA tiene entrega viva, la bandera queda fijada por ella (no se puede mezclar)', async () => {
+    const base = wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 4 }]);
+    useWipOrden.mockReturnValue({
+      data: {
+        ...base,
+        recibidoCostura: 10,
+        porRecibir: [
+          {
+            idTipoProceso: 6,
+            tipoProceso: 'Estampado',
+            codigoProceso: 'estampado',
+            generaEntradaPt: false,
+            devuelveAPt: false,
+            celdas: [],
+            totalPendiente: 4,
+            porMaquilero: [],
+          },
+        ],
+      } as unknown as WipOrden,
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    // La entrega viva es de bultos cortados ⇒ la bandera queda apagada y BLOQUEADA, aunque la
+    // orden ya tenga producto terminado (el servidor rechaza mezclar las dos formas).
+    const casilla = screen.getByTestId('avance-prenda-terminada');
+    expect(casilla).not.toBeChecked();
+    expect(casilla).toBeDisabled();
+  });
+
+  it('el RECIBO de un proceso que devuelve del tránsito pide almacén destino', async () => {
+    const base = wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 4 }]);
+    useWipOrden.mockReturnValue({
+      data: {
+        ...base,
+        porRecibir: [
+          {
+            idTipoProceso: 6,
+            tipoProceso: 'Estampado',
+            codigoProceso: 'estampado',
+            generaEntradaPt: false,
+            devuelveAPt: true,
+            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            totalPendiente: 4,
+            porMaquilero: [
+              {
+                idMaquilero: 77,
+                maquilero: 'Maquila del Norte',
+                celdas: [
+                  { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 },
+                ],
+                totalPendiente: 4,
+              },
+            ],
+          },
+        ],
+      } as unknown as WipOrden,
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    // El proceso NO crea PT, pero las prendas están en tránsito: hay que decir a dónde regresan.
+    expect(screen.getByTestId('avance-almacen-primeras')).toBeInTheDocument();
+  });
+});
