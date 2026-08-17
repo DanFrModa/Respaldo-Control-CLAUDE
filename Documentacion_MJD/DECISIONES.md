@@ -2832,3 +2832,43 @@ existente sirve) o un estado del kardex de PT? El repo ya tiene almacenes y tras
 - **Aplica en:** etapa propia del track V1, **antes de que Daniel empiece a capturar inventario real**
   (ya manda estampados después de costura, §Post-F9.60). Requiere migración y toca kardex.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.62) — El segundo respaldo es MENSUAL, no diario (GABRIEL, 17-ago-2026)
+
+> Gabriel, al ver que se estaba construyendo el respaldo: *"¿Cómo que respaldos? Los respaldos están
+> hechos en Railway, ¿qué haces?"* Y tras la explicación: *"Sí están prendidos, en Railway todos los
+> respaldos. Chance en R2 una vez al mes nada más."*
+
+**El planteamiento era correcto y la pregunta también.** `PLANMAESTRO.md` §91 pide **respaldo doble**:
+*"además de los backups de Railway, un job de pg-boss hace `pg_dump` diario y lo sube cifrado a R2"*, y
+la tabla de riesgos lo lista como **mitigación #1** de *"pérdida de datos (todo el negocio en una BD)"*.
+Lo que el lead no sabía —y Gabriel confirmó— es que **los backups de Railway ya están encendidos** en
+todos los ambientes.
+
+**Qué cambia:** el plan decía **diario**; queda **MENSUAL** (`RESPALDO_CRON`, configurable sin
+desplegar). **Es una desviación consciente del `PLANMAESTRO`, decidida por el dueño de la
+infraestructura**, y se escribe aquí para que nadie la lea como un incumplimiento.
+
+**Por qué el segundo respaldo sigue teniendo sentido** (la razón de no cancelarlo): el de Railway vive
+**dentro** de Railway. Sirve para casi todo —borrar una tabla, corromper un dato—, pero **no sirve
+cuando el problema ES Railway**: cuenta suspendida, servicio borrado por error, caída larga, o querer
+mudarse. Es el mismo principio de portabilidad que Gabriel puso en la arquitectura (*"si Railway se
+cae, se levanta en cualquier lado sin reescribir"*), aplicado a **los datos** y no sólo al código. Con
+esa lógica, **una copia mensual fuera de Railway cubre el escenario** — el diario lo cubre Railway.
+
+**Consecuencias del cambio, que NO son sólo "correr menos seguido":**
+
+1. **Retención en COPIAS, no en días** (12 = un año). La frecuencia es configurable, y una retención en
+   días cambiaría **en silencio** cuántas copias existen si alguien toca el cron.
+2. **Piso no configurable de 35 días**: las corridas manuales del día que se configure R2 no deben
+   empujar el año de historia fuera del tope.
+3. ⚠️ **El aviso de fallo pasa a ser LA parte crítica.** Con corridas mensuales, **si falla en enero
+   nadie lo nota hasta junio**. Por eso el requisito rector de la etapa fue *"que no falle en
+   silencio"* — y por eso el reviewer la rechazó al encontrar dos caminos que morían callados.
+
+**Pendiente que Gabriel debe hacer a mano:** generar `RESPALDO_LLAVE` (`openssl rand -base64 32`),
+ponerla en Railway **y guardarla también fuera** (gestor de contraseñas). Si se pierde, los respaldos
+son **irrecuperables por diseño**. Procedimiento completo en `docs/GUIA-RAILWAY-R2.md` §7.1.
+
+- **Aplica en:** V1-E6a. Sin permisos ni contrato nuevos; una migración aditiva (`respaldo_corrida`).
+- **Fecha:** 2026-08-17.
