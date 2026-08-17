@@ -222,7 +222,9 @@ export function EditorEncabezadoOrden({
               ya se había arreglado justo arriba). */}
           <SelectorProveedor
             idInput="orden-maquilero"
-            idSeleccionado={idMaquileroFormulario === '' ? undefined : Number(idMaquileroFormulario)}
+            idSeleccionado={
+              idMaquileroFormulario === '' ? undefined : Number(idMaquileroFormulario)
+            }
             nombreSeleccionado={orden.maquilero ?? undefined}
             alSeleccionar={(p) =>
               setValue('idMaquilero', String(p.id), { shouldDirty: true, shouldValidate: true })

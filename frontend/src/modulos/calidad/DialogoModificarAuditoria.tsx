@@ -60,7 +60,6 @@ export function DialogoModificarAuditoria({
     }
   }, [abierto, auditoria, sembradoId]);
 
-
   function guardar(): void {
     if (idAuditoria === undefined) return;
     const cuerpo: AuditoriaModificar = {
