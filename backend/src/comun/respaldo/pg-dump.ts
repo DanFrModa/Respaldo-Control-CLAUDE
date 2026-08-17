@@ -99,6 +99,36 @@ export function timeoutVolcadoMinutos(
   return Number.isFinite(crudo) && crudo > 0 ? crudo : TIMEOUT_VOLCADO_MIN_DEFECTO;
 }
 
+/**
+ * Margen, en minutos, que se le suma al tope del volcado para acotar la corrida COMPLETA: después
+ * del `pg_dump` quedan el cifrado, la subida a R2 y la retención. Una hora sobra para un volcado
+ * grande sobre una red lenta.
+ */
+export const MARGEN_CORRIDA_MIN = 60;
+
+/**
+ * Cuánto puede durar, como MÁXIMO, una corrida entera (volcado + cifrado + subida + retención).
+ *
+ * Es UN SOLO NÚMERO con TRES usos que TIENEN que coincidir, y de que no coincidieran nació un
+ * defecto real (corridas solapadas):
+ *  1. `expireInSeconds` del job de pg-boss — pasado ese tiempo la cola da el job por expirado y lo
+ *     REINTENTA **sin matar al que sigue corriendo**. Su default son 15 min, muy por debajo de las
+ *     3 h que permite `RESPALDO_TIMEOUT_MIN`.
+ *  2. `expireInSeconds` de la COLA (su valor por defecto, en `comun/jobs/index.ts`).
+ *  3. El umbral del barrido de huérfanas — sólo se cierra lo que lleva más de esta ventana abierto,
+ *     así una corrida legítima jamás es candidata a que la den por muerta.
+ *
+ * Vive AQUÍ, y no en `respaldo/config.ts`, por una razón concreta: el bootstrap genérico de jobs
+ * necesita este número, y `config.ts` arrastra el servicio de archivos (y con él el SDK de AWS).
+ * Este módulo sólo depende de `comun/errores`. Mientras los tres usos salgan de esta función, no
+ * pueden volver a discrepar.
+ */
+export function ventanaCorridaMinutos(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return timeoutVolcadoMinutos(env) + MARGEN_CORRIDA_MIN;
+}
+
 /** Corre un proceso y devuelve su código de salida junto con lo que escribió en stderr. */
 async function correr(
   ejecutable: string,

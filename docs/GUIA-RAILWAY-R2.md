@@ -289,6 +289,17 @@ sin dejar volcado a medias**) → `pg_restore`. Si la base destino ya tiene tabl
 llave**): cada corrida guarda el **SHA-256 del archivo cifrado** en `respaldo_corrida.sha256`; pásalo
 con `--sha256 <hex>` y el script verifica la huella antes de tocar nada.
 
+```bash
+# Forma CANÓNICA de auditar un respaldo sin tener la llave a mano:
+npx tsx --env-file=.env scripts/restaurar-respaldo.ts \
+  --archivo control-2026-09-01T080000Z.dump.enc --sha256 <hex> --solo-verificar
+```
+
+Responde si el archivo está **íntegro** y **no descifra nada**. Si la huella no cuadra, reporta **la
+huella** (esperada contra real), no un error de configuración. *(Sin `--sha256`, el script sigue
+exigiendo `RESPALDO_LLAVE` de entrada, a propósito: así no se bajan cientos de MB para morir al
+final.)*
+
 **Dos vías para correrlo, según el escenario:**
 
 | Escenario | Cómo |

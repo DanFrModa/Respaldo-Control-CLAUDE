@@ -23,8 +23,6 @@ import { z } from 'zod';
 import { credencialesR2SonDummy } from '../archivos.js';
 import { ErrorValidacion } from '../errores.js';
 
-import { timeoutVolcadoMinutos } from './pg-dump.js';
-
 /**
  * Largo mínimo de `RESPALDO_LLAVE`. 24 caracteres es lo que da una frase con entropía suficiente
  * sin volverla imposible de teclear; la recomendación de la guía es generarla con
@@ -62,32 +60,6 @@ export const RETENCION_DEFECTO = 12;
  * menos capturas.
  */
 export const CRON_DEFECTO = '0 8 1 * *';
-
-/**
- * Margen, en minutos, que se le suma al tope del `pg_dump` para acotar la corrida COMPLETA: después
- * del volcado quedan el cifrado, la subida a R2 y la retención. Una hora sobra para un volcado
- * grande sobre una red lenta.
- */
-export const MARGEN_CORRIDA_MIN = 60;
-
-/**
- * Cuánto puede durar, como MÁXIMO, una corrida entera (volcado + cifrado + subida + retención).
- *
- * Es UN SOLO NÚMERO con dos usos que TIENEN que coincidir, y de no coincidir nació un defecto real:
- *  1. `expireInSeconds` del job de pg-boss — pasado este tiempo, la cola da el job por expirado y lo
- *     REINTENTA **sin matar al que sigue corriendo**. Su default son 15 min, muy por debajo de las
- *     3 h que permite `RESPALDO_TIMEOUT_MIN`: dos `pg_dump` a la vez, dos corridas compartiendo key
- *     (se pisan el objeto en R2) y el barrido de huérfanas cerrando como "muerta" una corrida VIVA.
- *  2. El umbral del barrido de huérfanas — sólo se cierra lo que lleva MÁS de esta ventana abierto,
- *     así una corrida legítima jamás es candidata.
- *
- * Mientras los dos salgan de aquí, no se pueden volver a contradecir.
- */
-export function ventanaCorridaMinutos(
-  env: Record<string, string | undefined> = process.env,
-): number {
-  return timeoutVolcadoMinutos(env) + MARGEN_CORRIDA_MIN;
-}
 
 /** Prefijo (carpeta lógica) donde viven los respaldos dentro del bucket R2. */
 export const PREFIJO_DEFECTO = 'respaldos/bd';

@@ -988,6 +988,78 @@ SINUBE), y la liga entrega→cobro.
    resuelve **parejo en los diez** o no se resuelve.
 8. **Festivos 2027** si el go-live cruza el año (hoy están hardcodeados solo los de 2026).
 
+### E6a — ✅ HECHA (17-ago-2026): el respaldo mensual cifrado a R2
+
+> **Adelantada del resto de E6 por decisión de Daniel** (*"sí ok"*, 16-ago): de los ocho puntos de
+> esta etapa era **el único que protege de algo sin vuelta atrás**, y por eso se construyó antes de
+> que empiece a capturarse trabajo real.
+
+**Qué es y por qué existe habiendo backups de Railway.** Los diarios de Railway **están encendidos** y
+cubren el día a día. Éste es el **segundo** respaldo del `PLANMAESTRO` §91 (*"además de los backups de
+Railway"*), y su único valor es el caso en que **el problema SEA Railway**: cuenta suspendida, servicio
+borrado, caída larga, o mudarse. Un respaldo que vive dentro de Railway se va con el barco.
+**Cadencia mensual** por decisión de Gabriel (§Post-F9.62) — desviación consciente del plan, que decía
+diario.
+
+**Qué quedó.** Job pg-boss mensual: `pg_dump` → cifrado **AES-256-GCM** (sal por archivo, IV por
+corrida, etiqueta verificada, streaming de 64 KB) → subida a R2 → **verificación con HeadObject de que
+el objeto quedó y el tamaño cuadra** → retención → rastro. **Retención de 12 copias, no de días**
+(la frecuencia es configurable y una retención en días cambiaría en silencio cuántas copias existen),
+con piso no configurable de **35 días**. Script de restauración con `--listar`, `--sha256`,
+`--solo-verificar` y `--si-estoy-seguro`, y **ensayo de restauración automatizado** en la suite.
+
+**El requisito rector era que NO fallara en silencio**, y con cadencia mensual pesa más: *si falla en
+enero, nadie lo nota hasta junio*. **Tres rondas de revisión giraron casi por completo alrededor de
+eso.**
+
+**Lo que cazó el reviewer, todo EJECUTANDO (nada por lectura):**
+
+- **⭐ Ronda 1 — dos caminos morían callados.** (1) **Sin motor de jobs, el respaldo no se programaba y
+  no dejaba NI UNA línea** — y no es hipotético: el backend arranca antes de que Postgres responda y
+  **sigue sirviendo** (la cicatriz de `CLAUDE.md` §8), así que el escenario más probable era justo el
+  invisible. (2) El `mkdtemp` estaba **fuera del `try`**, así que un disco lleno hacía **lanzar** a una
+  función cuyo contrato dice *"NO lanza"*, y el fallo terminaba anotado dentro del **único esquema que
+  el respaldo excluye del volcado**. Invisible por partida doble.
+- **Dos de las tres guardas de la retención tenían pruebas decorativas:** el código protegía, pero
+  borrarlas dejaba **31 pruebas en verde**. Falla la red de seguridad, no la red eléctrica.
+- **La regresión de `pg_restore --dbname` no protegía al script**: el ensayo **copiaba** los argumentos
+  en vez de llamar a la función real. Borrando `--dbname` del script, pasaba **6/6**.
+- **⭐ Ronda 3 — un defecto NUEVO, nacido del arreglo de la ronda 2.** Al escribir la fila "en curso" al
+  empezar, el barrido de huérfanas **cerraba corridas que seguían VIVAS** y dejaba en la bitácora un
+  **FALLO que nunca ocurrió** — con los dos rastros contradiciéndose y **mintiendo el inmutable** (A7/D3).
+  Además dos corridas compartían key y una **pisaba el objeto de la otra en R2**.
+  **El disparador no era exótico, era el propio diseño contra sí mismo:** pg-boss da el job por expirado
+  a los **15 minutos** y lo reintenta sin matar al que corre, mientras el `RESPALDO_TIMEOUT_MIN` recién
+  introducido declaraba **180**. Dos números contradiciéndose, ganando el de la cola. **Latente hoy**
+  (el volcado pesa 641 KB y tarda segundos); **se encendía solo** conforme creciera la base — el
+  horizonte exacto para el que se escribió ese timeout.
+  **Se cerró derivando AMBOS del mismo número** (`ventanaCorridaMinutos()` = timeout + 60 de margen),
+  para que no puedan volver a desalinearse, más guarda de antigüedad en el barrido y `singletonKey`.
+
+**Decisiones declaradas, no silenciadas:** la key compartida se resolvió **por la causa** (impedir el
+solape) y no haciendo la key colisión-proof · se prefirió guardar el **SHA-256 en la BD** antes que
+mandar `ChecksumSHA256` a R2 sin poder probarlo (*"mandar a ciegas algo que puede romper la primera
+corrida habría sido lo contrario de esta etapa"*) · el esquema `pgboss` **se excluye** del volcado
+(restaurarlo re-dispararía trabajos viejos), con el hueco fino —evento publicado pero no consumido—
+escrito en la cabecera del script.
+
+**⚠️ La limitación real, dicha y no escondida:** el aviso es **PASIVO**. No hay correo ni notificación
+(el plan los difirió). Revisar la bitácora tiene que ser parte del procedimiento mensual hasta que
+exista notificación activa.
+
+**Dos lecciones de proceso que valen para todo el proyecto:**
+
+1. **Nunca juzgar un comando ENTUBADO.** `npm run lint | tail` devuelve el exit de `tail` — **siempre
+   0**. Así se reportó "lint limpio" estando rojo. **Capturar `$?` a archivo.** Lo sufrieron los dos
+   lados y lo confirmaron ejecutando.
+2. **Comprobar cada afirmación contra el diff antes de escribirla.** Los dos únicos tropiezos del coder
+   con el reviewer **no fueron errores de código sino afirmaciones no verificadas**.
+
+**Nota de despliegue:** **una migración aditiva** (`respaldo_corrida` + enums). **CERO permisos nuevos,
+CERO seed.** Requiere que Gabriel ponga `RESPALDO_LLAVE` en Railway **y la guarde también fuera**
+(si se pierde, los respaldos son irrecuperables por diseño). Procedimiento completo en
+`docs/GUIA-RAILWAY-R2.md` §7.1.
+
 ---
 
 ## V1-E7 · El ensayo

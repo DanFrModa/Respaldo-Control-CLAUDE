@@ -21,6 +21,8 @@
  */
 import { PgBoss } from 'pg-boss';
 
+import { ventanaCorridaMinutos } from '../respaldo/pg-dump.js';
+
 /** Nombres de las colas de jobs de la app. Centralizados para que productor y consumidor coincidan. */
 export const COLAS_JOBS = {
   /**
@@ -58,12 +60,20 @@ export type NombreColaJob = (typeof COLAS_JOBS)[keyof typeof COLAS_JOBS];
  * Opciones por cola aplicadas al crearla. El default de `expireInSeconds` de pg-boss son 15 minutos:
  * pasado ese rato marca el job como expirado y lo REINTENTA **sin detener al que sigue corriendo**.
  * Para un respaldo de una base grande eso significa dos corridas solapadas; por eso su cola declara
- * una ventana acorde (la misma que usa el propio respaldo, `ventanaCorridaMinutos`, y que su
- * `schedule` vuelve a pasar a nivel de job).
+ * una ventana acorde.
+ *
+ * El valor NO se teclea: sale de {@link ventanaCorridaMinutos}, la MISMA función que usan el
+ * `schedule` del respaldo y el barrido de huérfanas. Tecleado, subir `RESPALDO_TIMEOUT_MIN` volvería
+ * a separar los números — justo la deriva que ese arreglo vino a eliminar. Se importa de
+ * `respaldo/pg-dump.js` (módulo ligero) y no de `respaldo/config.js`, que arrastraría el servicio de
+ * archivos —y con él el SDK de AWS— a este bootstrap genérico.
+ *
+ * (Hoy este valor es el de RESERVA: pg-boss da precedencia al del job — `COALESCE("expireInSeconds",
+ * q.expire_seconds)` — y el `schedule` del respaldo pasa el suyo. Cubre a cualquier otro productor.)
  */
 const OPCIONES_POR_COLA: Partial<Record<NombreColaJob, { expireInSeconds: number }>> = {
   // La clave es el NOMBRE de la cola, no el alias del objeto.
-  [COLAS_JOBS.respaldoBd]: { expireInSeconds: (180 + 60) * 60 },
+  [COLAS_JOBS.respaldoBd]: { expireInSeconds: ventanaCorridaMinutos() * 60 },
 };
 
 /** Carga del job de recálculo de la RC de una orden (lo mínimo: el consumidor relee la BD, E4). */

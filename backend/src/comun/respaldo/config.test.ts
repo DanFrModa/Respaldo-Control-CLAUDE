@@ -6,13 +6,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { timeoutVolcadoMinutos } from './pg-dump.js';
-
 import {
   configRespaldoDesdeEnv,
   CRON_DEFECTO,
-  MARGEN_CORRIDA_MIN,
-  ventanaCorridaMinutos,
   decidirArranqueRespaldo,
   PREFIJO_DEFECTO,
   RETENCION_DEFECTO,
@@ -149,29 +145,5 @@ describe('decidirArranqueRespaldo', () => {
       const decision = decidirArranqueRespaldo(env);
       expect(decision.accion === 'programar').toBe(decision.config !== undefined);
     }
-  });
-});
-
-describe('ventanaCorridaMinutos (el número que NO puede contradecirse)', () => {
-  it('es el tope del volcado más el margen del resto de la corrida', () => {
-    // Un SOLO valor alimenta el `expireInSeconds` del job y el umbral del barrido de huérfanas. De
-    // que no coincidieran nació el defecto de las corridas solapadas: pg-boss reintentaba a los 15
-    // min encima de una corrida que el timeout permitía extender hasta 3 h.
-    expect(ventanaCorridaMinutos({})).toBe(180 + MARGEN_CORRIDA_MIN);
-  });
-
-  it('sigue al tope configurado por entorno', () => {
-    expect(ventanaCorridaMinutos({ RESPALDO_TIMEOUT_MIN: '30' })).toBe(30 + MARGEN_CORRIDA_MIN);
-  });
-
-  it('es SIEMPRE mayor que el tope del volcado (si no, se barrería una corrida viva)', () => {
-    for (const minutos of ['1', '30', '180', '600', 'basura']) {
-      const env = { RESPALDO_TIMEOUT_MIN: minutos };
-      expect(ventanaCorridaMinutos(env)).toBeGreaterThan(timeoutVolcadoMinutos(env));
-    }
-  });
-
-  it('supera con holgura el expire por defecto de pg-boss (15 min), que era el que mandaba', () => {
-    expect(ventanaCorridaMinutos({}) * 60).toBeGreaterThan(900);
   });
 });

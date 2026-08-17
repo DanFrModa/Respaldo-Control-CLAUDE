@@ -24,14 +24,27 @@
 > el motor de costeo**, con los precosteos congelados verificados intactos por construcción, guarda y
 > prueba.
 >
-> ⚠️ **PENDIENTE DE GABRIEL (16-ago):** `V1-E3c` (PR #180) y `V1-E3e` (PR #181) están **integradas en
-> `prueba` pero SIN DESPLEGAR**. Las dos van **SIN migración, SIN permisos y SIN seed** → **no**
-> requieren `SEED_ON_START`. Hasta que se despliegue, Daniel no ve ni la receta arreglada ni los
-> costos unificados. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
+> · **`V1-E3d pieza B` ✅ (⭐ el BOM vive en la OP, 16-ago, PR #182)** — la receta se copia del modelo
+> al crear la orden y ahí se congela: apagarle la jareta a un cliente ya no la apaga en las órdenes de
+> los demás ni en las ya producidas. Tres rondas, 18 hallazgos · **`V1-E4` ✅ (las defensas contra el
+> daño callado, 16-ago, PR #183)** — importar dos veces la misma OC ya no duplica todo en silencio; el
+> renglón de lista de precios deja de quedar atrapado **para siempre**; «cancelar pedido» dejó de
+> mentir. Con un **riesgo declarado abierto** (§4) · **`V1-E6a` ✅ (el respaldo mensual cifrado a R2,
+> 17-ago)** — adelantado del resto de E6 por ser lo único que protege de algo sin vuelta atrás.
+>
+> ⚠️ **PENDIENTE DE GABRIEL:** **CINCO etapas integradas en `prueba` y SIN DESPLEGAR** (`V1-E3c` #180,
+> `V1-E3e` #181, `V1-E3d pieza B` #182, `V1-E4` #183 y `V1-E6a`). Las tres primeras van **sin
+> migración, sin permisos y sin seed**; **`V1-E3d pieza B` y `V1-E4` y `V1-E6a` SÍ llevan migración**
+> (automática, sin `SEED_ON_START`). Hasta que se despliegue, **Daniel no ve nada de esto**.
+> 🔑 **Y el respaldo no corre hasta que Gabriel genere `RESPALDO_LLAVE`** y la guarde **también fuera de
+> Railway** (`docs/GUIA-RAILWAY-R2.md` §7.1): si se pierde, los respaldos son irrecuperables por
+> diseño. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
 > configuración de Cloudflare R2, ver `docs/hoja-de-ruta/F1-etapas.md:222` para las cuatro trampas.)*
 >
-> **PENDIENTES del track:** `V1-E3`, `V1-E3d pieza B` (el BOM
-> congelado en la OP, §Post-F9.43/.44), `V1-E4` a `V1-E7`, y la separación **desarrollo vs
+> **PENDIENTES del track:** el **tránsito de prendas a proceso** (§Post-F9.61: el envío saca de PT
+> para que faltantes y segundas tengan dónde caer — **antes de capturar inventario real**), la etapa
+> fusionada **arte + proveedores** (§Post-F9.52/.54/.55/.57/.58), lo que queda de `V1-E6`, `V1-E7`
+> (el ensayo, **con Daniel**), y la separación **desarrollo vs
 > producción** (§Post-F9.34, con sus tres cabos cerrados el 15-ago en §Post-F9.46 — el nº de
 > producción **se precarga editable**, cambio de opinión de Daniel).
 > ⚠️ **Bloqueo activo (15-ago):** **no se pueden subir fotos en `prueba`** — el diagnóstico descarta
@@ -259,6 +272,22 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
+
+- **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
+  Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el
+  mismo `singletonKey` fueron **ambos aceptados**. La razón está en `node_modules/pg-boss/dist/plans.js:567-590`
+  — los índices únicos sobre `(name, singleton_key)` sólo existen para colas con política
+  `short`/`singleton`/`stately`/`exclusive`/`key_strict_fifo`, y `comun/jobs/index.ts` crea **todas**
+  las colas **sin política** (→ `standard`), donde la clave **se guarda pero no restringe nada**.
+  ⚠️ **A quién le importa:** `encolarJob` (F5-E3, ADR-0012) usa `singletonKey: claveSerializacion(cola, idRecurso)`
+  para **serializar el recálculo del CPM por orden**, y su comentario afirma que *"pg-boss garantiza
+  que, para un `singletonKey` dado, a lo sumo UN job está en `created`/`active`"*. **Eso no se cumple
+  hoy**: varios eventos seguidos sobre la misma orden encolarían jobs duplicados en vez de colapsar en
+  uno, y podrían recalcular la misma ruta **en paralelo**.
+  **No muerde en la v1** porque la Ruta Crítica está apagada (§Post-F9.36 punto 1) — por eso es deuda y
+  no bloqueante. **Arreglo:** política `stately`/`exclusive` al crear esas colas, con su prueba; y de
+  paso **corregir el comentario**, que es la parte peligrosa (alguien se apoya en él). En V1-E6a la
+  opción se **retiró** en vez de fingirla, con el porqué escrito en el código.
 
 - **⚠️ RIESGO DECLARADO — 8 pruebas de la defensa anti-duplicado fallaron UNA vez en la suite completa,
   y la causa NO se identificó (V1-E4, 16-ago-2026).** En una corrida de los 133 archivos de

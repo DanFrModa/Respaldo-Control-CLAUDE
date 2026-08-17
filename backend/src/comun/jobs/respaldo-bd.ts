@@ -56,9 +56,8 @@ import {
   decidirArranqueRespaldo,
   type ConfigRespaldo,
   configRespaldoDesdeEnv,
-  ventanaCorridaMinutos,
 } from '../respaldo/config.js';
-import { generarVolcado, versionPgDump } from '../respaldo/pg-dump.js';
+import { generarVolcado, ventanaCorridaMinutos, versionPgDump } from '../respaldo/pg-dump.js';
 import { claveRespaldo, seleccionarObsoletos, type ObjetoRespaldo } from '../respaldo/retencion.js';
 import { enTransaccion, type ContextoBd } from '../transaccion.js';
 
@@ -614,16 +613,21 @@ export async function registrarRespaldoPeriodico(
         throw new Error(`Respaldo a R2 fallido (${resultado.paso}): ${resultado.error ?? ''}`);
       }
     });
-    // ⚠️ `expireInSeconds` NO ES DECORATIVO. El default de pg-boss son 15 minutos: pasado ese rato
-    // da el job por expirado y lo REINTENTA **sin matar al que sigue corriendo**, así que con una
-    // base grande habría dos corridas a la vez —dos `pg_dump`, la misma key pisándose en R2, y el
-    // barrido cerrando como muerta una corrida viva—. Se alinea con la MISMA ventana que usa el
-    // barrido de huérfanas, para que los dos números no puedan volver a contradecirse.
-    // `singletonKey` es el cinturón: con clave fija, la cola no admite dos jobs de este respaldo en
-    // vuelo aunque algo más los produjera.
+    // ⚠️ `expireInSeconds` NO ES DECORATIVO: es lo que impide que dos corridas se solapen. El
+    // default de pg-boss son 15 minutos, y pasado ese rato da el job por expirado y lo REINTENTA
+    // **sin matar al que sigue corriendo** — con una base grande eso serían dos `pg_dump` a la vez,
+    // la misma key pisándose en R2 y el barrido cerrando como muerta una corrida viva. Se alinea con
+    // la MISMA ventana que usa el barrido de huérfanas, para que los dos números no puedan volver a
+    // contradecirse.
+    //
+    // NO se pone `singletonKey`: en una cola con la política por defecto (`standard`) pg-boss
+    // GUARDA esa clave pero no restringe nada —los índices únicos sobre (name, singleton_key) sólo
+    // existen para las políticas `short`/`singleton`/`stately`/`exclusive`/`key_strict_fifo`—, así
+    // que sería un cinturón que no sujeta y un comentario en el que alguien se apoyaría dentro de
+    // dos años. Quien de verdad cierra el solape es `expireInSeconds` + la guarda de antigüedad del
+    // barrido, y ambos están probados.
     await boss.schedule(COLAS_JOBS.respaldoBd, config.cron, null, {
       expireInSeconds: ventanaCorridaMinutos() * 60,
-      singletonKey: COLAS_JOBS.respaldoBd,
       retryLimit: 2,
       retryDelay: 15 * 60,
     });
