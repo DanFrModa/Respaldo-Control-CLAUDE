@@ -244,6 +244,7 @@ environment) → arranque → healthcheck `/api/health`.
 | **`RESPALDO_LLAVE`** | **SÍ** (≥24 chars) | El job **no se programa** y queda una corrida en `FALLO`/`CONFIGURACION` + log. **No hay respaldo.** |
 | `RESPALDO_RETENCION` | no (def. **12**) | Conserva 12 copias = un año de respaldos mensuales |
 | `RESPALDO_CRON` | no (def. `0 8 1 * *` UTC) | Día 1 de cada mes, 02:00 hora del centro de México |
+| `RESPALDO_TIMEOUT_MIN` | no (def. **180**) | Si el `pg_dump` se cuelga, lo corta a las 3 h y deja la corrida en `FALLO` |
 | `RESPALDO_ACTIVO=false` | no | Lo apaga **a propósito**: avisa y **no** deja rastro rojo |
 | `R2_*` reales | SÍ | Con credenciales dummy **no se programa** y deja rastro rojo |
 
@@ -284,10 +285,20 @@ Baja de R2 → descifra (verifica integridad: llave equivocada o archivo corrupt
 sin dejar volcado a medias**) → `pg_restore`. Si la base destino ya tiene tablas **se niega**, salvo
 `--si-estoy-seguro`.
 
-⚠️ **El script NO viaja en la imagen de producción**: se corre desde un **checkout del repo** con
-cliente **PostgreSQL ≥ 17** (`pg_dump`/`pg_restore` se niegan a trabajar contra un servidor más nuevo
-que ellos, y Railway es PG17). En el escenario "Railway ya no está" eso es justamente lo que se quiere:
-el procedimiento no depende de que la plataforma caída siga en pie.
+**Comprobar el archivo ANTES de descifrar** (útil si se sospecha corrupción, y **no necesita la
+llave**): cada corrida guarda el **SHA-256 del archivo cifrado** en `respaldo_corrida.sha256`; pásalo
+con `--sha256 <hex>` y el script verifica la huella antes de tocar nada.
+
+**Dos vías para correrlo, según el escenario:**
+
+| Escenario | Cómo |
+| --- | --- |
+| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 17 |
+| **Railway ya no está** ← *el escenario para el que existe este respaldo* | Desde un **checkout del repo**, en cualquier máquina con Node 22 y cliente **PostgreSQL ≥ 17** |
+
+⚠️ El cliente debe ser **≥ 17**: `pg_dump`/`pg_restore` se niegan a trabajar contra un servidor más
+nuevo que ellos, y Railway es PG17. Que la segunda vía no dependa de la plataforma caída es
+deliberado — un procedimiento de emergencia que exige que la plataforma siga en pie no sirve de nada.
 
 **Qué NO trae el volcado:** el esquema `pgboss` se excluye a propósito (estado transitorio: restaurarlo
 re-dispararía trabajos de fechas pasadas). Consecuencia asumida: un evento ya publicado a la cola pero
