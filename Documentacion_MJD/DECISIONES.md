@@ -2686,3 +2686,49 @@ migración con traducción (`BORDADO`→`bordado`, `ESTAMPADO`→`estampado`), y
 - **Aplica en:** la etapa de proveedores + `V1-E3f` (arte). Ambas tocan lo mismo: **conviene fusionarlas
   en una sola etapa**.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.59) — ⭐ CORRECCIÓN DE DANIEL: hay procesos DESPUÉS de la costura, y devuelven producto terminado (16-ago-2026)
+
+> Daniel, corrigiendo la explicación del lead sobre `generaEntradaPt`: *"Está equivocado. Hay procesos
+> que también son después de costura. O sea, llega a producto terminado."*
+
+**Qué estaba mal.** El lead explicó —repitiendo lo que dice el seed— que *"solo la costura devuelve
+prenda terminada; estampado, bordado, lavado y aplicación la devuelven para seguir trabajándola"*. Eso
+asume que **el orden de los procesos es fijo**, y no lo es.
+
+**El sistema ya sabe a medias que no lo es.** `Modelo.secuenciaEstampado` (enum `SecuenciaEstampado`,
+`schema.prisma:4771`) existe con tres valores: **`antes` · `despues` · `flexible`** — capturado **por
+modelo**. Hoy solo lo consume la Ruta Crítica (`rutaOrden.ts:151`), que está apagada en la v1.
+
+**El defecto de modelado, dicho claro:** `TipoProceso.generaEntradaPt` es una bandera **por TIPO**
+(`prisma/seed.ts:411-417`: costura `true`, los otros cuatro `false`). Pero **si un proceso ocurre
+DESPUÉS de la costura, su recibo SÍ devuelve producto terminado** — el mismo estampado devuelve PT
+cuando va después y no lo devuelve cuando va antes. La propiedad **no es del tipo: es de la posición
+del proceso en esa orden**.
+
+⚠️ **La consecuencia de inventario, que es la grave:** si se mandan prendas **ya terminadas** a lavar y
+el recibo **no** las reingresa, **las piezas desaparecen del almacén** aunque estén físicamente ahí —
+el envío las sacó y el recibo no las devolvió. Con D3 (existencia = suma de movimientos) eso es un
+saldo equivocado, no un detalle de pantalla.
+
+**Lo que hay que resolver al construir** (NO se decide aquí, se deja planteado con honestidad):
+1. `generaEntradaPt` deja de ser propiedad fija del tipo y pasa a resolverse **por proceso de la
+   orden** — derivándolo de la secuencia (`antes`/`despues`) o capturándolo al programar el envío.
+2. Verificar **qué hace hoy el envío** de prendas ya terminadas: ¿las saca del PT? Si el envío no las
+   saca y el recibo no las mete, el saldo cuadra por accidente; si el envío sí saca, hoy hay una fuga.
+   **El lead verificó la bandera y el enum, NO trazó ese flujo completo.**
+3. `secuenciaEstampado` está hoy **solo en el modelo** y **solo la lee la RC**. Si la v1 va a distinguir
+   antes/después, alguien más tiene que leerla — o la orden necesita su propia secuencia.
+
+**2. ✅ Catálogo ÚNICO aprobado.** *"De acuerdo. Y un solo catálogo."* Se fusiona `ModeloArte.tipo`
+(enum) con `TipoProceso` (catálogo administrable) + bandera **`esArte`**. Con eso «embosado» se da de
+alta una vez, **aplicación queda marcada como arte** (corrección de Daniel), y el filtro de proveedores
+de arte se deriva de la misma marca.
+
+⚠️ **Y esta corrección le agrega un requisito al catálogo único:** la bandera `esArte` es del tipo, pero
+**`generaEntradaPt` NO puede seguir siéndolo**. Al fusionar, no arrastrar el error.
+
+- **Aplica en:** la etapa fusionada de **proveedores + arte**. El punto 1 (procesos después de costura)
+  **puede ser etapa propia** si al trazar el flujo resulta que toca el kardex de PT — se dimensiona al
+  arrancar.
+- **Fecha:** 2026-08-16.
