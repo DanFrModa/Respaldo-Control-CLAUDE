@@ -2521,3 +2521,69 @@ trabajo.)*
   anunció que mandará. **Se agrupa a propósito** para no tocar esa pantalla tres veces. Sin migración
   de datos; adjunto del proveedor por revisar si ya existe.
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.56) — Las siete observaciones de PROVEEDORES (DANIEL, 16-ago-2026)
+
+Daniel revisando la pantalla de proveedores. **Las siete verificadas contra el código antes de
+escribirlas**; dos ya estaban resueltas y una es una confusión de la pantalla, no un defecto de datos.
+
+**1. Catálogo de CONTACTOS, no uno solo.**
+> *"A veces es importante ir registrando al vendedor, a la de crédito y cobranza, al encargado del
+> taller, a la supervisora… Depende qué tipo de proveedor y qué tipo de puestos se requieren."*
+
+Hoy hay **un solo** `contacto String?` de texto libre. Necesita **tabla propia**: N contactos por
+proveedor, cada uno con puesto, teléfono y correo. **Requiere migración.**
+
+**2. El "nombre corto" duplicado — NO lo está: son dos campos distintos.**
+> *"Está en el segundo campo y también lo pusiste casi al final como código corto en el taller.
+> ¿Supongo que es lo mismo, o hay alguna razón de ser?"*
+
+Hay razón de ser, pero **la pantalla no la explica** — la confusión es legítima:
+- **`nombreCorto`** (`schema.prisma:581`) — lo pidió el propio Daniel el **6-ago**: *"Bloom"* para
+  *"BLOOM TEXTIL"*, para **armar el nombre compuesto de la tela** (A1.1). Solo display, **sin unicidad**.
+- **`corto`** (`:643`) — **clave corta de uso diario del taller**, heredada de `Maquilero.corto` del
+  sistema viejo. **`@unique` global.**
+
+**Propuesta:** etiquetarlos con claridad en la pantalla; y **si la clave del taller ya no se usa a
+diario, retirarla** y dejar uno solo. → **pregunta abierta (2)**.
+
+**3. El campo TIPO sale sobrando.**
+> *"Tienes un campo de TIPO y aparte tienes el rol (que pueden ser más de uno)… creo que el de tipo
+> sale sobrando. Y es importante poner todo lo que puede hacer un proveedor, porque puede hasta llegar
+> a vender telas y ser maquilero."*
+
+✅ **De acuerdo, y verificado:** `Proveedor.tipo` (enum `TipoProveedor`) se conservó junto a los roles
+**por acta de Gabriel del 13-jun-2026**, no por una razón técnica. Los roles N:N cubren justo el caso
+que Daniel nombra —vender telas **y** ser maquilero—, que el tipo único **no permite**. **Se retira.**
+⚠️ Al construir: revisar sus consumidores (contrato, etiquetas, filtros) y qué hacer con la
+clasificación de los migrados → **pregunta abierta (3)**.
+
+**4. Si no emite CFDI, no debe pedir RFC.** La bandera `factura Boolean?` (*"¿Emite CFDI? Define formal
+vs informal"*) **ya existe**; lo que falta es que **la pantalla la obedezca** y oculte RFC, régimen,
+uso de CFDI y CP de expedición cuando esté apagada.
+
+**5. ⭐ "Hay proveedores que a veces facturan y a veces no. ¿Cómo resolverlo?" — YA ESTÁ RESUELTO.**
+
+`Proveedor.modalidadFacturacion` (`:655`, F6-E4 decisión (h)) tiene tres valores: **`solo_con`**
+(siempre factura), **`solo_sin`** (nunca) y **`ambos`** — *"y en ese caso su estado de cuenta se
+segmenta en dos"*. Cada cargo se marca `conFactura` al validarse (`dominio/esma/cargos.ts:216`) y el
+estado de cuenta filtra por segmento (`dominio/esma/estado-cuenta.ts:48`).
+
+**6. El hueco REAL, que Daniel intuyó en el mismo punto:** eso funciona **solo para talleres/maquila
+(EsMa)**. Para los **proveedores de material (CxP)** el estado de cuenta **NO está segmentado**
+(verificado: `dominio/cxp/` no menciona `conFactura`). Daniel lo pide para reportes —*"si necesito una
+relación de proveedores con sus saldos, quisiera tener por separado los que son con factura y los sin
+factura"*— y él mismo lo difiere: *"pero eso será después"*. **Queda anotado con su ubicación exacta.**
+
+**7. "Está asegurado" solo aplica a maquila.** Ya está pensado así en los datos (`:645`, *"Nullable:
+solo aplica a talleres"*), pero **la pantalla lo muestra siempre**. Se condiciona a los roles de
+servicio (maquila, corte, arte…).
+
+**Preguntas abiertas a Daniel** *(numeradas para que conteste con el número — convención pedida por él
+el 16-ago)*: **(1)** ¿el **puesto** del contacto es catálogo o campo abierto? **(2)** ¿se sigue usando
+la clave corta del taller o se retira? **(3)** al quitar el TIPO, ¿se **traducen** las clasificaciones
+viejas a roles automáticamente o se reclasifica a mano?
+
+- **Aplica en:** la etapa de **proveedores** (junto con §Post-F9.54 y §Post-F9.55). **Requiere
+  migración** (contactos; retiro del tipo). El punto 6 queda **diferido** por decisión de Daniel.
+- **Fecha:** 2026-08-16.
