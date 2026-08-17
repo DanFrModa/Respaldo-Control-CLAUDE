@@ -182,6 +182,34 @@ export const esquemaPedidoCopiarCuerpo = z.object({
 /** Datos validados del cuerpo de copiar pedido. */
 export type DatosPedidoCopiar = z.infer<typeof esquemaPedidoCopiarCuerpo>;
 
+/**
+ * Cuerpo de cancelar un pedido (V1-E4 punto 5). Hasta esta etapa el endpoint no llevaba cuerpo y
+ * la pantalla prometía que el pedido "deja de producirse" mientras sus OPs seguían VIVAS,
+ * cortándose. Ahora la promesa se cumple o se rechaza:
+ *
+ *  • sin `cancelarOrdenes`, un pedido con OPs vivas se RECHAZA (409) nombrándolas;
+ *  • con `cancelarOrdenes: true`, se cancelan también sus OPs en la MISMA transacción — y eso
+ *    exige `ordenes.cancelar` (el mismo permiso que cancelar una OP a mano), más un `motivo`, que
+ *    es obligatorio para cancelar cualquier orden.
+ */
+export const esquemaPedidoCancelarCuerpo = z.object({
+  cancelarOrdenes: z
+    .boolean()
+    .optional()
+    .describe(
+      'true = cancelar TAMBIÉN las OPs vivas del pedido (exige `ordenes.cancelar` y `motivo`).',
+    ),
+  motivo: z
+    .string()
+    .trim()
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .optional()
+    .describe('Motivo de la cancelación (obligatorio si se cancelan también las OPs).'),
+});
+
+/** Datos validados del cuerpo de cancelar pedido. */
+export type DatosPedidoCancelar = z.infer<typeof esquemaPedidoCancelarCuerpo>;
+
 // ── Salida de un renglón de pedido ────────────────────────────────────────────────
 
 /**
@@ -478,6 +506,10 @@ export const esquemaPedidoRealSalida = z
     fechaInicio: z.iso.date().nullable().describe('Inicio de la ventana de entrega, o null.'),
     fechaFin: z.iso.date().nullable().describe('Fin de la ventana de entrega, o null.'),
     fechaEntregadaReal: z.iso.date().nullable().describe('Fecha en que se entregó, o null.'),
+    cancelado: z
+      .boolean()
+      .describe('Pedido real CANCELADO (cancelación suave, V1-E4 punto 6 / §Post-F9.37 punto 9).'),
+    motivoCancelada: z.string().nullable().describe('Motivo de la cancelación, o null.'),
     lineas: z.array(esquemaPedidoRealLineaSalida).describe('Renglones del pedido real.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
@@ -498,3 +530,20 @@ export const esquemaPedidoRealesLista = z
 
 /** Forma de la lista de pedidos reales. */
 export type PedidoRealesLista = z.infer<typeof esquemaPedidoRealesLista>;
+
+/**
+ * Cuerpo de cancelar un PEDIDO REAL (V1-E4 punto 6). Cierra el TODO abierto desde F2-E1: Daniel lo
+ * decidió en §Post-F9.37 punto 9 (*"Sí."*) — cancelación SUAVE y **con motivo**, como todo lo demás
+ * del sistema (D3: nada se borra). El motivo es obligatorio, mismo criterio que cancelar una orden.
+ */
+export const esquemaPedidoRealCancelarCuerpo = z.object({
+  motivo: z
+    .string({ error: 'El motivo de cancelación es obligatorio' })
+    .trim()
+    .min(1, { error: 'El motivo de cancelación es obligatorio' })
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .describe('Motivo de la cancelación (obligatorio).'),
+});
+
+/** Datos validados del cuerpo de cancelar un pedido real. */
+export type DatosPedidoRealCancelar = z.infer<typeof esquemaPedidoRealCancelarCuerpo>;

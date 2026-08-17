@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del FLUJO NUEVO de Pedidos (rediseño R3, §4.1) contra el stack real:
@@ -58,7 +58,7 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(page.getByRole('heading', { name: 'Pre-costeos', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
-    await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoProyecto, cliente, 'proyecto-cliente');
     await dialogoProyecto.getByLabel('Departamento').selectOption({ label: departamento });
     await dialogoProyecto.getByLabel('Nombre / tema').fill(nombreProyecto);
     await page.getByTestId('guardar-proyecto').click();
@@ -116,7 +116,11 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     // Matriz: aquí se CONSTRUYE — se agrega la talla (columna) y el color (fila) de ESTA corrida.
     const matriz = panelOp.getByTestId('matriz-op');
     await matriz.getByTestId('matriz-op-agregar-talla').selectOption({ label: talla });
-    await matriz.getByTestId('matriz-op-agregar-color').selectOption({ label: color });
+    // V1-E4 (punto 7): el color se busca TECLEANDO (combobox server-side). El `<select>` topado a
+    // 100 dejaba colores INALCANZABLES — el catálogo los rebasa (el importador de OC crea colores
+    // solo). Es el mismo control que la matriz de la OP usa desde §Post-F9.11.
+    await matriz.getByTestId('matriz-color-al-vuelo-input').fill(color);
+    await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
     await matriz.getByTestId('matriz-op-celda').first().fill('60');
     await expect(panelOp.getByTestId('generar-op-capturado')).toContainText('cuadra');
     await page.getByTestId('confirmar-generar-op').click();

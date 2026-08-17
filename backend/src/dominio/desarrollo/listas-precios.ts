@@ -35,7 +35,12 @@ import {
   type ListaPreciosDetalle,
   type ListasPreciosQuery,
 } from '../../contrato/esquemas/lista-precios.js';
-import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import {
+  aJsonBitacora,
+  datosCreacion,
+  datosModificacion,
+  registrarBitacora,
+} from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
@@ -565,6 +570,142 @@ export async function ajustarPrecioLinea(
   }, bd);
 
   return obtenerLista(sesion, idLista, bd);
+}
+
+// ── Quitar un renglón / borrar la lista (V1-E4 punto 4) ─────────────────────────────
+
+/**
+ * ⭐ V1-E4 (punto 4) — un desarrollo metido por error en una lista quedaba ATRAPADO PARA SIEMPRE.
+ *
+ * Por qué era una trampa y no una molestia: `lista_precios_linea` tiene `@@unique([idDesarrollo])`
+ * a nivel BD (F8-E5), o sea que **un desarrollo vive en A LO MÁS UNA lista**. Sin forma de quitar
+ * el renglón, ese desarrollo no podía entrar NUNCA a la lista correcta — `crearLista` lo rechazaba
+ * con "ya está en otra lista" y no había salida por ningún lado.
+ *
+ * D3 (nada desaparece en silencio): el renglón se borra FÍSICO —tiene que hacerlo, o el unique lo
+ * seguiría reteniendo— pero antes queda ÍNTEGRO en la bitácora: el objeto completo del `antes` con
+ * todos sus importes y su aprobación, MÁS todos sus eventos de negociación (que se irían por
+ * cascada). Nada de conteos: lo que se guarda es lo que había, tal cual, y con eso se puede
+ * reconstruir el renglón entero.
+ *
+ * Guardas: `listas.administrar`, empresa activa (A9 — un renglón ajeno da 404, no 409) y lista NO
+ * cerrada (una lista en estado de cierre es historia; para tocarla hay que reabrirla, que es un
+ * cambio de estado auditado).
+ */
+export async function quitarLineaLista(
+  sesion: SesionUsuario,
+  idLinea: number,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.administrar');
+
+  const idLista = await enTransaccion(async (tx) => {
+    // Mismo patrón que aprobar/ajustar: advisory lock por lista ANTES de leer el estado.
+    const base = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    exigirListaNoCerrada(base.esCierre);
+
+    // El objeto COMPLETO del `antes` (D3) + los eventos que se van por cascada.
+    const antes = await tx.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
+    const eventos = await tx.negociacionEvento.findMany({
+      where: { idListaLinea: idLinea },
+      orderBy: { id: 'asc' },
+    });
+
+    await tx.listaPreciosLinea.delete({ where: { id: idLinea } });
+    await tx.listaPrecios.update({
+      where: { id: base.idLista },
+      data: { ...datosModificacion(sesion) },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: base.idLista,
+      accion: 'MODIFICAR',
+      datos: {
+        operacion: 'quitar-linea',
+        idLinea,
+        antes: aJsonBitacora(antes),
+        eventosNegociacion: eventos.map(aJsonBitacora),
+      },
+    });
+    return base.idLista;
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
+/**
+ * ⭐ V1-E4 (punto 4) — BORRA una lista de precios completa (con sus renglones y sus eventos de
+ * negociación, que se van por cascada). Es la otra mitad de la trampa: una lista creada por error
+ * retenía a TODOS sus desarrollos, y ninguno podía entrar a la lista buena.
+ *
+ * D3: el `antes` que queda en bitácora es la lista ENTERA —encabezado con sus factores, cada
+ * renglón con sus importes y su aprobación, y cada evento de negociación—, no un conteo.
+ *
+ * Guardas: `listas.administrar`, empresa activa (A9) y estado NO de cierre. Una lista `cerrada` o
+ * `ya-pedida` es un compromiso con el cliente: para borrarla hay que reabrirla primero (cambio de
+ * estado auditado), y entonces se ve en la bitácora que alguien la reabrió PARA borrarla.
+ */
+export async function eliminarLista(
+  sesion: SesionUsuario,
+  idLista: number,
+  bd?: ContextoBd,
+): Promise<void> {
+  verificarPermiso(sesion, 'listas.administrar');
+
+  await enTransaccion(async (tx) => {
+    // A9 primero: una lista de otra empresa NO EXISTE para esta sesión (404, nunca 409 — un 409
+    // confirmaría que existe).
+    const existe = await tx.listaPrecios.findFirst({
+      where: { id: idLista, idEmpresa: sesion.idEmpresaActiva },
+      select: { id: true },
+    });
+    if (existe === null) {
+      throw new ErrorNoEncontrado('Lista de precios', idLista);
+    }
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_LISTA}::int, ${idLista}::int)`;
+
+    // Re-lectura BAJO el lock: el estado ya no puede cambiar hasta el commit.
+    const lista = await tx.listaPrecios.findFirstOrThrow({
+      where: { id: idLista, idEmpresa: sesion.idEmpresaActiva },
+      include: { estadoLista: { select: { esCierre: true, nombre: true } } },
+    });
+    if (lista.estadoLista.esCierre) {
+      throw new ErrorConflicto(
+        `La lista ${String(Number(lista.folio))} está "${lista.estadoLista.nombre}" (estado de cierre); reábrela antes de borrarla.`,
+      );
+    }
+
+    const lineas = await tx.listaPreciosLinea.findMany({
+      where: { idLista },
+      orderBy: { id: 'asc' },
+    });
+    const eventos = await tx.negociacionEvento.findMany({
+      where: { idListaLinea: { in: lineas.map((l) => l.id) } },
+      orderBy: { id: 'asc' },
+    });
+
+    // La bitácora va ANTES del delete: si el borrado falla, tampoco queda el registro (A2), y si
+    // sale bien el `antes` ya está escrito en la MISMA transacción.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: idLista,
+      // No hay acción `ELIMINAR` en el enum; el precedente del repo para un borrado físico es
+      // `OTRO` + `operacion` (ver `dominio/admin/roles.ts`).
+      accion: 'OTRO',
+      datos: {
+        operacion: 'eliminar-lista',
+        antes: aJsonBitacora({
+          ...lista,
+          estadoLista: undefined,
+          lineas,
+          eventosNegociacion: eventos,
+        }),
+      },
+    });
+    // Cascade: `lista_precios_linea` y, desde ahí, `negociacion_evento`.
+    await tx.listaPrecios.delete({ where: { id: idLista } });
+  }, bd);
 }
 
 // ── Lecturas ────────────────────────────────────────────────────────────────────────

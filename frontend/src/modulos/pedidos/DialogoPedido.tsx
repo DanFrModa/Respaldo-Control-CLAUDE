@@ -4,9 +4,9 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import { useActualizarPedido, useCrearPedido } from '@/api/pedidos';
 import type { Pedido, PedidoCrear, PedidoEditar, PedidoLineaEntrada } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,7 +24,6 @@ import {
   LeyendaObligatorios,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 
 import { EditorRenglones } from './EditorRenglones';
 import {
@@ -34,15 +33,6 @@ import {
   type DatosPedidoFormulario,
   type DatosRenglonFormulario,
 } from './esquemas';
-
-/** Tope alto: trae los clientes activos para el selector. */
-const QUERY_CLIENTES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /** Valores por defecto de un alta (todo vacío). */
 const VALORES_INICIALES: DatosPedidoFormulario = {
@@ -96,12 +86,11 @@ export function DialogoPedido({
   const actualizar = useActualizarPedido();
   const guardando = crear.isPending || actualizar.isPending;
 
-  const clientes = useClientes(QUERY_CLIENTES);
-
   const formulario = useForm<DatosPedidoFormulario>({
     resolver: zodResolver(esquemaPedidoFormulario),
     defaultValues: VALORES_INICIALES,
   });
+  const idClienteElegido = formulario.watch('idCliente');
 
   useEffect(() => {
     if (!abierto) {
@@ -204,19 +193,23 @@ export function DialogoPedido({
               <FieldLabel htmlFor="pedido-cliente" required>
                 Cliente
               </FieldLabel>
-              <SelectNativo
-                id="pedido-cliente"
-                disabled={guardando}
-                aria-invalid={Boolean(errors.idCliente)}
-                {...registrar('idCliente')}
-              >
-                <option value="">Elige un cliente…</option>
-                {(clientes.data?.datos ?? []).map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E4 (punto 7): búsqueda server-side. El valor sigue en el formulario; lo
+                  único que cambia es el control con el que se captura. */}
+              <FiltroCliente
+                idCliente={idClienteElegido === '' ? null : Number(idClienteElegido)}
+                deshabilitado={guardando}
+                nombreInicial={pedido?.cliente}
+                alCambiar={(c) =>
+                  formulario.setValue('idCliente', c === null ? '' : String(c.id), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                etiqueta="Cliente"
+                placeholder="Elige un cliente…"
+                idInput="pedido-cliente"
+                testid="pedido-cliente"
+              />
               <FieldError errors={[errors.idCliente]} />
             </Field>
 

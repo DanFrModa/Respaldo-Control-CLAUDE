@@ -104,6 +104,7 @@ const RENGLON: AnalizarPdf['renglones'][number] = {
   colorNuevo: true,
   tallasNuevas: ['5-6'],
   advertencias: [],
+  yaImportado: null,
 };
 
 /** Vista previa canónica: un PDF con su renglón (sin % adicional). */
@@ -346,5 +347,47 @@ describe('ImportadorPedidoPdf', () => {
     fireEvent.click(screen.getByTestId('stub-crear-modelo'));
     expect(await screen.findByText('ligado a mano')).toBeInTheDocument();
     expect(screen.queryByText('sin ligar')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ V1-E4 punto 1 — la vista previa tiene que GRITAR que esa OC ya se importó. Sin este aviso, el
+ * usuario confirma tan campante y nacen el segundo pedido, la segunda OP y su ruta crítica; se
+ * descubre semanas después, cortando doble.
+ */
+describe('ImportadorPedidoPdf — OC ya importada (V1-E4)', () => {
+  beforeEach(() => {
+    analizarMock.mockReset();
+    confirmarMock.mockReset();
+  });
+
+  it('marca el renglón con la OP que ya existe y pinta el aviso de duplicado', async () => {
+    await irAVistaPrevia({
+      ...PREVIEW,
+      renglones: [
+        {
+          ...RENGLON,
+          yaImportado: { idOrden: 41, folioOrden: 1207 },
+          advertencias: [
+            {
+              tipo: 'duplicado' as const,
+              mensaje: 'La OC 620884 del cliente YA se importó: nació la OP 1207.',
+            },
+          ],
+        },
+      ],
+    });
+
+    // El chip nombra la OP existente (el usuario tiene que poder ir a verla).
+    expect(await screen.findByText(/ya importada · OP 1207/i)).toBeInTheDocument();
+    // Y el aviso explica por qué no se va a importar.
+    const avisos = screen.getByTestId('importador-pdf-advertencias');
+    expect(avisos).toHaveTextContent(/YA se importó/i);
+  });
+
+  it('sin duplicado NO aparece el chip (el aviso no se pinta por costumbre)', async () => {
+    await irAVistaPrevia();
+
+    expect(screen.queryByText(/ya importada · OP/i)).not.toBeInTheDocument();
   });
 });

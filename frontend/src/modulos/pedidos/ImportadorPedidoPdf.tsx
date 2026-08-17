@@ -846,6 +846,11 @@ function FilaPdf({
             Precio <span className="num">${r.costoUnitario.toLocaleString('es-MX')}</span>
           </span>
         ) : null}
+        {/* V1-E4 (punto 1): esta OC del cliente YA parió su OP. El renglón se marca fuerte —no se
+            va a importar— para que nadie confirme creyendo que hace falta. */}
+        {r.yaImportado !== null ? (
+          <ChipEstado tono="crit">ya importada · OP {r.yaImportado.folioOrden}</ChipEstado>
+        ) : null}
         {valorLiga === null ? (
           <ChipEstado tono="crit">sin ligar</ChipEstado>
         ) : usaSugerencia ? (
@@ -874,7 +879,11 @@ function FilaPdf({
       {r.advertencias.length > 0 ? (
         <div className="border-t px-3 py-2" data-testid="importador-pdf-advertencias">
           {r.advertencias.map((a, i) => (
-            <p key={i} className="text-[11px] text-warn">
+            <p
+              key={i}
+              /* El duplicado NO es un aviso más: ese PDF no se importa. Va en rojo. */
+              className={a.tipo === 'duplicado' ? 'text-[11px] text-crit' : 'text-[11px] text-warn'}
+            >
               {a.mensaje}
             </p>
           ))}

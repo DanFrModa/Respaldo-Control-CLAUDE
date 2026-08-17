@@ -1,5 +1,4 @@
-import { screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -66,13 +65,20 @@ describe('TableroDesarrollos (F8-E6)', () => {
     expect(screen.getByTestId('tarjeta-estado-apagado')).toHaveTextContent('1');
   });
 
+  /**
+   * V1-E4 (punto 7): el filtro pasó de `<select>` (topado a la primera página del catálogo, 100 —
+   * con ~117 clientes había INALCANZABLES) al combobox con búsqueda server-side. La aserción de
+   * fondo no cambia: elegir un cliente re-consulta el tablero con su id.
+   */
   it('al filtrar por cliente, re-consulta el tablero con el idCliente', async () => {
-    const usuario = userEvent.setup();
     renderConProveedores(<TableroDesarrollos />, {
       sesion: estadoSesionDePrueba(['desarrollo.ver']),
     });
-    await usuario.selectOptions(screen.getByLabelText('Filtrar por cliente'), '1');
-    // La última llamada al hook debe incluir el filtro de cliente.
+
+    // Se teclea en el combobox y se elige la opción (mousedown: gana antes del blur).
+    fireEvent.change(screen.getByLabelText('Filtrar por cliente'), { target: { value: 'Liv' } });
+    fireEvent.mouseDown(await screen.findByText('Liverpool'));
+
     const ultimaLlamada = useTableroDesarrollosMock.mock.calls.at(-1)?.[0] as {
       idCliente?: number;
     };

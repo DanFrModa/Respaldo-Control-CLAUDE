@@ -60,6 +60,13 @@ import { normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
+import {
+  cargarOcYaImportadas,
+  claveOcCliente,
+  detectarDuplicadosOc,
+  mensajeDuplicado,
+  NAMESPACE_LOCK_IMPORTACION,
+} from './oc-duplicada.js';
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
 import { parsearPdfCya, type RenglonPdfCyaParseado } from './parseo-pdf-cya.js';
 import {
@@ -489,11 +496,28 @@ export async function analizarImportacionPdf(
   const coloresExistentes = await catalogoColoresPorNombre(cliente, [...nombresColor]);
   const tallasExistentes = await catalogoTallasPorEtiqueta(cliente, [...etiquetasTalla]);
 
-  const renglones: RenglonPdfPreview[] = procesados.map((p) => {
+  // Defensa V1-E4 (punto 1): ¿alguno de estos papeles YA parió su OP? Se resuelve ANTES de armar
+  // los renglones para que la vista previa lo diga en voz alta (el confirm además lo re-verifica
+  // bajo candado: aquí solo se AVISA, no se decide nada).
+  const duplicados = detectarDuplicadosOc(
+    procesados.map((p) => ({
+      nombreArchivo: p.nombreArchivo,
+      numeroOrden: p.parseado?.numeroOrden ?? '',
+    })),
+    await cargarOcYaImportadas(
+      cliente,
+      datos.idCliente,
+      sesion.idEmpresaActiva,
+      procesados.map((p) => p.parseado?.numeroOrden ?? ''),
+    ),
+  );
+
+  const renglones: RenglonPdfPreview[] = procesados.map((p, i) => {
     if (p.parseado === null) {
       return renglonError(p.nombreArchivo, p.error ?? 'No se pudo leer el PDF.');
     }
     const r = p.parseado;
+    const duplicado = duplicados[i] ?? null;
     const aprendida = ligas.get(claveModeloCliente(r.modeloCliente)) ?? null;
     // Sólo se SUGIERE una liga a un modelo ACTIVO: sugerir uno descontinuado haría reventar la tx al
     // confirmar. Si la liga aprendida apunta a un inactivo, el renglón llega SIN sugerencia + advertencia.
@@ -507,6 +531,9 @@ export async function analizarImportacionPdf(
         tipo: 'liga-inactiva',
         mensaje: `El modelo antes ligado (#${aprendida.codigo}) quedó inactivo; elige otro.`,
       });
+    }
+    if (duplicado !== null) {
+      advertencias.push({ tipo: 'duplicado', mensaje: mensajeDuplicado(duplicado, r.numeroOrden) });
     }
     const colorNuevo =
       r.colorGenerico !== '' &&
@@ -551,6 +578,15 @@ export async function analizarImportacionPdf(
       colorNuevo,
       tallasNuevas: [...new Set(tallasNuevas)],
       advertencias,
+      yaImportado:
+        duplicado !== null &&
+        duplicado.origen === 'importado' &&
+        duplicado.existente.donde === 'orden'
+          ? {
+              idOrden: duplicado.existente.idOrden,
+              folioOrden: duplicado.existente.folioOrden,
+            }
+          : null,
     };
   });
 
@@ -597,6 +633,7 @@ function renglonError(nombreArchivo: string, error: string): RenglonPdfPreview {
     colorNuevo: false,
     tallasNuevas: [],
     advertencias: [{ tipo: 'parseo', mensaje: error }],
+    yaImportado: null,
   };
 }
 
@@ -695,6 +732,24 @@ export async function confirmarImportacionPdf(
   // 2) Resolver liga por PDF y SUBIR (server-side, ANTES de la tx) los que sí se importarán. El índice
   //    de `procesados` corresponde 1:1 con `datos.archivos` (mismo orden): de ahí sale el ajuste manual
   //    (matriz editada + pantone) de ESE PDF.
+  // Defensa V1-E4 (punto 1): los papeles que YA parieron su OP (o que vienen repetidos en esta
+  // misma tanda) se OMITEN aquí, ANTES de subir nada a R2. La verdad final la dicta la
+  // re-verificación bajo candado dentro de la tx; ésta es la que da el mensaje bueno al usuario.
+  const yaImportadas = await cargarOcYaImportadas(
+    cliente,
+    datos.idCliente,
+    sesion.idEmpresaActiva,
+    procesados.map((p) => p.parseado?.numeroOrden ?? ''),
+  );
+  const duplicados = detectarDuplicadosOc(
+    procesados.map((p) => ({
+      nombreArchivo: p.nombreArchivo,
+      numeroOrden: p.parseado?.numeroOrden ?? '',
+    })),
+    yaImportadas,
+  );
+  let omitidosPorDuplicado = 0;
+
   const aImportar: PdfAImportar[] = [];
   for (let i = 0; i < procesados.length; i++) {
     const p = procesados[i]!;
@@ -708,6 +763,18 @@ export async function confirmarImportacionPdf(
       continue;
     }
     const r = p.parseado;
+    // La OC repetida se descarta ANTES de mirar la liga: el motivo que le importa al usuario es
+    // "ya la importaste", no "no tiene modelo ligado".
+    const duplicado = duplicados[i] ?? null;
+    if (duplicado !== null) {
+      omitidosPorDuplicado += 1;
+      noReconocidos.push({
+        nombreArchivo: p.nombreArchivo,
+        modeloCliente: r.modeloCliente,
+        motivo: mensajeDuplicado(duplicado, r.numeroOrden),
+      });
+      continue;
+    }
     const clave = claveModeloCliente(r.modeloCliente);
     // La liga MANUAL (de la vista previa) manda; sólo el selector ofrece modelos activos. La liga
     // APRENDIDA a un modelo INACTIVO no se usa: reventaría la tx al confirmar → el PDF se OMITE con un
@@ -765,8 +832,12 @@ export async function confirmarImportacionPdf(
   }
 
   if (aImportar.length === 0) {
+    // Si TODOS quedaron fuera por duplicado, el mensaje genérico ("ligá al menos uno") mandaría al
+    // usuario a religar modelos que están perfectamente bien. Se le dice lo que de verdad pasó.
     throw new ErrorValidacion(
-      'Ningún PDF se pudo importar (sin liga a un modelo, sin tallas o ilegible). Liga al menos uno.',
+      omitidosPorDuplicado === procesados.length
+        ? `Esas OC del cliente ya se importaron (${String(omitidosPorDuplicado)} de ${String(procesados.length)}); no se vuelven a importar para no duplicar la producción. Revisa las OP que ya existen.`
+        : 'Ningún PDF se pudo importar (sin liga a un modelo, sin tallas, ilegible o ya importado). Liga al menos uno.',
     );
   }
 
@@ -774,7 +845,30 @@ export async function confirmarImportacionPdf(
   //    modelo (existe + activo) la impone `salidaAProduccion` (resolverOrigenPedido) DENTRO del loop,
   //    igual que el importador Excel: si un modelo está descontinuado, toda la tx se revierte (A2).
   const resultado = await enTransaccion(async (tx) => {
+    // Candado por CLIENTE: serializa esta confirmación contra cualquier otra del mismo cliente
+    // (PDF o Excel). Con él, la re-verificación de abajo es race-free — sin él, dos usuarios
+    // confirmando el mismo papel a la vez leerían los dos "no existe" y nacerían las dos OPs.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_IMPORTACION}::int, ${datos.idCliente}::int)`;
     await exigirClienteActivo(tx, datos.idCliente);
+
+    // Re-verificación BAJO el candado (V1-E4 punto 1): entre el filtro de arriba y este commit
+    // pudo nacer la OP. Aquí ya no se omite en silencio: se aborta TODA la tx (A2) y se nombra el
+    // papel, porque a estas alturas el usuario ya confirmó y merece saber que alguien se le
+    // adelantó.
+    const yaImportadasEnTx = await cargarOcYaImportadas(
+      tx,
+      datos.idCliente,
+      sesion.idEmpresaActiva,
+      aImportar.map((item) => item.r.numeroOrden),
+    );
+    const colisiones = aImportar
+      .filter((item) => yaImportadasEnTx.has(claveOcCliente(item.r.numeroOrden)))
+      .map((item) => item.r.numeroOrden);
+    if (colisiones.length > 0) {
+      throw new ErrorConflicto(
+        `Otra importación acaba de crear la OP de ${colisiones.length === 1 ? 'la OC' : 'las OC'} ${colisiones.join(', ')} de este cliente; no se importó nada para no duplicar la producción.`,
+      );
+    }
 
     const referenciaGeneral =
       datos.referenciaGeneral === undefined ||
@@ -829,6 +923,7 @@ export async function confirmarImportacionPdf(
         idCliente: datos.idCliente,
         pdfs: aImportar.length,
         noReconocidos: noReconocidos.length,
+        omitidosPorDuplicado,
       },
     });
 

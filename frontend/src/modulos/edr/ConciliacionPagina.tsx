@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import {
   useAgregarLineaManual,
   useAjustarLinea,
@@ -13,6 +12,7 @@ import {
 } from '@/api/edr';
 import { useEmpresas } from '@/api/empresas';
 import type { EdrLinea, EdrLineasQuery, EdrOrigenLinea } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -360,7 +360,6 @@ function AgregarManual(props: { idEdr: number }): React.JSX.Element {
 
   const empresas = useEmpresas();
   const empresasEdr = (empresas.data ?? []).filter((e) => e.paraEdr);
-  const clientes = useClientes({ porPagina: 100 });
   const agregar = useAgregarLineaManual();
 
   function guardar(): void {
@@ -429,19 +428,15 @@ function AgregarManual(props: { idEdr: number }): React.JSX.Element {
         </Field>
         <Field>
           <FieldLabel htmlFor="man-cliente">Cliente</FieldLabel>
-          <SelectNativo
-            id="man-cliente"
-            value={idCliente}
-            onChange={(e) => setIdCliente(e.target.value)}
-            data-testid="man-cliente"
-          >
-            <option value="">Elige…</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+          <FiltroCliente
+            idCliente={idCliente === '' ? null : Number(idCliente)}
+            alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
+            etiqueta="Cliente"
+            placeholder="Elige…"
+            idInput="man-cliente"
+            testid="man-cliente"
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="man-desc">Descripción</FieldLabel>

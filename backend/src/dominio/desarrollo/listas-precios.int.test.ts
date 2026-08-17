@@ -35,8 +35,10 @@ import {
   crearLista,
   desgloseCostoLinea,
   editarFactoresLista,
+  eliminarLista,
   listarListas,
   obtenerLista,
+  quitarLineaLista,
 } from './listas-precios.js';
 
 let cliente: PrismaClient;
@@ -73,6 +75,12 @@ async function sembrarBase(): Promise<void> {
   await cliente.estadoLista.create({
     data: { codigo: 'abierta', nombre: 'Abierta', orden: 1, esCierre: false },
   });
+  // Estado de CIERRE (espejo del seed real, `prisma/seed.ts`): sin él, la prueba de la guarda
+  // `esCierre` moría en su `findFirstOrThrow` ANTES de ejercitar nada — o sea, la promesa "una
+  // lista cerrada no se toca" no la verificaba nadie. (Hallazgo del reviewer de V1-E4.)
+  await cliente.estadoLista.create({
+    data: { codigo: 'cerrada', nombre: 'Cerrada', orden: 3, esCierre: true },
+  });
 }
 
 /**
@@ -107,7 +115,15 @@ async function desarrolloConPrecosto(
   return desarrollo.id;
 }
 
-/** Crea un desarrollo con precosto CONGELADO de costo 0 (modelo sin tela y maquila 0). */
+/**
+ * Crea un desarrollo con precosto CONGELADO de costo 0 (modelo sin tela y maquila 0).
+ *
+ * ⚠️ El congelado se sella DIRECTO EN BD, no por `congelarVersion`: desde V1-E4 (punto 2) el
+ * dominio ya NO deja congelar en cero (`exigirCostoCongelable`), justamente porque esa versión
+ * inmutable acababa de base de un precio al cliente. La situación sigue siendo alcanzable con
+ * datos VIEJOS (congelados antes del guard, o traídos por ETL), así que la defensa de aguas abajo
+ * —"aprobar rechaza el renglón en 0"— se conserva y se prueba sembrando ese estado a mano.
+ */
 async function desarrolloCostoCero(codigoModelo: string): Promise<number> {
   const modelo = await cliente.modelo.create({ data: { codigo: codigoModelo, maquilaBase: 0 } });
   const proyecto = await crearProyecto(
@@ -117,7 +133,15 @@ async function desarrolloCostoCero(codigoModelo: string): Promise<number> {
   );
   const desarrollo = await crearDesarrollo(sesion(), proyecto.id, { idModelo: modelo.id }, bd());
   const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
-  await congelarVersion(sesion(), precosto.id, bd());
+  await cliente.precosto.update({
+    where: { id: precosto.id },
+    data: {
+      estado: 'congelado',
+      congeladoEn: new Date(),
+      congeladoPorId: 'usuario-prueba',
+      costoTotal: 0,
+    },
+  });
   return desarrollo.id;
 }
 
@@ -635,5 +659,147 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Desglose');
     const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
     await expect(desgloseCostoLinea(sesionOtra, idLinea, bd())).rejects.toThrow(ErrorNoEncontrado);
+  });
+});
+
+/**
+ * ⭐ V1-E4 punto 4 — un desarrollo metido POR ERROR en una lista quedaba ATRAPADO PARA SIEMPRE:
+ * `lista_precios_linea` tiene `@@unique([idDesarrollo])`, así que sin forma de quitar el renglón
+ * (ni de borrar la lista) ese desarrollo no podía entrar NUNCA a la lista correcta.
+ */
+describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
+  /** Crea una lista con un solo renglón y devuelve la lista + el id del renglón. */
+  async function listaConUnRenglon(codigo: string) {
+    await sembrarFactores();
+    const idDesarrollo = await desarrolloConPrecosto(codigo);
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    return { lista, idLinea: lista.lineas[0]!.id, idDesarrollo };
+  }
+
+  it('quitar el renglón LIBERA al desarrollo: ya puede entrar a la lista correcta', async () => {
+    const { lista, idLinea, idDesarrollo } = await listaConUnRenglon('MOD-QUITAR');
+
+    const despues = await quitarLineaLista(sesion(), idLinea, bd());
+    expect(despues.lineas).toHaveLength(0);
+
+    // LA PRUEBA DE QUE LA TRAMPA SE ABRIÓ: el desarrollo entra a otra lista.
+    const otraLista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    expect(otraLista.lineas).toHaveLength(1);
+    expect(otraLista.id).not.toBe(lista.id);
+  });
+
+  it('D3: lo que se quita queda ÍNTEGRO en la bitácora (el objeto, no un conteo)', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-QUITAR-BIT');
+    // Se aprueba antes de quitar, para que el `antes` tenga algo que perder.
+    await aprobarLinea(sesion(), idLinea, bd());
+    const antesEnBd = await cliente.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
+
+    await quitarLineaLista(sesion(), idLinea, bd());
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id) },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      antes: Record<string, unknown>;
+      eventosNegociacion: unknown[];
+    };
+    expect(datos.operacion).toBe('quitar-linea');
+    // El objeto COMPLETO: id, desarrollo, precosto, costo, precio calculado y el APROBADO.
+    expect(datos.antes.id).toBe(idLinea);
+    expect(datos.antes.idDesarrollo).toBe(antesEnBd.idDesarrollo);
+    expect(datos.antes.idPrecosto).toBe(antesEnBd.idPrecosto);
+    expect(datos.antes.costoUnit).toBe(antesEnBd.costoUnit.toNumber());
+    expect(datos.antes.precioCalculado).toBe(antesEnBd.precioCalculado.toNumber());
+    expect(datos.antes.precioAprobado).toBe(antesEnBd.precioAprobado?.toNumber());
+    expect(datos.antes.aprobadoPorId).toBe('usuario-prueba');
+    // Los importes son NÚMEROS, no cadenas. Se asevera el TIPO además del valor porque el bug que
+    // esto cazó era exactamente ése: el `replacer` de `JSON.stringify` recibe el valor DESPUÉS de
+    // `toJSON()`, así que los `Decimal` entraban como `"40"` y la conversión nunca corría.
+    expect(typeof datos.antes.costoUnit).toBe('number');
+    expect(typeof datos.antes.precioAprobado).toBe('number');
+    // Las fechas quedan en ISO 8601 (cadena), no como objeto vacío.
+    expect(datos.antes.creadoEn).toBe(antesEnBd.creadoEn.toISOString());
+    expect(Array.isArray(datos.eventosNegociacion)).toBe(true);
+  });
+
+  it('borrar la lista se lleva sus renglones y los deja íntegros en la bitácora', async () => {
+    const { lista, idDesarrollo } = await listaConUnRenglon('MOD-BORRAR');
+
+    await eliminarLista(sesion(), lista.id, bd());
+
+    expect(await cliente.listaPrecios.count({ where: { id: lista.id } })).toBe(0);
+    expect(await cliente.listaPreciosLinea.count({ where: { idLista: lista.id } })).toBe(0);
+    // El desarrollo quedó libre.
+    const otra = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    expect(otra.lineas).toHaveLength(1);
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      antes: { folio: string; lineas: unknown[] };
+    };
+    expect(datos.operacion).toBe('eliminar-lista');
+    expect(datos.antes.folio).toBe(String(lista.folio));
+    expect(datos.antes.lineas).toHaveLength(1);
+  });
+
+  it('una lista en estado de CIERRE no se toca (hay que reabrirla primero)', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-CERRADA');
+    const cerrada = await cliente.estadoLista.findFirstOrThrow({ where: { codigo: 'cerrada' } });
+    await cliente.listaPrecios.update({
+      where: { id: lista.id },
+      data: { idEstadoLista: cerrada.id },
+    });
+
+    await expect(quitarLineaLista(sesion(), idLinea, bd())).rejects.toThrow(ErrorConflicto);
+    await expect(eliminarLista(sesion(), lista.id, bd())).rejects.toThrow(ErrorConflicto);
+    expect(await cliente.listaPrecios.count({ where: { id: lista.id } })).toBe(1);
+  });
+
+  it('A9: un renglón/lista de OTRA empresa da 404 (nunca 409: un 409 confirmaría que existe)', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-A9-BORRAR');
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Borrar');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+
+    await expect(quitarLineaLista(sesionOtra, idLinea, bd())).rejects.toThrow(ErrorNoEncontrado);
+    await expect(eliminarLista(sesionOtra, lista.id, bd())).rejects.toThrow(ErrorNoEncontrado);
+    expect(await cliente.listaPreciosLinea.count({ where: { id: idLinea } })).toBe(1);
+  });
+
+  it('RBAC: sin listas.administrar no se quita ni se borra', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-RBAC-BORRAR');
+    const soloVer = sesion(['listas.ver']);
+
+    await expect(quitarLineaLista(soloVer, idLinea, bd())).rejects.toThrow(ErrorPermiso);
+    await expect(eliminarLista(soloVer, lista.id, bd())).rejects.toThrow(ErrorPermiso);
   });
 });

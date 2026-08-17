@@ -67,6 +67,12 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
+import {
+  cargarOcYaImportadas,
+  claveOcCliente,
+  describirExistente,
+  NAMESPACE_LOCK_IMPORTACION,
+} from './oc-duplicada.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 /** Tope del archivo decodificado (los OCs son chicos; blinda memoria/parseo). */
@@ -698,7 +704,12 @@ export async function confirmarImportacion(
   );
 
   const resultado = await enTransaccion(async (tx) => {
+    // Mismo candado por CLIENTE que el importador por PDF (V1-E4 punto 1): las dos rutas de
+    // importación comparten namespace, así que confirmar el mismo papel por Excel y por PDF a la
+    // vez tampoco puede colarse.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_IMPORTACION}::int, ${datos.idCliente}::int)`;
     await exigirClienteActivo(tx, datos.idCliente);
+    await exigirOcNoImportada(tx, datos.idCliente, sesion.idEmpresaActiva, ocCliente);
     const reconocedor = await cargarReconocedor(tx, datos.idCliente, sesion.idEmpresaActiva);
 
     const resueltos = gruposCrudos.map((grupo) => resolverGrupo(grupo, reconocedor, ligaManual));
@@ -802,6 +813,40 @@ export async function confirmarImportacion(
 }
 
 // ── Helpers compartidos ──────────────────────────────────────────────────────
+
+/**
+ * Defensa V1-E4 (punto 1): exige que la OC del cliente NO se haya importado ya, POR NINGUNA DE LAS
+ * DOS PUERTAS.
+ *
+ * ⚠️ En la primera ronda esta guarda solo miraba `Pedido.ocCliente`, mientras la del importador PDF
+ * miraba `Orden.ocCliente`. Como el PDF guarda el nº de orden del papel ÚNICAMENTE en la OP (en el
+ * pedido va la referencia general de la tanda), una OC importada por PDF se podía volver a importar
+ * por Excel SIN QUE NADA AVISARA — y al revés sí se detectaba. Ahora las dos puertas comparten
+ * `cargarOcYaImportadas`, que consulta ambas fuentes (ver `oc-duplicada.ts`).
+ *
+ * LÍMITE HONESTO: sin OC capturada no hay con qué comparar, así que una importación SIN referencia
+ * sigue pudiendo repetirse. Es deliberado: inventar una identidad (nombre del archivo, fecha…)
+ * bloquearía importaciones legítimas del mismo cliente el mismo día. El importador por PDF no tiene
+ * ese hueco porque cada OP trae su propio nº de orden del papel.
+ *
+ * Debe llamarse DENTRO de la tx y DESPUÉS de tomar `NAMESPACE_LOCK_IMPORTACION`, o vuelve a haber
+ * ventana de carrera.
+ */
+async function exigirOcNoImportada(
+  tx: Tx,
+  idCliente: number,
+  idEmpresa: number,
+  ocCliente: string | null,
+): Promise<void> {
+  if (claveOcCliente(ocCliente) === '') return;
+  const yaImportadas = await cargarOcYaImportadas(tx, idCliente, idEmpresa, [ocCliente ?? '']);
+  const existente = yaImportadas.get(claveOcCliente(ocCliente));
+  if (existente !== undefined) {
+    throw new ErrorConflicto(
+      `La OC "${(ocCliente ?? '').trim()}" de este cliente YA se importó: nació ${describirExistente(existente)}. No se vuelve a importar (se duplicaría la producción); si de verdad es otra orden de compra, cámbiale la referencia.`,
+    );
+  }
+}
 
 /** Exige que el cliente exista y esté ACTIVO (no se importan pedidos a un cliente desactivado). */
 async function exigirClienteActivo(tx: Tx, idCliente: number): Promise<void> {

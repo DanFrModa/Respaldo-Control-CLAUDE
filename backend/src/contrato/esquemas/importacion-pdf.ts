@@ -204,9 +204,17 @@ export type GrupoSobrepedido = z.infer<typeof esquemaGrupoSobrepedido>;
 export const esquemaAdvertenciaPdf = z
   .object({
     tipo: z
-      .enum(['suma-tallas', 'suma-monto', 'sin-tallas', 'parseo', 'liga-inactiva', 'sobrepedido'])
+      .enum([
+        'suma-tallas',
+        'suma-monto',
+        'sin-tallas',
+        'parseo',
+        'liga-inactiva',
+        'sobrepedido',
+        'duplicado',
+      ])
       .describe(
-        'Qué validación falló (incluye "liga-inactiva" y "sobrepedido": packs que no cuadran / proporción no entera).',
+        'Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, y "duplicado": esa OC del cliente ya se importó).',
       ),
     mensaje: z.string().describe('Mensaje legible para la vista previa.'),
   })
@@ -214,6 +222,24 @@ export const esquemaAdvertenciaPdf = z
 
 /** Forma de una advertencia. */
 export type AdvertenciaPdf = z.infer<typeof esquemaAdvertenciaPdf>;
+
+/**
+ * La OP que YA nació de esta MISMA OC del cliente (V1-E4 punto 1). Importar dos veces el mismo PDF
+ * duplicaba EN SILENCIO pedido + OP + nº de producción + RC + MRP, y se descubría semanas después
+ * cortando doble: la vista previa ahora lo señala y el confirm lo omite.
+ */
+export const esquemaOcYaImportada = z
+  .object({
+    idOrden: z
+      .number()
+      .int()
+      .describe('Id de la OP que ya existe con ese nº de orden del cliente.'),
+    folioOrden: z.number().int().describe('Folio de esa OP (para que el usuario la ubique).'),
+  })
+  .describe('OP existente con la misma OC del cliente.');
+
+/** Forma de la OP duplicada. */
+export type OcYaImportada = z.infer<typeof esquemaOcYaImportada>;
 
 /** Un renglón de la vista previa = un PDF parseado, con su liga sugerida y sus advertencias. */
 export const esquemaRenglonPdfPreview = z
@@ -281,6 +307,11 @@ export const esquemaRenglonPdfPreview = z
     advertencias: z
       .array(esquemaAdvertenciaPdf)
       .describe('Advertencias de validación (no bloquean).'),
+    yaImportado: esquemaOcYaImportada
+      .nullable()
+      .describe(
+        'La OP que YA nació de esta MISMA OC del cliente (nº de orden), o null si es la primera vez. Cuando viene, el PDF NO se importa al confirmar: se devuelve en `noReconocidos` (defensa V1-E4 contra la doble importación).',
+      ),
   })
   .describe('Un PDF parseado en la vista previa.');
 

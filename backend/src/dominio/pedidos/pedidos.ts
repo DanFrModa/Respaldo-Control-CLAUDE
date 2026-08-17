@@ -19,6 +19,7 @@
  * NO con CSS — el JSON que viaja NO trae los importes.
  */
 import {
+  esquemaPedidoCancelarCuerpo,
   esquemaPedidoCrear,
   esquemaPedidoEditar,
   esquemaPedidoCopiarCuerpo,
@@ -673,22 +674,95 @@ export async function copiarPedido(
 }
 
 /**
- * Cancela un pedido (cancelación SUAVE, doc 02 §4.2): pone `pedCancelado = true` + bitácora
- * `CANCELAR`. El pedido sigue consultable. Cancelar dos veces es `ErrorConflicto`.
+ * ⭐ V1-E4 (punto 5) — Cancela un pedido (cancelación SUAVE, doc 02 §4.2) DICIENDO LA VERDAD.
+ *
+ * El defecto: la pantalla prometía que el pedido "deja de producirse", pero cancelar solo ponía
+ * `pedCancelado = true`. Sus OPs seguían VIVAS —en el centro de órdenes, en el tablero de WIP, en
+ * la ruta crítica y en el MRP— y se seguían cortando. La mentira no truena en ningún lado: el
+ * usuario cree que paró la producción y la producción sigue.
+ *
+ * Las dos salidas honestas, y ninguna otra:
+ *  • el pedido NO tiene OPs vivas → se cancela, como siempre;
+ *  • sí las tiene y NO se pidió cancelarlas → `ErrorConflicto` que las NOMBRA por su FOLIO, para
+ *    que el usuario vaya a verlas y decida;
+ *  • sí las tiene y se pidió `cancelarOrdenes` → se cancelan TODAS en la MISMA transacción (A2),
+ *    con su motivo y su bitácora una por una (nunca un conteo, D3). Eso exige `ordenes.cancelar`:
+ *    el mismo permiso que cancelar una OP a mano, porque es exactamente lo que está pasando.
+ *
+ * Cancelar dos veces sigue siendo `ErrorConflicto`.
  */
 export async function cancelarPedido(
   sesion: SesionUsuario,
   id: number,
+  cuerpo: z.input<typeof esquemaPedidoCancelarCuerpo> = {},
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<PedidoSalida> {
   verificarPermiso(sesion, 'pedidos.administrar');
+  const datos = validarEntrada(esquemaPedidoCancelarCuerpo, cuerpo);
+  const motivo = datos.motivo === undefined || datos.motivo === '' ? null : datos.motivo;
+
+  // El permiso se exige ANTES de abrir la transacción: un 403 después de haber escrito la mitad
+  // sería un rollback silencioso (lección de F8-E3, "403-tras-commit").
+  if (datos.cancelarOrdenes === true) {
+    verificarPermiso(sesion, 'ordenes.cancelar');
+    if (motivo === null) {
+      throw new ErrorValidacion(
+        'Para cancelar también las OPs hace falta un motivo (toda orden cancelada lo lleva).',
+      );
+    }
+  }
 
   await enTransaccion(async (tx) => {
     const actual = await exigirPedido(tx, id, sesion.idEmpresaActiva);
     if (actual.pedCancelado) {
       throw new ErrorConflicto(`El pedido ${Number(actual.folio)} ya está cancelado.`);
     }
+
+    // Las OPs VIVAS del pedido (por sus renglones), ordenadas por folio para que el mensaje sea
+    // estable y el usuario pueda ir a buscarlas en ese orden.
+    const ordenesVivas = await tx.orden.findMany({
+      where: {
+        estado: { not: 'cancelada' },
+        pedidoLinea: { idPedido: id },
+      },
+      select: { id: true, folio: true },
+      orderBy: { folio: 'asc' },
+    });
+
+    if (ordenesVivas.length > 0) {
+      if (datos.cancelarOrdenes !== true || motivo === null) {
+        const folios = ordenesVivas.map((o) => String(Number(o.folio))).join(', ');
+        throw new ErrorConflicto(
+          `El pedido ${Number(actual.folio)} tiene ${String(ordenesVivas.length)} orden(es) de producción VIVA(S) (${folios}): cancelarlo NO las detiene, se seguirían cortando. Cancélalas también (marca la opción y captura el motivo) o cancélalas una por una desde Órdenes.`,
+        );
+      }
+      const motivoOrden = `Pedido ${Number(actual.folio)} cancelado: ${motivo}`;
+      for (const orden of ordenesVivas) {
+        await tx.orden.update({
+          where: { id: orden.id },
+          data: {
+            estado: 'cancelada',
+            motivoCancelada: motivoOrden,
+            ...datosModificacion(sesion),
+          },
+        });
+        // Bitácora POR ORDEN (A7/D3): cada OP cancelada deja su propio rastro, igual que si se
+        // hubiera cancelado a mano. Un solo renglón "se cancelaron N" no serviría para auditar.
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Orden',
+          idEntidad: orden.id,
+          accion: 'CANCELAR',
+          datos: {
+            folio: Number(orden.folio),
+            motivo: motivoOrden,
+            origen: 'cancelar-pedido',
+            idPedido: id,
+          },
+        });
+      }
+    }
+
     await tx.pedido.update({
       where: { id },
       data: { pedCancelado: true, ...datosModificacion(sesion) },
@@ -697,7 +771,11 @@ export async function cancelarPedido(
       entidad: 'Pedido',
       idEntidad: id,
       accion: 'CANCELAR',
-      datos: { folio: Number(actual.folio) },
+      datos: {
+        folio: Number(actual.folio),
+        ...(motivo === null ? {} : { motivo }),
+        ordenesCanceladas: ordenesVivas.map((o) => Number(o.folio)),
+      },
     });
   }, bd);
 

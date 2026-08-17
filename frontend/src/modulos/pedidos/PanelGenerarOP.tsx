@@ -1,10 +1,9 @@
 import { CheckIcon, InfoIcon, Loader2Icon, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useCamposCliente } from '@/api/clientes';
-import { useColores } from '@/api/colores';
 import { useSalidaProduccion } from '@/api/pedidos-mes';
 import { useTallasActivas } from '@/api/tallas';
 import type { PedidoMesFila, PedidoMesRenglon, SalidaProduccionCuerpo } from '@/api/tipos';
@@ -16,7 +15,9 @@ import {
   type MatrizLinea,
   type MatrizTalla,
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
+import { useSesion } from '@/sesion/useSesion';
 import { cn } from '@/lib/utils';
+import { AgregarColorMatriz } from '@/modulos/ordenes/AgregarColorMatriz';
 
 /**
  * PANEL "GENERAR OP" (rediseño R3, §4.1 — proto `renderOpGen`): la SALIDA A PRODUCCIÓN de un
@@ -44,7 +45,6 @@ export function PanelGenerarOP({
   const navigate = useNavigate();
   const generar = useSalidaProduccion();
 
-  const colores = useColores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre', direccion: 'asc' });
   const tallas = useTallasActivas();
   const campos = useCamposCliente(pedido.idCliente);
 
@@ -52,10 +52,22 @@ export function PanelGenerarOP({
   const [columnas, setColumnas] = useState<MatrizTalla[]>([]);
   const [referencias, setReferencias] = useState<Record<number, string>>({});
 
-  const coloresDisponibles = useMemo(
-    () => (colores.data?.datos ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
-    [colores.data],
-  );
+  // Alta de color AL VUELO (mismo criterio que la matriz de la OP, §Post-F9.11): la opción de
+  // crear solo se ofrece con el permiso que exige el endpoint; el backend re-valida (A1).
+  const { tienePermiso } = useSesion();
+  const puedeCrearColor = tienePermiso('colores.administrar');
+  const idsColoresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
+  // Contador propio para REMONTAR el combobox tras agregar (que no quede pegado lo tecleado).
+  // No se usa `lineas.length`: quitar una fila también lo cambiaría, remontando sin necesidad.
+  const [vecesAgregado, setVecesAgregado] = useState(0);
+  const agregarColorFila = useCallback((idColor: number, nombre: string): void => {
+    setLineas((previas) =>
+      previas.some((l) => l.idColor === idColor)
+        ? previas
+        : [...previas, { idColor, color: nombre, cantidades: {} }],
+    );
+    setVecesAgregado((n) => n + 1);
+  }, []);
   const tallasDisponibles = useMemo(
     () => (tallas.data?.datos ?? []).map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta })),
     [tallas.data],
@@ -248,7 +260,10 @@ export function PanelGenerarOP({
           <MatrizColorTalla
             tallas={columnas}
             lineas={lineas}
-            coloresDisponibles={coloresDisponibles}
+            /* El catálogo completo ya NO se precarga: el combobox del slot busca en servidor. Se
+               pasan solo los colores YA en la matriz, que es lo que la tabla necesita para
+               pintar sus nombres. */
+            coloresDisponibles={lineas.map((l) => ({ id: l.idColor, nombre: l.color }))}
             tallasDisponibles={tallasDisponibles}
             onLineasChange={setLineas}
             onTallasChange={setColumnas}
@@ -256,6 +271,20 @@ export function PanelGenerarOP({
               setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l)))
             }
             testid="matriz-op"
+            /* V1-E4 (punto 7): el `<select>` nativo de la matriz se alimentaba de la PRIMERA
+               PÁGINA del catálogo de colores (100). El catálogo los rebasa —el importador de OC
+               por PDF crea colores solo (`Blanco A`, `Blanco B`…)—, así que un color existente
+               podía ser INALCANZABLE aquí y el usuario terminaba duplicándolo. Se reusa el MISMO
+               combobox con búsqueda server-side + alta al vuelo que la matriz de la OP ya usa
+               desde §Post-F9.11 (`AgregarColorMatriz`), no uno nuevo. */
+            slotAgregarColor={
+              <AgregarColorMatriz
+                key={vecesAgregado}
+                idsUsados={idsColoresUsados}
+                alAgregar={agregarColorFila}
+                puedeCrear={puedeCrearColor}
+              />
+            }
           />
 
           {camposActivos.length > 0 ? (

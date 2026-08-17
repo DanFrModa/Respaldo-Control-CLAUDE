@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del módulo DESARROLLO (F8-E2) contra el stack real, en la estructura LISTA + DETALLE. Cubre el
@@ -50,7 +50,7 @@ test.describe('Desarrollo (F8-E2)', () => {
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await expect(dialogoProyecto.getByRole('heading', { name: 'Nuevo proyecto' })).toBeVisible();
-    await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoProyecto, cliente, 'proyecto-cliente');
     await dialogoProyecto.getByLabel('Departamento').selectOption({ label: departamento });
     await dialogoProyecto.getByLabel('Nombre / tema').fill(nombreProyecto);
     await page.getByTestId('guardar-proyecto').click();

@@ -4,10 +4,11 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useClientes, useDepartamentosCliente } from '@/api/clientes';
+import { useDepartamentosCliente } from '@/api/clientes';
 import { useActualizarProyecto, useCrearProyecto } from '@/api/proyectos';
 import type { Proyecto, ProyectoCrear, ProyectoEditar } from '@/api/proyectos';
 import { useTemporadas } from '@/api/temporadas';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,14 +24,8 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { esquemaProyectoFormulario, type DatosProyectoFormulario } from './esquemas';
 
-/** Tope alto: trae los clientes/temporadas activos para los selectores. */
-const QUERY_CLIENTES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
+/** Tope alto: trae las temporadas activas para su selector. (El de CLIENTE ya no carga catálogo:
+ * desde V1-E4 busca en servidor, ver `FiltroCliente`.) */
 const QUERY_TEMPORADAS = {
   pagina: 1,
   porPagina: 100,
@@ -69,7 +64,6 @@ export function DialogoProyecto({
   const actualizar = useActualizarProyecto();
   const guardando = crear.isPending || actualizar.isPending;
 
-  const clientes = useClientes(QUERY_CLIENTES);
   const temporadas = useTemporadas(QUERY_TEMPORADAS);
 
   const formulario = useForm<DatosProyectoFormulario>({
@@ -159,21 +153,27 @@ export function DialogoProyecto({
               <FieldLabel htmlFor="proyecto-cliente" required>
                 Cliente
               </FieldLabel>
-              <SelectNativo
-                id="proyecto-cliente"
-                disabled={guardando || esEdicion}
-                aria-invalid={Boolean(errors.idCliente)}
-                {...registrar('idCliente', {
-                  onChange: () => formulario.setValue('idClienteDepartamento', ''),
-                })}
-              >
-                <option value="">Elige un cliente…</option>
-                {(clientes.data?.datos ?? []).map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E4 (punto 7): búsqueda server-side. El valor sigue viviendo en el
+                  formulario (`setValue` con validación), solo cambia el control que lo captura. */}
+              <FiltroCliente
+                idCliente={idClienteElegido === '' ? null : Number(idClienteElegido)}
+                /* El cliente NO se cambia en EDICIÓN: el departamento del proyecto cuelga de él y
+                   el backend rechaza el guardado si dejan de casar (`proyectos.ts`). El `<select>`
+                   llevaba este mismo candado; al pasar al combobox se había perdido. */
+                deshabilitado={guardando || esEdicion}
+                nombreInicial={proyecto?.cliente}
+                alCambiar={(c) => {
+                  formulario.setValue('idCliente', c === null ? '' : String(c.id), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  formulario.setValue('idClienteDepartamento', '');
+                }}
+                etiqueta="Cliente"
+                placeholder="Elige un cliente…"
+                idInput="proyecto-cliente"
+                testid="proyecto-cliente"
+              />
               <FieldError errors={[errors.idCliente]} />
             </Field>
 

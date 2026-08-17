@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useClientes, useDepartamentosCliente } from '@/api/clientes';
+import { useDepartamentosCliente } from '@/api/clientes';
 import { useReactivarDesarrollo, type Desarrollo, type EstadoDesarrollo } from '@/api/desarrollos';
 import { useTableroDesarrollos } from '@/api/liga-orden';
 import { useCandidatosLista } from '@/api/listas-precios';
@@ -26,6 +26,7 @@ import {
 } from '@/api/proyectos';
 import type { Proyecto, ProyectosQuery } from '@/api/proyectos';
 import { useTemporadas } from '@/api/temporadas';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
@@ -158,7 +159,6 @@ export function ProyectosPagina(): React.JSX.Element {
   // Drill-in: el proyecto abierto a página completa (null = listado).
   const [seleccionId, setSeleccionId] = useState<number | null>(null);
 
-  const clientes = useClientes(QUERY_CATALOGO);
   const temporadas = useTemporadas(QUERY_CATALOGO);
   const departamentosFiltro = useDepartamentosCliente(
     idClienteFiltro === '' ? undefined : Number(idClienteFiltro),
@@ -355,19 +355,12 @@ export function ProyectosPagina(): React.JSX.Element {
             }}
           />
           <span className="w-40" data-testid="filtros-desarrollo">
-            <SelectNativo
-              className="h-[30px] text-xs"
-              aria-label="Filtrar por cliente"
-              value={idClienteFiltro}
-              onChange={(e) => cambiarClienteFiltro(e.target.value)}
-            >
-              <option value="">Todos los clientes</option>
-              {(clientes.data?.datos ?? []).map((c) => (
-                <option key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </option>
-              ))}
-            </SelectNativo>
+            {/* V1-E4 (punto 7): búsqueda server-side; el <select> se alimentaba de la primera
+                página del catálogo (100) y con ~117 clientes había inalcanzables. */}
+            <FiltroCliente
+              idCliente={idClienteFiltro === '' ? null : Number(idClienteFiltro)}
+              alCambiar={(c) => cambiarClienteFiltro(c === null ? '' : String(c.id))}
+            />
           </span>
           <SelectNativo
             className="w-44 h-[30px] text-xs"

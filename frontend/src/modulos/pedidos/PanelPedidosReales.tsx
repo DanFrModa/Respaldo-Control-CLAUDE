@@ -1,10 +1,11 @@
-import { PackageCheck, PencilIcon, PlusIcon, Loader2Icon } from 'lucide-react';
+import { Ban, PackageCheck, PencilIcon, PlusIcon, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
   useActualizarPedidoReal,
   useActualizarSeguimiento,
+  useCancelarPedidoReal,
   useCrearPedidoReal,
   usePedidosReales,
 } from '@/api/pedidos';
@@ -74,8 +75,9 @@ function textoEditar(valor: string): string | null {
  * entregada). Solo se muestran las acciones de escritura si `puedeAdministrarReales`
  * (`pedidos-reales.administrar`); el backend decide (A1).
  *
- * NOTA F2-E1: la CANCELACIÓN de un pedido real está DIFERIDA (pendiente de decisión de Daniel):
- * no hay botón de cancelar aquí.
+ * CANCELACIÓN (V1-E4 punto 6): ya existe. Daniel la autorizó en §Post-F9.37 punto 9 — suave y con
+ * motivo (D3). Un pedido real cancelado se marca, conserva su porqué y deja de admitir edición y
+ * seguimiento (los controles de captura desaparecen).
  */
 export function PanelPedidosReales({
   idPedido,
@@ -143,7 +145,13 @@ function PedidoRealItem({
   puedeAdministrarReales: boolean;
 }): React.JSX.Element {
   const seguimiento = useActualizarSeguimiento();
+  const cancelarReal = useCancelarPedidoReal();
   const [edicionAbierta, setEdicionAbierta] = useState(false);
+  const [cancelacionAbierta, setCancelacionAbierta] = useState(false);
+  const [motivoCancelar, setMotivoCancelar] = useState('');
+  // V1-E4 (punto 6): un pedido real CANCELADO ya no se captura. Se apagan los controles de
+  // escritura aquí además de en el backend, para que la cancelación no parezca decorativa.
+  const puedeCapturar = puedeAdministrarReales && !real.cancelado;
   // Estado local de captura: por renglón, las cantidades editadas (como texto).
   const [edicion, setEdicion] = useState<Record<number, { enviada: string; entregada: string }>>(
     () =>
@@ -185,17 +193,41 @@ function PedidoRealItem({
           {real.fechaPedPR ? (
             <span className="text-muted-foreground">Fecha: {formatearFecha(real.fechaPedPR)}</span>
           ) : null}
+          {/* V1-E4 (punto 6): el cancelado NO se borra; se ve, con su motivo (D3). */}
+          {real.cancelado ? (
+            <span
+              className="rounded bg-crit/15 px-1.5 py-0.5 text-[11px] font-semibold text-crit"
+              title={real.motivoCancelada ?? undefined}
+              data-testid="pedido-real-cancelado"
+            >
+              Cancelado{real.motivoCancelada === null ? '' : `: ${real.motivoCancelada}`}
+            </span>
+          ) : null}
         </div>
-        {puedeAdministrarReales ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setEdicionAbierta(true)}
-            data-testid="editar-pedido-real"
-          >
-            <PencilIcon aria-hidden />
-            Editar datos
-          </Button>
+        {puedeCapturar ? (
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEdicionAbierta(true)}
+              data-testid="editar-pedido-real"
+            >
+              <PencilIcon aria-hidden />
+              Editar datos
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setMotivoCancelar('');
+                setCancelacionAbierta(true);
+              }}
+              data-testid="cancelar-pedido-real"
+            >
+              <Ban aria-hidden />
+              Cancelar
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -215,7 +247,7 @@ function PedidoRealItem({
                 <TableCell className="font-medium">{l.codigoModelo}</TableCell>
                 <TableCell className="text-right">{l.cantidadPedida}</TableCell>
                 <TableCell className="text-right">
-                  {puedeAdministrarReales ? (
+                  {puedeCapturar ? (
                     <Input
                       type="number"
                       min={0}
@@ -239,7 +271,7 @@ function PedidoRealItem({
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  {puedeAdministrarReales ? (
+                  {puedeCapturar ? (
                     <Input
                       type="number"
                       min={0}
@@ -268,7 +300,7 @@ function PedidoRealItem({
         </Table>
       </div>
 
-      {puedeAdministrarReales ? (
+      {puedeCapturar ? (
         <div className="mt-2 flex justify-end">
           <Button
             size="sm"
@@ -289,6 +321,60 @@ function PedidoRealItem({
         abierto={edicionAbierta}
         alCambiarAbierto={setEdicionAbierta}
       />
+
+      {/* V1-E4 (punto 6): cancelar el pedido real — suave y CON MOTIVO obligatorio. */}
+      <Dialog open={cancelacionAbierta} onOpenChange={setCancelacionAbierta}>
+        <DialogContent className="sm:max-w-md" data-testid="dialogo-cancelar-pedido-real">
+          <DialogHeader>
+            <DialogTitle>Cancelar pedido real</DialogTitle>
+            <DialogDescription>
+              La liberación {real.numPedReal ?? 'sin número'} se conserva (cancelación suave) y deja
+              de admitir capturas.
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor={`cancelar-real-motivo-${String(real.id)}`} required>
+              Motivo
+            </FieldLabel>
+            <Input
+              id={`cancelar-real-motivo-${String(real.id)}`}
+              value={motivoCancelar}
+              onChange={(e) => setMotivoCancelar(e.target.value)}
+              placeholder="Por qué se cancela"
+              data-testid="motivo-cancelar-pedido-real"
+            />
+          </Field>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelacionAbierta(false)}
+              disabled={cancelarReal.isPending}
+            >
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelarReal.isPending || motivoCancelar.trim() === ''}
+              onClick={() =>
+                cancelarReal.mutate(
+                  { idPedido, idReal: real.id, cuerpo: { motivo: motivoCancelar.trim() } },
+                  {
+                    onSuccess: () => {
+                      toast.success('Pedido real cancelado.');
+                      setCancelacionAbierta(false);
+                    },
+                    onError: (error) => toast.error(error.message),
+                  },
+                )
+              }
+              data-testid="confirmar-cancelar-pedido-real"
+            >
+              {cancelarReal.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+              Cancelar pedido real
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

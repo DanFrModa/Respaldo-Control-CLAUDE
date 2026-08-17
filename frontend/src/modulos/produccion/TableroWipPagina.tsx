@@ -2,9 +2,9 @@ import { Layers, Search, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useClientes } from '@/api/clientes';
 import { useWipOrden, useTableroWip } from '@/api/wip';
 import type { TableroWipQuery, WipOrden, WipOrdenFila, WipProcesoPendiente } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
   TablaDensa,
@@ -23,7 +23,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 import {
   Table,
   TableBody,
@@ -74,8 +73,6 @@ export function TableroWipPagina(): React.JSX.Element {
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [ordenDrill, setOrdenDrill] = useState<number | undefined>(undefined);
-
-  const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   /** Filtros comunes (búsqueda + cliente), compartidos por la consulta y el conteo de pendientes. */
   const filtrosComunes = {
@@ -198,25 +195,20 @@ export function TableroWipPagina(): React.JSX.Element {
               aria-label="Buscar órdenes"
             />
           </div>
-          {/* SelectNativo envuelve el <select> en un div w-full: sin ancho fijo alrededor se roba
+          {/* El combobox del filtro ocupa el ancho de su contenedor: sin ancho fijo alrededor se roba
               un renglón completo de la barra (visto en la foto de fidelidad R9). */}
-          <SelectNativo
-            className="w-44 h-8 text-sm"
-            value={idCliente}
-            onChange={(e) => {
-              setIdCliente(e.target.value);
-              reiniciar();
-            }}
-            aria-label="Filtrar por cliente"
-            data-testid="wip-cliente"
-          >
-            <option value={TODOS}>Todos los clientes</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E4 (punto 7): búsqueda server-side; el <select> topado a 100 dejaba clientes
+              inalcanzables con ~117 en el catálogo. */}
+          <div className="w-44">
+            <FiltroCliente
+              idCliente={idCliente === TODOS ? null : Number(idCliente)}
+              alCambiar={(c) => {
+                setIdCliente(c === null ? TODOS : String(c.id));
+                reiniciar();
+              }}
+              testid="wip-cliente"
+            />
+          </div>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"

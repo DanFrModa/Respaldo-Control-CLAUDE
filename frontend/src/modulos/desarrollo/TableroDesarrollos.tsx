@@ -1,9 +1,10 @@
 import { LayoutDashboard } from 'lucide-react';
 import { useState } from 'react';
 
-import { useClientes, useDepartamentosCliente } from '@/api/clientes';
+import { useDepartamentosCliente } from '@/api/clientes';
 import { useTableroDesarrollos, type EstadoDesarrollo } from '@/api/liga-orden';
 import { useTemporadas } from '@/api/temporadas';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -40,7 +41,6 @@ export function TableroDesarrollos(): React.JSX.Element {
   const [idDepartamentoFiltro, setIdDepartamentoFiltro] = useState('');
   const [idTemporadaFiltro, setIdTemporadaFiltro] = useState('');
 
-  const clientes = useClientes(QUERY_CATALOGO);
   const temporadas = useTemporadas(QUERY_CATALOGO);
   const departamentos = useDepartamentosCliente(
     idClienteFiltro === '' ? undefined : Number(idClienteFiltro),
@@ -81,18 +81,11 @@ export function TableroDesarrollos(): React.JSX.Element {
         className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
         data-testid="filtros-tablero-desarrollos"
       >
-        <SelectNativo
-          aria-label="Filtrar por cliente"
-          value={idClienteFiltro}
-          onChange={(e) => cambiarCliente(e.target.value)}
-        >
-          <option value="">Todos los clientes</option>
-          {(clientes.data?.datos ?? []).map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.nombre}
-            </option>
-          ))}
-        </SelectNativo>
+        {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+        <FiltroCliente
+          idCliente={idClienteFiltro === '' ? null : Number(idClienteFiltro)}
+          alCambiar={(c) => cambiarCliente(c === null ? '' : String(c.id))}
+        />
         <SelectNativo
           aria-label="Filtrar por departamento"
           value={idDepartamentoFiltro}

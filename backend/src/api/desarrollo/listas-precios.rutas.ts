@@ -6,7 +6,7 @@
  *
  * RBAC (mutar implica leer — preHandler en arreglo = AND; evita 403-tras-commit, lección de E3):
  *  • LEER (listado/detalle/candidatos)        → `listas.ver`.
- *  • CREAR / editar factores                  → `listas.administrar` + `listas.ver`.
+ *  • CREAR / editar factores / QUITAR renglón / BORRAR lista → `listas.administrar` + `listas.ver`.
  *  • APROBAR / teclear precio de un renglón    → `listas.aprobar` + `listas.ver`.
  *  • NEGOCIAR (rondas/acuerdos/cambiar estado) → `listas.negociar` + `listas.ver` (F8-E5).
  *  • Historial de eventos de un renglón        → `listas.ver` (F8-E5).
@@ -46,8 +46,10 @@ import {
   crearLista,
   desgloseCostoLinea,
   editarFactoresLista,
+  eliminarLista,
   listarListas,
   obtenerLista,
+  quitarLineaLista,
 } from '../../dominio/desarrollo/listas-precios.js';
 import {
   cambiarEstadoLista,
@@ -194,6 +196,44 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return editarFactoresLista(sesion, request.params.id, request.body);
+    },
+  });
+
+  // QUITAR un renglón de la lista (V1-E4 punto 4: un desarrollo metido por error quedaba atrapado
+  // para siempre por el `@@unique([idDesarrollo])`). Devuelve la lista ya sin ese renglón.
+  app.route({
+    method: 'DELETE',
+    url: '/listas-precios/lineas/:idLinea',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Quitar un renglón de una lista de precios (queda íntegro en la bitácora)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return quitarLineaLista(sesion, request.params.idLinea);
+    },
+  });
+
+  // BORRAR una lista completa (V1-E4 punto 4). 204 sin cuerpo: ya no hay lista que devolver.
+  app.route({
+    method: 'DELETE',
+    url: '/listas-precios/:id',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Borrar una lista de precios (queda íntegra en la bitácora)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 204: z.null(), ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      await eliminarLista(sesion, request.params.id);
+      return reply.code(204).send(null);
     },
   });
 

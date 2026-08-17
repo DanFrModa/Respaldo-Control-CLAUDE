@@ -341,3 +341,138 @@ describe('confirmar importación (alta transaccional)', () => {
     expect(await cliente.pedido.count()).toBe(0);
   });
 });
+
+/**
+ * ⭐ V1-E4 punto 1 — la misma defensa que el importador por PDF, del lado del EXCEL. Aquí la
+ * identidad del papel es la OC capturada (`Pedido.ocCliente`), no el nº de orden de cada OP.
+ */
+describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
+  /** Confirma la importación del archivo demo con la OC indicada. */
+  async function importar(ocCliente: string | null): ReturnType<typeof confirmarImportacion> {
+    const archivoBase64 = await construirXlsxBase64(FILAS_DEMO);
+    return confirmarImportacion(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        nombreArchivo: 'OC C&A julio.xlsx',
+        archivoBase64,
+        mapeo: MAPEO_DEMO,
+        ...(ocCliente === null ? {} : { ocCliente }),
+        resoluciones: [],
+      },
+      bd(),
+    );
+  }
+
+  beforeEach(async () => {
+    await sembrarDesarrollo('DEV-114', 'CA-KM-114');
+    await sembrarDesarrollo('DEV-115', 'CA-KM-115');
+  });
+
+  it('re-importar la MISMA OC no crea un segundo pedido (ni sus OPs)', async () => {
+    await importar('OC-CA-4471');
+    expect(await cliente.pedido.count()).toBe(1);
+
+    await expect(importar('OC-CA-4471')).rejects.toBeInstanceOf(ErrorConflicto);
+
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.orden.count()).toBe(2); // las 2 de la primera importación, ni una más
+  });
+
+  it('la comparación no se deja engañar por espacios/mayúsculas del mismo número', async () => {
+    await importar('OC-CA-4471');
+    await expect(importar('  oc-ca-4471  ')).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.pedido.count()).toBe(1);
+  });
+
+  it('otra OC distinta del mismo cliente sí entra', async () => {
+    await importar('OC-CA-4471');
+    const segunda = await importar('OC-CA-4472');
+    expect(segunda.ordenes).toHaveLength(2);
+    expect(await cliente.pedido.count()).toBe(2);
+  });
+
+  /**
+   * ⚠️ CANCELAR EL PEDIDO NO BASTA: hay que cancelar TAMBIÉN sus OPs.
+   *
+   * La identidad de una OC vive en los DOS documentos (pedido y órdenes), así que mientras quede
+   * una OP viva con ese nº la re-importación sigue bloqueada — y con razón: esa OP se está
+   * cortando. Esto muerde sobre todo en los pedidos cancelados ANTES de V1-E4: hasta esta etapa
+   * «Cancelar pedido» dejaba sus OPs vivas (el defecto del punto 5), así que un pedido "cancelado"
+   * del histórico puede seguir reteniendo su OC. La salida es cancelar esas OPs, que además es lo
+   * que debió pasar desde el principio.
+   */
+  it('cancelar SOLO el pedido no libera la OC: sus OPs vivas la siguen reteniendo', async () => {
+    const primera = await importar('OC-CA-4471');
+    await cliente.pedido.update({
+      where: { id: primera.idPedido },
+      data: { pedCancelado: true },
+    });
+
+    await expect(importar('OC-CA-4471')).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('cancelando el pedido Y sus OPs, re-importar esa OC se permite', async () => {
+    const primera = await importar('OC-CA-4471');
+    await cliente.pedido.update({
+      where: { id: primera.idPedido },
+      data: { pedCancelado: true },
+    });
+    await cliente.orden.updateMany({
+      where: { id: { in: primera.ordenes.map((o) => o.idOrden) } },
+      data: { estado: 'cancelada', motivoCancelada: 'pedido cancelado' },
+    });
+
+    const segunda = await importar('OC-CA-4471');
+
+    expect(segunda.ordenes).toHaveLength(2);
+    expect(await cliente.pedido.count({ where: { pedCancelado: false } })).toBe(1);
+  });
+
+  /**
+   * ⭐ ASIMETRÍA CRUZADA PDF → EXCEL (hallazgo del reviewer de V1-E4).
+   *
+   * El importador PDF guarda el nº de orden del papel ÚNICAMENTE en `Orden.ocCliente` (en
+   * `Pedido.ocCliente` va la referencia general de la tanda, que puede ser otra cosa o nada). Como
+   * la guarda del Excel solo miraba `Pedido.ocCliente`, una OC importada por PDF se podía volver a
+   * importar por Excel SIN QUE NADA AVISARA — y al revés sí se detectaba. Aquí se siembra
+   * exactamente la huella que deja el PDF (pedido SIN referencia + OP CON el nº de orden) y se
+   * exige que el Excel la reconozca.
+   */
+  it('⭐ una OC importada por PDF (nº solo en la OP) BLOQUEA la importación por Excel', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'MOD-CRUZADO' } });
+    // Huella del importador PDF: el pedido NO lleva la OC; la OP sí.
+    const pedidoPdf = await cliente.pedido.create({
+      data: { folio: 9001, idEmpresa, idCliente: idClienteNegocio, ocCliente: null },
+    });
+    const lineaPdf = await cliente.pedidoLinea.create({
+      data: { idPedido: pedidoPdf.id, idModelo: modelo.id, cantidadPedida: 10, precio: 0 },
+    });
+    await cliente.orden.create({
+      data: {
+        folio: 7001,
+        idEmpresa,
+        idModelo: modelo.id,
+        idCliente: idClienteNegocio,
+        idPedidoLinea: lineaPdf.id,
+        ocCliente: 'OC-CA-4471',
+      },
+    });
+
+    await expect(importar('OC-CA-4471')).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y el mensaje manda al usuario a la OP, que es donde vive esa OC.
+    const error = await importar('OC-CA-4471').catch((e: unknown) => e);
+    expect((error as Error).message).toContain('OP 7001');
+    // No nació un segundo pedido.
+    expect(await cliente.pedido.count()).toBe(1);
+  });
+
+  it('LÍMITE CONOCIDO: sin OC capturada no hay identidad, así que sí se puede repetir', async () => {
+    await importar(null);
+    await importar(null);
+    // Documentado a propósito (ver `exigirOcNoImportada`): inventar una identidad bloquearía
+    // importaciones legítimas del mismo cliente el mismo día.
+    expect(await cliente.pedido.count()).toBe(2);
+  });
+});

@@ -2,9 +2,9 @@ import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useClientes } from '@/api/clientes';
 import { useTableroPedidosMes } from '@/api/ordenes-consulta';
 import type { TableroPedidosMesFila, TableroPedidosMesQuery } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
 import {
@@ -38,8 +38,10 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const [anio, setAnio] = useState<number | null>(new Date().getFullYear());
   const [idCliente, setIdCliente] = useState<number | null>(null);
-
-  const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  // El NOMBRE del cliente se conserva —no sólo su id— porque viaja en el deep-link: la Consulta
+  // llega con el filtro puesto y, con búsqueda server-side, sin el nombre no tendría cómo
+  // mostrarlo (enseñaría "Todos los clientes" estando filtrada).
+  const [nombreCliente, setNombreCliente] = useState<string | null>(null);
 
   const query: TableroPedidosMesQuery = {
     ...(anio !== null ? { anio } : {}),
@@ -52,7 +54,7 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
   /** Salta a la Consulta de órdenes filtrada por el año/cliente del tablero. */
   function saltarAConsulta(fila: TableroPedidosMesFila): void {
     void navigate('/produccion/consulta', {
-      state: { anio: fila.anio, idCliente },
+      state: { anio: fila.anio, idCliente, nombreCliente },
     });
   }
 
@@ -85,19 +87,16 @@ export function TableroPedidosMesPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
-          <SelectNativo
-            value={idCliente === null ? TODOS : String(idCliente)}
-            onChange={(e) => setIdCliente(e.target.value === TODOS ? null : Number(e.target.value))}
-            aria-label="Filtrar por cliente"
-            data-testid="filtro-cliente"
-          >
-            <option value={TODOS}>Todos los clientes</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E4 (punto 7): era un <select> de la primera página del catálogo (100) y con
+              ~117 clientes los del final del alfabeto NO aparecían. */}
+          <FiltroCliente
+            idCliente={idCliente}
+            alCambiar={(c) => {
+              setIdCliente(c?.id ?? null);
+              setNombreCliente(c?.nombre ?? null);
+            }}
+            testid="filtro-cliente"
+          />
         </div>
 
         {/* Salto a Pedidos reales (existe) + stubs (F3/F4/F7) */}

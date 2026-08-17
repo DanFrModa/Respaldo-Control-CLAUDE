@@ -20,10 +20,12 @@
  * Permiso: `pedidos-reales.administrar` para crear/editar/seguimiento; `pedidos.ver` para leer.
  * El ocultamiento de importes (`precio`) reutiliza `pedidos.importes` (mismo criterio, doc 02 §3).
  *
- * NOTA DIFERIDA (F2-E1): la CANCELACIÓN del pedido real está pendiente de decisión de Daniel;
- * no se construye en esta etapa (sin servicio, sin campo). Ver el TODO más abajo.
+ * CANCELACIÓN (V1-E4 punto 6): resuelta. Daniel la autorizó en §Post-F9.37 punto 9 (*"Sí."*) —
+ * cancelación SUAVE con motivo (`cancelado` + `motivoCancelada`), como todo lo demás del sistema
+ * (D3: nada se borra). Un pedido real cancelado ya no admite edición ni seguimiento.
  */
 import {
+  esquemaPedidoRealCancelarCuerpo,
   esquemaPedidoRealCrear,
   esquemaPedidoRealEditar,
   esquemaPedidoRealSeguimientoCuerpo,
@@ -49,6 +51,8 @@ export type EntradaCrearPedidoReal = z.input<typeof esquemaPedidoRealCrear>;
 export type EntradaActualizarPedidoReal = z.input<typeof esquemaPedidoRealEditar>;
 /** Cuerpo del seguimiento por renglón. */
 export type EntradaSeguimientoPedidoReal = z.input<typeof esquemaPedidoRealSeguimientoCuerpo>;
+/** Cuerpo de cancelar un pedido real (motivo obligatorio, V1-E4 punto 6). */
+export type EntradaCancelarPedidoReal = z.input<typeof esquemaPedidoRealCancelarCuerpo>;
 
 /** Pedido real con sus renglones (cada uno con el renglón del pedido interno y su modelo). */
 type PedidoRealConDetalle = PedidoReal & {
@@ -124,6 +128,8 @@ function aPedidoRealSalida(
     fechaInicio: aFechaIso(real.fechaInicio),
     fechaFin: aFechaIso(real.fechaFin),
     fechaEntregadaReal: aFechaIso(real.fechaEntregadaReal),
+    cancelado: real.cancelado,
+    motivoCancelada: real.motivoCancelada,
     lineas: real.lineas.map((l) => ({
       id: l.id,
       idPedidoLinea: l.idPedidoLinea,
@@ -243,7 +249,7 @@ export async function actualizarPedidoReal(
   const datos = validarEntrada(esquemaPedidoRealEditar, entrada);
 
   await enTransaccion(async (tx) => {
-    await exigirPedidoReal(tx, id, sesion.idEmpresaActiva);
+    exigirPedidoRealVivo(await exigirPedidoReal(tx, id, sesion.idEmpresaActiva));
 
     const cambios: Prisma.PedidoRealUpdateInput = { ...datosModificacion(sesion) };
     if (datos.numPedReal !== undefined) cambios.numPedReal = aTexto(datos.numPedReal) ?? null;
@@ -284,7 +290,7 @@ export async function actualizarSeguimientoPedidoReal(
   const datos = validarEntrada(esquemaPedidoRealSeguimientoCuerpo, entrada);
 
   await enTransaccion(async (tx) => {
-    await exigirPedidoReal(tx, id, sesion.idEmpresaActiva);
+    exigirPedidoRealVivo(await exigirPedidoReal(tx, id, sesion.idEmpresaActiva));
 
     const propias = await tx.pedidoRealLinea.findMany({
       where: { idPedidoReal: id },
@@ -318,9 +324,60 @@ export async function actualizarSeguimientoPedidoReal(
   return obtenerPedidoReal(sesion, id, bd);
 }
 
-// TODO(F2-E1 diferido): cancelación de PedidoReal pendiente de decisión de Daniel.
-// No se construye el servicio `cancelarPedidoReal` (ni su ruta, ni botón en UI, ni el campo
-// `cancelado` en `PedidoReal`) hasta que se confirme la política de cancelación del pedido real.
+/**
+ * ⭐ V1-E4 (punto 6) — CANCELA un pedido real (cancelación SUAVE con motivo).
+ *
+ * Cierra el TODO que llevaba abierto desde F2-E1 ("pendiente de decisión de Daniel"): lo resolvió
+ * en §Post-F9.37 punto 9 — *"Sí."*, el pedido real SÍ se puede cancelar. Como todo lo demás del
+ * sistema, no se borra nada (D3): la liberación sigue consultable, marcada y con su porqué.
+ *
+ * Reglas: `pedidos-reales.administrar` (el mismo permiso con que se crea y se le da seguimiento —
+ * sin permisos nuevos), empresa activa (A9: un pedido real ajeno da 404, nunca 409), motivo
+ * OBLIGATORIO y cancelar dos veces es `ErrorConflicto`.
+ */
+export async function cancelarPedidoReal(
+  sesion: SesionUsuario,
+  id: number,
+  entrada: EntradaCancelarPedidoReal,
+  bd?: ContextoBd,
+): Promise<PedidoRealSalida> {
+  verificarPermiso(sesion, 'pedidos-reales.administrar');
+  const datos = validarEntrada(esquemaPedidoRealCancelarCuerpo, entrada);
+
+  await enTransaccion(async (tx) => {
+    const actual = await exigirPedidoReal(tx, id, sesion.idEmpresaActiva);
+    if (actual.cancelado) {
+      throw new ErrorConflicto(
+        `El pedido real ${actual.numPedReal ?? String(id)} ya está cancelado.`,
+      );
+    }
+    await tx.pedidoReal.update({
+      where: { id },
+      data: { cancelado: true, motivoCancelada: datos.motivo, ...datosModificacion(sesion) },
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'PedidoReal',
+      idEntidad: id,
+      accion: 'CANCELAR',
+      datos: { idPedido: actual.idPedido, numPedReal: actual.numPedReal, motivo: datos.motivo },
+    });
+  }, bd);
+
+  return obtenerPedidoReal(sesion, id, bd);
+}
+
+/**
+ * Guard compartido de las mutaciones: un pedido real CANCELADO ya no se edita ni se le captura
+ * seguimiento. Sin esto, "cancelar" sería una etiqueta decorativa — el mismo defecto que V1-E4
+ * arregló en «Cancelar pedido» (punto 5): prometer que algo se detiene y que siga andando.
+ */
+function exigirPedidoRealVivo(real: PedidoReal): void {
+  if (real.cancelado) {
+    throw new ErrorConflicto(
+      `El pedido real ${real.numPedReal ?? String(real.id)} está cancelado; no se puede modificar.`,
+    );
+  }
+}
 
 /** Obtiene un pedido real (con su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`. */
 export async function obtenerPedidoReal(

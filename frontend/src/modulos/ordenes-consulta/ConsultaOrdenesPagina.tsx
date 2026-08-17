@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import { imprimirLoteOrdenes, imprimirOrden, useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { EstadoOrden, OrdenesConsultaQuery, OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ErrorDeApi } from '@/api/errores';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -50,6 +50,15 @@ function leerEnteroState(state: unknown, clave: string): number | null {
   return typeof valor === 'number' && Number.isInteger(valor) && valor > 0 ? valor : null;
 }
 
+/** Lee de forma defensiva un texto NO vacío del `state` de navegación (deep-link del tablero). */
+function leerTextoState(state: unknown, clave: string): string | undefined {
+  if (typeof state !== 'object' || state === null || !(clave in state)) {
+    return undefined;
+  }
+  const valor = (state as Record<string, unknown>)[clave];
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
+}
+
 /**
  * CONSULTA de Órdenes (F2-E4): la operación diaria de localizar/imprimir órdenes. Tabla LIGERA
  * (servidor) con filtros (cliente/año/modelo/estado/canceladas) + búsqueda combinada (folio, modelo,
@@ -71,6 +80,12 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
   const [idCliente, setIdCliente] = useState<number | null>(() =>
     leerEnteroState(estadoNavegacion, 'idCliente'),
   );
+  // Nombre del cliente que viene en el deep-link. Sin él la pantalla MENTIRÍA sobre su propio
+  // filtro: con búsqueda server-side el combobox sólo conoce 10 clientes, así que enseñaría
+  // «Todos los clientes» mientras la consulta sí está filtrada por ese cliente.
+  const [nombreClienteInicial] = useState<string | undefined>(() =>
+    leerTextoState(estadoNavegacion, 'nombreCliente'),
+  );
   const [anio, setAnio] = useState<number | null>(() => leerEnteroState(estadoNavegacion, 'anio'));
   const [estado, setEstado] = useState<EstadoOrden | null>(null);
   const [incluirCanceladas, setIncluirCanceladas] = useState(false);
@@ -79,7 +94,6 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
   const [imprimiendoLote, setImprimiendoLote] = useState(false);
 
   // Selector de clientes (para el filtro): lista corta, primera página.
-  const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: OrdenesConsultaQuery = {
     pagina,
@@ -190,22 +204,16 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
               aria-label="Buscar órdenes"
             />
           </div>
-          <SelectNativo
-            value={idCliente === null ? TODOS : String(idCliente)}
-            onChange={(e) => {
-              setIdCliente(e.target.value === TODOS ? null : Number(e.target.value));
+          {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+          <FiltroCliente
+            idCliente={idCliente}
+            nombreInicial={nombreClienteInicial}
+            alCambiar={(c) => {
+              setIdCliente(c?.id ?? null);
               reiniciar();
             }}
-            aria-label="Filtrar por cliente"
-            data-testid="filtro-cliente"
-          >
-            <option value={TODOS}>Todos los clientes</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+            testid="filtro-cliente"
+          />
           <SelectNativo
             value={anio === null ? TODOS : String(anio)}
             onChange={(e) => {

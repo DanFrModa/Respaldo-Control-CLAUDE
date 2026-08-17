@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del MOTOR de la Ruta Crítica por orden (F5-E5; pantalla R4 "Mis pendientes") contra el stack
@@ -107,7 +107,7 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.goto('/pedidos/administrar');
     await page.getByTestId('nuevo-pedido').click();
     const dialogoPedido = page.getByRole('dialog');
-    await dialogoPedido.getByLabel('Cliente').selectOption({ label: cliente });
+    await elegirCliente(page, dialogoPedido, cliente, 'pedido-cliente');
     await dialogoPedido.getByTestId('agregar-renglon').click();
     const filaRenglon = dialogoPedido.getByTestId('fila-renglon').first();
     await filaRenglon.getByLabel('Modelo del renglón').selectOption({ label: codigoModelo });
@@ -124,7 +124,11 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     const panelOp = page.getByTestId('panel-generar-op');
     const matrizOp = panelOp.getByTestId('matriz-op');
     await matrizOp.getByTestId('matriz-op-agregar-talla').selectOption({ index: 1 });
-    await matrizOp.getByTestId('matriz-op-agregar-color').selectOption({ index: 1 });
+    // V1-E4 (punto 7): el color sale de un combobox con búsqueda server-side. Enfocarlo abre la
+    // lista (primera página del catálogo) sin teclear nada: basta tomar la primera opción, que es
+    // lo que hacía el `selectOption({ index: 1 })` de antes.
+    await matrizOp.getByTestId('matriz-color-al-vuelo-input').click();
+    await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
     await matrizOp.getByTestId('matriz-op-celda').first().fill('20');
     await page.getByTestId('confirmar-generar-op').click();
     const toastOp = page.getByText(/OP \d+ creada/).first();

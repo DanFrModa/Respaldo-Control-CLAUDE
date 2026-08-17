@@ -2241,3 +2241,594 @@ permanente a toda orden viva con esa tela, y el aviso se volvería ruido de fond
   despliegue de la sesión que no se deshace con un clic. Permisos: **ninguno nuevo** (reusa
   `desarrollo.administrar`); seed: no.
 - **Fecha:** 2026-08-15/16.
+
+#### (Post-F9.51) — Las reglas que las DEFENSAS obligaron a fijar (V1-E4, 16-ago-2026)
+
+Daniel quiere operar el sistema. Esta etapa es la que se construye **antes** de capturar trabajo real:
+*"lo peor que puede pasar en producción no es que algo truene: es que corrompa datos sin avisar"*.
+Ninguna de estas reglas se le preguntó a Daniel — **son consecuencias de tapar los siete huecos**, y se
+escriben aquí porque cambian cómo se comporta el sistema.
+
+**1. ⭐ La identidad de una importación es `ocCliente` + CLIENTE, y las canceladas NO cuentan.**
+
+Importar dos veces la misma OC del cliente **duplicaba todo en silencio** —pedido, órdenes, nº de
+producción, ruta crítica y explosión de materiales— y se descubría semanas después **cortando doble**:
+tela y horas de maquila reales. La defensa va en los **dos** importadores (PDF y Excel).
+
+- **Excluir las canceladas es deliberado:** si la importación anterior se canceló, re-importar es
+  legítimo y no debe trabarse.
+- **El resurtido NO se atiende re-importando el papel** — se atiende con el botón de resurtido (punto 3
+  de esta misma etapa). Por eso la regla no produce falsos positivos.
+- **NO se puso un `@@unique(cliente, ocCliente)` en la BD**, y la razón es del negocio: esa columna
+  viene del ETL del sistema viejo, donde el nº de OC **no estaba controlado** (repetidos y vacíos). El
+  unique tumbaría la migración. El candado + la re-verificación dentro de la transacción dan la
+  garantía **hacia adelante** sin tocar el histórico.
+- ⚠️ **Límite conocido y aceptado:** un Excel **sin OC capturada** no se puede deduplicar — sin ese
+  dato no hay identidad, e inventar una (nombre de archivo, fecha) **bloquearía importaciones
+  legítimas** del mismo cliente el mismo día.
+
+**2. Un precosto NO se puede congelar en CERO.** Un modelo sin receta generaba las anclas de maquila y
+corte en $0 y la versión se congelaba **inmutable** — de ahí podía salir el precio de un cliente. Ahora
+se rechaza al congelar, no al aprobar.
+
+**3. «Cancelar pedido» dice la verdad, y puede cancelar en cascada.** Antes afirmaba que dejaba de
+producirse **y las OPs seguían vivas, cortándose**. Ahora: sin OPs vivas cancela igual; con OPs vivas
+**se niega nombrando los folios**; y con petición explícita + motivo las cancela en la misma
+transacción, con bitácora **por orden**.
+⚠️ **Cancelar una OP que ya llevaba corte SÍ se permite** — es **paridad exacta** con lo que el flujo
+manual ya hacía, no una puerta nueva. Verificado línea por línea contra `cancelarOrden`.
+
+**4. Un desarrollo metido por error en una lista de precios ya se puede sacar.** El
+`@@unique([idDesarrollo])` de la BD significaba que ese desarrollo **no podía entrar NUNCA a otra
+lista**: quedaba atrapado para siempre. El borrado es **físico** —un borrado suave no soltaría el
+unique, o sea que no abriría la trampa—, y por eso **el objeto completo del `antes` más todos sus
+`NegociacionEvento` van a la bitácora** antes de borrar, en la misma transacción (D3 se cumple ahí).
+
+**5. El Pedido Real se puede cancelar** (§Post-F9.37 punto 9 — cierra el TODO abierto desde F2-E1).
+Cancelación **suave con motivo**, y **cancelado deja de admitir edición y seguimiento**, para que no sea
+un adorno. **Requiere migración** (`pedido_real` += `cancelado`, `motivo_cancelada`).
+
+- **Aplica en:** V1-E4. **Una migración** (`20260816120000_cancelar_pedido_real`). **CERO permisos
+  nuevos, CERO seed** — reusa `listas.administrar`, `pedidos-reales.administrar` y `ordenes.cancelar`.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.52) — El ARTE, como Daniel lo usa de verdad (DANIEL, 16-ago-2026)
+
+Daniel revisando la ficha del modelo en `prueba`, **dos días después** de que el arte se mudara del
+catálogo al modelo (§Post-F9.35 / V1-E3d pieza A). Siete observaciones. **Cada una verificada contra
+el código antes de escribirla aquí** — las siete aplican, ninguna estaba resuelta.
+
+**1. El NOMBRE del arte no hace falta.**
+> *"No necesita tener un nombre del arte. Si la tabla exige un nombre, ponle uno compuesto. O si no,
+> no es necesario."*
+
+Hoy `ModeloArte.nombre` es **obligatorio** (`String`, sin `?`). Deja de pedirse al usuario: o se
+compone solo (tipo + posición + consecutivo, p. ej. *"Bordado frente 1"*) o desaparece. ⚠️ Ojo: hay un
+`@@unique([idOrden, nombre])` en `OrdenArte` que un nombre compuesto debe seguir respetando.
+
+**2. Falta decir si va en el FRENTE o la ESPALDA.**
+> *"Creo que es importante definir si va en el frente o la espalda."*
+
+Campo nuevo. No existe hoy.
+
+✅ **CERRADO (Daniel, 16-ago-2026): CAMPO ABIERTO, no catálogo.** Preguntado si eran solo frente y
+espalda o convenía un catálogo chico para agregar posiciones sin tocar el programa: *"puede ser un
+campo abierto. Porque a veces son cosas muy específicas, que no tendría caso tenerlas en un
+catálogo."* **Texto libre.** Más simple que la propuesta del lead y mejor para el caso real.
+
+**3. El selector de proveedores debe mostrar SOLO los de arte.** Hoy muestra **todos**.
+
+> Daniel: *"Tengo entendido que los proveedores se pueden clasificar mediante un catálogo de tipos de
+> proveedores. Creo que ahí hay que ponerle que son de arte."*
+
+⚠️ ~~**Corrección al entendido de Daniel:** `Proveedor.tipo` NO es un catálogo, es un enum grabado en el
+programa; agregar `ARTE` exige migración.~~ ❌ **ESA "CORRECCIÓN" DEL LEAD ERA FALSA. Daniel tenía
+razón** y lo demostró con una captura de la pantalla de proveedores.
+
+✅ **Lo que de verdad hay (verificado en `prisma/seed.ts:354-369`):** existe **`ProveedorRol`**, un
+**catálogo real en tabla, N:N** con el proveedor — *"Roles / servicios: qué hace este proveedor (elige
+al menos uno)"*. Ya trae **nueve** roles sembrados: `maquila-costura`, `corte`, `estampado`, `bordado`,
+`lavado`, `aplicacion`, `vende-telas`, `vende-avios`, `otros-servicios`. El `codigo` es la clave
+estable y **el nombre visible es editable**.
+
+**El error del lead:** miró `Proveedor.tipo` —una clasificación **vieja y burda** que convive con
+ésta— y concluyó que no existía el catálogo. Lección: cuando el dueño dice *"tengo entendido que ya
+existe"*, **buscar en la pantalla antes que en el esquema**.
+
+✅ **CERRADO (Daniel, 16-ago-2026): el filtro del arte se hace por ROLES.** No hace falta enum nuevo, ni
+migración, ni reclasificar a nadie: los proveedores de arte ya se marcan con `bordado` / `estampado`.
+*(Al construir: decidir si `lavado` y `aplicacion` también cuentan como arte para ese selector —
+Daniel los trata como tipos de arte en el punto 4.)*
+
+**4. ⭐ El TIPO de arte debe ser un CATÁLOGO, no una lista fija.**
+> *"Aparte de bordado y estampado, podríamos tener lavados, embosado, etc. Creo que hay que tener un
+> catálogo de tipos de arte."*
+
+Hoy es un **enum** (`TipoArte`: `BORDADO`/`ESTAMPADO`) — agregar un tipo exige migración y despliegue.
+Pasa a catálogo administrable, como `TipoProceso` (F3-E1), que es el precedente del repo.
+
+**5. Cada arte lleva SUS PROPIAS FOTOS, en plural.**
+> *"Cada arte debe de llevar sus propias fotos (aparte de las fotos del modelo)."*
+
+Hoy `ModeloArte.idArchivoFoto` es **UNA sola** foto. Pasa a colección, como `ModeloFoto`.
+
+**6. Las PUNTADAS se van.**
+> *"Las puntadas solo aplica para bordados. Yo quitaría ese campo."*
+
+⚠️ Quitar la columna **borraría el dato de los bordados que sí lo tienen** (D3: nada se destruye en
+silencio).
+
+✅ **CERRADO (Daniel, 16-ago-2026): NO se borra — se ATA AL TIPO.** El lead propuso que el campo
+dependa del tipo de arte (punto 4): que aparezca en bordado y desaparezca en estampado, lavado o
+embosado. Daniel: *"Ok como tú lo dices."* Consigue lo que pedía —no ver un campo que no aplica— sin
+tirar la historia de los bordados existentes.
+
+**7. ⭐ El proveedor se busca por CUALQUIER PALABRA — y esto ya estaba acordado.**
+> *"El proveedor debe de buscarse por cualquier palabra. No solo por la primera letra de la primera
+> palabra. **Habíamos acordado** que siempre que se busque un proveedor debe de buscar en todas las
+> palabras."*
+
+**Causa verificada:** el selector del arte es un `SelectNativo` con `porPagina: 100`
+(`DialogoArte.tsx:46,237`) — el "buscar tecleando" es el **typeahead del navegador**, que solo pega por
+**prefijo**. El servidor **ya busca bien** (`idsPorNombreSinAcentos`: `LIKE %texto%` sin acentos, casa
+en medio del nombre).
+
+⚠️ **Es la TERCERA vez esta semana que aparece este patrón**: el mismo defecto se arregló en el BOM
+(V1-E3c punto 4) y en las 12 pantallas de cliente (V1-E4 punto 7), **y no viajó al arte**. Al
+construirlo: **reusar `ComboboxBuscable`**, y de paso **barrer TODOS los `SelectNativo` de proveedor
+que queden**, no solo éste.
+
+✅ **CERRADO (Daniel, 16-ago-2026):** preguntado si bastaba con que **una palabra** case en cualquier
+parte del nombre (lo que el servidor ya hace) o si quería además que *"moda textil"* encontrara
+*"Textiles Moda del Norte"* con las palabras sueltas y en otro orden — *"como ya funciona el buscador,
+que busques una palabra está perfecto"*. **NO se parte la búsqueda en palabras.** El trabajo es
+puramente de pantalla: cambiar el desplegable nativo por el `ComboboxBuscable` que ya consume esa
+búsqueda.
+
+**8. DIFERIDO a una etapa posterior, por decisión de Daniel:**
+> *"En una siguiente etapa quiero poder poner la ficha del estampado."*
+
+La **ficha técnica del estampado** adjunta al arte. **No entra en la primera versión**; queda anotado
+para no perderse. Emparienta con las fichas técnicas estructuradas (R5) que ya estaban pendientes.
+
+⚠️ **Ripple que hay que mirar al construir:** **`OrdenArte` copia de `ModeloArte`** desde V1-E3d pieza
+B. Todo cambio de forma aquí (nombre, posición, tipo-catálogo, fotos múltiples, puntadas) **debe
+recorrer también la receta congelada de la orden**, su copia y su comparador de desalineación.
+
+- **Aplica en:** etapa propia — **`V1-E3f`**, después de V1-E4. **REQUIERE MIGRACIÓN** (nombre,
+  posición, catálogo de tipos, fotos múltiples, puntadas) y probablemente **seed** (los tipos de arte
+  iniciales). Permisos: reusar los de catálogos.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.53) — Las fotos masivas se cargan por el NOMBRE del archivo, y el respaldo se adelanta (DANIEL, 16-ago-2026)
+
+**1. Cómo llegan las fotos del sistema viejo — confirmado por Daniel y verificado en el código.**
+
+> Daniel: *"En control viejo, cada orden lleva un modelo y dentro de ese modelo hay dos campos con los
+> nombres de las fotos (jpg): si un archivo es `51001.jpg`, el campo dice `51001`. Eso para fotos de
+> modelos… y de artes es similar. Hay un catálogo de artes y las fotos funcionan de la misma manera.
+> ¿Sí vas a poder subir las fotos con esa referencia?"*
+
+✅ **Sí, y ya está construido exactamente así** desde F1-E7 (`migracion/loaders/fotos-modelos.ts`),
+esperando únicamente la carpeta física:
+
+- `Foto1` = **frente**, `Foto2` = **espalda**. El loader busca en el directorio el archivo cuyo
+  **nombre-base sin extensión** coincida con el valor del campo, **sin importar mayúsculas**, y acepta
+  `.jpg .jpeg .png .gif .bmp .webp`. Es **idempotente**: re-correrlo no duplica.
+- **Los artes igual**, desde la columna `Foto` de `Bordados.csv`. ⭐ Y el loader **ya está al día con
+  V1-E3d pieza A**: como los artes compartidos **se duplicaron** al mudarse al modelo, sube la foto
+  **una vez** y la liga a **todas** las copias de ese arte (vía `mapeo_migracion`), en vez de apuntar a
+  la tabla `Bordado` que ya no existe.
+- **Las órdenes NO necesitan carga propia:** la foto vive en el **modelo** y cada orden la muestra por
+  su modelo. Cargar los modelos deja a todas las órdenes con foto.
+
+**2. Se pide una MUESTRA antes del go-live.** El loader está probado contra datos **inventados**, nunca
+contra los nombres reales. Daniel ofreció subir un ejemplo (*"¿quieres que te suba un ejemplo para ir
+construyendo algo?"*) y el lead lo aceptó: **10–15 archivos de modelos y otros tantos de artes, con sus
+nombres originales**, para cazar hoy lo que si no aparece el día de la migración — acentos, espacios al
+final, extensiones en mayúsculas, o la convención `código-P` de la foto de espalda. **La carpeta
+completa y los datos correctos llegan hasta el go-live**, como Daniel indicó.
+
+**3. El respaldo diario cifrado se ADELANTA.** Preguntado si convenía sacarlo de V1-E6 y hacerlo en
+cuanto cierre V1-E4 —porque **hoy no existe** un respaldo propio del sistema y es lo único de la lista
+que expone de verdad al empezar a capturar trabajo real—: *"Sí ok."* **Se construye antes que el resto
+de E6.**
+
+- **Aplica en:** el punto 1 no requiere construir nada (ya existe); el punto 2 es un insumo de Daniel;
+  el punto 3 reordena V1-E6.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.54) — Los nombres de los roles de proveedor, y el principio del "proceso raro" (DANIEL, 16-ago-2026)
+
+Daniel, viendo la pantalla de proveedores: *"Hoy tienes esto ya definido. Ya hay arte (estampado), arte
+bordado, aplicaciones, lavados. Prácticamente ya hay todo."*
+
+**1. Renombres pedidos.** El `codigo` es la clave estable; solo cambia el **nombre visible**:
+
+| Código | Antes | **Ahora** |
+|---|---|---|
+| `estampado` | Prov. de Arte (estampado) | **Estampador** |
+| `bordado` | Prov. de Arte (bordado) | **Bordador** |
+| `vende-telas` | Vende telas | **Telas** |
+| `vende-avios` | Vende avíos | **Avíos** |
+
+> *"Yo cambiaría el nombre a Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como
+> Telas y Avíos, le quitaría el «Vende»."*
+
+⚠️ Los nombres se siembran en `ROLES_PROVEEDOR_BASE` y el seed **actualiza el nombre si el código ya
+existe** → el deploy de este cambio **requiere `SEED_ON_START=true`**. Al construir, verificar si la
+pantalla de catálogos ya permite renombrarlos a mano (sería mejor: sin despliegue).
+
+**2. ⭐ El principio del "proceso raro" — vale más que el renombre.**
+
+> Daniel, sobre el embosado: *"dentro de aplicación podemos poner el embosado, o podemos dar de alta
+> embosado también… o en otros. **Hay procesos que hago muy muy poco. No justifica hacer todo un
+> desarrollo para las pocas veces que lo ocupo.**"*
+
+**Regla de diseño que queda para todo el proyecto:** un proceso poco frecuente **no justifica una
+entidad propia**. Se acomoda en `aplicacion` o en `otros-servicios`, o se le da de alta un rol si es
+tan barato como una fila de catálogo — pero **nunca** se le construye flujo, pantalla ni reporte
+propio. Es el mismo criterio con el que Daniel apagó la Ruta Crítica en la v1 (§Post-F9.36 punto 1) y
+descartó la remisión y el packing list (punto 6).
+
+**Aplicado aquí:** el **embosado** NO recibe rol propio de entrada. Si al usarlo resulta que estorba
+no distinguirlo, se agrega entonces — una fila de catálogo, no un desarrollo.
+
+**3. Daniel anunció más observaciones sobre proveedores**, que mandará aparte para no cortar el hilo en
+curso. **Pendiente de recibir.**
+
+- **Aplica en:** V1-E3f (junto con los siete del arte). Los renombres van en `prisma/seed.ts`
+  (**requiere `SEED_ON_START`**). Sin migración: los códigos no cambian.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.55) — Alta de proveedor leyendo su Constancia de Situación Fiscal (DANIEL, 16-ago-2026)
+
+> Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
+> alta. Con ese documento se llena toda la info en automático: RFC, direcciones, etc."*
+
+**Qué se llenaría, y por qué NO requiere migración.** Los campos que la constancia trae ya existen en
+`Proveedor` (F1-E1B / R15): `rfc`, `razonSocial`, `regimenFiscalSat`, `codigoPostalExpedicion` y
+`direccion` (texto libre, se compone de calle/número/colonia/municipio/estado). **Cero cambios de
+esquema** para los datos; sí hace falta guardar el PDF como adjunto.
+
+**El precedente que lo abarata:** ya hay un lector de PDF en producción — el **importador de OC de C&A**
+(`parseo-pdf-cya.ts`, §Post-F9.2). Misma mecánica: extraer texto y mapear a campos. **Se reusa, no se
+inventa.**
+
+**⭐ REGLA: el documento PROPONE, la persona CONFIRMA. No hay llenado silencioso.**
+El `rfc` y el `regimenFiscalSat` alimentan el **CFDI**: un carácter mal leído no se nota hasta que una
+factura sale mal. El flujo es subir → la pantalla se llena con los datos resaltados → **Aceptar**. Dos
+segundos más a cambio de no meter basura fiscal en silencio. *(Mismo criterio que §Post-F9.34 punto 7
+para el nº de producción: el sistema asiste y verifica, no decide.)*
+
+**Tres cosas a construir con cuidado:**
+
+1. **Dos formatos:** persona **física** (nombre y apellidos) y persona **moral** (razón social). Traen
+   campos distintos; se contemplan los dos.
+2. **El SAT cambia el formato cada tanto.** Si no logra leerlo, **NO bloquea el alta**: se captura a
+   mano como hoy, avisando que no pudo. Degradar con gracia, nunca al revés.
+3. **La constancia se CONSERVA** como adjunto del proveedor, no se lee y se tira. La maquinaria de
+   adjuntos + R2 ya existe.
+
+**Fuera de alcance por ahora:** validar el QR de la constancia contra el SAT (exige salida a internet
+desde el servidor; se puede agregar después si hace falta).
+
+**Pregunta abierta a Daniel:** ¿solo en el **alta**, o también al **editar** un proveedor existente
+(subir la constancia y que actualice sus datos fiscales)? *(Default del lead: **los dos** — es el mismo
+trabajo.)*
+
+- **Aplica en:** etapa de **proveedores**, junto con §Post-F9.54 y el resto de observaciones que Daniel
+  anunció que mandará. **Se agrupa a propósito** para no tocar esa pantalla tres veces. Sin migración
+  de datos; adjunto del proveedor por revisar si ya existe.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.56) — Las siete observaciones de PROVEEDORES (DANIEL, 16-ago-2026)
+
+Daniel revisando la pantalla de proveedores. **Las siete verificadas contra el código antes de
+escribirlas**; dos ya estaban resueltas y una es una confusión de la pantalla, no un defecto de datos.
+
+**1. Catálogo de CONTACTOS, no uno solo.**
+> *"A veces es importante ir registrando al vendedor, a la de crédito y cobranza, al encargado del
+> taller, a la supervisora… Depende qué tipo de proveedor y qué tipo de puestos se requieren."*
+
+Hoy hay **un solo** `contacto String?` de texto libre. Necesita **tabla propia**: N contactos por
+proveedor, cada uno con puesto, teléfono y correo. **Requiere migración.**
+
+**2. El "nombre corto" duplicado — NO lo está: son dos campos distintos.**
+> *"Está en el segundo campo y también lo pusiste casi al final como código corto en el taller.
+> ¿Supongo que es lo mismo, o hay alguna razón de ser?"*
+
+Hay razón de ser, pero **la pantalla no la explica** — la confusión es legítima:
+- **`nombreCorto`** (`schema.prisma:581`) — lo pidió el propio Daniel el **6-ago**: *"Bloom"* para
+  *"BLOOM TEXTIL"*, para **armar el nombre compuesto de la tela** (A1.1). Solo display, **sin unicidad**.
+- **`corto`** (`:643`) — **clave corta de uso diario del taller**, heredada de `Maquilero.corto` del
+  sistema viejo. **`@unique` global.**
+
+**Propuesta:** etiquetarlos con claridad en la pantalla; y **si la clave del taller ya no se usa a
+diario, retirarla** y dejar uno solo. → **pregunta abierta (2)**.
+
+**3. El campo TIPO sale sobrando.**
+> *"Tienes un campo de TIPO y aparte tienes el rol (que pueden ser más de uno)… creo que el de tipo
+> sale sobrando. Y es importante poner todo lo que puede hacer un proveedor, porque puede hasta llegar
+> a vender telas y ser maquilero."*
+
+✅ **De acuerdo, y verificado:** `Proveedor.tipo` (enum `TipoProveedor`) se conservó junto a los roles
+**por acta de Gabriel del 13-jun-2026**, no por una razón técnica. Los roles N:N cubren justo el caso
+que Daniel nombra —vender telas **y** ser maquilero—, que el tipo único **no permite**. **Se retira.**
+⚠️ Al construir: revisar sus consumidores (contrato, etiquetas, filtros) y qué hacer con la
+clasificación de los migrados → **pregunta abierta (3)**.
+
+**4. Si no emite CFDI, no debe pedir RFC.** La bandera `factura Boolean?` (*"¿Emite CFDI? Define formal
+vs informal"*) **ya existe**; lo que falta es que **la pantalla la obedezca** y oculte RFC, régimen,
+uso de CFDI y CP de expedición cuando esté apagada.
+
+**5. ⭐ "Hay proveedores que a veces facturan y a veces no. ¿Cómo resolverlo?" — YA ESTÁ RESUELTO.**
+
+`Proveedor.modalidadFacturacion` (`:655`, F6-E4 decisión (h)) tiene tres valores: **`solo_con`**
+(siempre factura), **`solo_sin`** (nunca) y **`ambos`** — *"y en ese caso su estado de cuenta se
+segmenta en dos"*. Cada cargo se marca `conFactura` al validarse (`dominio/esma/cargos.ts:216`) y el
+estado de cuenta filtra por segmento (`dominio/esma/estado-cuenta.ts:48`).
+
+**6. El hueco REAL, que Daniel intuyó en el mismo punto:** eso funciona **solo para talleres/maquila
+(EsMa)**. Para los **proveedores de material (CxP)** el estado de cuenta **NO está segmentado**
+(verificado: `dominio/cxp/` no menciona `conFactura`). Daniel lo pide para reportes —*"si necesito una
+relación de proveedores con sus saldos, quisiera tener por separado los que son con factura y los sin
+factura"*— y él mismo lo difiere: *"pero eso será después"*. **Queda anotado con su ubicación exacta.**
+
+**7. "Está asegurado" solo aplica a maquila.** Ya está pensado así en los datos (`:645`, *"Nullable:
+solo aplica a talleres"*), pero **la pantalla lo muestra siempre**. Se condiciona a los roles de
+servicio (maquila, corte, arte…).
+
+**Preguntas abiertas a Daniel** *(numeradas para que conteste con el número — convención pedida por él
+el 16-ago)*: **(1)** ¿el **puesto** del contacto es catálogo o campo abierto? **(2)** ¿se sigue usando
+la clave corta del taller o se retira? **(3)** al quitar el TIPO, ¿se **traducen** las clasificaciones
+viejas a roles automáticamente o se reclasifica a mano?
+
+- **Aplica en:** la etapa de **proveedores** (junto con §Post-F9.54 y §Post-F9.55). **Requiere
+  migración** (contactos; retiro del tipo). El punto 6 queda **diferido** por decisión de Daniel.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.57) — Cierre de las tres preguntas de proveedores, y el punto 6 SÍ entra (DANIEL, 16-ago-2026)
+
+**(1) Contactos: tabla sí, puesto CAMPO ABIERTO.**
+> *"O sea, sí un catálogo de contactos, pero deja el campo abierto qué rol tiene cada persona."*
+
+Tabla de contactos por proveedor (N por proveedor), y el **puesto en texto libre** — no catálogo.
+Mismo criterio que la posición del arte (§Post-F9.52 punto 2): Daniel prefiere abierto donde la
+realidad es variada.
+
+**(2) ⭐ Los dos campos cortos se FUSIONAN en uno solo.**
+> *"Tanto para proveedores como para talleres necesitamos el campo corto. Podría ser el mismo campo. En
+> la migración hay que meter el que ya está ahorita como campo corto de los maquileros."*
+
+Se retira la duplicidad: **un solo campo corto**, válido para proveedor comercial y para taller. La
+**migración lo siembra con el `corto` actual de los maquileros**.
+
+⚠️ **Lo que hay que decidir al construir, porque los dos campos NO se comportan igual:** `corto` es
+**`@unique` global** y `nombreCorto` **no tiene unicidad**. Al fusionarlos hay que elegir:
+- **mantener la unicidad** (es una clave corta de uso diario; dos proveedores con la misma confunden
+  al operar) — y entonces la migración puede **chocar** si dos registros comparten valor;
+- o **soltarla**, y perder la garantía que el taller usaba.
+
+**Recomendación del lead:** mantenerla **única**, y que la migración **REPORTE las colisiones** en vez
+de resolverlas en silencio (D3: nada se decide callado). → **pregunta abierta (1)**.
+
+**(3) Las clasificaciones viejas se TRADUCEN solas.**
+> *"Sí, tradúcelo automáticamente."*
+
+Al retirar `Proveedor.tipo`, su valor se convierte en rol: `TELAS` → *Telas*, `AVIOS` → *Avíos*,
+`SERVICIOS` → *Otros servicios*, `SIN_CLASIFICAR` → sin rol. **Aditivo**: no pisa los roles que el
+proveedor ya tenga marcados.
+
+**⭐ Y el punto 6 (§Post-F9.56) DEJA DE ESTAR DIFERIDO.**
+> *"En el punto 6 dijiste que lo dejamos para después, pero si quieres de una vez… hay proveedores de
+> avíos o de telas que puede pasar que algunas cosas sean con factura y otras sin factura."*
+
+Esto **cambia el alcance**: la segmentación con-factura / sin-factura deja de ser un asunto de
+**talleres (EsMa)** y pasa a ser **general del proveedor**. Un proveedor de material puede surtir unas
+cosas facturadas y otras no, así que **CxP necesita la misma partición** que EsMa ya tiene: el
+movimiento se marca, el saldo se separa y el estado de cuenta se consulta por segmento.
+
+**Lo que ya existe y se reusa** (no se inventa): `Proveedor.modalidadFacturacion` con
+`solo_con`/`solo_sin`/**`ambos`**, el marcado por movimiento (`dominio/esma/cargos.ts:216`) y el filtro
+por segmento (`dominio/esma/estado-cuenta.ts:48`). **Lo que falta:** llevarlo a `dominio/cxp/`.
+
+⚠️ **Los REPORTES de saldos por separado siguen diferidos** — Daniel los pidió *"solo para que lo
+consideres… pero eso será después"*. Se construye el **motor** (marcado + saldo segmentado); la
+**relación de proveedores con sus saldos partida en dos consultas** viene después, y con el motor
+puesto es barata.
+
+- **Aplica en:** la etapa de proveedores. **Requiere migración** (contactos, fusión del campo corto,
+  retiro del tipo con traducción a roles, segmentación en CxP).
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.58) — El campo corto es ÚNICO, y el ARTE y el PROCESO son casi el mismo catálogo (DANIEL, 16-ago-2026)
+
+**1. ✅ El campo corto fusionado es ÚNICO.** Preguntado si al fusionar `nombreCorto` y `corto`
+convenía mantener la unicidad global (recomendación del lead) o soltarla: *"Sí debe de ser único."* La
+migración **reportará las colisiones** en vez de resolverlas en silencio (D3).
+
+**2. ⭐ «Aplicación también es arte» — y eso destapó que hay DOS catálogos casi iguales.**
+> Daniel: *"No solo bordado y estampado son artes. Aplicación también es arte… y los lavados no sé
+> cómo vamos a trabajarlos. Al final es un proceso que se va a hacer."*
+
+**Respuesta a lo del lavado, verificada en código: YA está modelado.** `TipoProceso` (F3-E1, catálogo
+**administrable**) se siembra con **costura, estampado, bordado, lavado y aplicación**
+(`prisma/seed.ts:411-417`), y cada uno trae `generaEntradaPt`: **solo `costura` es `true`** — las
+prendas vuelven terminadas. Estampado, bordado, lavado y aplicación son `false`: se mandan, se reciben
+y la prenda sigue en proceso. **El lavado se trabaja igual que el estampado.**
+
+**El hallazgo de fondo:** conviven **dos listas casi idénticas**:
+
+| | Qué es | Dónde vive | Valores |
+|---|---|---|---|
+| **Proceso** | qué se le manda a hacer a un tercero | `TipoProceso` (catálogo administrable) | costura · estampado · bordado · lavado · aplicación |
+| **Arte** | qué lleva la prenda como diseño | `ModeloArte.tipo` (**enum fijo**) | bordado · estampado |
+
+Se solapan en cuatro de cinco. La única diferencia real: **`costura` es proceso pero NO es arte**.
+
+**Propuesta del lead: UN SOLO catálogo.** Reusar `TipoProceso` y agregarle una bandera **`esArte`**,
+hermana de la `generaEntradaPt` que ya tiene. Con eso:
+- **«Embosado» se da de alta UNA vez** y sirve para el arte y para el proceso (§Post-F9.54, principio
+  del "proceso raro": una fila de catálogo, no un desarrollo).
+- **Aplicación queda marcada como arte**, la corrección de Daniel, sin caso especial.
+- El **filtro de proveedores de arte** (§Post-F9.52 punto 3) se deriva de la misma marca en vez de una
+  lista escrita a mano.
+- **No se construyen dos catálogos casi iguales** que acaban desincronizados — el defecto que este
+  proyecto ya pagó tres veces con los selectores.
+
+⚠️ **A cuidar si se acepta:** `ModeloArte.tipo` es hoy un **enum** y pasaría a FK del catálogo →
+migración con traducción (`BORDADO`→`bordado`, `ESTAMPADO`→`estampado`), y el ripple a **`OrdenArte`**
+(la receta congelada de la orden, V1-E3d pieza B).
+
+→ **pregunta abierta (1)**: ¿un solo catálogo con la marca, o dos listas separadas?
+
+- **Aplica en:** la etapa de proveedores + `V1-E3f` (arte). Ambas tocan lo mismo: **conviene fusionarlas
+  en una sola etapa**.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.59) — ⭐ CORRECCIÓN DE DANIEL: hay procesos DESPUÉS de la costura, y devuelven producto terminado (16-ago-2026)
+
+> Daniel, corrigiendo la explicación del lead sobre `generaEntradaPt`: *"Está equivocado. Hay procesos
+> que también son después de costura. O sea, llega a producto terminado."*
+
+**Qué estaba mal.** El lead explicó —repitiendo lo que dice el seed— que *"solo la costura devuelve
+prenda terminada; estampado, bordado, lavado y aplicación la devuelven para seguir trabajándola"*. Eso
+asume que **el orden de los procesos es fijo**, y no lo es.
+
+**El sistema ya sabe a medias que no lo es.** `Modelo.secuenciaEstampado` (enum `SecuenciaEstampado`,
+`schema.prisma:4771`) existe con tres valores: **`antes` · `despues` · `flexible`** — capturado **por
+modelo**. Hoy solo lo consume la Ruta Crítica (`rutaOrden.ts:151`), que está apagada en la v1.
+
+**El defecto de modelado, dicho claro:** `TipoProceso.generaEntradaPt` es una bandera **por TIPO**
+(`prisma/seed.ts:411-417`: costura `true`, los otros cuatro `false`). Pero **si un proceso ocurre
+DESPUÉS de la costura, su recibo SÍ devuelve producto terminado** — el mismo estampado devuelve PT
+cuando va después y no lo devuelve cuando va antes. La propiedad **no es del tipo: es de la posición
+del proceso en esa orden**.
+
+⚠️ **La consecuencia de inventario, que es la grave:** si se mandan prendas **ya terminadas** a lavar y
+el recibo **no** las reingresa, **las piezas desaparecen del almacén** aunque estén físicamente ahí —
+el envío las sacó y el recibo no las devolvió. Con D3 (existencia = suma de movimientos) eso es un
+saldo equivocado, no un detalle de pantalla.
+
+**Lo que hay que resolver al construir** (NO se decide aquí, se deja planteado con honestidad):
+1. `generaEntradaPt` deja de ser propiedad fija del tipo y pasa a resolverse **por proceso de la
+   orden** — derivándolo de la secuencia (`antes`/`despues`) o capturándolo al programar el envío.
+2. Verificar **qué hace hoy el envío** de prendas ya terminadas: ¿las saca del PT? Si el envío no las
+   saca y el recibo no las mete, el saldo cuadra por accidente; si el envío sí saca, hoy hay una fuga.
+   **El lead verificó la bandera y el enum, NO trazó ese flujo completo.**
+3. `secuenciaEstampado` está hoy **solo en el modelo** y **solo la lee la RC**. Si la v1 va a distinguir
+   antes/después, alguien más tiene que leerla — o la orden necesita su propia secuencia.
+
+**2. ✅ Catálogo ÚNICO aprobado.** *"De acuerdo. Y un solo catálogo."* Se fusiona `ModeloArte.tipo`
+(enum) con `TipoProceso` (catálogo administrable) + bandera **`esArte`**. Con eso «embosado» se da de
+alta una vez, **aplicación queda marcada como arte** (corrección de Daniel), y el filtro de proveedores
+de arte se deriva de la misma marca.
+
+⚠️ **Y esta corrección le agrega un requisito al catálogo único:** la bandera `esArte` es del tipo, pero
+**`generaEntradaPt` NO puede seguir siéndolo**. Al fusionar, no arrastrar el error.
+
+- **Aplica en:** la etapa fusionada de **proveedores + arte**. El punto 1 (procesos después de costura)
+  **puede ser etapa propia** si al trazar el flujo resulta que toca el kardex de PT — se dimensiona al
+  arrancar.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.60) — Procesos DESPUÉS de costura: no hay fuga, hay inventario que MIENTE sobre lo que está físicamente (16-ago-2026)
+
+> Daniel, preguntado si esto ya pasa o es a futuro: *"Sí sucede desde ahorita. En varias ocasiones se
+> manda un estampado después de costura o algún otro proceso."*
+
+**⚠️ CORRECCIÓN DEL LEAD a §Post-F9.59.** Ahí se advirtió que *"las piezas desaparecen del almacén"*.
+**Eso era FALSO** y se dijo antes de trazar el flujo (el propio texto avisaba que no se había trazado).
+Trazado ahora:
+
+- **El ENVÍO no toca el kardex de PT.** Textual en `dominio/produccion/etapas.ts:7-9`: *"el corte y el
+  envío NO tocan el kardex PT (no son entrada/salida de existencia). Escriben `EtapaMovimiento` +
+  `EtapaMovimientoDet`. El kardex PT entra hasta el recibo de costura y la entrega."*
+- **El RECIBO mete a PT sólo si `generaEntradaPt`** (`recibos.ts:14`, `:463`), o sea sólo costura.
+
+**Qué pasa hoy con un estampado DESPUÉS de costura:** (1) el recibo de costura mete las prendas al
+almacén; (2) el envío al estampador **no las saca**; (3) el recibo del estampado **no las mete**
+(nunca salieron). **El saldo cuadra.** No hay fuga.
+
+**⭐ El problema REAL es el contrario, y sí importa:** mientras las prendas están **físicamente en el
+estampador**, el inventario dice que **están en el almacén**. Dos consecuencias concretas:
+
+1. Se puede **comprometer o entregar** mercancía que no está en el piso.
+2. El **inventario cíclico** (F7-E5) reportará diferencias **sin explicación**: el conteo físico no
+   cuadra con el teórico y nada dice por qué.
+
+Y una tercera, de diseño: `generaEntradaPt` **sigue estando en el nivel equivocado** (§Post-F9.59). Hoy
+no muerde **porque el envío tampoco saca** — el saldo cuadra por compensación, no porque el modelo sea
+correcto. Si algún día el envío empieza a sacar, aparece la fuga que se temía.
+
+**Las dos salidas, para decidir con Daniel:**
+
+- **(a) Dejarlo así en la v1**, y que la pantalla **avise** cuántas piezas de esa orden están fuera en
+  proceso. Barato; el saldo sigue cuadrando; el conteo cíclico necesita saber leer ese aviso.
+- **(b) Modelarlo de verdad:** el envío de prendas **ya terminadas** saca de PT hacia un bucket «en
+  proceso externo», y el recibo las devuelve. El inventario diría la verdad física y el cíclico
+  cuadraría solo. Más trabajo, toca el kardex (D3: movimientos, nunca edición de saldos).
+
+**Recomendación del lead: (a) para la primera versión**, con el aviso visible — Daniel quiere arrancar,
+el saldo no está mal, y (b) se puede construir después sin deshacer nada. Pero **(a) sólo es honesto si
+el aviso existe**: dejarlo mudo es que el inventario mienta sin decirlo, y esta etapa (V1-E4) trata
+justamente de eso.
+
+- **Aplica en:** por decidir con Daniel. Si es (a), es chico y cabe en la etapa de proveedores/arte. Si
+  es (b), **etapa propia** con su ETL de saldos en tránsito.
+- **Fecha:** 2026-08-16.
+
+#### (Post-F9.61) — ⭐ Opción (b): el envío a proceso SACA del almacén, porque si no, los faltantes y las segundas no tienen dónde caer (DANIEL, 16-ago-2026)
+
+> Daniel, eligiendo entre avisar (a) o modelar el tránsito (b): *"Pensaría que B. O si no, ¿de qué
+> manera manejamos los faltantes o segundas?"*
+
+**Su pregunta es el argumento decisivo, y mejor que el que había dado el lead.** El lead defendía (b)
+por exactitud —*"el inventario miente sobre dónde están las prendas"*—. Daniel señaló algo más duro:
+**con (a) no hay dónde registrar lo que no vuelve, ni lo que vuelve peor de como salió.**
+
+**Verificado en código:** el recibo **ya captura primeras y segundas** por color×talla
+(`recibos.ts:161-202`) y, cuando `generaEntradaPt`, las manda a **sus almacenes respectivos**
+(`:15`). Pero en un proceso **después de costura** (`generaEntradaPt: false`) ese desglose se queda
+**sólo en el WIP**: no mueve inventario.
+
+**El escenario que hoy no tiene salida:**
+
+| | |
+|---|---|
+| Se mandan **100** al estampador | el almacén dice 100 primeras |
+| Vuelven **95 primeras, 3 segundas, faltan 2** | el almacén **sigue diciendo 100 primeras** |
+
+Las 3 segundas **no existen en ningún lado** y los 2 faltantes tampoco. Y no es que esté mal
+registrado: **no hay movimiento donde registrarlo**.
+
+**Lo que se construye (opción b):**
+
+| Momento | Movimiento |
+|---|---|
+| Envío de prendas **ya terminadas** | **SALIDA** de PT → saldo «en proceso» con ese tercero (por orden y proceso) |
+| Recibo de primeras | **ENTRADA** al almacén de primeras |
+| Recibo de segundas | **ENTRADA** al almacén de segundas |
+| Diferencia (enviado − recibido) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+
+⭐ **El faltante NO se absorbe en silencio** (D3): queda como saldo pendiente del maquilero — que es
+justo lo que se necesita para reclamárselo. Y resuelve de paso un caso que hoy tampoco tiene salida:
+**la prenda que salió primera y vuelve segunda** es una **reclasificación** (salida de primeras +
+entrada a segundas), expresable con movimientos sin editar saldos.
+
+**Y arregla el problema de nivel de §Post-F9.59:** con el envío sacando de verdad, `generaEntradaPt`
+deja de "cuadrar por compensación". El recibo mete a PT **según dónde va el proceso**, no según el tipo.
+
+⚠️ **Costo, dicho de frente:** toca el **motor de kardex**, la pieza más delicada del sistema (D3:
+existencia = suma de movimientos bajo lock, nunca un saldo editado). **Es etapa propia, no un ajuste.**
+Pero es **más barato AHORA que después**: con meses de movimientos capturados bajo la mecánica vieja,
+corregirlo obliga a reconstruir historia.
+
+**A resolver al construir:** ¿el saldo «en proceso» es un almacén más (y entonces el traspaso ya
+existente sirve) o un estado del kardex de PT? El repo ya tiene almacenes y traspasos entre ellos —
+**mirar eso antes de inventar una entidad nueva**.
+
+- **Aplica en:** etapa propia del track V1, **antes de que Daniel empiece a capturar inventario real**
+  (ya manda estampados después de costura, §Post-F9.60). Requiere migración y toca kardex.
+- **Fecha:** 2026-08-16.
