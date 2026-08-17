@@ -2641,3 +2641,48 @@ puesto es barata.
 - **Aplica en:** la etapa de proveedores. **Requiere migración** (contactos, fusión del campo corto,
   retiro del tipo con traducción a roles, segmentación en CxP).
 - **Fecha:** 2026-08-16.
+
+#### (Post-F9.58) — El campo corto es ÚNICO, y el ARTE y el PROCESO son casi el mismo catálogo (DANIEL, 16-ago-2026)
+
+**1. ✅ El campo corto fusionado es ÚNICO.** Preguntado si al fusionar `nombreCorto` y `corto`
+convenía mantener la unicidad global (recomendación del lead) o soltarla: *"Sí debe de ser único."* La
+migración **reportará las colisiones** en vez de resolverlas en silencio (D3).
+
+**2. ⭐ «Aplicación también es arte» — y eso destapó que hay DOS catálogos casi iguales.**
+> Daniel: *"No solo bordado y estampado son artes. Aplicación también es arte… y los lavados no sé
+> cómo vamos a trabajarlos. Al final es un proceso que se va a hacer."*
+
+**Respuesta a lo del lavado, verificada en código: YA está modelado.** `TipoProceso` (F3-E1, catálogo
+**administrable**) se siembra con **costura, estampado, bordado, lavado y aplicación**
+(`prisma/seed.ts:411-417`), y cada uno trae `generaEntradaPt`: **solo `costura` es `true`** — las
+prendas vuelven terminadas. Estampado, bordado, lavado y aplicación son `false`: se mandan, se reciben
+y la prenda sigue en proceso. **El lavado se trabaja igual que el estampado.**
+
+**El hallazgo de fondo:** conviven **dos listas casi idénticas**:
+
+| | Qué es | Dónde vive | Valores |
+|---|---|---|---|
+| **Proceso** | qué se le manda a hacer a un tercero | `TipoProceso` (catálogo administrable) | costura · estampado · bordado · lavado · aplicación |
+| **Arte** | qué lleva la prenda como diseño | `ModeloArte.tipo` (**enum fijo**) | bordado · estampado |
+
+Se solapan en cuatro de cinco. La única diferencia real: **`costura` es proceso pero NO es arte**.
+
+**Propuesta del lead: UN SOLO catálogo.** Reusar `TipoProceso` y agregarle una bandera **`esArte`**,
+hermana de la `generaEntradaPt` que ya tiene. Con eso:
+- **«Embosado» se da de alta UNA vez** y sirve para el arte y para el proceso (§Post-F9.54, principio
+  del "proceso raro": una fila de catálogo, no un desarrollo).
+- **Aplicación queda marcada como arte**, la corrección de Daniel, sin caso especial.
+- El **filtro de proveedores de arte** (§Post-F9.52 punto 3) se deriva de la misma marca en vez de una
+  lista escrita a mano.
+- **No se construyen dos catálogos casi iguales** que acaban desincronizados — el defecto que este
+  proyecto ya pagó tres veces con los selectores.
+
+⚠️ **A cuidar si se acepta:** `ModeloArte.tipo` es hoy un **enum** y pasaría a FK del catálogo →
+migración con traducción (`BORDADO`→`bordado`, `ESTAMPADO`→`estampado`), y el ripple a **`OrdenArte`**
+(la receta congelada de la orden, V1-E3d pieza B).
+
+→ **pregunta abierta (1)**: ¿un solo catálogo con la marca, o dos listas separadas?
+
+- **Aplica en:** la etapa de proveedores + `V1-E3f` (arte). Ambas tocan lo mismo: **conviene fusionarlas
+  en una sola etapa**.
+- **Fecha:** 2026-08-16.
