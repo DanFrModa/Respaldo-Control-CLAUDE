@@ -692,6 +692,10 @@ export const esquemaTipoProcesoFormulario = z.object({
     .min(1, { error: 'El nombre es obligatorio' })
     .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
   generaEntradaPt: z.boolean(),
+  /** V1-E3f (§Post-F9.58): ¿se ofrece como TIPO DE ARTE? (catálogo único). */
+  esArte: z.boolean(),
+  /** V1-E3f (§Post-F9.52 punto 6): ¿su arte lleva puntadas? (solo bordado en el seed). */
+  usaPuntadas: z.boolean(),
 });
 
 /** Datos del formulario de tipo de proceso. */

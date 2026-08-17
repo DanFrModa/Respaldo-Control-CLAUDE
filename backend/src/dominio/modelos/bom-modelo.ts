@@ -920,7 +920,8 @@ export async function copiarBom(
       // destino, así que el orden relativo del origen (su arte principal primero) se respeta.
       tx.modeloArte.findMany({
         where: { idModelo: datos.idOrigen },
-        orderBy: [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }],
+        orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+        include: { fotos: { select: { idArchivo: true, orden: true }, orderBy: { orden: 'asc' } } },
       }),
     ]);
 
@@ -930,7 +931,10 @@ export async function copiarBom(
     // desaparece para siempre. Por eso se LEE ANTES de borrar y cada renglón que se va queda
     // ÍNTEGRO en la bitácora (D3), igual que en `eliminarArte`.
     if (datos.reemplazar) {
-      const artesBorradas = await tx.modeloArte.findMany({ where: { idModelo: idDestino } });
+      const artesBorradas = await tx.modeloArte.findMany({
+        where: { idModelo: idDestino },
+        include: { fotos: { select: { idArchivo: true } } },
+      });
 
       // Reemplaza: borra todo el BOM del destino y vuelca el del origen.
       await tx.modeloTela.deleteMany({ where: { idModelo: idDestino } });
@@ -956,15 +960,18 @@ export async function copiarBom(
         // huérfanas (y borrar a ciegas dejaría a otro arte sin su imagen). Se deduplica porque dos
         // artes del destino pueden compartir la misma foto.
         for (const idArchivo of new Set(
-          artesBorradas.flatMap((a) => (a.idArchivoFoto === null ? [] : [a.idArchivoFoto])),
+          artesBorradas.flatMap((a) => a.fotos.map((f) => f.idArchivo)),
         )) {
           await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
         }
       }
     }
 
-    // Componentes que el destino YA tiene (para no pisarlos al fusionar / evitar P2002). El arte
-    // se identifica por NOMBRE (ya no tiene id de catálogo: es un hijo del modelo, V1-E3d).
+    // Componentes que el destino YA tiene (para no pisarlos al fusionar). ⚠️ El arte se compara
+    // por su DESCRIPCIÓN normalizada: desde V1-E3f no tiene nombre ni ninguna clave de negocio
+    // (§Post-F9.52 punto 1), así que esto ya no es una unicidad —la base la perdió a propósito—
+    // sino la heurística de "no traer dos veces lo mismo" al fusionar. Un falso positivo (dos
+    // artes distintos descritos igual) hace que uno no se copie; el usuario lo ve y lo agrega.
     const [telasDestino, aviosDestino, artesDestino] = datos.reemplazar
       ? [new Set<number>(), new Set<number>(), new Set<string>()]
       : await Promise.all([
@@ -975,13 +982,15 @@ export async function copiarBom(
             .findMany({ where: { idModelo: idDestino }, select: { idAvio: true } })
             .then((f) => new Set(f.map((x) => x.idAvio))),
           tx.modeloArte
-            .findMany({ where: { idModelo: idDestino }, select: { nombre: true } })
-            .then((f) => new Set(f.map((x) => x.nombre.toLocaleLowerCase()))),
+            .findMany({ where: { idModelo: idDestino }, select: { descripcion: true } })
+            .then((f) => new Set(f.map((x) => x.descripcion.trim().toLocaleLowerCase()))),
         ]);
 
     const telasACrear = telasOrigen.filter((t) => !telasDestino.has(t.idTela));
     const aviosACrear = aviosOrigen.filter((a) => !aviosDestino.has(a.idAvio));
-    const artesACrear = artesOrigen.filter((a) => !artesDestino.has(a.nombre.toLocaleLowerCase()));
+    const artesACrear = artesOrigen.filter(
+      (a) => !artesDestino.has(a.descripcion.trim().toLocaleLowerCase()),
+    );
 
     if (telasACrear.length > 0) {
       // El AMARRE de precio (R17) viaja con el renglón: copiar una receta y perder el proveedor
@@ -1041,7 +1050,9 @@ export async function copiarBom(
       // Al REEMPLAZAR, el destino quedó vacío: se copia el `orden` del origen tal cual (el arte
       // principal del origen llega como principal del destino). Al FUSIONAR, los copiados se
       // reindexan DETRÁS del arte que el destino ya tenía, para no desbancar a SU principal.
-      // La FOTO se comparte con el original (el objeto de R2 no se duplica; ver `arte-modelo.ts`).
+      // Las FOTOS se comparten con el original (el objeto de R2 no se duplica; ver
+      // `arte-modelo.ts`). Como son PLURALES desde V1-E3f, cada arte se crea con su set anidado y
+      // no con un `createMany` (que no admite relaciones); el arte por modelo es un puñado.
       let ordenBase = 0;
       if (!datos.reemplazar) {
         const maximo = await tx.modeloArte.aggregate({
@@ -1050,21 +1061,29 @@ export async function copiarBom(
         });
         ordenBase = (maximo._max.orden ?? -1) + 1;
       }
-      await tx.modeloArte.createMany({
-        data: artesACrear.map((a, i) => ({
-          idModelo: idDestino,
-          nombre: a.nombre,
-          descripcion: a.descripcion,
-          puntadas: a.puntadas,
-          precio: a.precio,
-          tipo: a.tipo,
-          idProveedor: a.idProveedor,
-          idArchivoFoto: a.idArchivoFoto,
-          orden: datos.reemplazar ? a.orden : ordenBase + i,
-          creadoPorId: sesion.id,
-          modificadoPorId: sesion.id,
-        })),
-      });
+      for (const [i, a] of artesACrear.entries()) {
+        await tx.modeloArte.create({
+          data: {
+            idModelo: idDestino,
+            descripcion: a.descripcion,
+            posicion: a.posicion,
+            puntadas: a.puntadas,
+            precio: a.precio,
+            idTipoArte: a.idTipoArte,
+            idProveedor: a.idProveedor,
+            orden: datos.reemplazar ? a.orden : ordenBase + i,
+            fotos: {
+              create: a.fotos.map((f) => ({
+                idArchivo: f.idArchivo,
+                orden: f.orden,
+                creadoPorId: sesion.id,
+              })),
+            },
+            creadoPorId: sesion.id,
+            modificadoPorId: sesion.id,
+          },
+        });
+      }
     }
 
     await tocarModelo(tx, sesion, idDestino);

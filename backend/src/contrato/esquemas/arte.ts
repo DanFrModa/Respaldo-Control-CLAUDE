@@ -1,67 +1,79 @@
 import { z } from 'zod';
 
 /**
- * ARTE del modelo (bordado / estampado) — contrato compartido (V1-E3d, §Post-F9.35).
+ * ARTE del modelo (bordado / estampado / aplicación / lavado…) — contrato compartido
+ * (V1-E3d §Post-F9.35 + **V1-E3f §Post-F9.52/.58**).
  *
  * Hasta V1-E3d el arte era un CATÁLOGO global (`Bordado`) que el BOM del modelo
  * referenciaba. Daniel (12-ago-2026): *"cada arte va pegado siempre a un solo modelo…
  * sería más fácil manejar el arte (o varios) dentro del modelo. Ahí mismo establecer su
- * precio, el proveedor"*. Desde entonces el arte es HIJO del modelo (`ModeloArte`): sus
- * datos, su precio —el que viaja a la OP—, su proveedor (nuevo) y su foto viven ahí.
+ * precio, el proveedor"*. Desde entonces el arte es HIJO del modelo (`ModeloArte`).
+ *
+ * **V1-E3f lo puso como Daniel lo usa de verdad** (§Post-F9.52, siete observaciones):
+ *  1. **Se fue el `nombre`** — *"Es completamente irrelevante el nombre del estampado. Creo que
+ *     con la descripción sería suficiente."* La `descripcion` pasó a REQUERIDA y es el campo
+ *     visible; la identidad del renglón es su `id` y el orden lo da `orden` (desempate por `id`).
+ *  2. **`posicion`** — frente / espalda / manga…, TEXTO LIBRE (*"a veces son cosas muy
+ *     específicas, que no tendría caso tenerlas en un catálogo"*).
+ *  3. El selector de proveedores se ACOTA por rol (`codigoRolProveedor` del tipo).
+ *  4. **El tipo es un CATÁLOGO** (`idTipoArte` → `TipoProceso` con `esArte`), no un enum.
+ *  5. **Fotos en PLURAL** (`ModeloArteFoto`), no una sola.
+ *  6. Las **puntadas** se muestran solo cuando el tipo las usa (`TipoProceso.usaPuntadas`).
  *
  * Por eso este esquema no tiene `activo` (borrado suave de catálogo): un arte es un
  * renglón del BOM, se agrega y se quita como las telas y los avíos.
  */
 
+/** Descripción del arte: el campo VISIBLE y obligatorio desde V1-E3f (ex `nombre`). */
+const descripcionArte = z
+  .string({ error: 'La descripción es obligatoria' })
+  .trim()
+  .min(1, { error: 'La descripción es obligatoria' })
+  .max(500, { error: 'La descripción no puede tener más de 500 caracteres' });
+
+/** Posición del arte en la prenda (texto libre, §Post-F9.52 punto 2). */
+const posicionArte = z
+  .string()
+  .trim()
+  .max(100, { error: 'La posición no puede tener más de 100 caracteres' });
+
+/** Puntadas: entero no negativo (se captura solo si el tipo las usa). */
+const puntadasArte = z
+  .number({ error: 'Las puntadas deben ser un número' })
+  .int({ error: 'Las puntadas deben ser un entero' })
+  .min(0, { error: 'Las puntadas no pueden ser negativas' })
+  .max(1_000_000, { error: 'Las puntadas no pueden ser más de 1,000,000' });
+
+/** Precio del arte (el que viaja a la OP). */
+const precioArte = z
+  .number({ error: 'El precio debe ser un número' })
+  .nonnegative({ error: 'El precio no puede ser negativo' });
+
+/** Id del tipo de arte: FK al catálogo ÚNICO (`TipoProceso` con `esArte`, §Post-F9.58). */
+const idTipoArte = z
+  .number({ error: 'El tipo de arte es obligatorio' })
+  .int({ error: 'El tipo de arte debe ser entero' })
+  .positive({ error: 'El tipo de arte debe ser positivo' });
+
+/** Id del proveedor que hace el arte. */
+const idProveedorArte = z
+  .number({ error: 'El id del proveedor debe ser un número' })
+  .int({ error: 'El id del proveedor debe ser entero' })
+  .positive({ error: 'El id del proveedor debe ser positivo' });
+
 /**
- * Tipo de arte: BORDADO real vs. ESTAMPADO / aplicación (ex campo `BorEst` del sistema
- * viejo, doc 01-Modelos §2). Alineado con el enum `TipoArte` de `src/datos`.
- */
-export const TIPOS_ARTE = ['BORDADO', 'ESTAMPADO'] as const;
-
-/** Clave de tipo de arte. */
-export type TipoArteClave = (typeof TIPOS_ARTE)[number];
-
-/** Etiquetas para UI de cada tipo de arte. */
-export const ETIQUETAS_TIPO_ARTE: Record<TipoArteClave, string> = {
-  BORDADO: 'Bordado',
-  ESTAMPADO: 'Estampado / aplicación',
-};
-
-/**
- * Alta de un arte DENTRO de un modelo (el id del modelo va en la ruta, no aquí). El
- * `nombre` es la clave de negocio, único dentro del modelo (ya no global: el mismo arte
- * duplicado en dos modelos es lo normal, §Post-F9.35). `precio` es el que viaja a la OP;
- * `idProveedor` es quién hace el arte. La FOTO no va aquí: se sube aparte con el flujo
- * presigned de R2.
+ * Alta de un arte DENTRO de un modelo (el id del modelo va en la ruta, no aquí). La
+ * `descripcion` y el `idTipoArte` son obligatorios; `precio` es el que viaja a la OP;
+ * `idProveedor` es quién lo hace. Las FOTOS no van aquí: se suben aparte con el flujo
+ * presigned de R2, una por una.
  */
 export const esquemaArteCrear = z.object({
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  descripcion: z
-    .string()
-    .trim()
-    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
-    .optional(),
-  puntadas: z
-    .number({ error: 'Las puntadas deben ser un número' })
-    .int({ error: 'Las puntadas deben ser un entero' })
-    .min(0, { error: 'Las puntadas no pueden ser negativas' })
-    .max(1_000_000, { error: 'Las puntadas no pueden ser más de 1,000,000' })
-    .optional(),
-  precio: z
-    .number({ error: 'El precio debe ser un número' })
-    .nonnegative({ error: 'El precio no puede ser negativo' })
-    .optional(),
-  tipo: z.enum(TIPOS_ARTE, { error: 'El tipo debe ser BORDADO o ESTAMPADO' }).default('BORDADO'),
-  idProveedor: z
-    .number({ error: 'El id del proveedor debe ser un número' })
-    .int({ error: 'El id del proveedor debe ser entero' })
-    .positive({ error: 'El id del proveedor debe ser positivo' })
-    .optional(),
+  descripcion: descripcionArte,
+  posicion: posicionArte.optional(),
+  puntadas: puntadasArte.optional(),
+  precio: precioArte.optional(),
+  idTipoArte,
+  idProveedor: idProveedorArte.optional(),
 });
 
 /** Datos validados de alta de un arte. */
@@ -72,42 +84,15 @@ export type DatosArteCrear = z.infer<typeof esquemaArteCrear>;
  *
  * Los opcionales de TEXTO/NÚMERO aceptan además `null` para poder VACIAR un dato ya
  * capturado (M1): omitir el campo (`undefined`) = no tocar; mandar `null` = borrar.
- * `tipo` NO es nullable (siempre tiene valor) y se re-declara SIN su `.default()` del
- * alta: en una edición parcial, omitir `tipo` NO debe resetearlo a BORDADO. `nombre`
- * tampoco es nullable (clave de negocio obligatoria).
+ * `descripcion` e `idTipoArte` NO son nullables (siempre tienen valor).
  */
 const baseArteEditar = z.object({
-  nombre: z
-    .string()
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' })
-    .optional(),
-  descripcion: z
-    .string()
-    .trim()
-    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
-    .optional()
-    .nullable(),
-  puntadas: z
-    .number({ error: 'Las puntadas deben ser un número' })
-    .int({ error: 'Las puntadas deben ser un entero' })
-    .min(0, { error: 'Las puntadas no pueden ser negativas' })
-    .max(1_000_000, { error: 'Las puntadas no pueden ser más de 1,000,000' })
-    .optional()
-    .nullable(),
-  precio: z
-    .number({ error: 'El precio debe ser un número' })
-    .nonnegative({ error: 'El precio no puede ser negativo' })
-    .optional()
-    .nullable(),
-  tipo: z.enum(TIPOS_ARTE, { error: 'El tipo debe ser BORDADO o ESTAMPADO' }).optional(),
-  idProveedor: z
-    .number({ error: 'El id del proveedor debe ser un número' })
-    .int({ error: 'El id del proveedor debe ser entero' })
-    .positive({ error: 'El id del proveedor debe ser positivo' })
-    .optional()
-    .nullable(),
+  descripcion: descripcionArte.optional(),
+  posicion: posicionArte.optional().nullable(),
+  puntadas: puntadasArte.optional().nullable(),
+  precio: precioArte.optional().nullable(),
+  idTipoArte: idTipoArte.optional(),
+  idProveedor: idProveedorArte.optional().nullable(),
 });
 
 /**
@@ -133,34 +118,43 @@ export const esquemaArtePatchCuerpo = baseArteEditar;
 /** Datos validados del cuerpo del PATCH de un arte (sin `id`). */
 export type DatosArtePatchCuerpo = z.infer<typeof esquemaArtePatchCuerpo>;
 
+/** Una foto del arte tal como sale embebida en el arte (sin URL: se piden aparte). */
+export const esquemaArteFotoResumen = z
+  .object({
+    idFoto: z.number().int().describe('Id del renglón de foto (ModeloArteFoto).'),
+    idArchivo: z.string().describe('Id del Archivo en R2.'),
+    orden: z.number().int().describe('Posición de la foto dentro del arte (0 = la primera).'),
+  })
+  .describe('Foto de un arte, sin su URL prefirmada.');
+
 /**
  * Salida de un arte en la API. Proyección de `ModeloArte` a JSON: el `precio` Decimal de
- * Prisma se serializa a `number` (o null); `idArchivoFoto` indica si tiene foto (el
- * frontend pide la URL aparte). `proveedor` viene resuelto para pintar la tabla sin un
- * segundo viaje. Parte del contrato OpenAPI.
+ * Prisma se serializa a `number` (o null). `proveedor` y los datos del TIPO vienen resueltos
+ * para pintar la tabla sin un segundo viaje, y `fotos` trae el resumen de las fotos (la URL
+ * prefirmada de cada una se pide aparte). Parte del contrato OpenAPI.
  */
 export const esquemaArteSalida = z
   .object({
     id: z.number().int().describe('Id del arte.'),
     idModelo: z.number().int().describe('Id del modelo dueño del arte.'),
-    nombre: z.string().describe('Nombre del arte.'),
-    descripcion: z.string().nullable().describe('Descripción, o null.'),
+    descripcion: z.string().describe('Descripción del arte (el campo visible desde V1-E3f).'),
+    posicion: z.string().nullable().describe('Dónde va en la prenda (texto libre), o null.'),
     puntadas: z.number().int().nullable().describe('Número de puntadas (informativo), o null.'),
     precio: z.number().nullable().describe('Precio del arte (el que viaja a la OP), o null.'),
-    tipo: z.enum(TIPOS_ARTE).describe('BORDADO real o ESTAMPADO/aplicación.'),
+    idTipoArte: z.number().int().describe('Id del tipo de arte (catálogo TipoProceso).'),
+    tipoArte: z.string().describe('Nombre del tipo de arte, resuelto.'),
+    codigoTipoArte: z.string().describe('Código estable del tipo de arte (ej. "bordado").'),
+    usaPuntadas: z.boolean().describe('¿El tipo de este arte usa puntadas? (§Post-F9.52.6).'),
     idProveedor: z.number().int().nullable().describe('Id del proveedor que lo hace, o null.'),
     proveedor: z.string().nullable().describe('Nombre del proveedor que lo hace, o null.'),
-    idArchivoFoto: z
-      .string()
-      .nullable()
-      .describe('Id del Archivo de la foto en R2, o null si no tiene foto.'),
+    fotos: z.array(esquemaArteFotoResumen).describe('Fotos del arte, ordenadas.'),
     orden: z.number().int().describe('Posición dentro del modelo (0 = arte principal).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
     modificadoPorId: z.string().nullable().describe('Id del último usuario que lo modificó.'),
   })
-  .describe('Arte (bordado/estampado) de un modelo, con foto opcional en R2.');
+  .describe('Arte (bordado/estampado/…) de un modelo, con sus fotos en R2.');
 
 /** Forma de un arte tal como lo devuelve la API. */
 export type ArteSalida = z.infer<typeof esquemaArteSalida>;
@@ -168,7 +162,7 @@ export type ArteSalida = z.infer<typeof esquemaArteSalida>;
 /** Lista de artes de un modelo (respuesta de `GET /api/modelos/{id}/artes`). */
 export const esquemaArtesLista = z
   .object({ datos: z.array(esquemaArteSalida).describe('Artes del modelo, ya ordenados.') })
-  .describe('Artes (bordados/estampados) de un modelo.');
+  .describe('Artes (bordados/estampados/…) de un modelo.');
 
 /** Forma de la lista de artes de un modelo. */
 export type ArtesLista = z.infer<typeof esquemaArtesLista>;
@@ -176,8 +170,11 @@ export type ArtesLista = z.infer<typeof esquemaArtesLista>;
 /**
  * Cuerpo de «copiar arte de otro modelo» (`POST /api/modelos/{id}/artes/copiar`). Trae el
  * arte YA LLENO para ajustarlo: es la conveniencia que daba el catálogo, sin reinventarlo
- * (§Post-F9.35). Copia nombre/descripción/puntadas/precio/tipo/proveedor **y la foto**
- * (las copias comparten el mismo `Archivo`, igual que las que dejó la migración).
+ * (§Post-F9.35). Copia descripción/posición/puntadas/precio/tipo/proveedor **y las fotos**
+ * (las copias comparten los mismos `Archivo`, igual que las que dejó la migración).
+ *
+ * Desde V1-E3f ya no lleva `nombre`: no hay nombre que desambiguar, y dos artes con la misma
+ * descripción en un modelo son legales (§Post-F9.52 punto 1 — Daniel lo sabe).
  */
 export const esquemaArteCopiarCuerpo = z
   .object({
@@ -185,13 +182,8 @@ export const esquemaArteCopiarCuerpo = z
       .number({ error: 'El id del arte de origen es obligatorio' })
       .int({ error: 'El id del arte de origen debe ser entero' })
       .positive({ error: 'El id del arte de origen debe ser positivo' }),
-    /** Nombre para la copia; si se omite, se conserva el del origen (o se desambigua). */
-    nombre: z
-      .string()
-      .trim()
-      .min(1, { error: 'El nombre es obligatorio' })
-      .max(150, { error: 'El nombre no puede tener más de 150 caracteres' })
-      .optional(),
+    /** Descripción para la copia; si se omite, se conserva la del origen. */
+    descripcion: descripcionArte.optional(),
   })
   .describe('Copiar a este modelo un arte que ya existe en otro.');
 
@@ -220,15 +212,20 @@ export const esquemaGaleriaArteQuery = z
       .trim()
       .max(150)
       .optional()
-      .describe('Texto a buscar en el nombre del arte o en la clave/nombre del modelo.'),
-    tipo: z.enum(TIPOS_ARTE).optional().describe('Filtra por tipo (BORDADO/ESTAMPADO).'),
+      .describe('Texto a buscar en la descripción del arte o en la clave/nombre del modelo.'),
+    idTipoArte: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por tipo de arte (id del catálogo TipoProceso).'),
     soloConFoto: z
       .stringbool()
       .default(false)
       .describe('Solo el arte que tiene foto ("true"/"false").'),
     ordenarPor: z
-      .enum(['nombre', 'modelo', 'tipo', 'creadoEn'])
-      .default('nombre')
+      .enum(['descripcion', 'modelo', 'tipo', 'creadoEn'])
+      .default('descripcion')
       .describe('Columna de ordenamiento.'),
     direccion: z.enum(['asc', 'desc']).default('asc').describe('Dirección del orden.'),
   })
@@ -241,13 +238,18 @@ export type GaleriaArteQuery = z.infer<typeof esquemaGaleriaArteQuery>;
 export const esquemaGaleriaArteItem = z
   .object({
     id: z.number().int().describe('Id del arte.'),
-    nombre: z.string().describe('Nombre del arte.'),
-    tipo: z.enum(TIPOS_ARTE).describe('BORDADO real o ESTAMPADO/aplicación.'),
+    descripcion: z.string().describe('Descripción del arte.'),
+    posicion: z.string().nullable().describe('Dónde va en la prenda, o null.'),
+    idTipoArte: z.number().int().describe('Id del tipo de arte.'),
+    tipoArte: z.string().describe('Nombre del tipo de arte.'),
     // Lo pinta el diálogo «copiar arte de otro modelo» (que consume este mismo endpoint): al
     // copiar un arte se copia SU PRECIO, así que hay que verlo ANTES de elegirlo. La rejilla de
     // la galería no lo muestra —ahí sobra—, pero el campo NO es decorativo.
     precio: z.number().nullable().describe('Precio del arte, o null.'),
-    idArchivoFoto: z.string().nullable().describe('Id del Archivo de la foto, o null.'),
+    idArchivoFoto: z
+      .string()
+      .nullable()
+      .describe('Id del Archivo de la PRIMERA foto del arte, o null si no tiene.'),
     idModelo: z.number().int().describe('Id del modelo dueño del arte.'),
     claveModelo: z.string().describe('Clave del modelo dueño (para la UI).'),
     nombreModelo: z.string().nullable().describe('Nombre del modelo dueño, o null.'),
@@ -268,10 +270,10 @@ export const esquemaGaleriaArtePagina = z
 /** Forma de la respuesta paginada de la galería. */
 export type GaleriaArtePagina = z.infer<typeof esquemaGaleriaArtePagina>;
 
-// ── Foto del arte (R2: 1 arte → 0..1 foto, vía presigned) ─────────────────────
+// ── Fotos del arte (R2: 1 arte → N fotos, vía presigned) ─────────────────────
 
 /**
- * Solicitud de subida de la FOTO de un arte: el navegador manda los metadatos de la
+ * Solicitud de subida de UNA foto de un arte: el navegador manda los metadatos de la
  * imagen y el backend devuelve la URL PUT prefirmada (flujo presigned de F0). Solo
  * imágenes (`image/*`): la foto se previsualiza, a diferencia de los PDF del proveedor.
  */
@@ -294,66 +296,45 @@ export const esquemaArteFotoCrear = z
       .positive({ error: 'El archivo está vacío' })
       .describe('Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño).'),
   })
-  .describe('Datos para preparar la subida de la foto de un arte.');
+  .describe('Datos para preparar la subida de una foto de un arte.');
 
 /** Datos validados de la solicitud de subida de la foto de un arte. */
 export type DatosArteFotoCrear = z.infer<typeof esquemaArteFotoCrear>;
 
-/** Salida tras solicitar la subida de la foto: registro + URL PUT prefirmada para R2. */
+/** Salida tras solicitar la subida de una foto: registro + URL PUT prefirmada para R2. */
 export const esquemaArteFotoSubida = z
   .object({
+    idFoto: z.number().int().describe('Id del renglón de foto creado (para limpiarlo si falla).'),
     idArchivo: z.string().describe('Id del registro Archivo creado para la foto.'),
     nombreOriginal: z.string().describe('Nombre original del archivo.'),
     urlSubida: z.string().describe('URL PUT prefirmada: el navegador sube directo a R2.'),
     expiraEnSegundos: z.number().int().describe('Vigencia de la URL de subida (segundos).'),
   })
-  .describe('Resultado de preparar la subida de la foto (URL prefirmada).');
+  .describe('Resultado de preparar la subida de una foto (URL prefirmada).');
 
-/** Forma de la respuesta al preparar la subida de la foto. */
+/** Forma de la respuesta al preparar la subida de una foto. */
 export type ArteFotoSubida = z.infer<typeof esquemaArteFotoSubida>;
 
-/**
- * Salida de la foto de un arte, con su URL GET prefirmada para verla. `urlDescarga` es
- * `null` cuando el arte NO tiene foto (la UI pinta el placeholder NoFoto).
- */
+/** Una foto del arte con su URL GET prefirmada para verla. */
 export const esquemaArteFotoSalida = z
   .object({
-    idArchivo: z.string().nullable().describe('Id del registro Archivo de la foto, o null.'),
-    nombreOriginal: z.string().nullable().describe('Nombre original del archivo, o null.'),
-    tipoMime: z.string().nullable().describe('Tipo MIME de la imagen, o null.'),
-    tamanoBytes: z.number().int().nullable().describe('Tamaño en bytes, o null.'),
-    urlDescarga: z
-      .string()
-      .nullable()
-      .describe('URL GET prefirmada para ver la foto, o null si no tiene foto.'),
+    idFoto: z.number().int().describe('Id del renglón de foto.'),
+    idArchivo: z.string().describe('Id del registro Archivo de la foto.'),
+    orden: z.number().int().describe('Posición dentro del arte (0 = la primera).'),
+    nombreOriginal: z.string().describe('Nombre original del archivo.'),
+    tipoMime: z.string().describe('Tipo MIME de la imagen.'),
+    tamanoBytes: z.number().int().describe('Tamaño en bytes.'),
+    urlDescarga: z.string().describe('URL GET prefirmada para ver la foto.'),
   })
-  .describe('Foto de un arte (con su URL de descarga) o vacía si no tiene.');
+  .describe('Foto de un arte con su URL de descarga.');
 
-/** Forma de la foto de un arte tal como la devuelve la API. */
+/** Forma de una foto de arte tal como la devuelve la API. */
 export type ArteFotoSalida = z.infer<typeof esquemaArteFotoSalida>;
 
-/**
- * Querystring OPCIONAL del borrado de la foto (`DELETE /api/modelos/{id}/artes/{idArte}/foto`).
- *
- * Sin `idArchivo` el borrado quita la foto VIGENTE, sea cual sea: es el botón "quitar foto" de la
- * pantalla, que quiere justamente eso. Con `idArchivo` el borrado queda ACOTADO a esa foto: si la
- * vigente ya es otra (alguien la reemplazó entre medias), NO se borra nada y la operación responde
- * 409 `CONFLICTO`, para que el llamador distinga "la quité" de "ya no era la tuya".
- *
- * Lo usa la LIMPIEZA del flujo presigned del frontend (`api/subida-archivo.ts`): cuando el `PUT` a
- * R2 falla, quien limpia debe borrar EXCLUSIVAMENTE el registro que su propio intento creó — nunca
- * la imagen buena que otro usuario subió mientras tanto.
- */
-export const esquemaArteFotoQuitarQuery = z
-  .object({
-    idArchivo: z
-      .string({ error: 'El id del archivo debe ser texto' })
-      .trim()
-      .min(1, { error: 'El id del archivo no puede ir vacío' })
-      .optional()
-      .describe('Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta.'),
-  })
-  .describe('Acotamiento opcional del borrado de la foto de un arte.');
+/** Lista de fotos de un arte (`GET /api/modelos/{id}/artes/{idArte}/fotos`). */
+export const esquemaArteFotosLista = z
+  .object({ datos: z.array(esquemaArteFotoSalida).describe('Fotos del arte, ordenadas.') })
+  .describe('Fotos de un arte, cada una con su URL prefirmada.');
 
-/** Datos validados del querystring del borrado de la foto. */
-export type DatosArteFotoQuitarQuery = z.infer<typeof esquemaArteFotoQuitarQuery>;
+/** Forma de la lista de fotos de un arte. */
+export type ArteFotosLista = z.infer<typeof esquemaArteFotosLista>;

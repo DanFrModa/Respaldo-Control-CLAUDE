@@ -1,6 +1,6 @@
 import { ImageIcon } from 'lucide-react';
 
-import { useFotoArte } from '@/api/artes';
+import { useFotosArte } from '@/api/artes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -20,13 +20,16 @@ const CLASES_ICONO: Record<TamanoMiniatura, string> = {
 };
 
 /**
- * Miniatura de SOLO LECTURA de la foto de un ARTE del modelo (V1-E3d): pide la URL de descarga
- * prefirmada (`useFotoArte`) y la muestra; si el arte no tiene foto (o aún no carga) muestra el
- * placeholder NoFoto. La usan la galería y el editor de arte del modelo (de ahí los tres tamaños).
- * No edita: subir/quitar vive en `FotoArte`.
+ * Miniatura de SOLO LECTURA de la PRIMERA foto de un ARTE del modelo: pide las URLs de descarga
+ * prefirmadas (`useFotosArte`) y muestra la primera; si el arte no tiene fotos (o aún no cargan)
+ * muestra el placeholder NoFoto. La usan la galería y el editor de arte del modelo (de ahí los
+ * tres tamaños). No edita: subir/quitar vive en `FotosArte`.
  *
- * Cuando el arte NO tiene foto (`tieneFoto=false`) ni siquiera se pide la URL: el listado ya trae
- * `idArchivoFoto`, así que la galería no dispara una petición por celda vacía.
+ * Desde V1-E3f las fotos del arte son PLURALES (§Post-F9.52 punto 5); la miniatura enseña la
+ * primera, que es la que el listado ya anuncia con `idArchivoFoto`.
+ *
+ * Cuando el arte NO tiene foto (`tieneFoto=false`) ni siquiera se piden las URLs: el listado ya lo
+ * dice, así que la galería no dispara una petición por celda vacía.
  */
 export function MiniaturaArte({
   idModelo,
@@ -41,8 +44,8 @@ export function MiniaturaArte({
   tieneFoto: boolean;
   tamano?: TamanoMiniatura;
 }): React.JSX.Element {
-  const consulta = useFotoArte(tieneFoto ? idModelo : undefined, tieneFoto ? idArte : undefined);
-  const url = consulta.data?.urlDescarga ?? null;
+  const consulta = useFotosArte(tieneFoto ? idModelo : undefined, tieneFoto ? idArte : undefined);
+  const url = consulta.data?.datos[0]?.urlDescarga ?? null;
 
   if (tieneFoto && consulta.isPending) {
     return <Skeleton className={cn('shrink-0', CLASES_TAMANO[tamano])} />;

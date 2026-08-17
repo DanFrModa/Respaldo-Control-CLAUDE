@@ -14,7 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
  *     fantasma que se acumulan al reintentar.
  * Y un tercero que salió al revisar ese arreglo: la limpieza del ARTE borraba "la foto que haya"
  * (su `DELETE` era el único sin id de archivo), así que podía llevarse la imagen buena que otro
- * usuario acababa de subir al mismo arte. El bloque final de este archivo fija esa regresión.
+ * usuario acababa de subir al mismo arte. El bloque final de este archivo fija esa regresión —
+ * que desde V1-E3f ya no es siquiera expresable: con las fotos del arte en PLURAL
+ * (§Post-F9.52 punto 5) el `DELETE` lleva el `idFoto` que devolvió SU propio POST, igual que las
+ * fotos del modelo.
  *
  * Dos garantías extra: si la limpieza TAMBIÉN falla, el usuario sigue viendo el error de la subida
  * (el de verdad), nunca uno del borrado — pero el fallo del borrado deja rastro en la consola.
@@ -58,9 +61,9 @@ interface Caso {
   /** Parámetros de ruta con los que debe llamarse esa limpieza. */
   paramsLimpieza: Record<string, unknown>;
   /**
-   * Querystring con el que debe llamarse la limpieza. Solo el ARTE lo usa (su foto es 0..1 y
-   * cuelga del arte, así que el acotamiento por id de archivo no cabe en la ruta); en los demás
-   * el id del archivo YA va en la ruta, así que la consulta va vacía.
+   * Querystring con el que debe llamarse la limpieza. Hoy NINGÚN caso la usa: todos identifican el
+   * registro por la RUTA. Se conserva el gancho porque la aserción "la consulta va vacía" es
+   * justamente la que impide volver a un borrado "de lo que haya".
    */
   queryLimpieza?: Record<string, unknown>;
   /** Cómo nombra el mensaje al archivo. */
@@ -94,16 +97,16 @@ const CASOS: Caso[] = [
       return (archivo: File) => mutacion.mutateAsync({ idModelo: 3, idArte: 9, archivo });
     },
     datosPost: {
+      idFoto: 21,
       idArchivo: 'arch_2',
       nombreOriginal: 'foto.png',
       urlSubida: URL_SUBIDA,
       expiraEnSegundos: 900,
     },
-    rutaLimpieza: '/api/modelos/{id}/artes/{idArte}/foto',
-    paramsLimpieza: { id: 3, idArte: 9 },
-    // ACOTADO a la foto de ESTE intento: sin esto, la limpieza borraría "la foto que haya" y se
-    // llevaría la que otro usuario haya subido al mismo arte mientras el PUT fallaba.
-    queryLimpieza: { idArchivo: 'arch_2' },
+    // V1-E3f: las fotos del arte son PLURALES, así que el renglón se identifica por la RUTA — el
+    // `idFoto` de ESTE intento. Ya no hace falta acotar por querystring.
+    rutaLimpieza: '/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}',
+    paramsLimpieza: { id: 3, idArte: 9, idFoto: 21 },
     sustantivo: 'la imagen',
   },
   {
@@ -322,14 +325,18 @@ describe.each(CASOS)('subida a R2 — $nombre', (caso) => {
 });
 
 /**
- * REGRESIÓN del arte (bordado): la limpieza NO puede borrar "la foto que haya".
+ * REGRESIÓN del arte: la limpieza NO puede borrar "la foto que haya".
  *
- * El arte tiene UNA sola foto colgando de él, así que su `DELETE` es el único que no lleva el id
- * del archivo en la ruta. Mientras la limpieza mandaba el borrado a secas, este escenario destruía
- * datos EN SILENCIO: Daniel sube una versión nueva del arte y su `PUT` a R2 tarda en fallar; en
- * esos segundos la asistente reemplaza la imagen del mismo arte y a ella SÍ le sale; cuando falla
- * el `PUT` de Daniel, su limpieza se lleva la imagen buena de la asistente. Por eso la limpieza va
- * ACOTADA al `idArchivo` de SU intento y el backend no borra si la vigente ya es otra (409).
+ * Cuando el arte tenía UNA sola foto, su `DELETE` era el único sin id del registro en la ruta, y
+ * mientras la limpieza mandaba el borrado a secas este escenario destruía datos EN SILENCIO:
+ * Daniel sube una versión nueva del arte y su `PUT` a R2 tarda en fallar; en esos segundos la
+ * asistente reemplaza la imagen del mismo arte y a ella SÍ le sale; cuando falla el `PUT` de
+ * Daniel, su limpieza se lleva la imagen buena de la asistente.
+ *
+ * V1-E3f cerró el hueco por construcción (§Post-F9.52 punto 5): con las fotos en PLURAL, el POST
+ * devuelve el `idFoto` de SU renglón y el DELETE va a ESA ruta — no existe la forma de pedir "la
+ * que haya". Estas pruebas se conservan para que un futuro rediseño no reintroduzca el borrado a
+ * ciegas.
  */
 describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
   const CASO_ARTE = CASOS.find((c) => c.nombre === 'imagen del arte del modelo') as Caso;
@@ -345,25 +352,26 @@ describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
     );
   });
 
-  it('la limpieza acota el borrado al idArchivo de SU intento (nunca a secas)', async () => {
+  it('la limpieza apunta al renglón de SU intento (nunca a "la foto que haya")', async () => {
     del.mockResolvedValue({ response: { ok: true }, error: undefined });
 
     await errorDeSubida(CASO_ARTE);
 
     const [borrado] = llamadasDeBorrado();
-    expect(borrado?.ruta).toBe('/api/modelos/{id}/artes/{idArte}/foto');
-    expect(borrado?.query).toEqual({ idArchivo: 'arch_2' });
-    // Sin querystring el backend borraría la foto VIGENTE, sea de quien sea: eso es lo prohibido.
-    expect(borrado?.query).not.toEqual({});
+    expect(borrado?.ruta).toBe('/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}');
+    // El `idFoto` del POST de ESTE intento: la foto de otro usuario es INALCANZABLE desde aquí.
+    expect(borrado?.params).toEqual({ id: 3, idArte: 9, idFoto: 21 });
+    // Y sin querystring que pueda significar "la vigente, sea de quien sea".
+    expect(borrado?.query).toEqual({});
   });
 
-  it('si la foto vigente ya es otra, el backend rechaza el borrado y el usuario solo ve su error', async () => {
-    // Lo que contesta el backend cuando la vigente ya no es la de este intento: 409, sin borrar.
+  it('si el borrado de limpieza falla, el usuario solo ve SU error de subida', async () => {
+    // Lo que contesta el backend si ese renglón ya no está (p. ej. otro usuario lo quitó).
     del.mockResolvedValue({
       response: { ok: false },
       error: {
-        codigo: 'CONFLICTO',
-        mensaje: 'La foto del arte "LOGO C&A" ya no es la que se iba a quitar',
+        codigo: 'NO_ENCONTRADO',
+        mensaje: 'Foto del arte no encontrada',
       },
     });
 
@@ -371,7 +379,7 @@ describe('subida a R2 — el arte no pierde la foto de otro usuario', () => {
 
     // El usuario ve SU error de subida; el 409 de la limpieza no lo tapa (solo deja rastro).
     expect(fallo.message).toContain('No se pudo guardar la imagen.');
-    expect(fallo.message).not.toContain('ya no es la que se iba a quitar');
+    expect(fallo.message).not.toContain('Foto del arte no encontrada');
     expect(del).toHaveBeenCalledTimes(1);
     expect(avisos).toHaveBeenCalledTimes(1);
   });

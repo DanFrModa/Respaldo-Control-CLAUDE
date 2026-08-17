@@ -29,8 +29,8 @@ import {
   esquemaArteCopiarCuerpo,
   esquemaArteCrear,
   esquemaArteFotoCrear,
-  esquemaArteFotoQuitarQuery,
   esquemaArteFotoSalida,
+  esquemaArteFotosLista,
   esquemaArteFotoSubida,
   esquemaArtePatchCuerpo,
   esquemaArteSalida,
@@ -79,7 +79,7 @@ import {
   marcarArtePrincipal,
   quitarFotoArte,
   solicitarSubidaFotoArte,
-  urlFotoArte,
+  listarFotosArte,
   type FotoArteConUrl,
   type GaleriaArteItem,
   type ModeloArteDetalle,
@@ -189,19 +189,22 @@ function aAvioBomSalida(
   };
 }
 
-/** Proyecta un ARTE del modelo a JSON (la `keyFoto` es interna del servidor: NUNCA sale). */
+/** Proyecta un ARTE del modelo a JSON (la `key` de cada foto es interna: NUNCA sale). */
 function aArteSalida(a: ModeloArteDetalle): z.infer<typeof esquemaArteSalida> {
   return {
     id: a.id,
     idModelo: a.idModelo,
-    nombre: a.nombre,
     descripcion: a.descripcion,
+    posicion: a.posicion,
     puntadas: a.puntadas,
     precio: a.precio,
-    tipo: a.tipo,
+    idTipoArte: a.idTipoArte,
+    tipoArte: a.tipoArte,
+    codigoTipoArte: a.codigoTipoArte,
+    usaPuntadas: a.usaPuntadas,
     idProveedor: a.idProveedor,
     proveedor: a.proveedor,
-    idArchivoFoto: a.idArchivoFoto,
+    fotos: a.fotos.map((f) => ({ idFoto: f.idFoto, idArchivo: f.idArchivo, orden: f.orden })),
     orden: a.orden,
     creadoEn: a.creadoEn.toISOString(),
     creadoPorId: a.creadoPorId,
@@ -216,8 +219,10 @@ function aGaleriaArteSalida(
 ): z.infer<typeof esquemaGaleriaArtePagina>['datos'][number] {
   return {
     id: a.id,
-    nombre: a.nombre,
-    tipo: a.tipo,
+    descripcion: a.descripcion,
+    posicion: a.posicion,
+    idTipoArte: a.idTipoArte,
+    tipoArte: a.tipoArte,
     precio: a.precio,
     idArchivoFoto: a.idArchivoFoto,
     idModelo: a.idModelo,
@@ -229,6 +234,7 @@ function aGaleriaArteSalida(
 /** Proyecta el resultado de preparar la subida de la foto de un arte a JSON. */
 function aSubidaFotoArteSalida(s: SubidaFotoArte): z.infer<typeof esquemaArteFotoSubida> {
   return {
+    idFoto: s.idFoto,
     idArchivo: s.idArchivo,
     nombreOriginal: s.nombreOriginal,
     urlSubida: s.urlSubida,
@@ -239,7 +245,9 @@ function aSubidaFotoArteSalida(s: SubidaFotoArte): z.infer<typeof esquemaArteFot
 /** Proyecta la foto de un arte (con URL) a JSON. */
 function aFotoArteSalida(foto: FotoArteConUrl): z.infer<typeof esquemaArteFotoSalida> {
   return {
+    idFoto: foto.idFoto,
     idArchivo: foto.idArchivo,
+    orden: foto.orden,
     nombreOriginal: foto.nombreOriginal,
     tipoMime: foto.tipoMime,
     tamanoBytes: foto.tamanoBytes,
@@ -327,6 +335,15 @@ const esquemaParamArte = z.object({
     .int()
     .positive()
     .describe('Id del arte (bordado/estampado) del modelo.'),
+});
+
+/** Parámetros `:id` (modelo) + `:idArte` + `:idFoto` (una foto del arte, V1-E3f). */
+const esquemaParamArteFoto = esquemaParamArte.extend({
+  idFoto: z.coerce
+    .number({ error: 'El id de la foto debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id de la foto del arte.'),
 });
 
 /** Querystring del selector de géneros. */
@@ -670,14 +687,14 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // ── Foto del arte en R2 (presigned) ─────────────────────────────────────────
+  // ── Fotos del arte en R2 (presigned; PLURALES desde V1-E3f, §Post-F9.52 punto 5) ──
   app.route({
     method: 'POST',
-    url: '/modelos/:id/artes/:idArte/foto',
+    url: '/modelos/:id/artes/:idArte/fotos',
     preHandler: app.conPermiso('modelos.administrar'),
     schema: {
       tags: ['modelos'],
-      summary: 'Preparar la subida de la foto de un arte (URL prefirmada)',
+      summary: 'Preparar la subida de una foto de un arte (URL prefirmada)',
       security: SEGURIDAD_SESION,
       params: esquemaParamArte,
       body: esquemaArteFotoCrear,
@@ -697,31 +714,31 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
 
   app.route({
     method: 'GET',
-    url: '/modelos/:id/artes/:idArte/foto',
+    url: '/modelos/:id/artes/:idArte/fotos',
     preHandler: app.conPermiso('modelos.ver'),
     schema: {
       tags: ['modelos'],
-      summary: 'Obtener la foto de un arte (URL prefirmada de descarga)',
+      summary: 'Listar las fotos de un arte (URLs prefirmadas de descarga)',
       security: SEGURIDAD_SESION,
       params: esquemaParamArte,
-      response: { 200: esquemaArteFotoSalida, ...respuestasError },
+      response: { 200: esquemaArteFotosLista, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return aFotoArteSalida(await urlFotoArte(sesion, request.params.id, request.params.idArte));
+      const fotos = await listarFotosArte(sesion, request.params.id, request.params.idArte);
+      return { datos: fotos.map(aFotoArteSalida) };
     },
   });
 
   app.route({
     method: 'DELETE',
-    url: '/modelos/:id/artes/:idArte/foto',
+    url: '/modelos/:id/artes/:idArte/fotos/:idFoto',
     preHandler: app.conPermiso('modelos.administrar'),
     schema: {
       tags: ['modelos'],
-      summary: 'Quitar la foto de un arte',
+      summary: 'Quitar una foto de un arte',
       security: SEGURIDAD_SESION,
-      params: esquemaParamArte,
-      querystring: esquemaArteFotoQuitarQuery,
+      params: esquemaParamArteFoto,
       response: { 204: z.null(), ...respuestasError },
     },
     handler: async (request, reply) => {
@@ -730,7 +747,7 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         sesion,
         request.params.id,
         request.params.idArte,
-        request.query.idArchivo,
+        request.params.idFoto,
       );
       return reply.code(204).send(null);
     },

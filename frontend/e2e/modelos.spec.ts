@@ -168,7 +168,9 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await detalle.getByTestId('tab-bom-artes').click();
     await detalle.getByTestId('agregar-arte').click();
     const dialogoArte = page.getByTestId('dialogo-arte');
-    await dialogoArte.getByTestId('arte-nombre').fill(arte);
+    await dialogoArte.getByTestId('arte-descripcion').fill(arte);
+    // V1-E3f: el tipo del arte es obligatorio y sale del catálogo único (§Post-F9.58).
+    await dialogoArte.getByTestId('arte-tipo').selectOption({ label: 'Bordado' });
     await dialogoArte.getByTestId('arte-precio').fill('45');
     await page.getByTestId('guardar-arte').click();
     await expect(page.getByText('Arte agregado.')).toBeVisible();

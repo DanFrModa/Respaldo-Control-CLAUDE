@@ -27,13 +27,23 @@ vi.mock('@/api/artes', () => ({
   useActualizarArte: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarArte: () => ({ mutate: vi.fn(), isPending: false }),
   useGaleriaArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
-  useFotoArte: () => ({ data: null, isPending: false, isError: false }),
+  useFotosArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useArtesModelo: () => ({ data: { datos: [] }, isPending: false, isError: false }),
   useSubirFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [] }, isPending: false }),
+  // V1-E3f: el selector de proveedor del diálogo pasó al `ComboboxBuscable` con búsqueda en
+  // servidor (§Post-F9.52 punto 7), que consume este hook.
+  useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useRolesProveedor: () => ({ data: [], isPending: false }),
+}));
+
+vi.mock('@/api/tipos-proceso', () => ({
+  // El tipo del arte sale del catálogo ÚNICO (V1-E3f, §Post-F9.58).
+  useTiposArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
 }));
 
 /** Un arte del modelo con lo mínimo que la sección pinta. */
@@ -41,14 +51,17 @@ function arte(over: { id: number; nombre: string; precio?: number; proveedor?: s
   return {
     id: over.id,
     idModelo: 1,
-    nombre: over.nombre,
-    descripcion: null,
+    descripcion: over.nombre,
+    posicion: null,
     puntadas: null,
     precio: over.precio ?? null,
-    tipo: 'BORDADO',
+    idTipoArte: 9,
+    tipoArte: 'Bordado',
+    codigoTipoArte: 'bordado',
+    usaPuntadas: true,
     idProveedor: over.proveedor === undefined ? null : 7,
     proveedor: over.proveedor ?? null,
-    idArchivoFoto: null,
+    fotos: [],
     orden: 0,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,

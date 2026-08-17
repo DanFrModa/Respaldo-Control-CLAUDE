@@ -214,11 +214,21 @@ export type RecetaOrdenAvio = z.infer<typeof esquemaRecetaOrdenAvio>;
 export const esquemaRecetaOrdenArte = z
   .object({
     ...camposComunesRenglon,
-    idModeloArte: z.number().int().nullable().describe('Traza al arte del modelo, o null.'),
-    nombre: z.string(),
-    descripcion: z.string().nullable(),
+    idModeloArte: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden ' +
+          '(al retirarse el `nombre`). null = agregado a mano.',
+      ),
+    descripcion: z.string().describe('Descripción del arte EN ESTA ORDEN (el campo visible).'),
+    posicion: z.string().nullable().describe('Dónde va en la prenda (texto libre), o null.'),
     puntadas: z.number().int().nullable(),
-    tipo_arte: z.enum(['BORDADO', 'ESTAMPADO']).describe('Bordado o estampado/aplicación.'),
+    idTipoArte: z.number().int().describe('Id del tipo de arte (catálogo TipoProceso).'),
+    tipoArte: z.string().describe('Nombre del tipo de arte, resuelto.'),
+    codigoTipoArte: z.string().describe('Código estable del tipo de arte (ej. "bordado").'),
+    usaPuntadas: z.boolean().describe('¿El tipo de este arte usa puntadas? (§Post-F9.52.6).'),
     precio: z
       .number()
       .nullable()
@@ -382,15 +392,22 @@ export const esquemaRecetaAgregarCuerpo = z.discriminatedUnion('tipo', [
   }),
   z.object({
     tipo: z.literal('arte'),
-    nombre: z
-      .string({ error: 'El nombre del arte es obligatorio' })
+    /**
+     * V1-E3f: la identidad del arte dentro de la orden. Si viene, el renglón se casa con ESE arte
+     * del modelo (y revive su lápida si la hay); si se omite, nace AGREGADO A MANO y entonces la
+     * `descripcion` y el `idTipoArte` son obligatorios (el renglón no tiene de dónde heredarlos).
+     */
+    idModeloArte: z.number().int().positive().optional(),
+    descripcion: z
+      .string({ error: 'La descripción del arte es obligatoria' })
       .trim()
-      .min(1, { error: 'El nombre del arte es obligatorio' })
-      .max(120),
-    descripcion: z.string().max(500).nullable().optional(),
+      .min(1, { error: 'La descripción del arte es obligatoria' })
+      .max(500)
+      .optional(),
+    posicion: z.string().trim().max(100).nullable().optional(),
     puntadas: z.number().int().nonnegative().nullable().optional(),
     precio: esquemaPrecioReceta.optional(),
-    tipoArte: z.enum(['BORDADO', 'ESTAMPADO']).optional(),
+    idTipoArte: z.number().int().positive().optional(),
     idProveedor: z.number().int().positive().nullable().optional(),
     notas: z.string().max(2000).nullable().optional(),
   }),
@@ -416,9 +433,10 @@ export const esquemaRecetaEditarCuerpo = z
     idAvioProveedor: z.number().int().positive().nullable().optional(),
     tallas: z.array(esquemaRecetaTallaEntrada).max(60).optional(),
     // Solo arte:
-    nombre: z.string().trim().min(1).max(120).optional(),
-    descripcion: z.string().max(500).nullable().optional(),
+    descripcion: z.string().trim().min(1).max(500).optional(),
+    posicion: z.string().trim().max(100).nullable().optional(),
     puntadas: z.number().int().nonnegative().nullable().optional(),
+    idTipoArte: z.number().int().positive().optional(),
     idProveedor: z.number().int().positive().nullable().optional(),
     notas: z.string().max(2000).nullable().optional(),
   })

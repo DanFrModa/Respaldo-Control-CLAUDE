@@ -388,9 +388,10 @@ export async function cargarFotosArte(
         return 'omitido';
       }
 
-      // Idempotencia: solo se atienden los artes que TODAVÍA no tienen foto.
+      // Idempotencia: solo se atienden los artes que TODAVÍA no tienen NINGUNA foto (V1-E3f: las
+      // fotos del arte son plurales, `ModeloArteFoto`).
       const pendientes = await (clienteBd as PrismaClient).modeloArte.findMany({
-        where: { id: { in: idsArte }, idArchivoFoto: null },
+        where: { id: { in: idsArte }, fotos: { none: {} } },
         select: { id: true },
       });
       if (pendientes.length === 0) {
@@ -415,7 +416,7 @@ export async function cargarFotosArte(
 
       try {
         // 1. Subir el objeto a R2 PRIMERO. Si la subida falla, no se commitea nada en BD y
-        //    re-correr reintenta limpio (los artes siguen con `idArchivoFoto` null). Un objeto
+        //    re-correr reintenta limpio (los artes siguen sin ninguna foto). Un objeto
         //    R2 huérfano de un intento previo es inofensivo: la key lleva `randomUUID`.
         await clienteR2.send(
           new PutObjectCommand({
@@ -439,9 +440,19 @@ export async function cargarFotosArte(
               subidoPorId: sesion.id,
             },
           });
+          // Un renglón de foto por cada copia del arte: TODAS comparten el mismo `Archivo` (el
+          // objeto de R2 no se duplica; ver `dominio/modelos/arte-modelo.ts`).
+          await tx.modeloArteFoto.createMany({
+            data: pendientes.map((p) => ({
+              idModeloArte: p.id,
+              idArchivo: archivo.id,
+              orden: 0,
+              creadoPorId: sesion.id,
+            })),
+          });
           await tx.modeloArte.updateMany({
-            where: { id: { in: pendientes.map((p) => p.id) }, idArchivoFoto: null },
-            data: { idArchivoFoto: archivo.id, ...datosModificacion(sesion) },
+            where: { id: { in: pendientes.map((p) => p.id) } },
+            data: { ...datosModificacion(sesion) },
           });
           for (const p of pendientes) {
             await registrarBitacora(tx, sesion, {

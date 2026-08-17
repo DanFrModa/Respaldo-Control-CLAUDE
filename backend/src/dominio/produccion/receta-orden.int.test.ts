@@ -1,10 +1,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Avio, Color, Empresa, PrismaClient, Talla, Tela } from '../../datos/index.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { explosionarOrden } from '../compras/mrp.js';
 import { actualizarOC, crearOC } from '../compras/ordenes-compra.js';
@@ -38,6 +48,8 @@ import {
  */
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let idCliente: number;
 let idModelo: number;
@@ -134,6 +146,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   idCliente = (await cliente.cliente.create({ data: { nombre: 'C&A' } })).id;
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
@@ -361,14 +374,19 @@ describe('⭐ Re-agregar un renglón VIVO — el precio congelado NO se puede pe
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
+    // V1-E3f: el arte se identifica por su TRAZA al arte del modelo (`idModeloArte`), no por
+    // nombre. Re-agregar el MISMO arte del modelo cuando ya está vivo sigue siendo un 409.
+    const arteModelo = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Logo pecho', idTipoArte, precio: 12 },
+    });
     await agregarRenglonReceta(
       sesion(),
       ordenA,
-      { tipo: 'arte', nombre: 'Logo pecho', precio: 12 },
+      { tipo: 'arte', idModeloArte: arteModelo.id, precio: 12 },
       bd(),
     );
     await expect(
-      agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', nombre: 'Logo pecho' }, bd()),
+      agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', idModeloArte: arteModelo.id }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
@@ -484,30 +502,112 @@ describe('Restaurar y desalineación (§Post-F9.43(f))', () => {
     expect(r.desalineacion.hayCambios).toBe(false);
   });
 
-  it('renombrar un arte a un nombre YA OCUPADO da 409 con mensaje, no un P2002 crudo', async () => {
-    // El nombre es la identidad del arte dentro de la orden (@@unique). Sin pre-chequeo esto
-    // reventaba con el error crudo de Prisma → 500 al usuario.
-    const r0 = await agregarRenglonReceta(
+  it('V1-E3f: la identidad del arte es su TRAZA, no el texto — dos artes a mano pueden llamarse igual', async () => {
+    // Antes el `nombre` era `@@unique([idOrden, nombre])` y renombrar a uno ocupado daba 409. Al
+    // retirarse el nombre (§Post-F9.52 punto 1) esa restricción se fue A PROPÓSITO: lo único único
+    // es `(idOrden, idModeloArte)`, y los agregados a mano llevan `idModeloArte` NULL (Postgres
+    // trata los NULL como distintos), así que caben varios.
+    await agregarRenglonReceta(
       sesion(),
       ordenA,
-      { tipo: 'arte', nombre: 'Logo pecho', precio: 12 },
+      { tipo: 'arte', descripcion: 'Logo pecho', idTipoArte, precio: 12 },
       bd(),
     );
-    await agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', nombre: 'Logo manga' }, bd());
-    const pecho = r0.artes.find((a) => a.nombre === 'Logo pecho')!;
+    const r1 = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', descripcion: 'Logo pecho', idTipoArte, precio: 20 },
+      bd(),
+    );
+    const homonimos = r1.artes.filter((a) => a.descripcion === 'Logo pecho');
+    expect(homonimos).toHaveLength(2);
+    expect(homonimos.every((a) => a.agregadoAMano && a.idModeloArte === null)).toBe(true);
 
+    // Y editar la descripción de uno a la del otro tampoco choca.
+    const primero = homonimos[0];
+    expect(primero).toBeDefined();
+    const r2 = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'arte',
+      primero?.id ?? 0,
+      { descripcion: 'Logo manga' },
+      bd(),
+    );
+    expect(r2.artes.find((a) => a.id === primero?.id)?.descripcion).toBe('Logo manga');
+  });
+
+  it('un arte AGREGADO A MANO sin descripción o sin tipo se rechaza (no hay de dónde heredarlos)', async () => {
     await expect(
-      editarRenglonReceta(sesion(), ordenA, 'arte', pecho.id, { nombre: 'Logo manga' }, bd()),
-    ).rejects.toThrow(/ya tiene un arte llamado "Logo manga"/);
+      agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', descripcion: 'Sin tipo' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(
+      agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', idTipoArte }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
 
-    // Y la LÁPIDA también ocupa el nombre (el índice único no distingue): el mensaje lo dice y
-    // ofrece la salida buena, que es revivirla.
-    await cliente.ordenArte.create({
-      data: { idOrden: ordenA, nombre: 'Logo viejo', excluido: true },
+  it('agregar por TRAZA hereda del arte del modelo y revive su lápida sin pisar lo congelado', async () => {
+    const arteModelo = await cliente.modeloArte.create({
+      data: {
+        idModelo,
+        descripcion: 'Escudo',
+        posicion: 'espalda',
+        idTipoArte,
+        puntadas: 800,
+        precio: 30,
+      },
+    });
+
+    // Nace heredando TODO del modelo (y `revisado`, porque es copia fiel).
+    const r1 = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', idModeloArte: arteModelo.id },
+      bd(),
+    );
+    const congelado = r1.artes.find((a) => a.idModeloArte === arteModelo.id);
+    expect(congelado).toMatchObject({
+      descripcion: 'Escudo',
+      posicion: 'espalda',
+      puntadas: 800,
+      precio: 30,
+      agregadoAMano: false,
+      estado: 'revisado',
+      enElModelo: true,
+    });
+
+    // Se le ajusta el precio EN ESTA ORDEN y se quita (queda lápida, no se borra).
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'arte',
+      congelado?.id ?? 0,
+      { precio: 44 },
+      bd(),
+    );
+    await quitarRenglonReceta(sesion(), ordenA, 'arte', congelado?.id ?? 0, {}, bd());
+
+    // Re-agregarlo REVIVE la misma fila y NO pisa su precio ajustado (el cuerpo no lo trae).
+    const r3 = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', idModeloArte: arteModelo.id },
+      bd(),
+    );
+    const revivido = r3.artes.find((a) => a.idModeloArte === arteModelo.id);
+    expect(revivido?.id).toBe(congelado?.id);
+    expect(revivido?.excluido).toBe(false);
+    expect(revivido?.precio).toBe(44);
+  });
+
+  it('agregar por una traza que NO es del modelo de la orden → ErrorNoEncontrado', async () => {
+    const otro = await cliente.modelo.create({ data: { codigo: 'AJENO' } });
+    const ajeno = await cliente.modeloArte.create({
+      data: { idModelo: otro.id, descripcion: 'De otro modelo', idTipoArte },
     });
     await expect(
-      editarRenglonReceta(sesion(), ordenA, 'arte', pecho.id, { nombre: 'Logo viejo' }, bd()),
-    ).rejects.toThrow(/sigue en su historial/);
+      agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', idModeloArte: ajeno.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 
   it('restaurar un renglón que YA NO está en el modelo se rechaza con un mensaje claro', async () => {

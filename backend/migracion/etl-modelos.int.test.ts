@@ -68,6 +68,17 @@ async function sembrarMinimo(): Promise<void> {
   for (const r of roles) {
     await cliente.rolProveedor.upsert({ where: { codigo: r.codigo }, update: {}, create: r });
   }
+  // V1-E3f: el tipo del arte es una FK al catálogo ÚNICO (`TipoProceso` con `esArte`,
+  // §Post-F9.58). El loader resuelve el id desde el `codigo` que devuelve `mapearTipoArte`
+  // (`bordado`/`estampado`), así que sin estas dos filas NINGÚN arte se puede crear — igual que en
+  // la base real, donde las siembra el seed antes de correr el ETL.
+  const tiposArte = [
+    { codigo: 'bordado', nombre: 'Bordado', esArte: true, usaPuntadas: true },
+    { codigo: 'estampado', nombre: 'Estampado', esArte: true, usaPuntadas: false },
+  ];
+  for (const t of tiposArte) {
+    await cliente.tipoProceso.upsert({ where: { codigo: t.codigo }, update: {}, create: t });
+  }
 }
 
 beforeEach(async () => {

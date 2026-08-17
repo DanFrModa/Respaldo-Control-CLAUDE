@@ -45,9 +45,10 @@ const archivosFake = {
 } as unknown as ServicioArchivos;
 
 /**
- * Un ARTE del modelo con los campos que al impreso le importan (nombre/tipo/keyFoto) y el resto
- * con valores inocuos: `ModeloArteDetalle` trae toda la ficha del arte (V1-E3d) y repetirla en
- * cada caso solo agregaría ruido.
+ * Un ARTE del modelo con los campos que al impreso le importan (descripción/tipo/fotos) y el resto
+ * con valores inocuos: `ModeloArteDetalle` trae toda la ficha del arte y repetirla en cada caso
+ * solo agregaría ruido. V1-E3f: el `nombre` se retiró y las fotos son PLURALES — `keysFoto` acepta
+ * varias para poder probar el arte con más de una imagen.
  */
 function arteBom(over: {
   id: number;
@@ -55,20 +56,24 @@ function arteBom(over: {
   tipo?: 'BORDADO' | 'ESTAMPADO';
   precio?: number;
   keyFoto?: string;
+  keysFoto?: string[];
 }): ModeloArteDetalle {
+  const keys = over.keysFoto ?? (over.keyFoto === undefined ? [] : [over.keyFoto]);
   return {
     id: over.id,
     idModelo: 1,
-    nombre: over.nombre,
-    descripcion: null,
+    descripcion: over.nombre,
+    posicion: null,
     puntadas: null,
     precio: over.precio ?? null,
-    tipo: over.tipo ?? 'BORDADO',
+    idTipoArte: over.tipo === 'ESTAMPADO' ? 2 : 1,
+    tipoArte: over.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado',
+    codigoTipoArte: over.tipo === 'ESTAMPADO' ? 'estampado' : 'bordado',
+    usaPuntadas: over.tipo !== 'ESTAMPADO',
     idProveedor: null,
     proveedor: null,
-    idArchivoFoto: over.keyFoto === undefined ? null : 'arch-1',
+    fotos: keys.map((key, i) => ({ idFoto: over.id * 100 + i, idArchivo: `arch-${key}`, orden: i, key })),
     orden: 0,
-    keyFoto: over.keyFoto ?? null,
     creadoEn: new Date('2026-01-01T00:00:00Z'),
     creadoPorId: null,
     modificadoEn: new Date('2026-01-01T00:00:00Z'),
@@ -125,7 +130,7 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     obsMaquila: 'Doble costura.',
     ...tabla,
     telas: [{ nombre: 'Jersey', consumoPorPrenda: 0.4 }],
-    listaArte: [{ nombre: 'Logo pecho', tipo: 'BORDADO' }],
+    listaArte: [{ descripcion: 'Logo pecho', tipoArte: 'Bordado' }],
     habilitacion: [{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }],
     fotos: [],
     artes: [],
@@ -488,8 +493,8 @@ describe('armarDatosImpresoOrden', () => {
           consumoPorPrenda: a.consumoPorPrenda,
         })),
       artes: bom.artes.map((a) => ({
-        nombre: a.nombre,
-        tipo: a.tipo,
+        descripcion: a.descripcion,
+        tipoArte: a.tipoArte,
         idModeloArte: a.id,
       })),
     };
@@ -610,7 +615,7 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.habilitacion).toEqual([
       { clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 },
     ]);
-    expect(datos.listaArte).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
+    expect(datos.listaArte).toEqual([{ descripcion: 'Logo', tipoArte: 'Bordado' }]);
     expect(JSON.stringify(datos)).not.toContain('12.5'); // ningún precio se filtró al impreso
 
     // Totales derivados de la matriz cuadran con el totalPiezas de la orden.
@@ -816,7 +821,7 @@ describe('armarDatosImpresoOrden', () => {
     expect(datos.artes).toEqual([{ dataUrl: 'data:img;https://r2/bor/2.png', titulo: 'Segundo' }]);
     expect(datos.artes.some((a) => a.principal === true)).toBe(false);
     // El arte principal sin foto sigue en la lista de TEXTO (no desaparece del impreso).
-    expect(datos.listaArte.map((a) => a.nombre)).toEqual(['Principal sin foto', 'Segundo']);
+    expect(datos.listaArte.map((a) => a.descripcion)).toEqual(['Principal sin foto', 'Segundo']);
     expect(esPdf(await generarPdfOrden(datos))).toBe(true);
   });
 
@@ -853,8 +858,8 @@ describe('armarDatosImpresoOrden', () => {
     expect(urlDescarga).toHaveBeenCalledWith('bor/1.png');
     // La lista de texto del arte conserva los dos renglones (con su subtipo).
     expect(datos.listaArte).toEqual([
-      { nombre: 'Logo pecho', tipo: 'BORDADO' },
-      { nombre: 'Estampa espalda', tipo: 'ESTAMPADO' },
+      { descripcion: 'Logo pecho', tipoArte: 'Bordado' },
+      { descripcion: 'Estampa espalda', tipoArte: 'Estampado' },
     ]);
   });
 
@@ -928,7 +933,7 @@ describe('armarDatosImpresoOrden', () => {
       expect(datos.artes).toEqual([]);
       expect(advertir).toHaveBeenCalled();
       // La lista de texto del arte sigue ahí (el bordado no desaparece del impreso).
-      expect(datos.listaArte).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
+      expect(datos.listaArte).toEqual([{ descripcion: 'Logo', tipoArte: 'Bordado' }]);
       expect(esPdf(await generarPdfOrden(datos))).toBe(true);
     } finally {
       advertir.mockRestore();

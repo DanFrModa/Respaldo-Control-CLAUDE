@@ -11,11 +11,18 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { manejarEventoAutoAvance, type MensajeEventoDominio } from './autoAvance.js';
 import { procesarOrdenCreada } from './rcAutomatica.js';
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let idEmpresa: number;
 let idClienteNegocio: number;
 let idModelo: number;
@@ -33,6 +40,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   const empresa = await crearEmpresaPrueba(cliente);
   idEmpresa = empresa.id;
   const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'C&A' } });
@@ -139,18 +147,36 @@ describe('procesarOrdenCreada (R3, B5)', () => {
     // usan modelos distintos a propósito, porque `resolverParametros` reusa los parámetros de la
     // última orden programada del MISMO modelo (F5, "los resurtidos repiten parámetros") y eso
     // taparía lo que aquí se quiere medir.
-    await cliente.modeloArte.create({ data: { idModelo, nombre: 'Logo pecho', precio: 10 } });
+    const arteA = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Logo pecho', idTipoArte, precio: 10 },
+    });
     const modeloB = await cliente.modelo.create({ data: { codigo: 'RC-B', llevaArte: true } });
-    await cliente.modeloArte.create({
-      data: { idModelo: modeloB.id, nombre: 'Logo pecho', precio: 10 },
+    const arteB = await cliente.modeloArte.create({
+      data: { idModelo: modeloB.id, descripcion: 'Logo pecho', idTipoArte, precio: 10 },
     });
 
     // Orden A: su receta SÍ trae el arte. Orden B: se lo excluyeron (el caso de la jareta).
     const idA = await crearOrdenPrueba({ fechaEntrega: '2026-09-01' });
     const idB = await crearOrdenPrueba({ fechaEntrega: '2026-09-01', idModelo: modeloB.id });
-    await cliente.ordenArte.create({ data: { idOrden: idA, nombre: 'Logo pecho', precio: 10 } });
     await cliente.ordenArte.create({
-      data: { idOrden: idB, nombre: 'Logo pecho', precio: 10, excluido: true, estado: 'ajustado' },
+      data: {
+        idOrden: idA,
+        idModeloArte: arteA.id,
+        descripcion: 'Logo pecho',
+        idTipoArte,
+        precio: 10,
+      },
+    });
+    await cliente.ordenArte.create({
+      data: {
+        idOrden: idB,
+        idModeloArte: arteB.id,
+        descripcion: 'Logo pecho',
+        idTipoArte,
+        precio: 10,
+        excluido: true,
+        estado: 'ajustado',
+      },
     });
 
     await procesarOrdenCreada({ idEmpresa, idOrden: idA }, bd());

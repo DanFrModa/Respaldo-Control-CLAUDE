@@ -4,24 +4,20 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Foto del ARTE del modelo: quién dice CUÁL foto se quita (V1-E3d — antes vivía en
- * `bordados.foto.test.ts`, cuando el arte era catálogo; el endpoint cambió de
- * `/api/bordados/{id}/foto` a `/api/modelos/{id}/artes/{idArte}/foto`, la trampa NO).
+ * Fotos del ARTE del modelo: quién dice CUÁL foto se quita (V1-E3d, actualizado en V1-E3f cuando
+ * las fotos pasaron a PLURAL, §Post-F9.52 punto 5).
  *
- * El endpoint acepta un `idArchivo` OPCIONAL que acota el borrado a una foto concreta. Eso parte el
- * camino en dos y cada mitad tiene su trampa:
+ * La trampa que esta prueba cuida sigue viva y es de TanStack Query, no del endpoint: el hook se
+ * monta en Query y ÉSTE llama al `mutationFn` con DOS argumentos (`variables` y un contexto
+ * `{ client, meta, mutationKey }`), así que pasarle la referencia pelada a una función de más
+ * parámetros le mete el contexto en el parámetro de más — la llamada reventaba ANTES de emitir el
+ * DELETE y el usuario veía un error de librería con la foto sin quitarse. **Ese defecto llegó a
+ * producción una vez** (commit `d938e92`); por eso la prueba monta el HOOK y no la función suelta.
  *
- *  - El botón "quitar foto" NO manda `idArchivo` (quita la vigente, sea cual sea). Como el hook se
- *    monta en TanStack Query y ÉSTE llama al `mutationFn` con DOS argumentos (`variables` y un
- *    contexto `{ client, meta, mutationKey }`), pasarle la referencia pelada a una función de más
- *    parámetros le metía el contexto en `idArchivo`: la querystring salía con un objeto anidado y
- *    la llamada reventaba ANTES de emitir el DELETE — el usuario veía un error de librería y la
- *    foto nunca se quitaba. **Ese defecto llegó a producción una vez** (commit `d938e92`), y por
- *    eso la prueba monta el HOOK y no la función suelta: pasando por Query es donde existe.
- *  - La limpieza de una subida fallida SÍ debe mandar `idArchivo`; si no, borraría "la foto que
- *    haya" y se llevaría la que otro usuario acabara de subir al mismo arte (pérdida silenciosa).
- *
- * Las dos mitades se prueban juntas para que arreglar una no rompa la otra.
+ * Y la segunda mitad: la limpieza de una subida fallida debe borrar EXACTAMENTE el renglón que su
+ * propio POST creó. Con la foto única eso exigía un `idArchivo` acotado en la querystring; con las
+ * fotos plurales el `idFoto` que devuelve el POST identifica el renglón por construcción, así que
+ * la pérdida silenciosa (llevarse la foto buena de otro usuario) ya no es expresable.
  */
 
 /** Respuesta cruda de `openapi-fetch` (solo lo que usa la capa de datos). */
@@ -69,20 +65,22 @@ describe('foto del arte del modelo', () => {
     del.mockResolvedValue({ response: { ok: true }, error: undefined });
   });
 
-  it('el botón "quitar foto" emite el DELETE SIN querystring', async () => {
-    const quitar = montar<{ idModelo: number; idArte: number }>(useQuitarFotoArte);
+  it('el botón "quitar foto" emite el DELETE de ESA foto (sin el contexto de Query colado)', async () => {
+    const quitar = montar<{ idModelo: number; idArte: number; idFoto: number }>(useQuitarFotoArte);
 
-    await quitar({ idModelo: 3, idArte: 7 });
+    await quitar({ idModelo: 3, idArte: 7, idFoto: 42 });
 
     expect(del).toHaveBeenCalledTimes(1);
-    expect(del.mock.calls[0]?.[0]).toBe('/api/modelos/{id}/artes/{idArte}/foto');
-    // Sin `idArchivo`: ni el valor, ni la llave, ni el contexto que Query pasa como 2º argumento.
-    expect(paramsDelDelete(0)).toEqual({ path: { id: 3, idArte: 7 }, query: {} });
+    expect(del.mock.calls[0]?.[0]).toBe('/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}');
+    // Los tres ids en la ruta y NADA más: ni querystring, ni el contexto que Query pasa como 2º
+    // argumento (que es justo lo que se colaba antes).
+    expect(paramsDelDelete(0)).toEqual({ path: { id: 3, idArte: 7, idFoto: 42 } });
   });
 
-  it('la limpieza de una subida fallida SÍ acota el borrado a SU archivo', async () => {
+  it('la limpieza de una subida fallida borra EXACTAMENTE el renglón que su POST creó', async () => {
     post.mockResolvedValue({
       data: {
+        idFoto: 99,
         idArchivo: 'arch_de_esta_subida',
         nombreOriginal: 'arte.png',
         urlSubida: 'https://r2.fake/put',
@@ -99,9 +97,8 @@ describe('foto del arte del modelo', () => {
     await expect(subir({ idModelo: 3, idArte: 7, archivo: PNG })).rejects.toThrow();
 
     expect(del).toHaveBeenCalledTimes(1);
-    expect(paramsDelDelete(0)).toEqual({
-      path: { id: 3, idArte: 7 },
-      query: { idArchivo: 'arch_de_esta_subida' },
-    });
+    expect(del.mock.calls[0]?.[0]).toBe('/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}');
+    // El `idFoto` de ESTA subida, no "la foto que haya": la de otro usuario no se puede tocar.
+    expect(paramsDelDelete(0)).toEqual({ path: { id: 3, idArte: 7, idFoto: 99 } });
   });
 });

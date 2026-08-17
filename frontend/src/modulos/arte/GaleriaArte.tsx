@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useGaleriaArte, type GaleriaArteItem, type GaleriaArteQuery } from '@/api/artes';
-import { ETIQUETAS_TIPO_ARTE, TIPOS_ARTE, type TipoArteClave } from '@/modulos/arte/esquemas';
+import { useTiposArte } from '@/api/tipos-proceso';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
@@ -16,15 +16,16 @@ import { MiniaturaArte } from './MiniaturaArte';
 const POR_PAGINA = 24;
 
 /** Valor del filtro de tipo que significa "todos" (sin filtrar). */
-const TIPO_TODOS = 'TODOS';
+const TIPO_TODOS = '';
 
 /**
  * Galería visual del ARTE, armada DESDE los modelos (V1-E3d, §Post-F9.35 punto 4).
  *
  * La galería SOBREVIVIÓ al retiro del catálogo de arte: sigue sirviendo para buscar visualmente
  * *"ese bordado que hicimos"*, pero ahora cada foto dice **de qué modelo** es y al tocarla lleva a
- * ese modelo. Rejilla paginada EN SERVIDOR con búsqueda (debounce, por nombre del arte o por
- * clave/nombre del modelo) y filtro por tipo.
+ * ese modelo. Rejilla paginada EN SERVIDOR con búsqueda (debounce, por descripción/posición del
+ * arte o por clave/nombre del modelo) y filtro por tipo — que desde V1-E3f sale del CATÁLOGO único
+ * (§Post-F9.58), no de una lista fija en el programa.
  *
  * `modelos.ver` gobierna el acceso. La decisión real la toma el backend en cada ruta (A1).
  */
@@ -33,16 +34,17 @@ export function GaleriaArte(): React.JSX.Element {
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [tipoFiltro, setTipoFiltro] = useState<TipoArteClave | typeof TIPO_TODOS>(TIPO_TODOS);
+  const [tipoFiltro, setTipoFiltro] = useState<string>(TIPO_TODOS);
   const [pagina, setPagina] = useState(1);
+  const tipos = useTiposArte();
 
   const query: GaleriaArteQuery = {
     pagina,
     porPagina: POR_PAGINA,
-    ordenarPor: 'nombre',
+    ordenarPor: 'descripcion',
     direccion: 'asc',
     ...(busqueda.length > 0 ? { busqueda } : {}),
-    ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
+    ...(tipoFiltro === TIPO_TODOS ? {} : { idTipoArte: Number(tipoFiltro) }),
   };
 
   const consulta = useGaleriaArte(query);
@@ -55,7 +57,7 @@ export function GaleriaArte(): React.JSX.Element {
   }
 
   function alCambiarTipo(valor: string): void {
-    setTipoFiltro(valor as TipoArteClave | typeof TIPO_TODOS);
+    setTipoFiltro(valor);
     setPagina(1);
   }
 
@@ -92,7 +94,7 @@ export function GaleriaArte(): React.JSX.Element {
             className="pl-8"
             value={textoBusqueda}
             onChange={(e) => alBuscar(e.target.value)}
-            aria-label="Buscar arte por nombre o por modelo"
+            aria-label="Buscar arte por descripción o por modelo"
             data-testid="buscar-galeria"
           />
         </div>
@@ -104,9 +106,9 @@ export function GaleriaArte(): React.JSX.Element {
           className="sm:w-56"
         >
           <option value={TIPO_TODOS}>Todos los tipos</option>
-          {TIPOS_ARTE.map((tipo) => (
-            <option key={tipo} value={tipo}>
-              {ETIQUETAS_TIPO_ARTE[tipo]}
+          {(tipos.data?.datos ?? []).map((tipo) => (
+            <option key={tipo.id} value={String(tipo.id)}>
+              {tipo.nombre}
             </option>
           ))}
         </SelectNativo>
@@ -148,13 +150,25 @@ export function GaleriaArte(): React.JSX.Element {
                   <MiniaturaArte
                     idModelo={item.idModelo}
                     idArte={item.id}
-                    nombre={item.nombre}
+                    nombre={item.descripcion}
                     tieneFoto={item.idArchivoFoto !== null}
                     tamano="grande"
                   />
-                  <span className="line-clamp-2 w-full text-xs font-medium" title={item.nombre}>
-                    {item.nombre}
+                  <span
+                    className="line-clamp-2 w-full text-xs font-medium"
+                    title={item.descripcion}
+                  >
+                    {item.descripcion}
                   </span>
+                  {/* Dónde va en la prenda (V1-E3f §Post-F9.52 punto 2): frente, espalda… */}
+                  {item.posicion === null ? null : (
+                    <span
+                      className="line-clamp-1 w-full text-[11px] text-muted-foreground"
+                      data-testid="celda-galeria-posicion"
+                    >
+                      {item.posicion}
+                    </span>
+                  )}
                   {/* De qué MODELO es (§Post-F9.35: "cada foto dice de qué modelo es"). */}
                   <span
                     className="line-clamp-1 w-full text-[11px] text-muted-foreground"

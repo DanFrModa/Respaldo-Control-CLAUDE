@@ -123,9 +123,11 @@ const incluirReceta = {
       tallas: { select: { consumo: true } },
     },
   },
+  // V1-E3f: el arte perdió el `nombre` — su campo visible es la `descripcion` y el desempate
+  // del orden pasó de nombre a `id` (§Post-F9.52 punto 1).
   artes: {
-    select: { id: true, nombre: true, precio: true },
-    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }],
+    select: { id: true, descripcion: true, precio: true },
+    orderBy: [{ orden: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.ModeloInclude;
 
@@ -251,7 +253,7 @@ function numerosPreCosto(modelo: ModeloConReceta, ultimos: UltimosPreciosCompra)
   // El arte vive DENTRO del modelo desde V1-E3d (§Post-F9.35): UN solo precio, sin catálogo detrás.
   const artes = modelo.artes.map((a) => ({
     idArte: a.id,
-    arte: a.nombre,
+    arte: a.descripcion,
     precio: num(a.precio),
   }));
 

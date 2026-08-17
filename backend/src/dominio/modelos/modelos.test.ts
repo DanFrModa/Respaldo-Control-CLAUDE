@@ -97,14 +97,21 @@ describe('dominio Modelos (F1-E4) — validación de captura (A1)', () => {
 
   it('agregar un arte con precio negativo → ErrorValidacion', async () => {
     await expect(
-      crearArte(sesionAdmin(), 1, { nombre: 'Logo', precio: -5 }, {}),
+      crearArte(sesionAdmin(), 1, { descripcion: 'Logo', idTipoArte: 1, precio: -5 }, {}),
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
-  it('agregar un arte sin nombre → ErrorValidacion', async () => {
-    await expect(crearArte(sesionAdmin(), 1, { nombre: '  ' }, {})).rejects.toBeInstanceOf(
-      ErrorValidacion,
-    );
+  it('agregar un arte sin descripción → ErrorValidacion (V1-E3f: reemplazó al nombre)', async () => {
+    await expect(
+      crearArte(sesionAdmin(), 1, { descripcion: '  ', idTipoArte: 1 }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('agregar un arte sin tipo → ErrorValidacion (ya no hay default BORDADO)', async () => {
+    await expect(
+      // @ts-expect-error el tipo es obligatorio desde V1-E3f: se prueba que el servidor lo exija.
+      crearArte(sesionAdmin(), 1, { descripcion: 'Logo' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
   it('copiar BOM con origen == destino → ErrorValidacion', async () => {
@@ -256,10 +263,9 @@ function bdConFotos(idModelo: number, fotos: { id: number; orden: number }[]) {
 /** `tx` falso con el ARTE de un modelo en memoria. */
 function bdConArte(idModelo: number, artes: { id: number; orden: number; nombre: string }[]) {
   const estado = artes.map((a) => ({ ...a }));
-  const ordenadas = () =>
-    [...estado].sort(
-      (a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre) || a.id - b.id,
-    );
+  // V1-E3f: el orden del arte es `orden` y luego `id` (el desempate por nombre se fue con el
+  // nombre, §Post-F9.52 punto 1).
+  const ordenadas = () => [...estado].sort((a, b) => a.orden - b.orden || a.id - b.id);
   const update = vi.fn((args: { where: { id: number }; data: { orden: number } }) => {
     const arte = estado.find((a) => a.id === args.where.id);
     if (arte !== undefined) {
@@ -281,20 +287,20 @@ function bdConArte(idModelo: number, artes: { id: number; orden: number; nombre:
           ordenadas().map((a) => ({
             id: a.id,
             idModelo,
-            nombre: a.nombre,
-            descripcion: null,
+            descripcion: a.nombre,
+            posicion: null,
             puntadas: null,
             precio: null,
-            tipo: 'BORDADO',
+            idTipoArte: 1,
             idProveedor: null,
-            idArchivoFoto: null,
             orden: a.orden,
             creadoEn: new Date('2026-01-01T00:00:00Z'),
             creadoPorId: null,
             modificadoEn: new Date('2026-01-01T00:00:00Z'),
             modificadoPorId: null,
             proveedor: null,
-            archivoFoto: null,
+            tipoArte: { nombre: 'Bordado', codigo: 'bordado', usaPuntadas: true },
+            fotos: [],
           })),
         ),
       ),

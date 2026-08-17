@@ -512,13 +512,13 @@ model Archivo {
   /// Adjunto de proveedor que apunta a este archivo (F1-E1B), si lo hay. Relación
   /// inversa exigida por Prisma; en la práctica es 0 o 1 (un archivo se adjunta una vez).
   proveedorArchivo       ProveedorArchivo?
-  /// Artes de modelo cuya foto es este archivo (V1-E3d). Inversa de `ModeloArte.archivoFoto`.
+  /// Fotos de arte que apuntan a este archivo (V1-E3f). Inversa de `ModeloArteFoto.archivo`.
   /// Es una LISTA, no 0..1: al sacar el arte del catálogo (§Post-F9.35) los artes compartidos
   /// por varios modelos se DUPLICAN, y las copias comparten la MISMA foto (el objeto de R2 no
   /// se puede duplicar desde una migración SQL, y `archivos.key` es único). Por eso quitar la
-  /// foto de un arte solo borra el `Archivo` cuando ningún otro arte lo referencia
+  /// foto de un arte solo borra el `Archivo` cuando ninguna otra foto de arte lo referencia
   /// (`dominio/modelos/arte-modelo.ts`).
-  modeloArtes            ModeloArte[]
+  modeloArteFotos        ModeloArteFoto[]
   /// Empresa cuyo LOGO es este archivo (post-F9), si la hay. Inversa de `Empresa.archivoLogo`;
   /// 0 o 1 (un archivo es el logo de una sola empresa).
   empresaLogo            Empresa?
@@ -941,11 +941,39 @@ model TipoProceso {
   /// NO migración. Editable solo por admin (A4).
   generaEntradaPt Boolean @default(false) @map("genera_entrada_pt")
 
+  /// ⭐ ¿Este proceso se puede usar como TIPO DE ARTE? (V1-E3f, §Post-F9.58/.59 — Daniel:
+  /// *"De acuerdo. Y un solo catálogo."*). Antes convivían DOS listas casi idénticas: este
+  /// catálogo (costura/estampado/bordado/lavado/aplicación) y un enum fijo `TipoArte`
+  /// (BORDADO/ESTAMPADO). Se fusionaron: `ModeloArte.idTipoArte` y `OrdenArte.idTipoArte`
+  /// apuntan AQUÍ, y esta bandera dice cuáles de los procesos son ofrecibles como arte.
+  /// Seed: `true` en bordado, estampado, aplicación (*"Aplicación también es arte"*, Daniel)
+  /// y lavado; `false` en costura — la única diferencia real entre las dos listas viejas.
+  /// Un proceso raro («embosado») se da de alta UNA vez y sirve para las dos cosas
+  /// (§Post-F9.54, principio del "proceso raro"). Default `false`: un proceso nuevo NO se
+  /// ofrece como arte salvo que se marque.
+  ///
+  /// ⚠️ NO confundir con `generaEntradaPt`: esa bandera está en el nivel EQUIVOCADO (la
+  /// posición del proceso respecto de la costura la lleva `EtapaMovimiento.prendaTerminada`
+  /// desde V1-E4b, no el tipo). `esArte` SÍ es propiedad del tipo: un bordado es arte
+  /// siempre, vaya antes o después de coser.
+  esArte Boolean @default(false) @map("es_arte")
+
+  /// ¿El arte de este tipo lleva PUNTADAS? (V1-E3f, §Post-F9.52 punto 6 — Daniel:
+  /// *"Las puntadas solo aplica para bordados"*, y sobre atarlo al tipo: *"Ok como tú lo
+  /// dices."*). El campo `puntadas` NO se borró (tirarlo destruiría el dato de los bordados
+  /// existentes, D3): se OCULTA cuando el tipo no lo usa. Por DATO y no por código, para que
+  /// un tipo nuevo tipo-bordado lo prenda sin tocar el programa. Seed: `true` solo en bordado.
+  usaPuntadas Boolean @default(false) @map("usa_puntadas")
+
   /// Etapas de envío/recibo de maquila de este proceso (F3, Restrict): un tipo de
   /// proceso en uso por una etapa no se borra físico → se desactiva.
   etapas     EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) de este proceso (F3, Restrict).
   cargosEsMa EsMaCargo[]
+  /// Artes del MODELO de este tipo (V1-E3f, Restrict): un tipo en uso no se borra físico.
+  artesModelo ModeloArte[]
+  /// Artes congelados en ÓRDENES de este tipo (V1-E3f, Restrict).
+  artesOrden  OrdenArte[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1241,15 +1269,11 @@ enum TipoComponenteTela {
   @@map("tipo_componente_tela")
 }
 
-/// Tipo de un ARTE (ex campo `BorEst` del viejo, doc 01-Modelos §2): distingue bordado
-/// real de estampado/aplicación. Desde V1-E3d (§Post-F9.35) el arte vive DENTRO del
-/// modelo (`ModeloArte`), no en un catálogo global.
-enum TipoArte {
-  BORDADO
-  ESTAMPADO
-
-  @@map("tipo_arte")
-}
+// NOTA (V1-E3f, §Post-F9.58/.59): el enum `TipoArte` (BORDADO/ESTAMPADO) se ELIMINÓ. El tipo
+// del arte ya no es una lista fija en el programa: es una FK al catálogo administrable
+// `TipoProceso` marcado con `esArte` — un solo catálogo para el proceso y para el arte,
+// aprobado por Daniel (*"De acuerdo. Y un solo catálogo."*). La migración tradujo
+// BORDADO→"bordado" y ESTAMPADO→"estampado" sin perder ninguna fila.
 
 /// Composición de una tela ("50% Algodón, 50% Poliéster") como CATÁLOGO, no texto libre
 /// (Daniel, 6-ago-2026 §Post-F9.11: *"de un catálogo de composiciones para mantener misma
@@ -2175,40 +2199,57 @@ model ModeloAvio {
 /// `precio` es NULLABLE en BD (los históricos migrados pueden no traerlo); en la captura por UI
 /// es REQUERIDO. **Es el precio que VIAJA a la OP** (`dominio/costos/costo-orden.ts`: entra UNA
 /// vez por modelo, SIN multiplicar por cantidad). `idProveedor` es nuevo (el catálogo no lo
-/// tenía): quién hace el arte. `nombre` único DENTRO del modelo (ya no global: el mismo arte
-/// duplicado en dos modelos es lo normal, no un error).
+/// tenía): quién hace el arte.
 ///
-/// La foto vive en R2: FK al `Archivo` de F0, SIN `@unique` — las copias que dejó la migración
-/// de los artes compartidos apuntan al MISMO archivo (ver nota en `Archivo.modeloArtes`).
+/// ⭐ **V1-E3f (§Post-F9.52): el arte ya NO tiene `nombre`.** Daniel: *"Es completamente
+/// irrelevante el nombre del estampado. Creo que con la descripción sería suficiente."* Como el
+/// nombre era la LLAVE (`@@unique([idModelo, nombre])`) y el desempate del orden, se reemplazó
+/// por: identidad = el propio `id`; orden = `orden` con desempate por `id`; y la `descripcion`
+/// pasó a REQUERIDA y visible. La migración copió `nombre` a `descripcion` donde ésta venía
+/// vacía (D3: nada se pierde en silencio). Se PIERDE a propósito la red que impedía dos artes
+/// con el mismo nombre en un modelo — Daniel lo sabe.
+///
+/// Otros cambios de V1-E3f: `posicion` (texto LIBRE — *"a veces son cosas muy específicas"*),
+/// `idTipoArte` (FK al catálogo único `TipoProceso.esArte`, ex enum `TipoArte`) y las fotos en
+/// PLURAL (`ModeloArteFoto`, ex `idArchivoFoto` de una sola).
+///
 /// Cascade hacia `Modelo` (descontinuar físico se lo lleva todo; en la práctica es borrado
-/// suave), SetNull hacia `Archivo` y Restrict hacia `Proveedor` (un proveedor en uso no se
-/// borra físico, se desactiva). Auditoría COMPLETA (A7).
+/// suave) y Restrict hacia `Proveedor` y `TipoProceso` (un catálogo en uso no se borra físico,
+/// se desactiva). Auditoría COMPLETA (A7).
 model ModeloArte {
-  id            Int      @id @default(autoincrement())
-  idModelo      Int      @map("id_modelo")
-  /// Nombre del arte. Único DENTRO del modelo (no global — ver nota de arriba).
-  nombre        String
-  descripcion   String?
-  /// Número de puntadas (informativo; contexto del costeo del bordado).
-  puntadas      Int?
+  id          Int     @id @default(autoincrement())
+  idModelo    Int     @map("id_modelo")
+  /// Descripción del arte — el campo VISIBLE y la identidad de cara al usuario desde V1-E3f
+  /// (§Post-F9.52 punto 1). REQUERIDA: sin nombre, es lo único que distingue un arte de otro.
+  descripcion String
+  /// Dónde va el arte en la prenda: "frente", "espalda", "manga izquierda"… TEXTO LIBRE, NO
+  /// catálogo (V1-E3f, §Post-F9.52 punto 2 — Daniel: *"a veces son cosas muy específicas, que no
+  /// tendría caso tenerlas en un catálogo"*). Opcional: el histórico migrado no lo trae.
+  posicion    String?
+  /// Número de puntadas (informativo; contexto del costeo del bordado). Se MUESTRA solo cuando
+  /// el tipo lo usa (`TipoProceso.usaPuntadas`): §Post-F9.52 punto 6, el campo no se borra.
+  puntadas    Int?
   /// Precio del arte en este modelo — el que viaja a la OP. Nullable en BD, requerido en UI.
-  precio        Decimal? @db.Decimal(12, 2)
-  /// Bordado real vs. estampado/aplicación (ex `BorEst`). Default BORDADO.
-  tipo          TipoArte @default(BORDADO)
+  precio      Decimal? @db.Decimal(12, 2)
+  /// Tipo del arte: FK al catálogo ÚNICO (`TipoProceso` con `esArte`). Ex enum `TipoArte`
+  /// (V1-E3f, §Post-F9.58: *"un solo catálogo"*). Restrict: un tipo en uso no se borra físico.
+  idTipoArte  Int      @map("id_tipo_arte")
   /// Proveedor que hace el arte (NUEVO en V1-E3d). Opcional: el histórico migrado no lo trae.
-  idProveedor   Int?     @map("id_proveedor")
-  /// Foto del arte en R2 (opcional). SIN `@unique`: varios artes pueden compartir archivo.
-  idArchivoFoto String?  @map("id_archivo_foto")
+  idProveedor Int?     @map("id_proveedor")
   /// Orden de despliegue del ARTE dentro del modelo (jul-2026, petición de Daniel: "la primera
   /// del arte también"). El arte PRINCIPAL es simplemente el PRIMERO (`orden` más bajo, desempate
-  /// por nombre): una sola fuente de verdad, sin bandera que pueda contradecir al orden. Marcar
-  /// principal = mover a la posición 0 y reindexar el resto (`marcarArtePrincipal`). Espejo de
-  /// `ModeloFoto.orden`; el default 0 deja al histórico ordenado por nombre, como hasta hoy.
-  orden         Int      @default(0)
+  /// por `id` desde V1-E3f — antes por nombre): una sola fuente de verdad, sin bandera que pueda
+  /// contradecir al orden. Marcar principal = mover a la posición 0 y reindexar el resto
+  /// (`marcarArtePrincipal`). Espejo de `ModeloFoto.orden`.
+  orden       Int      @default(0)
 
-  modelo      Modelo     @relation(fields: [idModelo], references: [id], onDelete: Cascade)
-  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
-  archivoFoto Archivo?   @relation(fields: [idArchivoFoto], references: [id], onDelete: SetNull)
+  modelo    Modelo      @relation(fields: [idModelo], references: [id], onDelete: Cascade)
+  proveedor Proveedor?  @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  tipoArte  TipoProceso @relation(fields: [idTipoArte], references: [id], onDelete: Restrict)
+
+  /// Fotos del arte en R2 (V1-E3f, §Post-F9.52 punto 5 — Daniel: *"cada arte debe de llevar sus
+  /// propias fotos"*, en PLURAL). Cascade: quitar el arte se lleva sus renglones de foto.
+  fotos ModeloArteFoto[]
 
   /// Renglones de precosto que valúan este arte (F8-E3, traza). SetNull: quitar el arte del
   /// modelo NO bloquea ni borra el precosto — su snapshot (`descripcion`/`precioUnit`) ya no
@@ -2216,7 +2257,7 @@ model ModeloArte {
   precostoLineas PrecostoLinea[]
 
   /// Renglones de RECETA DE ORDEN copiados de este arte (V1-E3d, traza). SetNull: quitar el arte
-  /// del modelo NO toca lo ya congelado en las órdenes (su nombre/precio ya viven en la copia).
+  /// del modelo NO toca lo ya congelado en las órdenes (su descripción/precio ya viven en la copia).
   ordenArtes OrdenArte[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
@@ -2224,11 +2265,40 @@ model ModeloArte {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idModelo, nombre])
   @@index([idModelo])
   @@index([idProveedor])
-  @@index([idArchivoFoto])
+  @@index([idTipoArte])
   @@map("modelo_arte")
+}
+
+/// Foto de un ARTE del modelo en R2 (V1-E3f, §Post-F9.52 punto 5). Espejo de `ModeloFoto`: liga
+/// un `Archivo` (motor de F0) a un arte con su `orden` de despliegue. N por arte.
+///
+/// ⚠️ **A diferencia de `ModeloFoto`, NO lleva `@@unique([idArchivo])`**: varios artes COMPARTEN
+/// el mismo `Archivo` a propósito. Al sacar el arte del catálogo (V1-E3d) los artes usados por
+/// varios modelos se DUPLICARON apuntando al mismo objeto de R2 (que no se puede clonar desde
+/// SQL), y «copiar arte de otro modelo» hace lo mismo. Por eso el `Archivo` solo se borra cuando
+/// NINGUNA otra foto de arte lo referencia (`borrarArchivoSiQuedoHuerfano`).
+///
+/// `onDelete`: Cascade hacia `ModeloArte` (las fotos son del arte) y Cascade hacia `Archivo` (al
+/// borrar el registro del archivo se van sus renglones; el objeto R2 huérfano es inofensivo — lo
+/// documenta `comun/archivos.ts`).
+model ModeloArteFoto {
+  id           Int    @id @default(autoincrement())
+  idModeloArte Int    @map("id_modelo_arte")
+  idArchivo    String @map("id_archivo")
+  /// Posición de la foto dentro del arte (0 = principal). Espejo de `ModeloFoto.orden`.
+  orden        Int    @default(0)
+
+  arte    ModeloArte @relation(fields: [idModeloArte], references: [id], onDelete: Cascade)
+  archivo Archivo    @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@index([idModeloArte])
+  @@index([idArchivo])
+  @@map("modelo_arte_foto")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3116,18 +3186,25 @@ model OrdenArte {
   idOrden Int   @map("id_orden")
   orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
 
-  /// Traza al arte del modelo del que se copió. SetNull: quitar el arte del modelo NO toca lo ya
-  /// congelado (nombre y precio ya viven aquí), igual que `PrecostoLinea.idModeloArte`.
+  /// Traza al arte del modelo del que se copió, y desde V1-E3f **la IDENTIDAD del renglón dentro
+  /// de la orden** (`@@unique([idOrden, idModeloArte])`): al desaparecer el `nombre` (§Post-F9.52
+  /// punto 1) es lo único que casa un renglón congelado con su arte del modelo. NULL = renglón
+  /// AGREGADO A MANO (Postgres trata los NULL como distintos, así que caben varios por orden).
+  /// SetNull: quitar el arte del modelo NO toca lo ya congelado (descripción y precio viven aquí).
   idModeloArte Int?        @map("id_modelo_arte")
   modeloArte   ModeloArte? @relation(fields: [idModeloArte], references: [id], onDelete: SetNull)
 
-  /// Nombre del arte EN ESTA ORDEN. Único dentro de la orden (misma regla que dentro del modelo).
-  nombre      String
-  descripcion String?
+  /// Descripción del arte EN ESTA ORDEN — el campo visible (V1-E3f: el `nombre` se retiró y la
+  /// migración lo copió aquí donde la descripción venía vacía, D3). REQUERIDA.
+  descripcion String
+  /// Dónde va el arte en la prenda (texto libre, V1-E3f §Post-F9.52 punto 2).
+  posicion    String?
   puntadas    Int?
   /// Precio del arte EN ESTA ORDEN (el override de §Post-F9.35). NULL = sin precio congelado.
   precio      Decimal?   @db.Decimal(12, 2)
-  tipo        TipoArte   @default(BORDADO)
+  /// Tipo del arte: FK al catálogo ÚNICO (`TipoProceso.esArte`), ex enum `TipoArte` (V1-E3f).
+  idTipoArte  Int         @map("id_tipo_arte")
+  tipoArte    TipoProceso @relation(fields: [idTipoArte], references: [id], onDelete: Restrict)
   /// Proveedor que hace el arte. Restrict (un proveedor en uso no se borra físico).
   idProveedor Int?       @map("id_proveedor")
   proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
@@ -3142,10 +3219,11 @@ model OrdenArte {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idOrden, nombre])
+  @@unique([idOrden, idModeloArte])
   @@index([idOrden])
   @@index([idModeloArte])
   @@index([idProveedor])
+  @@index([idTipoArte])
   @@map("orden_arte")
 }
 

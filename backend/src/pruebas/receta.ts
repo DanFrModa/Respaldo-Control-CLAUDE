@@ -96,11 +96,11 @@ export async function sembrarRecetaDeOrden(
         data: artes.map((a) => ({
           idOrden,
           idModeloArte: a.id,
-          nombre: a.nombre,
           descripcion: a.descripcion,
+          posicion: a.posicion,
           puntadas: a.puntadas,
           precio: a.precio,
-          tipo: a.tipo,
+          idTipoArte: a.idTipoArte,
           idProveedor: a.idProveedor,
         })),
       });

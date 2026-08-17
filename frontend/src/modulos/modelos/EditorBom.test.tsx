@@ -126,13 +126,22 @@ vi.mock('@/api/artes', () => ({
   useActualizarArte: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarArte: () => ({ mutate: vi.fn(), isPending: false }),
   useGaleriaArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
-  useFotoArte: () => ({ data: null, isPending: false, isError: false }),
+  useFotosArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useArtesModelo: () => ({ data: { datos: [] }, isPending: false, isError: false }),
   useSubirFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarFotoArte: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [] }, isPending: false }),
+  // V1-E3f: el selector de proveedor del arte pasó al combobox con búsqueda en servidor.
+  useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useRolesProveedor: () => ({ data: [], isPending: false }),
+}));
+
+vi.mock('@/api/tipos-proceso', () => ({
+  // El tipo del arte sale del catálogo ÚNICO (V1-E3f, §Post-F9.58).
+  useTiposArte: () => ({ data: { datos: [] }, isPending: false, isError: false }),
 }));
 
 /** Ficha mínima con una tela en la receta y el arte/avíos que se le pasen. */
@@ -604,14 +613,17 @@ describe('<EditorBom> — secciones de la receta', () => {
           {
             id: 5,
             idModelo: 1,
-            nombre: 'Logo',
-            descripcion: null,
+            descripcion: 'Logo',
+            posicion: null,
             puntadas: null,
             precio: 30,
-            tipo: 'BORDADO',
+            idTipoArte: 9,
+            tipoArte: 'Bordado',
+            codigoTipoArte: 'bordado',
+            usaPuntadas: true,
             idProveedor: null,
             proveedor: null,
-            idArchivoFoto: null,
+            fotos: [],
             orden: 0,
             creadoEn: '2026-01-01T00:00:00.000Z',
             creadoPorId: null,

@@ -47,11 +47,57 @@ export type EntradaActualizarTipoProceso = z.input<typeof esquemaTipoProcesoEdit
 export const esquemaListarTiposProceso = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(100).optional(),
   incluirInactivos: z.boolean().default(false),
+  /** V1-E3f: solo los tipos ofrecibles como ARTE (catálogo único, §Post-F9.58). */
+  soloArte: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'nombre', 'creadoEn']).default('nombre'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
 });
 
 export type ParametrosListarTiposProceso = z.input<typeof esquemaListarTiposProceso>;
+
+/**
+ * Un tipo de proceso tal como sale del dominio: el modelo + el ROL DE PROVEEDOR con el que se
+ * acota el selector de proveedores cuando se usa como tipo de arte (§Post-F9.52 punto 3).
+ */
+export type TipoProcesoDetalle = TipoProceso & { codigoRolProveedor: string | null };
+
+/**
+ * Resuelve el ROL DE PROVEEDOR de cada tipo: **el rol ACTIVO cuyo `codigo` es el mismo que el del
+ * proceso**. No hay columna que los ligue, y es a propósito.
+ *
+ * El catálogo único (§Post-F9.58) fusionó dos listas que ya compartían vocabulario: los cuatro
+ * procesos que son arte —`bordado`, `estampado`, `lavado`, `aplicacion`— existen con EXACTAMENTE
+ * ese código en `RolProveedor` (`prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`). Aprovecharlo evita una
+ * columna, una migración y una pantalla de administración para algo que hoy es una coincidencia
+ * exacta, y **degrada con gracia**: un tipo nuevo («embosado») sin rol homónimo devuelve `null` y
+ * el selector muestra TODOS los proveedores en vez de ninguno — que es lo que quiere el
+ * principio del "proceso raro" (§Post-F9.54: *"no justifica hacer todo un desarrollo"*). Si algún
+ * día hace falta desacoplar los dos códigos, se agrega la FK sin tocar a los consumidores: este
+ * campo ya es parte del contrato.
+ *
+ * Una sola consulta para toda la página (no N+1).
+ */
+async function conRolProveedor(tx: Tx, tipos: TipoProceso[]): Promise<TipoProcesoDetalle[]> {
+  if (tipos.length === 0) {
+    return [];
+  }
+  const roles = await tx.rolProveedor.findMany({
+    where: { activo: true, codigo: { in: tipos.map((t) => t.codigo) } },
+    select: { codigo: true },
+  });
+  const disponibles = new Set(roles.map((r) => r.codigo));
+  return tipos.map((t) => ({
+    ...t,
+    codigoRolProveedor: disponibles.has(t.codigo) ? t.codigo : null,
+  }));
+}
+
+/** Envuelve UN tipo con su rol de proveedor resuelto (ver {@link conRolProveedor}). */
+async function unoConRolProveedor(tx: Tx, tipo: TipoProceso): Promise<TipoProcesoDetalle> {
+  const [detalle] = await conRolProveedor(tx, [tipo]);
+  // `conRolProveedor` devuelve exactamente un elemento por entrada; el `??` es solo para el tipo.
+  return detalle ?? { ...tipo, codigoRolProveedor: null };
+}
 
 /**
  * ¿La sesión puede editar la bandera `generaEntradaPt`? (decisión (e)). Solo los roles de
@@ -92,13 +138,15 @@ async function exigirTipoProceso(tx: Tx, id: number): Promise<TipoProceso> {
 
 /**
  * Crea un tipo de proceso. `generaEntradaPt` solo se respeta si la sesión es admin (decisión (e));
- * para no-admins se ignora y queda en `false` (default seguro). Permiso `tipos-proceso.administrar`.
+ * para no-admins se ignora y queda en `false` (default seguro). `esArte`/`usaPuntadas` (V1-E3f)
+ * las fija cualquiera que administre el catálogo: no mueven inventario, solo deciden qué se
+ * ofrece en la lista de tipos de arte. Permiso `tipos-proceso.administrar`.
  */
 export async function crearTipoProceso(
   sesion: SesionUsuario,
   entrada: EntradaCrearTipoProceso,
   bd?: ContextoBd,
-): Promise<TipoProceso> {
+): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   const datos = validarEntrada(esquemaTipoProcesoCrear, entrada);
   // Solo un admin puede fijar la bandera; si no, se queda en el default seguro (false).
@@ -115,6 +163,8 @@ export async function crearTipoProceso(
           codigo: datos.codigo,
           nombre: datos.nombre,
           generaEntradaPt,
+          esArte: datos.esArte ?? false,
+          usaPuntadas: datos.usaPuntadas ?? false,
           ...datosCreacion(sesion),
         },
       });
@@ -122,9 +172,15 @@ export async function crearTipoProceso(
         entidad: 'TipoProceso',
         idEntidad: tipo.id,
         accion: 'CREAR',
-        datos: { codigo: tipo.codigo, nombre: tipo.nombre, generaEntradaPt: tipo.generaEntradaPt },
+        datos: {
+          codigo: tipo.codigo,
+          nombre: tipo.nombre,
+          generaEntradaPt: tipo.generaEntradaPt,
+          esArte: tipo.esArte,
+          usaPuntadas: tipo.usaPuntadas,
+        },
       });
-      return tipo;
+      return unoConRolProveedor(tx, tipo);
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
@@ -145,7 +201,7 @@ export async function actualizarTipoProceso(
   sesion: SesionUsuario,
   entrada: EntradaActualizarTipoProceso,
   bd?: ContextoBd,
-): Promise<TipoProceso> {
+): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   const datos = validarEntrada(esquemaTipoProcesoEditar, entrada);
   const esAdmin = puedeEditarGeneraEntradaPt(sesion);
@@ -161,11 +217,23 @@ export async function actualizarTipoProceso(
         datos.generaEntradaPt !== undefined &&
         esAdmin &&
         datos.generaEntradaPt !== actual.generaEntradaPt;
+      // V1-E3f: `esArte`/`usaPuntadas` NO son admin-only (ver {@link crearTipoProceso}).
+      const cambiaEsArte = datos.esArte !== undefined && datos.esArte !== actual.esArte;
+      const cambiaPuntadas =
+        datos.usaPuntadas !== undefined && datos.usaPuntadas !== actual.usaPuntadas;
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
-      if (!cambiaCodigo && !cambiaNombre && !cambiaBandera && !reactiva && !desactiva) {
-        return actual; // idempotente: nada que guardar, sin bitácora vacía
+      if (
+        !cambiaCodigo &&
+        !cambiaNombre &&
+        !cambiaBandera &&
+        !cambiaEsArte &&
+        !cambiaPuntadas &&
+        !reactiva &&
+        !desactiva
+      ) {
+        return unoConRolProveedor(tx, actual); // idempotente: nada que guardar, sin bitácora vacía
       }
 
       if (cambiaCodigo) {
@@ -184,13 +252,19 @@ export async function actualizarTipoProceso(
       if (cambiaBandera && datos.generaEntradaPt !== undefined) {
         cambios.generaEntradaPt = datos.generaEntradaPt;
       }
+      if (cambiaEsArte && datos.esArte !== undefined) {
+        cambios.esArte = datos.esArte;
+      }
+      if (cambiaPuntadas && datos.usaPuntadas !== undefined) {
+        cambios.usaPuntadas = datos.usaPuntadas;
+      }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
       }
 
       const tipo = await tx.tipoProceso.update({ where: { id: datos.id }, data: cambios });
 
-      if (cambiaCodigo || cambiaNombre || cambiaBandera || reactiva) {
+      if (cambiaCodigo || cambiaNombre || cambiaBandera || cambiaEsArte || cambiaPuntadas || reactiva) {
         await registrarBitacora(tx, sesion, {
           entidad: 'TipoProceso',
           idEntidad: tipo.id,
@@ -200,6 +274,10 @@ export async function actualizarTipoProceso(
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: tipo.nombre } } : {}),
             ...(cambiaBandera
               ? { generaEntradaPt: { de: actual.generaEntradaPt, a: tipo.generaEntradaPt } }
+              : {}),
+            ...(cambiaEsArte ? { esArte: { de: actual.esArte, a: tipo.esArte } } : {}),
+            ...(cambiaPuntadas
+              ? { usaPuntadas: { de: actual.usaPuntadas, a: tipo.usaPuntadas } }
               : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
           },
@@ -214,7 +292,7 @@ export async function actualizarTipoProceso(
         });
       }
 
-      return tipo;
+      return unoConRolProveedor(tx, tipo);
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
@@ -229,7 +307,7 @@ export async function desactivarTipoProceso(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TipoProceso> {
+): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTipoProceso(tx, id);
@@ -245,7 +323,7 @@ export async function reactivarTipoProceso(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TipoProceso> {
+): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTipoProceso(tx, id);
@@ -261,13 +339,14 @@ export async function obtenerTipoProceso(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TipoProceso> {
+): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.ver');
-  const tipo = await clienteLectura(bd).tipoProceso.findUnique({ where: { id } });
+  const cliente = clienteLectura(bd);
+  const tipo = await cliente.tipoProceso.findUnique({ where: { id } });
   if (tipo === null) {
     throw new ErrorNoEncontrado('TipoProceso', id);
   }
-  return tipo;
+  return unoConRolProveedor(cliente, tipo);
 }
 
 /** Lista tipos de proceso con búsqueda, orden y paginación EN SERVIDOR. */
@@ -275,12 +354,13 @@ export async function listarTiposProceso(
   sesion: SesionUsuario,
   parametros: ParametrosListarTiposProceso = {},
   bd?: ContextoBd,
-): Promise<Pagina<TipoProceso>> {
+): Promise<Pagina<TipoProcesoDetalle>> {
   verificarPermiso(sesion, 'tipos-proceso.ver');
   const filtros = validarEntrada(esquemaListarTiposProceso, parametros);
 
   const where: Prisma.TipoProcesoWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
+    ...(filtros.soloArte ? { esArte: true } : {}),
     ...(filtros.busqueda === undefined || filtros.busqueda === ''
       ? {}
       : {
@@ -301,5 +381,5 @@ export async function listarTiposProceso(
     }),
   ]);
 
-  return armarPagina(datos, total, filtros);
+  return armarPagina(await conRolProveedor(cliente, datos), total, filtros);
 }

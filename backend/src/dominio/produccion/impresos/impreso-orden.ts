@@ -126,8 +126,10 @@ export interface AvioImpreso {
 
 /** Un renglón de la sección ARTE (solo nombre/subtipo; SIN precio, decisión del dueño). */
 export interface ArteImpreso {
-  nombre: string;
-  tipo: 'BORDADO' | 'ESTAMPADO';
+  /** Descripción del arte (V1-E3f: el `nombre` se retiró, §Post-F9.52 punto 1). */
+  descripcion: string;
+  /** Nombre del TIPO, ya resuelto del catálogo único (ex enum BORDADO/ESTAMPADO). */
+  tipoArte: string;
 }
 
 /**
@@ -394,14 +396,22 @@ export async function armarDatosImpresoOrden(
   // El arte llega ORDENADO (`leerArtesModelo`), así que su PRIMER renglón es el PRINCIPAL: se
   // marca para que el tope de la rejilla jamás lo recorte (Daniel, jul-2026).
   // ⚠️ El recorrido va sobre `bom.artes` —que llega ORDENADO por el `orden` del modelo— y NO sobre
-  // la receta (ordenada por nombre): así el arte PRINCIPAL sigue siendo el primero del modelo y el
-  // tope de la rejilla jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden
-  // se conservan solo los artes que ESTA orden lleva; el nombre es la identidad del arte.
-  const nombresArteOrden = new Set(receta.artes.map((a) => a.nombre));
+  // la receta: así el arte PRINCIPAL sigue siendo el primero del modelo y el tope de la rejilla
+  // jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden se conservan solo
+  // los artes que ESTA orden lleva; desde V1-E3f la identidad es la TRAZA `idModeloArte` (el
+  // nombre del arte se retiró, §Post-F9.52 punto 1) y un arte puede traer VARIAS fotos.
+  const idsArteOrden = new Set(
+    receta.artes.flatMap((a) => (a.idModeloArte === null ? [] : [a.idModeloArte])),
+  );
   const artesBom = bom.artes
-    .filter((a) => nombresArteOrden.has(a.nombre))
+    .filter((a) => idsArteOrden.has(a.id))
     .flatMap((a, i) =>
-      a.keyFoto === null ? [] : [{ titulo: a.nombre, key: a.keyFoto, principal: i === 0 }],
+      a.fotos.map((foto, j) => ({
+        titulo: a.descripcion,
+        key: foto.key,
+        // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
+        principal: i === 0 && j === 0,
+      })),
     );
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
@@ -493,7 +503,7 @@ export async function armarDatosImpresoOrden(
     ...tabla,
     // Telas, Avíos y Arte: de la RECETA DE LA ORDEN, ya filtrada (`paraProduccion`, no excluidos).
     telas: receta.telas,
-    listaArte: receta.artes.map((a) => ({ nombre: a.nombre, tipo: a.tipo })),
+    listaArte: receta.artes.map((a) => ({ descripcion: a.descripcion, tipoArte: a.tipoArte })),
     habilitacion: receta.avios,
     fotos: fotosImpreso,
     // Primero el arte del MODELO (sus fotos), luego el subido a la orden.
@@ -827,9 +837,7 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     // sí se conserva por renglón ("Bordado"/"Estampado").
     seccionLista(
       'Arte',
-      datos.listaArte.map(
-        (a) => `${a.nombre} (${a.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
-      ),
+      datos.listaArte.map((a) => `${a.descripcion} (${a.tipoArte})`),
     ),
     // "Avíos", no "Habilitación" (mismo renombrado de vocabulario de Daniel que ya rige en toda la
     // app; este archivo no se pudo tocar en su momento y quedó con el rótulo viejo).

@@ -34,8 +34,8 @@ export type ArtesLista =
   paths['/api/modelos/{id}/artes']['get']['responses']['200']['content']['application/json'];
 /** Un arte del modelo tal como lo devuelve el API. */
 export type Arte = ArtesLista['datos'][number];
-/** Tipo de arte (BORDADO/ESTAMPADO). */
-export type TipoArte = Arte['tipo'];
+/** Una foto del arte tal como viaja embebida en el arte (sin URL). */
+export type ArteFotoResumen = Arte['fotos'][number];
 /** Cuerpo de alta de un arte (`POST /api/modelos/{id}/artes`). */
 export type ArteCrear =
   paths['/api/modelos/{id}/artes']['post']['requestBody']['content']['application/json'];
@@ -45,9 +45,11 @@ export type ArteEditar =
 /** Cuerpo de «copiar arte de otro modelo» (`POST /api/modelos/{id}/artes/copiar`). */
 export type ArteCopiar =
   paths['/api/modelos/{id}/artes/copiar']['post']['requestBody']['content']['application/json'];
-/** Foto de un arte con su URL de descarga (`GET /api/modelos/{id}/artes/{idArte}/foto`). */
-export type ArteFoto =
-  paths['/api/modelos/{id}/artes/{idArte}/foto']['get']['responses']['200']['content']['application/json'];
+/** Fotos de un arte con su URL de descarga (`GET /api/modelos/{id}/artes/{idArte}/fotos`). */
+export type ArteFotosLista =
+  paths['/api/modelos/{id}/artes/{idArte}/fotos']['get']['responses']['200']['content']['application/json'];
+/** Una foto de un arte, con su URL prefirmada. */
+export type ArteFoto = ArteFotosLista['datos'][number];
 /** Página de la galería de arte (`GET /api/artes`). */
 export type GaleriaArtePagina =
   paths['/api/artes']['get']['responses']['200']['content']['application/json'];
@@ -66,9 +68,9 @@ function claveArtesModelo(idModelo: number): readonly unknown[] {
   return [...CLAVE_ARTES, 'modelo', idModelo];
 }
 
-/** Clave de caché de la foto de UN arte. */
-function claveFoto(idModelo: number, idArte: number): readonly unknown[] {
-  return [...CLAVE_ARTES, 'foto', idModelo, idArte];
+/** Clave de caché de las FOTOS de UN arte (plurales desde V1-E3f). */
+function claveFotos(idModelo: number, idArte: number): readonly unknown[] {
+  return [...CLAVE_ARTES, 'fotos', idModelo, idArte];
 }
 
 /** Clave de caché de una página de la galería (depende de los filtros). */
@@ -162,9 +164,9 @@ async function listarGaleria(query: GaleriaArteQuery): Promise<GaleriaArtePagina
   return data;
 }
 
-/** Pide la foto de un arte (URL de descarga, o vacío si no tiene). */
-async function obtenerFoto(idModelo: number, idArte: number): Promise<ArteFoto> {
-  const { data, error } = await api.GET('/api/modelos/{id}/artes/{idArte}/foto', {
+/** Pide las fotos de un arte (cada una con su URL de descarga). */
+async function obtenerFotos(idModelo: number, idArte: number): Promise<ArteFotosLista> {
+  const { data, error } = await api.GET('/api/modelos/{id}/artes/{idArte}/fotos', {
     params: { path: { id: idModelo, idArte } },
   });
   if (!data) {
@@ -270,14 +272,14 @@ export function useGaleriaArte(
 
 // ── Foto del arte (presigned: POST metadatos → PUT directo a R2) ──────────────
 
-/** Lee la foto de un arte (deshabilitada si aún no hay arte). */
-export function useFotoArte(
+/** Lee las FOTOS de un arte (deshabilitada si aún no hay arte). */
+export function useFotosArte(
   idModelo: number | undefined,
   idArte: number | undefined,
-): UseQueryResult<ArteFoto, ErrorDeApi> {
+): UseQueryResult<ArteFotosLista, ErrorDeApi> {
   return useQuery({
-    queryKey: claveFoto(idModelo ?? 0, idArte ?? 0),
-    queryFn: () => obtenerFoto(idModelo as number, idArte as number),
+    queryKey: claveFotos(idModelo ?? 0, idArte ?? 0),
+    queryFn: () => obtenerFotos(idModelo as number, idArte as number),
     enabled: idModelo !== undefined && idArte !== undefined,
   });
 }
@@ -289,21 +291,20 @@ export interface ArgsSubirFotoArte extends ArgsArte {
 }
 
 /**
- * Sube la FOTO de un arte a R2 en DOS pasos (flujo presigned de F0):
- *   1) `POST /api/modelos/{id}/artes/{idArte}/foto` con los metadatos → el backend registra el
- *      `Archivo`, liga la foto al arte y devuelve una URL PUT prefirmada.
+ * Sube UNA foto de un arte a R2 en DOS pasos (flujo presigned de F0):
+ *   1) `POST /api/modelos/{id}/artes/{idArte}/fotos` con los metadatos → el backend registra el
+ *      `Archivo`, crea el renglón de foto y devuelve una URL PUT prefirmada.
  *   2) El navegador hace `PUT` de la imagen DIRECTO a esa URL (R2) con su `Content-Type`. La URL
  *      prefirmada NO firma content-type/content-length (el navegador los maneja como headers
  *      especiales y romperían el SigV4), así que el PUT cuadra y R2 lo acepta.
  *
- * Si el PUT a R2 falla, se QUITA la foto que el paso 1 ya había ligado (si no, el arte queda
- * apuntando a una imagen que nunca llegó). Esa limpieza manda el `idArchivo` de ESTA subida, y el
- * backend solo borra si la foto vigente sigue siendo esa (borrado ACOTADO): sin acotar sería una
- * pérdida silenciosa de datos, porque entre el POST y el fallo del PUT otro usuario pudo subir una
- * imagen buena al mismo arte y un borrado "de la foto que haya" se llevaría LA SUYA.
+ * Si el PUT a R2 falla, se QUITA el renglón que el paso 1 creó (si no, el arte queda apuntando a
+ * una imagen que nunca llegó). Desde V1-E3f la limpieza usa el `idFoto` de ESTA subida, así que
+ * es exacta por construcción: nunca puede tocar la foto que otro usuario subió mientras tanto (con
+ * la foto única había que acotar el borrado a mano para evitar esa pérdida silenciosa).
  */
 async function subirFoto({ idModelo, idArte, archivo }: ArgsSubirFotoArte): Promise<void> {
-  const { data, error } = await api.POST('/api/modelos/{id}/artes/{idArte}/foto', {
+  const { data, error } = await api.POST('/api/modelos/{id}/artes/{idArte}/fotos', {
     params: { path: { id: idModelo, idArte } },
     body: {
       nombreOriginal: archivo.name,
@@ -320,37 +321,28 @@ async function subirFoto({ idModelo, idArte, archivo }: ArgsSubirFotoArte): Prom
     archivo,
     tipoMime: archivo.type,
     sustantivo: 'la imagen',
-    limpiar: () => quitarFoto(idModelo, idArte, data.idArchivo),
+    limpiar: () => quitarFoto(idModelo, idArte, data.idFoto),
   });
 }
 
-/** Sube la foto (presigned PUT) e invalida la foto y el arte del modelo. */
+/** Sube una foto (presigned PUT) e invalida las fotos y el arte del modelo. */
 export function useSubirFotoArte(): UseMutationResult<void, ErrorDeApi, ArgsSubirFotoArte> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: subirFoto,
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: claveFoto(variables.idModelo, variables.idArte),
+        queryKey: claveFotos(variables.idModelo, variables.idArte),
       });
       invalidarArte(queryClient, variables.idModelo);
     },
   });
 }
 
-/**
- * Quita la foto de un arte (`DELETE /api/modelos/{id}/artes/{idArte}/foto`).
- *
- * `idArchivo` es OPCIONAL y acota el borrado a esa foto: el backend solo la quita si la vigente
- * sigue siendo exactamente esa, y si no, contesta 409 sin borrar nada. Sin `idArchivo` quita la
- * vigente, sea cual sea — que es lo que quiere el botón "quitar foto" de la pantalla.
- */
-async function quitarFoto(idModelo: number, idArte: number, idArchivo?: string): Promise<void> {
-  const { error, response } = await api.DELETE('/api/modelos/{id}/artes/{idArte}/foto', {
-    params: {
-      path: { id: idModelo, idArte },
-      query: idArchivo === undefined ? {} : { idArchivo },
-    },
+/** Quita UNA foto de un arte (`DELETE /api/modelos/{id}/artes/{idArte}/fotos/{idFoto}`). */
+async function quitarFoto(idModelo: number, idArte: number, idFoto: number): Promise<void> {
+  const { error, response } = await api.DELETE('/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}', {
+    params: { path: { id: idModelo, idArte, idFoto } },
   });
   // 204 No Content: éxito sin cuerpo; cualquier !ok es error.
   if (!response.ok) {
@@ -358,21 +350,27 @@ async function quitarFoto(idModelo: number, idArte: number, idArchivo?: string):
   }
 }
 
+/** Argumentos de la mutación que quita UNA foto. */
+export interface ArgsQuitarFotoArte extends ArgsArte {
+  idFoto: number;
+}
+
 /**
- * Quita la foto e invalida la foto y el arte del modelo.
+ * Quita una foto e invalida las fotos y el arte del modelo.
  *
  * El `mutationFn` va ENVUELTO en una flecha de UN argumento a propósito (mismo patrón que
  * `useQuitarFotoModelo` en `api/modelos.ts`): TanStack Query llama al `mutationFn` con DOS
  * argumentos (`variables` y un contexto `{ client, meta, mutationKey }`), así que pasar la
  * referencia pelada le metería ese contexto en el tercer parámetro.
  */
-export function useQuitarFotoArte(): UseMutationResult<void, ErrorDeApi, ArgsArte> {
+export function useQuitarFotoArte(): UseMutationResult<void, ErrorDeApi, ArgsQuitarFotoArte> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ idModelo, idArte }: ArgsArte) => quitarFoto(idModelo, idArte),
+    mutationFn: ({ idModelo, idArte, idFoto }: ArgsQuitarFotoArte) =>
+      quitarFoto(idModelo, idArte, idFoto),
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: claveFoto(variables.idModelo, variables.idArte),
+        queryKey: claveFotos(variables.idModelo, variables.idArte),
       });
       invalidarArte(queryClient, variables.idModelo);
     },

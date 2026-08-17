@@ -408,24 +408,53 @@ async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
 // SOLO costura deja prenda terminada → su recibo mete a inventario PT; estampado/aplicación,
 // bordado y lavado = false. Es el DEFAULT inicial; cambiarlo luego es dato (UI de admin), no
 // migración. `update` NO pisa la bandera si el tipo ya existe (pudo ajustarse en producción).
-const TIPOS_PROCESO_BASE: { codigo: string; nombre: string; generaEntradaPt: boolean }[] = [
-  { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
-  { codigo: 'estampado', nombre: 'Estampado', generaEntradaPt: false },
-  { codigo: 'bordado', nombre: 'Bordado', generaEntradaPt: false },
-  { codigo: 'lavado', nombre: 'Lavado', generaEntradaPt: false },
-  { codigo: 'aplicacion', nombre: 'Aplicación', generaEntradaPt: false },
+// V1-E3f (§Post-F9.58/.59): este catálogo es AHORA también el de TIPOS DE ARTE — Daniel:
+// *"De acuerdo. Y un solo catálogo."*. `esArte` marca cuáles se ofrecen como arte (bordado,
+// estampado, aplicación —*"Aplicación también es arte"*— y lavado; la costura NO, es la única
+// diferencia real entre las dos listas que se fusionaron), y `usaPuntadas` cuáles muestran el
+// campo de puntadas (solo bordado, §Post-F9.52 punto 6).
+//
+// ⚠️ El `update: {}` de abajo NO pisa las banderas de un tipo que YA existe: en una base con
+// datos (p. ej. `prueba`) las marca la MIGRACIÓN `20260818120000_catalogo_unico_de_arte`, por
+// código. Esto de aquí solo cubre la base recién creada. Los dos caminos coinciden a propósito.
+const TIPOS_PROCESO_BASE: {
+  codigo: string;
+  nombre: string;
+  generaEntradaPt: boolean;
+  esArte: boolean;
+  usaPuntadas: boolean;
+}[] = [
+  { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true, esArte: false, usaPuntadas: false },
+  {
+    codigo: 'estampado',
+    nombre: 'Estampado',
+    generaEntradaPt: false,
+    esArte: true,
+    usaPuntadas: false,
+  },
+  { codigo: 'bordado', nombre: 'Bordado', generaEntradaPt: false, esArte: true, usaPuntadas: true },
+  { codigo: 'lavado', nombre: 'Lavado', generaEntradaPt: false, esArte: true, usaPuntadas: false },
+  {
+    codigo: 'aplicacion',
+    nombre: 'Aplicación',
+    generaEntradaPt: false,
+    esArte: true,
+    usaPuntadas: false,
+  },
 ];
 
 async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
   for (const tipo of TIPOS_PROCESO_BASE) {
     await prisma.tipoProceso.upsert({
       where: { codigo: tipo.codigo },
-      // No se pisa nombre/activo/generaEntradaPt si ya existe (pudo editarse en producción).
+      // No se pisa nombre/activo/banderas si ya existe (pudo editarse en producción).
       update: {},
       create: {
         codigo: tipo.codigo,
         nombre: tipo.nombre,
         generaEntradaPt: tipo.generaEntradaPt,
+        esArte: tipo.esArte,
+        usaPuntadas: tipo.usaPuntadas,
       },
     });
   }

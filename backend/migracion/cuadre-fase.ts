@@ -70,7 +70,8 @@ export async function calcularCuadreFase(cliente: PrismaClient): Promise<Renglon
     cliente.modeloArte.count(),
     cliente.modeloFoto.count(),
     cliente.modeloArte.count(),
-    cliente.modeloArte.count({ where: { idArchivoFoto: { not: null } } }),
+    // V1-E3f: las fotos del arte son plurales (`ModeloArteFoto`); "con foto" = tiene al menos una.
+    cliente.modeloArte.count({ where: { fotos: { some: {} } } }),
   ]);
 
   const cuadreE7: RenglonCuadre[] = [

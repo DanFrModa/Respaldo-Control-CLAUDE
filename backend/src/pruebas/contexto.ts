@@ -77,3 +77,28 @@ export async function crearEmpresaPrueba(
     data: { nombre, paraIpt: true, paraEdr: true, favorita: false },
   });
 }
+
+/**
+ * Crea un TIPO DE ARTE del catálogo único (`TipoProceso` con `esArte`, V1-E3f §Post-F9.58) y
+ * devuelve su id. Como `limpiarBaseDatos` vacía todo antes de cada test, el arte necesita su tipo
+ * sembrado a mano: esto lo deja en UNA línea en vez de repetir el `create` en cada archivo.
+ *
+ * Los defaults son los del seed real para «bordado» (el tipo de arte que usa puntadas). El
+ * `codigo` es único global, así que un archivo que necesite dos tipos les pasa códigos distintos.
+ */
+export async function crearTipoArtePrueba(
+  cliente: PrismaClient,
+  codigo = 'bordado',
+  opciones: { nombre?: string; usaPuntadas?: boolean } = {},
+): Promise<number> {
+  const tipo = await cliente.tipoProceso.create({
+    data: {
+      codigo,
+      nombre: opciones.nombre ?? 'Bordado',
+      esArte: true,
+      usaPuntadas: opciones.usaPuntadas ?? codigo === 'bordado',
+    },
+    select: { id: true },
+  });
+  return tipo.id;
+}

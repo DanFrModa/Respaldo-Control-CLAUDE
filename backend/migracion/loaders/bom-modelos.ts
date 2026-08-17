@@ -447,10 +447,18 @@ async function cargarAviosBom(
 
 // ── ARTE de los modelos (V1-E3d: ya NO hay catálogo) ─────────────────────────────
 
-/** Datos del arte tal como venían en el catálogo viejo (`Bordados.csv`). */
+/**
+ * Datos del arte tal como venían en el catálogo viejo (`Bordados.csv`).
+ *
+ * ⚠️ V1-E3f: el arte nuevo ya NO tiene `nombre` (§Post-F9.52 punto 1) y su `descripcion` es
+ * OBLIGATORIA. El `nombre` viejo se conserva aquí por dos razones: es lo que se guarda como
+ * `descripcion` cuando la vieja venía vacía —la MISMA regla que aplicó la migración SQL, para que
+ * ETL y migración dejen exactamente lo mismo— y viaja al `mapeo_migracion` como rastro (D3).
+ */
 interface ArteViejo {
   nombre: string;
-  tipo: ReturnType<typeof mapearTipoArte>;
+  /** Código del tipo en el catálogo único (`bordado` / `estampado`). */
+  codigoTipo: ReturnType<typeof mapearTipoArte>;
   descripcion: string | undefined;
   puntadas: number | undefined;
   precio: number | undefined;
@@ -462,6 +470,8 @@ interface ArtePorCrear {
   clave: string;
   idModeloViejo: string;
   datos: ArteViejo;
+  /** Id del tipo en el catálogo único, ya resuelto desde `datos.codigoTipo` (V1-E3f). */
+  idTipoArte: number;
 }
 
 /**
@@ -493,7 +503,7 @@ function leerCatalogoArteViejo(reporte: Reporte): Map<string, ArteViejo> {
     const precioRaw = parsearDinero(fila.Precio);
     mapa.set(idViejo, {
       nombre,
-      tipo: mapearTipoArte(fila.BorEst),
+      codigoTipo: mapearTipoArte(fila.BorEst),
       descripcion,
       puntadas: puntadasRaw === null ? undefined : Math.max(0, puntadasRaw),
       precio: precioRaw === null ? undefined : Math.max(0, precioRaw),
@@ -519,6 +529,18 @@ async function cargarArtesModelos(
 ): Promise<ResultadoLoader> {
   const catalogoViejo = leerCatalogoArteViejo(reporte);
   const filas = leerCsv('ModelosBor.csv');
+
+  // V1-E3f: el tipo del arte es una FK al catálogo único (`TipoProceso` con `esArte`). Se resuelve
+  // el id UNA vez por corrida (no por fila) desde el `codigo`, que es la clave estable — la misma
+  // traducción que hizo la migración SQL (`bordado`/`estampado`).
+  const tiposArte = new Map(
+    (
+      await cliente.tipoProceso.findMany({
+        where: { esArte: true },
+        select: { id: true, codigo: true },
+      })
+    ).map((t) => [t.codigo, t.id] as const),
+  );
 
   // Igual que telas y avíos: el mapeo se carga DE UN GOLPE (no un `leerMapeo` por fila — ese era
   // justo el N+1 que este loader dice evitar) y los artes se AGRUPAN POR MODELO para escribirlos
@@ -581,11 +603,21 @@ async function cargarArtesModelos(
       continue;
     }
 
+    const idTipoArte = tiposArte.get(datos.codigoTipo);
+    if (idTipoArte === undefined) {
+      omitidos += 1;
+      reporte.agregar(
+        'Arte: tipo del catálogo único no encontrado (renglón omitido)',
+        `codigo=${datos.codigoTipo} — ¿corriste el seed? (IdBordados=${idArteViejo})`,
+      );
+      continue;
+    }
+
     const pendientes = porModelo.get(idModelo);
     if (pendientes === undefined) {
-      porModelo.set(idModelo, [{ clave, idModeloViejo, datos }]);
+      porModelo.set(idModelo, [{ clave, idModeloViejo, datos, idTipoArte }]);
     } else {
-      pendientes.push({ clave, idModeloViejo, datos });
+      pendientes.push({ clave, idModeloViejo, datos, idTipoArte });
     }
   }
 
@@ -604,7 +636,7 @@ async function cargarArtesModelos(
   for (const [id, datos] of sinUso) {
     reporte.agregar(
       'Arte sin uso en ningún modelo (NO migrado)',
-      `IdBordados=${id}, nombre="${datos.nombre}", tipo=${datos.tipo}`,
+      `IdBordados=${id}, nombre="${datos.nombre}", tipo=${datos.codigoTipo}`,
     );
   }
 
@@ -670,16 +702,20 @@ async function crearArteYMapear(
     sesion,
     idModelo,
     {
-      nombre: arte.datos.nombre,
-      tipo: arte.datos.tipo,
-      ...(arte.datos.descripcion === undefined ? {} : { descripcion: arte.datos.descripcion }),
+      // V1-E3f: la descripción es el campo visible y es OBLIGATORIA; si el catálogo viejo no la
+      // traía se usa el NOMBRE viejo — la misma regla que aplicó la migración SQL, para que una
+      // base migrada y una cargada por ETL queden idénticas (D3: el dato no se pierde).
+      descripcion: arte.datos.descripcion ?? arte.datos.nombre,
+      idTipoArte: arte.idTipoArte,
       ...(arte.datos.puntadas === undefined ? {} : { puntadas: arte.datos.puntadas }),
       ...(arte.datos.precio === undefined ? {} : { precio: arte.datos.precio }),
     },
     { tx },
   );
   await guardarMapeo(tx, ENTIDAD_MAPEO.modeloArte, arte.clave, creado.id, {
-    nombre: creado.nombre,
+    // El NOMBRE viejo se conserva en el rastro aunque el arte nuevo ya no lo tenga (D3).
+    nombre: arte.datos.nombre,
+    descripcion: creado.descripcion,
     idModeloViejo: arte.idModeloViejo,
   });
 }

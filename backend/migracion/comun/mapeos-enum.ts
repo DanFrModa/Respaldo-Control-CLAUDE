@@ -2,7 +2,6 @@
  * Mapeos de códigos del sistema viejo a los enums de v2 (F1-E6, ETL). Funciones puras,
  * cubiertas por tests unitarios.
  */
-import type { TipoArteClave } from '../../src/contrato/esquemas/arte.js';
 import type { TipoComponenteTelaClave } from '../../src/contrato/esquemas/tela.js';
 import type { TipoProveedorClave } from '../../src/contrato/esquemas/proveedor.js';
 
@@ -80,20 +79,25 @@ export function rolesDeMaquilero(costura: boolean, proceso: boolean): string[] {
 }
 
 /**
- * `Bordados.BorEst` → enum `TipoArte`. En el viejo `BorEst` distingue bordado real de
- * estampado/aplicación: `0`/vacío = BORDADO, distinto de 0 = ESTAMPADO.
+ * `Bordados.BorEst` → **código del tipo de arte** en el catálogo único (`TipoProceso.codigo`). En
+ * el viejo `BorEst` distingue bordado real de estampado/aplicación: `0`/vacío = bordado, distinto
+ * de 0 = estampado.
+ *
+ * ⚠️ V1-E3f: antes devolvía el enum `TipoArte` (`BORDADO`/`ESTAMPADO`), que ya no existe — el tipo
+ * es una FK al catálogo administrable (§Post-F9.58). Devuelve el `codigo`, que es la clave estable
+ * con la que el loader resuelve el id (los mismos dos valores que tradujo la migración SQL).
  */
-export function mapearTipoArte(borEst: string | undefined | null): TipoArteClave {
+export function mapearTipoArte(borEst: string | undefined | null): 'bordado' | 'estampado' {
   const t = (borEst ?? '').trim();
   if (t === '' || t === '0') {
-    return 'BORDADO';
+    return 'bordado';
   }
   const n = Number(t);
   if (Number.isFinite(n)) {
-    return n === 0 ? 'BORDADO' : 'ESTAMPADO';
+    return n === 0 ? 'bordado' : 'estampado';
   }
   // Texto no numérico distinto de vacío: lo tratamos como estampado (señal de no-bordado).
-  return 'ESTAMPADO';
+  return 'estampado';
 }
 
 /**

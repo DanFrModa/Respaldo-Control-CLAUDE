@@ -1,5 +1,6 @@
 /**
- * ARTE del modelo — bordados/estampados que van DENTRO del `Modelo` (V1-E3d, §Post-F9.35).
+ * ARTE del modelo — bordados/estampados/aplicaciones/lavados que van DENTRO del `Modelo`
+ * (V1-E3d §Post-F9.35 + **V1-E3f §Post-F9.52/.58**).
  *
  * Hasta V1-E3d el arte era un CATÁLOGO global (`Bordado`) que el BOM referenciaba. Daniel
  * (12-ago-2026): *"cada arte va pegado siempre a un solo modelo… sería más fácil manejar el arte
@@ -8,43 +9,52 @@
  * UN solo modelo (y los "compartidos" estaban nombrados con el número del modelo). **El catálogo
  * nunca funcionó como catálogo.**
  *
+ * ⭐ **V1-E3f cambió la FORMA del arte** (§Post-F9.52, siete observaciones de Daniel):
+ *  1. **Se fue el `nombre`** — *"Es completamente irrelevante el nombre del estampado. Creo que
+ *     con la descripción sería suficiente."* Era la LLAVE (`@@unique([idModelo, nombre])`) y el
+ *     desempate del orden, así que se reemplazó: la identidad es el `id`, el orden lo da `orden`
+ *     con desempate por `id`, y la `descripcion` pasó a REQUERIDA y visible. **Ya NO hay red que
+ *     impida dos artes con la misma descripción en un modelo** (Daniel lo sabe; la pantalla
+ *     AVISA, no bloquea).
+ *  2. **`posicion`** (frente/espalda/manga…): texto LIBRE, no catálogo.
+ *  3. El proveedor se acota por ROL (`bordado`/`estampado`/`aplicacion`…) — lo resuelve el
+ *     catálogo de tipos (`dominio/produccion/tipos-proceso.ts`), no este módulo.
+ *  4. **El tipo es el catálogo ÚNICO** `TipoProceso` con `esArte` (ex enum `TipoArte`).
+ *  5. **Fotos en PLURAL** (`ModeloArteFoto`), como la galería del modelo.
+ *  6. Las **puntadas** no se borran: se muestran solo si `TipoProceso.usaPuntadas`.
+ *
  * Qué vive aquí (todo bajo `modelos.ver` / `modelos.administrar` — SIN permisos nuevos):
  *  • CRUD del arte renglón por renglón (a diferencia de telas/avíos, que se guardan como SET
- *    completo: el arte tiene FOTO, y una foto no se puede mandar dentro de un PUT de conjunto).
+ *    completo: el arte tiene FOTOS, y una foto no se puede mandar dentro de un PUT de conjunto).
  *  • «Copiar arte de otro modelo»: trae el arte ya lleno para ajustarlo — la conveniencia que
  *    daba el catálogo, sin reinventarlo.
  *  • La GALERÍA de arte, armada DESDE los modelos: cada foto dice de qué modelo es.
- *  • La FOTO en R2, con el mismo flujo presigned que tenía el catálogo.
+ *  • Las FOTOS en R2, con el mismo flujo presigned que tenía el catálogo.
  *
  * ⚠️ **El precio del arte es el que VIAJA a la OP** (`dominio/costos/costo-orden.ts`): entra UNA
- * vez por modelo, SIN multiplicar por cantidad. Al mover el arte al modelo desapareció el precio
- * del catálogo y quedó UNO solo; la migración resolvió la cascada vieja
- * (`ModeloBordado.precio ?? Bordado.precio`) al copiar, así que el costeo de los datos existentes
- * no se mueve ni un centavo.
+ * vez por modelo, SIN multiplicar por cantidad.
  *
  * ⚠️ **Una foto puede estar compartida por VARIOS artes.** Al sacar el arte del catálogo, los
  * artes usados por varios modelos se DUPLICARON (cada modelo con su copia) y las copias apuntan al
  * MISMO `Archivo` — el objeto de R2 no se puede duplicar desde una migración SQL y `archivos.key`
- * es único. Lo mismo hace «copiar arte de otro modelo». Por eso, al quitar/reemplazar la foto, el
- * `Archivo` solo se borra cuando NINGÚN otro arte lo referencia (ver `borrarArchivoSiQuedoHuerfano`).
+ * es único. Lo mismo hace «copiar arte de otro modelo». Por eso, al quitar una foto, el `Archivo`
+ * solo se borra cuando NINGUNA otra foto de arte lo referencia (`borrarArchivoSiQuedoHuerfano`).
  */
 import {
   esquemaArteCopiarCuerpo,
   esquemaArteCrear,
   esquemaArteEditar,
   esquemaArteFotoCrear,
-  TIPOS_ARTE,
   type DatosArteFotoCrear,
 } from '../../contrato/esquemas/arte.js';
-import type { Prisma, TipoArte } from '../../datos/index.js';
+import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -59,7 +69,7 @@ import { reordenarComoPrincipal } from './orden-principal.js';
 /** Carpeta R2 de las fotos del arte (la key real se ordena por id, no por nombre, A5). */
 const CARPETA_FOTOS = 'modelo-arte';
 
-/** Alta de un arte tal como LLEGA (el `tipo` trae default en el esquema). */
+/** Alta de un arte tal como LLEGA. */
 export type EntradaCrearArte = z.input<typeof esquemaArteCrear>;
 
 /** Edición de un arte: `id` + cambios parciales. */
@@ -78,33 +88,44 @@ export const esquemaParametrosGaleria = z.object({
   pagina: z.number().int().min(1).default(1),
   porPagina: z.number().int().min(1).max(100).default(24),
   busqueda: z.string().trim().max(150).optional(),
-  tipo: z.enum(TIPOS_ARTE).optional(),
+  idTipoArte: z.number().int().positive().optional(),
   soloConFoto: z.boolean().default(false),
-  ordenarPor: z.enum(['nombre', 'modelo', 'tipo', 'creadoEn']).default('nombre'),
+  ordenarPor: z.enum(['descripcion', 'modelo', 'tipo', 'creadoEn']).default('descripcion'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
 });
 
 /** Parámetros de la galería tal como llegan al dominio. */
 export type ParametrosGaleriaArte = z.input<typeof esquemaParametrosGaleria>;
 
-/**
- * Un arte del modelo tal como sale al cliente. `keyFoto` es la key en R2 de la foto (campo
- * ADITIVO, interno del servidor: lo usa el IMPRESO de la orden para presignar y embeber las
- * imágenes del arte en el PDF; las rutas proyectan campo por campo, así que NUNCA sale a la API).
- */
+/** Una foto del arte tal como viaja embebida en el arte (sin URL prefirmada). */
+export interface ArteFotoResumen {
+  idFoto: number;
+  idArchivo: string;
+  orden: number;
+  /**
+   * Key en R2 (campo ADITIVO, interno del servidor: lo usa el IMPRESO de la orden para presignar
+   * y embeber las imágenes del arte en el PDF). Las rutas proyectan campo por campo, así que
+   * NUNCA sale a la API.
+   */
+  key: string;
+}
+
+/** Un arte del modelo tal como sale al cliente. */
 export interface ModeloArteDetalle {
   id: number;
   idModelo: number;
-  nombre: string;
-  descripcion: string | null;
+  descripcion: string;
+  posicion: string | null;
   puntadas: number | null;
   precio: number | null;
-  tipo: TipoArte;
+  idTipoArte: number;
+  tipoArte: string;
+  codigoTipoArte: string;
+  usaPuntadas: boolean;
   idProveedor: number | null;
   proveedor: string | null;
-  idArchivoFoto: string | null;
+  fotos: ArteFotoResumen[];
   orden: number;
-  keyFoto: string | null;
   creadoEn: Date;
   creadoPorId: string | null;
   modificadoEn: Date;
@@ -120,9 +141,12 @@ export interface ModeloArteDetalle {
  */
 export interface GaleriaArteItem {
   id: number;
-  nombre: string;
-  tipo: TipoArte;
+  descripcion: string;
+  posicion: string | null;
+  idTipoArte: number;
+  tipoArte: string;
   precio: number | null;
+  /** Archivo de la PRIMERA foto del arte (la miniatura), o null si no tiene ninguna. */
   idArchivoFoto: string | null;
   idModelo: number;
   claveModelo: string;
@@ -139,32 +163,41 @@ export interface GaleriaArteItem {
 const NAMESPACE_LOCK_ARTE = 20_544;
 
 /**
- * Orden de despliegue del ARTE (jul-2026): `orden` primero — el arte PRINCIPAL es el PRIMERO
- * (`marcarArtePrincipal`) — y como el histórico está todo en `orden` 0, el desempate por nombre
- * deja los modelos que nadie ha tocado exactamente como se listaban antes. `id` cierra el criterio
- * para que sea DETERMINISTA aun con nombres repetidos.
+ * Orden de despliegue del ARTE: `orden` primero — el arte PRINCIPAL es el PRIMERO
+ * (`marcarArtePrincipal`) — y `id` como desempate DETERMINISTA.
+ *
+ * ⚠️ Antes el desempate era por `nombre`; al retirarse el nombre (V1-E3f, §Post-F9.52 punto 1) el
+ * criterio pasa a `id`. Para el histórico —todo en `orden` 0— eso cambia el orden de listado de
+ * "alfabético" a "por antigüedad de captura". Es el precio del punto 1 y es reversible con un
+ * clic: marcar el arte principal reindexa el `orden` y manda.
  */
-const ORDEN_ARTES = [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }] as const;
+const ORDEN_ARTES = [{ orden: 'asc' }, { id: 'asc' }] as const;
+
+/** Orden de las fotos DENTRO de un arte (espejo de `ModeloFoto`). */
+const ORDEN_FOTOS = [{ orden: 'asc' }, { id: 'asc' }] as const;
 
 /** Lo que se lee de `ModeloArte` para armar un {@link ModeloArteDetalle}. */
 const SELECT_ARTE = {
   id: true,
   idModelo: true,
-  nombre: true,
   descripcion: true,
+  posicion: true,
   puntadas: true,
   precio: true,
-  tipo: true,
+  idTipoArte: true,
   idProveedor: true,
-  idArchivoFoto: true,
   orden: true,
   creadoEn: true,
   creadoPorId: true,
   modificadoEn: true,
   modificadoPorId: true,
   proveedor: { select: { nombre: true } },
-  archivoFoto: { select: { key: true } },
-} as const;
+  tipoArte: { select: { nombre: true, codigo: true, usaPuntadas: true } },
+  fotos: {
+    select: { id: true, idArchivo: true, orden: true, archivo: { select: { key: true } } },
+    orderBy: [...ORDEN_FOTOS],
+  },
+} satisfies Prisma.ModeloArteSelect;
 
 /** Fila cruda de `ModeloArte` con las relaciones de {@link SELECT_ARTE}. */
 type FilaArte = Prisma.ModeloArteGetPayload<{ select: typeof SELECT_ARTE }>;
@@ -174,16 +207,23 @@ function aDetalle(f: FilaArte): ModeloArteDetalle {
   return {
     id: f.id,
     idModelo: f.idModelo,
-    nombre: f.nombre,
     descripcion: f.descripcion,
+    posicion: f.posicion,
     puntadas: f.puntadas,
     precio: f.precio === null ? null : f.precio.toNumber(),
-    tipo: f.tipo,
+    idTipoArte: f.idTipoArte,
+    tipoArte: f.tipoArte.nombre,
+    codigoTipoArte: f.tipoArte.codigo,
+    usaPuntadas: f.tipoArte.usaPuntadas,
     idProveedor: f.idProveedor,
     proveedor: f.proveedor?.nombre ?? null,
-    idArchivoFoto: f.idArchivoFoto,
+    fotos: f.fotos.map((foto) => ({
+      idFoto: foto.id,
+      idArchivo: foto.idArchivo,
+      orden: foto.orden,
+      key: foto.archivo.key,
+    })),
     orden: f.orden,
-    keyFoto: f.archivoFoto?.key ?? null,
     creadoEn: f.creadoEn,
     creadoPorId: f.creadoPorId,
     modificadoEn: f.modificadoEn,
@@ -233,25 +273,24 @@ async function exigirProveedorValido(tx: Tx, idProveedor: number): Promise<void>
 }
 
 /**
- * Unicidad de negocio del nombre DENTRO del modelo (ya no global: el mismo arte duplicado en dos
- * modelos es lo normal). La carrera residual la captura el unique de la base (P2002).
+ * Valida el TIPO del arte contra el catálogo ÚNICO (V1-E3f): tiene que existir, estar ACTIVO y
+ * estar marcado como `esArte`. Sin esta última condición se podría capturar un arte "de costura",
+ * que es justo lo que la bandera vino a evitar (§Post-F9.58: la costura es la única de las cinco
+ * que NO es arte). El servidor es la autoridad aunque la pantalla ya filtre (A1).
  */
-async function exigirNombreLibre(
-  tx: Tx,
-  idModelo: number,
-  nombre: string,
-  idActual?: number,
-): Promise<void> {
-  const existente = await tx.modeloArte.findFirst({
-    where: {
-      idModelo,
-      nombre: { equals: nombre, mode: 'insensitive' },
-      ...(idActual === undefined ? {} : { id: { not: idActual } }),
-    },
-    select: { id: true },
+async function exigirTipoArteValido(tx: Tx, idTipoArte: number): Promise<void> {
+  const tipo = await tx.tipoProceso.findUnique({
+    where: { id: idTipoArte },
+    select: { nombre: true, activo: true, esArte: true },
   });
-  if (existente !== null) {
-    throw new ErrorConflicto(`Este modelo ya tiene un arte llamado "${nombre}".`);
+  if (tipo === null) {
+    throw new ErrorValidacion('El tipo de arte seleccionado no existe.');
+  }
+  if (!tipo.activo) {
+    throw new ErrorValidacion(`El tipo "${tipo.nombre}" está desactivado y no se puede usar.`);
+  }
+  if (!tipo.esArte) {
+    throw new ErrorValidacion(`El proceso "${tipo.nombre}" no está marcado como tipo de arte.`);
   }
 }
 
@@ -271,41 +310,31 @@ async function siguienteOrden(tx: Tx, idModelo: number): Promise<number> {
  * se borra en silencio). Vive en un solo lugar porque el arte se borra desde DOS caminos —
  * {@link eliminarArte} y «copiar receta con reemplazo» (`bom-modelo.ts`)— y los dos deben dejar el
  * MISMO rastro. Al desaparecer el catálogo, esta fila ES el arte: si no se registra `precio`,
- * `idProveedor` ni `idArchivoFoto`, no hay de dónde recuperarlos (y el precio entra al costo de la
- * OP, `costos/costo-orden.ts`).
+ * `idProveedor` ni sus fotos, no hay de dónde recuperarlos (y el precio entra al costo de la OP,
+ * `costos/costo-orden.ts`).
  */
 export function datosArteParaBitacora(a: {
   id: number;
-  nombre: string;
-  tipo: TipoArte;
-  descripcion: string | null;
+  descripcion: string;
+  posicion: string | null;
+  idTipoArte: number;
   puntadas: number | null;
   precio: Prisma.Decimal | null;
   idProveedor: number | null;
-  idArchivoFoto: string | null;
   orden: number;
+  fotos?: { idArchivo: string }[];
 }): Prisma.InputJsonObject {
   return {
     id: a.id,
-    nombre: a.nombre,
-    tipo: a.tipo,
     descripcion: a.descripcion,
+    posicion: a.posicion,
+    idTipoArte: a.idTipoArte,
     puntadas: a.puntadas,
     precio: a.precio === null ? null : a.precio.toNumber(),
     idProveedor: a.idProveedor,
-    idArchivoFoto: a.idArchivoFoto,
     orden: a.orden,
+    fotos: (a.fotos ?? []).map((f) => f.idArchivo),
   };
-}
-
-/** Traduce el choque del unique `(idModelo, nombre)` a un 409 con mensaje de negocio. */
-function comoConflictoDeNombre(error: unknown, nombre: string): unknown {
-  if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-    return new ErrorConflicto(`Este modelo ya tiene un arte llamado "${nombre}".`, {
-      causa: error,
-    });
-  }
-  return error;
 }
 
 // ── CRUD del arte (renglón por renglón; el permiso es el del BOM) ─────────────
@@ -327,15 +356,16 @@ export async function listarArtesModelo(
 
 /**
  * Agrega un ARTE a un modelo en UNA transacción (A2). Reglas: permiso `modelos.administrar`;
- * modelo existente; nombre único dentro del modelo; proveedor (si viene) existente y activo. El
- * arte nuevo entra AL FINAL (no desbanca al principal) y SIN foto (se sube aparte, presigned).
+ * modelo existente; tipo del catálogo único válido y marcado `esArte`; proveedor (si viene)
+ * existente y activo. El arte nuevo entra AL FINAL (no desbanca al principal) y SIN fotos (se
+ * suben aparte, presigned).
  *
- * Recalcula el estado de las órdenes del modelo: el arte es uno de los REQUISITOS de "orden
- * completa" (`requisitos-orden.ts`), y como el recálculo por catálogo solo ASCIENDE, agregar arte
- * solo puede completar órdenes, nunca degradarlas.
+ * ⚠️ **NO hay unicidad que validar** desde V1-E3f: al retirarse el `nombre` (§Post-F9.52 punto 1)
+ * dos artes con la misma descripción en un modelo son LEGALES. Daniel lo aceptó; el aviso —no
+ * bloqueo— vive en la pantalla.
  *
  * @example
- * await crearArte(sesion, idModelo, { nombre: "Logo Marilyn", tipo: "ESTAMPADO", precio: 12.5 });
+ * await crearArte(sesion, idModelo, { descripcion: "Logo Marilyn", idTipoArte: 3, precio: 12.5 });
  */
 export async function crearArte(
   sesion: SesionUsuario,
@@ -346,44 +376,42 @@ export async function crearArte(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteCrear, entrada);
 
-  try {
-    return await enTransaccion(async (tx) => {
-      await exigirModelo(tx, idModelo);
-      await exigirNombreLibre(tx, idModelo, datos.nombre);
-      if (datos.idProveedor !== undefined) {
-        await exigirProveedorValido(tx, datos.idProveedor);
-      }
+  return enTransaccion(async (tx) => {
+    await exigirModelo(tx, idModelo);
+    await exigirTipoArteValido(tx, datos.idTipoArte);
+    if (datos.idProveedor !== undefined) {
+      await exigirProveedorValido(tx, datos.idProveedor);
+    }
 
-      const creado = await tx.modeloArte.create({
-        data: {
-          idModelo,
-          nombre: datos.nombre,
-          tipo: datos.tipo,
-          orden: await siguienteOrden(tx, idModelo),
-          ...(datos.descripcion === undefined ? {} : { descripcion: datos.descripcion }),
-          ...(datos.puntadas === undefined ? {} : { puntadas: datos.puntadas }),
-          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
-          ...(datos.idProveedor === undefined ? {} : { idProveedor: datos.idProveedor }),
-          ...datosCreacion(sesion),
-        },
-        select: SELECT_ARTE,
-      });
+    const creado = await tx.modeloArte.create({
+      data: {
+        idModelo,
+        descripcion: datos.descripcion,
+        idTipoArte: datos.idTipoArte,
+        orden: await siguienteOrden(tx, idModelo),
+        ...(datos.posicion === undefined || datos.posicion === ''
+          ? {}
+          : { posicion: datos.posicion }),
+        ...(datos.puntadas === undefined ? {} : { puntadas: datos.puntadas }),
+        ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+        ...(datos.idProveedor === undefined ? {} : { idProveedor: datos.idProveedor }),
+        ...datosCreacion(sesion),
+      },
+      select: SELECT_ARTE,
+    });
 
-      await tocarModelo(tx, sesion, idModelo);
-      // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
-      // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
-      await registrarBitacora(tx, sesion, {
-        entidad: 'ModeloArte',
-        idEntidad: creado.id,
-        accion: 'CREAR',
-        datos: { idModelo, nombre: creado.nombre, tipo: creado.tipo },
-      });
+    await tocarModelo(tx, sesion, idModelo);
+    // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
+    // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ModeloArte',
+      idEntidad: creado.id,
+      accion: 'CREAR',
+      datos: { idModelo, descripcion: creado.descripcion, idTipoArte: creado.idTipoArte },
+    });
 
-      return aDetalle(creado);
-    }, bd);
-  } catch (error) {
-    throw comoConflictoDeNombre(error, datos.nombre);
-  }
+    return aDetalle(creado);
+  }, bd);
 }
 
 /** Detalle de un cambio de campo para la bitácora (de → a). */
@@ -403,9 +431,9 @@ function cambiaDecimal(entrada: number | null | undefined, actual: Prisma.Decima
 }
 
 /**
- * Actualiza un ARTE del modelo (nombre/descripción/puntadas/precio/tipo/proveedor) en UNA
- * transacción (A2). Semántica del PATCH parcial (M1): omitir = no tocar; `null` = borrar. La FOTO
- * no se toca aquí (tiene sus propias operaciones). Bitácora con el detalle de campos (A7).
+ * Actualiza un ARTE del modelo (descripción/posición/puntadas/precio/tipo/proveedor) en UNA
+ * transacción (A2). Semántica del PATCH parcial (M1): omitir = no tocar; `null` = borrar. Las
+ * FOTOS no se tocan aquí (tienen sus propias operaciones). Bitácora con el detalle de campos (A7).
  */
 export async function actualizarArte(
   sesion: SesionUsuario,
@@ -416,84 +444,76 @@ export async function actualizarArte(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteEditar, entrada);
 
-  try {
-    return await enTransaccion(async (tx) => {
-      const actual = await exigirArte(tx, idModelo, datos.id);
+  return enTransaccion(async (tx) => {
+    const actual = await exigirArte(tx, idModelo, datos.id);
 
-      const cambios: Prisma.ModeloArteUpdateInput = { ...datosModificacion(sesion) };
-      const detalle: Record<string, CambioCampo> = {};
+    const cambios: Prisma.ModeloArteUpdateInput = { ...datosModificacion(sesion) };
+    const detalle: Record<string, CambioCampo> = {};
 
-      const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
-      if (cambiaNombre && datos.nombre !== undefined) {
-        await exigirNombreLibre(tx, idModelo, datos.nombre, datos.id);
-        cambios.nombre = datos.nombre;
-        detalle.nombre = { de: actual.nombre, a: datos.nombre };
+    if (datos.descripcion !== undefined && datos.descripcion !== actual.descripcion) {
+      cambios.descripcion = datos.descripcion;
+      detalle.descripcion = { de: actual.descripcion, a: datos.descripcion };
+    }
+    if (datos.posicion !== undefined) {
+      const nuevo = datos.posicion === null || datos.posicion === '' ? null : datos.posicion;
+      if (nuevo !== actual.posicion) {
+        cambios.posicion = nuevo;
+        detalle.posicion = { de: actual.posicion, a: nuevo };
       }
-      if (datos.tipo !== undefined && datos.tipo !== actual.tipo) {
-        cambios.tipo = datos.tipo;
-        detalle.tipo = { de: actual.tipo, a: datos.tipo };
+    }
+    if (datos.idTipoArte !== undefined && datos.idTipoArte !== actual.idTipoArte) {
+      await exigirTipoArteValido(tx, datos.idTipoArte);
+      cambios.tipoArte = { connect: { id: datos.idTipoArte } };
+      detalle.idTipoArte = { de: actual.idTipoArte, a: datos.idTipoArte };
+    }
+    if (datos.puntadas !== undefined && datos.puntadas !== actual.puntadas) {
+      cambios.puntadas = datos.puntadas;
+      detalle.puntadas = { de: actual.puntadas, a: datos.puntadas };
+    }
+    if (cambiaDecimal(datos.precio, actual.precio)) {
+      cambios.precio = datos.precio ?? null;
+      detalle.precio = {
+        de: actual.precio === null ? null : actual.precio.toNumber(),
+        a: datos.precio ?? null,
+      };
+    }
+    if (datos.idProveedor !== undefined && datos.idProveedor !== actual.idProveedor) {
+      if (datos.idProveedor !== null) {
+        await exigirProveedorValido(tx, datos.idProveedor);
       }
-      if (datos.descripcion !== undefined) {
-        const nuevo =
-          datos.descripcion === null || datos.descripcion === '' ? null : datos.descripcion;
-        if (nuevo !== actual.descripcion) {
-          cambios.descripcion = nuevo;
-          detalle.descripcion = { de: actual.descripcion, a: nuevo };
-        }
-      }
-      if (datos.puntadas !== undefined && datos.puntadas !== actual.puntadas) {
-        cambios.puntadas = datos.puntadas;
-        detalle.puntadas = { de: actual.puntadas, a: datos.puntadas };
-      }
-      if (cambiaDecimal(datos.precio, actual.precio)) {
-        cambios.precio = datos.precio ?? null;
-        detalle.precio = {
-          de: actual.precio === null ? null : actual.precio.toNumber(),
-          a: datos.precio ?? null,
-        };
-      }
-      if (datos.idProveedor !== undefined && datos.idProveedor !== actual.idProveedor) {
-        if (datos.idProveedor !== null) {
-          await exigirProveedorValido(tx, datos.idProveedor);
-        }
-        cambios.proveedor =
-          datos.idProveedor === null
-            ? { disconnect: true }
-            : { connect: { id: datos.idProveedor } };
-        detalle.idProveedor = { de: actual.idProveedor, a: datos.idProveedor };
-      }
+      cambios.proveedor =
+        datos.idProveedor === null ? { disconnect: true } : { connect: { id: datos.idProveedor } };
+      detalle.idProveedor = { de: actual.idProveedor, a: datos.idProveedor };
+    }
 
-      if (Object.keys(detalle).length === 0) {
-        return aDetalle(actual); // nada que guardar: idempotente, sin bitácora vacía
-      }
+    if (Object.keys(detalle).length === 0) {
+      return aDetalle(actual); // nada que guardar: idempotente, sin bitácora vacía
+    }
 
-      const arte = await tx.modeloArte.update({
-        where: { id: datos.id },
-        data: cambios,
-        select: SELECT_ARTE,
-      });
-      await tocarModelo(tx, sesion, idModelo);
-      await registrarBitacora(tx, sesion, {
-        entidad: 'ModeloArte',
-        idEntidad: arte.id,
-        accion: 'MODIFICAR',
-        datos: { idModelo, ...detalle },
-      });
+    const arte = await tx.modeloArte.update({
+      where: { id: datos.id },
+      data: cambios,
+      select: SELECT_ARTE,
+    });
+    await tocarModelo(tx, sesion, idModelo);
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ModeloArte',
+      idEntidad: arte.id,
+      accion: 'MODIFICAR',
+      datos: { idModelo, ...detalle },
+    });
 
-      return aDetalle(arte);
-    }, bd);
-  } catch (error) {
-    throw comoConflictoDeNombre(error, datos.nombre ?? '');
-  }
+    return aDetalle(arte);
+  }, bd);
 }
 
 /**
  * Quita un ARTE del modelo en UNA transacción (A2). Es un renglón de la receta, no un catálogo:
  * se quita como se quita una tela o un avío (el borrado suave del catálogo viejo ya no aplica).
  * Queda constancia en la bitácora con TODO lo que decía el renglón (D3: nada se borra en
- * silencio). Su FOTO se desliga con el mismo cuidado que en `quitarFotoArte`: el `Archivo` solo se
- * borra si ningún otro arte lo comparte. La traza del precosto se pone en NULL sola (SetNull): el
- * precio usado ya vive en `PrecostoLinea.precioUnit`.
+ * silencio). Sus FOTOS se van con él (Cascade) y sus `Archivo` se borran con el mismo cuidado que
+ * en `quitarFotoArte`: solo si ningún otro arte los comparte. La traza del precosto se pone en
+ * NULL sola (SetNull): el precio usado ya vive en `PrecostoLinea.precioUnit`.
  */
 export async function eliminarArte(
   sesion: SesionUsuario,
@@ -505,16 +525,19 @@ export async function eliminarArte(
   return enTransaccion(async (tx) => {
     const actual = await exigirArte(tx, idModelo, idArte);
 
+    // Los renglones de foto se van por Cascade; los `Archivo` hay que evaluarlos DESPUÉS (si
+    // quedan sin dueño). Se guardan antes de borrar porque el borrado se los lleva.
+    const archivos = actual.fotos.map((f) => f.idArchivo);
     await tx.modeloArte.delete({ where: { id: idArte } });
-    if (actual.idArchivoFoto !== null) {
-      await borrarArchivoSiQuedoHuerfano(tx, actual.idArchivoFoto);
+    for (const idArchivo of new Set(archivos)) {
+      await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
     }
 
     await tocarModelo(tx, sesion, idModelo);
     // No hay acción `ELIMINAR` en el enum de bitácora (A7) y el arte no tiene borrado suave: se
     // registra como MODIFICAR con `operacion: 'quitar'` y TODO lo que decía el renglón
-    // ({@link datosArteParaBitacora} — descripción, orden y la FOTO incluidas), para que el rastro
-    // conserve lo que se fue (D3: nada se borra en silencio).
+    // ({@link datosArteParaBitacora} — descripción, posición, orden y las FOTOS incluidas), para
+    // que el rastro conserve lo que se fue (D3: nada se borra en silencio).
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
@@ -588,14 +611,13 @@ export async function marcarArtePrincipal(
 
 /**
  * COPIA a este modelo un arte que ya existe en OTRO (§Post-F9.35 punto 2): trae el arte ya lleno
- * —nombre, descripción, puntadas, precio, tipo, proveedor **y foto**— para ajustarlo. Es la
+ * —descripción, posición, puntadas, precio, tipo, proveedor **y sus fotos**— para ajustarlo. Es la
  * conveniencia que daba el catálogo, sin reinventarlo.
  *
- * La copia COMPARTE el `Archivo` de la foto con el original (ver nota de cabecera): la imagen es
- * la misma y el objeto de R2 no se duplica. Si el nombre ya está ocupado en el modelo destino, se
- * puede mandar uno distinto en `nombre`; si no, el choque sale como 409 con mensaje claro (no se
- * inventa un sufijo a espaldas del usuario). Copiar de un arte del MISMO modelo se rechaza: sería
- * un duplicado sin sentido con nombre forzado.
+ * Las fotos de la copia COMPARTEN los `Archivo` del original (ver nota de cabecera): la imagen es
+ * la misma y el objeto de R2 no se duplica. Copiar de un arte del MISMO modelo se rechaza: sería
+ * un duplicado sin sentido. Desde V1-E3f ya no hay choque de nombre que resolver (el nombre se
+ * retiró): se puede mandar otra `descripcion` para la copia, o se conserva la del origen.
  */
 export async function copiarArteDeOtroModelo(
   sesion: SesionUsuario,
@@ -606,69 +628,68 @@ export async function copiarArteDeOtroModelo(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteCopiarCuerpo, entrada);
 
-  let nombreFinal = '';
-  try {
-    return await enTransaccion(async (tx) => {
-      await exigirModelo(tx, idModelo);
-      const origen = await tx.modeloArte.findUnique({
-        where: { id: datos.idArteOrigen },
-        select: SELECT_ARTE,
-      });
-      if (origen === null) {
-        throw new ErrorNoEncontrado('Arte del modelo', datos.idArteOrigen);
-      }
-      if (origen.idModelo === idModelo) {
-        throw new ErrorValidacion('Ese arte ya es de este modelo: elige el arte de otro modelo.');
-      }
+  return enTransaccion(async (tx) => {
+    await exigirModelo(tx, idModelo);
+    const origen = await tx.modeloArte.findUnique({
+      where: { id: datos.idArteOrigen },
+      select: SELECT_ARTE,
+    });
+    if (origen === null) {
+      throw new ErrorNoEncontrado('Arte del modelo', datos.idArteOrigen);
+    }
+    if (origen.idModelo === idModelo) {
+      throw new ErrorValidacion('Ese arte ya es de este modelo: elige el arte de otro modelo.');
+    }
 
-      nombreFinal = datos.nombre ?? origen.nombre;
-      await exigirNombreLibre(tx, idModelo, nombreFinal);
-
-      const creado = await tx.modeloArte.create({
-        data: {
-          idModelo,
-          nombre: nombreFinal,
-          descripcion: origen.descripcion,
-          puntadas: origen.puntadas,
-          precio: origen.precio,
-          tipo: origen.tipo,
-          idProveedor: origen.idProveedor,
-          idArchivoFoto: origen.idArchivoFoto,
-          orden: await siguienteOrden(tx, idModelo),
-          ...datosCreacion(sesion),
+    const creado = await tx.modeloArte.create({
+      data: {
+        idModelo,
+        descripcion: datos.descripcion ?? origen.descripcion,
+        posicion: origen.posicion,
+        puntadas: origen.puntadas,
+        precio: origen.precio,
+        idTipoArte: origen.idTipoArte,
+        idProveedor: origen.idProveedor,
+        orden: await siguienteOrden(tx, idModelo),
+        fotos: {
+          create: origen.fotos.map((f) => ({
+            idArchivo: f.idArchivo,
+            orden: f.orden,
+            creadoPorId: sesion.id,
+          })),
         },
-        select: SELECT_ARTE,
-      });
+        ...datosCreacion(sesion),
+      },
+      select: SELECT_ARTE,
+    });
 
-      await tocarModelo(tx, sesion, idModelo);
-      // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
-      // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
-      await registrarBitacora(tx, sesion, {
-        entidad: 'ModeloArte',
-        idEntidad: creado.id,
-        accion: 'CREAR',
-        datos: {
-          idModelo,
-          nombre: creado.nombre,
-          operacion: 'copiar-de-otro-modelo',
-          idArteOrigen: origen.id,
-          idModeloOrigen: origen.idModelo,
-        },
-      });
+    await tocarModelo(tx, sesion, idModelo);
+    // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
+    // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ModeloArte',
+      idEntidad: creado.id,
+      accion: 'CREAR',
+      datos: {
+        idModelo,
+        descripcion: creado.descripcion,
+        operacion: 'copiar-de-otro-modelo',
+        idArteOrigen: origen.id,
+        idModeloOrigen: origen.idModelo,
+        fotosCopiadas: creado.fotos.length,
+      },
+    });
 
-      return aDetalle(creado);
-    }, bd);
-  } catch (error) {
-    throw comoConflictoDeNombre(error, nombreFinal);
-  }
+    return aDetalle(creado);
+  }, bd);
 }
 
 // ── Galería de arte (armada DESDE los modelos, §Post-F9.35 punto 4) ───────────
 
 /**
  * GALERÍA visual del arte. Sobrevivió al retiro del catálogo, pero ahora se arma desde los
- * modelos: cada celda dice de qué modelo es el arte. Búsqueda por nombre del arte O por
- * clave/nombre del modelo, filtro por tipo y por "solo con foto", todo paginado EN SERVIDOR.
+ * modelos: cada celda dice de qué modelo es el arte. Búsqueda por descripción/posición del arte O
+ * por clave/nombre del modelo, filtro por tipo y por "solo con foto", todo paginado EN SERVIDOR.
  * Requiere `modelos.ver` (el mismo permiso que la ficha del modelo — sin permisos nuevos).
  */
 export async function galeriaArte(
@@ -681,13 +702,14 @@ export async function galeriaArte(
 
   const busqueda = filtros.busqueda ?? '';
   const where: Prisma.ModeloArteWhereInput = {
-    ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
-    ...(filtros.soloConFoto ? { idArchivoFoto: { not: null } } : {}),
+    ...(filtros.idTipoArte === undefined ? {} : { idTipoArte: filtros.idTipoArte }),
+    ...(filtros.soloConFoto ? { fotos: { some: {} } } : {}),
     ...(busqueda === ''
       ? {}
       : {
           OR: [
-            { nombre: { contains: busqueda, mode: 'insensitive' } },
+            { descripcion: { contains: busqueda, mode: 'insensitive' } },
+            { posicion: { contains: busqueda, mode: 'insensitive' } },
             { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
             { modelo: { descripcion: { contains: busqueda, mode: 'insensitive' } } },
           ],
@@ -697,7 +719,9 @@ export async function galeriaArte(
   const orden: Prisma.ModeloArteOrderByWithRelationInput =
     filtros.ordenarPor === 'modelo'
       ? { modelo: { codigo: filtros.direccion } }
-      : { [filtros.ordenarPor]: filtros.direccion };
+      : filtros.ordenarPor === 'tipo'
+        ? { tipoArte: { nombre: filtros.direccion } }
+        : { [filtros.ordenarPor]: filtros.direccion };
 
   const cliente = clienteLectura(bd);
   const [total, filas] = await Promise.all([
@@ -707,12 +731,15 @@ export async function galeriaArte(
       orderBy: [orden, { id: 'asc' }],
       select: {
         id: true,
-        nombre: true,
-        tipo: true,
+        descripcion: true,
+        posicion: true,
+        idTipoArte: true,
         precio: true,
-        idArchivoFoto: true,
         idModelo: true,
+        tipoArte: { select: { nombre: true } },
         modelo: { select: { codigo: true, descripcion: true } },
+        // Solo la PRIMERA foto: la miniatura de la celda (el resto no se pinta en la rejilla).
+        fotos: { select: { idArchivo: true }, orderBy: [...ORDEN_FOTOS], take: 1 },
       },
       ...rangoPrisma(filtros),
     }),
@@ -720,10 +747,12 @@ export async function galeriaArte(
 
   const datos: GaleriaArteItem[] = filas.map((f) => ({
     id: f.id,
-    nombre: f.nombre,
-    tipo: f.tipo,
+    descripcion: f.descripcion,
+    posicion: f.posicion,
+    idTipoArte: f.idTipoArte,
+    tipoArte: f.tipoArte.nombre,
     precio: f.precio === null ? null : f.precio.toNumber(),
-    idArchivoFoto: f.idArchivoFoto,
+    idArchivoFoto: f.fotos[0]?.idArchivo ?? null,
     idModelo: f.idModelo,
     claveModelo: f.modelo.codigo,
     nombreModelo: f.modelo.descripcion,
@@ -732,23 +761,26 @@ export async function galeriaArte(
   return armarPagina(datos, total, filtros);
 }
 
-// ── Foto del arte en R2 (presigned, 1 arte → 0..1 foto) ──────────────────────
+// ── Fotos del arte en R2 (presigned, 1 arte → N fotos) ───────────────────────
 
-/** Resultado de preparar la subida de la foto (registro + URL PUT prefirmada). */
+/** Resultado de preparar la subida de una foto (registro + URL PUT prefirmada). */
 export interface SubidaFotoArte {
+  idFoto: number;
   idArchivo: string;
   nombreOriginal: string;
   urlSubida: string;
   expiraEnSegundos: number;
 }
 
-/** Foto de un arte con su URL de descarga prefirmada (o vacía si no tiene). */
+/** Una foto de un arte con su URL de descarga prefirmada. */
 export interface FotoArteConUrl {
-  idArchivo: string | null;
-  nombreOriginal: string | null;
-  tipoMime: string | null;
-  tamanoBytes: number | null;
-  urlDescarga: string | null;
+  idFoto: number;
+  idArchivo: string;
+  orden: number;
+  nombreOriginal: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  urlDescarga: string;
 }
 
 /**
@@ -765,11 +797,11 @@ export interface FotoArteConUrl {
  * carreras, una de ellas con PÉRDIDA DE IMAGEN:
  *
  *  1. *Copia vs. quitado.* T1 copia el arte 10 a otro modelo (la copia comparte `arch_7`,
- *     {@link copiarArteDeOtroModelo}); T2 quita la foto del arte 10. Si el `count` de T2 corre
+ *     {@link copiarArteDeOtroModelo}); T2 quita esa foto del arte 10. Si el `count` de T2 corre
  *     antes de que el INSERT de T1 sea visible, T2 ve 0 y borra `arch_7`. Ese DELETE se forma
  *     detrás del `FOR KEY SHARE` que el INSERT de T1 tomó sobre la fila de `archivos`, y al
- *     commit de T1 el `ON DELETE SET NULL` de la FK deja la copia recién nacida con
- *     `id_archivo_foto = NULL`: **la copia nace sin foto y su `Archivo` desaparece**, en silencio.
+ *     commit de T1 el `ON DELETE CASCADE` de la FK **se lleva la foto recién nacida**: la copia
+ *     queda sin imagen, en silencio.
  *  2. *Dos quitados a la vez.* Dos artes que comparten `arch_7` se quitan en paralelo: los dos
  *     `count` ven al otro arte todavía apuntando → ninguno borra → la fila `Archivo` queda
  *     HUÉRFANA (sin objeto R2 recuperable por nombre).
@@ -787,27 +819,26 @@ export async function borrarArchivoSiQuedoHuerfano(tx: Tx, idArchivo: string): P
   if (bloqueado.length === 0) {
     return; // ya no existe: otro camino lo borró y su fila está commiteada
   }
-  const enUso = await tx.modeloArte.count({ where: { idArchivoFoto: idArchivo } });
+  const enUso = await tx.modeloArteFoto.count({ where: { idArchivo } });
   if (enUso === 0) {
     await tx.archivo.delete({ where: { id: idArchivo } });
   }
 }
 
 /**
- * Prepara la subida de la FOTO de un arte (R2) en UNA transacción (A2): exige el arte y el
+ * Prepara la subida de UNA foto de un arte (R2) en UNA transacción (A2): exige el arte y el
  * permiso `modelos.administrar`, crea el registro `Archivo` vía el motor de R2 (carpeta
- * `modelo-arte/<id>` — llave ORDENADA por id, NO por nombre, A5), liga `idArchivoFoto` y devuelve
- * la URL PUT prefirmada para que el navegador suba DIRECTO a R2. Si el arte YA tenía foto, la
- * reemplaza: el `Archivo` anterior se borra en la misma transacción **si ningún otro arte lo
- * comparte**.
+ * `modelo-arte/<id>` — llave ORDENADA por id, NO por nombre, A5), crea el renglón
+ * `ModeloArteFoto` AL FINAL de las que ya hay y devuelve la URL PUT prefirmada para que el
+ * navegador suba DIRECTO a R2.
  *
- * CAS (compare-and-set) en el enlace: el `where` del `updateMany` incluye la foto que se LEYÓ, así
- * que el enlace solo aplica si esa sigue siendo la vigente. Sin él había carrera: dos reemplazos
- * simultáneos del mismo arte leen la misma foto previa, el segundo se forma detrás del lock de la
- * fila y luego intenta borrar un `Archivo` que el primero ya borró → P2025 → 500. Postgres
- * re-evalúa el `WHERE` después de tomar el lock (EPQ), de modo que el perdedor ve `count = 0` y
- * sale con un 409 claro ("vuelve a intentar") en vez de un error interno. Nada se pierde: la
- * subida ni siquiera había empezado y la transacción revierte el `Archivo` recién creado.
+ * ⚠️ **Ya no REEMPLAZA nada** (V1-E3f): las fotos son plurales, así que subir una segunda foto la
+ * AGREGA. Con eso desaparece el CAS que protegía el reemplazo de la foto única y la carrera que
+ * cerraba: dos subidas simultáneas al mismo arte ahora crean dos renglones distintos, que es
+ * exactamente lo que ambos usuarios querían. Para quitar una foto está `quitarFotoArte`.
+ *
+ * Si el PUT del navegador fallara, el `Archivo`/`ModeloArteFoto` referencian una key sin objeto
+ * (su `urlDescarga` daría 404): la limpieza del frontend borra ESE renglón por su `idFoto`.
  *
  * El servicio de archivos se INYECTA (default `servicioArchivos()` lazy) para poder pasar un fake
  * en tests sin R2 real.
@@ -824,7 +855,12 @@ export async function solicitarSubidaFotoArte(
   const datos = validarEntrada(esquemaArteFotoCrear, entrada);
 
   return enTransaccion(async (tx) => {
-    const actual = await exigirArte(tx, idModelo, idArte);
+    await exigirArte(tx, idModelo, idArte);
+
+    const ultima = await tx.modeloArteFoto.aggregate({
+      where: { idModeloArte: idArte },
+      _max: { orden: true },
+    });
 
     const subida = await archivos.solicitarSubida(tx, sesion, {
       nombreOriginal: datos.nombreOriginal,
@@ -833,32 +869,25 @@ export async function solicitarSubidaFotoArte(
       carpeta: `${CARPETA_FOTOS}/${idArte}`,
     });
 
-    const { count } = await tx.modeloArte.updateMany({
-      where: { id: idArte, idArchivoFoto: actual.idArchivoFoto },
-      data: { idArchivoFoto: subida.archivo.id, ...datosModificacion(sesion) },
+    const foto = await tx.modeloArteFoto.create({
+      data: {
+        idModeloArte: idArte,
+        idArchivo: subida.archivo.id,
+        orden: (ultima._max.orden ?? -1) + 1,
+        creadoPorId: sesion.id,
+      },
     });
-    if (count === 0) {
-      throw new ErrorConflicto(
-        `Otro usuario acaba de cambiar la foto del arte "${actual.nombre}": vuelve a intentar.`,
-      );
-    }
-    if (actual.idArchivoFoto !== null) {
-      await borrarArchivoSiQuedoHuerfano(tx, actual.idArchivoFoto);
-    }
 
     await tocarModelo(tx, sesion, idModelo);
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
       accion: 'MODIFICAR',
-      datos: {
-        idModelo,
-        foto: actual.idArchivoFoto === null ? 'agregar' : 'reemplazar',
-        archivo: datos.nombreOriginal,
-      },
+      datos: { idModelo, foto: 'agregar', idFoto: foto.id, archivo: datos.nombreOriginal },
     });
 
     return {
+      idFoto: foto.id,
       idArchivo: subida.archivo.id,
       nombreOriginal: datos.nombreOriginal,
       urlSubida: subida.urlSubida,
@@ -868,24 +897,31 @@ export async function solicitarSubidaFotoArte(
 }
 
 /**
- * Devuelve la FOTO del arte con su URL GET prefirmada para verla. Si no tiene foto, devuelve todo
- * en `null` (la UI pinta el placeholder NoFoto). Requiere `modelos.ver`.
+ * Devuelve las FOTOS del arte con sus URL GET prefirmadas para verlas, ordenadas. Si el arte no
+ * tiene ninguna devuelve `[]` (la UI pinta el placeholder NoFoto). Requiere `modelos.ver`.
  */
-export async function urlFotoArte(
+export async function listarFotosArte(
   sesion: SesionUsuario,
   idModelo: number,
   idArte: number,
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
-): Promise<FotoArteConUrl> {
+): Promise<FotoArteConUrl[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const arte = await cliente.modeloArte.findFirst({
     where: { id: idArte, idModelo },
     select: {
       id: true,
-      archivoFoto: {
-        select: { id: true, key: true, nombreOriginal: true, tipoMime: true, tamanoBytes: true },
+      fotos: {
+        select: {
+          id: true,
+          orden: true,
+          archivo: {
+            select: { id: true, key: true, nombreOriginal: true, tipoMime: true, tamanoBytes: true },
+          },
+        },
+        orderBy: [...ORDEN_FOTOS],
       },
     },
   });
@@ -893,78 +929,55 @@ export async function urlFotoArte(
     throw new ErrorNoEncontrado('Arte del modelo', idArte);
   }
 
-  const foto = arte.archivoFoto;
-  if (foto === null) {
-    return {
-      idArchivo: null,
-      nombreOriginal: null,
-      tipoMime: null,
-      tamanoBytes: null,
-      urlDescarga: null,
-    };
-  }
-
-  return {
-    idArchivo: foto.id,
-    nombreOriginal: foto.nombreOriginal,
-    tipoMime: foto.tipoMime,
-    tamanoBytes: foto.tamanoBytes,
-    urlDescarga: await archivos.urlDescarga(foto.key),
-  };
+  return Promise.all(
+    arte.fotos.map(async (foto) => ({
+      idFoto: foto.id,
+      idArchivo: foto.archivo.id,
+      orden: foto.orden,
+      nombreOriginal: foto.archivo.nombreOriginal,
+      tipoMime: foto.archivo.tipoMime,
+      tamanoBytes: foto.archivo.tamanoBytes,
+      urlDescarga: await archivos.urlDescarga(foto.archivo.key),
+    })),
+  );
 }
 
 /**
- * Quita la FOTO de un arte (R2) en UNA transacción (A2): desliga `idArchivoFoto` y borra el
- * `Archivo` **si ningún otro arte lo comparte**. Requiere `modelos.administrar`. Si el arte no
- * tiene foto → `ErrorConflicto` (pantalla desactualizada).
+ * Quita UNA foto de un arte (R2) en UNA transacción (A2): borra el renglón `ModeloArteFoto` y su
+ * `Archivo` **si ninguna otra foto de arte lo comparte**. Requiere `modelos.administrar`. Si la
+ * foto no pertenece a ese arte (o el arte no es de ese modelo) → `ErrorNoEncontrado`.
  *
- * **`idArchivoEsperado` acota el borrado a UNA foto concreta.** Sin él se quita la vigente, sea
- * cual sea (el botón "quitar foto" de la pantalla quiere justo eso). Con él, si la foto vigente ya
- * es otra, NO se borra nada y sale `ErrorConflicto` → el llamador distingue "la quité" de "ya no
- * era la tuya". Lo necesita la LIMPIEZA del flujo presigned del frontend: si el `PUT` a R2 falla y
- * mientras tanto otro usuario subió una foto buena al mismo arte, un borrado sin acotar destruiría
- * ESA (pérdida silenciosa de datos).
- *
- * El acotamiento NO es un `if` de check-then-act: el desligue se hace con un `updateMany` cuyo
- * `where` incluye `idArchivoFoto`, o sea un compare-and-set. Postgres re-evalúa ese `WHERE`
- * después de tomar el lock de la fila (EPQ), así que una transacción concurrente que reemplace la
- * foto entre la lectura y la escritura deja `count = 0` y aborta el borrado — no hay ventana.
+ * El `idFoto` identifica exactamente la foto a quitar, así que ya no hace falta el acotamiento por
+ * `idArchivo` que necesitaba la foto única (V1-E3d): la LIMPIEZA del flujo presigned del frontend
+ * borra por el `idFoto` que su propia subida creó y nunca puede tocar la de otro usuario.
  */
 export async function quitarFotoArte(
   sesion: SesionUsuario,
   idModelo: number,
   idArte: number,
-  idArchivoEsperado?: string,
+  idFoto: number,
   bd?: ContextoBd,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
-    const actual = await exigirArte(tx, idModelo, idArte);
-    if (actual.idArchivoFoto === null) {
-      throw new ErrorConflicto(`El arte "${actual.nombre}" no tiene foto.`);
-    }
-    const idAQuitar = idArchivoEsperado ?? actual.idArchivoFoto;
-
-    // CAS: solo desliga si la foto vigente SIGUE siendo `idAQuitar` (ver nota de arriba).
-    const { count } = await tx.modeloArte.updateMany({
-      where: { id: idArte, idArchivoFoto: idAQuitar },
-      data: { idArchivoFoto: null, ...datosModificacion(sesion) },
+    // Un solo `findFirst` amarra las tres pertenencias (modelo → arte → foto): A9 del sub-recurso.
+    const foto = await tx.modeloArteFoto.findFirst({
+      where: { id: idFoto, idModeloArte: idArte, arte: { idModelo } },
+      select: { id: true, idArchivo: true },
     });
-    if (count === 0) {
-      throw new ErrorConflicto(
-        `La foto del arte "${actual.nombre}" ya no es la que se iba a quitar (alguien la ` +
-          `reemplazó): no se quitó nada.`,
-      );
+    if (foto === null) {
+      throw new ErrorNoEncontrado('Foto del arte', idFoto);
     }
 
-    await borrarArchivoSiQuedoHuerfano(tx, idAQuitar);
+    await tx.modeloArteFoto.delete({ where: { id: foto.id } });
+    await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
 
     await tocarModelo(tx, sesion, idModelo);
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
       accion: 'MODIFICAR',
-      datos: { idModelo, foto: 'quitar', archivo: idAQuitar },
+      datos: { idModelo, foto: 'quitar', idFoto, archivo: foto.idArchivo },
     });
   }, bd);
 }

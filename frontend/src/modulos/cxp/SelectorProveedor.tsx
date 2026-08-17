@@ -7,9 +7,13 @@ import { useDebounce } from '@/lib/useDebounce';
 
 /**
  * SELECTOR DE PROVEEDOR reutilizable (F9-E2): combobox con búsqueda server-side por nombre; al elegir
- * emite el proveedor completo. Lo usa el estado de cuenta de CxP para fijar el proveedor. La lista
- * vive en el POPOVER del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`:
- * anti-carrera). Presentación pura (A1): solo consulta y emite.
+ * emite el proveedor completo. La lista vive en el POPOVER del {@link ComboboxBuscable} unificado
+ * del kit (modo `busquedaServidor`: anti-carrera). Presentación pura (A1): solo consulta y emite.
+ *
+ * ⚠️ **Es EL selector de proveedor de toda la app.** Un `<select>` nativo con tope de 100 esconde
+ * al proveedor que se busca en cuanto hay más de cien, y ese mismo defecto se arregló ya cuatro
+ * veces por separado (BOM V1-E3c, clientes V1-E4, arte y materiales V1-E3f §Post-F9.52 punto 7).
+ * Al agregar un lugar donde se elige proveedor, se usa ESTE componente — no otro desplegable.
  */
 export function SelectorProveedor({
   idSeleccionado,
@@ -17,6 +21,7 @@ export function SelectorProveedor({
   alSeleccionar,
   alLimpiar,
   rol,
+  excluirIds,
   testid = 'selector-proveedor',
   idInput,
 }: {
@@ -35,6 +40,12 @@ export function SelectorProveedor({
    * puede ser de cualquier tercero, no solo de quien vende material.
    */
   rol?: string | undefined;
+  /**
+   * Ids que NO deben ofrecerse (los que ya se eligieron en la pantalla que lo usa: p. ej. los
+   * proveedores ya agregados a un avío o a una tela). Se filtran DESPUÉS de la búsqueda del
+   * servidor, así que un proveedor ya elegido simplemente no aparece en la lista.
+   */
+  excluirIds?: ReadonlySet<number> | undefined;
   testid?: string;
   /** `id` del input (para que el `<label htmlFor>` del formulario lo enfoque). */
   idInput?: string | undefined;
@@ -50,7 +61,9 @@ export function SelectorProveedor({
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
 
-  const proveedores = consulta.data?.datos ?? [];
+  const proveedores = (consulta.data?.datos ?? []).filter(
+    (p) => excluirIds === undefined || !excluirIds.has(p.id),
+  );
   // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): no ofrecer opciones viejas.
   const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
