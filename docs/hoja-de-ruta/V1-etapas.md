@@ -1007,6 +1007,18 @@ que no verifica** — tercera vez en esta tanda.
 bitácora que mentiría, y la falta de índice único parcial— van en la misma ronda: un defecto conocido no
 es "menor".)*
 
+**Ronda de corrección (17-ago), pendiente de segunda revisión.** Los siete cerrados. El arreglo de H1 dejó
+una pieza de modelo que vale más que el defecto que lo originó: la existencia de PT se lleva **por bucket
+de orden**, el envío **elige de cuál sale** (`stockSinOrden`) y el recibo devuelve **al mismo** —
+reetiquetar al regresar habría movido saldo entre buckets sin que nadie lo pidiera. H2 cerró la puerta de
+atrás en `cancelarMovimientoPt`, que ahora **solo acepta lo capturado a mano**: todo lo demás es el
+*efecto* de un hecho con su propio estado, y anular el movimiento suelto revertía el inventario dejando el
+hecho en pie. H7 pasó de **detectable a imposible** (índice único parcial). Integración **1846** (+9).
+
+**Declarado, no callado:** H6 (la etiqueta de bitácora) va **sin prueba propia** — cubrirla exigiría
+afirmar sobre el JSON de `Bitacora`, cosa que ninguna prueba del repo hace hoy, y se prefirió decirlo
+antes que escribir una prueba decorativa. Esta tanda ya destapó tres de ésas.
+
 ---
 
 ## V1-E5 · Que los números sean los tuyos

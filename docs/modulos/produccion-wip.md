@@ -106,6 +106,10 @@ catálogo. Ver §Post-F9.59 de `DECISIONES.md`.
 | Proceso **antes** de costura (envío sin `prendaTerminada`) | Solo sube el WIP "recibido"; **NO** toca el kardex |
 | Proceso **después** de costura (envío con `prendaTerminada`) | **Devuelve** del Tránsito al almacén; no crea nada nuevo |
 
+El kardex de PT lo generan entonces **cuatro** momentos, no dos: recibo de costura (entrada nueva),
+entrega a cliente (salida), y el **envío/recibo de prenda ya terminada** (traspaso contra el Tránsito). El
+envío de **bultos cortados** —el flujo de siempre— sigue sin tocar el kardex.
+
 ## El Tránsito — dónde está la prenda que salió a proceso (V1-E4b)
 
 Una prenda ya terminada que se manda a estampar/lavar/aplicar **no está en el piso**, y el inventario no
@@ -126,6 +130,19 @@ faltantes o segundas?"* (§Post-F9.61). Su baja es un movimiento manual de PT co
 **Dos cuentas, dos preguntas distintas — y no se duplican:** el kardex responde *"¿cuántas piezas no están
 en el piso?"*; el **WIP** responde *"¿de quién son?"* (`wip.ts` `pendientePorMaquilero`, saldo por tercero).
 Por eso el Tránsito es **uno solo** y no uno por maquilero.
+
+### El bucket de orden — de qué stock salen las piezas
+
+La existencia de PT no se lleva sólo por artículo y almacén: se lleva **por orden**, y hay un bucket
+**«sin orden asignada»** (`idOrden = null`) donde vive *"lo capturado a mano en el arranque y lo migrado"*
+(`contrato/esquemas/movimiento-pt.ts`). **Ahí cae todo el histórico del Access y todo el conteo físico de
+arranque**, así que no es un caso de borde: es el bucket con más piezas el día uno.
+
+Por eso el envío **elige de qué bucket salen** (`EtapaMovimiento.stockSinOrden`), y el recibo las devuelve
+al **MISMO** bucket del que salieron — reetiquetarlas al regresar movería saldo entre buckets sin que
+nadie lo pidiera. Cuando el bucket elegido no alcanza, el error **dice dónde están las demás** en vez de
+afirmar que no hay existencia. *(Esto nació de un hallazgo de revisión en V1-E4b: la primera versión
+clavaba el bucket de la orden y el mensaje decía "0 en existencia" con 100 piezas a la vista.)*
 
 ⚠️ **Lo que NO cierra:** dar de baja el faltante en el kardex **no** cierra el pendiente del WIP contra el
 maquilero — eso exigiría un `TipoEtapaMovimiento` nuevo y rehacer la aritmética de pendientes. Es una
