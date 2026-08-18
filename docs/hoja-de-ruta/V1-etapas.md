@@ -1128,7 +1128,7 @@ medidas activas?—, el mismo con el que el precosto decide promediar: **sin ban
 usable**. Y el aviso de tallas sin medida se **REUSÓ** —la habilitación lo tiraba a la basura— en vez de
 construir uno nuevo; de paso dejó de señalar tallas con 0 piezas, que nadie iba a cortar.
 
-### Nota de cierre — 🔨 en segunda corrección (18-ago-2026)
+### Nota de cierre — ✅ HECHA (18-ago-2026)
 
 **Primera vuelta: RECHAZADA.** El reviewer confirmó lo más caro de verificar —la migración **no pierde un
 solo dato** (22 filas antes → 22 después contra datos sucios reales), el elástico **no se movió**, y el
@@ -1150,6 +1150,28 @@ coinciden. **La aserción no discrimina.**
 
 **Del lado del lead:** la ficha describía solo §Post-F9.64 —la mitad chica de la etapa—, `HOJA-DE-RUTA.md`
 no la mencionaba y las deudas declaradas no estaban escritas en §4. Reparado aquí.
+
+**Segunda vuelta: rechazada otra vez, y el hallazgo fue contra la documentación del lead** — el 432→8 de
+arriba. Además, **el arreglo de la primera vuelta estaba probado en una sola dirección**: mutar la línea a
+`consumoPorTalla: false` a secas —apagar el toggle a **todos** los avíos al nacer la orden, incluido el
+elástico legítimo— dejaba **191 pruebas en verde**. El comportamiento era correcto; faltaba la aserción.
+*Es el mismo patrón que la prueba decorativa de la vuelta anterior, ahora en el código recién escrito para
+impedir ese defecto.* Y **dos de las cuatro consultas del conteo previo mentían**: contaban órdenes
+canceladas pese a que su propio comentario decía que solo importan las vivas, y la que anuncia la cola de
+revisión manual **subreportaba 5 de 9 — por el lado malo**.
+
+**Tercera vuelta: APROBADA.** Las cuatro mutaciones supervivientes mueren; la consulta reescrita predijo
+**12 filas** y la migración marcó **12, las mismas**; y el barrido del repo confirmó que ningún lugar
+sigue diciendo "mueve costos". Integración final: **1914**.
+
+**El reviewer se corrigió a sí mismo:** su mutación del precio de la heredada en la segunda vuelta estaba
+**mal formada** (`&& false ? A : B` — `&&` liga más que `? :`, así que caía al brazo completo y el precio
+sí se comparaba). El hallazgo era legítimo; **su evidencia de entonces no**. La rehízo y esta vez muere
+con tres pruebas. *Lo dijo sin que nadie se lo pidiera.*
+
+**Lo que se llevó la etapa, en una línea:** tres vueltas, seis hallazgos reales, y **el más caro no fue un
+bug de código sino una afirmación sobre dinero escrita sin ejecutarla**. El sistema llevaba tiempo
+costeando 54 cierres por prenda y nadie lo sabía. Lo destapó **medir en vez de leer**.
 
 ### ⭐ El hallazgo que cambia el sentido de la etapa: el sistema estaba costeando 54× de más
 
