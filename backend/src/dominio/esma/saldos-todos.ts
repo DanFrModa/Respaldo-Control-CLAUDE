@@ -29,7 +29,7 @@ function redondear2(n: number): number {
 interface FilaCruda {
   idMaquilero: number;
   maquilero: string;
-  corto: string | null;
+  nombreCorto: string | null;
   totalCargos: number;
   totalAbonos: number;
   totalPagos: number;
@@ -62,7 +62,7 @@ export async function saldosDeTodosMaquileros(
     SELECT
       p."id"     AS "idMaquilero",
       p."nombre" AS "maquilero",
-      p."corto"  AS "corto",
+      p."nombre_corto" AS "nombreCorto",
       COALESCE(c."total", 0)::float8 AS "totalCargos",
       COALESCE(a."total", 0)::float8 AS "totalAbonos",
       COALESCE(pg."total", 0)::float8 AS "totalPagos",
@@ -108,7 +108,7 @@ export async function saldosDeTodosMaquileros(
   const filas = filasCrudas.map((f) => ({
     idMaquilero: f.idMaquilero,
     maquilero: f.maquilero,
-    corto: f.corto,
+    nombreCorto: f.nombreCorto,
     totalCargos: oculto(f.totalCargos),
     totalAbonos: oculto(f.totalAbonos),
     totalPagos: oculto(f.totalPagos),

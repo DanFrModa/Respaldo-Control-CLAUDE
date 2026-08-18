@@ -1,0 +1,74 @@
+/**
+ * SEGMENTACIÓN CON/SIN FACTURA de las cuentas por pagar (V1-E3f pieza B — §Post-F9.57).
+ *
+ * Daniel, levantando el punto que él mismo había diferido: *"En el punto 6 dijiste que lo dejamos
+ * para después, pero si quieres de una vez… hay proveedores de avíos o de telas que puede pasar que
+ * algunas cosas sean con factura y otras sin factura."*
+ *
+ * Eso CAMBIA el alcance: la partición deja de ser un asunto de talleres (EsMa) y pasa a ser general
+ * del proveedor. Lo que ya existía **se reusa, no se reinventa**:
+ *  • `Proveedor.modalidadFacturacion` (`solo_con`/`solo_sin`/`ambos`) — F6-E4 decisión (h).
+ *  • `resolverConFactura` (`dominio/esma/facturacion.ts`) — la regla de cómo la modalidad manda
+ *    sobre lo que se pidió. **Es la misma regla**, así que se importa; escribir una segunda copia
+ *    para CxP es exactamente el defecto que este proyecto ya pagó tres veces.
+ *
+ * Lo único que CxP agrega es la pieza que EsMa no necesitaba: **un origen puede ser intrínsecamente
+ * sin factura**. Ver {@link resolverSegmentoCxp}.
+ *
+ * DÓNDE VIVE EL SEGMENTO EN CxP: en `MovimientoTercero.esFiscal`, que ya existe y significa
+ * exactamente "este movimiento tiene CFDI". No se agrega una columna paralela: el propio motor ya
+ * equipara los dos conceptos al proyectar EsMa sobre el libro unificado
+ * (`convivencia-esma.ts`: `esFiscal: conFactura === true`). Cero migración.
+ */
+import type { OrigenMovimientoCxpClave } from '../../../contrato/index.js';
+import type { ModalidadFacturacion } from '../../../datos/index.js';
+
+import { ErrorValidacion } from '../../../comun/errores.js';
+import { resolverConFactura } from '../../esma/facturacion.js';
+
+/**
+ * Orígenes de CxP que son SIN FACTURA por definición, dijera lo que dijera la modalidad del
+ * proveedor. `entrada_sin_factura` es la mercancía recibida cuya factura formal todavía no llega
+ * (se concilia después, al leer el CFDI): marcarla como fiscal porque el proveedor "siempre
+ * factura" metería al reporte del contador un cargo SIN comprobante que lo respalde.
+ */
+const ORIGENES_SIN_FACTURA: readonly OrigenMovimientoCxpClave[] = ['entrada_sin_factura'];
+
+/**
+ * Resuelve si un movimiento de CxP es CON factura. Devuelve un `boolean` (no `null`) porque
+ * `MovimientoTercero.esFiscal` no es nullable: cuando nadie definió nada, el movimiento nace SIN
+ * factura, que es como se comportaba CxP hasta hoy (no cambia ningún saldo existente).
+ *
+ * Reglas, en orden:
+ *  1. **El origen manda sobre la modalidad.** Si el origen es sin-factura por definición, el
+ *     movimiento es sin factura. Y si además se pidió lo contrario, NO se corrige en silencio: se
+ *     rechaza con un mensaje que dice por qué (D3).
+ *  2. **La modalidad manda sobre lo pedido** (regla de EsMa, reusada tal cual):
+ *     `solo_con` → con factura · `solo_sin` → sin factura · `ambos` → EXIGE que se indique.
+ *  3. Sin modalidad definida (los proveedores migrados, que nunca contestaron la pregunta) se
+ *     respeta lo que se mandó; si tampoco se mandó, nace sin factura.
+ */
+export function resolverSegmentoCxp(
+  origen: OrigenMovimientoCxpClave,
+  modalidad: ModalidadFacturacion | null,
+  solicitado: boolean | undefined,
+): boolean {
+  if (ORIGENES_SIN_FACTURA.includes(origen)) {
+    if (solicitado === true) {
+      throw new ErrorValidacion(
+        'Una entrada SIN factura no puede marcarse como con factura: su comprobante se concilia ' +
+          'después, al capturar el CFDI del proveedor.',
+      );
+    }
+    return false;
+  }
+  return resolverConFactura(modalidad, solicitado) ?? false;
+}
+
+/**
+ * Cláusula `where` del segmento sobre `MovimientoTercero.esFiscal`. `todos` no filtra nada.
+ * Espejo exacto del `conFacturaWhere` del estado de cuenta de EsMa.
+ */
+export function segmentoWhere(segmento: 'todos' | 'con' | 'sin'): { esFiscal?: boolean } {
+  return segmento === 'todos' ? {} : { esFiscal: segmento === 'con' };
+}

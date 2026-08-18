@@ -76,7 +76,7 @@ export const esquemaCfdiCandidatoProveedor = z
     idProveedor: z.number().int().describe('Id del proveedor.'),
     nombre: z.string().describe('Nombre del proveedor.'),
     rfc: z.string().nullable().describe('RFC del proveedor (catálogo R15).'),
-    corto: z.string().nullable().describe('Clave corta del proveedor.'),
+    nombreCorto: z.string().nullable().describe('Campo corto del proveedor, o null.'),
   })
   .describe('Proveedor candidato por RFC.');
 

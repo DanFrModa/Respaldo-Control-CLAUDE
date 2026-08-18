@@ -144,6 +144,16 @@ ALTER TABLE "proveedores" DROP COLUMN "corto";
 CREATE UNIQUE INDEX "proveedores_nombre_corto_key" ON "proveedores"("nombre_corto");
 
 -- ── 4. El TIPO se traduce a rol y se retira ──────────────────────────────────
+-- Primero se GARANTIZA que existan los tres roles destino (mismo cuidado que la migración del
+-- catálogo de arte): si a una base le faltara alguno, el JOIN de abajo no empataría y esos
+-- proveedores perderían su clasificación EN SILENCIO — justo lo que no se vale (D3).
+-- `modificado_en` no tiene DEFAULT en la base (Prisma lo escribe con @updatedAt): se fija a mano.
+INSERT INTO "roles_proveedor" ("codigo", "nombre", "activo", "creado_en", "modificado_en")
+SELECT v."codigo", v."nombre", true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+  FROM (VALUES ('vende-telas', 'Telas'), ('vende-avios', 'Avíos'), ('otros-servicios', 'Otros servicios'))
+       AS v("codigo", "nombre")
+ WHERE NOT EXISTS (SELECT 1 FROM "roles_proveedor" r WHERE r."codigo" = v."codigo");
+
 -- ADITIVO: `ON CONFLICT DO NOTHING` respeta los roles que el proveedor ya tenía marcados.
 -- `SIN_CLASIFICAR` no produce rol (no hay nada que traducir).
 INSERT INTO "proveedor_rol" ("id_proveedor", "id_rol_proveedor", "creado_en")

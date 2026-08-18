@@ -32,3 +32,20 @@ export function codigoErrorPrisma(error: unknown): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * ¿La violación de unicidad (P2002) fue de ESTE campo? Prisma pone en `meta.target` las columnas
+ * del índice que se violó. Sirve para dar el mensaje correcto cuando una tabla tiene VARIOS únicos
+ * —el catálogo de proveedores tiene `nombre` y `nombre_corto`— en vez de culpar siempre al primero.
+ *
+ * Devuelve `false` si `meta.target` no viene (algunos conectores no lo mandan): el llamador debe
+ * dejar un mensaje genérico como último caso, nunca uno específico equivocado.
+ */
+export function unicidadDeCampo(error: unknown, ...columnas: string[]): boolean {
+  if (typeof error !== 'object' || error === null || !('meta' in error)) return false;
+  const meta: unknown = error.meta;
+  if (typeof meta !== 'object' || meta === null || !('target' in meta)) return false;
+  const target: unknown = meta.target;
+  const lista = typeof target === 'string' ? [target] : Array.isArray(target) ? target : [];
+  return lista.some((t) => typeof t === 'string' && columnas.some((c) => t.includes(c)));
+}

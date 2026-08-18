@@ -11,7 +11,7 @@ export type TipoMaquilero = '' | 'costura' | 'estampado';
 interface OpcionMaquilero {
   id: number;
   nombre: string;
-  corto: string | null;
+  nombreCorto: string | null;
 }
 
 /**
@@ -45,7 +45,7 @@ export function ComboboxMaquilero({
   const opciones: OpcionMaquilero[] = (maquileros.data?.filas ?? []).map((m) => ({
     id: m.id,
     nombre: m.nombre,
-    corto: m.corto,
+    nombreCorto: m.nombreCorto,
   }));
 
   return (
@@ -53,7 +53,9 @@ export function ComboboxMaquilero({
       opciones={opciones}
       valor={idMaquilero === '' ? null : Number(idMaquilero)}
       onChange={(id) => onCambioMaquilero(id === null ? '' : String(id))}
-      renderOpcion={(o) => <OpcionRica principal={o.nombre} secundario={o.corto ?? undefined} />}
+      renderOpcion={(o) => (
+        <OpcionRica principal={o.nombre} secundario={o.nombreCorto ?? undefined} />
+      )}
       cargando={maquileros.isFetching}
       mensajeError={maquileros.isError ? maquileros.error.message : undefined}
       conLupa

@@ -66,9 +66,22 @@ function rangoCreado(
   };
 }
 
-/** Cláusula `where` de facturación (solo la vista fiscal segmenta a `conFactura = true`). */
-function facturaWhere(soloFiscal: boolean): { conFactura?: boolean } {
-  return soloFiscal ? { conFactura: true } : {};
+/**
+ * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa (V1-E3f pieza B).
+ *
+ * ⚠️ `EsMaCargo.conFactura` es NULLABLE ("sin definir": así quedaron los movimientos que migraron
+ * del Access, donde la pregunta jamás se hizo). El segmento `sin` filtra por **`not: true`** —o sea
+ * los `false` **y** los sin definir— y NO por `= false`. Es a propósito, y es la única diferencia
+ * con el filtro de la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que sí usa `= false`):
+ *
+ *   aquí los dos segmentos tienen que ser una PARTICIÓN EXACTA del saldo, porque eso es justo lo
+ *   que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*).
+ *   Con `= false`, los movimientos sin definir se caerían de los DOS lados y la suma de los
+ *   segmentos no daría el saldo total — un hueco silencioso en un número de dinero.
+ */
+function facturaWhere(segmento: 'todos' | 'con' | 'sin'): { conFactura?: boolean | { not: true } } {
+  if (segmento === 'todos') return {};
+  return segmento === 'con' ? { conFactura: true } : { conFactura: { not: true } };
 }
 
 /**
@@ -108,8 +121,8 @@ export async function aportesEsMaSaldoLote(
 export interface OpcionesProyeccionEsMa {
   desde?: string | undefined;
   hasta?: string | undefined;
-  /** Vista fiscal: solo movimientos con factura (conFactura = true). */
-  soloFiscal: boolean;
+  /** Segmento de facturación: `todos` | `con` (conFactura = true) | `sin` (false o sin definir). */
+  segmento: 'todos' | 'con' | 'sin';
   /** Si false, los `monto` viajan en null (se ocultan importes). */
   puedeVerImportes: boolean;
 }
@@ -127,8 +140,8 @@ export async function proyectarMovimientosEsMa(
   nombre: string,
   opciones: OpcionesProyeccionEsMa,
 ): Promise<MovimientoTerceroSalida[]> {
-  const { desde, hasta, soloFiscal, puedeVerImportes } = opciones;
-  const factura = facturaWhere(soloFiscal);
+  const { desde, hasta, segmento, puedeVerImportes } = opciones;
+  const factura = facturaWhere(segmento);
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
 
   const [cargos, abonos, descuentos, pagos] = await Promise.all([

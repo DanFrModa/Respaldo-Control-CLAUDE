@@ -14,6 +14,7 @@ function cuentaDePrueba(): EstadoCuentaTerceroSalida {
     idTercero: 7,
     tercero: 'Hilaturas del Norte',
     vista: 'operativa',
+    segmento: 'todos',
     desde: '2026-07-01',
     hasta: '2026-07-31',
     saldo: {
@@ -22,6 +23,7 @@ function cuentaDePrueba(): EstadoCuentaTerceroSalida {
       tercero: 'Hilaturas del Norte',
       saldo: 700,
       saldoFiscal: 0,
+      saldoSinFactura: 0,
       saldoMovimientos: 700,
       saldoEsMa: 0,
       incluyeEsMa: true,

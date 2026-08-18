@@ -69,7 +69,7 @@ beforeEach(async () => {
   otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa CxP');
   // 5 días de crédito: los cargos caen holgadamente dentro de sus cubetas (5 días de margen a los bordes).
   proveedor = await cliente.proveedor.create({
-    data: { nombre: 'Hilaturas del Norte', corto: 'HDN', diasCredito: 5 },
+    data: { nombre: 'Hilaturas del Norte', nombreCorto: 'HDN', diasCredito: 5 },
   });
 });
 
@@ -391,7 +391,7 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
 
   it('un maquilero con deuda EsMa y 0 en el motor APARECE con su saldo en la cubeta maquila', async () => {
     const maquilero = await cliente.proveedor.create({
-      data: { nombre: 'Maquilas del Sur', corto: 'MDS' },
+      data: { nombre: 'Maquilas del Sur', nombreCorto: 'MDS' },
     });
     await sembrarCargoEsMa(maquilero.id, 10, 50); // 500 de maquila, 0 en el motor
 
@@ -447,5 +447,165 @@ describe('convivencia EsMa en la bandeja (cubeta maquila)', () => {
     // El saldo del renglón == el saldo del estado de cuenta (mismo total, sin doble conteo).
     const cuenta = await estadoCuentaProveedorCxp(sesion(), proveedor.id, {}, bd());
     expect(fila?.saldo).toBe(cuenta.saldo.saldo);
+  });
+});
+
+// ── (g) SEGMENTACIÓN con/sin factura (V1-E3f pieza B, §Post-F9.57) ───────────────────────────────
+//
+// Daniel: *"hay proveedores de avíos o de telas que puede pasar que algunas cosas sean con factura
+// y otras sin factura"*. El motor: el movimiento se MARCA con la modalidad del proveedor, el saldo
+// se PARTE en dos y el estado de cuenta se consulta por segmento.
+describe('segmentación con/sin factura en CxP', () => {
+  /** Fija la modalidad de facturación del proveedor de la prueba. */
+  async function conModalidad(m: 'solo_con' | 'solo_sin' | 'ambos' | null): Promise<void> {
+    await cliente.proveedor.update({
+      where: { id: proveedor.id },
+      data: { modalidadFacturacion: m },
+    });
+  }
+
+  it('la modalidad del proveedor MARCA el movimiento (solo_con → fiscal, solo_sin → no)', async () => {
+    await conModalidad('solo_con');
+    const conFactura = await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'nota_credito', importe: 100 },
+      bd(),
+    );
+    await conModalidad('solo_sin');
+    const sinFactura = await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      // Se pide `true` a propósito: la modalidad del proveedor manda sobre lo que pidió la pantalla.
+      { fecha: hace(0), origen: 'nota_credito', importe: 50, esFiscal: true },
+      bd(),
+    );
+
+    const enBd = await cliente.movimientoTercero.findMany({
+      where: { id: { in: [conFactura.id, sinFactura.id] } },
+      orderBy: { id: 'asc' },
+      select: { esFiscal: true },
+    });
+    expect(enBd.map((m) => m.esFiscal)).toEqual([true, false]);
+  });
+
+  it('⭐ con modalidad `ambos` EXIGE indicar el segmento (no elige en silencio)', async () => {
+    await conModalidad('ambos');
+    await expect(
+      registrarMovimientoCxp(
+        sesion(),
+        proveedor.id,
+        { fecha: hace(0), origen: 'pago', importe: 10 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // Indicándolo, pasa.
+    await expect(
+      registrarMovimientoCxp(
+        sesion(),
+        proveedor.id,
+        { fecha: hace(0), origen: 'pago', importe: 10, esFiscal: true },
+        bd(),
+      ),
+    ).resolves.toBeTruthy();
+  });
+
+  it('⭐ una entrada SIN factura no se vuelve fiscal ni con un proveedor `solo_con`', async () => {
+    await conModalidad('solo_con');
+    const mov = await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    const enBd = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: mov.id },
+      select: { esFiscal: true },
+    });
+    expect(enBd.esFiscal).toBe(false);
+  });
+
+  it('el saldo se parte en dos y los dos segmentos SUMAN el total', async () => {
+    await conModalidad('ambos');
+    // 1,000 sin factura de mercancía + 400 con factura − 100 de pago sin factura.
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'entrada_sin_factura', importe: 1000 },
+      bd(),
+    );
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'nota_credito', importe: 400, esFiscal: true },
+      bd(),
+    );
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'pago', importe: 100, esFiscal: false },
+      bd(),
+    );
+
+    const cuenta = await estadoCuentaProveedorCxp(sesion(), proveedor.id, {}, bd());
+    expect(cuenta.saldo.saldo).toBe(500); // 1000 − 400 − 100
+    expect(cuenta.saldo.saldoFiscal).toBe(-400);
+    expect(cuenta.saldo.saldoSinFactura).toBe(900); // 1000 − 100
+    // La partición es EXACTA: no hay dinero que se caiga de los dos lados.
+    expect((cuenta.saldo.saldoFiscal ?? 0) + (cuenta.saldo.saldoSinFactura ?? 0)).toBe(
+      cuenta.saldo.saldo,
+    );
+  });
+
+  it('el estado de cuenta filtra los renglones por segmento', async () => {
+    await conModalidad('ambos');
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'nota_credito', importe: 400, esFiscal: true },
+      bd(),
+    );
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'pago', importe: 100, esFiscal: false },
+      bd(),
+    );
+
+    const todos = await estadoCuentaProveedorCxp(sesion(), proveedor.id, {}, bd());
+    const con = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'con' }, bd());
+    const sin = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'sin' }, bd());
+
+    expect(todos.total).toBe(2);
+    expect(con.total).toBe(1);
+    expect(sin.total).toBe(1);
+    expect(con.movimientos[0]?.origen).toBe('nota_credito');
+    expect(sin.movimientos[0]?.origen).toBe('pago');
+    expect(con.segmento).toBe('con');
+  });
+
+  it('⭐ el segmento NO exige el permiso del contador (`terceros.fiscal`), la vista fiscal SÍ', async () => {
+    await conModalidad('solo_con');
+    await registrarMovimientoCxp(
+      sesion(),
+      proveedor.id,
+      { fecha: hace(0), origen: 'nota_credito', importe: 400 },
+      bd(),
+    );
+    const sinFiscal = sesion(PERM_TODOS.filter((p) => p !== 'terceros.fiscal'));
+
+    // La partición operativa que pidió Daniel NO puede quedar tras el candado del contador.
+    await expect(
+      estadoCuentaProveedorCxp(sinFiscal, proveedor.id, { segmento: 'con' }, bd()),
+    ).resolves.toBeTruthy();
+    await expect(
+      estadoCuentaProveedorCxp(sinFiscal, proveedor.id, { vista: 'fiscal' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('vista fiscal + segmento "sin" es contradictorio y se rechaza (no devuelve vacío mudo)', async () => {
+    await expect(
+      estadoCuentaProveedorCxp(sesion(), proveedor.id, { vista: 'fiscal', segmento: 'sin' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });

@@ -38,7 +38,7 @@ const PREVIEW: CfdiPrevisualizacion = {
     idProveedor: 7,
     nombre: 'Telas del Norte SA',
     rfc: 'AAA010101AA1',
-    corto: 'TDN',
+    nombreCorto: 'TDN',
   },
   candidatosOc: [
     {

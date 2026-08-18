@@ -37,8 +37,8 @@ test.describe('CRUD de Proveedores', () => {
     const dialogoAlta = page.getByRole('dialog');
     await expect(dialogoAlta.getByRole('heading', { name: 'Nuevo proveedor' })).toBeVisible();
     await dialogoAlta.locator('#proveedor-nombre').fill(nombre);
-    await dialogoAlta.getByLabel('Tipo').selectOption('AVIOS');
-    // Crear ahora exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
+    // El campo TIPO se retiró en V1-E3f pieza B (§Post-F9.56 punto 3): el rol lo cubre.
+    // Crear exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
     await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
     await page.getByTestId('guardar-proveedor').click();
 
@@ -48,10 +48,10 @@ test.describe('CRUD de Proveedores', () => {
     const filaNueva = page.getByTestId('fila-proveedor').filter({ hasText: nombre });
     await expect(filaNueva).toBeVisible();
 
-    // ── Seleccionar → el detalle muestra el proveedor (tipo y estado) ──────────
+    // ── Seleccionar → el detalle muestra el proveedor (rol y estado) ──────────
     await filaNueva.click();
     await expect(detalle.getByRole('heading', { name: nombre })).toBeVisible();
-    await expect(detalle.getByText('Avíos').first()).toBeVisible();
+    await expect(detalle.getByTestId('roles-proveedor-detalle')).toBeVisible();
     await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
 
     // ── Editar (boton directo del detalle) ─────────────────────────────────────
@@ -113,22 +113,15 @@ test.describe('CRUD de Proveedores', () => {
     await expect(page.getByText('No hay proveedores que coincidan con la búsqueda.')).toBeVisible();
   });
 
-  test('el filtro por tipo acota la lista', async ({ page }) => {
+  // El filtro por TIPO se retiró junto con el campo (§Post-F9.56 punto 3, V1-E3f pieza B): los
+  // roles multi-valor ya cubren el caso que el tipo único no podía (vender telas Y ser maquilero).
+  test('ya no hay filtro por tipo en la barra', async ({ page }) => {
     await entrarComoAdmin(page);
     await page.goto('/catalogos/proveedores');
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
-
-    await page.getByTestId('filtro-tipo-proveedor').selectOption('TELAS');
-    // El filtro recarga la lista en el servidor (tabla-first, sin auto-selección). Se
-    // verifica que los renglones muestren el tipo "Telas" (su badge) o, si el catálogo no
-    // tiene proveedores TELAS, que quede el estado vacío: ambos resultados son válidos.
-    await expect(
-      page
-        .getByTestId('fila-proveedor')
-        .filter({ hasText: 'Telas' })
-        .first()
-        .or(page.getByText('No hay proveedores que coincidan con la búsqueda.')),
-    ).toBeVisible();
+    await expect(page.getByTestId('filtro-tipo-proveedor')).toHaveCount(0);
+    // El que SÍ queda es el de rol.
+    await expect(page.getByTestId('filtro-rol-proveedor')).toBeVisible();
   });
 });
 

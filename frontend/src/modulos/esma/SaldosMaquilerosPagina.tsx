@@ -107,7 +107,9 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                       <span className="font-medium">{f.maquilero}</span>
                       <span className="font-semibold tabular-nums">{moneda(f.saldo)}</span>
                     </div>
-                    {f.corto ? <p className="text-xs text-muted-foreground">{f.corto}</p> : null}
+                    {f.nombreCorto ? (
+                      <p className="text-xs text-muted-foreground">{f.nombreCorto}</p>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -135,8 +137,10 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                       >
                         <TablaDensaCelda className="font-medium">
                           {f.maquilero}
-                          {f.corto ? (
-                            <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
+                          {f.nombreCorto ? (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({f.nombreCorto})
+                            </span>
                           ) : null}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica>{moneda(f.totalCargos)}</TablaDensaCelda>

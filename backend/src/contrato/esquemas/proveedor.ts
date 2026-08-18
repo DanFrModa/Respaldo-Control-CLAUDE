@@ -160,7 +160,6 @@ const camposEnriquecidosEditar = {
   modalidadFacturacion: camposEnriquecidos.modalidadFacturacion.nullable(),
 } as const;
 
-
 // ── CONTACTOS del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1 / §Post-F9.57 punto 1) ──────────
 //
 // Daniel: *"A veces es importante ir registrando al vendedor, a la de crédito y cobranza, al
@@ -242,6 +241,64 @@ export const esquemaProveedorContactoSalida = z
 
 /** Contacto de proveedor tal como sale de la API. */
 export type ProveedorContactoSalida = z.infer<typeof esquemaProveedorContactoSalida>;
+
+// ── CONSTANCIA DE SITUACIÓN FISCAL (V1-E3f pieza B, §Post-F9.55) ─────────────────────────────────
+//
+// Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
+// alta. Con ese documento se llena toda la info en automático: RFC, direcciones, etc."*
+//
+// ⭐ El documento PROPONE, la persona CONFIRMA: este endpoint NO guarda nada. Devuelve lo que dice el
+// papel y la pantalla llena los campos para que alguien los revise y acepte. Sirve igual en el ALTA
+// y en la EDICIÓN. El PDF viaja en base64 (misma mecánica que el importador de OC de C&A) y se
+// CONSERVA aparte como adjunto `CONSTANCIA` del proveedor: no se lee y se tira.
+
+/** Cuerpo del análisis: el PDF de la constancia en base64. */
+export const esquemaAnalizarConstanciaCuerpo = z
+  .object({
+    archivoBase64: z
+      .string({ error: 'Falta el archivo' })
+      .min(1, { error: 'Falta el archivo' })
+      .describe('PDF de la Constancia de Situación Fiscal, en base64 (máx. 10 MB decodificado).'),
+  })
+  .describe('Constancia de Situación Fiscal a leer (no se guarda nada aquí).');
+
+/** Datos validados del análisis de la constancia. */
+export type DatosAnalizarConstanciaCuerpo = z.infer<typeof esquemaAnalizarConstanciaCuerpo>;
+
+/** Un régimen fiscal propuesto por la constancia. */
+export const esquemaRegimenPropuesto = z
+  .object({
+    clave: z
+      .string()
+      .describe(
+        'Clave del catálogo c_RegimenFiscal del SAT (p. ej. "601"), o "" si no se reconoció.',
+      ),
+    descripcion: z.string().describe('Nombre del régimen tal como se leyó/reconoció.'),
+  })
+  .describe('Régimen fiscal propuesto (la persona escoge si hay más de uno).');
+
+/** Lo que la constancia PROPONE. Ningún campo se guarda sin confirmación. */
+export const esquemaAnalizarConstanciaSalida = z
+  .object({
+    tipoPersona: z.enum(['fisica', 'moral']).describe('fisica (trae CURP) o moral (denominación).'),
+    rfc: z.string().describe('RFC leído, o "".'),
+    razonSocial: z
+      .string()
+      .describe('Denominación (moral) o nombre + apellidos compuestos (física), o "".'),
+    curp: z.string().describe('CURP (solo persona física), o "".'),
+    regimenes: z
+      .array(esquemaRegimenPropuesto)
+      .describe('Regímenes encontrados. Con más de uno, la persona escoge.'),
+    codigoPostalExpedicion: z.string().describe('CP del domicilio fiscal (5 dígitos), o "".'),
+    direccion: z.string().describe('Domicilio armado con las partes que sí traen valor, o "".'),
+    advertencias: z
+      .array(z.string())
+      .describe('Lo que no se pudo leer. NO bloquea: se captura a mano.'),
+  })
+  .describe('Datos que PROPONE la constancia (la persona confirma).');
+
+/** Salida del análisis de la constancia. */
+export type AnalizarConstanciaSalida = z.infer<typeof esquemaAnalizarConstanciaSalida>;
 
 /**
  * Alta de proveedor (catálogo global F1-E1, ADR-0007: sin `idEmpresa`). El nombre

@@ -5,12 +5,9 @@
  * no resuelve modelos/colores): sólo devuelve lo que dice el papel + las advertencias de cuadre. El
  * reconocimiento (modelo↔liga, color/talla↔catálogo) y el alta viven en `importacion-pdf.ts` (A1).
  *
- * Por qué `unpdf`: wrapper moderno de una build serverless de pdf.js (Mozilla), 100 % JS SIN
- * dependencias nativas (a diferencia de las libs con binarios), mantenido y con tipos. Extrae SÓLO
- * texto (no renderiza), que es lo único que necesitamos. Verificado contra la OC real de C&A: mantiene
- * "Etiqueta: valor" en la misma línea (mucho más limpio que otras libs). Como sólo extrae texto de un
- * PDF chico (~200 KB, 3 páginas) es RÁPIDO (decenas de ms): corre inline en el request, SIN worker
- * (el worker de documentos del repo es para GENERAR PDFs con @react-pdf, otra cosa).
+ * La extracción del texto vive en `comun/pdf-texto.ts` (se comparte con el lector de la Constancia
+ * de Situación Fiscal, §Post-F9.55). Verificado contra la OC real de C&A: `unpdf` mantiene
+ * "Etiqueta: valor" en la misma línea (mucho más limpio que otras libs).
  *
  * Robustez del parseo: se trabaja sobre el texto NORMALIZADO (saltos de línea → espacios, espacios
  * colapsados) con regex ancladas a la etiqueta y con la FORMA del valor (número/fecha/token), de modo
@@ -18,9 +15,8 @@
  * quede pegado a la etiqueta de al lado. Las validaciones de cuadre (Σ tallas == Piezas Totales;
  * Σ×precio ≈ Monto Total) NO bloquean: se devuelven como ADVERTENCIAS para que el usuario decida.
  */
-import { extractText } from 'unpdf';
-
 import { ErrorValidacion } from '../../comun/errores.js';
+import { extraerTextoPdf } from '../../comun/pdf-texto.js';
 
 /** Una talla del PDF (fila de la tabla SKU/Talla/Piezas). */
 export interface TallaParseada {
@@ -80,9 +76,6 @@ export interface RenglonPdfCyaParseado {
   advertencias: AdvertenciaParseada[];
 }
 
-/** Tope del PDF decodificado (los OCs son chicos; blinda memoria/parseo). */
-export const MAX_PDF_BYTES = 10 * 1024 * 1024;
-
 // ── Utilidades de texto ──────────────────────────────────────────────────────
 
 /** Colapsa TODO el espacio en blanco (incl. saltos de línea) a un solo espacio y recorta. */
@@ -133,29 +126,6 @@ function desduplicarColor(texto: string): string {
     if (primera === segunda) return primera;
   }
   return limpio;
-}
-
-// ── Extracción del texto del PDF (parte con I/O) ──────────────────────────────
-
-/**
- * Extrae el texto de cada página del PDF con `unpdf`. Lanza `ErrorValidacion` con mensaje claro si el
- * archivo no es un PDF legible (corrupto/otro formato) — el llamador lo trata por-archivo.
- */
-export async function extraerTextoPdf(buffer: Buffer): Promise<string[]> {
-  if (buffer.length === 0) {
-    throw new ErrorValidacion('El PDF está vacío o no se pudo leer.');
-  }
-  if (buffer.length > MAX_PDF_BYTES) {
-    throw new ErrorValidacion('El PDF excede el máximo permitido (10 MB).');
-  }
-  try {
-    // `extractText` acepta los bytes directamente (build serverless de pdf.js); `mergePages:false` da
-    // el texto POR PÁGINA (la pág. 1 tiene el encabezado; la 2, la tabla de tallas).
-    const { text } = await extractText(new Uint8Array(buffer), { mergePages: false });
-    return text;
-  } catch {
-    throw new ErrorValidacion('El archivo no es un PDF válido o está dañado.');
-  }
 }
 
 // ── Parseo del texto (parte PURA) ─────────────────────────────────────────────

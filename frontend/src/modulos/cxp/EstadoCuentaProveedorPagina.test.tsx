@@ -32,6 +32,7 @@ const cuenta: CxpEstadoCuenta = {
   idTercero: 7,
   tercero: 'Hilaturas del Norte',
   vista: 'operativa',
+  segmento: 'todos',
   desde: null,
   hasta: null,
   saldo: {
@@ -40,6 +41,7 @@ const cuenta: CxpEstadoCuenta = {
     tercero: 'Hilaturas del Norte',
     saldo: 700,
     saldoFiscal: 0,
+    saldoSinFactura: 0,
     saldoMovimientos: 700,
     saldoEsMa: 0,
     incluyeEsMa: true,

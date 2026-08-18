@@ -65,10 +65,20 @@ export const esquemaMovimientoCxpCrear = z
       .number({ error: 'El importe es obligatorio' })
       .min(0.01, { error: 'El importe debe ser de al menos 0.01' })
       .describe('Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen).'),
+    /**
+     * ¿Este movimiento es CON factura? (V1-E3f pieza B, §Post-F9.57). **SIN default a propósito:**
+     * el servidor lo resuelve con la `modalidadFacturacion` del proveedor —`solo_con` lo fuerza a
+     * true, `solo_sin` a false, y **`ambos` EXIGE que se mande**, porque ahí nadie más puede
+     * decidirlo. Un `.default(false)` habría elegido "sin factura" en silencio justo en el caso que
+     * Daniel quiere partir en dos.
+     */
     esFiscal: z
       .boolean()
-      .default(false)
-      .describe('¿Movimiento fiscal (con CFDI)? El proveedor informal lo deja en false.'),
+      .optional()
+      .describe(
+        '¿Movimiento CON factura (CFDI)? Lo resuelve el servidor con la modalidad del proveedor; ' +
+          'obligatorio cuando el proveedor factura "de las dos formas".',
+      ),
     refTipo: z
       .string()
       .trim()
@@ -135,7 +145,7 @@ export const esquemaBandejaCxpFila = z
   .object({
     idProveedor: z.number().int().describe('Id del proveedor.'),
     proveedor: z.string().describe('Nombre del proveedor.'),
-    corto: z.string().nullable().describe('Clave corta del proveedor (o null).'),
+    nombreCorto: z.string().nullable().describe('Campo corto del proveedor, o null.'),
     diasCredito: z.number().int().describe('Días de crédito del proveedor (0 = contado).'),
     saldo: z.number().nullable().describe('Saldo por pagar combinado (motor + maquila EsMa).'),
     corriente: z.number().nullable().describe('No vencido (neto de abonos).'),

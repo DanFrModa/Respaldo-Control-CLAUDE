@@ -84,7 +84,9 @@ export function SelectorProveedor({
       }}
       alCambiarTexto={setTexto}
       busquedaServidor
-      renderOpcion={(o) => <OpcionRica principal={o.nombre} secundario={o.corto ?? undefined} />}
+      renderOpcion={(o) => (
+        <OpcionRica principal={o.nombre} secundario={o.nombreCorto ?? undefined} />
+      )}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
       conLupa
       permitirLimpiar={alLimpiar !== undefined}

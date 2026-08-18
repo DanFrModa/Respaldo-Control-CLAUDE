@@ -5,26 +5,10 @@ import {
   mapearTipoArte,
   mapearTipoComponente,
   mapearUnidadTela,
-  mapearTipoProveedor,
   rolesDeMaquilero,
 } from './mapeos-enum.js';
 
 describe('migración · mapeos de enum (puros)', () => {
-  describe('mapearTipoProveedor (TipoProv H/T/S)', () => {
-    it('H→AVIOS, T→TELAS, S→SERVICIOS, vacío/desconocido→SIN_CLASIFICAR', () => {
-      expect(mapearTipoProveedor('H')).toBe('AVIOS');
-      expect(mapearTipoProveedor('T')).toBe('TELAS');
-      expect(mapearTipoProveedor('S')).toBe('SERVICIOS');
-      expect(mapearTipoProveedor('')).toBe('SIN_CLASIFICAR');
-      expect(mapearTipoProveedor(null)).toBe('SIN_CLASIFICAR');
-      expect(mapearTipoProveedor('X')).toBe('SIN_CLASIFICAR');
-    });
-    it('es insensible a mayúsculas y espacios', () => {
-      expect(mapearTipoProveedor(' h ')).toBe('AVIOS');
-      expect(mapearTipoProveedor('t')).toBe('TELAS');
-    });
-  });
-
   describe('mapearRolProveedorComercial (TipoProv → código de rol, F4/MRP)', () => {
     it('T→vende-telas, H→vende-avios, S/vacío/desconocido→otros-servicios', () => {
       expect(mapearRolProveedorComercial('T')).toBe('vende-telas');

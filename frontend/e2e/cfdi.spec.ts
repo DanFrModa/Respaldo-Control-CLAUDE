@@ -47,14 +47,14 @@ test.describe('Importar CFDI de proveedor (F9-E3)', () => {
 
     await entrarComoAdmin(page);
 
-    // ── Crear un proveedor (name + tipo + rol, R15) ────────────────────────────
+    // ── Crear un proveedor (nombre + rol, R15) ─────────────────────────────────
     await page.goto('/catalogos/proveedores');
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
     await page.getByTestId('nuevo-proveedor').click();
     const dialogo = page.getByRole('dialog');
     // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
     await dialogo.locator('#proveedor-nombre').fill(proveedor);
-    await dialogo.getByLabel('Tipo').selectOption('AVIOS');
+    // El campo TIPO se retiró en V1-E3f pieza B (§Post-F9.56 punto 3).
     await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${proveedor}" creado.`)).toBeVisible();

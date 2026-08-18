@@ -35,7 +35,7 @@ import type { z } from 'zod';
 
 import { ErrorNoEncontrado } from '../../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
-import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { clienteLectura, enTransaccion, type ContextoBd } from '../../../comun/transaccion.js';
 import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma } from '../../../datos/index.js';
 
@@ -48,6 +48,7 @@ import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
 import { type LimitesAging } from '../aging-comun.js';
 import { netearCubetas, type CubetasAging, type CubetasBrutas } from './aging.js';
+import { resolverSegmentoCxp } from './facturacion-cxp.js';
 
 /** Redondeo monetario a 2 decimales. */
 function redondear2(n: number): number {
@@ -70,6 +71,10 @@ function normalizar(texto: string): string {
  * Registra un movimiento de CxP para un PROVEEDOR (pago/abono/descuento/nota de crédito/entrada sin
  * factura). Fija `tipoTercero='proveedor'` y delega al motor (A2/A3/A7). Permiso `cxp.administrar` (+
  * `terceros.administrar` del motor, defensa en profundidad). Empresa activa (A9).
+ *
+ * V1-E3f pieza B (§Post-F9.57): el SEGMENTO con/sin factura ya no se acepta a ciegas — lo resuelve
+ * {@link resolverSegmentoCxp} con la `modalidadFacturacion` del proveedor. Con `ambos` hay que
+ * indicarlo (nadie más puede decidirlo); con `solo_con`/`solo_sin` la modalidad manda.
  */
 export async function registrarMovimientoCxp(
   sesion: SesionUsuario,
@@ -80,21 +85,38 @@ export async function registrarMovimientoCxp(
   verificarPermiso(sesion, 'cxp.administrar');
   const datos: DatosMovimientoCxpCrear = validarEntrada(esquemaMovimientoCxpCrear, entrada);
 
-  return registrarMovimientoTercero(
-    sesion,
-    {
-      tipoTercero: 'proveedor',
-      idTercero: idProveedor,
-      fecha: datos.fecha,
-      origen: datos.origen,
-      importe: datos.importe,
-      esFiscal: datos.esFiscal,
-      ...(datos.refTipo === undefined ? {} : { refTipo: datos.refTipo }),
-      ...(datos.refId === undefined ? {} : { refId: datos.refId }),
-      ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
-    },
-    bd,
-  );
+  // La modalidad se lee DENTRO de la misma transacción en la que se escribe el movimiento (A2): si
+  // se leyera fuera, un cambio concurrente de la modalidad dejaría el movimiento marcado con una
+  // regla que ya no está vigente. `enTransaccion` reusa la tx del llamador si la hay, y el motor la
+  // reusa a su vez al recibir `{ tx }` — una sola transacción, no tres.
+  return enTransaccion(async (tx) => {
+    const proveedor = await tx.proveedor.findUnique({
+      where: { id: idProveedor },
+      select: { modalidadFacturacion: true },
+    });
+    // Si el proveedor no existe se deja pasar: el motor responde 404 con su mensaje (A9).
+    const esFiscal = resolverSegmentoCxp(
+      datos.origen,
+      proveedor?.modalidadFacturacion ?? null,
+      datos.esFiscal,
+    );
+
+    return registrarMovimientoTercero(
+      sesion,
+      {
+        tipoTercero: 'proveedor',
+        idTercero: idProveedor,
+        fecha: datos.fecha,
+        origen: datos.origen,
+        importe: datos.importe,
+        esFiscal,
+        ...(datos.refTipo === undefined ? {} : { refTipo: datos.refTipo }),
+        ...(datos.refId === undefined ? {} : { refId: datos.refId }),
+        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+      },
+      { tx },
+    );
+  }, bd);
 }
 
 /**
@@ -117,7 +139,8 @@ export async function registrarCargoCompraCxp(
       fecha: datos.fecha,
       origen: 'entrada_sin_factura',
       importe: datos.importe,
-      esFiscal: false,
+      // El origen ya define el segmento (sin factura): `resolverSegmentoCxp` lo confirma y NO deja
+      // que la modalidad del proveedor lo vuelva fiscal sin comprobante que lo respalde.
       refTipo: 'orden-compra',
       refId: datos.idOrdenCompra,
       ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
@@ -174,7 +197,7 @@ export async function estadoCuentaProveedorCxp(
 interface FilaAgregadoCxpCruda {
   idProveedor: number;
   proveedor: string;
-  corto: string | null;
+  nombreCorto: string | null;
   diasCredito: number;
   corriente: Prisma.Decimal;
   d1a30: Prisma.Decimal;
@@ -187,7 +210,7 @@ interface FilaAgregadoCxpCruda {
 interface FilaAgregadoCxp {
   idProveedor: number;
   proveedor: string;
-  corto: string | null;
+  nombreCorto: string | null;
   diasCredito: number;
   corriente: number;
   d1a30: number;
@@ -203,7 +226,7 @@ interface FilaAgregadoCxp {
 interface FilaNeta extends CubetasAging {
   idProveedor: number;
   proveedor: string;
-  corto: string | null;
+  nombreCorto: string | null;
   diasCredito: number;
   /** Aporte EsMa (maquila) — cubeta APARTE: no entra al aging del motor ni al "vencido". */
   maquila: number;
@@ -230,7 +253,7 @@ async function agregarPorProveedor(
     SELECT
       m.id_proveedor AS "idProveedor",
       p.nombre       AS "proveedor",
-      p.corto        AS "corto",
+      p.nombre_corto AS "nombreCorto",
       COALESCE(p.dias_credito, 0)::int AS "diasCredito",
       COALESCE(SUM(m.monto) FILTER (
         WHERE m.monto > 0 AND (m.fecha_vencimiento IS NULL OR CURRENT_DATE - m.fecha_vencimiento <= 0)
@@ -248,12 +271,12 @@ async function agregarPorProveedor(
     FROM movimientos_tercero m
     JOIN proveedores p ON p.id = m.id_proveedor
     WHERE m.id_empresa = ${idEmpresa} AND m.id_proveedor IS NOT NULL
-    GROUP BY m.id_proveedor, p.nombre, p.corto, p.dias_credito
+    GROUP BY m.id_proveedor, p.nombre, p.nombre_corto, p.dias_credito
   `);
   return crudas.map((f) => ({
     idProveedor: f.idProveedor,
     proveedor: f.proveedor,
-    corto: f.corto,
+    nombreCorto: f.nombreCorto,
     diasCredito: f.diasCredito,
     corriente: redondear2(f.corriente.toNumber()),
     d1a30: redondear2(f.d1a30.toNumber()),
@@ -281,7 +304,7 @@ function netearFila(f: FilaAgregadoCxp): FilaNeta {
   const fila: FilaNeta = {
     idProveedor: f.idProveedor,
     proveedor: f.proveedor,
-    corto: f.corto,
+    nombreCorto: f.nombreCorto,
     diasCredito: f.diasCredito,
     corriente: c.corriente,
     d1a30: c.d1a30,
@@ -370,7 +393,7 @@ export async function bandejaPorPagar(
       ? []
       : await cliente.proveedor.findMany({
           where: { id: { in: idsSoloEsMa } },
-          select: { id: true, nombre: true, corto: true, diasCredito: true },
+          select: { id: true, nombre: true, nombreCorto: true, diasCredito: true },
         });
   const infoPorId = new Map(infoSoloEsMa.map((p) => [p.id, p]));
   for (const [id, saldoEsMa] of aportesEsMa) {
@@ -387,7 +410,7 @@ export async function bandejaPorPagar(
     porId.set(id, {
       idProveedor: id,
       proveedor: info.nombre,
-      corto: info.corto,
+      nombreCorto: info.nombreCorto,
       diasCredito: info.diasCredito ?? 0,
       corriente: 0,
       d1a30: 0,
@@ -409,7 +432,7 @@ export async function bandejaPorPagar(
     base = base.filter(
       (f) =>
         normalizar(f.proveedor).includes(q) ||
-        (f.corto !== null && normalizar(f.corto).includes(q)),
+        (f.nombreCorto !== null && normalizar(f.nombreCorto).includes(q)),
     );
   }
   // Orden estable: mayor saldo primero, luego por nombre (determinista).
@@ -422,7 +445,7 @@ export async function bandejaPorPagar(
   const filas: BandejaCxpFila[] = pagina.map((f) => ({
     idProveedor: f.idProveedor,
     proveedor: f.proveedor,
-    corto: f.corto,
+    nombreCorto: f.nombreCorto,
     diasCredito: f.diasCredito,
     saldo: oculto(f.saldo),
     corriente: oculto(f.corriente),

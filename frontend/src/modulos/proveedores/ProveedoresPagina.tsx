@@ -38,11 +38,8 @@ import {
 import {
   ETIQUETAS_METODO_PAGO,
   ETIQUETAS_MONEDA,
-  ETIQUETAS_TIPO_PROVEEDOR,
-  TIPOS_PROVEEDOR,
   type MetodoPagoClave,
   type MonedaClave,
-  type TipoProveedorClave,
 } from '@/api/esquemas';
 import type { Proveedor, ProveedoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
@@ -77,19 +74,24 @@ import { DialogoProveedor } from './DialogoProveedor';
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
 
-/** Valor del filtro de tipo que significa "todos" (sin filtrar). */
-const TIPO_TODOS = 'TODOS';
-
 /** Valor del filtro de rol que significa "todos" (sin filtrar). */
 const ROL_TODOS = 'TODOS';
 
-/** Tono explicativo (color del avatar/chip) por tipo de proveedor. */
-const TONO_POR_TIPO: Record<TipoProveedorClave, Tono> = {
-  TELAS: 'telas',
-  AVIOS: 'avios',
-  SERVICIOS: 'servicios',
-  SIN_CLASIFICAR: 'neutro',
+/**
+ * Tono explicativo (color del chip) por CODIGO de rol. Sustituye al tono por `tipo`, que se retiro
+ * en V1-E3f pieza B (§Post-F9.56 punto 3). Un rol sin tono propio cae en `servicios`.
+ */
+const TONO_POR_ROL: Record<string, Tono> = {
+  'vende-telas': 'telas',
+  'vende-avios': 'avios',
 };
+
+/** Rol PRINCIPAL de un renglon: el primero del proveedor (los demas se ven en el cajon). */
+function rolPrincipal(p: Proveedor): { nombre: string; tono: Tono } | null {
+  const rol = p.roles[0];
+  if (rol === undefined) return null;
+  return { nombre: rol.nombre, tono: TONO_POR_ROL[rol.codigo] ?? 'servicios' };
+}
 
 /** ¿La cadena tiene contenido real (no null ni vacía)? */
 function hayTexto(valor: string | null): valor is string {
@@ -149,16 +151,23 @@ function CampoTextoSiHay({
 
 /** Resumen legible de lo que surte el proveedor (roles) para la columna "Surte". */
 function textoSurte(p: Proveedor): string {
-  if (p.roles.length > 0) {
-    return p.roles.map((r) => r.nombre).join(' · ');
-  }
-  return ETIQUETAS_TIPO_PROVEEDOR[p.tipo];
+  return p.roles.length > 0 ? p.roles.map((r) => r.nombre).join(' · ') : '—';
+}
+
+/**
+ * Texto de la columna "Contacto": el primer contacto ACTIVO del proveedor, con su puesto si lo
+ * tiene (§Post-F9.56 punto 1 — antes era el campo suelto `contacto`).
+ */
+function textoContacto(p: Proveedor): string {
+  const c = p.contactos[0];
+  if (c === undefined) return '—';
+  return hayTexto(c.puesto) ? `${c.nombre} · ${c.puesto}` : c.nombre;
 }
 
 /**
  * Pantalla de Proveedores (catálogo enriquecido R15) — re-vestida R9 a TABLA-FIRST fiel al proto
- * `vProveedores`/`drawerProveedor`: page-head + toolbar (filtro por tipo y rol, búsqueda, inactivos)
- * + TABLA DENSA (Proveedor · Tipo · Contacto · Surte · Estado) + barra de totales al pie. Al hacer
+ * `vProveedores`/`drawerProveedor`: page-head + toolbar (filtro por rol, búsqueda, inactivos)
+ * + TABLA DENSA (Proveedor · Rol · Contacto · Surte · Estado) + barra de totales al pie. Al hacer
  * clic en un renglón se abre un CAJÓN de detalle (contacto, fiscal/pago/operativo R15, estado de
  * cuenta CxP —placeholder de F9—, y **"Avíos que surte"** con asignar/quitar, B17). Alta/edición vía
  * el diálogo existente; desactivar con confirmación, reactivar directo.
@@ -179,7 +188,6 @@ export function ProveedoresPagina(): React.JSX.Element {
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [tipoFiltro, setTipoFiltro] = useState<TipoProveedorClave | typeof TIPO_TODOS>(TIPO_TODOS);
   // Filtro por rol: el id del rol como texto del `<select>` (vacio "TODOS" = sin filtrar).
   const [rolFiltro, setRolFiltro] = useState<string>(ROL_TODOS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
@@ -197,7 +205,6 @@ export function ProveedoresPagina(): React.JSX.Element {
     direccion: 'asc',
     incluirInactivos: incluirInactivos ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
-    ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
     ...(rolFiltro !== ROL_TODOS ? { rol: Number(rolFiltro) } : {}),
   };
 
@@ -242,7 +249,7 @@ export function ProveedoresPagina(): React.JSX.Element {
     });
   }
 
-  // Cambiar busqueda, tipo o el filtro de inactivos reinicia a la pagina 1.
+  // Cambiar busqueda, rol o el filtro de inactivos reinicia a la pagina 1.
   function reiniciar(): void {
     setPagina(1);
   }
@@ -275,24 +282,8 @@ export function ProveedoresPagina(): React.JSX.Element {
       <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
           {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
-              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
-          <SelectNativo
-            className="w-40 h-8 text-sm"
-            value={tipoFiltro}
-            onChange={(e) => {
-              setTipoFiltro(e.target.value as TipoProveedorClave | typeof TIPO_TODOS);
-              reiniciar();
-            }}
-            aria-label="Filtrar proveedores por tipo"
-            data-testid="filtro-tipo-proveedor"
-          >
-            <option value={TIPO_TODOS}>Todos los tipos</option>
-            {TIPOS_PROVEEDOR.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {ETIQUETAS_TIPO_PROVEEDOR[tipo]}
-              </option>
-            ))}
-          </SelectNativo>
+              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea).
+              El filtro por TIPO se retiró con el campo (§Post-F9.56 punto 3): el rol lo cubre. */}
           <SelectNativo
             className="w-40 h-8 text-sm"
             value={rolFiltro}
@@ -367,7 +358,7 @@ export function ProveedoresPagina(): React.JSX.Element {
               <TablaDensaEncabezado>
                 <TablaDensaFila>
                   <TablaDensaHead>Proveedor</TablaDensaHead>
-                  <TablaDensaHead>Tipo</TablaDensaHead>
+                  <TablaDensaHead>Rol</TablaDensaHead>
                   <TablaDensaHead>Contacto</TablaDensaHead>
                   <TablaDensaHead>Surte</TablaDensaHead>
                   <TablaDensaHead>Estado</TablaDensaHead>
@@ -390,11 +381,11 @@ export function ProveedoresPagina(): React.JSX.Element {
                       </div>
                     </TablaDensaCelda>
                     <TablaDensaCelda>
-                      {/* Proto: `badge neutral` con punto para el tipo (gris uniforme). */}
-                      <ChipEstado tono="neutro">{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</ChipEstado>
+                      {/* Proto: `badge neutral` con punto (gris uniforme) — ahora con el rol. */}
+                      <ChipEstado tono="neutro">{rolPrincipal(p)?.nombre ?? '—'}</ChipEstado>
                     </TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">
-                      {hayTexto(p.contacto) ? p.contacto : '—'}
+                      {textoContacto(p)}
                     </TablaDensaCelda>
                     <TablaDensaCelda className="text-xs text-faint">
                       {textoSurte(p)}
@@ -457,7 +448,7 @@ export function ProveedoresPagina(): React.JSX.Element {
             ''
           )
         }
-        subtitulo={seleccion !== null ? ETIQUETAS_TIPO_PROVEEDOR[seleccion.tipo] : undefined}
+        subtitulo={seleccion === null ? undefined : (rolPrincipal(seleccion)?.nombre ?? undefined)}
         acciones={
           seleccion !== null && puedeAdministrar ? (
             <>
@@ -571,16 +562,12 @@ function DetalleProveedor({
 
   return (
     <div className="space-y-4" data-testid="detalle-proveedor">
-      {/* ── General (siempre: tipo y roles existen) ──────────────────────────── */}
+      {/* ── General (siempre: los roles existen) ─────────────────────────────── */}
       <SeccionDetalle titulo="Datos del proveedor" icono={ClipboardList}>
         <RejillaCampos>
-          <CampoDetalle icono={Tag} etiqueta="Tipo">
-            <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</TipoBadge>
-          </CampoDetalle>
-          {/* Nombre corto de uso diario (A1.1): arma el nombre compuesto de sus telas. */}
-          <CampoTextoSiHay icono={Tag} etiqueta="Nombre corto" valor={p.nombreCorto} />
+          {/* Campo corto ÚNICO (§Post-F9.57/.58): display de la tela Y clave del taller. */}
+          <CampoTextoSiHay icono={Tag} etiqueta="Campo corto" valor={p.nombreCorto} />
           <CampoTextoSiHay icono={ClipboardList} etiqueta="Razón social" valor={p.razonSocial} />
-          <CampoTextoSiHay icono={Mail} etiqueta="Contacto" valor={p.contacto} />
           <CampoTextoSiHay icono={Phone} etiqueta="Teléfono" valor={p.telefono} />
           <CampoTextoSiHay icono={Mail} etiqueta="Email" valor={p.email} />
           <CampoTextoSiHay icono={MapPin} etiqueta="Dirección" valor={p.direccion} anchoCompleto />
