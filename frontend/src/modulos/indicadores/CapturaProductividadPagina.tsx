@@ -233,15 +233,32 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             <Field className="sm:col-span-2 lg:col-span-3">
               <FieldLabel htmlFor="cap-fecha">Fecha</FieldLabel>
               <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  id="cap-fecha"
-                  type="date"
-                  className="w-44"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  disabled={!puedeFechaLibre}
-                  data-testid="cap-fecha"
-                />
+                {/* §Post-F9.68 — esconder, no negar: sin `indicadores.fecha-libre`
+                    NO se pinta un campo de fecha apagado con un letrero al lado;
+                    se pinta la fecha elegida (los atajos la mueven) y ya. El
+                    backend re-valida la fecha igual (A1). */}
+                {puedeFechaLibre ? (
+                  <Input
+                    id="cap-fecha"
+                    type="date"
+                    className="w-44"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    data-testid="cap-fecha"
+                  />
+                ) : (
+                  // De texto y `readOnly` (no `type="date"` apagado): un date
+                  // deshabilitado se ve como un control roto, y `readOnly` sobre
+                  // un date no impide el selector nativo en todos los navegadores.
+                  <Input
+                    id="cap-fecha"
+                    type="text"
+                    readOnly
+                    className="w-44 tabular-nums"
+                    value={fecha}
+                    data-testid="cap-fecha"
+                  />
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -266,11 +283,6 @@ export function CapturaProductividadPagina(): React.JSX.Element {
                 >
                   Sábado
                 </Button>
-                {!puedeFechaLibre && (
-                  <span className="text-xs text-muted-foreground">
-                    Solo Hoy/Ayer/Sábado (fecha libre requiere permiso).
-                  </span>
-                )}
               </div>
             </Field>
 

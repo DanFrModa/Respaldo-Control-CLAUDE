@@ -849,6 +849,12 @@ function DetalleRenglon({
   alGenerarOp: () => void;
 }): React.JSX.Element {
   const navigate = useNavigate();
+  // §Post-F9.68: cada atajo del cajón solo aparece si su destino se puede abrir.
+  const { tienePermiso } = useSesion();
+  const puedeVerRuta = tienePermiso('rc.ruta-ver');
+  const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
+  const puedeVerListas = tienePermiso('listas.ver');
+  const puedeVerOrdenes = tienePermiso('ordenes.ver');
   const pct =
     renglon.cantidad > 0
       ? Math.min(100, Math.round((renglon.cortado / renglon.cantidad) * 100))
@@ -873,10 +879,12 @@ function DetalleRenglon({
       valor: renglon.idDesarrollo !== null ? `#${renglon.codigoModelo}` : '—',
       activo: renglon.idDesarrollo !== null,
       ...(renglon.idDesarrollo !== null
-        ? {
-            onNavegar: () =>
-              void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
-          }
+        ? puedeVerDesarrollo
+          ? {
+              onNavegar: () =>
+                void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
+            }
+          : {}
         : { titulo: 'modelo anterior al módulo de Desarrollo' }),
     },
     {
@@ -884,7 +892,7 @@ function DetalleRenglon({
       etiqueta: 'Lista de precios',
       valor: 'cotización',
       activo: renglon.idDesarrollo !== null,
-      ...(renglon.idDesarrollo !== null
+      ...(renglon.idDesarrollo !== null && puedeVerListas
         ? { onNavegar: () => void navigate('/listas-precios') }
         : {}),
     },
@@ -999,17 +1007,19 @@ function DetalleRenglon({
       <div className="flex flex-wrap gap-2">
         {renglon.idOrden !== null ? (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void navigate('/produccion/ordenes', { state: { idOrden: renglon.idOrden } })
-              }
-              data-testid="cajon-ver-orden"
-            >
-              <ExternalLink aria-hidden />
-              Ver en Órdenes
-            </Button>
+            {puedeVerOrdenes ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void navigate('/produccion/ordenes', { state: { idOrden: renglon.idOrden } })
+                }
+                data-testid="cajon-ver-orden"
+              >
+                <ExternalLink aria-hidden />
+                Ver en Órdenes
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               size="sm"
@@ -1019,14 +1029,17 @@ function DetalleRenglon({
               <Printer aria-hidden />
               Imprimir orden
             </Button>
-            <Button
-              size="sm"
-              onClick={() => void navigate(`/ruta-critica/ordenes/${renglon.idOrden}`)}
-              data-testid="cajon-ver-rc"
-            >
-              <Route aria-hidden />
-              Ver ruta crítica
-            </Button>
+            {/* §Post-F9.68: solo para quien puede abrir la ruta. */}
+            {puedeVerRuta ? (
+              <Button
+                size="sm"
+                onClick={() => void navigate(`/ruta-critica/ordenes/${renglon.idOrden}`)}
+                data-testid="cajon-ver-rc"
+              >
+                <Route aria-hidden />
+                Ver ruta crítica
+              </Button>
+            ) : null}
             {/* RESURTIDO (V1-E4 punto 3): la segunda OP del renglón. Antes, con una OP ya
                 creada, no había forma de generar otra desde la pantalla — aunque el backend lo
                 modela a propósito (reusa el nº de producción del modelo). */}

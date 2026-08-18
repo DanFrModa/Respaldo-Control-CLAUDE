@@ -38,7 +38,13 @@
 > *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
 > primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
 >
-> 🔴 **Y de ahí salió el hallazgo más caro de todo el track:** el reviewer midió el precosteo **REAL** y el
+> ✅ **`V1-E3g` mergeada** (#187). 🔨 **En curso: `V1-E6b`** · *esconder, no negar* — las **tres capas** que
+> pidió Daniel. La de en medio **no existía**: de las 135 rutas solo 2 miraban permisos, así que tecleando
+> la URL se **entraba** a cualquier pantalla (el backend sí rechazaba, pero se veía el esqueleto). Aprobada
+> en segunda vuelta; el hallazgo fue que **cinco pantallas de Administración heredaban la unión de permisos
+> del hub** y que la prueba que lo debía impedir era **ciega a esa forma del hueco**.
+>
+> 🔴 **Y de `V1-E3g` salió el hallazgo más caro de todo el track:** el reviewer midió el precosteo **REAL** y el
 > modelo pasaba de **432 a 8** — **el sistema estaba costeando 54 cierres por prenda en vez de 1**, porque
 > **la medida se leía como cantidad**. El arreglo **no mueve costos: REPARA un sobrecosto de 54×**.
 > *(Este párrafo decía lo contrario hasta el 18-ago — ver la corrección en la ficha.)*

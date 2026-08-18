@@ -556,9 +556,12 @@ function PaginaLista({
         {puedeAprobar ? (
           <div className="m-3 flex items-center gap-1.5 rounded-lg border bg-secondary px-3 py-2 text-[11.5px] text-muted-foreground">
             <LockIcon className="size-3.5 shrink-0" aria-hidden />
+            {/* §Post-F9.68: se le dice a QUIÉN le toca, no cómo se llama el
+                permiso por dentro — la forma interna del sistema no es del
+                usuario. (Este aviso solo lo ve quien SÍ puede aprobar.) */}
             <span>
-              Aprobar/teclear precios y editar factores requiere permiso (<b>solo el dueño</b>, RBAC{' '}
-              <code className="num">listas.aprobar</code>). Queda registrado quién y cuándo.
+              Aprobar/teclear precios y editar factores es facultad del <b>dueño</b>. Queda
+              registrado quién y cuándo.
             </span>
           </div>
         ) : null}

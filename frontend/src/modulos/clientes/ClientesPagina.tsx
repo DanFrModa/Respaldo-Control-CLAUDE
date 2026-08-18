@@ -416,7 +416,10 @@ function DetalleCliente({
   const { tienePermiso } = useSesion();
   // Los factores de lista viven en el módulo de listas: se ven con `listas.ver` y se editan con
   // `listas.administrar` (permisos distintos de los del cliente).
-  const puedeVerFactores = tienePermiso('listas.ver');
+  // Los factores SON un dato de dinero: sin `consultas.ver-importes` no queda nada
+  // que enseñar, así que la sección entera —con su rótulo— no se pinta, en vez de
+  // dejarla con un letrero de permiso adentro (§Post-F9.68).
+  const puedeVerFactores = tienePermiso('listas.ver') && tienePermiso('consultas.ver-importes');
   const puedeAdministrarFactores = tienePermiso('listas.administrar');
 
   const hayContacto =

@@ -122,9 +122,12 @@ describe('SeccionDesarrolloOrden (F8-E6)', () => {
     expect(args).toEqual({ idOrden: 50, idDesarrollo: 3 });
   });
 
-  it('sin permiso de importes NO muestra el precio (deriva del permiso, no del null)', () => {
+  // §Post-F9.68 — esconder, no negar: sin `consultas.ver-importes` el campo del
+  // precio se va COMPLETO (rótulo incluido) y NO queda letrero de permiso ni
+  // celda vacía. Va con su gemela positiva: con el permiso, el precio SÍ está.
+  it('sin permiso de importes el campo del precio no existe (ni letrero ni celda vacía)', () => {
     useSugerenciaLigaMock.mockReturnValue({
-      data: sugerenciaConCandidato(null),
+      data: sugerenciaConCandidato(87.5),
       isPending: false,
       isError: false,
     });
@@ -132,9 +135,23 @@ describe('SeccionDesarrolloOrden (F8-E6)', () => {
       <SeccionDesarrolloOrden orden={ordenDePrueba} puedeAdministrar verImportes={false} />,
       { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
     );
-    expect(screen.getByTestId('precio-sugerido-pedido')).toHaveTextContent(
-      'Sin permiso de importes',
+    expect(screen.queryByTestId('precio-sugerido-pedido')).toBeNull();
+    expect(screen.queryByText(/Precio sugerido al pedido/i)).toBeNull();
+    expect(screen.queryByText(/permiso/i)).toBeNull();
+  });
+
+  it('CON permiso de importes el precio sí se muestra (gemela positiva)', () => {
+    useSugerenciaLigaMock.mockReturnValue({
+      data: sugerenciaConCandidato(87.5),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(
+      <SeccionDesarrolloOrden orden={ordenDePrueba} puedeAdministrar verImportes />,
+      { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
     );
+    expect(screen.getByTestId('precio-sugerido-pedido')).toBeInTheDocument();
+    expect(screen.getByText(/Precio sugerido al pedido/i)).toBeInTheDocument();
   });
 
   it('sin desarrollo.administrar no muestra el botón de ligar', () => {

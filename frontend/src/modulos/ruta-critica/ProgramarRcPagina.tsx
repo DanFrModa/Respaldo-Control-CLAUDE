@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+
 import { useSesion } from '@/sesion/useSesion';
 
 import { Semaforo, fechaRc } from './piezas';
@@ -34,14 +35,16 @@ const ETIQUETA_RECALCULO: Record<RutaOrden['estadoRecalculo'], string> = {
  * si el CPM sigue calculando (`estadoRecalculo === 'recalculando'`), se SONDEA el GET ruta sin
  * bloquear la pantalla hasta que termine. CERO lógica de negocio (A1): el cálculo de fechas, el
  * semáforo y la validación de ciclos viven en el backend; aquí solo se capturan datos y se disparan
- * mutaciones. La gobierna `rc.programar`.
+ * mutaciones. La cierra la CAPA DE RUTA con `rc.programar` (`catalogo.ts`, §Post-F9.68): quien no
+ * lo tiene NO ve ni el botón que lleva aquí ni la pantalla, en vez de entrar y leer un letrero de
+ * permiso. El backend re-verifica igual (A4).
  */
 export function ProgramarRcPagina(): React.JSX.Element {
   const { idOrden: idOrdenParam } = useParams<{ idOrden: string }>();
   const idOrden = idOrdenParam !== undefined ? Number(idOrdenParam) : undefined;
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
-  const puedeProgramar = tienePermiso('rc.programar');
+  const puedeVerRuta = tienePermiso('rc.ruta-ver');
 
   const orden = useOrden(idOrden);
   // Sondea mientras el CPM recalcula para que las fechas aparezcan solas al terminar.
@@ -118,7 +121,8 @@ export function ProgramarRcPagina(): React.JSX.Element {
               </p>
             </div>
           </div>
-          {idOrden !== undefined ? (
+          {/* §Post-F9.68: el atajo a la ruta solo para quien puede abrirla. */}
+          {idOrden !== undefined && puedeVerRuta ? (
             <Button
               variant="outline"
               size="sm"
@@ -130,184 +134,174 @@ export function ProgramarRcPagina(): React.JSX.Element {
           ) : null}
         </header>
 
-        {!puedeProgramar ? (
-          <p className="text-sm text-destructive" role="alert">
-            No tienes permiso para programar la Ruta Crítica.
-          </p>
-        ) : (
-          <>
-            {/* ── Formulario de programación ───────────────────────────────────── */}
-            <section
-              className="space-y-4 rounded-lg border bg-card p-4"
-              data-testid="form-programar-rc"
-            >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="prog-articulo">Artículo</FieldLabel>
-                  <SelectNativo
-                    id="prog-articulo"
-                    value={idArticulo}
-                    onChange={(e) => setIdArticulo(e.target.value)}
-                    data-testid="prog-articulo"
-                  >
-                    <option value="">— Selecciona —</option>
-                    {(articulos.data ?? []).map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="prog-tela">Tipo de tela</FieldLabel>
-                  <SelectNativo
-                    id="prog-tela"
-                    value={idTela}
-                    onChange={(e) => setIdTela(e.target.value)}
-                    data-testid="prog-tela"
-                  >
-                    <option value="">— Selecciona —</option>
-                    {(telas.data ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="prog-aplicacion">Aplicación</FieldLabel>
-                  <SelectNativo
-                    id="prog-aplicacion"
-                    value={idAplicacion}
-                    onChange={(e) => setIdAplicacion(e.target.value)}
-                    data-testid="prog-aplicacion"
-                  >
-                    <option value="">— Selecciona —</option>
-                    {(aplicaciones.data ?? []).map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="prog-entrega">Fecha de entrega</FieldLabel>
-                  <Input
-                    id="prog-entrega"
-                    type="date"
-                    value={fechaEntrega}
-                    onChange={(e) => setFechaEntrega(e.target.value)}
-                    data-testid="prog-entrega"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="prog-inicio">Fecha de inicio (opcional)</FieldLabel>
-                  <Input
-                    id="prog-inicio"
-                    type="date"
-                    value={fechaInicio}
-                    onChange={(e) => setFechaInicio(e.target.value)}
-                    data-testid="prog-inicio"
-                  />
-                </Field>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-input accent-primary"
-                  checked={esResurtido}
-                  onChange={(e) => setEsResurtido(e.target.checked)}
-                  data-testid="prog-resurtido"
-                />
-                Es resurtido
-              </label>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={enviar}
-                  disabled={!formularioListo || programar.isPending}
-                  data-testid="prog-enviar"
-                >
-                  {programar.isPending ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : null}
-                  {yaTieneRuta ? 'Re-programar' : 'Programar'}
-                </Button>
-
-                {ruta !== undefined && ruta.estadoRecalculo === 'recalculando' ? (
-                  <span
-                    className="inline-flex items-center gap-1.5 text-sm text-amber-600"
-                    data-testid="prog-recalculando"
-                  >
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                    Recalculando fechas…
-                  </span>
-                ) : null}
-              </div>
-
-              <CopiarDeOrden
-                onCopiado={(origen) => {
-                  if (origen.idArticuloRC != null) setIdArticulo(String(origen.idArticuloRC));
-                  if (origen.idTipoTela != null) setIdTela(String(origen.idTipoTela));
-                  if (origen.idAplicacion != null) setIdAplicacion(String(origen.idAplicacion));
-                  setEsResurtido(origen.esResurtido);
-                }}
+        {/* ── Formulario de programación ───────────────────────────────────── */}
+        <section
+          className="space-y-4 rounded-lg border bg-card p-4"
+          data-testid="form-programar-rc"
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="prog-articulo">Artículo</FieldLabel>
+              <SelectNativo
+                id="prog-articulo"
+                value={idArticulo}
+                onChange={(e) => setIdArticulo(e.target.value)}
+                data-testid="prog-articulo"
+              >
+                <option value="">— Selecciona —</option>
+                {(articulos.data ?? []).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="prog-tela">Tipo de tela</FieldLabel>
+              <SelectNativo
+                id="prog-tela"
+                value={idTela}
+                onChange={(e) => setIdTela(e.target.value)}
+                data-testid="prog-tela"
+              >
+                <option value="">— Selecciona —</option>
+                {(telas.data ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="prog-aplicacion">Aplicación</FieldLabel>
+              <SelectNativo
+                id="prog-aplicacion"
+                value={idAplicacion}
+                onChange={(e) => setIdAplicacion(e.target.value)}
+                data-testid="prog-aplicacion"
+              >
+                <option value="">— Selecciona —</option>
+                {(aplicaciones.data ?? []).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="prog-entrega">Fecha de entrega</FieldLabel>
+              <Input
+                id="prog-entrega"
+                type="date"
+                value={fechaEntrega}
+                onChange={(e) => setFechaEntrega(e.target.value)}
+                data-testid="prog-entrega"
               />
-            </section>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="prog-inicio">Fecha de inicio (opcional)</FieldLabel>
+              <Input
+                id="prog-inicio"
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                data-testid="prog-inicio"
+              />
+            </Field>
+          </div>
 
-            {/* ── Resultado: encabezado + renglones con fechas ─────────────────── */}
-            {yaTieneRuta && ruta !== undefined ? (
-              <section className="space-y-3" data-testid="resultado-ruta">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-card p-4">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Estado general</span>
-                    <Semaforo semaforo={ruta.semaforo} />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Entrega</span>
-                    <span className="text-sm font-medium">{fechaRc(ruta.fechaEntregaRC)}</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Cálculo</span>
-                    <span className="inline-flex items-center gap-1.5 text-sm">
-                      {ruta.estadoRecalculo === 'recalculando' ? (
-                        <Loader2 className="size-3.5 animate-spin text-amber-600" aria-hidden />
-                      ) : null}
-                      {ETIQUETA_RECALCULO[ruta.estadoRecalculo]}
-                    </span>
-                  </div>
-                </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-input accent-primary"
+              checked={esResurtido}
+              onChange={(e) => setEsResurtido(e.target.checked)}
+              data-testid="prog-resurtido"
+            />
+            Es resurtido
+          </label>
 
-                <ul className="space-y-2" data-testid="renglones-ruta">
-                  {ruta.procesos.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {p.secuencia}.
-                        </span>
-                        <span className="truncate font-medium">{p.nombreProceso}</span>
-                        {p.critico ? (
-                          <Badge variant="destructive" className="shrink-0">
-                            Crítico
-                          </Badge>
-                        ) : null}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {fechaRc(p.fechaPlaneadaVigente)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={enviar}
+              disabled={!formularioListo || programar.isPending}
+              data-testid="prog-enviar"
+            >
+              {programar.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              {yaTieneRuta ? 'Re-programar' : 'Programar'}
+            </Button>
 
-                <AjustesRuta idOrden={idOrden} ruta={ruta} />
-              </section>
+            {ruta !== undefined && ruta.estadoRecalculo === 'recalculando' ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-sm text-amber-600"
+                data-testid="prog-recalculando"
+              >
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                Recalculando fechas…
+              </span>
             ) : null}
-          </>
-        )}
+          </div>
+
+          <CopiarDeOrden
+            onCopiado={(origen) => {
+              if (origen.idArticuloRC != null) setIdArticulo(String(origen.idArticuloRC));
+              if (origen.idTipoTela != null) setIdTela(String(origen.idTipoTela));
+              if (origen.idAplicacion != null) setIdAplicacion(String(origen.idAplicacion));
+              setEsResurtido(origen.esResurtido);
+            }}
+          />
+        </section>
+
+        {/* ── Resultado: encabezado + renglones con fechas ─────────────────── */}
+        {yaTieneRuta && ruta !== undefined ? (
+          <section className="space-y-3" data-testid="resultado-ruta">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-card p-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Estado general</span>
+                <Semaforo semaforo={ruta.semaforo} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Entrega</span>
+                <span className="text-sm font-medium">{fechaRc(ruta.fechaEntregaRC)}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Cálculo</span>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  {ruta.estadoRecalculo === 'recalculando' ? (
+                    <Loader2 className="size-3.5 animate-spin text-amber-600" aria-hidden />
+                  ) : null}
+                  {ETIQUETA_RECALCULO[ruta.estadoRecalculo]}
+                </span>
+              </div>
+            </div>
+
+            <ul className="space-y-2" data-testid="renglones-ruta">
+              {ruta.procesos.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {p.secuencia}.
+                    </span>
+                    <span className="truncate font-medium">{p.nombreProceso}</span>
+                    {p.critico ? (
+                      <Badge variant="destructive" className="shrink-0">
+                        Crítico
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {fechaRc(p.fechaPlaneadaVigente)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <AjustesRuta idOrden={idOrden} ruta={ruta} />
+          </section>
+        ) : null}
       </div>
     </div>
   );

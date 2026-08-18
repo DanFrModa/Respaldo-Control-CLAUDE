@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CfdiPrevisualizacion, ClavePermiso } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 
 import { ImportarCfdiPagina } from './ImportarCfdiPagina';
 
@@ -97,9 +98,28 @@ describe('ImportarCfdiPagina (F9-E3)', () => {
     importarSpy.mockClear();
   });
 
-  it('sin cxp.administrar muestra el aviso de permiso', () => {
-    renderConProveedores(<ImportarCfdiPagina />, { sesion: estadoSesionDePrueba(['cxp.ver']) });
-    expect(screen.getByText(/No tienes permiso para importar CFDI/i)).toBeInTheDocument();
+  // §Post-F9.68 — esconder, no negar: sin `cxp.administrar` la pantalla NO se
+  // monta (la cierra la capa de ruta) en vez de entrar y leer un letrero de
+  // permiso. Se prueba por la ruta real, con su gemela positiva.
+  it('sin cxp.administrar la pantalla NO se monta (la cierra la capa de ruta)', () => {
+    renderConProveedores(
+      <GuardiaPermisoRuta>
+        <ImportarCfdiPagina />
+      </GuardiaPermisoRuta>,
+      { sesion: estadoSesionDePrueba(['cxp.ver']), rutaInicial: '/cxp/importar-cfdi' },
+    );
+    expect(screen.queryByTestId('cfdi-importar')).toBeNull();
+    expect(screen.queryByText(/permiso/i)).toBeNull();
+  });
+
+  it('con cxp.administrar la pantalla sí se monta (gemela positiva)', () => {
+    renderConProveedores(
+      <GuardiaPermisoRuta>
+        <ImportarCfdiPagina />
+      </GuardiaPermisoRuta>,
+      { sesion: estadoSesionDePrueba(ADMIN), rutaInicial: '/cxp/importar-cfdi' },
+    );
+    expect(screen.getByTestId('cfdi-importar')).toBeInTheDocument();
   });
 
   it('previsualiza y muestra emisor, receptor, total, UUID y conceptos', async () => {

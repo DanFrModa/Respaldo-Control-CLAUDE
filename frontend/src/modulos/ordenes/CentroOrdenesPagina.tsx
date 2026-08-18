@@ -991,6 +991,10 @@ function Mosaico({
   icono: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   etiqueta: string;
   onClick?: () => void;
+  /**
+   * Apaga el mosaico por el ESTADO de la orden (p. ej. algo que aún no aplica),
+   * NUNCA por permiso: lo que el usuario no puede usar no se pinta (§Post-F9.68).
+   */
   deshabilitado?: boolean;
   tooltip?: string;
   testid?: string;
@@ -1135,6 +1139,8 @@ function CadenaTrazaOrden({
   puedeVerDesarrollo: boolean;
 }): React.JSX.Element {
   const navigate = useNavigate();
+  // §Post-F9.68: el nodo de la lista navega solo si su pantalla se puede abrir.
+  const puedeVerListas = useSesion().tienePermiso('listas.ver');
   const sugerencia = useSugerenciaLiga(puedeVerDesarrollo ? orden.id : undefined);
   const yaLigada = sugerencia.data?.yaLigada === true;
   const expediente = useExpedienteOrden(puedeVerDesarrollo ? orden.id : undefined, yaLigada);
@@ -1156,20 +1162,24 @@ function CadenaTrazaOrden({
       etiqueta: 'Desarrollo',
       valor: yaLigada ? `#${expediente.data?.codigoModelo ?? orden.codigoModelo}` : '—',
       activo: yaLigada,
+      // §Post-F9.68: el nodo NAVEGA solo si el usuario puede abrir el destino; sin
+      // el permiso queda como dato (no como enlace roto) y NO se dice por qué —
+      // antes el tooltip anunciaba «Requiere permiso de Desarrollo».
       ...(yaLigada
-        ? { onNavegar: () => void navigate('/desarrollo', { state: { idModelo: orden.idModelo } }) }
-        : {
-            titulo: puedeVerDesarrollo
-              ? 'modelo anterior al módulo de Desarrollo (sin liga)'
-              : 'Requiere permiso de Desarrollo',
-          }),
+        ? puedeVerDesarrollo
+          ? {
+              onNavegar: () =>
+                void navigate('/desarrollo', { state: { idModelo: orden.idModelo } }),
+            }
+          : {}
+        : { titulo: 'modelo anterior al módulo de Desarrollo (sin liga)' }),
     },
     {
       clave: 'lista',
       etiqueta: 'Lista de precios',
       valor: expediente.data?.lista != null ? `#${expediente.data.lista.folioLista}` : '—',
       activo: expediente.data?.lista != null,
-      ...(expediente.data?.lista != null
+      ...(expediente.data?.lista != null && puedeVerListas
         ? { onNavegar: () => void navigate('/listas-precios') }
         : {}),
     },
@@ -1225,6 +1235,15 @@ function DetalleCentroOrden({
   alModificar: (idOrden: number) => void;
 }): React.JSX.Element {
   const navigate = useNavigate();
+  const { tienePermiso } = useSesion();
+  // §Post-F9.68 — esconder, no negar: un mosaico que lleva a una pantalla que el
+  // usuario no puede abrir NO se pinta (ni apagado ni con tooltip). Cada uno
+  // pregunta por el permiso de SU destino, el mismo que exige la ruta/el backend.
+  const puedeVerModelos = tienePermiso('modelos.ver');
+  const puedeVerNotas = tienePermiso('notas.ver');
+  const puedeVerCompras = tienePermiso('compras.ver');
+  const puedeVerRuta = tienePermiso('rc.ruta-ver');
+  const puedeMoverTelas = tienePermiso('inventario-telas.mover');
   const consulta = useOrden(idOrden);
   const orden = consulta.data;
   // Panel "Ruta de la orden" (R4): el mosaico lo abre aquí mismo (sin navegar), reusando el
@@ -1305,52 +1324,63 @@ function DetalleCentroOrden({
 
         {/* Mosaicos a módulos relacionados (los existentes NAVEGAN de verdad). */}
         <div className="grid grid-cols-4 gap-1.5" data-testid="centro-mosaicos">
-          <Mosaico
-            icono={Shirt}
-            etiqueta="Modelo"
-            onClick={() => void navigate('/modelos', { state: { idModelo: orden.idModelo } })}
-            testid="mosaico-modelo"
-          />
-          <Mosaico
-            icono={Layers}
-            etiqueta="Avíos"
-            // Deshabilitado bloquea el click; solo se agrega el tooltip cuando falta el permiso.
-            onClick={() => setHabAbierta(true)}
-            deshabilitado={!puedeVerHabilitacion}
-            {...(puedeVerHabilitacion ? {} : { tooltip: 'Requiere permiso de Avíos' })}
-            testid="mosaico-habilitacion"
-          />
-          <Mosaico
-            icono={Send}
-            etiqueta="Notas salida"
-            onClick={() =>
-              void navigate('/produccion/notas-salida/por-orden', { state: { idOrden: orden.id } })
-            }
-            testid="mosaico-notas"
-          />
-          <Mosaico
-            icono={Package}
-            etiqueta="O.C."
-            onClick={() => void navigate('/compras/por-orden', { state: { idOrden: orden.id } })}
-            testid="mosaico-oc"
-          />
-          <Mosaico
-            icono={Route}
-            etiqueta="Ruta crítica"
-            onClick={() => setRutaAbierta(true)}
-            testid="mosaico-rc"
-          />
-          <Mosaico
-            icono={Calculator}
-            etiqueta="Consumo tela"
-            // Se lleva la ORDEN puesta (reporte de Daniel, 30-jul-2026: *"cuando le doy click ahí
-            // quiero que me mande a descargar la tela de esa orden en particular"*). Antes abría la
-            // pantalla en blanco y había que volver a buscar la orden a mano.
-            onClick={() =>
-              void navigate('/inventarios/telas/salida-orden', { state: { idOrden: orden.id } })
-            }
-            testid="mosaico-tela"
-          />
+          {puedeVerModelos ? (
+            <Mosaico
+              icono={Shirt}
+              etiqueta="Modelo"
+              onClick={() => void navigate('/modelos', { state: { idModelo: orden.idModelo } })}
+              testid="mosaico-modelo"
+            />
+          ) : null}
+          {puedeVerHabilitacion ? (
+            <Mosaico
+              icono={Layers}
+              etiqueta="Avíos"
+              onClick={() => setHabAbierta(true)}
+              testid="mosaico-habilitacion"
+            />
+          ) : null}
+          {puedeVerNotas ? (
+            <Mosaico
+              icono={Send}
+              etiqueta="Notas salida"
+              onClick={() =>
+                void navigate('/produccion/notas-salida/por-orden', {
+                  state: { idOrden: orden.id },
+                })
+              }
+              testid="mosaico-notas"
+            />
+          ) : null}
+          {puedeVerCompras ? (
+            <Mosaico
+              icono={Package}
+              etiqueta="O.C."
+              onClick={() => void navigate('/compras/por-orden', { state: { idOrden: orden.id } })}
+              testid="mosaico-oc"
+            />
+          ) : null}
+          {puedeVerRuta ? (
+            <Mosaico
+              icono={Route}
+              etiqueta="Ruta crítica"
+              onClick={() => setRutaAbierta(true)}
+              testid="mosaico-rc"
+            />
+          ) : null}
+          {puedeMoverTelas ? (
+            <Mosaico
+              icono={Calculator}
+              etiqueta="Consumo tela"
+              // Se lleva la ORDEN puesta (reporte de Daniel, 30-jul-2026: *"cuando le doy click ahí
+              // quiero que me mande a descargar la tela de esa orden en particular"*). Antes abría la
+              // pantalla en blanco y había que volver a buscar la orden a mano.
+              onClick={() =>
+                void navigate('/inventarios/telas/salida-orden', { state: { idOrden: orden.id } })
+              }
+              testid="mosaico-tela"
+            />
+          ) : null}
           <Mosaico
             icono={Printer}
             etiqueta="Imprimir"

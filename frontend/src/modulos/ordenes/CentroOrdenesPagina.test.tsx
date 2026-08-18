@@ -409,4 +409,64 @@ describe('<CentroOrdenesPagina>', () => {
       });
     }
   });
+  // ── §Post-F9.68 · esconder, no negar ───────────────────────────────────────
+  // Los MOSAICOS del detalle llevan a otras pantallas (Modelo, Notas, O.C.,
+  // Consumo de tela) o abren paneles (Avíos, Ruta Crítica). El que el usuario no
+  // puede abrir NO se pinta: ni apagado ni con tooltip explicando el permiso.
+  // Las dos pruebas van EN PAREJA — la negativa sola pasaría igual si el detalle
+  // no montara.
+  describe('mosaicos del detalle (esconder, no negar)', () => {
+    const MOSAICOS = [
+      'mosaico-modelo',
+      'mosaico-habilitacion',
+      'mosaico-notas',
+      'mosaico-oc',
+      'mosaico-rc',
+      'mosaico-tela',
+    ] as const;
+
+    it('sin ningún permiso de destino, NINGÚN mosaico de navegación se pinta', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, { sesion: estadoSesionDePrueba([]) });
+
+      for (const testid of MOSAICOS) {
+        expect(screen.queryByTestId(testid)).toBeNull();
+      }
+      // Los que no dependen de otro módulo siguen ahí (si no, la prueba de
+      // arriba pasaría solo porque el detalle no se montó).
+      expect(screen.getByTestId('mosaico-imprimir')).toBeInTheDocument();
+      expect(screen.getByTestId('mosaico-modificar')).toBeInTheDocument();
+      // Y NADA habla de permisos (ni tooltip ni letrero).
+      expect(screen.getByTestId('centro-mosaicos').textContent).not.toMatch(/permiso/i);
+    });
+
+    it('con los permisos de destino, los seis mosaicos aparecen (gemela positiva)', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba([
+          'modelos.ver',
+          'ordenes.habilitacion',
+          'notas.ver',
+          'compras.ver',
+          'rc.ruta-ver',
+          'inventario-telas.mover',
+        ]),
+      });
+
+      for (const testid of MOSAICOS) {
+        expect(screen.getByTestId(testid)).toBeInTheDocument();
+      }
+    });
+
+    it('un mosaico aparece SOLO con su propio permiso, no con el de otro', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver']),
+      });
+
+      expect(screen.getByTestId('mosaico-oc')).toBeInTheDocument();
+      expect(screen.queryByTestId('mosaico-rc')).toBeNull();
+      expect(screen.queryByTestId('mosaico-modelo')).toBeNull();
+    });
+  });
 });

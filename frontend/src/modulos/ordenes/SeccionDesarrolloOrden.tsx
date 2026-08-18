@@ -37,17 +37,12 @@ function BadgeEstadoDesarrollo({ estado }: { estado: EstadoDesarrollo }): React.
   );
 }
 
-/** Muestra un importe si hay permiso de importes; si no, una nota clara (no infiere del null). */
-function Importe({
-  valor,
-  verImportes,
-}: {
-  valor: number | null;
-  verImportes: boolean;
-}): React.JSX.Element {
-  if (!verImportes) {
-    return <span className="text-xs text-muted-foreground">Sin permiso de importes</span>;
-  }
+/**
+ * Un importe ya formateado. NO decide nada de permisos: sin `consultas.ver-importes`
+ * el campo entero (rótulo incluido) no se pinta — §Post-F9.68, «columna entera, no
+ * celda vacía»: una celda en blanco haría creer que el dato no existe.
+ */
+function Importe({ valor }: { valor: number | null }): React.JSX.Element {
   return <span className="font-medium tabular-nums">{formatearMoneda(valor)}</span>;
 }
 
@@ -61,7 +56,9 @@ function Importe({
  *    solo lectura) + "Quitar liga" (con confirmación).
  *
  * Los importes se DERIVAN del permiso real (`consultas.ver-importes`), no de inferir null (el backend
- * ya los oculta). Los botones se gatéan por `desarrollo.administrar`; el backend re-decide (A1).
+ * ya los oculta). Sin ese permiso el campo de dinero se va COMPLETO —rótulo incluido— y NO se pone
+ * un letrero de permiso en su lugar (§Post-F9.68: esconder, no negar; una celda vacía haría creer
+ * que el dato no existe). Los botones se gatéan por `desarrollo.administrar`; el backend re-decide (A1).
  */
 export function SeccionDesarrolloOrden({
   orden,
@@ -141,24 +138,31 @@ export function SeccionDesarrolloOrden({
               </span>
             ) : null}
           </CampoDetalle>
-          <CampoDetalle icono={Banknote} etiqueta="Precosto vigente">
-            {exp.precostoVigente === null ? (
-              <span className="text-xs text-muted-foreground">Sin versión congelada</span>
-            ) : (
-              <>
-                <span className="text-xs text-muted-foreground">
-                  v{exp.precostoVigente.version} ·{' '}
-                </span>
-                <Importe valor={exp.precostoVigente.costoTotal} verImportes={verImportes} />
-              </>
-            )}
-          </CampoDetalle>
-          <CampoDetalle icono={Banknote} etiqueta="Lista / precio">
+          {/* El PRECOSTO es puro dinero: sin permiso de importes se va el campo
+              COMPLETO, rótulo incluido (§Post-F9.68). */}
+          {verImportes ? (
+            <CampoDetalle icono={Banknote} etiqueta="Precosto vigente">
+              {exp.precostoVigente === null ? (
+                <span className="text-xs text-muted-foreground">Sin versión congelada</span>
+              ) : (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    v{exp.precostoVigente.version} ·{' '}
+                  </span>
+                  <Importe valor={exp.precostoVigente.costoTotal} />
+                </>
+              )}
+            </CampoDetalle>
+          ) : null}
+          {/* La LISTA no es solo dinero: sin importes se conserva el dato que sí
+              se puede ver (folio y estado) y el rótulo cambia a «Lista», para no
+              prometer un precio que no se está mostrando. */}
+          <CampoDetalle icono={Banknote} etiqueta={verImportes ? 'Lista / precio' : 'Lista'}>
             {exp.lista === null ? (
               <span className="text-xs text-muted-foreground">No está en lista</span>
             ) : (
               <>
-                <Importe valor={exp.lista.precio} verImportes={verImportes} />
+                {verImportes ? <Importe valor={exp.lista.precio} /> : null}
                 <span className="block text-xs text-muted-foreground">
                   Lista #{exp.lista.folioLista} · {exp.lista.nombreEstadoLista}
                   {exp.lista.aprobado ? ' · aprobado' : ''}
@@ -253,25 +257,27 @@ export function SeccionDesarrolloOrden({
               </span>
             ) : null}
           </CampoDetalle>
-          <CampoDetalle icono={Banknote} etiqueta="Precio sugerido al pedido" anchoCompleto>
-            {candidato.precioSugeridoPedido === null && verImportes ? (
-              <span className="text-xs text-muted-foreground">Sin lista/precio aún</span>
-            ) : (
-              <span
-                className="text-lg font-semibold tabular-nums"
-                data-testid="precio-sugerido-pedido"
-              >
-                {verImportes
-                  ? formatearMoneda(candidato.precioSugeridoPedido)
-                  : 'Sin permiso de importes'}
-              </span>
-            )}
-            {verImportes && candidato.precioSugeridoPedido !== null ? (
-              <span className="block text-xs text-muted-foreground">
-                Default editable: aplícalo (o ajústalo) en el precio del renglón del pedido.
-              </span>
-            ) : null}
-          </CampoDetalle>
+          {/* Sin permiso de importes el campo entero desaparece: es un precio y
+              nada más (§Post-F9.68). */}
+          {verImportes ? (
+            <CampoDetalle icono={Banknote} etiqueta="Precio sugerido al pedido" anchoCompleto>
+              {candidato.precioSugeridoPedido === null ? (
+                <span className="text-xs text-muted-foreground">Sin lista/precio aún</span>
+              ) : (
+                <>
+                  <span
+                    className="text-lg font-semibold tabular-nums"
+                    data-testid="precio-sugerido-pedido"
+                  >
+                    {formatearMoneda(candidato.precioSugeridoPedido)}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Default editable: aplícalo (o ajústalo) en el precio del renglón del pedido.
+                  </span>
+                </>
+              )}
+            </CampoDetalle>
+          ) : null}
         </RejillaCampos>
       </div>
 

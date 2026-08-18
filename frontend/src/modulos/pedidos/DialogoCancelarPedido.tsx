@@ -101,12 +101,17 @@ export function DialogoCancelarPedido({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* §Post-F9.68 — esconder, no negar: sin `ordenes.cancelar` la casilla
+              NO existe (no deshabilitada) y NO se dice por qué. El aviso también
+              cambia: sin la casilla no puede mandar a «márcalas abajo». */}
           <p className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
             <span>
               <b>Cancelar el pedido NO detiene sus órdenes de producción.</b> Si ya tiene OPs vivas,
-              seguirían cortándose: márcalas abajo para cancelarlas también, o cancélalas una por
-              una desde Órdenes.
+              seguirían cortándose:{' '}
+              {puedeCancelarOrdenes
+                ? 'márcalas abajo para cancelarlas también, o cancélalas una por una desde Órdenes.'
+                : 'hay que cancelarlas una por una desde Órdenes.'}
             </span>
           </p>
 
@@ -123,12 +128,7 @@ export function DialogoCancelarPedido({
                 Cancelar <b>también sus órdenes de producción</b>
               </span>
             </label>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No tienes permiso para cancelar órdenes; si el pedido tiene OPs vivas, pídeselo a
-              quien lo tenga.
-            </p>
-          )}
+          ) : null}
 
           <Field>
             <FieldLabel htmlFor="cancelar-pedido-motivo" required={tambienOrdenes}>

@@ -47,6 +47,12 @@ vi.mock('@/api/clientes', () => ({
   useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// Hooks de los FACTORES de lista (sección del detalle): inertes.
+vi.mock('@/api/cliente-factores', () => ({
+  useFactoresCliente: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useGuardarFactoresCliente: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 /** Cliente de ejemplo (con sus campos embebidos, vacíos por defecto). */
 function cliente(id: number, nombre: string, activo = true): Cliente {
   return {
@@ -222,6 +228,36 @@ describe('<ClientesPagina>', () => {
     const detalle = screen.getByTestId('detalle-cliente');
     expect(within(detalle).getByText('Campos de referencia (D7)')).toBeInTheDocument();
     expect(within(detalle).getByTestId('editor-campos-cliente')).toBeInTheDocument();
+  });
+
+  // §Post-F9.68 — esconder, no negar: los factores SON dinero, así que sin
+  // `consultas.ver-importes` la SECCIÓN ENTERA (con su rótulo) desaparece, en vez
+  // de mostrar un letrero de permiso adentro. Va con su gemela positiva.
+  it('sin permiso de importes la sección de factores no existe (ni su rótulo)', async () => {
+    const usuario = userEvent.setup();
+    useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
+    renderConProveedores(<ClientesPagina />, {
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('fila-cliente'));
+    const detalle = screen.getByTestId('detalle-cliente');
+    expect(within(detalle).queryByText(/Factores de lista de precios/i)).toBeNull();
+    expect(within(detalle).queryByTestId('editor-factores-cliente')).toBeNull();
+    expect(detalle.textContent).not.toMatch(/permiso/i);
+  });
+
+  it('CON permiso de importes la sección de factores sí aparece (gemela positiva)', async () => {
+    const usuario = userEvent.setup();
+    useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
+    renderConProveedores(<ClientesPagina />, {
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'consultas.ver-importes']),
+    });
+
+    await usuario.click(screen.getByTestId('fila-cliente'));
+    const detalle = screen.getByTestId('detalle-cliente');
+    expect(within(detalle).getByText(/Factores de lista de precios/i)).toBeInTheDocument();
+    expect(within(detalle).getByTestId('editor-factores-cliente')).toBeInTheDocument();
   });
 
   it('en modo lectura lista los campos embebidos del cliente sin acciones', async () => {

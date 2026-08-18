@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RutaOrden } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 
 import { ProgramarRcPagina } from './ProgramarRcPagina';
 
@@ -94,21 +95,46 @@ describe('<ProgramarRcPagina>', () => {
     expect(screen.getByTestId('prog-enviar')).toHaveTextContent('Re-programar');
   });
 
-  it('niega el acceso a quien no tiene rc.programar', () => {
+  // §Post-F9.68 — esconder, no negar: sin `rc.programar` la pantalla NO se monta
+  // (la cierra la capa de ruta), en vez de entrar y leer un letrero de permiso.
+  it('sin rc.programar la pantalla NO se monta, y sin decir nada de permisos', () => {
     useRutaOrden.mockReturnValue({
       data: undefined,
       isFetching: false,
       isError: false,
       error: null,
     });
-    renderConProveedores(<ProgramarRcPagina />, {
-      sesion: estadoSesionDePrueba(['rc.ruta-ver']),
-      rutaInicial: '/ruta-critica/ordenes/100/programar',
-    });
+    renderConProveedores(
+      <GuardiaPermisoRuta>
+        <ProgramarRcPagina />
+      </GuardiaPermisoRuta>,
+      {
+        sesion: estadoSesionDePrueba(['rc.ruta-ver']),
+        rutaInicial: '/ruta-critica/ordenes/100/programar',
+      },
+    );
 
-    expect(
-      screen.getByText('No tienes permiso para programar la Ruta Crítica.'),
-    ).toBeInTheDocument();
     expect(screen.queryByTestId('form-programar-rc')).not.toBeInTheDocument();
+    expect(screen.queryByText(/permiso/i)).toBeNull();
+  });
+
+  it('con rc.programar la pantalla sí se monta (gemela positiva)', () => {
+    useRutaOrden.mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(
+      <GuardiaPermisoRuta>
+        <ProgramarRcPagina />
+      </GuardiaPermisoRuta>,
+      {
+        sesion: estadoSesionDePrueba(['rc.ruta-ver', 'rc.programar']),
+        rutaInicial: '/ruta-critica/ordenes/100/programar',
+      },
+    );
+
+    expect(screen.getByTestId('form-programar-rc')).toBeInTheDocument();
   });
 });

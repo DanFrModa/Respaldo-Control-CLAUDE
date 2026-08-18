@@ -274,15 +274,35 @@ describe('<PedidosPagina>', () => {
       expect(cancelarMutate).not.toHaveBeenCalled();
     });
 
-    it('sin `ordenes.cancelar` la casilla NO se ofrece', async () => {
+    // §Post-F9.68 — esconder, no negar: sin `ordenes.cancelar` la casilla no
+    // existe Y no se explica por qué; el aviso tampoco manda a marcarla.
+    it('sin `ordenes.cancelar` la casilla NO se ofrece, y nada habla de permisos', async () => {
       const usuario = userEvent.setup();
       usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
       renderConProveedores(<PedidosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
 
       await usuario.click(screen.getByTestId('desactivar-pedido'));
-      await screen.findByRole('dialog');
+      const dialogo = await screen.findByRole('dialog');
 
       expect(screen.queryByTestId('cancelar-tambien-ordenes')).not.toBeInTheDocument();
+      expect(dialogo.textContent).not.toMatch(/permiso/i);
+      // El aviso NO puede mandar a una casilla que no está.
+      expect(dialogo).not.toHaveTextContent(/márcalas abajo/i);
+      expect(dialogo).toHaveTextContent(/una por una desde Órdenes/i);
+    });
+
+    it('CON `ordenes.cancelar` el aviso sí manda a la casilla (gemela positiva)', async () => {
+      const usuario = userEvent.setup();
+      usePedidos.mockReturnValue(consultaConDatos([pedido(7, 107, 'Liverpool')]));
+      renderConProveedores(<PedidosPagina />, {
+        sesion: estadoSesionDePrueba([...PERM_TODOS, 'ordenes.cancelar']),
+      });
+
+      await usuario.click(screen.getByTestId('desactivar-pedido'));
+      const dialogo = await screen.findByRole('dialog');
+
+      expect(await screen.findByTestId('cancelar-tambien-ordenes')).toBeInTheDocument();
+      expect(dialogo).toHaveTextContent(/márcalas abajo/i);
     });
   });
 

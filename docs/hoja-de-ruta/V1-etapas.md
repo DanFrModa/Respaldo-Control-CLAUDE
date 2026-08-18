@@ -1215,6 +1215,80 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E6b · Esconder, no negar — y la capa de ruta que faltaba ⭐ — ✅ HECHA (18-ago-2026)
+
+> Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen
+> acceso a costos, en lugar de mandarle un mensaje diciendo que no tienen permiso, mejor que les borre esa
+> opción.**"* Y después, defensa en profundidad: *"ocultar botones mientras se pueda y **al mismo tiempo
+> bloquear pantallas para asegurarnos que no haya una puerta que no estemos viendo**"*.
+> Decisión en `DECISIONES.md` **§Post-F9.68**.
+
+### Las tres capas — y la de en medio no existía
+
+| Capa | Qué hace | Antes | Ahora |
+|---|---|---|---|
+| **Menú** | esconde la opción | ✅ | ✅ |
+| **Ruta** | cierra la pantalla | 🔴 **NO EXISTÍA** | ✅ |
+| **Backend** | rechaza la operación | ✅ | ✅ |
+
+**La intuición de Daniel era correcta y la puerta existía:** `RutaProtegida.tsx` comprobaba **solo que hubiera
+sesión** —lo decía su propio comentario: *"es solo la PRIMERA barrera (UX)"*— y de las **135 rutas solo 2**
+mencionaban permisos. Quien tecleara la URL de una pantalla ajena **entraba**, veía encabezados y botones, y
+todo fallaba al cargar. **No era agujero de seguridad** —el backend rechaza— pero era la puerta que él
+intuyó sin verla.
+
+Ahora las 135 declaran su exigencia **tomándola de `catalogo.ts`**, la misma fuente del menú: si fueran dos
+listas, en seis meses alguien agrega una pantalla al menú, olvida la ruta, y el hueco vuelve sin que nadie
+lo note.
+
+### La pregunta grave, contestada con evidencia
+
+Se recorrieron **los 558 endpoints** del backend: **556 llevan guardia de permiso**; los 2 sin ella
+(`GET /sesion`, `GET /empresas/logo`) más `/health` son públicos a propósito. **Ningún endpoint dependía de
+que la UI escondiera el botón.** Esconder sigue siendo **presentación**, no seguridad.
+
+### Nota de cierre — ✅ HECHA (18-ago-2026)
+
+Ocho pantallas corregidas (las 3 conocidas **+ 5 que el coder encontró**), incluida una que mostraba el
+**nombre técnico del permiso** en pantalla y un mosaico *deshabilitado con tooltip "Requiere permiso de
+Avíos"* — la puerta enseñada y luego cerrada, justo lo que Daniel no quería.
+
+**⭐ El hallazgo de la revisión, y por qué importa más que el hueco:** cinco pantallas de **Administración**
+(`usuarios`, `roles`, `empresas`, `conceptos-costo`, `estados-lista`) **heredaban la UNIÓN de permisos del
+hub**. Medido: alguien con **solo `admin.ver-bitacora`** abría Usuarios, Roles y Empresas, veía el botón
+«Nuevo», y la consulta reventaba — *el síntoma exacto que la etapa venía a matar, en el módulo más sensible
+del sistema*.
+
+**Y lo peor no era el hueco: era que la prueba de deriva era ESTRUCTURALMENTE CIEGA a él.** Esas rutas caían
+en el bucket "gateadas" y pasaban las dos aserciones. La garantía cubría *sin declaración* y *abierta por
+herencia*, **no *gateada de más por herencia***. Se cerró haciendo que el resolvedor devuelva **de qué
+declaración salió** el permiso —sin eso una ruta heredada y una con gate propio **se ven idénticas**— más
+una tercera aserción. El reviewer la probó colgando pantallas nuevas a **los diez hubs**, no a los dos que
+tocó el coder: las cazó todas.
+
+**Un arreglo destapó otro:** el 404 decía *"no existe o no tienes permiso para verla"* — tras esta etapa esa
+cláusula era **el único texto de la app que le hablaba de permisos al usuario**, y era **falsa**. Al ir a
+quitarla apareció que esa pantalla la usaban **dos** caminos: el comodín y el de un módulo escondido por
+permisos, que sin la cláusula habría dicho "no existe". Se separó en tres mensajes, cada uno cierto para su
+caso, con el texto aprobado por Daniel viviendo en **un solo archivo**.
+
+**31 pruebas nuevas, todas en pareja:** cada "no aparece sin permiso" tiene su gemela "sí aparece con
+permiso". Sin las dos, una prueba de ocultamiento **pasa igual cuando el elemento nunca aparece por otro
+motivo**. Cero regresiones en 104 hojas de menú y 7 hubs.
+
+**Aplazado y declarado:** **36 de 82** controles siguen `disabled` en vez de ausentes — son controles de
+**escritura dentro de pantallas de consulta** (`costos.capturar` sobre `costos.ver`, `calidad.actualizar-
+auditorias` sobre `calidad.ver`…). Los otros 46 quedaron cubiertos por la capa de ruta, verificado pantalla
+por pantalla por las dos partes.
+
+⚠️ **Lo que Daniel debe decidir, y no es de esta etapa:** los **9 catálogos** (`telas`, `avios`, `colores`,
+`tallas`, `clientes`, `proveedores`, `almacenes`, `temporadas`, `etiquetas-marca`) siguen en `'autenticado'`
+— deuda **pre-existente** (§4), con ese valor pedido por él en su momento. **En esas nueve su petición de
+§Post-F9.68 sigue sin cumplirse**: cualquiera que entre al sistema ve el catálogo de clientes y el de
+proveedores, con sus nombres y condiciones.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

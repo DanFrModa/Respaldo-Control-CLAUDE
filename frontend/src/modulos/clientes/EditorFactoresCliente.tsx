@@ -92,8 +92,12 @@ function valoresDe(factores: ClienteFactores | undefined): DatosFactoresFormular
 /**
  * Editor de los FACTORES de lista de precios del cliente (F8-E4, D13/R20a): un DEFAULT por cliente
  * (`idClienteDepartamento` null) y overrides opcionales por departamento. Vive en el DETALLE del
- * cliente (necesita su id). Solo se puede editar con `listas.administrar` (`deshabilitado`), y los
- * porcentajes se ven "—" sin `consultas.ver-importes` (el backend los oculta).
+ * cliente (necesita su id). Solo se puede editar con `listas.administrar` (`deshabilitado`).
+ *
+ * §Post-F9.68 — esconder, no negar: sin `consultas.ver-importes` NO hay nada que enseñar aquí (los
+ * factores SON el dato de dinero), así que la SECCIÓN ENTERA —con su rótulo— desaparece del detalle
+ * del cliente (`ClientesPagina`) en vez de mostrar un letrero de permiso. Este `null` es la segunda
+ * barrera por si alguien monta el editor sin ese gate.
  *
  * La fórmula (margen + descuentos + regalías + costo de ventas, en cascada sobre la venta) la aplica
  * el backend al crear/editar la lista (A1); aquí solo se capturan los factores.
@@ -104,7 +108,7 @@ export function EditorFactoresCliente({
 }: {
   idCliente: number;
   deshabilitado?: boolean;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const { tienePermiso } = useSesion();
   const verImportes = tienePermiso('consultas.ver-importes');
 
@@ -155,6 +159,11 @@ export function EditorFactoresCliente({
     );
   }
 
+  // Segunda barrera (la primera es que la sección no se pinta): sin permiso de
+  // importes no hay factores que mostrar, y NO se pone un letrero en su lugar.
+  if (!verImportes) {
+    return null;
+  }
   if (factoresConsulta.isPending) {
     return (
       <div className="space-y-2" data-testid="factores-cargando">
@@ -174,35 +183,29 @@ export function EditorFactoresCliente({
         ajuste.
       </p>
 
-      {!verImportes ? (
-        <p className="text-sm text-muted-foreground" data-testid="factores-ocultos">
-          No tienes permiso para ver los importes; los factores están ocultos.
-        </p>
-      ) : (
-        <form
-          onSubmit={(e) => void formularioDefault.handleSubmit(guardarDefault)(e)}
-          noValidate
-          className="rounded-lg border p-3"
-          data-testid="form-factores-default"
-        >
-          <p className="mb-2 text-sm font-medium">Factores por defecto del cliente</p>
-          <CamposFactores formulario={formularioDefault} guardando={guardar.isPending} />
-          {!deshabilitado ? (
-            <div className="mt-3 flex justify-end">
-              <Button
-                type="submit"
-                disabled={guardar.isPending}
-                data-testid="guardar-factores-default"
-              >
-                {guardar.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-                Guardar factores
-              </Button>
-            </div>
-          ) : null}
-        </form>
-      )}
+      <form
+        onSubmit={(e) => void formularioDefault.handleSubmit(guardarDefault)(e)}
+        noValidate
+        className="rounded-lg border p-3"
+        data-testid="form-factores-default"
+      >
+        <p className="mb-2 text-sm font-medium">Factores por defecto del cliente</p>
+        <CamposFactores formulario={formularioDefault} guardando={guardar.isPending} />
+        {!deshabilitado ? (
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="submit"
+              disabled={guardar.isPending}
+              data-testid="guardar-factores-default"
+            >
+              {guardar.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+              Guardar factores
+            </Button>
+          </div>
+        ) : null}
+      </form>
 
-      {verImportes && departamentos.length > 0 ? (
+      {departamentos.length > 0 ? (
         <div className="space-y-2">
           <p className="text-sm font-medium">Ajustes por departamento</p>
           <ul className="space-y-2" data-testid="lista-factores-departamento">
