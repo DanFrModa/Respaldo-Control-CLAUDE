@@ -147,6 +147,56 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
       expect(JSON.stringify(bitacora?.datos)).toContain('"antes":"S"');
     });
 
+    it('⭐ H4: una heredada SIN número no congela el avío — viaja para conservarse', async () => {
+      const heredada = await cliente.avioMedida.findFirstOrThrow({ where: { idAvio } });
+      // El usuario todavía no sabe a qué medida corresponde la "S", pero sí quiere corregir el
+      // precio de otra y dar de alta una nueva. Antes esto era imposible: el panel abortaba.
+      const r = await reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        {
+          unidadMedida: 'cm',
+          medidas: [
+            { id: heredada.id, valor: null, precio: 7 },
+            { valor: 53, precio: 6 },
+          ],
+        },
+        bd(),
+      );
+      const conservada = r.datos.find((d) => d.id === heredada.id);
+      expect(conservada?.activo).toBe(true); // ⭐ NO se dio de baja
+      expect(conservada?.medida).toBe('S'); // conserva su etiqueta original
+      expect(conservada?.valor).toBeNull(); // nadie le inventó un número
+      expect(conservada?.requiereRevision).toBe(true); // y sigue pidiendo revisión
+      expect(conservada?.precio).toBe(7); // lo que sí se pudo ajustar
+      expect(r.datos.some((d) => d.medida === '53 cm' && d.activo)).toBe(true);
+    });
+
+    it('H4: NO se le puede quitar el número a una medida ya normalizada', async () => {
+      const buena = await cliente.avioMedida.create({
+        data: { idAvio, medida: '53 cm', valor: 53, precio: 6 },
+      });
+      await expect(
+        reemplazarMedidasAvio(
+          sesion(),
+          idAvio,
+          { unidadMedida: 'cm', medidas: [{ id: buena.id, valor: null, precio: 6 }] },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('H4: un set de PURAS heredadas sin número no exige unidad (si no, no se podría guardar)', async () => {
+      const heredada = await cliente.avioMedida.findFirstOrThrow({ where: { idAvio } });
+      const r = await reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: null, medidas: [{ id: heredada.id, valor: null, precio: 9 }] },
+        bd(),
+      );
+      expect(r.datos.find((d) => d.id === heredada.id)?.precio).toBe(9);
+    });
+
     it('un id de OTRO avío no se acepta (no se corrige la medida ajena)', async () => {
       const otro = await cliente.avio.create({ data: { clave: 'X-1', descripcion: 'Otro' } });
       const ajena = await cliente.avioMedida.create({

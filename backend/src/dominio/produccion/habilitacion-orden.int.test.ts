@@ -257,19 +257,26 @@ describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
     }
 
     it('nombra las tallas SIN capturar EN ORDEN CANÓNICO y las cuenta en el resumen', async () => {
-      // Se agrega la G al FINAL de la matriz pero con orden 3: el aviso debe salir "M, G" y no en
-      // el orden en que cayeron las filas.
-      const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 3 } });
+      // ⚠️ H5 del review: la primera versión de esta prueba NO discriminaba. Metía la G al final de
+      // la matriz Y con el orden canónico más alto, así que orden de inserción y orden canónico
+      // coincidían: borrar el `.sort()` la dejaba igual de verde.
+      //
+      // Ahora la talla que se agrega AL FINAL de la matriz es la XCH, que canónicamente va PRIMERO
+      // (orden 0, antes que CH y M). Los dos órdenes quedan enfrentados:
+      //   • inserción → ["M", "XCH"]      (como caen las filas en la matriz)
+      //   • canónico  → ["XCH", "M"]      ← lo único correcto
+      // Sólo el segundo pasa, así que la aserción sí sostiene la regla.
+      const tallaXch = await cliente.talla.create({ data: { etiqueta: 'XCH', orden: 0 } });
       const linea = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: ordenId } });
       await cliente.ordenLineaTalla.create({
-        data: { idOrdenLinea: linea.id, idTalla: tallaG.id, cantidad: 5 },
+        data: { idOrdenLinea: linea.id, idTalla: tallaXch.id, cantidad: 5 },
       });
-      await hiloPorTalla([{ idTalla: tallaCH.id, consumo: 3 }]); // faltan M y G
+      await hiloPorTalla([{ idTalla: tallaCH.id, consumo: 3 }]); // faltan M y XCH
       const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
       const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
       expect(hilo.consumoPorTalla).toBe(true);
-      expect(hilo.tallasSinMedida).toEqual(['M', 'G']);
-      expect(hilo.requerido).toBe(80); // 3×10 + 2×20 + 2×5 (M y G caen al consumo por prenda)
+      expect(hilo.tallasSinMedida).toEqual(['XCH', 'M']);
+      expect(hilo.requerido).toBe(80); // 3×10 + 2×20 + 2×5 (M y XCH caen al consumo por prenda)
       expect(h.aviosSinMedida).toBe(1);
       // AVISA, NO BLOQUEA: el tablero responde normal y el resto de los avíos ni se entera.
       expect(h.avios.find((a) => a.idAvio === avioBoton.id)?.tallasSinMedida).toEqual([]);

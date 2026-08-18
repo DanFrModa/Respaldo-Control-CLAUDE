@@ -19,6 +19,12 @@ interface RenglonMedida {
   requiereRevision: boolean;
   /** Etiqueta ORIGINAL, para poder decir en pantalla qué decía antes de corregirse. */
   etiquetaOriginal: string;
+  /**
+   * El `valor` que la fila tiene GUARDADO (null = heredada sin normalizar). Es lo que distingue
+   * "todavía no le pongo número, consérvala" de "borré el número de una medida ya buena", que sí
+   * es un error. No se puede deducir del campo en pantalla: los dos se ven vacíos.
+   */
+  valorOriginal: number | null;
 }
 
 /**
@@ -58,6 +64,7 @@ export function MedidasAvio({
         precio: String(m.precio),
         requiereRevision: m.requiereRevision,
         etiquetaOriginal: m.medida,
+        valorOriginal: m.valor,
       })),
     );
     setUnidad(consulta.data?.unidadMedida ?? '');
@@ -73,7 +80,14 @@ export function MedidasAvio({
   function agregar(): void {
     setRenglones((prev) => [
       ...prev,
-      { id: null, valor: '', precio: '', requiereRevision: false, etiquetaOriginal: '' },
+      {
+        id: null,
+        valor: '',
+        precio: '',
+        requiereRevision: false,
+        etiquetaOriginal: '',
+        valorOriginal: null,
+      },
     ]);
   }
   function quitar(indice: number): void {
@@ -81,7 +95,7 @@ export function MedidasAvio({
   }
 
   function alGuardar(): void {
-    const medidas: { id?: number; valor: number; precio: number; orden: number }[] = [];
+    const medidas: { id?: number; valor: number | null; precio: number; orden: number }[] = [];
     for (let i = 0; i < renglones.length; i += 1) {
       const r = renglones[i];
       if (r === undefined) {
@@ -89,26 +103,35 @@ export function MedidasAvio({
       }
       const valorNum = Number(r.valor);
       const precioNum = Number(r.precio);
-      if (r.valor.trim() === '' || Number.isNaN(valorNum) || valorNum <= 0) {
+      const sinNumero = r.valor.trim() === '' || Number.isNaN(valorNum) || valorNum <= 0;
+      // ⭐ H4 del review — Una medida HEREDADA que todavía nadie normalizó viaja SIN número, para
+      // CONSERVARSE. Antes cualquier campo vacío abortaba el guardado entero, así que una sola fila
+      // marcada congelaba el avío completo: no se podía ni corregir el precio de otra medida. Y
+      // dejarla fuera del set-completo tampoco era opción: la habría dado de baja en silencio.
+      const conservar = sinNumero && r.id !== null && r.valorOriginal === null;
+      if (sinNumero && !conservar) {
         toast.error('Cada medida necesita su número (ej. 53), mayor que cero.');
         return;
       }
       if (r.precio.trim() === '' || Number.isNaN(precioNum) || precioNum < 0) {
-        toast.error(`El precio de la medida ${String(valorNum)} debe ser un número ≥ 0.`);
+        toast.error(
+          `El precio de la medida ${conservar ? r.etiquetaOriginal : String(valorNum)} debe ser un número ≥ 0.`,
+        );
         return;
       }
       medidas.push({
         ...(r.id === null ? {} : { id: r.id }),
-        valor: valorNum,
+        valor: conservar ? null : valorNum,
         precio: precioNum,
         orden: i,
       });
     }
-    if (new Set(medidas.map((m) => m.valor)).size !== medidas.length) {
+    const numeros = medidas.flatMap((m) => (m.valor === null ? [] : [m.valor]));
+    if (new Set(numeros).size !== numeros.length) {
       toast.error('Hay medidas repetidas.');
       return;
     }
-    if (medidas.length > 0 && unidad.trim() === '') {
+    if (numeros.length > 0 && unidad.trim() === '') {
       toast.error('Captura la unidad de las medidas (cm, mm…): sin ella el número no dice nada.');
       return;
     }
@@ -205,7 +228,8 @@ export function MedidasAvio({
                 </div>
                 {r.requiereRevision ? (
                   <p className="mt-1 text-xs text-warn" data-testid="medida-por-revisar">
-                    Revisar: venía como “{r.etiquetaOriginal}” y no se pudo convertir a número.
+                    Revisar: venía como “{r.etiquetaOriginal}” y no se pudo convertir a número. Se
+                    conserva tal cual hasta que le pongas el suyo — no frena guardar el resto.
                   </p>
                 ) : null}
               </div>

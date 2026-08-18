@@ -442,6 +442,39 @@ describe('modo de captura por talla (V1-E3g)', () => {
     expect(JSON.stringify(bitacora?.datos)).toContain('consumoPorTallaForzadoAFalse');
   });
 
+  it('⭐ H3: la CONTRADICCIÓN heredada se avisa TAMBIÉN en el BOM, que es donde se arregla', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    // Estado anterior a V1-E3g: cantidades por talla + toggle encendido…
+    await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: true, tallas: [{ idTalla: tallaCh.id, consumo: 3 }] },
+      bd(),
+    );
+    // …y después alguien le pone medidas al avío en el catálogo.
+    await volverPorMedida(avio.id);
+
+    // La LECTURA lo dice y NO lo apaga (una consulta no cambia datos).
+    const leido = await obtenerMedidasAvio(sesion(), modelo.id, avio.id, bd());
+    expect(leido.modoCaptura).toBe('medida');
+    expect(leido.consumoPorTalla).toBe(true);
+    expect(leido.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(true);
+    const renglon = await cliente.modeloAvio.findUniqueOrThrow({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avio.id } },
+    });
+    expect(renglon.consumoPorTalla).toBe(true);
+  });
+
+  it('H3: sin contradicción, el modo `medida` no inventa avisos', async () => {
+    const { avio, modelo } = await prepararModeloConCurva();
+    await volverPorMedida(avio.id);
+    const leido = await obtenerMedidasAvio(sesion(), modelo.id, avio.id, bd());
+    expect(leido.modoCaptura).toBe('medida');
+    expect(leido.consumoPorTalla).toBe(false);
+    expect(leido.avisos).toEqual([]);
+  });
+
   it('en modo `medida` el consumo NO se captura: lo siembra el consumo por prenda del renglón', async () => {
     const { avio, modelo, tallaCh } = await prepararModeloConCurva();
     const idMedida = await volverPorMedida(avio.id);

@@ -139,6 +139,76 @@ describe('<MedidasAvio> (V1-E3g)', () => {
     expect(screen.getByTestId('avisos-medidas-avio')).toHaveTextContent('revisión manual');
   });
 
+  it('⭐ H4: una heredada sin número NO congela el avío — viaja para conservarse', async () => {
+    const usuario = userEvent.setup();
+    useMedidas.mockReturnValue({
+      data: medidas({
+        datos: [
+          {
+            id: 2,
+            medida: 'S',
+            valor: null,
+            requiereRevision: true,
+            precio: 4,
+            orden: 0,
+            activo: true,
+          },
+          {
+            id: 1,
+            medida: '53 cm',
+            valor: 53,
+            requiereRevision: false,
+            precio: 6,
+            orden: 1,
+            activo: true,
+          },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    render();
+
+    // Se corrige el precio de la medida BUENA sin tocar la heredada.
+    const precioBueno = screen.getByLabelText('Precio de la medida 2');
+    await usuario.clear(precioBueno);
+    await usuario.type(precioBueno, '8');
+    await usuario.click(screen.getByTestId('guardar-medidas'));
+
+    await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+    const args = guardarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { medidas: { id?: number; valor: number | null; precio: number }[] };
+    };
+    // La heredada viaja CON su id y SIN número: el servidor la conserva en vez de darla de baja.
+    expect(args.cuerpo.medidas).toEqual([
+      { id: 2, valor: null, precio: 4, orden: 0 },
+      { id: 1, valor: 53, precio: 8, orden: 1 },
+    ]);
+  });
+
+  it('H4: un renglón NUEVO sin número es un error aunque traiga precio (no se cuela como "conservar")', async () => {
+    const usuario = userEvent.setup();
+    render();
+    await usuario.click(screen.getByTestId('agregar-medida'));
+    // Precio VÁLIDO a propósito: si no, el guardado se detendría por el precio y esta prueba no
+    // diría nada sobre el número (fue justo el agujero que dejó la primera versión).
+    await usuario.type(screen.getByLabelText('Precio de la medida 2'), '5');
+    await usuario.click(screen.getByTestId('guardar-medidas'));
+    expect(guardarMutate).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalled();
+  });
+
+  it('H4: BORRAR el número de una medida ya normalizada es un error, no un "conservar"', async () => {
+    const usuario = userEvent.setup();
+    render(); // el fixture trae la 53 cm con `valor: 53`
+    await usuario.clear(screen.getByLabelText('Medida 1'));
+    await usuario.click(screen.getByTestId('guardar-medidas'));
+    expect(guardarMutate).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalled();
+  });
+
   it('los avisos del servidor se muestran y NO bloquean', async () => {
     const usuario = userEvent.setup();
     useMedidas.mockReturnValue({

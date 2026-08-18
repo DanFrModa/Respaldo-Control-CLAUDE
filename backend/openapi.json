@@ -27970,10 +27970,17 @@
                           "maximum": 9007199254740991
                         },
                         "valor": {
-                          "type": "number",
-                          "exclusiveMinimum": 0,
-                          "maximum": 999999,
-                          "description": "NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm)."
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 999999
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "NÚMERO de la medida en la `unidadMedida` del avío; `null` = heredada sin normalizar (exige `id`)."
                         },
                         "precio": {
                           "type": "number",

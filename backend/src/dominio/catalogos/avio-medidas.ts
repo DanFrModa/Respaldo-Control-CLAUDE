@@ -234,19 +234,38 @@ export async function reemplazarMedidasAvio(
     // ⚠️ El `valor` se REDONDEA a 2 decimales ANTES de derivar la etiqueta. La columna es
     // `Decimal(12,2)`: sin esto, capturar 53.456 guardaría 53.46 con una etiqueta "53.456 cm" que
     // ya no corresponde al número — el mismo divorcio texto/dato que esta etapa vino a cerrar.
-    const derivados = datos.medidas.map((m) => {
-      const valor = redondear2(m.valor);
-      return { ...m, valor, etiqueta: etiquetaMedida(valor, unidadMedida) };
-    });
-    if (new Set(derivados.map((d) => d.etiqueta)).size !== derivados.length) {
-      throw new ErrorValidacion('Hay medidas repetidas en el avío.');
-    }
-
     // Un `id` que no es de ESTE avío no se acepta: sería corregir la medida de otro (A9 en chico).
-    for (const d of derivados) {
+    for (const d of datos.medidas) {
       if (d.id !== undefined && !actualPorId.has(d.id)) {
         throw new ErrorValidacion('Una de las medidas a corregir no existe o no es de este avío.');
       }
+    }
+
+    // ⭐ H4 del review — Una medida HEREDADA sin normalizar (`valor: null`) viaja para CONSERVARSE:
+    // mantiene su etiqueta original y su marca de revisión, y sólo se le puede mover precio/orden.
+    // Sin esto, una sola fila marcada congelaba el avío entero (no se podía guardar ningún otro
+    // cambio) o —peor— había que dejarla fuera del set-completo, que la habría dado de baja.
+    // ⚠️ Lo que NO se permite es des-normalizar: quitarle el número a una medida que YA lo tiene
+    // sería perder justo el dato que esta etapa vino a ganar.
+    const derivados = datos.medidas.map((m) => {
+      if (m.valor === null) {
+        const actual = m.id === undefined ? undefined : actualPorId.get(m.id);
+        if (actual === undefined) {
+          throw new ErrorValidacion('Una medida sin número tiene que ser una ya existente.');
+        }
+        if (actual.valor !== null) {
+          throw new ErrorValidacion(
+            `La medida "${actual.medida}" ya tiene número: no se le puede quitar. ` +
+              'Corrígelo si está mal, pero no lo dejes en blanco.',
+          );
+        }
+        return { ...m, valor: null, etiqueta: actual.medida, conservar: true };
+      }
+      const valor = redondear2(m.valor);
+      return { ...m, valor, etiqueta: etiquetaMedida(valor, unidadMedida), conservar: false };
+    });
+    if (new Set(derivados.map((d) => d.etiqueta)).size !== derivados.length) {
+      throw new ErrorValidacion('Hay medidas repetidas en el avío.');
     }
 
     // A qué fila EXISTENTE le toca cada renglón: por `id` si lo trae (corrección en su lugar) y,
@@ -298,6 +317,7 @@ export async function reemplazarMedidasAvio(
           data: {
             idAvio,
             medida: deseado.etiqueta,
+            // Un alta SIEMPRE trae número (una entrada sin él exige `id` y por tanto fila previa).
             valor: deseado.valor,
             requiereRevision: false,
             precio: deseado.precio,
@@ -310,13 +330,16 @@ export async function reemplazarMedidasAvio(
       } else {
         tocados.add(actual.id);
         const valorActual = actual.valor === null ? null : actual.valor.toNumber();
-        const cambia =
-          actual.medida !== deseado.etiqueta ||
-          valorActual !== deseado.valor ||
-          num(actual.precio) !== deseado.precio ||
-          actual.orden !== orden ||
-          !actual.activo ||
-          actual.requiereRevision;
+        // Una medida CONSERVADA (sin número) no se normaliza: sigue marcada y con su etiqueta. Sólo
+        // cuenta como cambio lo que sí se puede ajustar en ella (precio, orden, reactivación).
+        const cambia = deseado.conservar
+          ? num(actual.precio) !== deseado.precio || actual.orden !== orden || !actual.activo
+          : actual.medida !== deseado.etiqueta ||
+            valorActual !== deseado.valor ||
+            num(actual.precio) !== deseado.precio ||
+            actual.orden !== orden ||
+            !actual.activo ||
+            actual.requiereRevision;
         if (cambia) {
           if (actual.medida !== deseado.etiqueta) {
             renombradas.push({ id: actual.id, antes: actual.medida, ahora: deseado.etiqueta });
@@ -324,10 +347,14 @@ export async function reemplazarMedidasAvio(
           await tx.avioMedida.update({
             where: { id: actual.id },
             data: {
-              medida: deseado.etiqueta,
-              valor: deseado.valor,
-              // Capturarla con un número ES la revisión que la marca pedía: se apaga sola.
-              requiereRevision: false,
+              ...(deseado.conservar
+                ? {}
+                : {
+                    medida: deseado.etiqueta,
+                    valor: deseado.valor,
+                    // Capturarla con un número ES la revisión que la marca pedía: se apaga sola.
+                    requiereRevision: false,
+                  }),
               precio: deseado.precio,
               orden,
               activo: true,

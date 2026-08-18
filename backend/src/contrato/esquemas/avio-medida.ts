@@ -29,12 +29,23 @@ export const esquemaAvioMedidaEntrada = z.object({
     .int({ error: 'El id de la medida debe ser entero' })
     .positive({ error: 'El id de la medida debe ser positivo' })
     .optional(),
+  /**
+   * NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm).
+   *
+   * ⭐ `null` = **"todavía no le pongo número"**, y sólo vale acompañado de `id` (H4 del review). Es
+   * lo que necesita una medida HEREDADA que la migración no pudo convertir: mientras nadie la
+   * revisa, su fila tiene que poder viajar en el set-completo **sin número** para no ser dada de
+   * baja, y sin congelar el resto del avío. Conserva su etiqueta y su marca de revisión; su precio
+   * y su orden sí se ajustan. Lo que NO se acepta es quitarle el número a una medida ya
+   * normalizada: eso sería perder el dato que esta etapa vino a ganar.
+   */
   valor: z
-    .number({ error: 'La medida es obligatoria y debe ser un número' })
+    .number({ error: 'La medida debe ser un número' })
     .positive({ error: 'La medida debe ser mayor que cero' })
     .max(999_999, { error: 'La medida es demasiado grande' })
+    .nullable()
     .describe(
-      'NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm).',
+      'NÚMERO de la medida en la `unidadMedida` del avío; `null` = heredada sin normalizar (exige `id`).',
     ),
   precio: z
     .number({ error: 'El precio es obligatorio' })
@@ -56,8 +67,9 @@ export type DatosAvioMedidaEntrada = z.infer<typeof esquemaAvioMedidaEntrada>;
  * `unidadMedida` del avío + los renglones. El dominio sincroniza (agrega/quita/actualiza) en UNA
  * transacción A2. Puede quedar vacío (el avío deja de ser "por medida"). Sin `valor` repetido.
  *
- * `unidadMedida` es OBLIGATORIA si viene al menos una medida: sin ella el número no significa nada
- * (¿53 cm o 53 mm?) y es justo la ambigüedad que esta etapa vino a cerrar.
+ * `unidadMedida` es OBLIGATORIA en cuanto viene al menos una medida CON NÚMERO: sin ella el número
+ * no significa nada (¿53 cm o 53 mm?) y es justo la ambigüedad que esta etapa vino a cerrar. Un set
+ * que sólo conserva medidas heredadas sin normalizar todavía no tiene unidad que declarar.
  */
 export const esquemaAvioMedidasCuerpo = z
   .object({
@@ -71,14 +83,30 @@ export const esquemaAvioMedidasCuerpo = z
     medidas: z
       .array(esquemaAvioMedidaEntrada)
       .max(100, { error: 'Demasiadas medidas en el avío' })
-      .refine((items) => new Set(items.map((i) => i.valor)).size === items.length, {
-        error: 'Hay medidas repetidas en el avío',
+      // Los `null` NO cuentan como repetidos entre sí: son "sin número todavía", no un valor.
+      .refine(
+        (items) => {
+          const numeros = items.flatMap((i) => (i.valor === null ? [] : [i.valor]));
+          return new Set(numeros).size === numeros.length;
+        },
+        { error: 'Hay medidas repetidas en el avío' },
+      )
+      .refine((items) => items.every((i) => i.valor !== null || i.id !== undefined), {
+        error: 'Una medida sin número sólo puede ser una ya existente que está por revisar',
       }),
   })
-  .refine((c) => c.medidas.length === 0 || (c.unidadMedida !== null && c.unidadMedida !== ''), {
-    error: 'Falta la unidad de las medidas del avío (cm, mm…): sin ella el número no dice nada',
-    path: ['unidadMedida'],
-  })
+  // La unidad se exige cuando hay al menos un NÚMERO que interpretar. Un avío que sólo conserva
+  // medidas heredadas sin normalizar todavía no tiene unidad que declarar, y exigírsela lo dejaría
+  // sin poder guardar ni un cambio de precio (H4 del review).
+  .refine(
+    (c) =>
+      !c.medidas.some((m) => m.valor !== null) ||
+      (c.unidadMedida !== null && c.unidadMedida !== ''),
+    {
+      error: 'Falta la unidad de las medidas del avío (cm, mm…): sin ella el número no dice nada',
+      path: ['unidadMedida'],
+    },
+  )
   .describe('Set completo de medidas de un avío "por medida".');
 
 /** Datos validados del set de medidas del avío. */

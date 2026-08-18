@@ -1797,7 +1797,7 @@ model Avio {
   /// este avío (cm, mm, pulg…). **NO es lo mismo que `unidad`** y por eso es un campo aparte: un
   /// cierre se CONSUME en `pza` pero se PIDE por su largo en `cm`. Es la unidad que la UI pega al
   /// campo numérico de la medida y con la que el dominio decide si un número es absurdo
-  /// (`comun/unidades-avio.ts`). NULL = el avío no maneja medidas, o la migración no pudo
+  /// (`dominio/catalogos/unidades-avio.ts`). NULL = el avío no maneja medidas, o la migración no pudo
   /// deducirla de las etiquetas viejas (entonces sus medidas quedan `requiereRevision`).
   unidadMedida     String?  @map("unidad_medida")
   /// Presentación/empaque (caja, rollo…). NULLABLE en BD; obligatoria en alta por UI (ADR-0009).

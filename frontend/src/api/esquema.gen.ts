@@ -12088,8 +12088,8 @@ export interface paths {
             unidadMedida?: string | null;
             medidas: {
               id?: number;
-              /** @description NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm). */
-              valor: number;
+              /** @description NÚMERO de la medida en la `unidadMedida` del avío; `null` = heredada sin normalizar (exige `id`). */
+              valor: number | null;
               /** @description Precio real de compra de esta medida (entra al promedio del precosto). */
               precio: number;
               /** @description Orden de despliegue dentro del avío (opcional). */
