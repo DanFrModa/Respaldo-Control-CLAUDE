@@ -18,9 +18,9 @@
  *    `Tipo de Vialidad`, el `Nombre de la Localidad` y el `Entre Calle` vienen SIN valor, y el texto
  *    extraído queda así:
  *
- *        Tipo de Vialidad: Nombre de Vialidad: TAINE
+ *        Tipo de Vialidad: Nombre de Vialidad: ROBLE
  *
- *    Un lector que corte "hasta el fin de línea" mete `Nombre de Vialidad: TAINE` como tipo de
+ *    Un lector que corte "hasta el fin de línea" mete `Nombre de Vialidad: ROBLE` como tipo de
  *    vialidad y sigue tan campante: basura en el domicilio **sin fallar**, que es la peor forma de
  *    equivocarse. Por eso aquí cada campo se corta **en la SIGUIENTE ETIQUETA CONOCIDA**
  *    ({@link valorEntreEtiquetas}) y el vacío queda vacío.
@@ -313,8 +313,8 @@ function aplanar(texto: string): string {
  * etiqueta conocida**, no en el fin de línea. Si entre las dos etiquetas no hay nada, devuelve ''
  * — que es la respuesta correcta para un campo que el SAT imprimió vacío.
  *
- * `Tipo de Vialidad: Nombre de Vialidad: TAINE` → tipo de vialidad = '' y nombre de vialidad =
- * 'TAINE'. Cortar por fin de línea daría 'Nombre de Vialidad: TAINE' como tipo de vialidad.
+ * `Tipo de Vialidad: Nombre de Vialidad: ROBLE` → tipo de vialidad = '' y nombre de vialidad =
+ * 'ROBLE'. Cortar por fin de línea daría 'Nombre de Vialidad: ROBLE' como tipo de vialidad.
  */
 export function valorEntreEtiquetas(texto: string, etiqueta: string): string {
   const inicio = new RegExp(`${etiqueta}\\s*:`, 'i').exec(texto);

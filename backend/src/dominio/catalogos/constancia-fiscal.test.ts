@@ -283,7 +283,7 @@ describe('parsearTextoConstancia — persona MORAL (estructura del PDF real)', (
 // falla, el valor se recorta y se AVISA — nunca se guarda basura en silencio.
 describe('red de seguridad: una etiqueta colada se detecta y se avisa', () => {
   it('etiquetaColada encuentra la etiqueta metida en un valor', () => {
-    expect(etiquetaColada('MIGUEL HIDALGO')).toBeNull();
+    expect(etiquetaColada('SAN MIGUEL')).toBeNull();
     expect(
       etiquetaColada('TLALNEPANTLA Nombre del Municipio o Demarcación Territorial: TLALNEPANTLA'),
     ).not.toBeNull();
