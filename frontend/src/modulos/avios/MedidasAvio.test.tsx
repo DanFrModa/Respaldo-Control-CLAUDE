@@ -13,7 +13,14 @@ import { MedidasAvio } from './MedidasAvio';
  * entonces obliga al usuario a evitar poner 53 cm, 53 centímetros o 53CM"*. La unidad va aparte y
  * se ve pegada al campo; lo heredado que no se pudo convertir sale MARCADO, no borrado (D3).
  */
-const useMedidas = vi.fn<() => { data: TipoMedidas | undefined; isPending: boolean; isError: boolean; error: { message: string } | null }>();
+const useMedidas = vi.fn<
+  () => {
+    data: TipoMedidas | undefined;
+    isPending: boolean;
+    isError: boolean;
+    error: { message: string } | null;
+  }
+>();
 const guardarMutate = vi.fn();
 
 vi.mock('@/api/medidas-avio', () => ({
@@ -21,16 +28,29 @@ vi.mock('@/api/medidas-avio', () => ({
   useGuardarMedidasAvio: () => ({ mutate: guardarMutate, isPending: false }),
 }));
 
-const toastError = vi.fn();
+const toastError = vi.fn<(mensaje: string) => void>();
 vi.mock('sonner', () => ({
-  toast: { error: (m: string) => toastError(m), success: vi.fn() },
+  toast: {
+    error: (m: string): void => {
+      toastError(m);
+    },
+    success: vi.fn(),
+  },
 }));
 
 /** Respuesta del GET con una medida ya normalizada. */
 function medidas(over: Partial<TipoMedidas> = {}): TipoMedidas {
   return {
     datos: [
-      { id: 1, medida: '53 cm', valor: 53, requiereRevision: false, precio: 6, orden: 0, activo: true },
+      {
+        id: 1,
+        medida: '53 cm',
+        valor: 53,
+        requiereRevision: false,
+        precio: 6,
+        orden: 0,
+        activo: true,
+      },
     ],
     unidadMedida: 'cm',
     promedioPreCosto: 6,
@@ -96,7 +116,15 @@ describe('<MedidasAvio> (V1-E3g)', () => {
     useMedidas.mockReturnValue({
       data: medidas({
         datos: [
-          { id: 2, medida: 'S', valor: null, requiereRevision: true, precio: 4, orden: 0, activo: true },
+          {
+            id: 2,
+            medida: 'S',
+            valor: null,
+            requiereRevision: true,
+            precio: 4,
+            orden: 0,
+            activo: true,
+          },
         ],
         avisos: ['1 medida(s) de este avío necesitan revisión manual ("S").'],
       }),

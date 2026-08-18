@@ -14,6 +14,28 @@ const quitarMutateMock = vi.fn();
 const restaurarMutateMock = vi.fn();
 const editarMutateMock = vi.fn();
 
+/**
+ * El catálogo de medidas del avío (para el amarre por talla). Por defecto VACÍO: sólo las pruebas
+ * del modo `medida` (V1-E3g) lo llenan.
+ */
+const catalogoMedidas = vi.fn<
+  () => {
+    data: {
+      datos: {
+        id: number;
+        medida: string;
+        valor: number | null;
+        precio: number;
+        activo: boolean;
+      }[];
+    };
+  }
+>(() => ({ data: { datos: [] } }));
+
+vi.mock('@/api/medidas-avio', () => ({
+  useMedidasAvio: () => catalogoMedidas(),
+}));
+
 vi.mock('@/api/receta-orden', () => ({
   useRecetaOrden: (id: unknown) => useRecetaOrdenMock(id) as unknown,
   useMarcarRecetaRevisada: () => ({ mutate: marcarMutateMock, isPending: false }),
@@ -503,5 +525,111 @@ describe('Medidas por talla en la OP (§Post-F9.43(c))', () => {
     expect(screen.getByTestId('medida-receta-avio-2-100')).toBeDisabled();
     expect(screen.getByTestId('consumo-por-talla-receta-2')).toBeDisabled();
     expect(screen.queryByTestId('guardar-medidas-receta-avio-2')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ V1-E3g (§Post-F9.66) — el renglón de avío captura por talla UNA cosa, no dos: la CANTIDAD
+ * (elástico, con la unidad pegada) o la MEDIDA (cierres). El modo lo manda el servidor.
+ */
+describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
+  beforeEach(() => {
+    editarMutateMock.mockReset();
+    catalogoMedidas.mockReturnValue({
+      data: { datos: [{ id: 7, medida: '53 cm', valor: 53, precio: 6, activo: true }] },
+    });
+  });
+
+  /** La receta con el botón en modo `medida` y una talla en la orden. */
+  function enModoMedida(): RecetaOrden {
+    const base = recetaDePrueba();
+    return {
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              modoCaptura: 'medida' as const,
+              unidadMedida: 'cm',
+              tieneTallas: true,
+              tallas: [
+                {
+                  idTalla: 100,
+                  etiqueta: 'CH',
+                  consumo: 1,
+                  enLaOrden: true,
+                  idAvioMedida: null,
+                  medidaAmarrada: null,
+                  precioMedida: null,
+                },
+              ],
+            }
+          : a,
+      ),
+    };
+  }
+
+  it('en modo `medida` no hay checkbox ni campo de cantidad; guarda SIN consumo', async () => {
+    render(enModoMedida());
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+
+    expect(screen.queryByTestId('consumo-por-talla-receta-2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('medida-receta-avio-2-100')).not.toBeInTheDocument();
+    expect(screen.getByTestId('modo-medida-receta-2')).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByTestId('medida-amarre-receta-avio-2-100'), '7');
+    await userEvent.click(screen.getByTestId('guardar-medidas-receta-avio-2'));
+
+    const args = editarMutateMock.mock.calls[0]?.[0] as {
+      cuerpo: { consumoPorTalla: boolean; tallas: { idTalla: number; idAvioMedida: number }[] };
+    };
+    expect(args.cuerpo.consumoPorTalla).toBe(false);
+    expect(args.cuerpo.tallas).toEqual([{ idTalla: 100, idAvioMedida: 7 }]);
+  });
+
+  it('el aviso de captura del servidor se muestra (contradicción heredada) sin bloquear', async () => {
+    const base = enModoMedida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? { ...a, consumoPorTalla: true, avisoCaptura: 'Este avío se compra POR MEDIDA…' }
+          : a,
+      ),
+    });
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toHaveTextContent('POR MEDIDA');
+    expect(screen.getByTestId('guardar-medidas-receta-avio-2')).toBeEnabled();
+  });
+
+  it('en modo `consumo` la unidad del avío se ve pegada al campo', async () => {
+    const base = recetaDePrueba();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              consumoPorTalla: true,
+              tieneTallas: true,
+              tallas: [
+                {
+                  idTalla: 100,
+                  etiqueta: 'CH',
+                  consumo: 0.5,
+                  enLaOrden: true,
+                  idAvioMedida: null,
+                  medidaAmarrada: null,
+                  precioMedida: null,
+                },
+              ],
+            }
+          : a,
+      ),
+    });
+    await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
+    const fila = screen.getByTestId('medida-receta-avio-2-100').closest('span');
+    expect(fila).not.toBeNull();
+    expect(within(fila as HTMLElement).getByText('pza')).toBeInTheDocument();
   });
 });

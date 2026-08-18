@@ -597,7 +597,10 @@ function MedidasPorTalla({
           )}
 
           {porMedida ? (
-            <span className="block text-muted-foreground" data-testid={`modo-medida-receta-${avio.id}`}>
+            <span
+              className="block text-muted-foreground"
+              data-testid={`modo-medida-receta-${avio.id}`}
+            >
               Este avío se compra POR MEDIDA: por talla se elige <b>qué medida</b> se pide, no
               cuánto se gasta. La cantidad es la del renglón y no cambia entre tallas.
             </span>
@@ -1137,7 +1140,12 @@ function SeccionAvios({
                       editar.mutate(
                         { idOrden, tipo: 'avio', idRenglon: a.id, cuerpo },
                         {
-                          onSuccess: () => toast.success('Consumo por talla guardado.'),
+                          onSuccess: () =>
+                            toast.success(
+                              a.modoCaptura === 'medida'
+                                ? 'Medida por talla guardada.'
+                                : 'Consumo por talla guardado.',
+                            ),
                           onError: (error) => toast.error(error.message),
                         },
                       )

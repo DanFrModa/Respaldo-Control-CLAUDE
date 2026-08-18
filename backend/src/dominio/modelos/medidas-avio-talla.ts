@@ -270,10 +270,7 @@ async function leerMedidasAvio(
  * En modo `medida` no se revisan las cantidades por talla: ahí no se capturan (el aviso del valor
  * de la medida vive en el catálogo del avío, que es donde se teclea).
  */
-function avisosDeCaptura(
-  contexto: ContextoAvioTalla,
-  tallas: ModeloAvioTallaDetalle[],
-): string[] {
+function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDetalle[]): string[] {
   if (contexto.modoCaptura === 'medida') return [];
   const avisos: string[] = [];
   for (const t of tallas) {
@@ -491,8 +488,7 @@ export async function guardarMedidasAvio(
     // FUERZA a false pase lo que pase: si se dejara encendido, unas cantidades por talla que la
     // pantalla ya ni muestra seguirían mandando en el requerido del MRP, en la sombra. Se fuerza
     // y se ASIENTA (bitácora + aviso): lo contrario de un cambio callado (D3).
-    const consumoPorTallaFinal =
-      contexto.modoCaptura === 'medida' ? false : datos.consumoPorTalla;
+    const consumoPorTallaFinal = contexto.modoCaptura === 'medida' ? false : datos.consumoPorTalla;
     const forzado = contexto.modoCaptura === 'medida' && datos.consumoPorTalla;
 
     const cambiaBandera = contexto.consumoPorTalla !== consumoPorTallaFinal;

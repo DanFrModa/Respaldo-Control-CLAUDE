@@ -33,7 +33,9 @@ export const esquemaAvioMedidaEntrada = z.object({
     .number({ error: 'La medida es obligatoria y debe ser un número' })
     .positive({ error: 'La medida debe ser mayor que cero' })
     .max(999_999, { error: 'La medida es demasiado grande' })
-    .describe('NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm).'),
+    .describe(
+      'NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm).',
+    ),
   precio: z
     .number({ error: 'El precio es obligatorio' })
     .nonnegative({ error: 'El precio no puede ser negativo' })
@@ -132,7 +134,9 @@ export const esquemaAvioMedidasLista = z
       .describe('Promedio de precios de las medidas activas (el que usa el precosto), o null.'),
     avisos: z
       .array(z.string())
-      .describe('Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo).'),
+      .describe(
+        'Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo).',
+      ),
   })
   .describe('Medidas de un avío con el promedio del precosteo.');
 

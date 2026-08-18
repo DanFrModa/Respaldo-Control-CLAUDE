@@ -1765,8 +1765,9 @@ export async function restaurarRenglonReceta(
             paraCosto: delModelo.paraCosto,
             // V1-E3g: el modelo ya viene normalizado, pero restaurar NO debe ser la rendija por
             // la que un toggle viejo vuelva a encenderse en un avío "por medida".
-            consumoPorTalla:
-              (await avioEsPorMedida(tx, fila.idAvio)) ? false : delModelo.consumoPorTalla,
+            consumoPorTalla: (await avioEsPorMedida(tx, fila.idAvio))
+              ? false
+              : delModelo.consumoPorTalla,
             idAvioProveedor: delModelo.idAvioProveedor,
             agregadoAMano: false,
             ...marca,

@@ -85,7 +85,11 @@ const seleccionOrdenHabilitacion = {
       // La ETIQUETA de la talla viaja para poder NOMBRAR las tallas sin medida en el aviso
       // (§Post-F9.64) sin una segunda consulta ni un pivote en el cliente.
       tallas: {
-        select: { idTalla: true, cantidad: true, talla: { select: { etiqueta: true } } },
+        select: {
+          idTalla: true,
+          cantidad: true,
+          talla: { select: { etiqueta: true, orden: true } },
+        },
       },
     },
   },
@@ -110,13 +114,17 @@ function totalPiezasOrden(orden: OrdenParaHabilitacion): number {
  */
 function piezasPorTallaOrden(
   orden: OrdenParaHabilitacion,
-): Map<number, { piezas: number; etiqueta: string }> {
-  const mapa = new Map<number, { piezas: number; etiqueta: string }>();
+): Map<number, { piezas: number; etiqueta: string; orden: number }> {
+  const mapa = new Map<number, { piezas: number; etiqueta: string; orden: number }>();
   for (const linea of orden.lineas) {
     for (const t of linea.tallas) {
       const previo = mapa.get(t.idTalla);
       if (previo === undefined) {
-        mapa.set(t.idTalla, { piezas: t.cantidad, etiqueta: t.talla.etiqueta });
+        mapa.set(t.idTalla, {
+          piezas: t.cantidad,
+          etiqueta: t.talla.etiqueta,
+          orden: t.talla.orden,
+        });
       } else {
         previo.piezas += t.cantidad;
       }
@@ -199,10 +207,15 @@ export async function habilitacionOrden(
     idsReceta.add(ma.idAvio);
     const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimples);
     // Las etiquetas se resuelven con el mapa que ya se armó: sin consulta extra y sin pivotear en
-    // el cliente. El orden es el de la matriz de la orden, no el de la BD.
-    const etiquetasSinMedida = tallasSinMedida.map(
-      (id) => piezasPorTalla.get(id)?.etiqueta ?? `#${String(id)}`,
-    );
+    // el cliente. Se ordenan por el ORDEN CANÓNICO de la talla (CH, M, G…) y no por cómo hayan
+    // caído en la matriz: el aviso se lee de corrido y no cambia de forma entre dos consultas.
+    const etiquetasSinMedida = tallasSinMedida
+      .map(
+        (id) =>
+          piezasPorTalla.get(id) ?? { etiqueta: `#${String(id)}`, orden: Number.MAX_SAFE_INTEGER },
+      )
+      .sort((a, b) => a.orden - b.orden || a.etiqueta.localeCompare(b.etiqueta, 'es'))
+      .map((t) => t.etiqueta);
     if (etiquetasSinMedida.length > 0) aviosSinMedida += 1;
     const enviado = enviadoPorAvio.get(ma.idAvio) ?? 0;
     const falta = Math.max(0, requerido - enviado);

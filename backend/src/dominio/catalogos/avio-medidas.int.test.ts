@@ -75,7 +75,13 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
       reemplazarMedidasAvio(
         sesion(),
         idAvio,
-        { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 1 }, { valor: 53, precio: 2 }] },
+        {
+          unidadMedida: 'cm',
+          medidas: [
+            { valor: 53, precio: 1 },
+            { valor: 53, precio: 2 },
+          ],
+        },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
@@ -196,11 +202,49 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  it('dos renglones que apuntan a la MISMA fila se rechazan (uno pisaría al otro)', async () => {
+    const previa = await cliente.avioMedida.create({
+      data: { idAvio, medida: '53 cm', valor: 53, precio: 5 },
+    });
+    await expect(
+      reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        {
+          unidadMedida: 'cm',
+          // Un renglón por id y otro sin id que casa por etiqueta: los dos caen en la misma fila.
+          medidas: [
+            { id: previa.id, valor: 60, precio: 5 },
+            { valor: 53, precio: 9 },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('el valor se REDONDEA a 2 decimales y la etiqueta dice EXACTAMENTE lo guardado', async () => {
+    const r = await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53.456, precio: 5 }] },
+      bd(),
+    );
+    expect(r.datos[0]?.valor).toBe(53.46);
+    expect(r.datos[0]?.medida).toBe('53.46 cm'); // no "53.456 cm"
+  });
+
   it('lo que ya no viene se DESACTIVA (borrado suave) y queda íntegro en la bitácora', async () => {
     await reemplazarMedidasAvio(
       sesion(),
       idAvio,
-      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 5 }, { valor: 55, precio: 6 }] },
+      {
+        unidadMedida: 'cm',
+        medidas: [
+          { valor: 53, precio: 5 },
+          { valor: 55, precio: 6 },
+        ],
+      },
       bd(),
     );
     const r = await reemplazarMedidasAvio(

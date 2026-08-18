@@ -382,7 +382,10 @@ function FilaHab({
             medida capturada, así que su requerido salió con el consumo por prenda. El servidor ya
             trae las etiquetas agregadas (nunca se pivotea aquí). */}
         {avio.tallasSinMedida.length > 0 ? (
-          <div className="mt-0.5 flex items-start gap-1 text-xs text-warn" data-testid="hab-sin-medida">
+          <div
+            className="mt-0.5 flex items-start gap-1 text-xs text-warn"
+            data-testid="hab-sin-medida"
+          >
             <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
             <span>
               Sin medida por talla: <b>{avio.tallasSinMedida.join(', ')}</b> — se usó el consumo por

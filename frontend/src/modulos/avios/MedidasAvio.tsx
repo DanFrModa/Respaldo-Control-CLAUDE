@@ -97,7 +97,12 @@ export function MedidasAvio({
         toast.error(`El precio de la medida ${String(valorNum)} debe ser un número ≥ 0.`);
         return;
       }
-      medidas.push({ ...(r.id === null ? {} : { id: r.id }), valor: valorNum, precio: precioNum, orden: i });
+      medidas.push({
+        ...(r.id === null ? {} : { id: r.id }),
+        valor: valorNum,
+        precio: precioNum,
+        orden: i,
+      });
     }
     if (new Set(medidas.map((m) => m.valor)).size !== medidas.length) {
       toast.error('Hay medidas repetidas.');

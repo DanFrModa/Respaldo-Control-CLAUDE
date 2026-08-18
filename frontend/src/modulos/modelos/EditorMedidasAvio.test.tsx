@@ -22,21 +22,20 @@ const useMedidasAvio = vi.fn<
   }
 >();
 const guardarMutate = vi.fn();
-const medidasDelCatalogo =
-  vi.fn<
-    () => {
-      data: {
-        datos: {
-          id: number;
-          medida: string;
-          valor: number | null;
-          requiereRevision: boolean;
-          precio: number;
-          activo: boolean;
-        }[];
-      };
-    }
-  >();
+const medidasDelCatalogo = vi.fn<
+  () => {
+    data: {
+      datos: {
+        id: number;
+        medida: string;
+        valor: number | null;
+        requiereRevision: boolean;
+        precio: number;
+        activo: boolean;
+      }[];
+    };
+  }
+>();
 
 vi.mock('@/api/modelo-medidas', () => ({
   useMedidasAvio: () => useMedidasAvio(),

@@ -207,10 +207,13 @@ export async function reemplazarMedidasAvio(
 
     // La ETIQUETA sale del número + la unidad del avío. Se calcula ANTES de tocar nada para poder
     // rechazar de una vez dos renglones que colisionarían en el `@@unique` (p. ej. 53 y 53.0).
-    const derivados = datos.medidas.map((m) => ({
-      ...m,
-      etiqueta: etiquetaMedida(m.valor, unidadMedida),
-    }));
+    // ⚠️ El `valor` se REDONDEA a 2 decimales ANTES de derivar la etiqueta. La columna es
+    // `Decimal(12,2)`: sin esto, capturar 53.456 guardaría 53.46 con una etiqueta "53.456 cm" que
+    // ya no corresponde al número — el mismo divorcio texto/dato que esta etapa vino a cerrar.
+    const derivados = datos.medidas.map((m) => {
+      const valor = redondear2(m.valor);
+      return { ...m, valor, etiqueta: etiquetaMedida(valor, unidadMedida) };
+    });
     if (new Set(derivados.map((d) => d.etiqueta)).size !== derivados.length) {
       throw new ErrorValidacion('Hay medidas repetidas en el avío.');
     }
@@ -222,12 +225,26 @@ export async function reemplazarMedidasAvio(
       }
     }
 
-    // A qué fila EXISTENTE le toca cada etiqueta nueva (por id, o por etiqueta si no vino id).
+    // A qué fila EXISTENTE le toca cada renglón: por `id` si lo trae (corrección en su lugar) y,
+    // si no, por la etiqueta derivada. Se resuelve UNA sola vez y se reusa más abajo: si se
+    // recalculara, la lista de choques y la de escrituras podrían dejar de hablar de lo mismo.
+    const resueltos = derivados.map((d) => ({
+      deseado: d,
+      actual: d.id === undefined ? actualPorEtiqueta.get(d.etiqueta) : actualPorId.get(d.id),
+    }));
+
     const destinoPorId = new Map<number, string>();
-    for (const d of derivados) {
-      const actual =
-        d.id === undefined ? actualPorEtiqueta.get(d.etiqueta) : actualPorId.get(d.id);
-      if (actual !== undefined) destinoPorId.set(actual.id, d.etiqueta);
+    for (const { deseado, actual } of resueltos) {
+      if (actual === undefined) continue;
+      // Dos renglones del cuerpo apuntando a la MISMA fila (id repetido, o un id + otro sin id que
+      // casa por etiqueta): uno pisaría al otro en silencio y el usuario vería desaparecer una
+      // medida que sí capturó.
+      if (destinoPorId.has(actual.id)) {
+        throw new ErrorValidacion(
+          `Dos renglones apuntan a la misma medida ("${actual.medida}") del avío.`,
+        );
+      }
+      destinoPorId.set(actual.id, deseado.etiqueta);
     }
     // ⚠️ Choque de etiquetas: normalizar una medida heredada puede llevarla al nombre que YA tiene
     // OTRA fila ("15cm" corregida a 15 cuando ya existe "15 cm"). El `@@unique([idAvio, medida])`
@@ -249,13 +266,8 @@ export async function reemplazarMedidasAvio(
     const tocados = new Set<number>();
     const renombradas: MedidaRenombrada[] = [];
     let i = 0;
-    for (const deseado of derivados) {
+    for (const { deseado, actual } of resueltos) {
       const orden = deseado.orden ?? i;
-      // Casa por id (corrección en su lugar) y, si no viene, por la etiqueta derivada.
-      const actual =
-        deseado.id === undefined
-          ? actualPorEtiqueta.get(deseado.etiqueta)
-          : actualPorId.get(deseado.id);
 
       if (actual === undefined) {
         const creada = await tx.avioMedida.create({

@@ -256,13 +256,20 @@ describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
       }
     }
 
-    it('nombra las tallas SIN capturar y las cuenta en el resumen', async () => {
-      await hiloPorTalla([{ idTalla: tallaCH.id, consumo: 3 }]); // falta M
+    it('nombra las tallas SIN capturar EN ORDEN CANÓNICO y las cuenta en el resumen', async () => {
+      // Se agrega la G al FINAL de la matriz pero con orden 3: el aviso debe salir "M, G" y no en
+      // el orden en que cayeron las filas.
+      const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 3 } });
+      const linea = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: ordenId } });
+      await cliente.ordenLineaTalla.create({
+        data: { idOrdenLinea: linea.id, idTalla: tallaG.id, cantidad: 5 },
+      });
+      await hiloPorTalla([{ idTalla: tallaCH.id, consumo: 3 }]); // faltan M y G
       const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
       const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
       expect(hilo.consumoPorTalla).toBe(true);
-      expect(hilo.tallasSinMedida).toEqual(['M']);
-      expect(hilo.requerido).toBe(70); // 3×10 + 2×20 (M cae al consumo por prenda)
+      expect(hilo.tallasSinMedida).toEqual(['M', 'G']);
+      expect(hilo.requerido).toBe(80); // 3×10 + 2×20 + 2×5 (M y G caen al consumo por prenda)
       expect(h.aviosSinMedida).toBe(1);
       // AVISA, NO BLOQUEA: el tablero responde normal y el resto de los avíos ni se entera.
       expect(h.avios.find((a) => a.idAvio === avioBoton.id)?.tallasSinMedida).toEqual([]);
