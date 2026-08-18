@@ -3082,3 +3082,65 @@ endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**
 
 - **Aplica en:** V1-E6b. Sin migración, sin permisos nuevos, sin contrato.
 - **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.66) — ⭐ Medida vs. consumo: dos ideas que vivían en el mismo campo (DANIEL, 17/18-ago-2026)
+
+> **Salió de Daniel capturando un modelo real** —un cierre—, no de un plan ni de una revisión técnica.
+> Es el segundo hallazgo de esa naturaleza en dos días (el otro fue el tránsito de prendas), y los dos
+> encontraron cosas que **ningún reviewer habría visto: el código estaba bien, lo que estaba mal era el
+> modelo del negocio**.
+
+**El hallazgo.** Daniel: *"En el caso del cierre el consumo por prenda es 1 pieza… pero lo que hay que
+poner por talla no es el consumo, sino **la medida a la que hay que pedir** ese cierre. Para cuestión de
+consumos es 1, pero para cuestión de información, es por medida."*
+
+Y después, la frase que destapó el fondo: *"Los costos de elástico o de jareta se expresan en metros.
+Cuesta 3 pesos el metro. Entonces poner .75 hace sentido porque el costo se calcula con una simple
+multiplicación."*
+
+| | Elástico / jareta | Cierre |
+|---|---|---|
+| El valor por talla **es** | el **CONSUMO** (0.75 m en CH) | la **ESPECIFICACIÓN** (cierre de 53 cm) |
+| La cantidad | varía por talla | **siempre 1 pza** |
+| ¿Se multiplica por el precio? | **sí** ($3/m × 0.75) | no — es una instrucción de compra |
+| Decimales | **naturales y correctos** | no tienen sentido |
+
+**No es que unos avíos usen decimales y otros no: es que unos capturan CUÁNTO GASTAS y otros QUÉ PIDES.**
+Por eso ninguna regla global funcionaba.
+
+**El camino de la decisión, con lo descartado y su razón** *(no re-abrir)*:
+
+- ❌ **"Siempre CM, sin decimales"** — lo propuso el **lead** y **Daniel lo tumbó con razón**: forzar el
+  elástico a centímetros obliga a dividir entre 100 en algún lado, y ahí nacen los errores.
+- ❌ **Medida como TEXTO LIBRE** — la pidió Daniel: *"un día pueden ser medidas de 52, 53, 54 cm y otro
+  modelo de 67, 68, 69… no tiene sentido tener un catálogo con todas las medidas posibles"*. **Su queja
+  era válida** (obligar a dar de alta cada centímetro es fricción absurda), pero el texto libre **rompe la
+  compra**: `"53 cm"`, `"53cm"` y `"53"` serían tres cosas distintas y la orden de compra saldría partida
+  en tres.
+- ✅ **Lo que Daniel propuso y ganó:** *"le ponemos la medida en que va cada avío (como default CM) y el
+  campo donde se captura lo dejamos solo numérico. Entonces obliga al usuario a evitar poner 53 cm, 53
+  centímetros o 53CM."*
+  **Quita la ambigüedad en el origen en vez de limpiarla después** — un campo que no admite el dato malo
+  vale más que una validación que avisa, porque los avisos se ignoran.
+
+**⚠️ El riesgo que queda, acotado:** que un avío tenga **mal puesta su unidad**. Contra eso, la unidad se
+ve **pegada al campo** al capturar (`0.75 m`, `53 cm`) y hay **aviso —no bloqueo— cuando el número es
+absurdo** para esa unidad (un `1` en un cierre casi seguro quiso ser `100`).
+
+**Cerrado con Daniel:** ningún avío necesita **cantidad por talla Y medida por talla a la vez**
+(*"no se me ocurre algo que lleve las dos cosas a la vez"*), así que **nunca se sostienen los dos modos
+vivos**.
+
+**Migración:** lo convertible se convierte; **lo que no, se marca para revisión manual** y sigue **vivo y
+usable** — Daniel lo pidió con esas palabras: *"que un puñado te aparezca marcado a que el sistema decida
+por ti y te enteres tres meses después"*.
+
+**Las etiquetas eran parte del defecto:** el panel se llamaba *"Consumo por talla"* para las dos cosas y el
+esquema documentaba el campo como *"Medida (consumo) del avío para esta talla"* — **la confusión estaba
+escrita desde el origen**, y por eso Daniel llegó a la misma duda que habría tenido cualquiera.
+
+- **Aplica en:** V1-E3g. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
+  `SEED_ON_START`. Sí requiere que alguien revise en el catálogo de Avíos las medidas marcadas.
+- **Fecha:** 2026-08-18.

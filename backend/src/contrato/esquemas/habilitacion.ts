@@ -48,6 +48,17 @@ export const esquemaHabilitacionAvio = z
       .describe('% de surtido real del avío (enviado/requerido×100; puede pasar de 100).'),
     esExtra: z.boolean().describe('¿Es un avío enviado FUERA de la receta de la orden?'),
     estado: esquemaEstadoHabilitacion,
+    consumoPorTalla: z
+      .boolean()
+      .describe('¿Este avío se captura POR TALLA (R18)? Sólo esos pueden tener tallas sin medida.'),
+    tallasSinMedida: z
+      .array(z.string())
+      .describe(
+        'Etiquetas de las tallas que la orden PIDE (piezas > 0) y que NO tienen medida capturada ' +
+          'en este avío (§Post-F9.64). Su requerido se calculó con el consumo por prenda. AVISA, ' +
+          'NO BLOQUEA. Vacío en avíos de consumo plano y en los que sí están completos. Un cero ' +
+          'CAPTURADO no aparece aquí: es una decisión, no un olvido.',
+      ),
   })
   .describe('Renglón de habilitación de un avío en la orden.');
 
@@ -79,6 +90,13 @@ export const esquemaHabilitacionOrden = z
     pendientes: z.number().int().describe('# de avíos de la receta sin enviar.'),
     faltaTotal: z.number().describe('Σ de faltantes de los avíos de la receta.'),
     faltanAvios: z.number().int().describe('# de avíos de la receta con faltante > 0.'),
+    aviosSinMedida: z
+      .number()
+      .int()
+      .describe(
+        '# de avíos de la receta con al menos una talla sin medida capturada (§Post-F9.64). El ' +
+          'conteo se AGREGA EN SERVIDOR (nunca pivoteando en el cliente).',
+      ),
     avios: z.array(esquemaHabilitacionAvio).describe('Renglones (receta + extras).'),
   })
   .describe('Habilitación / surtido de avíos de una orden (requerido vs. enviado).');

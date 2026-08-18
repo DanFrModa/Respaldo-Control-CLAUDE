@@ -231,6 +231,93 @@ describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
     expect(hilo.requerido).toBe(110);
   });
 
+  /**
+   * ⭐ §Post-F9.64 — el AVISO de tallas sin medida. El mecanismo (`tallasSinMedida`) existía desde
+   * F8 pero aquí se tiraba: sólo el MRP lo pintaba, y la habilitación —la pantalla de quien surte—
+   * se quedaba callada. **Avisa, NO bloquea**: el requerido se calcula igual (cae al consumo por
+   * prenda) y la orden se puede surtir.
+   */
+  describe('aviso de tallas SIN MEDIDA (§Post-F9.64)', () => {
+    /** Deja el hilo "por talla" con las medidas dadas (las que no se den quedan SIN capturar). */
+    async function hiloPorTalla(medidas: { idTalla: number; consumo: number }[]): Promise<void> {
+      const renglon = await cliente.ordenAvio.update({
+        where: { idOrden_idAvio: { idOrden: ordenId, idAvio: avioHilo.id } },
+        data: { consumoPorTalla: true },
+        select: { id: true },
+      });
+      if (medidas.length > 0) {
+        await cliente.ordenAvioTalla.createMany({
+          data: medidas.map((m) => ({
+            idOrdenAvio: renglon.id,
+            idTalla: m.idTalla,
+            consumo: m.consumo,
+          })),
+        });
+      }
+    }
+
+    it('nombra las tallas SIN capturar EN ORDEN CANÓNICO y las cuenta en el resumen', async () => {
+      // ⚠️ H5 del review: la primera versión de esta prueba NO discriminaba. Metía la G al final de
+      // la matriz Y con el orden canónico más alto, así que orden de inserción y orden canónico
+      // coincidían: borrar el `.sort()` la dejaba igual de verde.
+      //
+      // Ahora la talla que se agrega AL FINAL de la matriz es la XCH, que canónicamente va PRIMERO
+      // (orden 0, antes que CH y M). Los dos órdenes quedan enfrentados:
+      //   • inserción → ["M", "XCH"]      (como caen las filas en la matriz)
+      //   • canónico  → ["XCH", "M"]      ← lo único correcto
+      // Sólo el segundo pasa, así que la aserción sí sostiene la regla.
+      const tallaXch = await cliente.talla.create({ data: { etiqueta: 'XCH', orden: 0 } });
+      const linea = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: ordenId } });
+      await cliente.ordenLineaTalla.create({
+        data: { idOrdenLinea: linea.id, idTalla: tallaXch.id, cantidad: 5 },
+      });
+      await hiloPorTalla([{ idTalla: tallaCH.id, consumo: 3 }]); // faltan M y XCH
+      const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+      const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
+      expect(hilo.consumoPorTalla).toBe(true);
+      expect(hilo.tallasSinMedida).toEqual(['XCH', 'M']);
+      expect(hilo.requerido).toBe(80); // 3×10 + 2×20 + 2×5 (M y XCH caen al consumo por prenda)
+      expect(h.aviosSinMedida).toBe(1);
+      // AVISA, NO BLOQUEA: el tablero responde normal y el resto de los avíos ni se entera.
+      expect(h.avios.find((a) => a.idAvio === avioBoton.id)?.tallasSinMedida).toEqual([]);
+    });
+
+    it('un CERO capturado NO es un olvido: no aparece en el aviso', async () => {
+      await hiloPorTalla([
+        { idTalla: tallaCH.id, consumo: 3 },
+        { idTalla: tallaM.id, consumo: 0 },
+      ]);
+      const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+      const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
+      expect(hilo.tallasSinMedida).toEqual([]);
+      expect(hilo.requerido).toBe(30); // 3×10 + 0×20
+      expect(h.aviosSinMedida).toBe(0);
+    });
+
+    it('los avíos de consumo PLANO nunca entran al aviso (serían ruido)', async () => {
+      const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+      expect(h.avios.every((a) => a.tallasSinMedida.length === 0)).toBe(true);
+      expect(h.avios.every((a) => !a.consumoPorTalla)).toBe(true);
+      expect(h.aviosSinMedida).toBe(0);
+    });
+
+    it('una talla con CERO PIEZAS en la matriz no "falta" (D4): no se va a producir', async () => {
+      const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 3 } });
+      const linea = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: ordenId } });
+      await cliente.ordenLineaTalla.create({
+        data: { idOrdenLinea: linea.id, idTalla: tallaG.id, cantidad: 0 },
+      });
+      await hiloPorTalla([
+        { idTalla: tallaCH.id, consumo: 3 },
+        { idTalla: tallaM.id, consumo: 4 },
+      ]);
+      const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+      const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
+      expect(hilo.tallasSinMedida).toEqual([]); // la G NO se señala
+      expect(hilo.requerido).toBe(110);
+    });
+  });
+
   it('⭐ V1-E3d: cambiar el BOM del MODELO ya NO cambia lo que surte una orden viva', async () => {
     // El modelo duplica el consumo del botón y le agrega el cierre. La orden está congelada: sigue
     // pidiendo 180 botones y NO conoce el cierre. Antes de esta etapa las dos cosas la alcanzaban.

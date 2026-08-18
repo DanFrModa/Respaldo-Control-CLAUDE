@@ -16,6 +16,14 @@
  *    las tallas sin medida caen a `consumoPorPrenda`). El cálculo PURO vive en el helper COMPARTIDO
  *    `requeridoAvioReceta` (`./receta-avios.ts`), la MISMA fuente que usa la explosión MRP
  *    (`compras/mrp.ts`) — sin duplicar la regla ni acoplarse al `select` pesado del MRP.
+ *  • ⭐ **TALLAS SIN MEDIDA (§Post-F9.64).** El helper ya devolvía `tallasSinMedida` y aquí se
+ *    tiraba a la basura (`const { requerido } = …`): el MRP avisaba y la habilitación —la pantalla
+ *    que sí mira quien surte— se quedaba callada. Ahora se publican las ETIQUETAS por avío y el
+ *    conteo agregado `aviosSinMedida`, calculados EN SERVIDOR. **Avisa, NO bloquea**: la orden se
+ *    surte igual (una talla de última hora es producción legítima). Sólo entran las tallas que la
+ *    orden pide de verdad (piezas > 0) y sólo los avíos `consumoPorTalla`; un cero CAPTURADO no
+ *    aparece —es una decisión, no un olvido— porque el dominio nunca crea fila para lo no
+ *    capturado.
  *  • ENVIADO = Σ de `NotaSalidaLinea.cantidad` de notas **confirmadas** (NO borrador ni cancelada) de
  *    esa orden×avío. ⚠ Fuente DISTINTA de `estatusMaterialesOrden` (MRP), que cruza contra
  *    COMPRAS/recepciones: aquí es contra NOTAS DE SALIDA — no se doble-cuenta.
@@ -74,7 +82,15 @@ const seleccionOrdenHabilitacion = {
   },
   lineas: {
     select: {
-      tallas: { select: { idTalla: true, cantidad: true } },
+      // La ETIQUETA de la talla viaja para poder NOMBRAR las tallas sin medida en el aviso
+      // (§Post-F9.64) sin una segunda consulta ni un pivote en el cliente.
+      tallas: {
+        select: {
+          idTalla: true,
+          cantidad: true,
+          talla: { select: { etiqueta: true, orden: true } },
+        },
+      },
     },
   },
 } satisfies Prisma.OrdenSelect;
@@ -92,12 +108,26 @@ function totalPiezasOrden(orden: OrdenParaHabilitacion): number {
   return total;
 }
 
-/** Piezas de la orden AGRUPADAS por talla (para el consumo por talla, R18). */
-function piezasPorTallaOrden(orden: OrdenParaHabilitacion): Map<number, number> {
-  const mapa = new Map<number, number>();
+/**
+ * Piezas de la orden AGRUPADAS por talla (para el consumo por talla, R18), con la ETIQUETA a la
+ * mano para poder nombrar las tallas en el aviso sin una segunda consulta.
+ */
+function piezasPorTallaOrden(
+  orden: OrdenParaHabilitacion,
+): Map<number, { piezas: number; etiqueta: string; orden: number }> {
+  const mapa = new Map<number, { piezas: number; etiqueta: string; orden: number }>();
   for (const linea of orden.lineas) {
     for (const t of linea.tallas) {
-      mapa.set(t.idTalla, (mapa.get(t.idTalla) ?? 0) + t.cantidad);
+      const previo = mapa.get(t.idTalla);
+      if (previo === undefined) {
+        mapa.set(t.idTalla, {
+          piezas: t.cantidad,
+          etiqueta: t.talla.etiqueta,
+          orden: t.talla.orden,
+        });
+      } else {
+        previo.piezas += t.cantidad;
+      }
     }
   }
   return mapa;
@@ -142,6 +172,7 @@ export async function habilitacionOrden(
 
   const totalPiezas = totalPiezasOrden(orden);
   const piezasPorTalla = piezasPorTallaOrden(orden);
+  const piezasSimples = new Map([...piezasPorTalla].map(([id, v]) => [id, v.piezas]));
 
   // ENVIADO por avío = Σ de renglones de notas CONFIRMADAS de esta orden×avío (una sola consulta).
   const enviados = await cliente.notaSalidaLinea.groupBy({
@@ -171,9 +202,21 @@ export async function habilitacionOrden(
   let pendientes = 0;
   let faltaTotal = 0;
   let faltanAvios = 0;
+  let aviosSinMedida = 0;
   for (const ma of orden.recetaAvios) {
     idsReceta.add(ma.idAvio);
-    const { requerido } = requeridoAvioReceta(ma, totalPiezas, piezasPorTalla);
+    const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimples);
+    // Las etiquetas se resuelven con el mapa que ya se armó: sin consulta extra y sin pivotear en
+    // el cliente. Se ordenan por el ORDEN CANÓNICO de la talla (CH, M, G…) y no por cómo hayan
+    // caído en la matriz: el aviso se lee de corrido y no cambia de forma entre dos consultas.
+    const etiquetasSinMedida = tallasSinMedida
+      .map(
+        (id) =>
+          piezasPorTalla.get(id) ?? { etiqueta: `#${String(id)}`, orden: Number.MAX_SAFE_INTEGER },
+      )
+      .sort((a, b) => a.orden - b.orden || a.etiqueta.localeCompare(b.etiqueta, 'es'))
+      .map((t) => t.etiqueta);
+    if (etiquetasSinMedida.length > 0) aviosSinMedida += 1;
     const enviado = enviadoPorAvio.get(ma.idAvio) ?? 0;
     const falta = Math.max(0, requerido - enviado);
     const estado = estadoAvio(requerido, enviado, false);
@@ -198,6 +241,8 @@ export async function habilitacionOrden(
       porcentaje: porcentajeAvio(requerido, enviado),
       esExtra: false,
       estado,
+      consumoPorTalla: ma.consumoPorTalla,
+      tallasSinMedida: etiquetasSinMedida,
     });
   }
 
@@ -224,6 +269,9 @@ export async function habilitacionOrden(
         porcentaje: porcentajeAvio(0, enviado),
         esExtra: true,
         estado: 'extra',
+        // Un avío EXTRA no está en la receta: no tiene consumo por talla que revisar.
+        consumoPorTalla: false,
+        tallasSinMedida: [],
       });
     }
   }
@@ -246,6 +294,7 @@ export async function habilitacionOrden(
     pendientes,
     faltaTotal,
     faltanAvios,
+    aviosSinMedida,
     avios,
   };
 }

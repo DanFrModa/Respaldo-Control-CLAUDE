@@ -38,6 +38,10 @@ function aMedidasSalida(m: MedidasAvio): z.infer<typeof esquemaModeloAvioMedidas
     idAvio: m.idAvio,
     consumoPorTalla: m.consumoPorTalla,
     tieneCurva: m.tieneCurva,
+    modoCaptura: m.modoCaptura,
+    unidadConsumo: m.unidadConsumo,
+    unidadMedida: m.unidadMedida,
+    avisos: m.avisos,
     tallas: m.tallas.map((t) => ({
       idTalla: t.idTalla,
       etiquetaTalla: t.etiquetaTalla,

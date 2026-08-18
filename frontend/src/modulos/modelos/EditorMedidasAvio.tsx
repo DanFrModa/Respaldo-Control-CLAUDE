@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Loader2Icon, Ruler } from 'lucide-react';
+import { AlertTriangleIcon, ChevronDown, ChevronRight, Loader2Icon, Ruler } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,11 +11,11 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 
-/** Una talla en captura (consumo como texto + el amarre a la medida del avío). */
+/** Una talla en captura (cantidad como texto + la medida amarrada). */
 interface RenglonTalla {
   idTalla: number;
   etiquetaTalla: string;
-  /** Consumo como texto (el `<input type=number>` entrega string). */
+  /** CANTIDAD como texto (el `<input type=number>` entrega string). */
   consumo: string;
   /** ¿La talla es de la curva vigente del modelo? (false = quedó de una curva anterior). */
   enCurva: boolean;
@@ -37,20 +37,29 @@ function aRenglon(t: MedidaTalla): RenglonTalla {
 }
 
 /**
- * Consumo POR TALLA de un avío del BOM (F8-E1, R18 + amarre de medida R5/B11). Panel colapsable
- * dentro del renglón de avío del editor de receta: al abrirlo carga las medidas (GET), muestra un
- * checkbox "¿se consume por talla?" y, si está activo, la matriz de las TALLAS DE LA CURVA del
- * modelo con su consumo y —cuando el avío tiene medidas capturadas (cierres, elástico…)— la
- * medida real con la que se compra esa talla.
+ * Captura POR TALLA de un avío del BOM (F8-E1, R18 + amarre de medida R5/B11). Panel colapsable
+ * dentro del renglón de avío del editor de receta.
  *
- * ⭐ V1-E3c: los renglones ya NO dependen de que alguien los haya creado antes (nadie podía: no
- * existía forma de darlos de alta). Los trae el servidor DESDE LA CURVA del modelo, y el aviso
- * "el modelo no tiene curva de tallas" solo sale cuando de verdad no la tiene (`tieneCurva`) —
- * antes se deducía de una lista que SIEMPRE venía vacía, así que mentía con la curva puesta.
+ * ⭐ **V1-E3g (§Post-F9.66): hay DOS cosas capturables por talla y nunca las dos a la vez.** Es el
+ * hallazgo de Daniel capturando un cierre — *"lo que hay que poner por talla no es el consumo, sino
+ * la medida a la que hay que pedir ese cierre"*:
+ *
+ *  • **modo `consumo`** (elástico, jareta) — se captura CUÁNTO se gasta en cada talla, en la unidad
+ *    del avío (0.75 m en CH), que se muestra PEGADA al campo. Se multiplica por piezas y precio.
+ *  • **modo `medida`** (cierres) — el avío tiene un catálogo de medidas: por talla se elige QUÉ se
+ *    pide. La cantidad no varía (es el consumo por prenda del renglón), así que el campo numérico
+ *    ni se muestra ni se manda: el servidor lo resuelve solo.
+ *
+ * El modo lo decide el SERVIDOR (`modoCaptura`), no esta pantalla: es el mismo hecho con el que el
+ * precosto decide promediar las medidas del avío. Los `avisos` (número absurdo para la unidad,
+ * contradicción heredada) se muestran pero **NO bloquean**.
+ *
+ * ⭐ V1-E3c: los renglones los trae el servidor DESDE LA CURVA del modelo, y el aviso "el modelo no
+ * tiene curva de tallas" solo sale cuando de verdad no la tiene (`tieneCurva`).
  *
  * Solo se monta para avíos YA guardados en el BOM (el endpoint requiere el renglón). El estado de
- * captura vive aquí (sembrado desde el GET); el backend valida tallas y medidas y es la autoridad
- * (A1). Sin `puedeAdministrar` el panel queda en solo lectura.
+ * captura vive aquí (sembrado desde el GET); el backend valida y es la autoridad (A1). Sin
+ * `puedeAdministrar` el panel queda en solo lectura.
  */
 export function EditorMedidasAvio({
   idModelo,
@@ -91,30 +100,46 @@ export function EditorMedidasAvio({
     setTallas((prev) => prev.map((r) => (r.idTalla === idTalla ? { ...r, ...cambios } : r)));
   }
 
+  // El MODO lo manda el servidor. Mientras no llega la respuesta se asume `consumo` (lo que había
+  // antes de V1-E3g): así el panel nunca se queda en blanco esperando.
+  const modo = datos?.modoCaptura ?? 'consumo';
+  const porMedida = modo === 'medida';
+  const unidadConsumo = datos?.unidadConsumo ?? null;
+  const avisos = datos?.avisos ?? [];
+  const titulo = porMedida ? 'Medida por talla' : 'Consumo por talla';
+
   function guardarMedidas(): void {
     guardar.mutate(
       {
         idModelo,
         idAvio,
-        cuerpo: {
-          consumoPorTalla,
-          // ⚠️ Las tallas en BLANCO NO se mandan: el PUT es SET-COMPLETO, así que "no viene" =
-          // "no hay fila". Mandarlas como 0 creaba una medida de cero REAL que el precosto metía
-          // al promedio (5 tallas con 3 capturadas: 0.45 se convertía en 0.27) y que apagaba el
-          // aviso `tallasSinMedida` del MRP. Un 0 TECLEADO sí viaja: es un cero a propósito.
-          // Y como el set-completo borra lo que no viene, vaciar una talla ya capturada
-          // (dejarla en blanco) también sirve para BORRAR su medida.
-          tallas: tallas
-            .filter((r) => r.consumo.trim() !== '')
-            .map((r) => ({
-              idTalla: r.idTalla,
-              consumo: Number(r.consumo),
-              idAvioMedida: r.idAvioMedida,
-            })),
-        },
+        cuerpo: porMedida
+          ? {
+              // En modo MEDIDA la cantidad no se captura por talla: el toggle va apagado y sólo
+              // viajan las tallas que SÍ tienen medida elegida (set-completo: lo que no viene, no
+              // está — así se des-captura una talla dejándola en "Sin medida").
+              consumoPorTalla: false,
+              tallas: tallas
+                .filter((r) => r.idAvioMedida !== null)
+                .map((r) => ({ idTalla: r.idTalla, idAvioMedida: r.idAvioMedida })),
+            }
+          : {
+              consumoPorTalla,
+              // ⚠️ Las tallas en BLANCO NO se mandan: el PUT es SET-COMPLETO, así que "no viene" =
+              // "no hay fila". Mandarlas como 0 creaba una cantidad de cero REAL que el precosto
+              // metía al promedio y que apagaba el aviso de talla sin medida. Un 0 TECLEADO sí
+              // viaja: es un cero a propósito. Y vaciar una talla ya capturada la BORRA.
+              tallas: tallas
+                .filter((r) => r.consumo.trim() !== '')
+                .map((r) => ({
+                  idTalla: r.idTalla,
+                  consumo: Number(r.consumo),
+                  idAvioMedida: r.idAvioMedida,
+                })),
+            },
       },
       {
-        onSuccess: () => toast.success('Consumo por talla guardado.'),
+        onSuccess: () => toast.success(`${titulo} guardado.`),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -123,6 +148,9 @@ export function EditorMedidasAvio({
   // Con curva SIEMPRE hay matriz que capturar: el servidor manda una fila por talla de la curva.
   const tieneCurva = datos?.tieneCurva ?? tieneCurvaModelo ?? false;
   const medidasCatalogo = (catalogoMedidas.data?.datos ?? []).filter((m) => m.activo);
+  // En modo MEDIDA la matriz se muestra siempre que haya tallas; en modo CONSUMO sólo si el avío
+  // está marcado como "se consume por talla".
+  const mostrarMatriz = porMedida || consumoPorTalla;
 
   return (
     <div className="border-t pt-2" data-testid={`medidas-avio-${idAvio}`}>
@@ -141,7 +169,7 @@ export function EditorMedidasAvio({
           <ChevronRight className="size-3.5" aria-hidden />
         )}
         <Ruler className="size-3.5" aria-hidden />
-        Consumo por talla
+        {titulo}
       </Button>
 
       {abierto ? (
@@ -152,23 +180,53 @@ export function EditorMedidasAvio({
             <p className="text-sm text-destructive">{consulta.error.message}</p>
           ) : (
             <>
-              <label className="flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-input accent-primary"
-                  checked={consumoPorTalla}
-                  disabled={!puedeAdministrar || guardar.isPending}
-                  onChange={(e) => setConsumoPorTalla(e.target.checked)}
-                  data-testid={`consumo-por-talla-${idAvio}`}
-                />
-                ¿Este avío se consume por talla?
-              </label>
+              {avisos.length > 0 ? (
+                <ul
+                  className="space-y-1 rounded-md border border-warn/40 bg-warn-soft px-2 py-1.5 text-xs"
+                  data-testid={`avisos-medidas-avio-${idAvio}`}
+                >
+                  {avisos.map((a) => (
+                    <li key={a} className="flex gap-1.5">
+                      <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                      <span>{a}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
-              {consumoPorTalla ? (
+              {porMedida ? (
+                <p className="text-xs text-muted-foreground" data-testid={`modo-medida-${idAvio}`}>
+                  Este avío se compra POR MEDIDA: por talla se elige <strong>qué medida</strong> se
+                  pide, no cuánto se gasta. La cantidad es la del renglón (consumo por prenda) y no
+                  cambia entre tallas.
+                </p>
+              ) : (
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={consumoPorTalla}
+                    disabled={!puedeAdministrar || guardar.isPending}
+                    onChange={(e) => setConsumoPorTalla(e.target.checked)}
+                    data-testid={`consumo-por-talla-${idAvio}`}
+                  />
+                  ¿Este avío se consume por talla?
+                </label>
+              )}
+
+              {mostrarMatriz ? (
                 !tieneCurva && tallas.length === 0 ? (
                   <p className="text-xs text-muted-foreground" data-testid={`sin-curva-${idAvio}`}>
                     El modelo no tiene curva de tallas. Asígnale una curva (en los datos del modelo)
-                    para capturar el consumo por talla.
+                    para capturar {porMedida ? 'la medida' : 'el consumo'} por talla.
+                  </p>
+                ) : porMedida && medidasCatalogo.length === 0 ? (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid={`sin-medidas-catalogo-${idAvio}`}
+                  >
+                    Este avío no tiene medidas activas en su catálogo. Captúralas en la pantalla de
+                    Avíos para poder elegir cuál lleva cada talla.
                   </p>
                 ) : (
                   <ul className="space-y-1.5" data-testid={`tabla-tallas-avio-${idAvio}`}>
@@ -178,7 +236,11 @@ export function EditorMedidasAvio({
                         className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5"
                       >
                         <label
-                          htmlFor={`consumo-talla-${idAvio}-${r.idTalla}`}
+                          htmlFor={
+                            porMedida
+                              ? `medida-talla-${String(idAvio)}-${String(r.idTalla)}`
+                              : `consumo-talla-${String(idAvio)}-${String(r.idTalla)}`
+                          }
                           className="flex w-24 shrink-0 items-center gap-1.5 text-xs font-medium"
                         >
                           {r.etiquetaTalla}
@@ -188,34 +250,47 @@ export function EditorMedidasAvio({
                             </ChipEstado>
                           )}
                         </label>
-                        <Input
-                          id={`consumo-talla-${idAvio}-${r.idTalla}`}
-                          type="number"
-                          min={0}
-                          step="0.0001"
-                          inputMode="decimal"
-                          className="h-7 w-28"
-                          placeholder="0"
-                          value={r.consumo}
-                          disabled={!puedeAdministrar || guardar.isPending}
-                          onChange={(e) => cambiarTalla(r.idTalla, { consumo: e.target.value })}
-                          data-testid={`consumo-talla-${idAvio}-${r.idTalla}`}
-                        />
+                        {porMedida ? null : (
+                          <span className="flex items-center gap-1.5">
+                            <Input
+                              id={`consumo-talla-${idAvio}-${r.idTalla}`}
+                              type="number"
+                              min={0}
+                              step="0.0001"
+                              inputMode="decimal"
+                              className="h-7 w-28"
+                              placeholder="0"
+                              value={r.consumo}
+                              disabled={!puedeAdministrar || guardar.isPending}
+                              onChange={(e) => cambiarTalla(r.idTalla, { consumo: e.target.value })}
+                              data-testid={`consumo-talla-${idAvio}-${r.idTalla}`}
+                            />
+                            {/* La unidad, PEGADA al campo: la defensa contra capturar en la unidad
+                                equivocada (0.75 m ≠ 75 cm). */}
+                            {unidadConsumo === null ? null : (
+                              <span className="text-xs text-muted-foreground" aria-hidden>
+                                {unidadConsumo}
+                              </span>
+                            )}
+                          </span>
+                        )}
                         {medidasCatalogo.length > 0 ? (
                           <SelectNativo
+                            id={`medida-talla-${idAvio}-${r.idTalla}`}
                             className="w-56"
                             aria-label={`Medida del avío para la talla ${r.etiquetaTalla}`}
-                            // El amarre medida×talla VIVE en la fila `ModeloAvioTalla`, y esa fila
-                            // solo existe si hay consumo capturado: sin consumo no hay dónde
-                            // guardarlo, así que se pide primero el consumo en vez de aceptar una
-                            // medida que se perdería al guardar.
+                            // En modo CONSUMO el amarre VIVE en la fila de la cantidad, y esa fila
+                            // solo existe si hay cantidad capturada: sin ella no hay dónde
+                            // guardarlo. En modo MEDIDA la fila la crea el propio amarre.
                             title={
-                              r.consumo.trim() === ''
+                              !porMedida && r.consumo.trim() === ''
                                 ? 'Captura primero el consumo de esta talla para poder amarrarle una medida.'
                                 : undefined
                             }
                             disabled={
-                              !puedeAdministrar || guardar.isPending || r.consumo.trim() === ''
+                              !puedeAdministrar ||
+                              guardar.isPending ||
+                              (!porMedida && r.consumo.trim() === '')
                             }
                             value={r.idAvioMedida === null ? '' : String(r.idAvioMedida)}
                             onChange={(e) =>
@@ -253,7 +328,7 @@ export function EditorMedidasAvio({
                   data-testid={`guardar-medidas-avio-${idAvio}`}
                 >
                   {guardar.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-                  Guardar consumo por talla
+                  Guardar {porMedida ? 'medida por talla' : 'consumo por talla'}
                 </Button>
               ) : null}
             </>

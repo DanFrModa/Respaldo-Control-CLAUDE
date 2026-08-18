@@ -22,10 +22,20 @@ const useMedidasAvio = vi.fn<
   }
 >();
 const guardarMutate = vi.fn();
-const medidasDelCatalogo =
-  vi.fn<
-    () => { data: { datos: { id: number; medida: string; precio: number; activo: boolean }[] } }
-  >();
+const medidasDelCatalogo = vi.fn<
+  () => {
+    data: {
+      datos: {
+        id: number;
+        medida: string;
+        valor: number | null;
+        requiereRevision: boolean;
+        precio: number;
+        activo: boolean;
+      }[];
+    };
+  }
+>();
 
 vi.mock('@/api/modelo-medidas', () => ({
   useMedidasAvio: () => useMedidasAvio(),
@@ -43,6 +53,10 @@ function medidas(consumoPorTalla: boolean, extra: Partial<MedidasAvio> = {}): Me
     idAvio: 7,
     consumoPorTalla,
     tieneCurva: true,
+    modoCaptura: 'consumo',
+    unidadConsumo: 'm',
+    unidadMedida: null,
+    avisos: [],
     tallas: [talla(10, 'CH'), talla(11, 'M'), talla(12, 'G')],
     ...extra,
   };
@@ -178,8 +192,8 @@ describe('<EditorMedidasAvio>', () => {
     medidasDelCatalogo.mockReturnValue({
       data: {
         datos: [
-          { id: 3, medida: '15 cm', precio: 5.8, activo: true },
-          { id: 4, medida: '18 cm', precio: 6.2, activo: true },
+          { id: 3, medida: '15 cm', valor: 15, requiereRevision: false, precio: 5.8, activo: true },
+          { id: 4, medida: '18 cm', valor: 18, requiereRevision: false, precio: 6.2, activo: true },
         ],
       },
     });
@@ -229,5 +243,105 @@ describe('<EditorMedidasAvio>', () => {
     expect(screen.queryByTestId('guardar-medidas-avio-7')).not.toBeInTheDocument();
     expect(screen.getByTestId('consumo-talla-7-10')).toBeDisabled();
     expect(screen.getByTestId('consumo-por-talla-7')).toBeDisabled();
+  });
+});
+
+/**
+ * ⭐ V1-E3g (§Post-F9.66) — el panel cambia de cara según el MODO que manda el servidor: en
+ * `medida` (cierres) se elige QUÉ se pide y el campo de cantidad ni se muestra ni se manda; en
+ * `consumo` (elástico) se captura CUÁNTO, con la unidad del avío PEGADA al campo.
+ */
+describe('<EditorMedidasAvio> — modo de captura (V1-E3g)', () => {
+  beforeEach(() => {
+    useMedidasAvio.mockReset();
+    guardarMutate.mockReset();
+    medidasDelCatalogo.mockReset();
+    medidasDelCatalogo.mockReturnValue({
+      data: {
+        datos: [
+          { id: 4, medida: '53 cm', valor: 53, requiereRevision: false, precio: 6, activo: true },
+        ],
+      },
+    });
+  });
+
+  it('en modo `medida` no hay checkbox ni campo de cantidad: solo se elige la medida', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(false, { modoCaptura: 'medida', unidadMedida: 'cm', unidadConsumo: 'pza' }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    expect(screen.queryByTestId('consumo-por-talla-7')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('consumo-talla-7-10')).not.toBeInTheDocument();
+    expect(screen.getByTestId('modo-medida-7')).toBeInTheDocument();
+    // La matriz sale SIN necesidad de encender nada (el select ya está vivo).
+    expect(screen.getByTestId('medida-talla-7-10')).toBeEnabled();
+
+    await usuario.selectOptions(screen.getByTestId('medida-talla-7-10'), '4');
+    await usuario.click(screen.getByTestId('guardar-medidas-avio-7'));
+    await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+    const args = guardarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { consumoPorTalla: boolean; tallas: { idTalla: number; idAvioMedida: number }[] };
+    };
+    // Sólo la talla con medida elegida, SIN `consumo` y con el toggle apagado.
+    expect(args.cuerpo.consumoPorTalla).toBe(false);
+    expect(args.cuerpo.tallas).toEqual([{ idTalla: 10, idAvioMedida: 4 }]);
+  });
+
+  it('en modo `consumo` la UNIDAD del avío se ve pegada al campo', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true, { modoCaptura: 'consumo', unidadConsumo: 'm' }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    const fila = screen.getByTestId('consumo-talla-7-10').closest('span');
+    expect(fila).not.toBeNull();
+    expect(within(fila as HTMLElement).getByText('m')).toBeInTheDocument();
+  });
+
+  it('los AVISOS del servidor se muestran y NO bloquean el guardado', async () => {
+    const usuario = userEvent.setup();
+    useMedidasAvio.mockReturnValue({
+      data: medidas(true, {
+        modoCaptura: 'consumo',
+        unidadConsumo: 'm',
+        avisos: ['El consumo de la talla CH (75 m) queda fuera de lo normal para "m".'],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    expect(screen.getByTestId('avisos-medidas-avio-7')).toHaveTextContent('fuera de lo normal');
+    await usuario.type(screen.getByTestId('consumo-talla-7-10'), '75');
+    await usuario.click(screen.getByTestId('guardar-medidas-avio-7'));
+    await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+  });
+
+  it('en modo `medida` sin medidas en el catálogo, dice qué falta hacer', async () => {
+    const usuario = userEvent.setup();
+    medidasDelCatalogo.mockReturnValue({ data: { datos: [] } });
+    useMedidasAvio.mockReturnValue({
+      data: medidas(false, { modoCaptura: 'medida' }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorMedidasAvio idModelo={1} idAvio={7} puedeAdministrar />);
+
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-7'));
+    expect(screen.getByTestId('sin-medidas-catalogo-7')).toBeInTheDocument();
   });
 });

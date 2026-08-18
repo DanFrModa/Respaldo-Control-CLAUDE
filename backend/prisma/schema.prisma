@@ -1790,8 +1790,16 @@ model Avio {
   /// Clave de negocio del avío (estable). Única global y clave de captura.
   clave            String   @unique
   descripcion      String
-  /// Unidad de medida (pza, m, kg…). NULLABLE en BD; obligatoria en alta por UI (ADR-0009).
+  /// Unidad de CONSUMO (pza, m, kg…): en qué se mide CUÁNTO se gasta del avío por prenda.
+  /// NULLABLE en BD; obligatoria en alta por UI (ADR-0009).
   unidad           String?
+  /// ⭐ V1-E3g (§Post-F9.66) — Unidad de la ESPECIFICACIÓN, en qué se expresan las `medidas` de
+  /// este avío (cm, mm, pulg…). **NO es lo mismo que `unidad`** y por eso es un campo aparte: un
+  /// cierre se CONSUME en `pza` pero se PIDE por su largo en `cm`. Es la unidad que la UI pega al
+  /// campo numérico de la medida y con la que el dominio decide si un número es absurdo
+  /// (`dominio/catalogos/unidades-avio.ts`). NULL = el avío no maneja medidas, o la migración no pudo
+  /// deducirla de las etiquetas viejas (entonces sus medidas quedan `requiereRevision`).
+  unidadMedida     String?  @map("unidad_medida")
   /// Presentación/empaque (caja, rollo…). NULLABLE en BD; obligatoria en alta por UI (ADR-0009).
   presentacion     String?
   /// Avío de uso frecuente (preselección en la UI; si es favorito ⇒ `cantFav` obligatoria).
@@ -1893,8 +1901,19 @@ model AvioMedida {
   id     Int     @id @default(autoincrement())
   idAvio Int     @map("id_avio")
   avio   Avio    @relation(fields: [idAvio], references: [id], onDelete: Cascade)
-  /// Etiqueta de la medida (ej. "15 cm", "18 cm"). Única DENTRO del avío (respaldada por @@unique).
+  /// ⭐ V1-E3g (§Post-F9.66) — ETIQUETA de la medida ("53 cm"), para mostrar y para el diff del
+  /// set-completo (`@@unique`). **Ya NO se captura a mano:** el dominio la DERIVA de `valor` +
+  /// `Avio.unidadMedida`, porque el texto libre partía la compra en tres ("53 cm", "53cm", "53").
+  /// Las filas viejas conservan su texto original mientras nadie las corrija (D3: no se tira nada).
   medida String
+  /// ⭐ V1-E3g — El NÚMERO de la medida, en `Avio.unidadMedida`. Es lo único que se captura. NULL
+  /// SOLO en filas heredadas cuya etiqueta no se pudo convertir ("S", "vieja", rangos): esas
+  /// quedan `requiereRevision = true` en vez de perderse o de recibir un valor inventado.
+  valor  Decimal? @db.Decimal(12, 2)
+  /// ⭐ V1-E3g — Bandera de REVISIÓN MANUAL (D3): la migración no pudo normalizar esta etiqueta a
+  /// número+unidad y NO adivinó. Es un aviso, NO un bloqueo: la medida sigue viva, se sigue
+  /// promediando en el precosto y se puede amarrar. Se apaga sola al re-capturarla con un número.
+  requiereRevision Boolean @default(false) @map("requiere_revision")
   /// Precio real de compra de esta medida (por unidad de compra). Entra al PROMEDIO del precosto.
   precio Decimal @db.Decimal(12, 2)
   /// Orden de despliegue dentro del avío (lo gestiona el dominio; no único en BD).
@@ -3156,7 +3175,8 @@ model OrdenAvioTalla {
   idTalla     Int       @map("id_talla")
   talla       Talla     @relation(fields: [idTalla], references: [id], onDelete: Restrict)
 
-  /// Medida (consumo) del avío para esta talla EN ESTA ORDEN.
+  /// ⭐ CANTIDAD que se consume de este avío en esta talla EN ESTA ORDEN, en `Avio.unidad` (R18).
+  /// ⚠️ NO es la medida/especificación: eso es `idAvioMedida` (§Post-F9.66, V1-E3g).
   consumo      Decimal     @db.Decimal(12, 4)
   /// Amarre medida×talla (qué `AvioMedida` usa esta talla), copiado del BOM. SetNull.
   idAvioMedida Int?        @map("id_avio_medida")
@@ -6496,7 +6516,11 @@ model ModeloAvioTalla {
   idAvio       Int         @map("id_avio")
   idTalla      Int         @map("id_talla")
   talla        Talla       @relation(fields: [idTalla], references: [id], onDelete: Restrict)
-  /// Medida (consumo) del avío para esta talla (R18).
+  /// ⭐ CANTIDAD que se consume de este avío en esta talla, en `Avio.unidad` (R18) — 0.75 m de
+  /// elástico en CH, 0.80 en M. Se MULTIPLICA por las piezas y por el precio.
+  /// ⚠️ NO es la medida/especificación del avío: eso es `idAvioMedida` (el cierre de 53 cm). La
+  /// vieja glosa decía "Medida (consumo)" y ahí nació la confusión que V1-E3g vino a deshacer
+  /// (§Post-F9.66): un campo captura CUÁNTO GASTAS, el otro QUÉ PIDES.
   consumo      Decimal     @db.Decimal(12, 4)
   /// AMARRE medida×talla (rediseño R5, B11): qué `AvioMedida` (tamaño) usa esta talla, para que la
   /// compra/MRP desglose por medida×talla con el precio real de la medida. NULLABLE → sin amarre: el

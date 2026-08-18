@@ -25,6 +25,17 @@ import { z } from 'zod';
  *  • Al apagar el toggle, la lista de tallas sigue reemplazando el set: si se manda `tallas:[]` se
  *    vacían las medidas; si se mandan tallas con `consumoPorTalla=false`, quedan LATENTES (se
  *    guardan aunque el toggle esté off — se reusan si se vuelve a encender).
+ *
+ * ⭐ **V1-E3g (§Post-F9.66) — hay DOS modos de captura y nunca los dos a la vez.** Daniel lo
+ * encontró capturando un cierre: el número por talla no siempre significa lo mismo.
+ *
+ *  • `modoCaptura: 'consumo'` — el avío se gasta por talla (elástico, jareta): se captura CUÁNTO,
+ *    en `Avio.unidad` (0.75 m en CH, 0.80 en M). Se multiplica por piezas y por precio.
+ *  • `modoCaptura: 'medida'`  — el avío tiene un CATÁLOGO de medidas (cierres): por talla se elige
+ *    QUÉ se pide (el cierre de 53 cm). La cantidad no varía —es `consumoPorPrenda`, 1 pza— así que
+ *    `consumoPorTalla` queda en **false** y el requerido se calcula por prenda, no por talla.
+ *
+ * Por eso `consumo` es OPCIONAL en la entrada: en modo `medida` ni se captura ni se muestra.
  */
 
 /** Consumo por talla: número ≥ 0 (Prisma lo guarda como `Decimal(12,4)`). */
@@ -42,7 +53,12 @@ export const esquemaModeloAvioTallaEntrada = z.object({
     .number({ error: 'El id de la talla es obligatorio' })
     .int({ error: 'El id de la talla debe ser entero' })
     .positive({ error: 'El id de la talla debe ser positivo' }),
-  consumo: esquemaConsumoTalla,
+  /**
+   * CANTIDAD que se consume en esta talla, en `Avio.unidad` (R18). **Opcional desde V1-E3g**: en un
+   * avío en modo `medida` (cierres) no se captura —la cantidad es la del renglón— y el dominio la
+   * rellena solo. En modo `consumo` es OBLIGATORIA y el dominio la exige.
+   */
+  consumo: esquemaConsumoTalla.optional(),
   /**
    * AMARRE medida×talla (R5/B11): qué `AvioMedida` (tamaño real: "15 cm", "18 cm") usa esta talla,
    * para que la compra/MRP desglose con el precio real de la medida. `null` = sin amarre. El
@@ -101,7 +117,10 @@ export const esquemaModeloAvioTallaSalida = z
     consumo: z
       .number()
       .nullable()
-      .describe('Consumo capturado del avío para esta talla; null = sin capturar (no hay fila).'),
+      .describe(
+        'CANTIDAD capturada del avío para esta talla (en `Avio.unidad`); null = sin capturar (no ' +
+          'hay fila). NO es la medida/especificación: eso es `idAvioMedida`.',
+      ),
     enCurva: z.boolean().describe('¿La talla pertenece a la curva vigente del modelo?'),
     idAvioMedida: z
       .number()
@@ -111,10 +130,28 @@ export const esquemaModeloAvioTallaSalida = z
     medidaAmarrada: z.string().nullable().describe('Etiqueta de la medida amarrada, o null.'),
     precioMedida: z.number().nullable().describe('Precio de la medida amarrada, o null.'),
   })
-  .describe('Medida (consumo) de un avío del BOM para una talla.');
+  .describe('Renglón por talla de un avío del BOM: su CANTIDAD y/o su MEDIDA amarrada.');
 
 /** Forma de una medida por talla tal como la devuelve la API. */
 export type ModeloAvioTallaSalida = z.infer<typeof esquemaModeloAvioTallaSalida>;
+
+/**
+ * MODO DE CAPTURA por talla de un avío (V1-E3g, §Post-F9.66). Lo DERIVA el servidor de un solo
+ * hecho: ¿el avío tiene medidas ACTIVAS en su catálogo (`AvioMedida`)?
+ *
+ *  • `medida`  — sí las tiene ⇒ es un avío "por medida" (un cierre): por talla se elige QUÉ se
+ *    pide. La cantidad no varía por talla, así que `consumoPorTalla` se mantiene en false.
+ *  • `consumo` — no las tiene ⇒ por talla se captura CUÁNTO se gasta, en `Avio.unidad`.
+ *
+ * Es el mismo hecho con el que el precosto decide usar el PROMEDIO de las medidas
+ * (`resolucion-precios.ts`): una sola definición de "avío por medida" en todo el sistema.
+ */
+export const esquemaModoCapturaTalla = z
+  .enum(['consumo', 'medida'])
+  .describe('¿Por talla se captura la CANTIDAD (consumo) o la ESPECIFICACIÓN (medida)?');
+
+/** Modo de captura por talla de un avío. */
+export type ModoCapturaTalla = z.infer<typeof esquemaModoCapturaTalla>;
 
 /**
  * Salida completa de las medidas por talla de un avío del BOM (respuesta de los endpoints GET y
@@ -132,6 +169,18 @@ export const esquemaModeloAvioMedidasSalida = z
      * lista viniera vacía, y el aviso "el modelo no tiene curva" salía incluso con curva puesta.
      */
     tieneCurva: z.boolean().describe('¿El modelo tiene curva de tallas asignada?'),
+    modoCaptura: esquemaModoCapturaTalla,
+    unidadConsumo: z
+      .string()
+      .nullable()
+      .describe('`Avio.unidad` — la unidad del CONSUMO (m, pza…). La UI la pega al campo.'),
+    unidadMedida: z
+      .string()
+      .nullable()
+      .describe('`Avio.unidadMedida` — la unidad de las MEDIDAS del avío (cm, mm…), o null.'),
+    avisos: z
+      .array(z.string())
+      .describe('Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante).'),
     tallas: z.array(esquemaModeloAvioTallaSalida).describe('Medidas por talla del avío.'),
   })
   .describe('Medidas por talla de un avío del BOM de un modelo.');

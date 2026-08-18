@@ -77,4 +77,28 @@ describe('requeridoAvioReceta (R18 — helper compartido MRP ↔ Habilitación)'
     expect(conCero.requerido).toBe(30); // 3×10 + 0×20
     expect(conCero.tallasSinMedida).toEqual([]);
   });
+
+  it('⭐ V1-E3g: una talla con CERO PIEZAS no cuenta ni avisa (§Post-F9.64, D4)', () => {
+    // La matriz color×talla puede traer una talla en 0 (se abrió la columna y no se llenó). Esa
+    // talla no se va a producir: ni suma al requerido ni "le falta" medida. Antes se colaba en
+    // `tallasSinMedida` y el aviso señalaba tallas que nadie iba a cortar.
+    const conTallaEnCero = new Map<number, number>([
+      [1, 10],
+      [2, 20],
+      [3, 0],
+    ]);
+    const r = requeridoAvioReceta(
+      avio({
+        consumoPorTalla: true,
+        tallas: [
+          { idTalla: 1, consumo: D(3) },
+          { idTalla: 2, consumo: D(4) },
+        ],
+      }),
+      30,
+      conTallaEnCero,
+    );
+    expect(r.requerido).toBe(110); // igual que sin la talla en cero
+    expect(r.tallasSinMedida).toEqual([]); // la talla 3 NO aparece
+  });
 });

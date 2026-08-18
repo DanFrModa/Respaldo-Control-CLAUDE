@@ -6,8 +6,14 @@
  *
  * Regla R18: si el avío NO se consume por talla → `consumoPorPrenda × totalPiezas`. Si SÍ → Σ(medida
  * de la talla × piezas de esa talla en la orden); las tallas presentes en la orden SIN medida
- * capturada caen a `consumoPorPrenda` y se reportan en `tallasSinMedida` para que el llamador decida
- * si avisa (el MRP arma un aviso con las etiquetas; la habilitación lo ignora).
+ * capturada caen a `consumoPorPrenda` y se reportan en `tallasSinMedida` para que el llamador
+ * avise (§Post-F9.64: **avisa, NO bloquea** — bloquear pararía la talla de última hora, que es
+ * producción legítima). Lo usan el MRP (`compras/mrp.ts`) y la habilitación
+ * (`produccion/habilitacion-orden.ts`), cada uno pintando el aviso donde le toca.
+ *
+ * ⚠️ **Sólo cuentan las tallas que la orden REALMENTE pide** (piezas > 0, D4): una talla con cero
+ * piezas no se va a producir, así que ni suma al requerido ni "le falta" medida. Antes se colaba
+ * en `tallasSinMedida` y el aviso señalaba tallas que nadie iba a cortar.
  *
  * Es una función pura sin BD: toma sólo los campos mínimos del BOM (no el `select` pesado del MRP).
  */
@@ -49,6 +55,8 @@ export function requeridoAvioReceta(
   let requerido = 0;
   const tallasSinMedida: number[] = [];
   for (const [idTalla, piezas] of piezasPorTalla) {
+    // Talla que la orden no pide (0 piezas): no aporta al requerido y NO le falta medida.
+    if (piezas <= 0) continue;
     const medida = medidaPorTalla.get(idTalla);
     if (medida !== undefined) {
       requerido += medida * piezas;

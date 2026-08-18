@@ -864,6 +864,8 @@ export {
   esquemaMedidasAvioGuardar,
   esquemaModeloAvioTallaSalida,
   esquemaModeloAvioMedidasSalida,
+  esquemaModoCapturaTalla,
+  type ModoCapturaTalla,
   type DatosModeloAvioTallaEntrada,
   type DatosMedidasAvioGuardar,
   type ModeloAvioTallaSalida,

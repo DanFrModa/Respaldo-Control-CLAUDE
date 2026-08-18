@@ -182,6 +182,26 @@ export const esquemaRecetaOrdenAvio = z
     paraProduccion: z.boolean(),
     paraCosto: z.boolean(),
     consumoPorTalla: z.boolean().describe('¿El consumo se captura por TALLA (R18)?'),
+    modoCaptura: z
+      .enum(['consumo', 'medida'])
+      .describe(
+        '⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se ' +
+          'gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo ' +
+          'de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva ' +
+          'el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto ' +
+          'decide promediarlas. Nunca se capturan las dos cosas a la vez.',
+      ),
+    unidadMedida: z
+      .string()
+      .nullable()
+      .describe('Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo).'),
+    avisoCaptura: z
+      .string()
+      .nullable()
+      .describe(
+        'Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción ' +
+          'heredada entre modo y toggle, o un número absurdo para la unidad), o null.',
+      ),
     idAvioProveedor: z
       .number()
       .int()
@@ -349,10 +369,15 @@ const esquemaPrecioReceta = z
   .max(99999999, { error: 'El precio es demasiado grande' })
   .nullable();
 
-/** Medida por talla al capturar (R18). */
+/**
+ * Renglón por talla al capturar (R18). ⭐ V1-E3g: `consumo` es **opcional** porque en un avío "por
+ * medida" (cierres) la cantidad no se captura por talla —es la del renglón— y por talla sólo se
+ * elige QUÉ medida se pide. El dominio la resuelve: conserva la que ya tenía la fila y, si es
+ * nueva, siembra el `consumoPorPrenda` congelado del renglón.
+ */
 export const esquemaRecetaTallaEntrada = z.object({
   idTalla: z.number().int().positive(),
-  consumo: esquemaConsumoReceta,
+  consumo: esquemaConsumoReceta.optional(),
   idAvioMedida: z.number().int().positive().nullable().optional(),
 });
 

@@ -7,16 +7,46 @@ import { z } from 'zod';
  * del avío padre (decisión Daniel). Se administran desde la pantalla de Avíos (sección expandible
  * "Medidas del avío"): un SET completo que el dominio sincroniza en UNA transacción (como los
  * proveedores del avío). Toda la lógica vive en el dominio (A1); aquí sólo las FORMAS.
+ *
+ * ⭐ **V1-E3g (§Post-F9.66) — la medida es un NÚMERO, no un texto.** Antes se capturaba la etiqueta a
+ * mano ("15 cm") y `"53 cm"`, `"53cm"` y `"53"` eran tres medidas distintas: la orden de compra salía
+ * partida en tres. Ahora se captura `valor` (solo el número) y la unidad vive UNA vez en el avío
+ * (`unidadMedida`, ej. "cm"); la etiqueta la DERIVA el dominio. Daniel lo dijo así: *"el campo donde
+ * se captura lo dejamos solo numérico, entonces obliga al usuario a evitar poner 53 cm, 53
+ * centímetros o 53CM"* — se quita la ambigüedad en el origen en vez de limpiarla después.
  */
 
-/** Un renglón de captura de medida: etiqueta + precio real de compra + orden opcional. */
+/** Un renglón de captura de medida: el NÚMERO + el precio real de compra + orden opcional. */
 export const esquemaAvioMedidaEntrada = z.object({
-  medida: z
-    .string({ error: 'La medida es obligatoria' })
-    .trim()
-    .min(1, { error: 'La medida es obligatoria' })
-    .max(60, { error: 'La medida no puede tener más de 60 caracteres' })
-    .describe('Etiqueta de la medida (ej. "15 cm", "18 cm").'),
+  /**
+   * Id de la medida que se está CORRIGIENDO. Se manda para editar una medida existente sin
+   * perderla y sin crear otra: es el camino de las medidas heredadas marcadas `requiereRevision`,
+   * cuya etiqueta va a cambiar al normalizarse ("15 cm" ⇒ "15 cm" con `valor` 15). Sin `id`, el
+   * dominio casa por ETIQUETA derivada (comportamiento de siempre) y da de alta lo que no exista.
+   */
+  id: z
+    .number({ error: 'El id de la medida debe ser un número' })
+    .int({ error: 'El id de la medida debe ser entero' })
+    .positive({ error: 'El id de la medida debe ser positivo' })
+    .optional(),
+  /**
+   * NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm).
+   *
+   * ⭐ `null` = **"todavía no le pongo número"**, y sólo vale acompañado de `id` (H4 del review). Es
+   * lo que necesita una medida HEREDADA que la migración no pudo convertir: mientras nadie la
+   * revisa, su fila tiene que poder viajar en el set-completo **sin número** para no ser dada de
+   * baja, y sin congelar el resto del avío. Conserva su etiqueta y su marca de revisión; su precio
+   * y su orden sí se ajustan. Lo que NO se acepta es quitarle el número a una medida ya
+   * normalizada: eso sería perder el dato que esta etapa vino a ganar.
+   */
+  valor: z
+    .number({ error: 'La medida debe ser un número' })
+    .positive({ error: 'La medida debe ser mayor que cero' })
+    .max(999_999, { error: 'La medida es demasiado grande' })
+    .nullable()
+    .describe(
+      'NÚMERO de la medida en la `unidadMedida` del avío; `null` = heredada sin normalizar (exige `id`).',
+    ),
   precio: z
     .number({ error: 'El precio es obligatorio' })
     .nonnegative({ error: 'El precio no puede ser negativo' })
@@ -33,19 +63,50 @@ export const esquemaAvioMedidaEntrada = z.object({
 export type DatosAvioMedidaEntrada = z.infer<typeof esquemaAvioMedidaEntrada>;
 
 /**
- * Cuerpo para reemplazar el SET COMPLETO de medidas de un avío (`PUT /api/avios/:id/medidas`): el
- * dominio sincroniza (agrega/quita/actualiza) en UNA transacción A2. Puede quedar vacío (el avío deja
- * de ser "por medida"). Sin `medida` repetida dentro del avío.
+ * Cuerpo para reemplazar el SET COMPLETO de medidas de un avío (`PUT /api/avios/:id/medidas`): la
+ * `unidadMedida` del avío + los renglones. El dominio sincroniza (agrega/quita/actualiza) en UNA
+ * transacción A2. Puede quedar vacío (el avío deja de ser "por medida"). Sin `valor` repetido.
+ *
+ * `unidadMedida` es OBLIGATORIA en cuanto viene al menos una medida CON NÚMERO: sin ella el número
+ * no significa nada (¿53 cm o 53 mm?) y es justo la ambigüedad que esta etapa vino a cerrar. Un set
+ * que sólo conserva medidas heredadas sin normalizar todavía no tiene unidad que declarar.
  */
 export const esquemaAvioMedidasCuerpo = z
   .object({
+    unidadMedida: z
+      .string({ error: 'La unidad de las medidas debe ser texto' })
+      .trim()
+      .max(12, { error: 'La unidad de las medidas no puede tener más de 12 caracteres' })
+      .nullable()
+      .default(null)
+      .describe('Unidad en que se expresan las medidas del avío (cm, mm, pulg…).'),
     medidas: z
       .array(esquemaAvioMedidaEntrada)
       .max(100, { error: 'Demasiadas medidas en el avío' })
-      .refine((items) => new Set(items.map((i) => i.medida.trim())).size === items.length, {
-        error: 'Hay medidas repetidas en el avío',
+      // Los `null` NO cuentan como repetidos entre sí: son "sin número todavía", no un valor.
+      .refine(
+        (items) => {
+          const numeros = items.flatMap((i) => (i.valor === null ? [] : [i.valor]));
+          return new Set(numeros).size === numeros.length;
+        },
+        { error: 'Hay medidas repetidas en el avío' },
+      )
+      .refine((items) => items.every((i) => i.valor !== null || i.id !== undefined), {
+        error: 'Una medida sin número sólo puede ser una ya existente que está por revisar',
       }),
   })
+  // La unidad se exige cuando hay al menos un NÚMERO que interpretar. Un avío que sólo conserva
+  // medidas heredadas sin normalizar todavía no tiene unidad que declarar, y exigírsela lo dejaría
+  // sin poder guardar ni un cambio de precio (H4 del review).
+  .refine(
+    (c) =>
+      !c.medidas.some((m) => m.valor !== null) ||
+      (c.unidadMedida !== null && c.unidadMedida !== ''),
+    {
+      error: 'Falta la unidad de las medidas del avío (cm, mm…): sin ella el número no dice nada',
+      path: ['unidadMedida'],
+    },
+  )
   .describe('Set completo de medidas de un avío "por medida".');
 
 /** Datos validados del set de medidas del avío. */
@@ -55,7 +116,22 @@ export type DatosAvioMedidas = z.infer<typeof esquemaAvioMedidasCuerpo>;
 export const esquemaAvioMedidaSalida = z
   .object({
     id: z.number().int().describe('Id de la medida.'),
-    medida: z.string().describe('Etiqueta de la medida.'),
+    medida: z
+      .string()
+      .describe('ETIQUETA de la medida ("53 cm"), derivada de `valor` + la unidad del avío.'),
+    valor: z
+      .number()
+      .nullable()
+      .describe(
+        'NÚMERO de la medida. `null` SOLO en filas heredadas cuya etiqueta no se pudo convertir ' +
+          '("S", "vieja", rangos): quedan marcadas `requiereRevision` en vez de perderse (D3).',
+      ),
+    requiereRevision: z
+      .boolean()
+      .describe(
+        '¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y ' +
+          'NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando.',
+      ),
     precio: z.number().describe('Precio real de compra de esta medida.'),
     orden: z.number().int().describe('Orden de despliegue.'),
     activo: z.boolean().describe('Falso si está desactivada (borrado suave).'),
@@ -69,14 +145,26 @@ export type AvioMedidaSalida = z.infer<typeof esquemaAvioMedidaSalida>;
  * Lista de medidas de un avío + el PROMEDIO de precios que usa el precosto (`GET /api/avios/:id/medidas`).
  * `promedioPreCosto` = AVG de los precios de las medidas ACTIVAS (null si no hay ninguna); es el valor
  * que la calculadora muestra como "Promedio (precosteo)".
+ *
+ * `avisos` son advertencias que **NO bloquean** (V1-E3g): medidas pendientes de revisión, falta de
+ * `unidadMedida`, o números absurdos para la unidad (un cierre de 1 cm casi seguro quiso ser 100).
  */
 export const esquemaAvioMedidasLista = z
   .object({
     datos: z.array(esquemaAvioMedidaSalida).describe('Medidas del avío (ordenadas).'),
+    unidadMedida: z
+      .string()
+      .nullable()
+      .describe('Unidad en que se expresan las medidas de este avío (cm, mm…), o null.'),
     promedioPreCosto: z
       .number()
       .nullable()
       .describe('Promedio de precios de las medidas activas (el que usa el precosto), o null.'),
+    avisos: z
+      .array(z.string())
+      .describe(
+        'Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo).',
+      ),
   })
   .describe('Medidas de un avío con el promedio del precosteo.');
 

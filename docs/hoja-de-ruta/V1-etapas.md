@@ -1101,7 +1101,105 @@ que arranque el worker. Degrada en lentitud, no en fallo, y no lo introdujo esta
 
 ---
 
-## V1-E3g · Que avise cuando una talla de la orden no tiene medida capturada ⬜ (pedida 17-ago-2026)
+## V1-E3g · Medida vs. consumo por talla ⭐ + el aviso de tallas sin medida (18-ago-2026)
+
+> **Salió de Daniel CAPTURANDO**, no de un plan ni de una revisión técnica. Es el **segundo** hallazgo de
+> esa naturaleza en dos días (el otro fue el tránsito de prendas), y los dos encontraron cosas que **ningún
+> reviewer habría visto: el código estaba bien, lo que estaba mal era el modelo del negocio.**
+> Decisiones: `DECISIONES.md` **§Post-F9.66** (el grueso) y **§Post-F9.64** (el aviso).
+
+### El hueco de fondo
+
+Dos ideas distintas vivían en el mismo campo. En el **elástico**, el valor por talla **es el consumo**
+(0.75 m) y se multiplica por el precio del metro: los decimales son correctos. En el **cierre**, el
+consumo es **1 pza siempre** y lo que cambia por talla es **la especificación** (53 cm), que no se
+multiplica por nada — es una instrucción de compra. *No es que unos avíos usen decimales y otros no: unos
+capturan **cuánto gastas** y otros **qué pides**.*
+
+Y las etiquetas eran parte del defecto: el panel se llamaba *"Consumo por talla"* para las dos cosas y el
+esquema documentaba el campo como *"Medida (consumo)"* — **la confusión estaba escrita desde el origen**.
+
+### Qué entrega
+
+La medida deja de ser texto libre: `AvioMedida` gana valor numérico y **la etiqueta la DERIVA el dominio**
+de valor + unidad. El **modo** (consumo / medida) se deriva de un hecho que **ya existía** —¿el avío tiene
+medidas activas?—, el mismo con el que el precosto decide promediar: **sin bandera nueva**. Los dos modos
+**nunca** están vivos a la vez. La migración convierte lo convertible y deja el resto **marcado, vivo y
+usable**. Y el aviso de tallas sin medida se **REUSÓ** —la habilitación lo tiraba a la basura— en vez de
+construir uno nuevo; de paso dejó de señalar tallas con 0 piezas, que nadie iba a cortar.
+
+### Nota de cierre — ✅ HECHA (18-ago-2026)
+
+**Primera vuelta: RECHAZADA.** El reviewer confirmó lo más caro de verificar —la migración **no pierde un
+solo dato** (22 filas antes → 22 después contra datos sucios reales), el elástico **no se movió**, y el
+aviso **se reusó y no se duplicó**— y aun así encontró dos cosas que valían el rechazo:
+
+1. **⭐ La rendija estaba en el camino principal.** Se normalizó el toggle en `agregarRenglonReceta`,
+   `editarRenglonReceta` y `restaurarRenglonReceta` —los **tres secundarios**— y se dejó
+   `copiarRecetaDelModelo`, **por donde pasa el 100 % de las órdenes**. Sonda: orden nueva con toggle
+   heredado → requerido **70 cuando por prenda serían 10**. Es *exactamente el "MRP en la sombra" que la
+   etapa invocó como razón para forzar la bandera*, fabricándose en cada orden nueva.
+2. **⭐ La migración no marcaba el caso que justifica toda la decisión.** §Post-F9.66 dice textual que
+   *"`53 cm`, `53cm` y `53` serían tres cosas distintas"*. El reviewer migró **ese caso exacto**: tres
+   filas indistinguibles, **ninguna marcada, ningún aviso** — y al guardar, `ErrorValidacion` sin pista de
+   cuál borrar. Palabra por palabra lo que Daniel pidió evitar.
+
+**Y una prueba decorativa más:** la que se llama *"nombra las tallas SIN capturar EN ORDEN CANÓNICO"* pasa
+con el `.sort()` borrado, porque el fixture mete la M antes que la G y orden de inserción y orden canónico
+coinciden. **La aserción no discrimina.**
+
+**Del lado del lead:** la ficha describía solo §Post-F9.64 —la mitad chica de la etapa—, `HOJA-DE-RUTA.md`
+no la mencionaba y las deudas declaradas no estaban escritas en §4. Reparado aquí.
+
+**Segunda vuelta: rechazada otra vez, y el hallazgo fue contra la documentación del lead** — el 432→8 de
+arriba. Además, **el arreglo de la primera vuelta estaba probado en una sola dirección**: mutar la línea a
+`consumoPorTalla: false` a secas —apagar el toggle a **todos** los avíos al nacer la orden, incluido el
+elástico legítimo— dejaba **191 pruebas en verde**. El comportamiento era correcto; faltaba la aserción.
+*Es el mismo patrón que la prueba decorativa de la vuelta anterior, ahora en el código recién escrito para
+impedir ese defecto.* Y **dos de las cuatro consultas del conteo previo mentían**: contaban órdenes
+canceladas pese a que su propio comentario decía que solo importan las vivas, y la que anuncia la cola de
+revisión manual **subreportaba 5 de 9 — por el lado malo**.
+
+**Tercera vuelta: APROBADA.** Las cuatro mutaciones supervivientes mueren; la consulta reescrita predijo
+**12 filas** y la migración marcó **12, las mismas**; y el barrido del repo confirmó que ningún lugar
+sigue diciendo "mueve costos". Integración final: **1914**.
+
+**El reviewer se corrigió a sí mismo:** su mutación del precio de la heredada en la segunda vuelta estaba
+**mal formada** (`&& false ? A : B` — `&&` liga más que `? :`, así que caía al brazo completo y el precio
+sí se comparaba). El hallazgo era legítimo; **su evidencia de entonces no**. La rehízo y esta vez muere
+con tres pruebas. *Lo dijo sin que nadie se lo pidiera.*
+
+**Lo que se llevó la etapa, en una línea:** tres vueltas, seis hallazgos reales, y **el más caro no fue un
+bug de código sino una afirmación sobre dinero escrita sin ejecutarla**. El sistema llevaba tiempo
+costeando 54 cierres por prenda y nadie lo sabía. Lo destapó **medir en vez de leer**.
+
+### ⭐ El hallazgo que cambia el sentido de la etapa: el sistema estaba costeando 54× de más
+
+🔴 **CORRECCIÓN (18-ago-2026).** La primera redacción de esta ficha decía que el forzado *"mueve dinero"*
+y que había que contar las filas afectadas para **autorizar un cambio de costos**. **Es al revés**, y lo
+midió el reviewer **ejecutando `calcularPreCosto` real** sobre el cierre de Daniel (1 pza/prenda, medidas
+53 y 55 capturadas en el campo de consumo por talla):
+
+```
+ANTES    consumoPorPrenda: 54   importe: 432
+DESPUÉS  consumoPorPrenda:  1   importe:   8
+costo TOTAL del modelo:  432 → 8
+```
+
+**El forzado no mueve costos: REPARA un sobrecosto de 54×.** El mecanismo es exactamente el hallazgo de
+Daniel — **la medida se estaba leyendo como cantidad**, así que el sistema costeaba *54 cierres por
+prenda* (54 = promedio de 53 y 55) en vez de 1. **El estado actual es el error; el cambio es la
+corrección.**
+
+⚠️ **El conteo previo al despliegue SIGUE siendo obligatorio, pero mide otra cosa:** no autoriza un
+cambio, **mide cuánto está mal hoy**. Sin él nadie sabe cuántos modelos y órdenes vivas traen precios
+inflados. Consultas en `scratchpad/v1-e3g-conteo-antes-del-deploy.sql`.
+
+*(Se deja escrito el error en vez de borrarlo: el texto viejo se redactó **antes** de que apareciera el
+54×, y es lo que Gabriel habría leído para decidir. Es la tercera nota de este proyecto que se quema por
+lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
+
+### El aviso de tallas sin medida (§Post-F9.64) ⬜ (pedida 17-ago-2026)
 
 > Nace de una pregunta de Daniel sobre la curva de tallas. Decisión y criterios en `DECISIONES.md`
 > **§Post-F9.64**. La curva **ya** es una guía y no una jaula —capturar el XCH fuera de curva se puede

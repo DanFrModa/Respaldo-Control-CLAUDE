@@ -26,10 +26,25 @@
  *    perder las medidas ya capturadas.
  *  • Auditoría A7 + bitácora (entidad `'Modelo'`, `MODIFICAR`) y `tocarModelo` cuando algo cambia.
  *
+ * ⭐ **V1-E3g (§Post-F9.66) — dos modos, nunca los dos vivos a la vez.** El número por talla no
+ * siempre significa lo mismo, y ahí nacía la confusión que Daniel encontró capturando un cierre:
+ *
+ *  • **`consumo`** (elástico, jareta) — el avío NO tiene medidas en su catálogo: por talla se
+ *    captura CUÁNTO se gasta, en `Avio.unidad` (0.75 m en CH). Se multiplica por piezas y precio.
+ *  • **`medida`** (cierres) — el avío SÍ tiene medidas activas: por talla se elige QUÉ se pide (el
+ *    cierre de 53 cm). La cantidad no varía por talla —es `consumoPorPrenda`— así que el dominio
+ *    **fuerza `consumoPorTalla = false`** y el requerido (R18) se calcula por prenda. Se fuerza en
+ *    vez de dejarlo como estaba porque un consumo por talla que la pantalla ya no muestra seguiría
+ *    moviendo el MRP **en la sombra**; forzarlo queda ASENTADO en la bitácora y en un aviso, que es
+ *    lo contrario de callado. Las cantidades viejas NO se borran (D3): sólo dejan de mandar.
+ *
  * Permisos: leer = `modelos.ver`; mutar = `modelos.administrar`.
  */
 import type { Prisma } from '../../datos/index.js';
-import type { esquemaModeloAvioTallaEntrada } from '../../contrato/esquemas/modelo-avio-talla.js';
+import type {
+  esquemaModeloAvioTallaEntrada,
+  ModoCapturaTalla,
+} from '../../contrato/esquemas/modelo-avio-talla.js';
 import { esquemaMedidasAvioGuardar } from '../../contrato/esquemas/modelo-avio-talla.js';
 import type { z } from 'zod';
 
@@ -43,6 +58,8 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
 
@@ -72,14 +89,35 @@ export interface ModeloAvioTallaDetalle {
   precioMedida: number | null;
 }
 
-/** Medidas por talla completas de un avío del BOM (toggle + renglones). */
+/** Medidas por talla completas de un avío del BOM (modo + toggle + renglones + avisos). */
 export interface MedidasAvio {
   idModelo: number;
   idAvio: number;
   consumoPorTalla: boolean;
   /** ¿El MODELO tiene curva de tallas asignada? (con curva SIEMPRE hay renglones que capturar). */
   tieneCurva: boolean;
+  /** ¿Por talla se captura la CANTIDAD o la ESPECIFICACIÓN? (V1-E3g; lo deriva el servidor). */
+  modoCaptura: ModoCapturaTalla;
+  /** `Avio.unidad` — unidad del CONSUMO (m, pza…). La UI la pega al campo que se captura. */
+  unidadConsumo: string | null;
+  /** `Avio.unidadMedida` — unidad de las MEDIDAS del avío (cm, mm…). */
+  unidadMedida: string | null;
+  /** Advertencias que NO bloquean (valor absurdo para la unidad, unidad faltante). */
+  avisos: string[];
   tallas: ModeloAvioTallaDetalle[];
+}
+
+/**
+ * Lo que hace falta saber del AVÍO para capturar por talla: su modo (¿tiene medidas activas en el
+ * catálogo?), sus dos unidades y el consumo por prenda del renglón del BOM (el que rellena la
+ * cantidad en modo `medida`).
+ */
+interface ContextoAvioTalla {
+  consumoPorTalla: boolean;
+  consumoPorPrenda: number;
+  modoCaptura: ModoCapturaTalla;
+  unidadConsumo: string | null;
+  unidadMedida: string | null;
 }
 
 /** Marca la auditoría del modelo (modificadoPorId/En) cuando cambian sus medidas por talla. */
@@ -88,18 +126,43 @@ async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Pro
 }
 
 /**
- * Lee el renglón `ModeloAvio` (solo el toggle) o lanza `ErrorNoEncontrado`: si no existe, el avío
- * no está en el BOM de ese modelo (aunque el avío exista en el catálogo).
+ * Lee el renglón `ModeloAvio` + el AVÍO del catálogo, o lanza `ErrorNoEncontrado`: si no existe, el
+ * avío no está en el BOM de ese modelo (aunque el avío exista en el catálogo).
+ *
+ * ⭐ El `modoCaptura` se DERIVA aquí de un solo hecho —¿el avío tiene ≥1 medida ACTIVA en su
+ * catálogo?— que es exactamente el mismo con el que el precosto decide promediar las medidas
+ * (`costos/resolucion-precios.ts`). Una sola definición de "avío por medida" en todo el sistema:
+ * si viviera duplicada, la pantalla y el costeo podrían opinar distinto del mismo avío.
  */
-async function exigirRenglonAvio(tx: Tx, idModelo: number, idAvio: number): Promise<boolean> {
+async function exigirRenglonAvio(
+  tx: Tx,
+  idModelo: number,
+  idAvio: number,
+): Promise<ContextoAvioTalla> {
   const renglon = await tx.modeloAvio.findUnique({
     where: { idModelo_idAvio: { idModelo, idAvio } },
-    select: { consumoPorTalla: true },
+    select: {
+      consumoPorTalla: true,
+      consumoPorPrenda: true,
+      avio: {
+        select: {
+          unidad: true,
+          unidadMedida: true,
+          _count: { select: { medidas: { where: { activo: true } } } },
+        },
+      },
+    },
   });
   if (renglon === null) {
     throw new ErrorNoEncontrado('Avío en el BOM del modelo', idAvio);
   }
-  return renglon.consumoPorTalla;
+  return {
+    consumoPorTalla: renglon.consumoPorTalla,
+    consumoPorPrenda: renglon.consumoPorPrenda.toNumber(),
+    modoCaptura: renglon.avio._count.medidas > 0 ? 'medida' : 'consumo',
+    unidadConsumo: renglon.avio.unidad,
+    unidadMedida: renglon.avio.unidadMedida,
+  };
 }
 
 /**
@@ -141,7 +204,7 @@ async function leerMedidasAvio(
   tx: Tx,
   idModelo: number,
   idAvio: number,
-  consumoPorTalla: boolean,
+  contexto: ContextoAvioTalla,
 ): Promise<MedidasAvio> {
   const [curva, filas] = await Promise.all([
     leerTallasCurvaModelo(tx, idModelo),
@@ -184,13 +247,59 @@ async function leerMedidasAvio(
     .filter((f) => !idsCurva.has(f.idTalla))
     .map((f) => detalle(f, f.idTalla, f.talla.etiqueta, false));
 
+  const tallas = [...deLaCurva, ...fueraDeCurva];
   return {
     idModelo,
     idAvio,
-    consumoPorTalla,
+    consumoPorTalla: contexto.consumoPorTalla,
     tieneCurva: curva.length > 0,
-    tallas: [...deLaCurva, ...fueraDeCurva],
+    modoCaptura: contexto.modoCaptura,
+    unidadConsumo: contexto.unidadConsumo,
+    unidadMedida: contexto.unidadMedida,
+    avisos: avisosDeCaptura(contexto, tallas),
+    tallas,
   };
+}
+
+/**
+ * AVISOS que NO bloquean (V1-E3g): el riesgo que quedó abierto al confiar en la unidad del avío es
+ * que esté MAL PUESTA, y contra eso se avisa cuando el número no tiene sentido para esa unidad (un
+ * `1` en un cierre en cm casi seguro quiso ser `100`). Nunca es un error: los rangos son de sentido
+ * común, no reglas del negocio, y un rango mal calibrado no debe frenar una captura legítima.
+ *
+ * En modo `medida` no se revisan las cantidades por talla: ahí no se capturan (el aviso del valor
+ * de la medida vive en el catálogo del avío, que es donde se teclea).
+ */
+function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDetalle[]): string[] {
+  const avisos: string[] = [];
+
+  // ⭐ H3 del review — La CONTRADICCIÓN heredada (avío por medida + `consumoPorTalla` encendido) se
+  // avisaba en la receta de la ORDEN pero no aquí, en el BOM… que es **donde se arregla**. El
+  // usuario leía el aviso en la orden, venía al modelo y encontraba una pantalla que no mencionaba
+  // el problema. Igual que allá: se DICE, no se apaga al leer — apagarlo lo hace el guardado.
+  if (contexto.modoCaptura === 'medida') {
+    if (contexto.consumoPorTalla) {
+      avisos.push(
+        'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
+          '"se consume por talla" de una captura anterior: las cantidades por talla ya no se ' +
+          'capturan y siguen contando en el requerido. Guarda para normalizarlo.',
+      );
+    }
+    // En modo `medida` las cantidades no se capturan aquí, así que revisarlas sería ruido: el
+    // aviso del número absurdo de la MEDIDA vive en el catálogo del avío, que es donde se teclea.
+    return avisos;
+  }
+
+  for (const t of tallas) {
+    if (t.consumo === null) continue;
+    const aviso = avisoValorFueraDeRango(
+      `El consumo de la talla ${t.etiquetaTalla}`,
+      t.consumo,
+      contexto.unidadConsumo,
+    );
+    if (aviso !== null) avisos.push(aviso);
+  }
+  return avisos;
 }
 
 /**
@@ -256,6 +365,7 @@ async function sincronizarMedidas(
   idModelo: number,
   idAvio: number,
   deseados: MedidaTallaValidada[],
+  contexto: ContextoAvioTalla,
 ): Promise<ResultadoSincronizacion> {
   await exigirTallasValidas(
     tx,
@@ -271,13 +381,32 @@ async function sincronizarMedidas(
   const actualPorId = new Map(actuales.map((f) => [f.idTalla, f]));
   const deseadoPorId = new Map(deseados.map((d) => [d.idTalla, d]));
 
+  /**
+   * CANTIDAD que va a quedar en la fila. En modo `consumo` es la capturada y es OBLIGATORIA (sin
+   * ella no hay nada que guardar). En modo `medida` NO se captura: se conserva la que ya tenía la
+   * fila —nunca se pisa lo que había, D3— y si la fila es nueva se siembra con el `consumoPorPrenda`
+   * del renglón, que es el número correcto (1 pza por prenda). Da igual para el requerido: en modo
+   * `medida` el toggle queda en false y R18 calcula por prenda, no por talla.
+   */
+  const consumoDe = (d: MedidaTallaValidada): number => {
+    if (contexto.modoCaptura === 'consumo') {
+      if (d.consumo === undefined) {
+        throw new ErrorValidacion(
+          'Falta el consumo de una de las tallas: este avío se captura por cantidad.',
+        );
+      }
+      return d.consumo;
+    }
+    return d.consumo ?? actualPorId.get(d.idTalla)?.consumo.toNumber() ?? contexto.consumoPorPrenda;
+  };
+
   const aQuitar = [...actualPorId.keys()].filter((id) => !deseadoPorId.has(id));
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idTalla));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idTalla);
     return (
       actual !== undefined &&
-      (actual.consumo.toNumber() !== d.consumo || actual.idAvioMedida !== d.idAvioMedida)
+      (actual.consumo.toNumber() !== consumoDe(d) || actual.idAvioMedida !== d.idAvioMedida)
     );
   });
 
@@ -315,7 +444,7 @@ async function sincronizarMedidas(
         idModelo,
         idAvio,
         idTalla: d.idTalla,
-        consumo: d.consumo,
+        consumo: consumoDe(d),
         idAvioMedida: d.idAvioMedida,
         creadoPorId: sesion.id,
         modificadoPorId: sesion.id,
@@ -325,7 +454,7 @@ async function sincronizarMedidas(
   for (const d of aActualizar) {
     await tx.modeloAvioTalla.update({
       where: { idModelo_idAvio_idTalla: { idModelo, idAvio, idTalla: d.idTalla } },
-      data: { consumo: d.consumo, idAvioMedida: d.idAvioMedida, ...datosModificacion(sesion) },
+      data: { consumo: consumoDe(d), idAvioMedida: d.idAvioMedida, ...datosModificacion(sesion) },
     });
   }
   return { cambio: true, retiradas };
@@ -344,8 +473,8 @@ export async function obtenerMedidasAvio(
 ): Promise<MedidasAvio> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
-  const consumoPorTalla = await exigirRenglonAvio(cliente, idModelo, idAvio);
-  return leerMedidasAvio(cliente, idModelo, idAvio, consumoPorTalla);
+  const contexto = await exigirRenglonAvio(cliente, idModelo, idAvio);
+  return leerMedidasAvio(cliente, idModelo, idAvio, contexto);
 }
 
 /**
@@ -370,17 +499,24 @@ export async function guardarMedidasAvio(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
-    const consumoActual = await exigirRenglonAvio(tx, idModelo, idAvio);
+    const contexto = await exigirRenglonAvio(tx, idModelo, idAvio);
 
-    const cambiaBandera = consumoActual !== datos.consumoPorTalla;
+    // ⭐ En modo `medida` la cantidad NO varía por talla (el cierre es 1 pza), así que el toggle se
+    // FUERZA a false pase lo que pase: si se dejara encendido, unas cantidades por talla que la
+    // pantalla ya ni muestra seguirían mandando en el requerido del MRP, en la sombra. Se fuerza
+    // y se ASIENTA (bitácora + aviso): lo contrario de un cambio callado (D3).
+    const consumoPorTallaFinal = contexto.modoCaptura === 'medida' ? false : datos.consumoPorTalla;
+    const forzado = contexto.modoCaptura === 'medida' && datos.consumoPorTalla;
+
+    const cambiaBandera = contexto.consumoPorTalla !== consumoPorTallaFinal;
     if (cambiaBandera) {
       await tx.modeloAvio.update({
         where: { idModelo_idAvio: { idModelo, idAvio } },
-        data: { consumoPorTalla: datos.consumoPorTalla, ...datosModificacion(sesion) },
+        data: { consumoPorTalla: consumoPorTallaFinal, ...datosModificacion(sesion) },
       });
     }
 
-    const medidas = await sincronizarMedidas(tx, sesion, idModelo, idAvio, datos.tallas);
+    const medidas = await sincronizarMedidas(tx, sesion, idModelo, idAvio, datos.tallas, contexto);
 
     if (cambiaBandera || medidas.cambio) {
       await tocarModelo(tx, sesion, idModelo);
@@ -391,7 +527,11 @@ export async function guardarMedidasAvio(
         datos: {
           bom: 'medidas-avio',
           idAvio,
-          consumoPorTalla: datos.consumoPorTalla,
+          consumoPorTalla: consumoPorTallaFinal,
+          modoCaptura: contexto.modoCaptura,
+          // Deja constancia de que el toggle se apagó SOLO por ser un avío "por medida", para que
+          // nadie lea después "el usuario lo apagó" donde lo apagó la regla.
+          ...(forzado ? { consumoPorTallaForzadoAFalse: 'avío por medida (V1-E3g)' } : {}),
           tallas: datos.tallas.length,
           // Las medidas que se FUERON, ÍNTEGRAS (talla, consumo y amarre previos): es lo único
           // con lo que se puede reconstruir un borrado por vaciado (D3). Si no se quitó ninguna,
@@ -401,6 +541,16 @@ export async function guardarMedidasAvio(
       });
     }
 
-    return leerMedidasAvio(tx, idModelo, idAvio, datos.consumoPorTalla);
+    const resultado = await leerMedidasAvio(tx, idModelo, idAvio, {
+      ...contexto,
+      consumoPorTalla: consumoPorTallaFinal,
+    });
+    if (forzado) {
+      resultado.avisos.push(
+        'Este avío se compra POR MEDIDA (tiene medidas en su catálogo): la cantidad no se captura ' +
+          'por talla, se toma el consumo por prenda del renglón. Se apagó "se consume por talla".',
+      );
+    }
+    return resultado;
   }, bd);
 }

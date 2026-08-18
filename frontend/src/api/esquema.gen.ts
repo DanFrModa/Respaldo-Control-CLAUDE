@@ -11962,8 +11962,12 @@ export interface paths {
               datos: {
                 /** @description Id de la medida. */
                 id: number;
-                /** @description Etiqueta de la medida. */
+                /** @description ETIQUETA de la medida ("53 cm"), derivada de `valor` + la unidad del avío. */
                 medida: string;
+                /** @description NÚMERO de la medida. `null` SOLO en filas heredadas cuya etiqueta no se pudo convertir ("S", "vieja", rangos): quedan marcadas `requiereRevision` en vez de perderse (D3). */
+                valor: number | null;
+                /** @description ¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando. */
+                requiereRevision: boolean;
                 /** @description Precio real de compra de esta medida. */
                 precio: number;
                 /** @description Orden de despliegue. */
@@ -11971,8 +11975,12 @@ export interface paths {
                 /** @description Falso si está desactivada (borrado suave). */
                 activo: boolean;
               }[];
+              /** @description Unidad en que se expresan las medidas de este avío (cm, mm…), o null. */
+              unidadMedida: string | null;
               /** @description Promedio de precios de las medidas activas (el que usa el precosto), o null. */
               promedioPreCosto: number | null;
+              /** @description Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo). */
+              avisos: string[];
             };
           };
         };
@@ -12073,9 +12081,15 @@ export interface paths {
       requestBody: {
         content: {
           'application/json': {
+            /**
+             * @description Unidad en que se expresan las medidas del avío (cm, mm, pulg…).
+             * @default null
+             */
+            unidadMedida?: string | null;
             medidas: {
-              /** @description Etiqueta de la medida (ej. "15 cm", "18 cm"). */
-              medida: string;
+              id?: number;
+              /** @description NÚMERO de la medida en la `unidadMedida` del avío; `null` = heredada sin normalizar (exige `id`). */
+              valor: number | null;
               /** @description Precio real de compra de esta medida (entra al promedio del precosto). */
               precio: number;
               /** @description Orden de despliegue dentro del avío (opcional). */
@@ -12096,8 +12110,12 @@ export interface paths {
               datos: {
                 /** @description Id de la medida. */
                 id: number;
-                /** @description Etiqueta de la medida. */
+                /** @description ETIQUETA de la medida ("53 cm"), derivada de `valor` + la unidad del avío. */
                 medida: string;
+                /** @description NÚMERO de la medida. `null` SOLO en filas heredadas cuya etiqueta no se pudo convertir ("S", "vieja", rangos): quedan marcadas `requiereRevision` en vez de perderse (D3). */
+                valor: number | null;
+                /** @description ¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando. */
+                requiereRevision: boolean;
                 /** @description Precio real de compra de esta medida. */
                 precio: number;
                 /** @description Orden de despliegue. */
@@ -12105,8 +12123,12 @@ export interface paths {
                 /** @description Falso si está desactivada (borrado suave). */
                 activo: boolean;
               }[];
+              /** @description Unidad en que se expresan las medidas de este avío (cm, mm…), o null. */
+              unidadMedida: string | null;
               /** @description Promedio de precios de las medidas activas (el que usa el precosto), o null. */
               promedioPreCosto: number | null;
+              /** @description Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo). */
+              avisos: string[];
             };
           };
         };
@@ -23828,6 +23850,8 @@ export interface paths {
               faltaTotal: number;
               /** @description # de avíos de la receta con faltante > 0. */
               faltanAvios: number;
+              /** @description # de avíos de la receta con al menos una talla sin medida capturada (§Post-F9.64). El conteo se AGREGA EN SERVIDOR (nunca pivoteando en el cliente). */
+              aviosSinMedida: number;
               /** @description Renglones (receta + extras). */
               avios: {
                 /** @description Avío del catálogo. */
@@ -23855,6 +23879,10 @@ export interface paths {
                  * @enum {string}
                  */
                 estado: 'completo' | 'parcial' | 'pendiente' | 'sobre-surtido' | 'extra';
+                /** @description ¿Este avío se captura POR TALLA (R18)? Sólo esos pueden tener tallas sin medida. */
+                consumoPorTalla: boolean;
+                /** @description Etiquetas de las tallas que la orden PIDE (piezas > 0) y que NO tienen medida capturada en este avío (§Post-F9.64). Su requerido se calculó con el consumo por prenda. AVISA, NO BLOQUEA. Vacío en avíos de consumo plano y en los que sí están completos. Un cero CAPTURADO no aparece aquí: es una decisión, no un olvido. */
+                tallasSinMedida: string[];
               }[];
             };
           };
@@ -24355,6 +24383,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -24595,7 +24632,7 @@ export interface paths {
                 idAvioProveedor?: number | null;
                 tallas?: {
                   idTalla: number;
-                  consumo: number;
+                  consumo?: number;
                   idAvioMedida?: number | null;
                 }[];
                 notas?: string | null;
@@ -24729,6 +24766,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -25067,6 +25113,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -25282,7 +25337,7 @@ export interface paths {
             idAvioProveedor?: number | null;
             tallas?: {
               idTalla: number;
-              consumo: number;
+              consumo?: number;
               idAvioMedida?: number | null;
             }[];
             descripcion?: string;
@@ -25409,6 +25464,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -25735,6 +25799,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -26061,6 +26134,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -26387,6 +26469,15 @@ export interface paths {
                 paraCosto: boolean;
                 /** @description ¿El consumo se captura por TALLA (R18)? */
                 consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -81426,13 +81517,24 @@ export interface paths {
               consumoPorTalla: boolean;
               /** @description ¿El modelo tiene curva de tallas asignada? */
               tieneCurva: boolean;
+              /**
+               * @description ¿Por talla se captura la CANTIDAD (consumo) o la ESPECIFICACIÓN (medida)?
+               * @enum {string}
+               */
+              modoCaptura: 'consumo' | 'medida';
+              /** @description `Avio.unidad` — la unidad del CONSUMO (m, pza…). La UI la pega al campo. */
+              unidadConsumo: string | null;
+              /** @description `Avio.unidadMedida` — la unidad de las MEDIDAS del avío (cm, mm…), o null. */
+              unidadMedida: string | null;
+              /** @description Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante). */
+              avisos: string[];
               /** @description Medidas por talla del avío. */
               tallas: {
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta de la talla (para la UI). */
                 etiquetaTalla: string;
-                /** @description Consumo capturado del avío para esta talla; null = sin capturar (no hay fila). */
+                /** @description CANTIDAD capturada del avío para esta talla (en `Avio.unidad`); null = sin capturar (no hay fila). NO es la medida/especificación: eso es `idAvioMedida`. */
                 consumo: number | null;
                 /** @description ¿La talla pertenece a la curva vigente del modelo? */
                 enCurva: boolean;
@@ -81548,7 +81650,7 @@ export interface paths {
             consumoPorTalla: boolean;
             tallas: {
               idTalla: number;
-              consumo: number;
+              consumo?: number;
               /** @default null */
               idAvioMedida?: number | null;
             }[];
@@ -81571,13 +81673,24 @@ export interface paths {
               consumoPorTalla: boolean;
               /** @description ¿El modelo tiene curva de tallas asignada? */
               tieneCurva: boolean;
+              /**
+               * @description ¿Por talla se captura la CANTIDAD (consumo) o la ESPECIFICACIÓN (medida)?
+               * @enum {string}
+               */
+              modoCaptura: 'consumo' | 'medida';
+              /** @description `Avio.unidad` — la unidad del CONSUMO (m, pza…). La UI la pega al campo. */
+              unidadConsumo: string | null;
+              /** @description `Avio.unidadMedida` — la unidad de las MEDIDAS del avío (cm, mm…), o null. */
+              unidadMedida: string | null;
+              /** @description Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante). */
+              avisos: string[];
               /** @description Medidas por talla del avío. */
               tallas: {
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta de la talla (para la UI). */
                 etiquetaTalla: string;
-                /** @description Consumo capturado del avío para esta talla; null = sin capturar (no hay fila). */
+                /** @description CANTIDAD capturada del avío para esta talla (en `Avio.unidad`); null = sin capturar (no hay fila). NO es la medida/especificación: eso es `idAvioMedida`. */
                 consumo: number | null;
                 /** @description ¿La talla pertenece a la curva vigente del modelo? */
                 enCurva: boolean;

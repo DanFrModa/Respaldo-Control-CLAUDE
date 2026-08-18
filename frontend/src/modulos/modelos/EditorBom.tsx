@@ -391,7 +391,7 @@ export function EditorBom({
               />
             ) : (
               <p className="border-t pt-2 text-xs text-muted-foreground">
-                Guarda la receta para capturar consumo por talla de este avío.
+                Guarda la receta para capturar por talla este avío (su medida o su consumo).
               </p>
             )
           }
