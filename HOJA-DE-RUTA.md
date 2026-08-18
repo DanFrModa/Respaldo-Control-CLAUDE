@@ -35,10 +35,15 @@
 > ✅ **`V1-E4b` mergeada** (#185) y ✅ **`V1-E3f` mergeada** (#186, el catálogo único de procesos + el arte
 > como Daniel lo usa). 🔨 **En curso: `V1-E3g`** · medida vs. consumo por talla — **salió de Daniel
 > capturando un cierre**, no de un plan: dos ideas distintas vivían en el mismo campo (el elástico captura
-> *cuánto gastas*, el cierre *qué pides*). Primera vuelta **RECHAZADA**: la normalización cubría los tres
-> caminos secundarios y dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**.
-> ⚠️ Su despliegue exige **contar antes** las filas con medidas activas **y** `consumoPorTalla = true`:
-> el forzado **mueve costos** en esa combinación heredada.
+> *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
+> primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
+>
+> 🔴 **Y de ahí salió el hallazgo más caro de todo el track:** el reviewer midió el precosteo **REAL** y el
+> modelo pasaba de **432 a 8** — **el sistema estaba costeando 54 cierres por prenda en vez de 1**, porque
+> **la medida se leía como cantidad**. El arreglo **no mueve costos: REPARA un sobrecosto de 54×**.
+> *(Este párrafo decía lo contrario hasta el 18-ago — ver la corrección en la ficha.)*
+> ⚠️ Su despliegue exige **contar antes** las filas con medidas activas **y** `consumoPorTalla = true`,
+> no para autorizar un cambio sino **para medir cuánto está mal hoy**.
 >
 > *(Texto histórico de V1-E4b, conservado:)* **`V1-E4b`** (etapa
 > NUEVA, nacida de Daniel el 16-ago: *"hay procesos que también son después de costura"* — y pasa HOY).
