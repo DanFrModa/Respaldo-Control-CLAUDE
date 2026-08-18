@@ -484,6 +484,10 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **No hay aviso para "cierre sin medida amarrada en una talla" (V1-E3g):** `tallasSinMedida` sólo cubre
   el caso `consumoPorTalla`. Se dejó fuera **a propósito** —el encargo prohibía construir avisos nuevos,
   justo para no duplicar el que ya existía— y se declara aquí en vez de callarse.
+- **Índice de una página de las decisiones, para el GO-LIVE (pedido por Daniel, 18-ago-2026):** una línea
+  por decisión con su enlace, para poder repasarlas sin abrir un archivo de 3,000+ líneas. Daniel lo
+  quiere **cuando salga el primer producto a producción**, no antes — *"más adelante… pero cuando lancemos
+  el primer producto a producción"*. Se anota aquí para que no se pierda entre etapas.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
