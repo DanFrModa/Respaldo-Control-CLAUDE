@@ -135,13 +135,24 @@ const REGIMENES_SAT: { clave: string; frase: string; nombre: string }[] = [
 ];
 
 /**
- * TODAS las etiquetas que la constancia puede imprimir. Es la pieza clave del parseo: el valor de un
- * campo va desde su etiqueta hasta la SIGUIENTE etiqueta de esta lista (trampa 1). Incluye a
- * propósito etiquetas que no se usan (estatus, obligaciones, teléfonos…): están aquí justamente
- * para servir de FRENO al campo anterior. Se aceptan las variantes de redacción que el SAT ha
- * usado (`Denominación/Razón Social` y `Denominación o Razón Social`, con y sin acento).
+ * TODAS las etiquetas que la constancia imprime, **tomadas del texto real de dos constancias del
+ * SAT** (una física y una moral) tal como lo entrega `unpdf` — no de una reconstrucción. Es la
+ * pieza clave del parseo: el valor de un campo va desde su etiqueta hasta la SIGUIENTE etiqueta de
+ * esta lista (trampa 1). Incluye a propósito etiquetas que no se usan (estatus, obligaciones,
+ * actividades económicas…): están aquí justamente para servir de FRENO al campo anterior.
+ *
+ * 🔴 **Aquí estuvo el defecto que costó esta etapa.** La lista decía `Municipio o Delegación`,
+ * pero el SAT imprime la forma LARGA: **`Nombre del Municipio o Demarcación Territorial:`**. Al no
+ * reconocerla, el valor de `Nombre de la Localidad` se la tragaba entera y el domicilio salía con
+ * la etiqueta dentro — sin tronar y sin avisar. Se descubrió al probar contra los PDF reales, no
+ * contra el texto reconstruido. Por eso ahora hay, además, la RED de {@link etiquetaColada}.
+ *
+ * Se aceptan las variantes de redacción que el SAT ha usado (con y sin acento; la forma corta
+ * `Municipio o Delegación` se conserva por si vuelve).
  */
 const ETIQUETAS: string[] = [
+  // ── Identificación ──────────────────────────────────────────────────────────
+  'idCIF',
   'RFC',
   'CURP',
   'Nombre \\(s\\)',
@@ -157,6 +168,8 @@ const ETIQUETAS: string[] = [
   'Estatus en el padr[oó]n',
   'Fecha de [uú]ltimo cambio de estado',
   'Nombre del Contribuyente',
+  'Datos de Identificaci[oó]n del Contribuyente',
+  // ── Domicilio ───────────────────────────────────────────────────────────────
   'C[oó]digo Postal',
   'Tipo de Vialidad',
   'Nombre de Vialidad',
@@ -164,6 +177,8 @@ const ETIQUETAS: string[] = [
   'N[uú]mero Interior',
   'Nombre de la Colonia',
   'Nombre de la Localidad',
+  // ⚠️ La forma LARGA primero: la corta es prefijo de nada, pero el orden documenta cuál manda.
+  'Nombre del Municipio o Demarcaci[oó]n Territorial',
   'Municipio o Delegaci[oó]n',
   'Nombre de la Entidad Federativa',
   'Entre Calle',
@@ -173,15 +188,112 @@ const ETIQUETAS: string[] = [
   'Al\\. Telef[oó]nica',
   'Tel\\. Fijo Lada',
   'N[uú]mero',
-  'Datos de identificaci[oó]n del contribuyente',
-  'Datos del domicilio registrado',
+  // ── Secciones y pies ────────────────────────────────────────────────────────
+  'Actividades Econ[oó]micas',
   'Caracter[ií]sticas fiscales',
   'Reg[ií]menes',
   'Obligaciones',
+  'Descripci[oó]n de la Obligaci[oó]n',
+  'Cadena Original Sello',
+  'Sello Digital',
 ];
 
-/** Alternancia de TODAS las etiquetas, con sus dos puntos. Es el "freno" de cada campo. */
-const RE_CUALQUIER_ETIQUETA = new RegExp(`(?:${ETIQUETAS.join('|')})\\s*:`, 'i');
+/**
+ * Encabezados de sección que el SAT imprime **SIN dos puntos** (`Datos del domicilio registrado`,
+ * la fila de títulos de las tablas…). No aportan valor, pero SÍ tienen que frenar al campo
+ * anterior: sin ellos, `Nombre Comercial:` se comería el encabezado de la sección siguiente.
+ * Van aparte porque {@link ETIQUETAS} exige el `:` y éstos no lo llevan.
+ */
+const CORTES_SIN_DOS_PUNTOS: string[] = [
+  'Datos del domicilio registrado',
+  'Registro Federal de Contribuyentes',
+  'Nombre, denominaci[oó]n o raz[oó]n',
+  'Lugar y Fecha de Emisi[oó]n',
+  'C[EÉ]DULA DE IDENTIFICACI[OÓ]N FISCAL',
+  'CONSTANCIA DE SITUACI[OÓ]N FISCAL',
+  'Orden Actividad Econ[oó]mica Porcentaje',
+  'R[eé]gimen Fecha Inicio Fecha Fin',
+  'P[aá]gina \\[',
+];
+
+/**
+ * Alternancia de TODO lo que frena a un campo: las etiquetas con sus dos puntos y los encabezados
+ * de sección que no los llevan.
+ */
+const RE_CUALQUIER_ETIQUETA = new RegExp(
+  `(?:(?:${ETIQUETAS.join('|')})\\s*:|${CORTES_SIN_DOS_PUNTOS.join('|')})`,
+  'i',
+);
+
+/**
+ * ⭐ LA RED DE SEGURIDAD (§Post-F9.55, exigida tras el defecto del municipio).
+ *
+ * Vale más que cualquier etiqueta que se agregue a la lista: comprueba que un valor ya extraído no
+ * lleve DENTRO el texto de otra etiqueta. Si lo lleva, el corte falló —da igual por qué—, así que
+ * el valor se recorta ahí y se AVISA. Convierte toda esta familia de errores de invisible en
+ * visible.
+ *
+ * Detecta DOS casos, y el segundo es el que importa:
+ *  1. Una etiqueta **conocida** metida en el valor: se nombra tal cual, para que el aviso diga qué
+ *     pasó.
+ *  2. ⭐ Cualquier otro `Texto:` que quede dentro. Los campos de una constancia **no llevan dos
+ *     puntos en su valor** (ni el RFC, ni el nombre, ni el domicilio), así que un `:` sobrante
+ *     sólo puede venir de una etiqueta que el lector NO conoce. Éste es justo el caso que se nos
+ *     coló: el SAT cambió `Municipio o Delegación` por `Nombre del Municipio o Demarcación
+ *     Territorial` y, al no reconocerla, el domicilio se la tragó sin una queja. Con esta segunda
+ *     regla, el próximo cambio de formato del SAT AVISA en vez de guardar basura.
+ *
+ * Devuelve el texto de lo que se coló (etiqueta conocida o fragmento sospechoso), o `null` si el
+ * valor está limpio.
+ */
+export function etiquetaColada(valor: string): string | null {
+  const conocida = new RegExp(`(${ETIQUETAS.join('|')})\\s*:`, 'i').exec(valor);
+  if (conocida !== null) {
+    return conocida[1] ?? null;
+  }
+  return etiquetaDesconocida(valor);
+}
+
+/** ¿La palabra tiene forma de PALABRA DE ETIQUETA? (Title Case: mayúscula seguida de minúscula). */
+function esPalabraDeEtiqueta(palabra: string): boolean {
+  return /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(palabra);
+}
+
+/** Conectores que unen las palabras de una etiqueta ("Nombre **de la** Colonia"). */
+const CONECTORES = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'o', 'y', 'e', 'en', 'a']);
+
+/**
+ * Busca una etiqueta que el lector NO conoce dentro de un valor, apoyándose en cómo el SAT
+ * TIPOGRAFÍA la constancia: las **etiquetas van en Title Case** ("Nombre de la Colonia") y los
+ * **valores en MAYÚSCULAS** ("LOMAS VERDES"). Así, ante
+ * `LOMAS VERDES Nombre de la Sub-Localidad:` se devuelve `Nombre de la Sub-Localidad` y el valor
+ * limpio (`LOMAS VERDES`) se conserva, en vez de tirarlo entero.
+ *
+ * Un valor de constancia no lleva dos puntos, así que un `:` sobrante siempre es señal de corte
+ * fallido; lo que esta función acota es CUÁNTO de lo que quedó es la etiqueta intrusa.
+ */
+function etiquetaDesconocida(valor: string): string | null {
+  const dosPuntos = valor.indexOf(':');
+  if (dosPuntos < 0) {
+    return null;
+  }
+  const palabras = valor.slice(0, dosPuntos).trim().split(/\s+/);
+  let desde = palabras.length;
+  let hayTitulo = false;
+  while (desde > 0) {
+    const palabra = palabras[desde - 1] ?? '';
+    if (esPalabraDeEtiqueta(palabra)) {
+      hayTitulo = true;
+    } else if (!CONECTORES.has(palabra.toLowerCase())) {
+      break;
+    }
+    desde -= 1;
+  }
+  // Sin ninguna palabra en Title Case no hay etiqueta reconocible: se reporta el resto tal cual
+  // (algo raro pasó, y callarlo sería justo lo que no se vale).
+  const etiqueta = hayTitulo ? palabras.slice(desde).join(' ') : palabras.join(' ');
+  return etiqueta === '' ? null : etiqueta;
+}
 
 /** Quita acentos y baja a minúsculas (para comparar sin pelearse con la tipografía del SAT). */
 function normalizarComparacion(texto: string): string {
@@ -213,9 +325,40 @@ export function valorEntreEtiquetas(texto: string, etiqueta: string): string {
   return aplanar(crudo);
 }
 
-/** Une con ', ' las partes que traen algo (una parte vacía no deja hueco ni coma suelta). */
+/**
+ * Extrae un campo **con la red puesta**: corta por la siguiente etiqueta y, si aun así se coló el
+ * texto de otra etiqueta conocida, RECORTA ahí y deja una advertencia con el nombre del campo.
+ *
+ * Recortar además de avisar es a propósito: la mitad limpia del valor casi siempre sirve, y así el
+ * formulario nunca se llena con la etiqueta dentro. Lo que NO se vale es guardarlo callado.
+ */
+function leerCampo(texto: string, etiqueta: string, campo: string, advertencias: string[]): string {
+  const valor = valorEntreEtiquetas(texto, etiqueta);
+  const colada = etiquetaColada(valor);
+  if (colada === null) {
+    return valor;
+  }
+  advertencias.push(
+    `El documento trae un formato que no se reconoce del todo: en "${campo}" se coló la etiqueta ` +
+      `"${colada}". Revisa ese dato antes de aceptarlo.`,
+  );
+  const corte = valor.toLowerCase().indexOf(colada.toLowerCase());
+  return aplanar(valor.slice(0, corte < 0 ? 0 : corte));
+}
+
+/**
+ * Une con ', ' las partes que traen algo (una parte vacía no deja hueco ni coma suelta) y colapsa
+ * las REPETICIONES seguidas: en las constancias reales la localidad y el municipio suelen traer el
+ * mismo texto ("NAUCALPAN DE JUAREZ, NAUCALPAN DE JUAREZ"), y repetirlo en el domicilio se lee
+ * como un error. No se inventa nada: sólo se deja de escribir dos veces lo mismo.
+ */
 function unir(partes: (string | undefined)[], separador = ', '): string {
-  return partes.filter((p): p is string => p !== undefined && p.trim() !== '').join(separador);
+  const utiles = partes.filter((p): p is string => p !== undefined && p.trim() !== '');
+  return utiles
+    .filter(
+      (p, i) => i === 0 || normalizarComparacion(p) !== normalizarComparacion(utiles[i - 1] ?? ''),
+    )
+    .join(separador);
 }
 
 /**
@@ -260,11 +403,11 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
   const texto = paginas.join('\n');
   const advertencias: string[] = [];
 
-  const curp = valorEntreEtiquetas(texto, 'CURP').toUpperCase();
+  const curp = leerCampo(texto, 'CURP', 'CURP', advertencias).toUpperCase();
   const tipoPersona: 'fisica' | 'moral' = curp === '' ? 'moral' : 'fisica';
 
   // El RFC aparece dos veces (cédula + datos de identificación) con el MISMO valor: la primera basta.
-  const rfc = valorEntreEtiquetas(texto, 'RFC').toUpperCase().replace(/\s+/g, '');
+  const rfc = leerCampo(texto, 'RFC', 'RFC', advertencias).toUpperCase().replace(/\s+/g, '');
   if (rfc === '') {
     advertencias.push('No se encontró el RFC en el documento.');
   }
@@ -272,8 +415,8 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
   let razonSocial: string;
   if (tipoPersona === 'moral') {
     razonSocial =
-      valorEntreEtiquetas(texto, 'Denominaci[oó]n/Raz[oó]n Social') ||
-      valorEntreEtiquetas(texto, 'Denominaci[oó]n o Raz[oó]n Social');
+      leerCampo(texto, 'Denominaci[oó]n/Raz[oó]n Social', 'razón social', advertencias) ||
+      leerCampo(texto, 'Denominaci[oó]n o Raz[oó]n Social', 'razón social', advertencias);
     if (razonSocial === '') {
       advertencias.push('No se encontró la denominación o razón social.');
     }
@@ -281,9 +424,9 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
     // Persona física: el SAT NO imprime una "razón social" — se COMPONE con nombre y apellidos.
     razonSocial = unir(
       [
-        valorEntreEtiquetas(texto, 'Nombre \\(s\\)'),
-        valorEntreEtiquetas(texto, 'Primer Apellido'),
-        valorEntreEtiquetas(texto, 'Segundo Apellido'),
+        leerCampo(texto, 'Nombre \\(s\\)', 'nombre', advertencias),
+        leerCampo(texto, 'Primer Apellido', 'primer apellido', advertencias),
+        leerCampo(texto, 'Segundo Apellido', 'segundo apellido', advertencias),
       ],
       ' ',
     );
@@ -292,7 +435,7 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
     }
   }
 
-  const codigoPostal = valorEntreEtiquetas(texto, 'C[oó]digo Postal')
+  const codigoPostal = leerCampo(texto, 'C[oó]digo Postal', 'código postal', advertencias)
     .replace(/\D/g, '')
     .slice(0, 5);
   if (codigoPostal.length !== 5) {
@@ -301,14 +444,22 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
 
   // Domicilio: cada parte se corta en la siguiente etiqueta, así que las VACÍAS quedan vacías y no
   // arrastran el texto de la de al lado.
-  const tipoVialidad = valorEntreEtiquetas(texto, 'Tipo de Vialidad');
-  const nombreVialidad = valorEntreEtiquetas(texto, 'Nombre de Vialidad');
-  const numeroExterior = valorEntreEtiquetas(texto, 'N[uú]mero Exterior');
-  const numeroInterior = valorEntreEtiquetas(texto, 'N[uú]mero Interior');
-  const colonia = valorEntreEtiquetas(texto, 'Nombre de la Colonia');
-  const localidad = valorEntreEtiquetas(texto, 'Nombre de la Localidad');
-  const municipio = valorEntreEtiquetas(texto, 'Municipio o Delegaci[oó]n');
-  const entidad = valorEntreEtiquetas(texto, 'Nombre de la Entidad Federativa');
+  const tipoVialidad = leerCampo(texto, 'Tipo de Vialidad', 'tipo de vialidad', advertencias);
+  const nombreVialidad = leerCampo(texto, 'Nombre de Vialidad', 'calle', advertencias);
+  const numeroExterior = leerCampo(texto, 'N[uú]mero Exterior', 'número exterior', advertencias);
+  const numeroInterior = leerCampo(texto, 'N[uú]mero Interior', 'número interior', advertencias);
+  const colonia = leerCampo(texto, 'Nombre de la Colonia', 'colonia', advertencias);
+  const localidad = leerCampo(texto, 'Nombre de la Localidad', 'localidad', advertencias);
+  // ⚠️ La forma LARGA es la que imprime el SAT hoy (verificado en dos constancias reales); la
+  // corta se intenta después, por si alguna vez vuelve.
+  const municipio =
+    leerCampo(
+      texto,
+      'Nombre del Municipio o Demarcaci[oó]n Territorial',
+      'municipio',
+      advertencias,
+    ) || leerCampo(texto, 'Municipio o Delegaci[oó]n', 'municipio', advertencias);
+  const entidad = leerCampo(texto, 'Nombre de la Entidad Federativa', 'estado', advertencias);
 
   const calle = unir([tipoVialidad, nombreVialidad], ' ');
   const numeros = unir(
