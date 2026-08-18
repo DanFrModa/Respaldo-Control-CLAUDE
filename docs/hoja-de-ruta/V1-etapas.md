@@ -1311,9 +1311,16 @@ La nota decía que **el seed actualiza el nombre del rol si el código ya existe
 verificó lo que faltaba: **no existe CRUD de `RolProveedor`, solo un `GET`** — o sea que **renombrar a mano
 era imposible** y la vía correcta es el `UPDATE` en migración. Confirmado por el reviewer.
 
-### Nota de cierre — ⬜ EN CORRECCIÓN (18-ago-2026)
+### Nota de cierre — ✅ HECHA (18-ago-2026)
 
-**Lo que resistió, que era lo que más miedo daba:** la migración fusiona **dos columnas en una con
+**Segunda vuelta: APROBADA.** El reviewer no se fio de las pruebas del coder: **escribió la suya desde
+cero** —mezclando EsMa en los tres estados con movimientos del motor, sumando **montos** y no conteos— y
+verificó que **falla con el código viejo** (`expected 4 to be 5`). Montó el índice sobre `lower()` contra
+una base con **cuatro variantes de caja** del mismo corto (posible en la base real, porque `corto` era
+único **exacto**): migración en **exit 0, 13 → 13**, con los tres desplazados en bitácora. Y la carrera
+concurrente con distinta caja pasó de **2 filas a 1**.
+
+**Lo que resistió desde el principio, que era lo que más miedo daba:** la migración fusiona **dos columnas en una con
 unicidad**, convierte un campo en tabla y tira un enum. El reviewer la montó contra datos adversarios
 —cortos duplicados exactos y con distinta caja, con espacios, vacíos, contactos en blanco, acentos, roles
 destino faltantes— y salió **11 proveedores → 11**, los 6 contactos exactos, y **4 filas de bitácora** con

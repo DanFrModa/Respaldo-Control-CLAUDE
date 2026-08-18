@@ -38,7 +38,14 @@
 > *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
 > primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
 >
-> ✅ **`V1-E3g` mergeada** (#187). 🔨 **En curso: `V1-E6b`** · *esconder, no negar* — las **tres capas** que
+> ✅ **`V1-E3g` mergeada** (#187) · ✅ **`V1-E6b` mergeada** (#188) · 🔨 **`V1-E3f pieza B` (proveedores)**
+> aprobada en segunda vuelta, lista para PR: renombres de rol, contactos como tabla, **el campo corto
+> fusionado en uno y único**, el `tipo` retirado, el **lector de la Constancia de Situación Fiscal** y la
+> **segmentación con/sin factura en CxP**. Su hallazgo caro: `{ not: true }` **no incluye los NULL** —los
+> cargos migrados se caían de los dos segmentos mientras el encabezado sí los sumaba— y **ninguna de las
+> 74 pruebas del área lo tocaba**.
+>
+> *(histórico)* **`V1-E6b`** · *esconder, no negar* — las **tres capas** que
 > pidió Daniel. La de en medio **no existía**: de las 135 rutas solo 2 miraban permisos, así que tecleando
 > la URL se **entraba** a cualquier pantalla (el backend sí rechazaba, pero se veía el esqueleto). Aprobada
 > en segunda vuelta; el hallazgo fue que **cinco pantallas de Administración heredaban la unión de permisos
@@ -488,6 +495,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   por decisión con su enlace, para poder repasarlas sin abrir un archivo de 3,000+ líneas. Daniel lo
   quiere **cuando salga el primer producto a producción**, no antes — *"más adelante… pero cuando lancemos
   el primer producto a producción"*. Se anota aquí para que no se pierda entre etapas.
+- **⚠️ `unicidadDeCampo` NUNCA devuelve `true` con el driver adapter de Prisma 7 — y la misma suposición
+  decide en Ruta Crítica (descubierto en V1-E3f pieza B, 18-ago-2026):** `comun/prisma-errores.ts:44-50`
+  busca `meta.target`, pero con `@prisma/adapter-pg` el error P2002 **no trae esa llave**: la información
+  viaja en `meta.driverAdapterError.cause.constraint.fields`. En proveedores se arregló; **el mismo defecto
+  sigue vivo en `dominio/ruta-critica/hitosOrden.ts:161-176`**, donde `esViolacionHitoVivoUnico` también
+  devuelve **siempre `false`**, así que la carrera sobre `hito_orden_vivo_unico` **no se traduce al
+  `ErrorConflicto` que su comentario promete**. Es de la época de F5 y **no muerde en la v1 porque la RC
+  está apagada** — por eso es deuda y no bloqueante. ⚠️ **Y su prueba FABRICA el error con `meta.target` a
+  mano** (`hitosOrden.test.ts:32`): el mismo patrón del fixture inventado que ya costó un rechazo en esta
+  tanda — *una prueba que confirma la suposición de quien la escribió en vez de cazarla*. Al arreglarlo,
+  la prueba tiene que construirse contra un P2002 **real**.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
