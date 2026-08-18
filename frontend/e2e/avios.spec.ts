@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { elegirProveedor, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Avíos (F1-E3, R1) contra el stack real, en la estructura LISTA + DETALLE
@@ -63,9 +63,14 @@ test.describe('CRUD de Avíos', () => {
     await dialogoAlta.getByLabel('Presentación').fill('CAJA');
     // Marca genérico.
     await dialogoAlta.getByTestId('avio-generico').check();
-    // Agrega los 2 proveedores (el select se vacía tras cada selección: siempre el primero).
-    await dialogoAlta.getByTestId('agregar-proveedor-avio').selectOption({ label: prov1 });
-    await dialogoAlta.getByTestId('agregar-proveedor-avio').selectOption({ label: prov2 });
+    // Agrega los 2 proveedores. V1-E3f (§Post-F9.52 punto 7): ya NO es un `<select>` con tope de
+    // 100 sino un combobox que BUSCA EN EL SERVIDOR, así que se teclea el nombre y se toca la
+    // opción. El input NO se vacía solo tras elegir —conserva el nombre del elegido hasta que
+    // pierde el foco—, y por eso el ayudante usa `fill`, que reemplaza lo que haya en vez de
+    // añadirse a ello. El ya agregado queda EXCLUIDO de la lista (`excluirIds`), así que al
+    // teclear el segundo nombre la primera opción es la que se busca.
+    await elegirProveedor(page, dialogoAlta, prov1, 'agregar-proveedor-avio');
+    await elegirProveedor(page, dialogoAlta, prov2, 'agregar-proveedor-avio');
     await expect(
       dialogoAlta.getByTestId('proveedores-avio-elegidos').getByRole('listitem'),
     ).toHaveCount(2);
