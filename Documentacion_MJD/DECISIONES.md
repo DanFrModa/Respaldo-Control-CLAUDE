@@ -2977,3 +2977,57 @@ vivo el 17-ago—; lo que faltaba era esto.)*
 
 - **Aplica en:** V1-E3f (una línea en `DialogoModelo.tsx`). Sin migración, permisos ni contrato.
 - **Fecha:** 2026-08-17.
+
+---
+
+#### (Post-F9.67) — ⭐ Los perfiles NO van en cascada: van por PUESTO, y se suman (DANIEL, 18-ago-2026)
+
+> Daniel, sin que se lo preguntaran: *"El sistema de perfiles en cascada lo hice al principio pero **dejó
+> de funcionar. No es funcional. No me gusta por cascada.** Mejor definir permisos directos por persona.
+> O por perfil de puesto."*
+
+**Lo que había, y por qué estaba mal.** El seed trae **ocho roles construidos por RESTA** —Administrador,
+Directivo, Gerencial, Ventas, Logística, Asistente, Secretarial, Básico—, cada uno un subconjunto estricto
+del anterior. Están anotados en el propio código con la frase *"absorbe el nivel 45"*: son la **traducción
+literal de los niveles del Access viejo** (30, 40, 45, 47, 50, 60, 100).
+
+⚠️ **Y eso los volvía la reconstrucción del sistema equivocado.** `10-Modelo-Datos-y-Usuarios.md` ya decía
+que en el Access convivían **DOS** sistemas de seguridad —los niveles en cascada y los accesos granulares
+por persona (`Accesos` + `UsuAccesos`)— y que **el que se usaba era el granular**. La ingeniería inversa lo
+tenía documentado; el seed reprodujo el que Daniel ya había abandonado. Su incomodidad no era preferencia:
+era que se copió lo que no servía.
+
+**Lo que el modelo YA aguanta (verificado en `schema.prisma`, no supuesto):** `UsuarioRol` es **N:N** y
+`RolPermiso` es **N:N**. O sea que **un usuario puede tener VARIOS roles y sus permisos son la UNIÓN**. La
+cascada no existe en el modelo de datos — solo en cómo se llenaron esos ocho roles. **No hace falta
+migración para cambiar de enfoque.**
+
+**Cómo quedan:**
+
+- **Perfiles por PUESTO**, no por nivel: *Cortador*, *Almacenista*, *Compras*, *Calidad*, *Contabilidad*…
+  Cada uno con lo que ese puesto necesita, **sin importar quién está "arriba" de quién**.
+- **Excepciones por persona = perfiles chicos SUMABLES**, de una sola capacidad: *Ve costos*, *Autoriza
+  compras*, *Aprueba precios*. Alguien es **Compras + Ve costos**; otro es **Compras** a secas. Da
+  granularidad por persona **sin** configurar permiso por permiso, que es justo donde el sistema viejo se
+  volvió inmanejable.
+- **Los ocho perfiles heredados se RETIRAN** al construir los nuevos.
+
+**Criterio de reparto (del lead, aceptado como marco de la revisión):** de los 120 permisos, solo dos
+familias son de verdad delicadas — **lo que toca dinero** (costos, precios, finanzas) y **lo que
+autoriza** (compras, listas de precios), más un tercer grupo de **operaciones peligrosas** (deshacer,
+antedatar, dejar existencias en negativo). En todo lo demás conviene ser **generoso**: *si alguien se topa
+con «no tienes permiso» en su primera semana, deja de usar el sistema y se regresa al papel*. Es más fácil
+apretar después con un caso real que recuperar a alguien que ya se fue.
+
+**Los 13 puestos que Daniel definió (18-ago-2026):** Daniel (todo) · **Aurora** (gerente general y de
+ventas — **SIN estado de resultados**, y algunos reportes de finanzas por definir) · Producción · Compras ·
+Habilitaciones · Recibo de mercancía · Encargado de telas · Calidad · Administración y finanzas ·
+Desarrollo de producto · **Gestión técnica** (2ª etapa: fichas técnicas) · Trazador · Entregas.
+
+**Instrumento de trabajo:** matriz de **65 capacidades × 13 puestos** (que cubre los 120 permisos, cuadrado
+sin faltantes ni sobrantes), entregada a Daniel para afinar. Seis cruces quedaron marcados como pregunta
+abierta.
+
+- **Aplica en:** etapa de perfiles y permisos (previa al go-live). **Sin migración** — el modelo ya lo
+  soporta.
+- **Fecha:** 2026-08-18.
