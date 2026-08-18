@@ -96,6 +96,8 @@ export function PanelRutaOrden({
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
   const puedeProgramar = tienePermiso('rc.programar');
+  // §Post-F9.68: el enlace al detalle completo solo para quien puede abrirlo.
+  const puedeVerRuta = tienePermiso('rc.ruta-ver');
 
   const consulta = useRutaOrden(idOrden, {
     habilitado: abierto && idOrden !== undefined,
@@ -156,14 +158,16 @@ export function PanelRutaOrden({
               <Printer className="size-4" aria-hidden />
               Plan (PDF)
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void navigate(`/ruta-critica/ordenes/${idOrden}`)}
-              data-testid="panel-ruta-detalle"
-            >
-              Ver detalle completo
-            </Button>
+            {puedeVerRuta ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void navigate(`/ruta-critica/ordenes/${idOrden}`)}
+                data-testid="panel-ruta-detalle"
+              >
+                Ver detalle completo
+              </Button>
+            ) : null}
           </>
         ) : undefined
       }

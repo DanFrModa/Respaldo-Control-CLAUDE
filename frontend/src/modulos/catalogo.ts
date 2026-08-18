@@ -1877,3 +1877,184 @@ export function tituloPorRuta(pathname: string): string | undefined {
   );
   return portada?.[1];
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * LA CAPA DE RUTA (V1-E6b · `DECISIONES.md §Post-F9.68`)
+ *
+ * Daniel pidió TRES capas: el MENÚ esconde la opción, la RUTA cierra la
+ * pantalla y el BACKEND rechaza la operación. La de en medio faltaba:
+ * `RutaProtegida` solo exigía sesión, así que quien tecleara la URL de una
+ * pantalla que no le toca entraba, veía encabezados y botones, y la pantalla
+ * fallaba al cargar datos.
+ *
+ * ⚠️ El permiso de cada ruta se TOMA DE ESTE CATÁLOGO — una sola fuente. Si se
+ * declarara aparte, las dos listas se desalinearían con el tiempo. Solo las
+ * rutas REALES que NO son hoja del menú (portadas-hub, redirecciones, pantallas
+ * de detalle con `:param`, comodines) necesitan la tabla de abajo, porque de
+ * ellas el catálogo no sabe nada.
+ *
+ * Esconder es de PRESENTACIÓN: el backend sigue devolviendo 401/403/404 y NADA
+ * de la seguridad depende de esta capa (A4).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Lo que una ruta exige: alguna de estas claves, o solo estar autenticado. */
+export type ExigenciaRuta = readonly ClavePermiso[] | 'autenticado';
+
+/**
+ * Rutas REALES de `App.tsx` que NO son hoja del catálogo, con lo que exigen.
+ * Los patrones aceptan segmentos `:param` (comodín de UN segmento).
+ *
+ * Son de cuatro clases, y NINGUNA duplica un permiso que el catálogo ya sepa:
+ *  - PORTADAS-HUB (`/catalogos`, `/inventarios`, `/produccion`): sus TARJETAS
+ *    son las hojas y ya se auto-filtran por permiso, así que el hub es de uso
+ *    general; entrar sin nada que ver muestra un hub vacío, no una puerta.
+ *  - REDIRECCIONES (`<Navigate>`): no pintan nada; el gate lo aplica el destino.
+ *  - PANTALLAS DE DETALLE con `:param`, que nunca fueron entrada de menú.
+ *  - COMODINES (`:modulo` → «Próximamente», `*` → «No encontrado»): ambas ya
+ *    resuelven por su cuenta lo que el usuario puede ver.
+ */
+const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: ExigenciaRuta])[] = [
+  // ── Portadas-hub (sus tarjetas se filtran solas) ──
+  ['/catalogos', 'autenticado'],
+  ['/inventarios', 'autenticado'],
+  ['/produccion', 'autenticado'],
+  // ── Redirecciones puras (el destino es el que gatea) ──
+  ['/produccion/corte', 'autenticado'],
+  ['/produccion/envios', 'autenticado'],
+  ['/produccion/recibos', 'autenticado'],
+  ['/ruta-critica', 'autenticado'],
+  ['/ruta-critica/bandeja', 'autenticado'],
+  // ── Pantallas que nunca fueron hoja del menú ──
+  // Catálogo de direcciones de entrega de la OC: sin permisos propios, se
+  // gobierna con los de compras (§Post-F9.18).
+  ['/catalogos/direcciones-entrega', ['compras.ver']],
+  // La RC de una orden: consultar es `rc.ruta-ver`; programarla, `rc.programar`.
+  ['/ruta-critica/ordenes/:idOrden', ['rc.ruta-ver']],
+  ['/ruta-critica/ordenes/:idOrden/programar', ['rc.programar']],
+  // Importar un CFDI ES administrar la cuenta (así lo gatea el backend:
+  // `cxp.administrar` / `cxc.administrar`). Son pantallas de PURA ESCRITURA a
+  // las que solo se llega por su botón —ya oculto sin el permiso— o por un
+  // enlace pegado, así que la ruta pide el permiso de escritura y no el de ver.
+  ['/cxp/importar-cfdi', ['cxp.administrar']],
+  ['/cxc/importar-cfdi', ['cxc.administrar']],
+];
+
+/** Rutas comodín de `App.tsx` que resuelven por su cuenta lo que se puede ver. */
+const RUTAS_COMODIN: readonly string[] = [':modulo', '*'];
+
+/** Segmentos no vacíos de un pathname (`/a/b/` → `['a','b']`). */
+function segmentosDe(ruta: string): readonly string[] {
+  return ruta.split('/').filter((segmento) => segmento.length > 0);
+}
+
+/**
+ * ¿El patrón es prefijo del pathname? Devuelve su ESPECIFICIDAD (número de
+ * segmentos, menos una fracción por cada `:param`, para que un literal le gane
+ * a un comodín del mismo largo), o `null` si no coincide.
+ */
+function especificidadPatron(patron: string, segmentos: readonly string[]): number | null {
+  const segsPatron = segmentosDe(patron);
+  if (segsPatron.length > segmentos.length) {
+    return null;
+  }
+  let parametros = 0;
+  for (const [i, segmento] of segsPatron.entries()) {
+    if (segmento.startsWith(':')) {
+      parametros += 1;
+      continue;
+    }
+    if (segmento !== segmentos[i]) {
+      return null;
+    }
+  }
+  return segsPatron.length - parametros / (segsPatron.length + 1);
+}
+
+/** Une dos exigencias de la misma ruta (más permisiva, nunca más estricta). */
+function unirExigencias(a: ExigenciaRuta, b: ExigenciaRuta): ExigenciaRuta {
+  if (a === 'autenticado' || b === 'autenticado') {
+    return 'autenticado';
+  }
+  return [...new Set([...a, ...b])];
+}
+
+/**
+ * TODAS las declaraciones ruta → exigencia, de las TRES fuentes que ya existen
+ * (ninguna nueva):
+ *  1. las HOJAS del catálogo, con su permiso tal cual;
+ *  2. las entradas `colapsar` del RIEL — las portadas-hub (`/costos`, `/edr`,
+ *     `/indicadores`, `/esma`, `/calidad`, `/administracion`), cuyo gate es la
+ *     UNIÓN de los permisos de sus tarjetas y es EXACTAMENTE a quien el menú le
+ *     ofrece la entrada;
+ *  3. las rutas reales que no son ninguna de las dos (`EXIGENCIA_RUTA_EXTRA`).
+ */
+const DECLARACIONES_RUTA: readonly (readonly [string, ExigenciaRuta])[] = [
+  ...MODULOS_MENU.filter((modulo) => modulo.ruta !== '/').map(
+    (modulo) => [modulo.ruta, modulo.permisos] as const,
+  ),
+  ...ESPEC_RIEL.flatMap((grupo) =>
+    grupo.entradas.flatMap((entrada) =>
+      entrada.tipo === 'colapsar' ? [[entrada.ruta, entrada.permisos] as const] : [],
+    ),
+  ),
+  ...EXIGENCIA_RUTA_EXTRA,
+];
+
+/**
+ * Lo que exige la ruta `pathname`, o `undefined` si NADA la declara.
+ *
+ * Gana la declaración MÁS ESPECÍFICA que sea prefijo del pathname, así una
+ * sub-pantalla hereda el gate de su pantalla padre (`/inventarios/telas/
+ * entradas/nueva` hereda de `/inventarios/telas/entradas`) sin declararse. La
+ * portada `/` se compara EXACTA: si fuera prefijo de todo, cualquier ruta sin
+ * declarar caería en ella y el gate se apagaría en silencio.
+ */
+export function exigenciaDeRuta(pathname: string): ExigenciaRuta | undefined {
+  if (pathname === '/') {
+    return 'autenticado';
+  }
+  const segmentos = segmentosDe(pathname);
+  if (segmentos.length === 0) {
+    return 'autenticado';
+  }
+  let mejor: { exige: ExigenciaRuta; especificidad: number } | undefined;
+  for (const [ruta, exige] of DECLARACIONES_RUTA) {
+    const especificidad = especificidadPatron(ruta, segmentos);
+    if (especificidad === null) {
+      continue;
+    }
+    if (mejor === undefined || especificidad > mejor.especificidad) {
+      mejor = { exige, especificidad };
+    } else if (especificidad === mejor.especificidad) {
+      // EMPATE (la misma ruta declarada dos veces): se toma la UNIÓN, nunca la
+      // más estricta. El caso real es `/administracion`, hoja del catálogo con
+      // los cuatro `*.administrar` y entrada del riel con esos MÁS
+      // `admin.ver-bitacora` (quien solo tiene la bitácora ve la entrada en el
+      // menú y aterriza en el hub con esa única tarjeta). La capa de ruta NUNCA
+      // debe cerrar una pantalla que el menú sí ofrece.
+      mejor = { exige: unirExigencias(mejor.exige, exige), especificidad };
+    }
+  }
+  return mejor?.exige;
+}
+
+/**
+ * ¿Esta sesión puede ver la pantalla de `pathname`? (Capa de RUTA, A4.)
+ *
+ * Una ruta SIN declaración no se cierra: esta capa es de presentación y su
+ * trabajo es no enseñar puertas, no sustituir al backend (que sigue rechazando
+ * la operación). La prueba `catalogo-rutas.test.ts` recorre `App.tsx` y truena
+ * si alguna ruta se quedó sin declarar, para que ese caso no exista.
+ */
+export function rutaPermitida(pathname: string, permisos: ReadonlySet<ClavePermiso>): boolean {
+  const exige = exigenciaDeRuta(pathname);
+  if (exige === undefined || exige === 'autenticado') {
+    return true;
+  }
+  return exige.some((clave) => permisos.has(clave));
+}
+
+/** Las rutas comodín de `App.tsx` (las usa la prueba de deriva). */
+export function esRutaComodin(ruta: string): boolean {
+  return RUTAS_COMODIN.includes(ruta);
+}

@@ -23,6 +23,7 @@ import { filtrarGruposVisibles, tituloPorRuta } from '@/modulos/catalogo';
 import { NavegacionModulos } from '@/modulos/NavegacionModulos';
 import { PaletaComandos } from '@/modulos/PaletaComandos';
 import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
+import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
@@ -43,7 +44,9 @@ import { useSesion } from '@/sesion/useSesion';
  *
  * El menu lista SOLO lo que los permisos del usuario hacen visible (A4); la
  * sesion la provee `ProveedorSesion` (`GET /api/sesion`). El guard
- * `RutaProtegida` garantiza que aqui ya hay sesion.
+ * `RutaProtegida` garantiza que aqui ya hay sesion, y `GuardiaPermisoRuta`
+ * (dentro del `<main>`) cierra la PANTALLA cuando la ruta pide un permiso que
+ * la sesion no tiene (§Post-F9.68).
  */
 export function CascaronSistema(): React.JSX.Element {
   const navigate = useNavigate();
@@ -231,9 +234,14 @@ export function CascaronSistema(): React.JSX.Element {
             </div>
           </header>
 
-          {/* El main NO scrollea: cada pantalla maneja su propio scroll. */}
+          {/* El main NO scrollea: cada pantalla maneja su propio scroll. La
+              CAPA DE RUTA (§Post-F9.68) va aquí adentro y no afuera, para que
+              el riel y la topbar sigan en pie: quien llegue por un enlace
+              compartido a una pantalla que no le toca puede irse a otra. */}
           <main className="min-h-0 flex-1 overflow-hidden">
-            <Outlet />
+            <GuardiaPermisoRuta>
+              <Outlet />
+            </GuardiaPermisoRuta>
           </main>
         </div>
       </div>

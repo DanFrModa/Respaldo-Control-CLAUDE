@@ -17,7 +17,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { useSesion } from '@/sesion/useSesion';
 
 import { SelectorProveedor } from './SelectorProveedor';
 import { moneda } from './comun';
@@ -33,13 +32,13 @@ function etiquetaTipo(tipo: string): string {
  * por RFC, OC por total cercano) → elegir proveedor y OC → confirmar. Al importar nace el cargo FISCAL
  * de CxP por el total del CFDI (I → cargo, E → nota de crédito) y el XML se guarda en R2.
  *
- * Todo el parseo/validación/conciliación es BACKEND (A1); esta pantalla solo orquesta. Gated
- * `cxp.administrar` (el backend re-verifica). Es importación, NO emisión.
+ * Todo el parseo/validación/conciliación es BACKEND (A1); esta pantalla solo orquesta. La cierra la CAPA
+ * DE RUTA con `cxp.administrar` (`catalogo.ts`, §Post-F9.68): quien no lo tiene NO la ve —ni el botón
+ * que lleva aquí ni la pantalla—, en vez de entrar y leer un letrero de permiso. El backend
+ * re-verifica igual (A4). Es importación, NO emisión.
  */
 export function ImportarCfdiPagina(): React.JSX.Element {
   const navigate = useNavigate();
-  const { tienePermiso } = useSesion();
-  const puedeAdministrar = tienePermiso('cxp.administrar');
 
   const [xml, setXml] = useState('');
   const [nombreArchivo, setNombreArchivo] = useState('');
@@ -113,16 +112,6 @@ export function ImportarCfdiPagina(): React.JSX.Element {
         },
         onError: (error) => toast.error(error.message),
       },
-    );
-  }
-
-  if (!puedeAdministrar) {
-    return (
-      <div className="p-6" data-testid="cfdi-importar">
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No tienes permiso para importar CFDI (requiere administrar CxP).
-        </p>
-      </div>
     );
   }
 
