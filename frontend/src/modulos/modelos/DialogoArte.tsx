@@ -6,12 +6,13 @@ import { toast } from 'sonner';
 
 import {
   useActualizarArte,
+  useArtesModelo,
   useCrearArte,
   type Arte,
   type ArteCrear,
   type ArteEditar,
 } from '@/api/artes';
-import { useProveedores } from '@/api/proveedores';
+import { useTiposArte } from '@/api/tipos-proceso';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,29 +32,19 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import { FotoArte } from '@/modulos/arte/FotoArte';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
+import { FotosArte } from '@/modulos/arte/FotosArte';
 import {
-  ETIQUETAS_TIPO_ARTE,
-  TIPOS_ARTE,
   esquemaArteFormulario,
   numeroOpcionalACuerpo,
   type DatosArteFormulario,
 } from '@/modulos/arte/esquemas';
 
-/** Tope alto: trae los proveedores activos para el selector (ordenados por nombre). */
-const QUERY_PROVEEDORES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
-
-/** Valores por defecto de un alta (todo vacío; el tipo arranca en BORDADO, como el backend). */
+/** Valores por defecto de un alta (todo vacío; el tipo se elige del catálogo). */
 const VALORES_INICIALES: DatosArteFormulario = {
-  nombre: '',
-  tipo: 'BORDADO',
   descripcion: '',
+  posicion: '',
+  idTipoArte: '',
   puntadas: '',
   precio: '',
   idProveedor: '',
@@ -61,9 +52,12 @@ const VALORES_INICIALES: DatosArteFormulario = {
 
 /** Traduce la captura al cuerpo del ALTA (POST): los opcionales vacíos se OMITEN. */
 function aCuerpoCrear(datos: DatosArteFormulario): ArteCrear {
-  const cuerpo: ArteCrear = { nombre: datos.nombre, tipo: datos.tipo };
-  if (datos.descripcion.length > 0) {
-    cuerpo.descripcion = datos.descripcion;
+  const cuerpo: ArteCrear = {
+    descripcion: datos.descripcion,
+    idTipoArte: Number(datos.idTipoArte),
+  };
+  if (datos.posicion.length > 0) {
+    cuerpo.posicion = datos.posicion;
   }
   const puntadas = numeroOpcionalACuerpo(datos.puntadas);
   if (puntadas !== undefined) {
@@ -86,9 +80,9 @@ function aCuerpoCrear(datos: DatosArteFormulario): ArteCrear {
  */
 function aCuerpoEditar(datos: DatosArteFormulario): ArteEditar {
   return {
-    nombre: datos.nombre,
-    tipo: datos.tipo,
-    descripcion: datos.descripcion.length > 0 ? datos.descripcion : null,
+    descripcion: datos.descripcion,
+    idTipoArte: Number(datos.idTipoArte),
+    posicion: datos.posicion.length > 0 ? datos.posicion : null,
     puntadas: numeroOpcionalACuerpo(datos.puntadas) ?? null,
     precio: numeroOpcionalACuerpo(datos.precio) ?? null,
     idProveedor: datos.idProveedor.trim() === '' ? null : Number(datos.idProveedor),
@@ -96,12 +90,22 @@ function aCuerpoEditar(datos: DatosArteFormulario): ArteEditar {
 }
 
 /**
- * Alta/edición de UN ARTE del modelo (V1-E3d, §Post-F9.35). El arte dejó de ser catálogo: se
- * captura DENTRO del modelo, con su nombre, tipo, puntadas, **precio** (el que viaja a la OP),
- * **proveedor** (quién lo hace) y su FOTO.
+ * Alta/edición de UN ARTE del modelo (V1-E3d §Post-F9.35 + **V1-E3f §Post-F9.52**).
  *
- * La FOTO solo aparece en EDICIÓN: necesita el arte ya creado para subirla (flujo presigned, igual
- * que la foto del modelo). Validación de UX con Zod; el backend re-valida y es la autoridad (A1).
+ * El arte dejó de ser catálogo: se captura DENTRO del modelo. Y desde V1-E3f se captura **como
+ * Daniel lo usa**:
+ *  • **Sin NOMBRE** — *"Es completamente irrelevante el nombre del estampado. Creo que con la
+ *    descripción sería suficiente."* La descripción es el campo visible y obligatorio. Como ya no
+ *    hay unicidad, si otra descripción del mismo modelo se repite se AVISA (no se bloquea).
+ *  • **Con POSICIÓN** (frente / espalda / manga…), texto LIBRE — *"a veces son cosas muy
+ *    específicas, que no tendría caso tenerlas en un catálogo"*.
+ *  • **Tipo del CATÁLOGO único** (`TipoProceso` con `esArte`, §Post-F9.58), no de una lista fija.
+ *  • **Puntadas atadas al tipo**: solo se piden si el tipo elegido las usa (`usaPuntadas`).
+ *  • **Proveedor con BUSCADOR** acotado al ROL del tipo (bordado/estampado/aplicación…): era la
+ *    cuarta vez que el desplegable con tope de 100 escondía al proveedor que se buscaba.
+ *  • **FOTOS en plural**, solo en EDICIÓN (necesitan el arte ya creado, flujo presigned).
+ *
+ * Validación de UX con Zod; el backend re-valida y es la autoridad (A1).
  */
 export function DialogoArte({
   abierto,
@@ -118,7 +122,9 @@ export function DialogoArte({
   const esEdicion = arte !== undefined;
   const crear = useCrearArte();
   const actualizar = useActualizarArte();
-  const proveedores = useProveedores(QUERY_PROVEEDORES);
+  const tipos = useTiposArte();
+  // El arte que YA tiene el modelo: solo para AVISAR de una descripción repetida (ver abajo).
+  const artesDelModelo = useArtesModelo(abierto ? idModelo : undefined);
 
   const formulario = useForm<DatosArteFormulario>({
     resolver: zodResolver(esquemaArteFormulario),
@@ -134,15 +140,70 @@ export function DialogoArte({
       arte === undefined
         ? VALORES_INICIALES
         : {
-            nombre: arte.nombre,
-            tipo: arte.tipo,
-            descripcion: arte.descripcion ?? '',
+            descripcion: arte.descripcion,
+            posicion: arte.posicion ?? '',
+            idTipoArte: String(arte.idTipoArte),
             puntadas: arte.puntadas === null ? '' : String(arte.puntadas),
             precio: arte.precio === null ? '' : String(arte.precio),
             idProveedor: arte.idProveedor === null ? '' : String(arte.idProveedor),
           },
     );
   }, [abierto, arte, formulario]);
+
+  const idTipoElegido = formulario.watch('idTipoArte');
+  const descripcionCapturada = formulario.watch('descripcion');
+  const idProveedorElegido = formulario.watch('idProveedor');
+
+  /**
+   * ⚠️ Opciones del selector de tipo = el catálogo **más el tipo que el arte YA tiene**, si ése no
+   * viene en la lista.
+   *
+   * El catálogo se pide con `incluirInactivos=false` y `soloArte=true`, así que basta con que un
+   * admin desactive «lavado» —o le quite la marca de arte— para que el tipo de un arte existente
+   * desaparezca de las opciones. Sin esta inyección, abrir ese arte mostraba «Elige el tipo…» y
+   * guardar lo RE-TIPIFICABA con otra cosa: una pérdida silenciosa de un dato que nadie tocó.
+   * Inyectándolo, el arte conserva su tipo mientras no se cambie a propósito, y la opción se rotula
+   * «(ya no disponible)» para que quede claro por qué no está en la lista de los demás.
+   *
+   * `usaPuntadas` viaja en el propio arte, así que el campo de puntadas sigue decidiéndose bien
+   * aunque el tipo ya no esté en el catálogo. Lo que NO se puede recuperar de ahí es el rol de
+   * proveedor (no viaja en el arte): en ese caso el buscador de proveedor no se acota — igual que
+   * con un tipo sin rol homónimo.
+   */
+  const tiposDelCatalogo = tipos.data?.datos ?? [];
+  const tipoRetirado =
+    arte !== undefined && !tiposDelCatalogo.some((t) => t.id === arte.idTipoArte)
+      ? {
+          id: arte.idTipoArte,
+          nombre: `${arte.tipoArte} (ya no disponible)`,
+          usaPuntadas: arte.usaPuntadas,
+          codigoRolProveedor: null as string | null,
+        }
+      : undefined;
+  const opcionesTipo = [
+    ...tiposDelCatalogo.map((t) => ({
+      id: t.id,
+      nombre: t.nombre,
+      usaPuntadas: t.usaPuntadas,
+      codigoRolProveedor: t.codigoRolProveedor,
+    })),
+    ...(tipoRetirado === undefined ? [] : [tipoRetirado]),
+  ];
+  const tipoElegido = opcionesTipo.find((t) => String(t.id) === idTipoElegido);
+
+  /**
+   * Aviso —NO bloqueo— cuando la descripción ya existe en este modelo. Al retirarse el `nombre`
+   * único (§Post-F9.52 punto 1) la base ya no lo impide, y Daniel lo aceptó; pero repetir texto
+   * suele ser un descuido, así que la pantalla lo dice y deja seguir.
+   */
+  const descripcionRepetida =
+    descripcionCapturada.trim() !== '' &&
+    (artesDelModelo.data?.datos ?? []).some(
+      (a) =>
+        a.id !== arte?.id &&
+        a.descripcion.trim().toLocaleLowerCase() ===
+          descripcionCapturada.trim().toLocaleLowerCase(),
+    );
 
   function alEnviar(datos: DatosArteFormulario): void {
     if (arte === undefined) {
@@ -182,8 +243,8 @@ export function DialogoArte({
         <DialogHeader>
           <DialogTitle>{esEdicion ? 'Editar arte' : 'Agregar arte'}</DialogTitle>
           <DialogDescription>
-            El arte es del modelo: aquí se capturan su precio (el que viaja a la orden), su
-            proveedor y su foto.
+            El arte es del modelo: aquí se capturan su descripción, dónde va en la prenda, su precio
+            (el que viaja a la orden), su proveedor y sus fotos.
           </DialogDescription>
         </DialogHeader>
 
@@ -192,26 +253,59 @@ export function DialogoArte({
             <LeyendaObligatorios />
 
             <Field>
-              <FieldLabel htmlFor="arte-nombre">Nombre *</FieldLabel>
+              <FieldLabel htmlFor="arte-descripcion">Descripción *</FieldLabel>
               <Input
-                id="arte-nombre"
-                {...formulario.register('nombre')}
-                aria-invalid={errores.nombre !== undefined}
-                data-testid="arte-nombre"
+                id="arte-descripcion"
+                {...formulario.register('descripcion')}
+                aria-invalid={errores.descripcion !== undefined}
+                data-testid="arte-descripcion"
               />
-              <FieldError>{errores.nombre?.message}</FieldError>
+              <FieldDescription>
+                Qué es el arte (p. ej. «Águila bordada a 3 hilos»).
+              </FieldDescription>
+              {descripcionRepetida ? (
+                <FieldDescription data-testid="arte-descripcion-repetida">
+                  ⚠️ Este modelo ya tiene otro arte con esta descripción. Se puede guardar igual,
+                  pero conviene distinguirlos.
+                </FieldDescription>
+              ) : null}
+              <FieldError>{errores.descripcion?.message}</FieldError>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="arte-posicion">Posición</FieldLabel>
+              <Input
+                id="arte-posicion"
+                placeholder="frente, espalda, manga izquierda…"
+                {...formulario.register('posicion')}
+                aria-invalid={errores.posicion !== undefined}
+                data-testid="arte-posicion"
+              />
+              <FieldDescription>Dónde va en la prenda. Texto libre.</FieldDescription>
+              <FieldError>{errores.posicion?.message}</FieldError>
             </Field>
 
             <Field>
               <FieldLabel htmlFor="arte-tipo">Tipo *</FieldLabel>
-              <SelectNativo id="arte-tipo" {...formulario.register('tipo')} data-testid="arte-tipo">
-                {TIPOS_ARTE.map((tipo) => (
-                  <option key={tipo} value={tipo}>
-                    {ETIQUETAS_TIPO_ARTE[tipo]}
+              <SelectNativo
+                id="arte-tipo"
+                {...formulario.register('idTipoArte')}
+                disabled={tipos.isPending}
+                data-testid="arte-tipo"
+              >
+                <option value="">Elige el tipo…</option>
+                {opcionesTipo.map((tipo) => (
+                  <option key={tipo.id} value={String(tipo.id)}>
+                    {tipo.nombre}
                   </option>
                 ))}
               </SelectNativo>
-              <FieldError>{errores.tipo?.message}</FieldError>
+              <FieldDescription>
+                Sale del catálogo de tipos de proceso: un proceso nuevo se da de alta una sola vez.
+              </FieldDescription>
+              <FieldError>
+                {errores.idTipoArte?.message ?? (tipos.isError ? tipos.error.message : undefined)}
+              </FieldError>
             </Field>
 
             <Field>
@@ -234,56 +328,61 @@ export function DialogoArte({
 
             <Field>
               <FieldLabel htmlFor="arte-proveedor">Proveedor</FieldLabel>
-              <SelectNativo
-                id="arte-proveedor"
-                {...formulario.register('idProveedor')}
-                disabled={proveedores.isPending}
-                data-testid="arte-proveedor"
-              >
-                <option value="">Sin proveedor</option>
-                {(proveedores.data?.datos ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
-              <FieldDescription>Quién hace el arte (bordador/estampador).</FieldDescription>
+              <SelectorProveedor
+                idInput="arte-proveedor"
+                idSeleccionado={
+                  idProveedorElegido.trim() === '' ? undefined : Number(idProveedorElegido)
+                }
+                nombreSeleccionado={
+                  arte?.idProveedor !== null &&
+                  arte?.idProveedor !== undefined &&
+                  String(arte.idProveedor) === idProveedorElegido
+                    ? (arte.proveedor ?? undefined)
+                    : undefined
+                }
+                alSeleccionar={(proveedor) =>
+                  formulario.setValue('idProveedor', String(proveedor.id), { shouldDirty: true })
+                }
+                alLimpiar={() => formulario.setValue('idProveedor', '', { shouldDirty: true })}
+                rol={tipoElegido?.codigoRolProveedor ?? undefined}
+                testid="arte-proveedor"
+              />
+              <FieldDescription>
+                Quién hace el arte. Se busca por cualquier palabra del nombre
+                {tipoElegido?.codigoRolProveedor === null || tipoElegido === undefined
+                  ? '.'
+                  : `, entre los proveedores marcados como «${tipoElegido.nombre}».`}
+              </FieldDescription>
               <FieldError>{errores.idProveedor?.message}</FieldError>
             </Field>
 
-            <Field>
-              <FieldLabel htmlFor="arte-puntadas">Puntadas</FieldLabel>
-              <Input
-                id="arte-puntadas"
-                type="number"
-                min={0}
-                step="1"
-                inputMode="numeric"
-                {...formulario.register('puntadas')}
-                aria-invalid={errores.puntadas !== undefined}
-                data-testid="arte-puntadas"
-              />
-              <FieldError>{errores.puntadas?.message}</FieldError>
-            </Field>
+            {/* Las PUNTADAS solo aplican a los tipos que las usan (§Post-F9.52 punto 6): el campo
+                no se borró —tirarlo destruiría el dato de los bordados existentes, D3— sino que
+                se OCULTA cuando el tipo elegido no las lleva. */}
+            {tipoElegido?.usaPuntadas === true ? (
+              <Field>
+                <FieldLabel htmlFor="arte-puntadas">Puntadas</FieldLabel>
+                <Input
+                  id="arte-puntadas"
+                  type="number"
+                  min={0}
+                  step="1"
+                  inputMode="numeric"
+                  {...formulario.register('puntadas')}
+                  aria-invalid={errores.puntadas !== undefined}
+                  data-testid="arte-puntadas"
+                />
+                <FieldError>{errores.puntadas?.message}</FieldError>
+              </Field>
+            ) : null}
 
-            <Field>
-              <FieldLabel htmlFor="arte-descripcion">Descripción</FieldLabel>
-              <Input
-                id="arte-descripcion"
-                {...formulario.register('descripcion')}
-                aria-invalid={errores.descripcion !== undefined}
-                data-testid="arte-descripcion"
-              />
-              <FieldError>{errores.descripcion?.message}</FieldError>
-            </Field>
-
-            {/* La foto necesita el arte YA creado (flujo presigned): solo en edición. */}
+            {/* Las fotos necesitan el arte YA creado (flujo presigned): solo en edición. */}
             {arte === undefined ? (
-              <FieldDescription>Guarda el arte para poder subirle su foto.</FieldDescription>
+              <FieldDescription>Guarda el arte para poder subirle sus fotos.</FieldDescription>
             ) : (
               <Field>
-                <FieldLabel>Foto</FieldLabel>
-                <FotoArte arte={arte} deshabilitado={guardando} />
+                <FieldLabel>Fotos</FieldLabel>
+                <FotosArte arte={arte} deshabilitado={guardando} />
               </Field>
             )}
           </FieldGroup>

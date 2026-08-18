@@ -115,9 +115,16 @@ afterAll(async () => {
   await cliente.$disconnect();
 });
 
+/**
+ * Id del tipo de arte «bordado» del catálogo ÚNICO (V1-E3f, §Post-F9.58). Lo siembra `sembrar()`
+ * como cualquier otro tipo de proceso; se resuelve una vez por test porque el arte lo exige.
+ */
+let idTipoArte: number;
+
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   await sembrar(cliente);
+  idTipoArte = (await cliente.tipoProceso.findUniqueOrThrow({ where: { codigo: 'bordado' } })).id;
 });
 
 /** Forma mínima de un modelo de la API que usan estas pruebas. */
@@ -169,7 +176,7 @@ async function crearArteApi(
     method: 'POST',
     url: `/api/modelos/${String(idModelo)}/artes`,
     headers: { cookie },
-    payload: { nombre, precio },
+    payload: { descripcion: nombre, idTipoArte, precio },
   });
   expect(res.statusCode).toBe(201);
   return res.json<{ id: number }>().id;
@@ -728,12 +735,16 @@ describe('API de modelos (F1-E4)', () => {
         payload: { idOrigen: origen.id, reemplazar: true },
       });
       expect(copia.statusCode).toBe(200);
-      const bom = copia.json<{ telas: unknown[]; avios: unknown[]; artes: { nombre: string }[] }>();
+      const bom = copia.json<{
+        telas: unknown[];
+        avios: unknown[];
+        artes: { descripcion: string }[];
+      }>();
       expect(bom.telas).toHaveLength(1);
       expect(bom.avios).toHaveLength(1);
       expect(bom.artes).toHaveLength(1);
       // La copia es un arte PROPIO del destino (no una referencia a un catálogo que ya no existe).
-      expect(bom.artes[0]?.nombre).toBe('Estampa');
+      expect(bom.artes[0]?.descripcion).toBe('Estampa');
 
       // Origen == destino → 400.
       const mismo = await app.inject({
@@ -1136,17 +1147,18 @@ describe('API de modelos (F1-E4)', () => {
       expect(ficha.json<{ artes: { id: number }[] }>().artes.map((x) => x.id)).toEqual([c, a, b]);
     });
 
-    it('el HISTÓRICO (todo el arte en `orden` 0) se sigue listando alfabético y se puede marcar', async () => {
+    it('el HISTÓRICO (todo el arte en `orden` 0) se lista por antigüedad y se puede marcar', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'PRIN-HIST' });
-      // Datos como los deja la MIGRACIÓN de V1-E3d: todos con el default `orden` 0 (el histórico
-      // migrado). El desempate por nombre los deja como se listaban antes del cambio.
+      // Datos como los deja la MIGRACIÓN: todos con el default `orden` 0 (el histórico migrado).
+      // ⚠️ V1-E3f: el desempate ya NO es por nombre (se retiró) sino por `id`, así que el
+      // histórico se lista por ANTIGÜEDAD DE CAPTURA, no alfabético. Zeta se creó primero.
       const zeta = await cliente.modeloArte.create({
-        data: { idModelo: body.id, nombre: 'Zeta', precio: 30 },
+        data: { idModelo: body.id, descripcion: 'Zeta', idTipoArte, precio: 30 },
         select: { id: true },
       });
       const alfa = await cliente.modeloArte.create({
-        data: { idModelo: body.id, nombre: 'Alfa', precio: 10 },
+        data: { idModelo: body.id, descripcion: 'Alfa', idTipoArte, precio: 10 },
         select: { id: true },
       });
 
@@ -1156,11 +1168,11 @@ describe('API de modelos (F1-E4)', () => {
         headers: { cookie },
       });
       expect(ficha.json<{ artes: { id: number }[] }>().artes.map((x) => x.id)).toEqual([
-        alfa.id,
         zeta.id,
+        alfa.id,
       ]);
 
-      // Marcar el segundo (Zeta) como principal compacta el orden y lo pone al frente.
+      // Marcar Zeta como principal compacta el orden y lo deja al frente.
       const res = await app.inject({
         method: 'POST',
         url: `/api/modelos/${body.id}/artes/${String(zeta.id)}/principal`,
@@ -1195,7 +1207,7 @@ describe('API de modelos (F1-E4)', () => {
         headers: { cookie },
       });
 
-      // Se agrega un arte cuyo NOMBRE lo pondría primero por alfabético.
+      // Se agrega un arte cuya DESCRIPCIÓN lo pondría primero por alfabético.
       const nuevo = await crearArteApi(cookie, body.id, 'Arte AA', 5);
 
       const lista = await app.inject({

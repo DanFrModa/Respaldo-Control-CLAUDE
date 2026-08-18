@@ -54,15 +54,33 @@ export function DialogoTipoProceso({
 
   const formulario = useForm<DatosTipoProcesoFormulario>({
     resolver: zodResolver(esquemaTipoProcesoFormulario),
-    defaultValues: { codigo: '', nombre: '', generaEntradaPt: false },
+    defaultValues: {
+      codigo: '',
+      nombre: '',
+      generaEntradaPt: false,
+      esArte: false,
+      usaPuntadas: false,
+    },
   });
 
   useEffect(() => {
     if (abierto) {
       formulario.reset(
         tipo
-          ? { codigo: tipo.codigo, nombre: tipo.nombre, generaEntradaPt: tipo.generaEntradaPt }
-          : { codigo: '', nombre: '', generaEntradaPt: false },
+          ? {
+              codigo: tipo.codigo,
+              nombre: tipo.nombre,
+              generaEntradaPt: tipo.generaEntradaPt,
+              esArte: tipo.esArte,
+              usaPuntadas: tipo.usaPuntadas,
+            }
+          : {
+              codigo: '',
+              nombre: '',
+              generaEntradaPt: false,
+              esArte: false,
+              usaPuntadas: false,
+            },
       );
     }
   }, [abierto, tipo, formulario]);
@@ -70,7 +88,16 @@ export function DialogoTipoProceso({
   const enviar = formulario.handleSubmit((datos) => {
     // Si NO es admin, no se manda `generaEntradaPt` (el backend igual lo descartaría): se respeta
     // el valor que ya tenía el registro y no se intenta cambiarlo desde una sesión sin permiso.
-    const cuerpo = puedeEditarBandera ? datos : { codigo: datos.codigo, nombre: datos.nombre };
+    // `esArte`/`usaPuntadas` NO son admin-only (V1-E3f): no mueven inventario, solo deciden qué
+    // se ofrece en la lista de tipos de arte. Las manda cualquiera que administre el catálogo.
+    const cuerpo = puedeEditarBandera
+      ? datos
+      : {
+          codigo: datos.codigo,
+          nombre: datos.nombre,
+          esArte: datos.esArte,
+          usaPuntadas: datos.usaPuntadas,
+        };
 
     if (esEdicion) {
       actualizar.mutate(
@@ -160,6 +187,37 @@ export function DialogoTipoProceso({
                 Solo un administrador puede cambiar si el proceso mete prenda a inventario PT.
               </p>
             ) : null}
+
+            {/* V1-E3f (§Post-F9.58): el MISMO catálogo sirve para el proceso y para el arte —
+                Daniel: *"De acuerdo. Y un solo catálogo."*. Un proceso raro («embosado») se da de
+                alta UNA vez y ya se puede elegir como tipo de arte. */}
+            <Field orientation="horizontal">
+              <input
+                id="tp-es-arte"
+                type="checkbox"
+                className="size-4 rounded border-input accent-primary disabled:opacity-50"
+                disabled={guardando}
+                data-testid="tp-es-arte"
+                {...formulario.register('esArte')}
+              />
+              <FieldLabel htmlFor="tp-es-arte" className="font-normal">
+                ¿Se puede elegir como tipo de ARTE del modelo? (bordado, estampado, aplicación…)
+              </FieldLabel>
+            </Field>
+
+            <Field orientation="horizontal">
+              <input
+                id="tp-usa-puntadas"
+                type="checkbox"
+                className="size-4 rounded border-input accent-primary disabled:opacity-50"
+                disabled={guardando}
+                data-testid="tp-usa-puntadas"
+                {...formulario.register('usaPuntadas')}
+              />
+              <FieldLabel htmlFor="tp-usa-puntadas" className="font-normal">
+                ¿Su arte lleva PUNTADAS? (el campo solo aparece en los tipos que las usan)
+              </FieldLabel>
+            </Field>
           </FieldGroup>
 
           <DialogFooter>

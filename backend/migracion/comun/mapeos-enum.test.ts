@@ -66,12 +66,14 @@ describe('migración · mapeos de enum (puros)', () => {
   });
 
   describe('mapearTipoArte (BorEst)', () => {
-    it('0/vacío→BORDADO, distinto de 0→ESTAMPADO', () => {
-      expect(mapearTipoArte('0')).toBe('BORDADO');
-      expect(mapearTipoArte('')).toBe('BORDADO');
-      expect(mapearTipoArte(null)).toBe('BORDADO');
-      expect(mapearTipoArte('1')).toBe('ESTAMPADO');
-      expect(mapearTipoArte('-1')).toBe('ESTAMPADO');
+    // V1-E3f: devuelve el CÓDIGO del catálogo único (`TipoProceso.codigo`), no el enum retirado.
+    it('0/vacío→bordado, distinto de 0→estampado', () => {
+      expect(mapearTipoArte('0')).toBe('bordado');
+      expect(mapearTipoArte('')).toBe('bordado');
+      expect(mapearTipoArte(null)).toBe('bordado');
+      expect(mapearTipoArte('1')).toBe('estampado');
+      expect(mapearTipoArte('-1')).toBe('estampado');
+      expect(mapearTipoArte('sí')).toBe('estampado');
     });
   });
 

@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useEliminarArte, useMarcarArtePrincipal, type Arte } from '@/api/artes';
 import { Button } from '@/components/ui/button';
 import { MiniaturaArte } from '@/modulos/arte/MiniaturaArte';
-import { ETIQUETAS_TIPO_ARTE } from '@/modulos/arte/esquemas';
 
 import { CopiarArteDialogo } from './CopiarArteDialogo';
 import { DialogoArte } from './DialogoArte';
@@ -14,9 +13,10 @@ import { DialogoArte } from './DialogoArte';
  * Sección ARTE de la receta del modelo (V1-E3d, §Post-F9.35).
  *
  * A diferencia de telas y avíos —que se guardan como SET completo— el arte se administra RENGLÓN
- * POR RENGLÓN: cada arte tiene su ficha (nombre, tipo, puntadas, precio, proveedor) y su FOTO, y
- * una foto no cabe dentro de un PUT de conjunto. Por eso aquí hay «Agregar arte», editar, quitar
- * y «Copiar arte de otro modelo» (la conveniencia que daba el catálogo, sin reinventarlo).
+ * POR RENGLÓN: cada arte tiene su ficha (descripción, posición, tipo, puntadas, precio, proveedor)
+ * y sus FOTOS, y una foto no cabe dentro de un PUT de conjunto. Por eso aquí hay «Agregar arte»,
+ * editar, quitar y «Copiar arte de otro modelo» (la conveniencia que daba el catálogo, sin
+ * reinventarlo).
  *
  * El ORDEN importa: el PRIMER renglón es el arte PRINCIPAL del modelo (jul-2026, Daniel) — lleva
  * estrella + rótulo "Principal" y los demás una acción para tomar su lugar.
@@ -52,7 +52,7 @@ export function SeccionArte({
     eliminar.mutate(
       { idModelo, idArte: arte.id },
       {
-        onSuccess: () => toast.success(`Arte "${arte.nombre}" quitado del modelo.`),
+        onSuccess: () => toast.success(`Arte "${arte.descripcion}" quitado del modelo.`),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -106,17 +106,19 @@ export function SeccionArte({
               <MiniaturaArte
                 idModelo={idModelo}
                 idArte={arte.id}
-                nombre={arte.nombre}
-                tieneFoto={arte.idArchivoFoto !== null}
+                nombre={arte.descripcion}
+                tieneFoto={arte.fotos.length > 0}
                 tamano="lg"
               />
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{arte.nombre}</p>
+                <p className="truncate text-sm font-medium">{arte.descripcion}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {ETIQUETAS_TIPO_ARTE[arte.tipo]}
+                  {arte.tipoArte}
+                  {arte.posicion === null ? '' : ` · ${arte.posicion}`}
                   {arte.precio === null ? ' · sin precio' : ` · $${arte.precio.toFixed(2)}`}
                   {arte.proveedor === null ? '' : ` · ${arte.proveedor}`}
+                  {arte.fotos.length > 1 ? ` · ${String(arte.fotos.length)} fotos` : ''}
                 </p>
               </div>
 
@@ -136,7 +138,7 @@ export function SeccionArte({
                   className="h-7 shrink-0 text-[11px]"
                   onClick={() => marcar(arte)}
                   disabled={ocupado}
-                  aria-label={`Marcar ${arte.nombre} como arte principal`}
+                  aria-label={`Marcar ${arte.descripcion} como arte principal`}
                   data-testid={`marcar-principal-arte-${arte.id}`}
                 >
                   {marcarPrincipal.isPending ? (
@@ -157,7 +159,7 @@ export function SeccionArte({
                     className="shrink-0"
                     onClick={() => abrirEdicion(arte)}
                     disabled={ocupado}
-                    aria-label={`Editar ${arte.nombre}`}
+                    aria-label={`Editar ${arte.descripcion}`}
                     data-testid={`editar-arte-${arte.id}`}
                   >
                     <PencilIcon aria-hidden />
@@ -169,7 +171,7 @@ export function SeccionArte({
                     className="shrink-0 text-destructive"
                     onClick={() => quitar(arte)}
                     disabled={ocupado}
-                    aria-label={`Quitar ${arte.nombre} del modelo`}
+                    aria-label={`Quitar ${arte.descripcion} del modelo`}
                     data-testid={`quitar-arte-${arte.id}`}
                   >
                     <Trash2Icon aria-hidden />

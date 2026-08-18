@@ -30191,11 +30191,11 @@
                             "maximum": 9007199254740991,
                             "description": "Id del modelo dueño del arte."
                           },
-                          "nombre": {
-                            "type": "string",
-                            "description": "Nombre del arte."
-                          },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -30204,7 +30204,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Descripción, o null."
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -30230,13 +30230,23 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
-                          "tipo": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "BORDADO real o ESTAMPADO/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "idProveedor": {
                             "anyOf": [
@@ -30262,16 +30272,37 @@
                             ],
                             "description": "Nombre del proveedor que lo hace, o null."
                           },
-                          "idArchivoFoto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                          "fotos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idFoto": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón de foto (ModeloArteFoto)."
+                                },
+                                "idArchivo": {
+                                  "type": "string",
+                                  "description": "Id del Archivo en R2."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Posición de la foto dentro del arte (0 = la primera)."
+                                }
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                              "required": [
+                                "idFoto",
+                                "idArchivo",
+                                "orden"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Foto de un arte, sin su URL prefirmada."
+                            },
+                            "description": "Fotos del arte, ordenadas."
                           },
                           "orden": {
                             "type": "integer",
@@ -30317,14 +30348,17 @@
                         "required": [
                           "id",
                           "idModelo",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
                           "precio",
-                          "tipo",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "idProveedor",
                           "proveedor",
-                          "idArchivoFoto",
+                          "fotos",
                           "orden",
                           "creadoEn",
                           "creadoPorId",
@@ -30332,7 +30366,7 @@
                           "modificadoPorId"
                         ],
                         "additionalProperties": false,
-                        "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                        "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                       },
                       "description": "Arte (bordados/estampados) del modelo."
                     },
@@ -33159,7 +33193,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Artes (bordados/estampados) de un modelo.",
+            "description": "Artes (bordados/estampados/…) de un modelo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33182,11 +33216,11 @@
                             "maximum": 9007199254740991,
                             "description": "Id del modelo dueño del arte."
                           },
-                          "nombre": {
-                            "type": "string",
-                            "description": "Nombre del arte."
-                          },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -33195,7 +33229,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Descripción, o null."
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -33221,13 +33255,23 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
-                          "tipo": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "BORDADO real o ESTAMPADO/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "idProveedor": {
                             "anyOf": [
@@ -33253,16 +33297,37 @@
                             ],
                             "description": "Nombre del proveedor que lo hace, o null."
                           },
-                          "idArchivoFoto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                          "fotos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idFoto": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón de foto (ModeloArteFoto)."
+                                },
+                                "idArchivo": {
+                                  "type": "string",
+                                  "description": "Id del Archivo en R2."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Posición de la foto dentro del arte (0 = la primera)."
+                                }
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                              "required": [
+                                "idFoto",
+                                "idArchivo",
+                                "orden"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Foto de un arte, sin su URL prefirmada."
+                            },
+                            "description": "Fotos del arte, ordenadas."
                           },
                           "orden": {
                             "type": "integer",
@@ -33308,14 +33373,17 @@
                         "required": [
                           "id",
                           "idModelo",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
                           "precio",
-                          "tipo",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "idProveedor",
                           "proveedor",
-                          "idArchivoFoto",
+                          "fotos",
                           "orden",
                           "creadoEn",
                           "creadoPorId",
@@ -33323,7 +33391,7 @@
                           "modificadoPorId"
                         ],
                         "additionalProperties": false,
-                        "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                        "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                       },
                       "description": "Artes del modelo, ya ordenados."
                     }
@@ -33332,7 +33400,7 @@
                     "datos"
                   ],
                   "additionalProperties": false,
-                  "description": "Artes (bordados/estampados) de un modelo."
+                  "description": "Artes (bordados/estampados/…) de un modelo."
                 }
               }
             }
@@ -33496,14 +33564,14 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "nombre": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 150
-                  },
                   "descripcion": {
                     "type": "string",
+                    "minLength": 1,
                     "maxLength": 500
+                  },
+                  "posicion": {
+                    "type": "string",
+                    "maxLength": 100
                   },
                   "puntadas": {
                     "type": "integer",
@@ -33514,13 +33582,10 @@
                     "type": "number",
                     "minimum": 0
                   },
-                  "tipo": {
-                    "default": "BORDADO",
-                    "type": "string",
-                    "enum": [
-                      "BORDADO",
-                      "ESTAMPADO"
-                    ]
+                  "idTipoArte": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "idProveedor": {
                     "type": "integer",
@@ -33529,7 +33594,8 @@
                   }
                 },
                 "required": [
-                  "nombre"
+                  "descripcion",
+                  "idTipoArte"
                 ]
               }
             }
@@ -33555,7 +33621,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2.",
+            "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33573,11 +33639,11 @@
                       "maximum": 9007199254740991,
                       "description": "Id del modelo dueño del arte."
                     },
-                    "nombre": {
-                      "type": "string",
-                      "description": "Nombre del arte."
-                    },
                     "descripcion": {
+                      "type": "string",
+                      "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                    },
+                    "posicion": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -33586,7 +33652,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Descripción, o null."
+                      "description": "Dónde va en la prenda (texto libre), o null."
                     },
                     "puntadas": {
                       "anyOf": [
@@ -33612,13 +33678,23 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
-                    "tipo": {
+                    "idTipoArte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del tipo de arte (catálogo TipoProceso)."
+                    },
+                    "tipoArte": {
                       "type": "string",
-                      "enum": [
-                        "BORDADO",
-                        "ESTAMPADO"
-                      ],
-                      "description": "BORDADO real o ESTAMPADO/aplicación."
+                      "description": "Nombre del tipo de arte, resuelto."
+                    },
+                    "codigoTipoArte": {
+                      "type": "string",
+                      "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                     },
                     "idProveedor": {
                       "anyOf": [
@@ -33644,16 +33720,37 @@
                       ],
                       "description": "Nombre del proveedor que lo hace, o null."
                     },
-                    "idArchivoFoto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
+                    "fotos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idFoto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de foto (ModeloArteFoto)."
+                          },
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del Archivo en R2."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición de la foto dentro del arte (0 = la primera)."
+                          }
                         },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                        "required": [
+                          "idFoto",
+                          "idArchivo",
+                          "orden"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Foto de un arte, sin su URL prefirmada."
+                      },
+                      "description": "Fotos del arte, ordenadas."
                     },
                     "orden": {
                       "type": "integer",
@@ -33699,14 +33796,17 @@
                   "required": [
                     "id",
                     "idModelo",
-                    "nombre",
                     "descripcion",
+                    "posicion",
                     "puntadas",
                     "precio",
-                    "tipo",
+                    "idTipoArte",
+                    "tipoArte",
+                    "codigoTipoArte",
+                    "usaPuntadas",
                     "idProveedor",
                     "proveedor",
-                    "idArchivoFoto",
+                    "fotos",
                     "orden",
                     "creadoEn",
                     "creadoPorId",
@@ -33714,7 +33814,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                  "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                 }
               }
             }
@@ -33880,16 +33980,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "nombre": {
+                  "descripcion": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 150
+                    "maxLength": 500
                   },
-                  "descripcion": {
+                  "posicion": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 500
+                        "maxLength": 100
                       },
                       {
                         "type": "null"
@@ -33919,12 +34019,10 @@
                       }
                     ]
                   },
-                  "tipo": {
-                    "type": "string",
-                    "enum": [
-                      "BORDADO",
-                      "ESTAMPADO"
-                    ]
+                  "idTipoArte": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "idProveedor": {
                     "anyOf": [
@@ -33974,7 +34072,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2.",
+            "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33992,11 +34090,11 @@
                       "maximum": 9007199254740991,
                       "description": "Id del modelo dueño del arte."
                     },
-                    "nombre": {
-                      "type": "string",
-                      "description": "Nombre del arte."
-                    },
                     "descripcion": {
+                      "type": "string",
+                      "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                    },
+                    "posicion": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -34005,7 +34103,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Descripción, o null."
+                      "description": "Dónde va en la prenda (texto libre), o null."
                     },
                     "puntadas": {
                       "anyOf": [
@@ -34031,13 +34129,23 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
-                    "tipo": {
+                    "idTipoArte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del tipo de arte (catálogo TipoProceso)."
+                    },
+                    "tipoArte": {
                       "type": "string",
-                      "enum": [
-                        "BORDADO",
-                        "ESTAMPADO"
-                      ],
-                      "description": "BORDADO real o ESTAMPADO/aplicación."
+                      "description": "Nombre del tipo de arte, resuelto."
+                    },
+                    "codigoTipoArte": {
+                      "type": "string",
+                      "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                     },
                     "idProveedor": {
                       "anyOf": [
@@ -34063,16 +34171,37 @@
                       ],
                       "description": "Nombre del proveedor que lo hace, o null."
                     },
-                    "idArchivoFoto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
+                    "fotos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idFoto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de foto (ModeloArteFoto)."
+                          },
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del Archivo en R2."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición de la foto dentro del arte (0 = la primera)."
+                          }
                         },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                        "required": [
+                          "idFoto",
+                          "idArchivo",
+                          "orden"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Foto de un arte, sin su URL prefirmada."
+                      },
+                      "description": "Fotos del arte, ordenadas."
                     },
                     "orden": {
                       "type": "integer",
@@ -34118,14 +34247,17 @@
                   "required": [
                     "id",
                     "idModelo",
-                    "nombre",
                     "descripcion",
+                    "posicion",
                     "puntadas",
                     "precio",
-                    "tipo",
+                    "idTipoArte",
+                    "tipoArte",
+                    "codigoTipoArte",
+                    "usaPuntadas",
                     "idProveedor",
                     "proveedor",
-                    "idArchivoFoto",
+                    "fotos",
                     "orden",
                     "creadoEn",
                     "creadoPorId",
@@ -34133,7 +34265,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                  "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                 }
               }
             }
@@ -34508,7 +34640,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Artes (bordados/estampados) de un modelo.",
+            "description": "Artes (bordados/estampados/…) de un modelo.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34531,11 +34663,11 @@
                             "maximum": 9007199254740991,
                             "description": "Id del modelo dueño del arte."
                           },
-                          "nombre": {
-                            "type": "string",
-                            "description": "Nombre del arte."
-                          },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -34544,7 +34676,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Descripción, o null."
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -34570,13 +34702,23 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
-                          "tipo": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "BORDADO real o ESTAMPADO/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "idProveedor": {
                             "anyOf": [
@@ -34602,16 +34744,37 @@
                             ],
                             "description": "Nombre del proveedor que lo hace, o null."
                           },
-                          "idArchivoFoto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                          "fotos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idFoto": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón de foto (ModeloArteFoto)."
+                                },
+                                "idArchivo": {
+                                  "type": "string",
+                                  "description": "Id del Archivo en R2."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Posición de la foto dentro del arte (0 = la primera)."
+                                }
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                              "required": [
+                                "idFoto",
+                                "idArchivo",
+                                "orden"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Foto de un arte, sin su URL prefirmada."
+                            },
+                            "description": "Fotos del arte, ordenadas."
                           },
                           "orden": {
                             "type": "integer",
@@ -34657,14 +34820,17 @@
                         "required": [
                           "id",
                           "idModelo",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
                           "precio",
-                          "tipo",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "idProveedor",
                           "proveedor",
-                          "idArchivoFoto",
+                          "fotos",
                           "orden",
                           "creadoEn",
                           "creadoPorId",
@@ -34672,7 +34838,7 @@
                           "modificadoPorId"
                         ],
                         "additionalProperties": false,
-                        "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                        "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                       },
                       "description": "Artes del modelo, ya ordenados."
                     }
@@ -34681,7 +34847,7 @@
                     "datos"
                   ],
                   "additionalProperties": false,
-                  "description": "Artes (bordados/estampados) de un modelo."
+                  "description": "Artes (bordados/estampados/…) de un modelo."
                 }
               }
             }
@@ -34852,10 +35018,10 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
-                  "nombre": {
+                  "descripcion": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 150
+                    "maxLength": 500
                   }
                 },
                 "required": [
@@ -34887,7 +35053,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2.",
+            "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34905,11 +35071,11 @@
                       "maximum": 9007199254740991,
                       "description": "Id del modelo dueño del arte."
                     },
-                    "nombre": {
-                      "type": "string",
-                      "description": "Nombre del arte."
-                    },
                     "descripcion": {
+                      "type": "string",
+                      "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                    },
+                    "posicion": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -34918,7 +35084,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Descripción, o null."
+                      "description": "Dónde va en la prenda (texto libre), o null."
                     },
                     "puntadas": {
                       "anyOf": [
@@ -34944,13 +35110,23 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
-                    "tipo": {
+                    "idTipoArte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del tipo de arte (catálogo TipoProceso)."
+                    },
+                    "tipoArte": {
                       "type": "string",
-                      "enum": [
-                        "BORDADO",
-                        "ESTAMPADO"
-                      ],
-                      "description": "BORDADO real o ESTAMPADO/aplicación."
+                      "description": "Nombre del tipo de arte, resuelto."
+                    },
+                    "codigoTipoArte": {
+                      "type": "string",
+                      "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                     },
                     "idProveedor": {
                       "anyOf": [
@@ -34976,16 +35152,37 @@
                       ],
                       "description": "Nombre del proveedor que lo hace, o null."
                     },
-                    "idArchivoFoto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
+                    "fotos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idFoto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de foto (ModeloArteFoto)."
+                          },
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del Archivo en R2."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición de la foto dentro del arte (0 = la primera)."
+                          }
                         },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                        "required": [
+                          "idFoto",
+                          "idArchivo",
+                          "orden"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Foto de un arte, sin su URL prefirmada."
+                      },
+                      "description": "Fotos del arte, ordenadas."
                     },
                     "orden": {
                       "type": "integer",
@@ -35031,14 +35228,17 @@
                   "required": [
                     "id",
                     "idModelo",
-                    "nombre",
                     "descripcion",
+                    "posicion",
                     "puntadas",
                     "precio",
-                    "tipo",
+                    "idTipoArte",
+                    "tipoArte",
+                    "codigoTipoArte",
+                    "usaPuntadas",
                     "idProveedor",
                     "proveedor",
-                    "idArchivoFoto",
+                    "fotos",
                     "orden",
                     "creadoEn",
                     "creadoPorId",
@@ -35046,7 +35246,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                  "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                 }
               }
             }
@@ -35199,9 +35399,9 @@
         }
       }
     },
-    "/api/modelos/{id}/artes/{idArte}/foto": {
+    "/api/modelos/{id}/artes/{idArte}/fotos": {
       "post": {
-        "summary": "Preparar la subida de la foto de un arte (URL prefirmada)",
+        "summary": "Preparar la subida de una foto de un arte (URL prefirmada)",
         "tags": [
           "modelos"
         ],
@@ -35235,11 +35435,11 @@
                   "tipoMime",
                   "tamanoBytes"
                 ],
-                "description": "Datos para preparar la subida de la foto de un arte."
+                "description": "Datos para preparar la subida de una foto de un arte."
               }
             }
           },
-          "description": "Datos para preparar la subida de la foto de un arte."
+          "description": "Datos para preparar la subida de una foto de un arte."
         },
         "parameters": [
           {
@@ -35272,12 +35472,18 @@
         ],
         "responses": {
           "201": {
-            "description": "Resultado de preparar la subida de la foto (URL prefirmada).",
+            "description": "Resultado de preparar la subida de una foto (URL prefirmada).",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "idFoto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del renglón de foto creado (para limpiarlo si falla)."
+                    },
                     "idArchivo": {
                       "type": "string",
                       "description": "Id del registro Archivo creado para la foto."
@@ -35298,13 +35504,14 @@
                     }
                   },
                   "required": [
+                    "idFoto",
                     "idArchivo",
                     "nombreOriginal",
                     "urlSubida",
                     "expiraEnSegundos"
                   ],
                   "additionalProperties": false,
-                  "description": "Resultado de preparar la subida de la foto (URL prefirmada)."
+                  "description": "Resultado de preparar la subida de una foto (URL prefirmada)."
                 }
               }
             }
@@ -35457,7 +35664,7 @@
         }
       },
       "get": {
-        "summary": "Obtener la foto de un arte (URL prefirmada de descarga)",
+        "summary": "Listar las fotos de un arte (URLs prefirmadas de descarga)",
         "tags": [
           "modelos"
         ],
@@ -35492,79 +35699,72 @@
         ],
         "responses": {
           "200": {
-            "description": "Foto de un arte (con su URL de descarga) o vacía si no tiene.",
+            "description": "Fotos de un arte, cada una con su URL prefirmada.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "idArchivo": {
-                      "anyOf": [
-                        {
-                          "type": "string"
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idFoto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de foto."
+                          },
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del registro Archivo de la foto."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Posición dentro del arte (0 = la primera)."
+                          },
+                          "nombreOriginal": {
+                            "type": "string",
+                            "description": "Nombre original del archivo."
+                          },
+                          "tipoMime": {
+                            "type": "string",
+                            "description": "Tipo MIME de la imagen."
+                          },
+                          "tamanoBytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño en bytes."
+                          },
+                          "urlDescarga": {
+                            "type": "string",
+                            "description": "URL GET prefirmada para ver la foto."
+                          }
                         },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Id del registro Archivo de la foto, o null."
-                    },
-                    "nombreOriginal": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Nombre original del archivo, o null."
-                    },
-                    "tipoMime": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Tipo MIME de la imagen, o null."
-                    },
-                    "tamanoBytes": {
-                      "anyOf": [
-                        {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Tamaño en bytes, o null."
-                    },
-                    "urlDescarga": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "URL GET prefirmada para ver la foto, o null si no tiene foto."
+                        "required": [
+                          "idFoto",
+                          "idArchivo",
+                          "orden",
+                          "nombreOriginal",
+                          "tipoMime",
+                          "tamanoBytes",
+                          "urlDescarga"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Foto de un arte con su URL de descarga."
+                      },
+                      "description": "Fotos del arte, ordenadas."
                     }
                   },
                   "required": [
-                    "idArchivo",
-                    "nombreOriginal",
-                    "tipoMime",
-                    "tamanoBytes",
-                    "urlDescarga"
+                    "datos"
                   ],
                   "additionalProperties": false,
-                  "description": "Foto de un arte (con su URL de descarga) o vacía si no tiene."
+                  "description": "Fotos de un arte, cada una con su URL prefirmada."
                 }
               }
             }
@@ -35715,23 +35915,15 @@
             }
           }
         }
-      },
+      }
+    },
+    "/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}": {
       "delete": {
-        "summary": "Quitar la foto de un arte",
+        "summary": "Quitar una foto de un arte",
         "tags": [
           "modelos"
         ],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "in": "query",
-            "name": "idArchivo",
-            "required": false,
-            "description": "Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta."
-          },
           {
             "schema": {
               "type": "integer",
@@ -35753,6 +35945,17 @@
             "name": "idArte",
             "required": true,
             "description": "Id del arte (bordado/estampado) del modelo."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idFoto",
+            "required": true,
+            "description": "Id de la foto del arte."
           }
         ],
         "security": [
@@ -35951,20 +36154,18 @@
             "in": "query",
             "name": "busqueda",
             "required": false,
-            "description": "Texto a buscar en el nombre del arte o en la clave/nombre del modelo."
+            "description": "Texto a buscar en la descripción del arte o en la clave/nombre del modelo."
           },
           {
             "schema": {
-              "type": "string",
-              "enum": [
-                "BORDADO",
-                "ESTAMPADO"
-              ]
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             },
             "in": "query",
-            "name": "tipo",
+            "name": "idTipoArte",
             "required": false,
-            "description": "Filtra por tipo (BORDADO/ESTAMPADO)."
+            "description": "Filtra por tipo de arte (id del catálogo TipoProceso)."
           },
           {
             "schema": {
@@ -35977,10 +36178,10 @@
           },
           {
             "schema": {
-              "default": "nombre",
+              "default": "descripcion",
               "type": "string",
               "enum": [
-                "nombre",
+                "descripcion",
                 "modelo",
                 "tipo",
                 "creadoEn"
@@ -36030,17 +36231,30 @@
                             "maximum": 9007199254740991,
                             "description": "Id del arte."
                           },
-                          "nombre": {
+                          "descripcion": {
                             "type": "string",
-                            "description": "Nombre del arte."
+                            "description": "Descripción del arte."
                           },
-                          "tipo": {
-                            "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
+                          "posicion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
                             ],
-                            "description": "BORDADO real o ESTAMPADO/aplicación."
+                            "description": "Dónde va en la prenda, o null."
+                          },
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte."
+                          },
+                          "tipoArte": {
+                            "type": "string",
+                            "description": "Nombre del tipo de arte."
                           },
                           "precio": {
                             "anyOf": [
@@ -36062,7 +36276,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Id del Archivo de la foto, o null."
+                            "description": "Id del Archivo de la PRIMERA foto del arte, o null si no tiene."
                           },
                           "idModelo": {
                             "type": "integer",
@@ -36088,8 +36302,10 @@
                         },
                         "required": [
                           "id",
-                          "nombre",
-                          "tipo",
+                          "descripcion",
+                          "posicion",
+                          "idTipoArte",
+                          "tipoArte",
                           "precio",
                           "idArchivoFoto",
                           "idModelo",
@@ -36627,11 +36843,11 @@
                             "maximum": 9007199254740991,
                             "description": "Id del modelo dueño del arte."
                           },
-                          "nombre": {
-                            "type": "string",
-                            "description": "Nombre del arte."
-                          },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte (el campo visible desde V1-E3f)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -36640,7 +36856,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Descripción, o null."
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -36666,13 +36882,23 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
-                          "tipo": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "BORDADO real o ESTAMPADO/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "idProveedor": {
                             "anyOf": [
@@ -36698,16 +36924,37 @@
                             ],
                             "description": "Nombre del proveedor que lo hace, o null."
                           },
-                          "idArchivoFoto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                          "fotos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idFoto": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón de foto (ModeloArteFoto)."
+                                },
+                                "idArchivo": {
+                                  "type": "string",
+                                  "description": "Id del Archivo en R2."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Posición de la foto dentro del arte (0 = la primera)."
+                                }
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Id del Archivo de la foto en R2, o null si no tiene foto."
+                              "required": [
+                                "idFoto",
+                                "idArchivo",
+                                "orden"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Foto de un arte, sin su URL prefirmada."
+                            },
+                            "description": "Fotos del arte, ordenadas."
                           },
                           "orden": {
                             "type": "integer",
@@ -36753,14 +37000,17 @@
                         "required": [
                           "id",
                           "idModelo",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
                           "precio",
-                          "tipo",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "idProveedor",
                           "proveedor",
-                          "idArchivoFoto",
+                          "fotos",
                           "orden",
                           "creadoEn",
                           "creadoPorId",
@@ -36768,7 +37018,7 @@
                           "modificadoPorId"
                         ],
                         "additionalProperties": false,
-                        "description": "Arte (bordado/estampado) de un modelo, con foto opcional en R2."
+                        "description": "Arte (bordado/estampado/…) de un modelo, con sus fotos en R2."
                       },
                       "description": "Artes del modelo, ya ordenados."
                     }
@@ -59864,12 +60114,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -59877,7 +60128,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -59891,13 +60143,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -59958,10 +60220,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -60422,16 +60687,21 @@
                           "arte"
                         ]
                       },
-                      "nombre": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 120
+                      "idModeloArte": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       "descripcion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "posicion": {
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 500
+                            "maxLength": 100
                           },
                           {
                             "type": "null"
@@ -60462,12 +60732,10 @@
                           }
                         ]
                       },
-                      "tipoArte": {
-                        "type": "string",
-                        "enum": [
-                          "BORDADO",
-                          "ESTAMPADO"
-                        ]
+                      "idTipoArte": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       "idProveedor": {
                         "anyOf": [
@@ -60494,8 +60762,7 @@
                       }
                     },
                     "required": [
-                      "tipo",
-                      "nombre"
+                      "tipo"
                     ]
                   }
                 ]
@@ -61167,12 +61434,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -61180,7 +61448,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -61194,13 +61463,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -61261,10 +61540,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -61627,16 +61909,16 @@
                       ]
                     }
                   },
-                  "nombre": {
+                  "descripcion": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 500
                   },
-                  "descripcion": {
+                  "posicion": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "maxLength": 500
+                        "maxLength": 100
                       },
                       {
                         "type": "null"
@@ -61654,6 +61936,11 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "idTipoArte": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "idProveedor": {
                     "anyOf": [
@@ -62374,12 +62661,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -62387,7 +62675,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -62401,13 +62690,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -62468,10 +62767,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -63444,12 +63746,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -63457,7 +63760,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -63471,13 +63775,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -63538,10 +63852,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -64498,12 +64815,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -64511,7 +64829,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -64525,13 +64844,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -64592,10 +64921,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -65527,12 +65859,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -65540,7 +65873,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -65554,13 +65888,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -65621,10 +65965,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -66556,12 +66903,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Traza al arte del modelo, o null."
-                          },
-                          "nombre": {
-                            "type": "string"
+                            "description": "Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano."
                           },
                           "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del arte EN ESTA ORDEN (el campo visible)."
+                          },
+                          "posicion": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -66569,7 +66917,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "Dónde va en la prenda (texto libre), o null."
                           },
                           "puntadas": {
                             "anyOf": [
@@ -66583,13 +66932,23 @@
                               }
                             ]
                           },
-                          "tipo_arte": {
+                          "idTipoArte": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del tipo de arte (catálogo TipoProceso)."
+                          },
+                          "tipoArte": {
                             "type": "string",
-                            "enum": [
-                              "BORDADO",
-                              "ESTAMPADO"
-                            ],
-                            "description": "Bordado o estampado/aplicación."
+                            "description": "Nombre del tipo de arte, resuelto."
+                          },
+                          "codigoTipoArte": {
+                            "type": "string",
+                            "description": "Código estable del tipo de arte (ej. \"bordado\")."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "¿El tipo de este arte usa puntadas? (§Post-F9.52.6)."
                           },
                           "precio": {
                             "anyOf": [
@@ -66650,10 +67009,13 @@
                           "enElModelo",
                           "cambios",
                           "idModeloArte",
-                          "nombre",
                           "descripcion",
+                          "posicion",
                           "puntadas",
-                          "tipo_arte",
+                          "idTipoArte",
+                          "tipoArte",
+                          "codigoTipoArte",
+                          "usaPuntadas",
                           "precio",
                           "idProveedor",
                           "proveedor",
@@ -86091,6 +86453,15 @@
           },
           {
             "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "soloArte",
+            "required": false,
+            "description": "Solo los tipos marcados como ARTE (\"true\"/\"false\"), V1-E3f."
+          },
+          {
+            "schema": {
               "default": "nombre",
               "type": "string",
               "enum": [
@@ -86155,6 +86526,25 @@
                             "type": "boolean",
                             "description": "Si el recibo de este proceso genera entrada a inventario PT (decisión (e))."
                           },
+                          "esArte": {
+                            "type": "boolean",
+                            "description": "Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58)."
+                          },
+                          "usaPuntadas": {
+                            "type": "boolean",
+                            "description": "Si el arte de este tipo lleva puntadas (§Post-F9.52.6)."
+                          },
+                          "codigoRolProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay."
+                          },
                           "activo": {
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
@@ -86199,6 +86589,9 @@
                           "codigo",
                           "nombre",
                           "generaEntradaPt",
+                          "esArte",
+                          "usaPuntadas",
+                          "codigoRolProveedor",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -86421,6 +86814,14 @@
                   "generaEntradaPt": {
                     "description": "¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.",
                     "type": "boolean"
+                  },
+                  "esArte": {
+                    "description": "¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único).",
+                    "type": "boolean"
+                  },
+                  "usaPuntadas": {
+                    "description": "¿El arte de este tipo lleva puntadas? (solo bordado en el seed).",
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -86461,6 +86862,25 @@
                     "generaEntradaPt": {
                       "type": "boolean",
                       "description": "Si el recibo de este proceso genera entrada a inventario PT (decisión (e))."
+                    },
+                    "esArte": {
+                      "type": "boolean",
+                      "description": "Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58)."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "Si el arte de este tipo lleva puntadas (§Post-F9.52.6)."
+                    },
+                    "codigoRolProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay."
                     },
                     "activo": {
                       "type": "boolean",
@@ -86506,6 +86926,9 @@
                     "codigo",
                     "nombre",
                     "generaEntradaPt",
+                    "esArte",
+                    "usaPuntadas",
+                    "codigoRolProveedor",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -86716,6 +87139,25 @@
                       "type": "boolean",
                       "description": "Si el recibo de este proceso genera entrada a inventario PT (decisión (e))."
                     },
+                    "esArte": {
+                      "type": "boolean",
+                      "description": "Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58)."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "Si el arte de este tipo lleva puntadas (§Post-F9.52.6)."
+                    },
+                    "codigoRolProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -86760,6 +87202,9 @@
                     "codigo",
                     "nombre",
                     "generaEntradaPt",
+                    "esArte",
+                    "usaPuntadas",
+                    "codigoRolProveedor",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -86946,6 +87391,14 @@
                     "description": "¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.",
                     "type": "boolean"
                   },
+                  "esArte": {
+                    "description": "¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único).",
+                    "type": "boolean"
+                  },
+                  "usaPuntadas": {
+                    "description": "¿El arte de este tipo lleva puntadas? (solo bordado en el seed).",
+                    "type": "boolean"
+                  },
                   "activo": {
                     "type": "boolean"
                   }
@@ -86998,6 +87451,25 @@
                       "type": "boolean",
                       "description": "Si el recibo de este proceso genera entrada a inventario PT (decisión (e))."
                     },
+                    "esArte": {
+                      "type": "boolean",
+                      "description": "Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58)."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "Si el arte de este tipo lleva puntadas (§Post-F9.52.6)."
+                    },
+                    "codigoRolProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -87042,6 +87514,9 @@
                     "codigo",
                     "nombre",
                     "generaEntradaPt",
+                    "esArte",
+                    "usaPuntadas",
+                    "codigoRolProveedor",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -87250,6 +87725,25 @@
                       "type": "boolean",
                       "description": "Si el recibo de este proceso genera entrada a inventario PT (decisión (e))."
                     },
+                    "esArte": {
+                      "type": "boolean",
+                      "description": "Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58)."
+                    },
+                    "usaPuntadas": {
+                      "type": "boolean",
+                      "description": "Si el arte de este tipo lleva puntadas (§Post-F9.52.6)."
+                    },
+                    "codigoRolProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -87294,6 +87788,9 @@
                     "codigo",
                     "nombre",
                     "generaEntradaPt",
+                    "esArte",
+                    "usaPuntadas",
+                    "codigoRolProveedor",
                     "activo",
                     "creadoEn",
                     "creadoPorId",

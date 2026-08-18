@@ -20,7 +20,12 @@ import type {
   Talla,
   Tela,
 } from '../../datos/index.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { redondear2 } from '../costos/decimales.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearDesarrollo } from './desarrollos.js';
@@ -38,6 +43,8 @@ import {
 } from './precostos.js';
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let clienteNegocio: Cliente;
 let departamento: ClienteDepartamento;
@@ -87,6 +94,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   clienteNegocio = await cliente.cliente.create({ data: { nombre: 'C&A' } });
   departamento = await cliente.clienteDepartamento.create({
@@ -678,14 +686,15 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     expect(restaurada.importe).toBe(100); // 2 × 50 (sugerido vigente)
   });
 
-  it('un ARTE ajustado que perdió su traza NO se duplica al recalcular (se reconoce por nombre)', async () => {
+  it('un ARTE ajustado que perdió su traza NO se duplica al recalcular (se reconoce por su texto)', async () => {
     // V1-E3d: el arte es HIJO del modelo, así que borrarlo pone `idModeloArte` del renglón en NULL
-    // (SetNull). Si el modelo vuelve a tener un arte con el MISMO nombre —recapturado, o
+    // (SetNull). Si el modelo vuelve a tener un arte con la MISMA descripción —recapturado, o
     // re-apuntado por la migración—, el renglón ajustado huérfano ya no casa por id y el arte
     // entraría DOS veces en el borrador. Con el catálogo viejo no pasaba (el id sobrevivía).
+    // V1-E3f: el texto que se compara es la `descripcion` (el `nombre` se retiró).
     const modelo = await cliente.modelo.create({ data: { codigo: 'ARTE-HUERFANO' } });
     const arte = await cliente.modeloArte.create({
-      data: { idModelo: modelo.id, nombre: 'Escudo', precio: 20 },
+      data: { idModelo: modelo.id, descripcion: 'Escudo', idTipoArte, precio: 20 },
     });
     const idProyecto = await proyectoNuevo();
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
@@ -696,11 +705,11 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     precosto = await editarLinea(sesion(), precosto.id, lineaArte.id, { precioUnit: 35 }, bd());
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'bordado')?.ajustado).toBe(true);
 
-    // El arte se borra del modelo (la traza del renglón cae a NULL) y se recaptura con el MISMO
-    // nombre: id nuevo, misma identidad de negocio.
+    // El arte se borra del modelo (la traza del renglón cae a NULL) y se recaptura con la MISMA
+    // descripción: id nuevo, misma identidad de negocio.
     await cliente.modeloArte.delete({ where: { id: arte.id } });
     await cliente.modeloArte.create({
-      data: { idModelo: modelo.id, nombre: 'Escudo', precio: 20 },
+      data: { idModelo: modelo.id, descripcion: 'Escudo', idTipoArte, precio: 20 },
     });
     expect(
       (await cliente.precostoLinea.findUniqueOrThrow({ where: { id: lineaArte.id } })).idModeloArte,

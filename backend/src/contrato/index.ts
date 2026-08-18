@@ -300,13 +300,13 @@ export {
   type AvioProveedoresLista,
 } from './esquemas/avio.js';
 
-// ── Arte del modelo (V1-E3d, §Post-F9.35): ya NO es catálogo, vive en el modelo ──
+// ── Arte del modelo (V1-E3d §Post-F9.35 + V1-E3f §Post-F9.52/.58): vive en el modelo,
+//    su tipo sale del catálogo ÚNICO (`TipoProceso.esArte`) y sus fotos son PLURALES ──
 export {
-  TIPOS_ARTE,
-  ETIQUETAS_TIPO_ARTE,
   esquemaArteCrear,
   esquemaArteEditar,
   esquemaArtePatchCuerpo,
+  esquemaArteFotoResumen,
   esquemaArteSalida,
   esquemaArtesLista,
   esquemaArteCopiarCuerpo,
@@ -316,8 +316,7 @@ export {
   esquemaArteFotoCrear,
   esquemaArteFotoSubida,
   esquemaArteFotoSalida,
-  esquemaArteFotoQuitarQuery,
-  type TipoArteClave,
+  esquemaArteFotosLista,
   type DatosArteCrear,
   type DatosArteEditar,
   type DatosArtePatchCuerpo,
@@ -329,7 +328,7 @@ export {
   type DatosArteFotoCrear,
   type ArteFotoSubida,
   type ArteFotoSalida,
-  type DatosArteFotoQuitarQuery,
+  type ArteFotosLista,
 } from './esquemas/arte.js';
 
 // ── Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos (ADR-0007) ──────

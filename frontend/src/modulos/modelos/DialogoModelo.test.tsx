@@ -31,7 +31,10 @@ vi.mock('@/api/dificultad', () => ({
 }));
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [] }, isFetching: false }),
-  useRolesProveedor: () => ({ data: [] }),
+  // V1-E3f (§Post-F9.52 punto 7): los selectores de proveedor pasaron al `ComboboxBuscable` con
+  // búsqueda en el SERVIDOR, que consume estos dos hooks.
+  useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useRolesProveedor: () => ({ data: [], isPending: false }),
 }));
 
 describe('DialogoModelo · props del importador', () => {

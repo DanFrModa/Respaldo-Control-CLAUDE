@@ -148,7 +148,13 @@ vi.mock('@/api/telas', () => ({
   useTelasCategorias: () => ({ data: { datos: [] } }),
   etiquetaUnidadTela: (unidad: 'KG' | 'M') => (unidad === 'KG' ? 'kg' : 'm'),
 }));
-vi.mock('@/api/proveedores', () => ({ useProveedores: () => ({ data: { datos: [] } }) }));
+vi.mock('@/api/proveedores', () => ({
+  useProveedores: () => ({ data: { datos: [] } }),
+  // V1-E3f (§Post-F9.52 punto 7): los selectores de proveedor pasaron al `ComboboxBuscable` con
+  // búsqueda en el SERVIDOR, que consume estos dos hooks.
+  useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+  useRolesProveedor: () => ({ data: [], isPending: false }),
+}));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
 
 describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () => {

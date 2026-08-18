@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,18 +26,24 @@ vi.mock('@/api/tela-proveedores', () => ({
 }));
 
 // Catálogo de proveedores para el selector del diálogo.
+// V1-E3f (§Post-F9.52 punto 7): el selector de proveedor de la tela pasó del `<select>` con tope
+// de 100 al `ComboboxBuscable` con búsqueda en el SERVIDOR, que consume `useProveedoresPorRol`.
+const CATALOGO_PROVEEDORES = {
+  data: {
+    datos: [
+      { id: 11, nombre: 'Textiles del Norte' },
+      { id: 12, nombre: 'Hilos SA' },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  error: null,
+};
+
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({
-    data: {
-      datos: [
-        { id: 11, nombre: 'Textiles del Norte' },
-        { id: 12, nombre: 'Hilos SA' },
-      ],
-    },
-    isPending: false,
-    isError: false,
-    error: null,
-  }),
+  useProveedores: () => CATALOGO_PROVEEDORES,
+  useProveedoresPorRol: () => CATALOGO_PROVEEDORES,
+  useRolesProveedor: () => ({ data: [], isPending: false }),
 }));
 
 function proveedorTela(sobre: Partial<TelaProveedor> = {}): TelaProveedor {
@@ -155,7 +161,13 @@ describe('<EditorProveedoresTela>', () => {
 
     await usuario.click(screen.getByTestId('nuevo-proveedor-tela'));
     const dialogo = await screen.findByRole('dialog');
-    await usuario.selectOptions(within(dialogo).getByTestId('selector-proveedor-tela'), '11');
+    // V1-E3f: el proveedor ya no se elige de un `<select>` sino del combobox con búsqueda en
+    // servidor — se abre el popover y se toca la opción.
+    await usuario.click(within(dialogo).getByTestId('selector-proveedor-tela-busqueda'));
+    // La lista vive en un PORTAL fuera del diálogo y en jsdom (sin CSS) hereda el
+    // `pointer-events:none` que radix pone en el body; el combobox elige en `mousedown`.
+    const opciones = await screen.findAllByTestId('selector-proveedor-tela-opcion');
+    fireEvent.mouseDown(opciones[0] as HTMLElement);
     await usuario.click(within(dialogo).getByTestId('maneja-precio-por-color'));
     await usuario.type(within(dialogo).getByTestId('precio-color-proveedor-1'), '42');
     await usuario.click(within(dialogo).getByTestId('guardar-proveedor-tela'));

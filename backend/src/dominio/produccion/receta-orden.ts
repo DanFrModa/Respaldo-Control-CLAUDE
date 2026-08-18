@@ -306,11 +306,11 @@ export async function copiarRecetaDelModelo(
       data: artes.map((a) => ({
         idOrden: orden.id,
         idModeloArte: a.id,
-        nombre: a.nombre,
         descripcion: a.descripcion,
+        posicion: a.posicion,
         puntadas: a.puntadas,
         precio: a.precio === null ? null : new Prisma.Decimal(a.precio),
-        tipo: a.tipo,
+        idTipoArte: a.idTipoArte,
         idProveedor: a.idProveedor,
         ...auditoria,
       })),
@@ -371,17 +371,18 @@ const SELECT_AVIO = {
 const SELECT_ARTE = {
   id: true,
   idModeloArte: true,
-  nombre: true,
   descripcion: true,
+  posicion: true,
   puntadas: true,
   precio: true,
-  tipo: true,
+  idTipoArte: true,
   idProveedor: true,
   estado: true,
   agregadoAMano: true,
   excluido: true,
   notas: true,
   proveedor: { select: { nombre: true } },
+  tipoArte: { select: { nombre: true, codigo: true, usaPuntadas: true } },
 } satisfies Prisma.OrdenArteSelect;
 
 /** Fila de tela tal como la devuelven los `select` de este módulo. */
@@ -499,11 +500,11 @@ function medidasPorTalla(
 function fotoArte(f: FilaArte): object {
   return {
     idModeloArte: f.idModeloArte,
-    nombre: f.nombre,
     descripcion: f.descripcion,
+    posicion: f.posicion,
     puntadas: f.puntadas,
     precio: dec(f.precio),
-    tipoArte: f.tipo,
+    idTipoArte: f.idTipoArte,
     idProveedor: f.idProveedor,
     estado: f.estado,
     agregadoAMano: f.agregadoAMano,
@@ -652,7 +653,7 @@ export function calcularDesalineacion(
       ...revisar(
         'arte',
         ar,
-        ar.nombre,
+        ar.descripcion,
         { orden: null, modelo: null },
         // El arte no tiene cascada de compra: su precio es uno solo (§Post-F9.35).
         { orden: ar.precio, modelo: ar.precioModelo, deCompra: false },
@@ -739,7 +740,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       tx.ordenArte.findMany({
         where: { idOrden: orden.id },
         select: SELECT_ARTE,
-        orderBy: [{ nombre: 'asc' }],
+        // V1-E3f: al retirarse el `nombre`, el orden estable es por descripción y luego por id.
+        orderBy: [{ descripcion: 'asc' }, { id: 'asc' }],
       }),
       leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
       leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
@@ -782,10 +784,14 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
 
   const telaPorId = new Map(telasModelo.map((t) => [t.idTela, t]));
   const avioPorId = new Map(aviosModelo.map((a) => [a.idAvio, a]));
-  // El arte se casa por NOMBRE dentro del modelo (su identidad, igual que en el precosteo): la
-  // traza `idModeloArte` se pone en NULL si el arte del modelo se borra, y perderla no puede
-  // significar "el modelo lo quitó" cuando sigue ahí con el mismo nombre.
-  const artePorNombre = new Map(artesModelo.map((a) => [a.nombre, a]));
+  // ⭐ V1-E3f: el arte se casa por su TRAZA `idModeloArte`, no por nombre — el nombre se retiró
+  // (§Post-F9.52 punto 1) y la traza es ahora la identidad del renglón dentro de la orden
+  // (`@@unique([idOrden, idModeloArte])`). Consecuencia buscada: si el arte del modelo se borra,
+  // la FK cae a NULL (SetNull) y el renglón congelado pasa a leerse como "ya no está en el
+  // modelo" — que es exactamente lo que pasó. Antes se casaba por nombre justo para NO decir eso
+  // cuando el arte seguía ahí con el mismo nombre; sin nombre, esa distinción ya no existe y la
+  // lectura literal de la traza es la única honesta.
+  const artePorTraza = new Map(artesModelo.map((a) => [a.id, a]));
 
   const telas: RecetaOrdenTela[] = filasTela.map((f) => {
     const delModelo = telaPorId.get(f.idTela);
@@ -848,7 +854,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
   });
 
   const artes: RecetaOrdenArte[] = filasArte.map((f) => {
-    const delModelo = artePorNombre.get(f.nombre);
+    const delModelo = f.idModeloArte === null ? undefined : artePorTraza.get(f.idModeloArte);
     return {
       id: f.id,
       tipo: 'arte' as const,
@@ -859,10 +865,13 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       enElModelo: delModelo !== undefined,
       cambios: [],
       idModeloArte: f.idModeloArte,
-      nombre: f.nombre,
       descripcion: f.descripcion,
+      posicion: f.posicion,
       puntadas: f.puntadas,
-      tipo_arte: f.tipo,
+      idTipoArte: f.idTipoArte,
+      tipoArte: f.tipoArte.nombre,
+      codigoTipoArte: f.tipoArte.codigo,
+      usaPuntadas: f.tipoArte.usaPuntadas,
       precio: dec(f.precio),
       idProveedor: f.idProveedor,
       proveedor: f.proveedor?.nombre ?? null,
@@ -875,7 +884,9 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
   // Un renglón excluido SÍ cuenta como presente — la orden ya decidió sobre él.
   const idsTelaOrden = new Set(filasTela.map((f) => f.idTela));
   const idsAvioOrden = new Set(filasAvio.map((f) => f.idAvio));
-  const nombresArteOrden = new Set(filasArte.map((f) => f.nombre));
+  const idsArteOrden = new Set(
+    filasArte.flatMap((f) => (f.idModeloArte === null ? [] : [f.idModeloArte])),
+  );
   const faltantes: { tipo: TipoRenglonRecetaClave; material: string }[] = [
     ...telasModelo
       .filter((t) => !idsTelaOrden.has(t.idTela))
@@ -884,8 +895,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       .filter((a) => !idsAvioOrden.has(a.idAvio))
       .map((a) => ({ tipo: 'avio' as const, material: `${a.clave} — ${a.descripcion}` })),
     ...artesModelo
-      .filter((a) => !nombresArteOrden.has(a.nombre))
-      .map((a) => ({ tipo: 'arte' as const, material: a.nombre })),
+      .filter((a) => !idsArteOrden.has(a.id))
+      .map((a) => ({ tipo: 'arte' as const, material: a.descripcion })),
   ];
 
   const desalineacion = calcularDesalineacion(telas, avios, artes, faltantes, ocs > 0);
@@ -1282,20 +1293,55 @@ export async function agregarRenglonReceta(
       if (datos.idProveedor != null) {
         await exigirProveedorExiste(tx, datos.idProveedor);
       }
-      const previo = await tx.ordenArte.findUnique({
-        where: { idOrden_nombre: { idOrden: orden.id, nombre: datos.nombre } },
-        select: SELECT_ARTE,
-      });
-      exigirNoEstaVivo(previo, `El arte "${datos.nombre}"`);
-      const delModeloArte = (await leerArtesModelo(tx, orden.idModelo)).find(
-        (a) => a.nombre === datos.nombre,
+      // ⭐ V1-E3f: la identidad del arte dentro de la orden es su TRAZA al arte del modelo
+      // (`@@unique([idOrden, idModeloArte])`), porque el `nombre` que la hacía se retiró
+      // (§Post-F9.52 punto 1). Dos consecuencias directas:
+      //  • **Con `idModeloArte`** se busca la lápida de ESE arte y se revive (el caso "traer al
+      //    pedido lo que el modelo agregó después"), y el arte del modelo se resuelve por id, no
+      //    por texto.
+      //  • **Sin `idModeloArte`** el renglón es AGREGADO A MANO y siempre se CREA: sin nombre no
+      //    hay con qué reconocer una lápida suya, y varios artes a mano en la misma orden son
+      //    legales (Postgres trata los NULL del unique como distintos). La descripción y el tipo
+      //    son entonces obligatorios: no hay de dónde heredarlos.
+      const delModeloArte =
+        datos.idModeloArte === undefined
+          ? undefined
+          : (await leerArtesModelo(tx, orden.idModelo)).find((a) => a.id === datos.idModeloArte);
+      if (datos.idModeloArte !== undefined && delModeloArte === undefined) {
+        throw new ErrorNoEncontrado('Arte del modelo', datos.idModeloArte);
+      }
+      const previo =
+        datos.idModeloArte === undefined
+          ? null
+          : await tx.ordenArte.findUnique({
+              where: {
+                idOrden_idModeloArte: { idOrden: orden.id, idModeloArte: datos.idModeloArte },
+              },
+              select: SELECT_ARTE,
+            });
+      exigirNoEstaVivo(
+        previo,
+        `El arte "${datos.descripcion ?? delModeloArte?.descripcion ?? ''}"`,
       );
+
+      const idTipoArte = datos.idTipoArte ?? delModeloArte?.idTipoArte;
+      const descripcion = datos.descripcion ?? delModeloArte?.descripcion;
+      if (previo === null && (idTipoArte === undefined || descripcion === undefined)) {
+        throw new ErrorValidacion(
+          'Un arte agregado a mano necesita descripción y tipo (no hay arte del modelo del que ' +
+            'heredarlos).',
+        );
+      }
+      if (datos.idTipoArte !== undefined) {
+        await exigirTipoArteExiste(tx, datos.idTipoArte);
+      }
 
       const delCuerpoArte = {
         descripcion: datos.descripcion,
+        posicion: datos.posicion,
         puntadas: datos.puntadas,
         precio: datos.precio === undefined ? undefined : precioDecimal(datos.precio),
-        tipo: datos.tipoArte,
+        idTipoArte: datos.idTipoArte,
         idProveedor: datos.idProveedor,
       };
 
@@ -1308,11 +1354,12 @@ export async function agregarRenglonReceta(
         await tx.ordenArte.create({
           data: {
             idOrden: orden.id,
-            nombre: datos.nombre,
-            descripcion: datos.descripcion ?? delModeloArte?.descripcion ?? null,
+            // Los dos ya están comprobados arriba (el `if` de más arriba corta si faltan).
+            descripcion: descripcion ?? '',
+            idTipoArte: idTipoArte ?? 0,
+            posicion: datos.posicion ?? delModeloArte?.posicion ?? null,
             puntadas: datos.puntadas ?? delModeloArte?.puntadas ?? null,
             precio: delCuerpoArte.precio ?? precioDecimal(delModeloArte?.precio ?? null),
-            tipo: datos.tipoArte ?? delModeloArte?.tipo ?? 'BORDADO',
             idProveedor: datos.idProveedor ?? delModeloArte?.idProveedor ?? null,
             idModeloArte: delModeloArte?.id ?? null,
             agregadoAMano: delModeloArte === undefined,
@@ -1320,8 +1367,9 @@ export async function agregarRenglonReceta(
               delModeloArte !== undefined &&
                 datos.precio === undefined &&
                 datos.descripcion === undefined &&
+                datos.posicion === undefined &&
                 datos.puntadas === undefined &&
-                datos.tipoArte === undefined &&
+                datos.idTipoArte === undefined &&
                 datos.idProveedor === undefined,
             ),
             ...auditoria,
@@ -1330,7 +1378,7 @@ export async function agregarRenglonReceta(
       }
       await bitacoraReceta(tx, sesion, orden.id, 'CREAR', {
         tipo: 'arte',
-        nombre: datos.nombre,
+        idModeloArte: datos.idModeloArte ?? null,
         cambios: datos,
         revivido: previo !== null,
         ...(previo === null
@@ -1445,29 +1493,19 @@ export async function editarRenglonReceta(
       if (datos.idProveedor != null) {
         await exigirProveedorExiste(tx, datos.idProveedor);
       }
-      // El nombre ES la identidad del arte dentro de la orden (`@@unique([idOrden, nombre])`), así
-      // que renombrarlo a uno ya ocupado choca con el índice. Sin este pre-chequeo Prisma tira un
-      // P2002 crudo → 500; el usuario merece un 409 que diga qué pasó. Ojo: la lápida (`excluido`)
-      // TAMBIÉN ocupa el nombre — por eso el mensaje distingue los dos casos.
-      if (datos.nombre !== undefined && datos.nombre !== fila.nombre) {
-        const choque = await tx.ordenArte.findUnique({
-          where: { idOrden_nombre: { idOrden: orden.id, nombre: datos.nombre } },
-          select: { excluido: true },
-        });
-        if (choque !== null) {
-          throw new ErrorConflicto(
-            choque.excluido
-              ? `Esta orden ya tuvo un arte llamado "${datos.nombre}" y sigue en su historial. ` +
-                  `Agrégalo de nuevo para revivirlo, o usa otro nombre.`
-              : `Esta orden ya tiene un arte llamado "${datos.nombre}". Usa otro nombre.`,
-          );
-        }
+      // V1-E3f: ya no hay choque de nombre que pre-chequear (la identidad del renglón es su traza
+      // `idModeloArte`, que esta edición NO toca). Editar la descripción de un arte a una que ya
+      // usa otro renglón de la misma orden es legal — el nombre único se retiró a propósito
+      // (§Post-F9.52 punto 1). Lo que sí se valida es el TIPO, que viene del catálogo.
+      if (datos.idTipoArte !== undefined && datos.idTipoArte !== fila.idTipoArte) {
+        await exigirTipoArteExiste(tx, datos.idTipoArte);
       }
       await tx.ordenArte.update({
         where: { id: fila.id },
         data: {
-          ...(datos.nombre === undefined ? {} : { nombre: datos.nombre }),
           ...(datos.descripcion === undefined ? {} : { descripcion: datos.descripcion }),
+          ...(datos.posicion === undefined ? {} : { posicion: datos.posicion }),
+          ...(datos.idTipoArte === undefined ? {} : { idTipoArte: datos.idTipoArte }),
           ...(datos.puntadas === undefined ? {} : { puntadas: datos.puntadas }),
           ...(datos.precio === undefined
             ? {}
@@ -1693,13 +1731,17 @@ export async function restaurarRenglonReceta(
       }
 
       const fila = await exigirRenglonArte(tx, orden.id, idRenglon);
-      const delModelo = (await leerArtesModelo(tx, orden.idModelo)).find(
-        (a) => a.nombre === fila.nombre,
-      );
+      // V1-E3f: restaurar sigue la TRAZA (`idModeloArte`), no el nombre. Un renglón que la perdió
+      // —porque el arte del modelo se borró— ya no tiene a qué volver, y tampoco lo tenía antes:
+      // el nombre solo lo disimulaba mientras existiera un arte llamado igual.
+      const delModelo =
+        fila.idModeloArte === null
+          ? undefined
+          : (await leerArtesModelo(tx, orden.idModelo)).find((a) => a.id === fila.idModeloArte);
       if (delModelo === undefined) {
         throw new ErrorConflicto(
-          `El arte "${fila.nombre}" ya no está en el modelo: no hay a qué restaurarlo. Ajústalo a ` +
-            'mano o quítalo.',
+          `El arte "${fila.descripcion}" ya no está en el modelo: no hay a qué restaurarlo. ` +
+            'Ajústalo a mano o quítalo.',
         );
       }
       await tx.ordenArte.update({
@@ -1707,9 +1749,10 @@ export async function restaurarRenglonReceta(
         data: {
           idModeloArte: delModelo.id,
           descripcion: delModelo.descripcion,
+          posicion: delModelo.posicion,
           puntadas: delModelo.puntadas,
           precio: delModelo.precio === null ? null : new Prisma.Decimal(delModelo.precio),
-          tipo: delModelo.tipo,
+          idTipoArte: delModelo.idTipoArte,
           idProveedor: delModelo.idProveedor,
           agregadoAMano: false,
           ...marca,
@@ -1919,6 +1962,25 @@ async function exigirAvioExiste(tx: Tx, idAvio: number): Promise<void> {
   }
 }
 
+/**
+ * El TIPO de arte existe, está activo y está marcado como arte (V1-E3f, catálogo único). Mismo
+ * criterio que el arte del modelo (`arte-modelo.ts`): sin la última condición se podría congelar
+ * en la orden un arte "de costura", que es justo lo que la bandera vino a evitar.
+ */
+async function exigirTipoArteExiste(tx: Tx, idTipoArte: number): Promise<void> {
+  const tipo = await tx.tipoProceso.findUnique({
+    where: { id: idTipoArte },
+    select: { nombre: true, activo: true, esArte: true },
+  });
+  if (tipo === null) throw new ErrorValidacion('El tipo de arte seleccionado no existe.');
+  if (!tipo.activo) {
+    throw new ErrorValidacion(`El tipo "${tipo.nombre}" está desactivado y no se puede usar.`);
+  }
+  if (!tipo.esArte) {
+    throw new ErrorValidacion(`El proceso "${tipo.nombre}" no está marcado como tipo de arte.`);
+  }
+}
+
 /** El proveedor existe y está activo (mismo criterio que el arte del modelo). */
 async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void> {
   const proveedor = await tx.proveedor.findUnique({
@@ -1939,8 +2001,8 @@ async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void>
 export interface RecetaParaImpreso {
   telas: { nombre: string; consumoPorPrenda: number }[];
   avios: { clave: string; descripcion: string; consumoPorPrenda: number }[];
-  /** Artes de la orden, en orden alfabético (el nombre es su identidad). */
-  artes: { nombre: string; tipo: 'BORDADO' | 'ESTAMPADO'; idModeloArte: number | null }[];
+  /** Artes de la orden, ordenados por descripción (V1-E3f: el nombre se retiró). */
+  artes: { descripcion: string; tipoArte: string; idModeloArte: number | null }[];
 }
 
 /**
@@ -1966,8 +2028,8 @@ export async function leerRecetaParaImpreso(tx: Tx, idOrden: number): Promise<Re
     }),
     tx.ordenArte.findMany({
       where: { idOrden, excluido: false },
-      select: { nombre: true, tipo: true, idModeloArte: true },
-      orderBy: { nombre: 'asc' },
+      select: { descripcion: true, idModeloArte: true, tipoArte: { select: { nombre: true } } },
+      orderBy: [{ descripcion: 'asc' }, { id: 'asc' }],
     }),
   ]);
   return {
@@ -1981,8 +2043,8 @@ export async function leerRecetaParaImpreso(tx: Tx, idOrden: number): Promise<Re
       consumoPorPrenda: num(a.consumoPorPrenda),
     })),
     artes: artes.map((a) => ({
-      nombre: a.nombre,
-      tipo: a.tipo,
+      descripcion: a.descripcion,
+      tipoArte: a.tipoArte.nombre,
       idModeloArte: a.idModeloArte,
     })),
   };

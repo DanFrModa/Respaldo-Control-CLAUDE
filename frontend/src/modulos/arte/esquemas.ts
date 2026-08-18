@@ -11,15 +11,9 @@ import { z } from 'zod';
  * usa `api/esquemas.ts`).
  */
 
-/** Tipos de arte (espejo del backend). */
-export const TIPOS_ARTE = ['BORDADO', 'ESTAMPADO'] as const;
-/** Clave de tipo de arte. */
-export type TipoArteClave = (typeof TIPOS_ARTE)[number];
-/** Etiquetas para UI de cada tipo de arte. */
-export const ETIQUETAS_TIPO_ARTE: Record<TipoArteClave, string> = {
-  BORDADO: 'Bordado',
-  ESTAMPADO: 'Estampado / aplicación',
-};
+// V1-E3f (§Post-F9.58): los tipos de arte YA NO son una lista fija en el programa — salen del
+// catálogo administrable `TipoProceso` marcado con `esArte` (`api/tipos-proceso.ts`,
+// `useTiposArte`). Por eso aquí ya no hay `TIPOS_ARTE` ni sus etiquetas.
 
 /**
  * Helper de captura para un numero OPCIONAL en un `<input type="number">`: el valor es
@@ -61,22 +55,28 @@ export function numeroOpcionalACuerpo(valor: string): number | undefined {
 }
 
 /**
- * Captura del formulario del ARTE (alta y edición comparten forma). El `nombre` es obligatorio;
- * `descripcion` es texto opcional; `puntadas`, `precio` e `idProveedor` se capturan como texto
- * (vacío = sin valor) y `tipo` siempre se elige. La FOTO no va en el schema: se sube/quita aparte
- * (presigned). Validación solo de UX: el backend re-valida (A1).
+ * Captura del formulario del ARTE (alta y edición comparten forma). V1-E3f (§Post-F9.52):
+ * la `descripcion` es el campo VISIBLE y obligatorio (el `nombre` se retiró — Daniel: *"Es
+ * completamente irrelevante el nombre del estampado"*), `posicion` es texto LIBRE, el tipo es un
+ * id del catálogo único y `puntadas`/`precio`/`idProveedor` se capturan como texto (vacío = sin
+ * valor). Las FOTOS no van en el schema: se suben/quitan aparte (presigned). Validación solo de
+ * UX: el backend re-valida (A1).
  */
 export const esquemaArteFormulario = z.object({
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  tipo: z.enum(TIPOS_ARTE, { error: 'El tipo debe ser BORDADO o ESTAMPADO' }),
   descripcion: z
+    .string({ error: 'La descripción es obligatoria' })
+    .trim()
+    .min(1, { error: 'La descripción es obligatoria' })
+    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+  /** Dónde va el arte en la prenda: frente, espalda, manga… TEXTO LIBRE (§Post-F9.52 punto 2). */
+  posicion: z
     .string()
     .trim()
-    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+    .max(100, { error: 'La posición no puede tener más de 100 caracteres' }),
+  /** Id del tipo de arte en el catálogo único. Vacío = no se eligió (obligatorio). */
+  idTipoArte: z
+    .string()
+    .refine((valor) => valor.trim() !== '', { error: 'El tipo de arte es obligatorio' }),
   puntadas: numeroOpcional({
     min: 0,
     max: 1_000_000,

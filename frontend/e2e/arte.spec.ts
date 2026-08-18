@@ -41,7 +41,11 @@ test.describe('Arte del modelo', () => {
     // ── Agregar el primer arte, con su precio (el que viaja a la OP) ────────────
     await detalle.getByTestId('agregar-arte').click();
     const dialogo = page.getByTestId('dialogo-arte');
-    await dialogo.getByTestId('arte-nombre').fill(primerArte);
+    await dialogo.getByTestId('arte-descripcion').fill(primerArte);
+    // V1-E3f: el tipo sale del CATÁLOGO único (§Post-F9.58) y es obligatorio — «Bordado» lo
+    // siembra el seed como tipo de proceso marcado `esArte`.
+    await dialogo.getByTestId('arte-tipo').selectOption({ label: 'Bordado' });
+    await dialogo.getByTestId('arte-posicion').fill('frente');
     await dialogo.getByTestId('arte-precio').fill('45');
     await page.getByTestId('guardar-arte').click();
     await expect(page.getByText('Arte agregado.')).toBeVisible();
@@ -63,8 +67,8 @@ test.describe('Arte del modelo', () => {
     // ── Un segundo arte entra AL FINAL y puede tomar el lugar de principal ──────
     await detalle.getByTestId('agregar-arte').click();
     const dialogo2 = page.getByTestId('dialogo-arte');
-    await dialogo2.getByTestId('arte-nombre').fill(segundoArte);
-    await dialogo2.getByTestId('arte-tipo').selectOption('ESTAMPADO');
+    await dialogo2.getByTestId('arte-descripcion').fill(segundoArte);
+    await dialogo2.getByTestId('arte-tipo').selectOption({ label: 'Estampado' });
     await dialogo2.getByTestId('arte-precio').fill('12');
     await page.getByTestId('guardar-arte').click();
     await expect(page.getByText('Arte agregado.')).toBeVisible();
@@ -109,7 +113,9 @@ test.describe('Galería de arte', () => {
     const detalle = await crearModeloYAbrir(page, codigo);
     await detalle.getByTestId('tab-bom-artes').click();
     await detalle.getByTestId('agregar-arte').click();
-    await page.getByTestId('dialogo-arte').getByTestId('arte-nombre').fill(nombreArte);
+    const dialogoGal = page.getByTestId('dialogo-arte');
+    await dialogoGal.getByTestId('arte-descripcion').fill(nombreArte);
+    await dialogoGal.getByTestId('arte-tipo').selectOption({ label: 'Bordado' });
     await page.getByTestId('guardar-arte').click();
     await expect(page.getByText('Arte agregado.')).toBeVisible();
 

@@ -9,6 +9,12 @@ import { z } from 'zod';
  * EDITA solo un administrador (lo decide y reaplica el servicio de dominio, A4); el resto del
  * catálogo lo administra quien tenga `tipos-proceso.administrar`.
  *
+ * ⭐ V1-E3f (§Post-F9.58/.59): este catálogo es AHORA TAMBIÉN el de TIPOS DE ARTE — Daniel:
+ * *"De acuerdo. Y un solo catálogo."*. Dos banderas nuevas: `esArte` (¿se ofrece como tipo de
+ * arte?) y `usaPuntadas` (¿su arte lleva puntadas?, §Post-F9.52 punto 6). Las edita quien
+ * administra el catálogo (a diferencia de `generaEntradaPt`, que sigue siendo admin-only: esa
+ * mueve inventario, éstas solo deciden qué se ofrece en una lista).
+ *
  * Una sola definición de reglas para UI y servidor (alimenta el OpenAPI).
  */
 
@@ -38,6 +44,14 @@ export const esquemaTipoProcesoCrear = z.object({
     .boolean({ error: 'Debe ser verdadero o falso' })
     .optional()
     .describe('¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.'),
+  esArte: z
+    .boolean({ error: 'Debe ser verdadero o falso' })
+    .optional()
+    .describe('¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único).'),
+  usaPuntadas: z
+    .boolean({ error: 'Debe ser verdadero o falso' })
+    .optional()
+    .describe('¿El arte de este tipo lleva puntadas? (solo bordado en el seed).'),
 });
 
 /** Datos validados de alta de tipo de proceso. */
@@ -68,6 +82,17 @@ export const esquemaTipoProcesoSalida = z
     generaEntradaPt: z
       .boolean()
       .describe('Si el recibo de este proceso genera entrada a inventario PT (decisión (e)).'),
+    esArte: z
+      .boolean()
+      .describe('Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58).'),
+    usaPuntadas: z.boolean().describe('Si el arte de este tipo lleva puntadas (§Post-F9.52.6).'),
+    codigoRolProveedor: z
+      .string()
+      .nullable()
+      .describe(
+        'Código del RolProveedor con el que se acota el selector de proveedores de un arte de ' +
+          'este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay.',
+      ),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
@@ -100,6 +125,10 @@ export const esquemaTiposProcesoQuery = z
       .stringbool()
       .default(false)
       .describe('Incluye los desactivados ("true"/"false").'),
+    soloArte: z
+      .stringbool()
+      .default(false)
+      .describe('Solo los tipos marcados como ARTE ("true"/"false"), V1-E3f.'),
     ordenarPor: z
       .enum(['codigo', 'nombre', 'creadoEn'])
       .default('nombre')

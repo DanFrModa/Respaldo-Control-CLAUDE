@@ -46,7 +46,7 @@ export function CopiarArteDialogo({
   const consulta = useGaleriaArte({
     pagina: 1,
     porPagina: POR_PAGINA,
-    ordenarPor: 'nombre',
+    ordenarPor: 'descripcion',
     direccion: 'asc',
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
@@ -59,7 +59,7 @@ export function CopiarArteDialogo({
       { idModelo, cuerpo: { idArteOrigen: item.id } },
       {
         onSuccess: () => {
-          toast.success(`Arte "${item.nombre}" copiado a este modelo.`);
+          toast.success(`Arte "${item.descripcion}" copiado a este modelo.`);
           alCambiarAbierto(false);
           setTextoBusqueda('');
         },
@@ -77,8 +77,8 @@ export function CopiarArteDialogo({
         <DialogHeader>
           <DialogTitle>Copiar arte de otro modelo</DialogTitle>
           <DialogDescription>
-            Trae el arte ya lleno (precio, proveedor y foto) como una copia de este modelo, para
-            ajustarla.
+            Trae el arte ya lleno (precio, proveedor y sus fotos) como una copia de este modelo,
+            para ajustarla.
           </DialogDescription>
         </DialogHeader>
 
@@ -122,7 +122,10 @@ export function CopiarArteDialogo({
                   data-testid={`copiar-arte-${item.id}`}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{item.nombre}</span>
+                    <span className="block truncate text-sm font-medium">
+                      {item.descripcion}
+                      {item.posicion === null ? '' : ` · ${item.posicion}`}
+                    </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {item.claveModelo}
                       {item.nombreModelo === null ? '' : ` · ${item.nombreModelo}`}

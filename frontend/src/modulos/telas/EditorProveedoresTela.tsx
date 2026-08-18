@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { numeroOpcionalACuerpo } from '@/api/esquemas';
-import { useProveedores } from '@/api/proveedores';
 import {
   useActualizarTelaProveedor,
   useCrearTelaProveedor,
@@ -15,7 +14,6 @@ import {
   type TelaProveedorCrear,
   type TelaProveedorEditar,
 } from '@/api/tela-proveedores';
-import type { Proveedor } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { EstadoPunto } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
@@ -29,8 +27,8 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 /** Un color de la tela (para el grid de precio por color). */
 export interface ColorTela {
@@ -40,15 +38,6 @@ export interface ColorTela {
 
 /** Formato de precio en pesos MXN. */
 const FORMATO_MONEDA = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
-
-/** Tope alto: trae todos los proveedores activos para el selector (catálogo conocido). */
-const QUERY_PROVEEDORES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /**
  * Presenta un precio (o "—" si es null / no se puede ver importes). Los importes se ocultan sin
@@ -345,10 +334,11 @@ function DialogoProveedorTela({
   const actualizar = useActualizarTelaProveedor();
   const guardando = crear.isPending || actualizar.isPending;
 
-  const catalogo = useProveedores(QUERY_PROVEEDORES);
-  const proveedoresCatalogo: Proveedor[] = catalogo.data?.datos ?? [];
-
+  // V1-E3f: el catálogo completo ya no se carga aquí — el `SelectorProveedor` busca en el
+  // SERVIDOR (§Post-F9.52 punto 7), así que no hay lista de 100 que traer ni que filtrar.
   const [idProveedor, setIdProveedor] = useState<string>('');
+  /** Nombre del proveedor elegido en el buscador (puede venir de fuera de la primera página). */
+  const [nombreElegido, setNombreElegido] = useState<string | undefined>(undefined);
   const [precio, setPrecio] = useState('');
   const [condiciones, setCondiciones] = useState('');
   const [manejaPrecioPorColor, setManejaPrecioPorColor] = useState(false);
@@ -372,9 +362,6 @@ function DialogoProveedorTela({
     }
     setGrid(armarGridColores(colores, proveedor));
   }, [abierto, proveedor, colores]);
-
-  // Proveedores disponibles en el alta: activos y no asignados aún.
-  const disponibles = proveedoresCatalogo.filter((p) => !idsAsignados.has(p.id));
 
   function cambiarPrecioColor(idColor: number, valor: string): void {
     setGrid((prev) => prev.map((r) => (r.idColor === idColor ? { ...r, precio: valor } : r)));
@@ -473,26 +460,23 @@ function DialogoProveedorTela({
               ) : (
                 <Field>
                   <FieldLabel htmlFor="tp-proveedor">Proveedor</FieldLabel>
-                  <SelectNativo
-                    id="tp-proveedor"
-                    value={idProveedor}
-                    disabled={guardando || catalogo.isPending || disponibles.length === 0}
-                    onChange={(e) => setIdProveedor(e.target.value)}
-                    data-testid="selector-proveedor-tela"
-                  >
-                    <option value="">
-                      {catalogo.isPending
-                        ? 'Cargando proveedores…'
-                        : disponibles.length === 0
-                          ? 'No hay proveedores por agregar'
-                          : 'Elige un proveedor…'}
-                    </option>
-                    {disponibles.map((p) => (
-                      <option key={p.id} value={String(p.id)}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
+                  {/* V1-E3f (§Post-F9.52 punto 7): buscador en el SERVIDOR, no un desplegable con
+                      tope de 100 — con más de cien proveedores el que se busca no aparecía. */}
+                  <SelectorProveedor
+                    idInput="tp-proveedor"
+                    idSeleccionado={idProveedor === '' ? undefined : Number(idProveedor)}
+                    nombreSeleccionado={nombreElegido}
+                    alSeleccionar={(p) => {
+                      setIdProveedor(String(p.id));
+                      setNombreElegido(p.nombre);
+                    }}
+                    alLimpiar={() => {
+                      setIdProveedor('');
+                      setNombreElegido(undefined);
+                    }}
+                    excluirIds={idsAsignados}
+                    testid="selector-proveedor-tela"
+                  />
                 </Field>
               )}
 

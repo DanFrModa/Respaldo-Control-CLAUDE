@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 
 import { useAuditoria, useModificarAuditoria } from '@/api/calidad';
 import { ETIQUETAS_TIPO_AUDITORIA, TIPOS_AUDITORIA } from '@/api/esquemas';
-import { useProveedores } from '@/api/proveedores';
 import type { AuditoriaModificar, TipoAuditoria } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +17,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 /**
  * Diálogo para MODIFICAR los datos de ENCABEZADO de una auditoría (F6-E3 — ex `CC_ModificarDatos`):
@@ -37,7 +37,6 @@ export function DialogoModificarAuditoria({
   const consulta = useAuditoria(abierto ? idAuditoria : undefined);
   const auditoria = consulta.data;
   const modificar = useModificarAuditoria();
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const [idMaquilero, setIdMaquilero] = useState('');
   const [fechaElaboracion, setFechaElaboracion] = useState('');
@@ -60,18 +59,6 @@ export function DialogoModificarAuditoria({
       setSembradoId(undefined);
     }
   }, [abierto, auditoria, sembradoId]);
-
-  // Opciones de maquilero: catálogo + el maquilero actual (por si no está entre los primeros 100).
-  const opciones = proveedores.data?.datos ?? [];
-  const actualFaltante =
-    auditoria?.idMaquilero != null && !opciones.some((p) => p.id === auditoria.idMaquilero)
-      ? [
-          {
-            id: auditoria.idMaquilero,
-            nombre: auditoria.maquilero ?? `Proveedor ${auditoria.idMaquilero}`,
-          },
-        ]
-      : [];
 
   function guardar(): void {
     if (idAuditoria === undefined) return;
@@ -114,19 +101,17 @@ export function DialogoModificarAuditoria({
           <div className="space-y-4 py-4">
             <Field>
               <FieldLabel htmlFor="mod-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="mod-maquilero"
-                value={idMaquilero}
-                onChange={(e) => setIdMaquilero(e.target.value)}
-                data-testid="modificar-maquilero"
-              >
-                <option value="">Sin maquilero</option>
-                {[...actualFaltante, ...opciones].map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E3f (§Post-F9.52 punto 7): buscador en el SERVIDOR. Antes era un `<select>`
+                  con tope de 100 que necesitaba inyectar a mano el maquilero actual "por si no
+                  está entre los primeros 100" — el síntoma del defecto que este barrido cierra. */}
+              <SelectorProveedor
+                idInput="mod-maquilero"
+                idSeleccionado={idMaquilero === '' ? undefined : Number(idMaquilero)}
+                nombreSeleccionado={auditoria.maquilero ?? undefined}
+                alSeleccionar={(p) => setIdMaquilero(String(p.id))}
+                alLimpiar={() => setIdMaquilero('')}
+                testid="modificar-maquilero"
+              />
             </Field>
 
             <Field>

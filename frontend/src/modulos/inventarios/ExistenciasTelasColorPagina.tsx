@@ -10,7 +10,6 @@ import {
   useKardexTelaColor,
   usePartidasTela,
 } from '@/api/inventario-materiales';
-import { useProveedores } from '@/api/proveedores';
 import { etiquetaUnidadTela, useTelasCategorias } from '@/api/telas';
 import type {
   ExistenciaTelaAgrupada,
@@ -32,6 +31,7 @@ import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -70,18 +70,14 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
   const busqueda = useDebounce(texto.trim(), 300);
   const [idCategoria, setIdCategoria] = useState<string>(TODOS);
   const [idProveedor, setIdProveedor] = useState<string>(TODOS);
+  /** Nombre del proveedor filtrado (el combobox busca en servidor: puede no estar en la 1ª página). */
+  const [nombreProveedor, setNombreProveedor] = useState<string | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [incluirCeros, setIncluirCeros] = useState(false);
   const [colapsadas, setColapsadas] = useState<Set<number>>(new Set());
   const [colorKardex, setColorKardex] = useState<ColorKardex | undefined>(undefined);
 
   const categorias = useTelasCategorias({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
-  const proveedores = useProveedores({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
@@ -183,20 +179,23 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
-          <SelectNativo
-            className="h-8 w-44 text-sm"
-            aria-label="Filtrar por proveedor"
-            value={idProveedor}
-            onChange={(e) => setIdProveedor(e.target.value)}
-            data-testid="telas-color-proveedor"
-          >
-            <option value={TODOS}>Todos los proveedores</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E3f (§Post-F9.52 punto 7): el filtro por proveedor busca en el SERVIDOR. Con un
+              `<select>` de 100 el proveedor por el que se quiere filtrar podía no estar. */}
+          <div className="w-56">
+            <SelectorProveedor
+              idSeleccionado={idProveedor === TODOS ? undefined : Number(idProveedor)}
+              nombreSeleccionado={nombreProveedor}
+              alSeleccionar={(p) => {
+                setIdProveedor(String(p.id));
+                setNombreProveedor(p.nombre);
+              }}
+              alLimpiar={() => {
+                setIdProveedor(TODOS);
+                setNombreProveedor(undefined);
+              }}
+              testid="telas-color-proveedor"
+            />
+          </div>
           <SelectNativo
             className="h-8 w-44 text-sm"
             aria-label="Filtrar por almacén"

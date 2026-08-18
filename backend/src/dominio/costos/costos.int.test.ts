@@ -14,7 +14,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Empresa, PrismaClient } from '../../datos/index.js';
 import { ErrorConflicto } from '../../comun/errores.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -29,6 +34,8 @@ import { guardarCostoOrden, listarCostos, obtenerCostoOrden } from './costo-orde
 import { margenesPorPedido } from './margenes.js';
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let idModelo: number;
 let idOrden: number;
@@ -54,6 +61,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   await cliente.configuracionEmpresa.create({
     data: { idEmpresa: empresa.id, utilidadSugerida: 50, regaliasBase: 10 },
@@ -75,7 +83,8 @@ beforeEach(async () => {
       telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1.5 }] }, // banderas default true
       avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 2 }] },
       // V1-E3d: el arte es HIJO del modelo, con su propio precio (ya no hay catálogo detrás).
-      artes: { create: [{ nombre: 'Logo', precio: 5 }] },
+      // V1-E3f: su tipo sale del catálogo ÚNICO (`TipoProceso` con `esArte`).
+      artes: { create: [{ descripcion: 'Logo', idTipoArte, precio: 5 }] },
     },
   });
   idModelo = modelo.id;

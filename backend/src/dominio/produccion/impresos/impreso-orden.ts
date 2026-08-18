@@ -126,8 +126,10 @@ export interface AvioImpreso {
 
 /** Un renglón de la sección ARTE (solo nombre/subtipo; SIN precio, decisión del dueño). */
 export interface ArteImpreso {
-  nombre: string;
-  tipo: 'BORDADO' | 'ESTAMPADO';
+  /** Descripción del arte (V1-E3f: el `nombre` se retiró, §Post-F9.52 punto 1). */
+  descripcion: string;
+  /** Nombre del TIPO, ya resuelto del catálogo único (ex enum BORDADO/ESTAMPADO). */
+  tipoArte: string;
 }
 
 /**
@@ -394,15 +396,25 @@ export async function armarDatosImpresoOrden(
   // El arte llega ORDENADO (`leerArtesModelo`), así que su PRIMER renglón es el PRINCIPAL: se
   // marca para que el tope de la rejilla jamás lo recorte (Daniel, jul-2026).
   // ⚠️ El recorrido va sobre `bom.artes` —que llega ORDENADO por el `orden` del modelo— y NO sobre
-  // la receta (ordenada por nombre): así el arte PRINCIPAL sigue siendo el primero del modelo y el
-  // tope de la rejilla jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden
-  // se conservan solo los artes que ESTA orden lleva; el nombre es la identidad del arte.
-  const nombresArteOrden = new Set(receta.artes.map((a) => a.nombre));
-  const artesBom = bom.artes
-    .filter((a) => nombresArteOrden.has(a.nombre))
-    .flatMap((a, i) =>
-      a.keyFoto === null ? [] : [{ titulo: a.nombre, key: a.keyFoto, principal: i === 0 }],
-    );
+  // la receta: así el arte PRINCIPAL sigue siendo el primero del modelo y el tope de la rejilla
+  // jamás lo recorta (invariante de la pieza A, Daniel jul-2026). De ese orden se conservan solo
+  // los artes que ESTA orden lleva; desde V1-E3f la identidad es la TRAZA `idModeloArte` (el
+  // nombre del arte se retiró, §Post-F9.52 punto 1) y un arte puede traer VARIAS fotos.
+  const idsArteOrden = new Set(
+    receta.artes.flatMap((a) => (a.idModeloArte === null ? [] : [a.idModeloArte])),
+  );
+  const artesBom = porRondas(
+    bom.artes
+      .filter((a) => idsArteOrden.has(a.id))
+      .map((a, i) =>
+        a.fotos.map((foto, j) => ({
+          titulo: a.descripcion,
+          key: foto.key,
+          // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
+          principal: i === 0 && j === 0,
+        })),
+      ),
+  );
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
       titulo: arte.titulo,
@@ -493,7 +505,7 @@ export async function armarDatosImpresoOrden(
     ...tabla,
     // Telas, Avíos y Arte: de la RECETA DE LA ORDEN, ya filtrada (`paraProduccion`, no excluidos).
     telas: receta.telas,
-    listaArte: receta.artes.map((a) => ({ nombre: a.nombre, tipo: a.tipo })),
+    listaArte: receta.artes.map((a) => ({ descripcion: a.descripcion, tipoArte: a.tipoArte })),
     habilitacion: receta.avios,
     fotos: fotosImpreso,
     // Primero el arte del MODELO (sus fotos), luego el subido a la orden.
@@ -678,6 +690,10 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
  * tope se aplica al arreglo completo y el arte del BOM va primero, así que un ADJUNTO recortado no
  * aparece en ningún lado salvo en el conteo del título (los bordados del BOM sí quedan siempre en la
  * lista de texto). Con 5+ bordados con foto, los adjuntos de la orden no se ven.
+ *
+ * ⭐ V1-E3f: con las fotos del arte en PLURAL, el reparto {@link porRondas} garantiza que el tope se
+ * lleve primero las fotos EXTRA de un arte y no la única foto de otro — un arte con cinco fotos ya
+ * no expulsa de la rejilla a los demás artes. Sobre los ADJUNTOS no cambia nada: siguen detrás.
  */
 export const MAX_ARTES = 4;
 
@@ -705,10 +721,41 @@ export function anteponerPrincipal(imagenes: FotoImpreso[]): FotoImpreso[] {
 }
 
 /**
+ * ⭐ Reparte las fotos de VARIOS artes **por rondas**: primero la 1ª foto de cada arte, luego la 2ª
+ * de cada uno, y así. Pura y estable (conserva el orden de los artes dentro de cada ronda).
+ *
+ * **Por qué existe** (V1-E3f, §Post-F9.52 punto 5): al pasar las fotos del arte a PLURAL, un arte
+ * con 5 fotos se comía la rejilla entera —tope {@link MAX_ARTES}— y **sacaba del impreso a todos
+ * los demás artes**. Antes no podía pasar: cada arte aportaba exactamente una imagen.
+ *
+ * **La decisión, dicha completa:** el papel del piso tiene que enseñar *qué artes lleva la prenda*,
+ * no cinco ángulos de uno. Con las rondas, mientras quepan artes distintos NINGUNO se queda sin su
+ * primera foto, y las fotos extra solo entran con el espacio que sobra. El arte PRINCIPAL sigue
+ * garantizado: su primera foto va en la ronda 1, posición 0, y `recortarArtes` la antepone.
+ * Lo que se recorta NO se esconde: el título de la sección dice cuántas se muestran del total y la
+ * lista de texto "Arte" sigue enumerando todos los artes de la orden.
+ */
+export function porRondas<T>(porArte: readonly (readonly T[])[]): T[] {
+  const maximo = porArte.reduce((max, fotos) => Math.max(max, fotos.length), 0);
+  const salida: T[] = [];
+  for (let ronda = 0; ronda < maximo; ronda += 1) {
+    for (const fotos of porArte) {
+      const foto = fotos[ronda];
+      if (foto !== undefined) {
+        salida.push(foto);
+      }
+    }
+  }
+  return salida;
+}
+
+/**
  * Aplica el tope de la rejilla de ARTES: la principal al frente ({@link anteponerPrincipal}) y las
  * primeras {@link MAX_ARTES} imágenes; devuelve además cuántas quedaron fuera (para el aviso del
  * título). Como el tope es ≥ 1 y la principal quedó en la posición 0, el ARTE PRINCIPAL nunca se
- * recorta. Función pura, exportada para probar el criterio sin renderizar.
+ * recorta. Las fotos de los artes llegan repartidas {@link porRondas}, así que el tope se lleva
+ * primero las fotos EXTRA de un arte y solo después la única foto de otro. Función pura, exportada
+ * para probar el criterio sin renderizar.
  */
 export function recortarArtes(artes: FotoImpreso[]): { mostradas: FotoImpreso[]; ocultas: number } {
   const mostradas = anteponerPrincipal(artes).slice(0, MAX_ARTES);
@@ -827,9 +874,7 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     // sí se conserva por renglón ("Bordado"/"Estampado").
     seccionLista(
       'Arte',
-      datos.listaArte.map(
-        (a) => `${a.nombre} (${a.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
-      ),
+      datos.listaArte.map((a) => `${a.descripcion} (${a.tipoArte})`),
     ),
     // "Avíos", no "Habilitación" (mismo renombrado de vocabulario de Daniel que ya rige en toda la
     // app; este archivo no se pudo tocar en su momento y quedó con el rótulo viejo).

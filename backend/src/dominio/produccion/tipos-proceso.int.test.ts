@@ -206,3 +206,94 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
     });
   });
 });
+
+/**
+ * V1-E3f (§Post-F9.58) — este catálogo es AHORA también el de TIPOS DE ARTE (Daniel: *"De acuerdo.
+ * Y un solo catálogo."*). Lo que se cuida aquí:
+ *  • el filtro `soloArte` (lo que ve la pantalla de captura del arte);
+ *  • que `esArte`/`usaPuntadas` las pueda fijar quien administra el catálogo, SIN ser admin total
+ *    (a diferencia de `generaEntradaPt`, que sí mueve inventario);
+ *  • el `codigoRolProveedor` que ACOTA el selector de proveedores del arte — y su degradado con
+ *    gracia cuando no hay rol homónimo (§Post-F9.54, principio del "proceso raro").
+ */
+describe('catálogo ÚNICO: proceso y arte (V1-E3f)', () => {
+  it('`soloArte` deja fuera a los procesos que NO son arte (la costura)', async () => {
+    await crearTipoProceso(sesionAdmin(), { codigo: 'costura', nombre: 'Costura' }, bd());
+    await crearTipoProceso(
+      sesionAdmin(),
+      { codigo: 'bordado', nombre: 'Bordado', esArte: true, usaPuntadas: true },
+      bd(),
+    );
+
+    const todos = await listarTiposProceso(sesionAdmin(), {}, bd());
+    expect(todos.total).toBe(2);
+
+    const soloArte = await listarTiposProceso(sesionAdmin(), { soloArte: true }, bd());
+    expect(soloArte.datos.map((t) => t.codigo)).toEqual(['bordado']);
+    expect(soloArte.datos[0]?.usaPuntadas).toBe(true);
+  });
+
+  it('un GESTOR (sin admin total) SÍ puede fijar y cambiar esArte/usaPuntadas', async () => {
+    const creado = await crearTipoProceso(
+      sesionGestor(),
+      { codigo: 'embosado', nombre: 'Embosado', esArte: true, usaPuntadas: false },
+      bd(),
+    );
+    // A diferencia de `generaEntradaPt`, que el servidor le descarta por no ser admin total.
+    expect(creado).toMatchObject({ esArte: true, usaPuntadas: false, generaEntradaPt: false });
+
+    const editado = await actualizarTipoProceso(
+      sesionGestor(),
+      { id: creado.id, usaPuntadas: true },
+      bd(),
+    );
+    expect(editado.usaPuntadas).toBe(true);
+
+    // Y el cambio queda en la bitácora con su de→a (A7).
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'TipoProceso', idEntidad: String(creado.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(bitacora.datos).toMatchObject({ usaPuntadas: { de: false, a: true } });
+  });
+
+  it('`codigoRolProveedor` sale del rol ACTIVO homónimo, y es null si no lo hay', async () => {
+    await cliente.rolProveedor.create({ data: { codigo: 'bordado', nombre: 'Bordador' } });
+    await cliente.rolProveedor.create({
+      data: { codigo: 'lavado', nombre: 'Lavandería', activo: false },
+    });
+    const bordado = await crearTipoProceso(
+      sesionAdmin(),
+      { codigo: 'bordado', nombre: 'Bordado', esArte: true },
+      bd(),
+    );
+    const lavado = await crearTipoProceso(
+      sesionAdmin(),
+      { codigo: 'lavado', nombre: 'Lavado', esArte: true },
+      bd(),
+    );
+    const raro = await crearTipoProceso(
+      sesionAdmin(),
+      { codigo: 'embosado', nombre: 'Embosado', esArte: true },
+      bd(),
+    );
+
+    // Con rol homónimo ACTIVO: el selector de proveedores del arte se acota a ese rol.
+    expect(bordado.codigoRolProveedor).toBe('bordado');
+    // Rol homónimo DESACTIVADO: no acota (acotar a un rol apagado dejaría la lista vacía).
+    expect(lavado.codigoRolProveedor).toBeNull();
+    // Proceso raro sin rol propio: degrada con gracia — se ofrecen TODOS los proveedores.
+    expect(raro.codigoRolProveedor).toBeNull();
+
+    // Y el listado lo resuelve igual (una sola consulta para toda la página, no N+1).
+    const pagina = await listarTiposProceso(sesionAdmin(), { soloArte: true }, bd());
+    expect(Object.fromEntries(pagina.datos.map((t) => [t.codigo, t.codigoRolProveedor]))).toEqual({
+      bordado: 'bordado',
+      lavado: null,
+      embosado: null,
+    });
+    expect(await obtenerTipoProceso(sesionAdmin(), bordado.id, bd())).toMatchObject({
+      codigoRolProveedor: 'bordado',
+    });
+  });
+});

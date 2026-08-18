@@ -2455,9 +2455,18 @@ bordado, aplicaciones, lavados. Prácticamente ya hay todo."*
 > *"Yo cambiaría el nombre a Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como
 > Telas y Avíos, le quitaría el «Vende»."*
 
-⚠️ Los nombres se siembran en `ROLES_PROVEEDOR_BASE` y el seed **actualiza el nombre si el código ya
-existe** → el deploy de este cambio **requiere `SEED_ON_START=true`**. Al construir, verificar si la
-pantalla de catálogos ya permite renombrarlos a mano (sería mejor: sin despliegue).
+⚠️ ~~Los nombres se siembran en `ROLES_PROVEEDOR_BASE` y el seed **actualiza el nombre si el código ya
+existe** → el deploy de este cambio **requiere `SEED_ON_START=true`**.~~
+
+🔴 **CORRECCIÓN (18-ago-2026) — lo tachado arriba era FALSO.** Lo detectó el coder de V1-E3f y lo
+**confirmó el reviewer independiente ejecutando**: `sembrarRolesProveedor` (`seed.ts:381-386`) usa
+`update: {}`, que **explícitamente NO toca el nombre**. Con `SEED_ON_START=true` los renombres que pidió
+Daniel **no ocurrirían** — el deploy pasaría en verde y los nombres seguirían igual, que es la peor forma
+de fallar: *en silencio y con cara de éxito*.
+
+**La etapa de proveedores necesita otra vía:** o la pantalla de catálogos permite renombrarlos a mano
+(lo mejor — sin despliegue), o un `UPDATE` acotado en la migración. **Verificar cuál antes de
+construir**, y no dar por buena esta nota sin volver a mirarla: ya mintió una vez.
 
 **2. ⭐ El principio del "proceso raro" — vale más que el renombre.**
 
@@ -2872,3 +2881,204 @@ son **irrecuperables por diseño**. Procedimiento completo en `docs/GUIA-RAILWAY
 
 - **Aplica en:** V1-E6a. Sin permisos ni contrato nuevos; una migración aditiva (`respaldo_corrida`).
 - **Fecha:** 2026-08-17.
+
+---
+
+#### (Post-F9.63) — El nombre del arte SE RETIRA: basta la descripción (DANIEL, 17-ago-2026)
+
+> Daniel, viendo la pantalla: *"Es completamente irrelevante el nombre del estampado. Creo que con la
+> descripción sería suficiente. **¿Es indispensable el nombre para el funcionamiento del sistema?**"*
+
+La pregunta tenía respuesta técnica: **sí lo era, pero no por el negocio.** El `nombre` era la **llave**
+(`@@unique([idModelo, nombre])` en `ModeloArte`, `@@unique([idOrden, nombre])` en `OrdenArte`) y el
+desempate del orden de despliegue. No se podía borrar sin reemplazar la identidad.
+
+**Cómo quedó:**
+
+- `descripcion` pasa a ser el campo visible y **requerido**; `nombre` se **retira** de ambas tablas.
+- La migración **conserva el dato**: donde `descripcion` venía vacía (NULL, `''` o solo espacios), se
+  llena con el `nombre` actual. **Nada se pierde en silencio** (D3). *(El reviewer verificó que sin ese
+  relleno, artes como "LOGO FRENTE" se degradaban a "Arte 1" **sin tronar** — el relleno es cargante,
+  no cosmético.)*
+- La identidad pasa al propio registro; en `OrdenArte`, a `(idOrden, idModeloArte)`, con NULL para los
+  agregados a mano —por eso caben varios—.
+- El orden lo da el campo `orden` que ya existía, con desempate por `id`.
+
+⚠️ **Dos consecuencias dichas, no calladas.** (1) Se **pierde** la red que impedía dos artes con el mismo
+nombre en un modelo; queda un aviso en pantalla que **no bloquea**. (2) El histórico (todo en `orden` 0)
+pasa a listarse **por antigüedad de captura y no alfabéticamente**; se corrige con un clic en
+"principal".
+
+- **Aplica en:** V1-E3f. Migración con relleno; sin permisos nuevos.
+- **Fecha:** 2026-08-17.
+
+---
+
+#### (Post-F9.64) — La curva de tallas es una GUÍA, no una jaula — y el sistema debe AVISAR (DANIEL, 17-ago-2026)
+
+> Daniel: *"¿Qué pasa si se pensó para una curva CH-M-G-EX y en la producción nos piden una talla más,
+> XCH-CH-M-G-EX? A la hora de pasar la info a producción ¿podemos agregar la medida de la talla
+> adicional?"*
+
+**Sí se puede, y ya funcionaba** (verificado en código antes de responder): `ModeloAvioTalla` se lleva
+**por talla**, no colgada de la curva. `listarMedidas` ya devuelve las tallas de la curva **más** las
+capturadas que ya no están en ella, marcadas `enCurva: false`, con la razón escrita en el propio código:
+*"para no perderlas en silencio si alguien cambió la curva después"*.
+
+**El hueco:** si la orden pide una talla y ese avío **no tiene medida capturada**. Daniel: **"Sí. Haz el
+ajuste porfa. Que sí avise."**
+
+🔴 **CORRECCIÓN (18-ago-2026) — la primera redacción de este párrafo era FALSA en dos puntos.** Decía que
+*"el renglón sale en cero"* y que *"nadie avisa"*. Lo escribió el lead a partir de su propia lectura del
+código, sin verificarlo; lo desmintió el reviewer de V1-E3f, ejecutando:
+
+1. **NO sale en cero.** `receta-avios.ts:56` cae al **consumo por prenda**: `requerido += consumoPorPrenda
+   * piezas`.
+2. **El MRP SÍ avisa.** `mrp.ts:510-514` empuja el aviso literal *"Avío …: sin medida por talla (R18)
+   para \<tallas\>; se usó el consumo por prenda"*, y la cabecera del módulo declara la política: *"los
+   casos ambiguos NO truenan en silencio: van a `avisos`"*.
+
+**El hueco real es más chico y más preciso**, y lo dice el propio código en `receta-avios.ts:9-10`: *"se
+reportan en `tallasSinMedida` para que el llamador decida si avisa (**el MRP arma un aviso con las
+etiquetas; la habilitación lo ignora**)"*. O sea: **el mecanismo YA EXISTE y YA ES COMPARTIDO** — lo que
+falta es que **la habilitación/producción y la pantalla lo usen**.
+
+⚠️ **Por qué importa la corrección:** si se construye sobre la redacción vieja, se construye **un aviso
+que ya existe** y se duplica. Y es la **segunda** nota de este archivo que se quema por lo mismo en dos
+días (ver §Post-F9.54): **una afirmación sobre el sistema, escrita sin ejecutar**.
+
+**Criterios cerrados con él:**
+
+- **AVISA, NO BLOQUEA.** Dijo *"que sí avise"*, no *"que no deje"*: bloquear pararía producción legítima
+  —la talla de última hora es exactamente el caso que describió—.
+- Solo tallas que la orden **realmente pide** (cantidad > 0 en la matriz color×talla, D4).
+- Solo avíos con consumo **por talla**; los de consumo plano no entran (serían ruido).
+- Distinguir **"no capturada"** de **"capturada en cero"**: un cero deliberado no es un olvido y no debe
+  gritar igual. El dominio ya los separa (`consumo: null` vs `0`).
+
+- **Aplica en:** V1-E3g (etapa propia; toca producción y merece su revisión).
+- **Fecha:** 2026-08-17.
+
+---
+
+#### (Post-F9.65) — La sección «Clasificación» del modelo abre por defecto (DANIEL, 17-ago-2026)
+
+> Daniel, buscando dónde asignar la curva de tallas: *"no sé dónde hacerlo… no lo veo"*. Y al
+> explicarle que estaba en una sección plegada: *"Sí, está bien que la abras. Creo que es información
+> que vamos a tener en la mayoría de los modelos."*
+
+El diálogo del modelo tiene tres secciones plegables y `defaultValue={['identidad','costos']}` dejaba
+**Clasificación** cerrada — justo donde viven **curva de tallas, temporada y género**. La sección dejó de
+ser el rincón de lo excepcional, así que abre sola.
+
+*(Se registra aquí porque el reviewer de V1-E3f levantó, con razón, que el cambio se justificaba en el
+código con una cita de Daniel **que no existía en ningún documento del repo**. La cita es real —dicha en
+vivo el 17-ago—; lo que faltaba era esto.)*
+
+- **Aplica en:** V1-E3f (una línea en `DialogoModelo.tsx`). Sin migración, permisos ni contrato.
+- **Fecha:** 2026-08-17.
+
+---
+
+#### (Post-F9.67) — ⭐ Los perfiles NO van en cascada: van por PUESTO, y se suman (DANIEL, 18-ago-2026)
+
+> Daniel, sin que se lo preguntaran: *"El sistema de perfiles en cascada lo hice al principio pero **dejó
+> de funcionar. No es funcional. No me gusta por cascada.** Mejor definir permisos directos por persona.
+> O por perfil de puesto."*
+
+**Lo que había, y por qué estaba mal.** El seed trae **ocho roles construidos por RESTA** —Administrador,
+Directivo, Gerencial, Ventas, Logística, Asistente, Secretarial, Básico—, cada uno un subconjunto estricto
+del anterior. Están anotados en el propio código con la frase *"absorbe el nivel 45"*: son la **traducción
+literal de los niveles del Access viejo** (30, 40, 45, 47, 50, 60, 100).
+
+⚠️ **Y eso los volvía la reconstrucción del sistema equivocado.** `10-Modelo-Datos-y-Usuarios.md` ya decía
+que en el Access convivían **DOS** sistemas de seguridad —los niveles en cascada y los accesos granulares
+por persona (`Accesos` + `UsuAccesos`)— y que **el que se usaba era el granular**. La ingeniería inversa lo
+tenía documentado; el seed reprodujo el que Daniel ya había abandonado. Su incomodidad no era preferencia:
+era que se copió lo que no servía.
+
+**Lo que el modelo YA aguanta (verificado en `schema.prisma`, no supuesto):** `UsuarioRol` es **N:N** y
+`RolPermiso` es **N:N**. O sea que **un usuario puede tener VARIOS roles y sus permisos son la UNIÓN**. La
+cascada no existe en el modelo de datos — solo en cómo se llenaron esos ocho roles. **No hace falta
+migración para cambiar de enfoque.**
+
+**Cómo quedan:**
+
+- **Perfiles por PUESTO**, no por nivel: *Cortador*, *Almacenista*, *Compras*, *Calidad*, *Contabilidad*…
+  Cada uno con lo que ese puesto necesita, **sin importar quién está "arriba" de quién**.
+- **Excepciones por persona = perfiles chicos SUMABLES**, de una sola capacidad: *Ve costos*, *Autoriza
+  compras*, *Aprueba precios*. Alguien es **Compras + Ve costos**; otro es **Compras** a secas. Da
+  granularidad por persona **sin** configurar permiso por permiso, que es justo donde el sistema viejo se
+  volvió inmanejable.
+- **Los ocho perfiles heredados se RETIRAN** al construir los nuevos.
+
+**Criterio de reparto (del lead, aceptado como marco de la revisión):** de los 120 permisos, solo dos
+familias son de verdad delicadas — **lo que toca dinero** (costos, precios, finanzas) y **lo que
+autoriza** (compras, listas de precios), más un tercer grupo de **operaciones peligrosas** (deshacer,
+antedatar, dejar existencias en negativo). En todo lo demás conviene ser **generoso**: *si alguien se topa
+con «no tienes permiso» en su primera semana, deja de usar el sistema y se regresa al papel*. Es más fácil
+apretar después con un caso real que recuperar a alguien que ya se fue.
+
+**Los 13 puestos que Daniel definió (18-ago-2026):** Daniel (todo) · **Aurora** (gerente general y de
+ventas — **SIN estado de resultados**, y algunos reportes de finanzas por definir) · Producción · Compras ·
+Habilitaciones · Recibo de mercancía · Encargado de telas · Calidad · Administración y finanzas ·
+Desarrollo de producto · **Gestión técnica** (2ª etapa: fichas técnicas) · Trazador · Entregas.
+
+**Instrumento de trabajo:** matriz de **65 capacidades × 13 puestos** (que cubre los 120 permisos, cuadrado
+sin faltantes ni sobrantes), entregada a Daniel para afinar. Seis cruces quedaron marcados como pregunta
+abierta.
+
+- **Aplica en:** etapa de perfiles y permisos (previa al go-live). **Sin migración** — el modelo ya lo
+  soporta.
+- **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.68) — Esconder, no negar: la UI no enseña lo que el usuario no puede usar (DANIEL, 18-ago-2026)
+
+> Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen
+> acceso a costos, en lugar de mandarle un mensaje diciendo que no tienen permiso para verlo, mejor que
+> les borre esa opción.**"*
+
+**El principio ya existía** (A4: *"la UI esconde lo que no le toca al usuario, no lo informa"*) y **el
+menú ya lo cumple**: `frontend/src/modulos/catalogo.ts` declara el permiso de cada una de sus ~116
+entradas y un grupo aparece solo si alguna hoja hija es visible; ⌘K usa el mismo filtro.
+
+⚠️ **Pero adentro de las pantallas NO se aplica parejo** (verificado, no supuesto): `ImportarCfdiPagina`
+dice *"No tienes permiso para importar CFDI (requiere administrar CxP)"* —que además **nombra el permiso
+que falta**, o sea le cuenta al usuario la forma del sistema—, `ProgramarRcPagina` dice *"No tienes
+permiso para programar la Ruta Crítica"*, y `SeccionDesarrolloOrden` pinta *"Sin permiso de importes"*
+donde va el precio. **Medido:** 124 pantallas, **39 sin ninguna consulta de permiso**.
+
+**Las dos reglas finas, cerradas con Daniel:**
+
+1. **Columna entera, no celda vacía.** Si un dato desaparece por permiso, se va **con su encabezado**.
+   Una celda vacía haría creer que el dato **no existe** o que el sistema falló — peor que el letrero que
+   se está quitando.
+2. **La excepción legítima es el enlace compartido.** Quien reciba la URL de una pantalla que no puede
+   ver **sí** debe leer algo, o parecería que el sistema se rompió: *"Esta pantalla no está disponible
+   para tu usuario."* **Sin** nombrar el permiso, sin sugerir a quién pedirlo, sin código de error.
+
+**⭐ Y las TRES CAPAS, petición expresa de Daniel:** *"Podemos intentar ocultar botones mientras se pueda
+y al mismo tiempo bloquear pantallas para asegurarnos que no haya una puerta que no estemos viendo. Así
+aseguramos que no entran, y al mismo tiempo intentamos que no sea ofensivo para el usuario."*
+
+| Capa | Qué hace | Estado (verificado 18-ago) |
+|---|---|---|
+| **Menú** | esconde la opción | ✅ ya funciona |
+| **Ruta** | cierra la pantalla | 🔴 **NO EXISTE** |
+| **Backend** | rechaza la operación | ✅ ya funciona |
+
+🔴 **La capa de en medio falta.** `sesion/RutaProtegida.tsx` verifica **solo que haya sesión** —lo dice su
+propio comentario: *"Es solo la PRIMERA barrera (UX)"*— y de las **135 rutas de `App.tsx` solo 2 mencionan
+permisos**. Quien teclee la URL de una pantalla que no le toca **entra**, ve encabezados y botones, y la
+pantalla falla al cargar. **No es agujero de seguridad** (el backend rechaza), pero es exactamente la
+puerta que Daniel intuyó sin verla. Las rutas deben tomar su permiso de `catalogo.ts` —**una sola
+fuente**—, no de una lista nueva que se desalinearía con el tiempo.
+
+**Regla que NO se negocia:** esconder es **de presentación**. El backend sigue devolviendo 403/404 como
+corresponde; **la seguridad nunca depende de que la UI no muestre el botón**. Si al barrer aparece un
+endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**, no una nota.
+
+- **Aplica en:** V1-E6b. Sin migración, sin permisos nuevos, sin contrato.
+- **Fecha:** 2026-08-18.

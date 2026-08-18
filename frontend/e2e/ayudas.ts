@@ -96,16 +96,35 @@ export async function crearColorYTalla(
 }
 
 /**
+ * Elige una opción en CUALQUIER `ComboboxBuscable` con búsqueda server-side: teclea el texto y
+ * toca la primera opción de la lista.
+ *
+ * Es la interacción que reemplazó al `selectOption` en todas las pantallas donde un `<select>` con
+ * tope de 100 escondía lo que se buscaba (clientes V1-E4 punto 7; proveedores, telas, avíos y
+ * maquileros en V1-E3f §Post-F9.52 punto 7). **Si una pantalla cambia de desplegable a combobox,
+ * su e2e se pasa a este ayudante** — es la cicatriz de `CLAUDE.md` §8 aplicada a los selectores.
+ *
+ * `contenedor` acota la búsqueda del INPUT (típicamente el diálogo); la LISTA se busca desde
+ * `page` porque el popover se PORTA a `document.body` y escapa del `<dialog>`. El `click` de
+ * Playwright espera a que la opción exista, así que absorbe el debounce (300 ms) y el viaje al
+ * servidor sin necesidad de esperas explícitas.
+ */
+export async function elegirEnCombobox(
+  page: Page,
+  contenedor: Locator,
+  texto: string,
+  testid: string,
+): Promise<void> {
+  await contenedor.getByTestId(`${testid}-busqueda`).fill(texto);
+  await page.getByTestId(`${testid}-opcion`).first().click();
+}
+
+/**
  * Elige un CLIENTE en el combobox con búsqueda server-side (V1-E4 punto 7).
  *
  * Antes era un `<select>` alimentado de la primera página del catálogo (`porPagina: 100`, que
  * además es el tope del contrato de paginación): con ~117 clientes activos, los del final del
- * alfabeto NO APARECÍAN y quedaban inalcanzables — sin error, sin aviso. Ahora se teclea y el
- * servidor busca, así que la interacción del e2e cambió de `selectOption` a "teclear + elegir".
- *
- * `contenedor` acota la búsqueda del input (típicamente el diálogo); la LISTA de opciones se
- * renderiza en el mismo contenedor del combobox, pero se busca desde `page` porque puede escapar
- * del `<dialog>` en algunos layouts.
+ * alfabeto NO APARECÍAN y quedaban inalcanzables — sin error, sin aviso.
  */
 export async function elegirCliente(
   page: Page,
@@ -113,6 +132,21 @@ export async function elegirCliente(
   nombre: string,
   testid = 'selector-cliente',
 ): Promise<void> {
-  await contenedor.getByTestId(`${testid}-busqueda`).fill(nombre);
-  await page.getByTestId(`${testid}-opcion`).first().click();
+  await elegirEnCombobox(page, contenedor, nombre, testid);
+}
+
+/**
+ * Elige un PROVEEDOR (o maquilero) en su combobox — V1-E3f, §Post-F9.52 punto 7: era la CUARTA vez
+ * que el mismo defecto del `<select>` con tope de 100 aparecía, así que ocho pantallas pasaron al
+ * `SelectorProveedor` de una vez. El `testid` cambia según la pantalla
+ * (`agregar-proveedor-avio`, `selector-proveedor-tela`, `arte-proveedor`, `orden-maquilero`,
+ * `modelo-maquilero`, `modificar-maquilero`, `historial-maquilero`, `telas-color-proveedor`).
+ */
+export async function elegirProveedor(
+  page: Page,
+  contenedor: Locator,
+  nombre: string,
+  testid = 'selector-proveedor',
+): Promise<void> {
+  await elegirEnCombobox(page, contenedor, nombre, testid);
 }

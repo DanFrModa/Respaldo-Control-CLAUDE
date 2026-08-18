@@ -1183,9 +1183,10 @@ function SeccionArtes({
           {receta.artes.map((a: RecetaOrdenArte) => (
             <TablaDensaFila key={a.id} className={claseFila(a.excluido)}>
               <TablaDensaCelda>
-                <span className="text-sm">{a.nombre}</span>
+                <span className="text-sm">{a.descripcion}</span>
                 <span className="ml-1 text-xs text-muted-foreground">
-                  ({a.tipo_arte === 'BORDADO' ? 'bordado' : 'estampado'})
+                  ({a.tipoArte.toLocaleLowerCase('es')}
+                  {a.posicion === null ? '' : ` · ${a.posicion}`})
                 </span>
               </TablaDensaCelda>
               <TablaDensaCelda>
@@ -1217,7 +1218,7 @@ function SeccionArtes({
                   enElModelo={a.enElModelo}
                   excluido={a.excluido}
                   alRestaurar={() => alRestaurar(a.id)}
-                  alQuitar={() => alQuitar(a.id, a.nombre)}
+                  alQuitar={() => alQuitar(a.id, a.descripcion)}
                   testid={`receta-arte-${a.id}`}
                 />
               </TablaDensaCelda>

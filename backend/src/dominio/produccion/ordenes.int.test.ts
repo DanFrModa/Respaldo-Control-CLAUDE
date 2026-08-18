@@ -13,7 +13,12 @@ import type {
   PrismaClient,
   Talla,
 } from '../../datos/index.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearArte } from '../modelos/arte-modelo.js';
 import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
@@ -42,6 +47,8 @@ import { agregarRenglonReceta, liberarReceta, marcarRecetaRevisada } from './rec
  */
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let clienteNegocio: Cliente;
 let otroCliente: Cliente;
@@ -95,6 +102,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
   otroCliente = await cliente.cliente.create({ data: { nombre: 'Coppel' } });
@@ -465,10 +473,10 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     // ⭐ V1-E3d: capturar el arte en el MODELO ya no alcanza a la orden (su receta está congelada);
     // el arte se agrega a la RECETA DE LA ORDEN, y ahí sí la completa.
     const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
-    await crearArte(
+    const arteModelo = await crearArte(
       sAdmin,
       conArte.id,
-      { nombre: 'Logo pecho', tipo: 'BORDADO', precio: 10 },
+      { descripcion: 'Logo pecho', idTipoArte, precio: 10 },
       bd(),
     );
     expect((await obtenerOrden(s, orden.id, bd())).requisitos.arte).toBe(false);
@@ -476,7 +484,7 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     await agregarRenglonReceta(
       sesion(['desarrollo.administrar', ...PERM_TODOS]),
       orden.id,
-      { tipo: 'arte', nombre: 'Logo pecho', tipoArte: 'BORDADO', precio: 10 },
+      { tipo: 'arte', idModeloArte: arteModelo.id, precio: 10 },
       bd(),
     );
     // Meter material a una receta ya liberada la RE-ABRE (la firma de Desarrollo se revoca), así que

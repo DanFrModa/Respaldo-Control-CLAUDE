@@ -12908,25 +12908,35 @@ export interface paths {
                 id: number;
                 /** @description Id del modelo dueño del arte. */
                 idModelo: number;
-                /** @description Nombre del arte. */
-                nombre: string;
-                /** @description Descripción, o null. */
-                descripcion: string | null;
+                /** @description Descripción del arte (el campo visible desde V1-E3f). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 /** @description Número de puntadas (informativo), o null. */
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Id del proveedor que lo hace, o null. */
                 idProveedor: number | null;
                 /** @description Nombre del proveedor que lo hace, o null. */
                 proveedor: string | null;
-                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-                idArchivoFoto: string | null;
+                /** @description Fotos del arte, ordenadas. */
+                fotos: {
+                  /** @description Id del renglón de foto (ModeloArteFoto). */
+                  idFoto: number;
+                  /** @description Id del Archivo en R2. */
+                  idArchivo: string;
+                  /** @description Posición de la foto dentro del arte (0 = la primera). */
+                  orden: number;
+                }[];
                 /** @description Posición dentro del modelo (0 = arte principal). */
                 orden: number;
                 /**
@@ -14080,7 +14090,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Artes (bordados/estampados) de un modelo. */
+        /** @description Artes (bordados/estampados/…) de un modelo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -14093,25 +14103,35 @@ export interface paths {
                 id: number;
                 /** @description Id del modelo dueño del arte. */
                 idModelo: number;
-                /** @description Nombre del arte. */
-                nombre: string;
-                /** @description Descripción, o null. */
-                descripcion: string | null;
+                /** @description Descripción del arte (el campo visible desde V1-E3f). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 /** @description Número de puntadas (informativo), o null. */
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Id del proveedor que lo hace, o null. */
                 idProveedor: number | null;
                 /** @description Nombre del proveedor que lo hace, o null. */
                 proveedor: string | null;
-                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-                idArchivoFoto: string | null;
+                /** @description Fotos del arte, ordenadas. */
+                fotos: {
+                  /** @description Id del renglón de foto (ModeloArteFoto). */
+                  idFoto: number;
+                  /** @description Id del Archivo en R2. */
+                  idArchivo: string;
+                  /** @description Posición de la foto dentro del arte (0 = la primera). */
+                  orden: number;
+                }[];
                 /** @description Posición dentro del modelo (0 = arte principal). */
                 orden: number;
                 /**
@@ -14229,21 +14249,17 @@ export interface paths {
       requestBody: {
         content: {
           'application/json': {
-            nombre: string;
-            descripcion?: string;
+            descripcion: string;
+            posicion?: string;
             puntadas?: number;
             precio?: number;
-            /**
-             * @default BORDADO
-             * @enum {string}
-             */
-            tipo?: 'BORDADO' | 'ESTAMPADO';
+            idTipoArte: number;
             idProveedor?: number;
           };
         };
       };
       responses: {
-        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        /** @description Arte (bordado/estampado/…) de un modelo, con sus fotos en R2. */
         201: {
           headers: {
             [name: string]: unknown;
@@ -14254,25 +14270,35 @@ export interface paths {
               id: number;
               /** @description Id del modelo dueño del arte. */
               idModelo: number;
-              /** @description Nombre del arte. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
+              /** @description Descripción del arte (el campo visible desde V1-E3f). */
+              descripcion: string;
+              /** @description Dónde va en la prenda (texto libre), o null. */
+              posicion: string | null;
               /** @description Número de puntadas (informativo), o null. */
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del tipo de arte (catálogo TipoProceso). */
+              idTipoArte: number;
+              /** @description Nombre del tipo de arte, resuelto. */
+              tipoArte: string;
+              /** @description Código estable del tipo de arte (ej. "bordado"). */
+              codigoTipoArte: string;
+              /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+              usaPuntadas: boolean;
               /** @description Id del proveedor que lo hace, o null. */
               idProveedor: number | null;
               /** @description Nombre del proveedor que lo hace, o null. */
               proveedor: string | null;
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
+              /** @description Fotos del arte, ordenadas. */
+              fotos: {
+                /** @description Id del renglón de foto (ModeloArteFoto). */
+                idFoto: number;
+                /** @description Id del Archivo en R2. */
+                idArchivo: string;
+                /** @description Posición de la foto dentro del arte (0 = la primera). */
+                orden: number;
+              }[];
               /** @description Posición dentro del modelo (0 = arte principal). */
               orden: number;
               /**
@@ -14512,18 +14538,17 @@ export interface paths {
       requestBody: {
         content: {
           'application/json': {
-            nombre?: string;
-            descripcion?: string | null;
+            descripcion?: string;
+            posicion?: string | null;
             puntadas?: number | null;
             precio?: number | null;
-            /** @enum {string} */
-            tipo?: 'BORDADO' | 'ESTAMPADO';
+            idTipoArte?: number;
             idProveedor?: number | null;
           };
         };
       };
       responses: {
-        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        /** @description Arte (bordado/estampado/…) de un modelo, con sus fotos en R2. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -14534,25 +14559,35 @@ export interface paths {
               id: number;
               /** @description Id del modelo dueño del arte. */
               idModelo: number;
-              /** @description Nombre del arte. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
+              /** @description Descripción del arte (el campo visible desde V1-E3f). */
+              descripcion: string;
+              /** @description Dónde va en la prenda (texto libre), o null. */
+              posicion: string | null;
               /** @description Número de puntadas (informativo), o null. */
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del tipo de arte (catálogo TipoProceso). */
+              idTipoArte: number;
+              /** @description Nombre del tipo de arte, resuelto. */
+              tipoArte: string;
+              /** @description Código estable del tipo de arte (ej. "bordado"). */
+              codigoTipoArte: string;
+              /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+              usaPuntadas: boolean;
               /** @description Id del proveedor que lo hace, o null. */
               idProveedor: number | null;
               /** @description Nombre del proveedor que lo hace, o null. */
               proveedor: string | null;
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
+              /** @description Fotos del arte, ordenadas. */
+              fotos: {
+                /** @description Id del renglón de foto (ModeloArteFoto). */
+                idFoto: number;
+                /** @description Id del Archivo en R2. */
+                idArchivo: string;
+                /** @description Posición de la foto dentro del arte (0 = la primera). */
+                orden: number;
+              }[];
               /** @description Posición dentro del modelo (0 = arte principal). */
               orden: number;
               /**
@@ -14680,7 +14715,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Artes (bordados/estampados) de un modelo. */
+        /** @description Artes (bordados/estampados/…) de un modelo. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -14693,25 +14728,35 @@ export interface paths {
                 id: number;
                 /** @description Id del modelo dueño del arte. */
                 idModelo: number;
-                /** @description Nombre del arte. */
-                nombre: string;
-                /** @description Descripción, o null. */
-                descripcion: string | null;
+                /** @description Descripción del arte (el campo visible desde V1-E3f). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 /** @description Número de puntadas (informativo), o null. */
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Id del proveedor que lo hace, o null. */
                 idProveedor: number | null;
                 /** @description Nombre del proveedor que lo hace, o null. */
                 proveedor: string | null;
-                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-                idArchivoFoto: string | null;
+                /** @description Fotos del arte, ordenadas. */
+                fotos: {
+                  /** @description Id del renglón de foto (ModeloArteFoto). */
+                  idFoto: number;
+                  /** @description Id del Archivo en R2. */
+                  idArchivo: string;
+                  /** @description Posición de la foto dentro del arte (0 = la primera). */
+                  orden: number;
+                }[];
                 /** @description Posición dentro del modelo (0 = arte principal). */
                 orden: number;
                 /**
@@ -14845,12 +14890,12 @@ export interface paths {
         content: {
           'application/json': {
             idArteOrigen: number;
-            nombre?: string;
+            descripcion?: string;
           };
         };
       };
       responses: {
-        /** @description Arte (bordado/estampado) de un modelo, con foto opcional en R2. */
+        /** @description Arte (bordado/estampado/…) de un modelo, con sus fotos en R2. */
         201: {
           headers: {
             [name: string]: unknown;
@@ -14861,25 +14906,35 @@ export interface paths {
               id: number;
               /** @description Id del modelo dueño del arte. */
               idModelo: number;
-              /** @description Nombre del arte. */
-              nombre: string;
-              /** @description Descripción, o null. */
-              descripcion: string | null;
+              /** @description Descripción del arte (el campo visible desde V1-E3f). */
+              descripcion: string;
+              /** @description Dónde va en la prenda (texto libre), o null. */
+              posicion: string | null;
               /** @description Número de puntadas (informativo), o null. */
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
-              /**
-               * @description BORDADO real o ESTAMPADO/aplicación.
-               * @enum {string}
-               */
-              tipo: 'BORDADO' | 'ESTAMPADO';
+              /** @description Id del tipo de arte (catálogo TipoProceso). */
+              idTipoArte: number;
+              /** @description Nombre del tipo de arte, resuelto. */
+              tipoArte: string;
+              /** @description Código estable del tipo de arte (ej. "bordado"). */
+              codigoTipoArte: string;
+              /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+              usaPuntadas: boolean;
               /** @description Id del proveedor que lo hace, o null. */
               idProveedor: number | null;
               /** @description Nombre del proveedor que lo hace, o null. */
               proveedor: string | null;
-              /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-              idArchivoFoto: string | null;
+              /** @description Fotos del arte, ordenadas. */
+              fotos: {
+                /** @description Id del renglón de foto (ModeloArteFoto). */
+                idFoto: number;
+                /** @description Id del Archivo en R2. */
+                idArchivo: string;
+                /** @description Posición de la foto dentro del arte (0 = la primera). */
+                orden: number;
+              }[];
               /** @description Posición dentro del modelo (0 = arte principal). */
               orden: number;
               /**
@@ -14987,14 +15042,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/modelos/{id}/artes/{idArte}/foto': {
+  '/api/modelos/{id}/artes/{idArte}/fotos': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Obtener la foto de un arte (URL prefirmada de descarga) */
+    /** Listar las fotos de un arte (URLs prefirmadas de descarga) */
     get: {
       parameters: {
         query?: never;
@@ -15009,23 +15064,30 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Foto de un arte (con su URL de descarga) o vacía si no tiene. */
+        /** @description Fotos de un arte, cada una con su URL prefirmada. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Id del registro Archivo de la foto, o null. */
-              idArchivo: string | null;
-              /** @description Nombre original del archivo, o null. */
-              nombreOriginal: string | null;
-              /** @description Tipo MIME de la imagen, o null. */
-              tipoMime: string | null;
-              /** @description Tamaño en bytes, o null. */
-              tamanoBytes: number | null;
-              /** @description URL GET prefirmada para ver la foto, o null si no tiene foto. */
-              urlDescarga: string | null;
+              /** @description Fotos del arte, ordenadas. */
+              datos: {
+                /** @description Id del renglón de foto. */
+                idFoto: number;
+                /** @description Id del registro Archivo de la foto. */
+                idArchivo: string;
+                /** @description Posición dentro del arte (0 = la primera). */
+                orden: number;
+                /** @description Nombre original del archivo. */
+                nombreOriginal: string;
+                /** @description Tipo MIME de la imagen. */
+                tipoMime: string;
+                /** @description Tamaño en bytes. */
+                tamanoBytes: number;
+                /** @description URL GET prefirmada para ver la foto. */
+                urlDescarga: string;
+              }[];
             };
           };
         };
@@ -15112,7 +15174,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Preparar la subida de la foto de un arte (URL prefirmada) */
+    /** Preparar la subida de una foto de un arte (URL prefirmada) */
     post: {
       parameters: {
         query?: never;
@@ -15125,7 +15187,7 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Datos para preparar la subida de la foto de un arte. */
+      /** @description Datos para preparar la subida de una foto de un arte. */
       requestBody: {
         content: {
           'application/json': {
@@ -15139,13 +15201,15 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Resultado de preparar la subida de la foto (URL prefirmada). */
+        /** @description Resultado de preparar la subida de una foto (URL prefirmada). */
         201: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
+              /** @description Id del renglón de foto creado (para limpiarlo si falla). */
+              idFoto: number;
               /** @description Id del registro Archivo creado para la foto. */
               idArchivo: string;
               /** @description Nombre original del archivo. */
@@ -15239,19 +15303,34 @@ export interface paths {
         };
       };
     };
-    /** Quitar la foto de un arte */
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/artes/{idArte}/fotos/{idFoto}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Quitar una foto de un arte */
     delete: {
       parameters: {
-        query?: {
-          /** @description Si viene, solo quita la foto cuando la vigente es EXACTAMENTE esta. */
-          idArchivo?: string;
-        };
+        query?: never;
         header?: never;
         path: {
           /** @description Id del modelo. */
           id: number;
           /** @description Id del arte (bordado/estampado) del modelo. */
           idArte: number;
+          /** @description Id de la foto del arte. */
+          idFoto: number;
         };
         cookie?: never;
       };
@@ -15366,14 +15445,14 @@ export interface paths {
           pagina?: number;
           /** @description Renglones por página (máx 100). */
           porPagina?: number;
-          /** @description Texto a buscar en el nombre del arte o en la clave/nombre del modelo. */
+          /** @description Texto a buscar en la descripción del arte o en la clave/nombre del modelo. */
           busqueda?: string;
-          /** @description Filtra por tipo (BORDADO/ESTAMPADO). */
-          tipo?: 'BORDADO' | 'ESTAMPADO';
+          /** @description Filtra por tipo de arte (id del catálogo TipoProceso). */
+          idTipoArte?: number;
           /** @description Solo el arte que tiene foto ("true"/"false"). */
           soloConFoto?: string;
           /** @description Columna de ordenamiento. */
-          ordenarPor?: 'nombre' | 'modelo' | 'tipo' | 'creadoEn';
+          ordenarPor?: 'descripcion' | 'modelo' | 'tipo' | 'creadoEn';
           /** @description Dirección del orden. */
           direccion?: 'asc' | 'desc';
         };
@@ -15394,16 +15473,17 @@ export interface paths {
               datos: {
                 /** @description Id del arte. */
                 id: number;
-                /** @description Nombre del arte. */
-                nombre: string;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Descripción del arte. */
+                descripcion: string;
+                /** @description Dónde va en la prenda, o null. */
+                posicion: string | null;
+                /** @description Id del tipo de arte. */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte. */
+                tipoArte: string;
                 /** @description Precio del arte, o null. */
                 precio: number | null;
-                /** @description Id del Archivo de la foto, o null. */
+                /** @description Id del Archivo de la PRIMERA foto del arte, o null si no tiene. */
                 idArchivoFoto: string | null;
                 /** @description Id del modelo dueño del arte. */
                 idModelo: number;
@@ -15639,25 +15719,35 @@ export interface paths {
                 id: number;
                 /** @description Id del modelo dueño del arte. */
                 idModelo: number;
-                /** @description Nombre del arte. */
-                nombre: string;
-                /** @description Descripción, o null. */
-                descripcion: string | null;
+                /** @description Descripción del arte (el campo visible desde V1-E3f). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 /** @description Número de puntadas (informativo), o null. */
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
-                /**
-                 * @description BORDADO real o ESTAMPADO/aplicación.
-                 * @enum {string}
-                 */
-                tipo: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Id del proveedor que lo hace, o null. */
                 idProveedor: number | null;
                 /** @description Nombre del proveedor que lo hace, o null. */
                 proveedor: string | null;
-                /** @description Id del Archivo de la foto en R2, o null si no tiene foto. */
-                idArchivoFoto: string | null;
+                /** @description Fotos del arte, ordenadas. */
+                fotos: {
+                  /** @description Id del renglón de foto (ModeloArteFoto). */
+                  idFoto: number;
+                  /** @description Id del Archivo en R2. */
+                  idArchivo: string;
+                  /** @description Posición de la foto dentro del arte (0 = la primera). */
+                  orden: number;
+                }[];
                 /** @description Posición dentro del modelo (0 = arte principal). */
                 orden: number;
                 /**
@@ -24314,16 +24404,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -24508,12 +24603,12 @@ export interface paths {
             | {
                 /** @enum {string} */
                 tipo: 'arte';
-                nombre: string;
-                descripcion?: string | null;
+                idModeloArte?: number;
+                descripcion?: string;
+                posicion?: string | null;
                 puntadas?: number | null;
                 precio?: number | null;
-                /** @enum {string} */
-                tipoArte?: 'BORDADO' | 'ESTAMPADO';
+                idTipoArte?: number;
                 idProveedor?: number | null;
                 notas?: string | null;
               };
@@ -24683,16 +24778,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -25016,16 +25116,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -25180,9 +25285,10 @@ export interface paths {
               consumo: number;
               idAvioMedida?: number | null;
             }[];
-            nombre?: string;
-            descripcion?: string | null;
+            descripcion?: string;
+            posicion?: string | null;
             puntadas?: number | null;
+            idTipoArte?: number;
             idProveedor?: number | null;
             notas?: string | null;
           };
@@ -25352,16 +25458,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -25673,16 +25784,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -25994,16 +26110,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -26315,16 +26436,21 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
-                /** @description Traza al arte del modelo, o null. */
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
-                nombre: string;
-                descripcion: string | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
                 puntadas: number | null;
-                /**
-                 * @description Bordado o estampado/aplicación.
-                 * @enum {string}
-                 */
-                tipo_arte: 'BORDADO' | 'ESTAMPADO';
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
                 /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
                 precio: number | null;
                 idProveedor: number | null;
@@ -33955,6 +34081,8 @@ export interface paths {
           busqueda?: string;
           /** @description Incluye los desactivados ("true"/"false"). */
           incluirInactivos?: string;
+          /** @description Solo los tipos marcados como ARTE ("true"/"false"), V1-E3f. */
+          soloArte?: string;
           /** @description Columna de ordenamiento. */
           ordenarPor?: 'codigo' | 'nombre' | 'creadoEn';
           /** @description Dirección del orden. */
@@ -33983,6 +34111,12 @@ export interface paths {
                 nombre: string;
                 /** @description Si el recibo de este proceso genera entrada a inventario PT (decisión (e)). */
                 generaEntradaPt: boolean;
+                /** @description Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58). */
+                esArte: boolean;
+                /** @description Si el arte de este tipo lleva puntadas (§Post-F9.52.6). */
+                usaPuntadas: boolean;
+                /** @description Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay. */
+                codigoRolProveedor: string | null;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
                 /**
@@ -34109,6 +34243,10 @@ export interface paths {
             nombre: string;
             /** @description ¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo. */
             generaEntradaPt?: boolean;
+            /** @description ¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único). */
+            esArte?: boolean;
+            /** @description ¿El arte de este tipo lleva puntadas? (solo bordado en el seed). */
+            usaPuntadas?: boolean;
           };
         };
       };
@@ -34128,6 +34266,12 @@ export interface paths {
               nombre: string;
               /** @description Si el recibo de este proceso genera entrada a inventario PT (decisión (e)). */
               generaEntradaPt: boolean;
+              /** @description Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58). */
+              esArte: boolean;
+              /** @description Si el arte de este tipo lleva puntadas (§Post-F9.52.6). */
+              usaPuntadas: boolean;
+              /** @description Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay. */
+              codigoRolProveedor: string | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -34270,6 +34414,12 @@ export interface paths {
               nombre: string;
               /** @description Si el recibo de este proceso genera entrada a inventario PT (decisión (e)). */
               generaEntradaPt: boolean;
+              /** @description Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58). */
+              esArte: boolean;
+              /** @description Si el arte de este tipo lleva puntadas (§Post-F9.52.6). */
+              usaPuntadas: boolean;
+              /** @description Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay. */
+              codigoRolProveedor: string | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -34401,6 +34551,12 @@ export interface paths {
               nombre: string;
               /** @description Si el recibo de este proceso genera entrada a inventario PT (decisión (e)). */
               generaEntradaPt: boolean;
+              /** @description Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58). */
+              esArte: boolean;
+              /** @description Si el arte de este tipo lleva puntadas (§Post-F9.52.6). */
+              usaPuntadas: boolean;
+              /** @description Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay. */
+              codigoRolProveedor: string | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -34522,6 +34678,10 @@ export interface paths {
             nombre?: string;
             /** @description ¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo. */
             generaEntradaPt?: boolean;
+            /** @description ¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único). */
+            esArte?: boolean;
+            /** @description ¿El arte de este tipo lleva puntadas? (solo bordado en el seed). */
+            usaPuntadas?: boolean;
             activo?: boolean;
           };
         };
@@ -34542,6 +34702,12 @@ export interface paths {
               nombre: string;
               /** @description Si el recibo de este proceso genera entrada a inventario PT (decisión (e)). */
               generaEntradaPt: boolean;
+              /** @description Si se ofrece como TIPO DE ARTE (catálogo único, V1-E3f §Post-F9.58). */
+              esArte: boolean;
+              /** @description Si el arte de este tipo lleva puntadas (§Post-F9.52.6). */
+              usaPuntadas: boolean;
+              /** @description Código del RolProveedor con el que se acota el selector de proveedores de un arte de este tipo (el rol activo cuyo código coincide con el del proceso), o null si no hay. */
+              codigoRolProveedor: string | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**

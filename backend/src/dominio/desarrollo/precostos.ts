@@ -128,9 +128,11 @@ const incluirBomModelo = {
       tallas: { select: { consumo: true } },
     },
   },
+  // V1-E3f: el arte perdió el `nombre` — su campo visible es la `descripcion` y el desempate
+  // del orden pasó de nombre a `id` (§Post-F9.52 punto 1).
   artes: {
-    select: { id: true, nombre: true, precio: true },
-    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }, { id: 'asc' }],
+    select: { id: true, descripcion: true, precio: true },
+    orderBy: [{ orden: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.ModeloInclude;
 
@@ -257,17 +259,19 @@ function claveBom(l: {
  *
  * Desde V1-E3d el arte es hijo del modelo: al borrarlo, la FK del renglón cae a NULL (SetNull) y
  * su {@link claveBom} se vuelve `"bom_arte:::"` — que ya no empata con NINGÚN renglón regenerado.
- * Si el modelo vuelve a tener un arte con el MISMO nombre (se recapturó, o la migración no pudo
- * re-apuntar el renglón viejo), `recalcularDesdeBom` metería el arte otra vez y el borrador
- * mostraría el concepto DUPLICADO: el ajustado huérfano + el regenerado. Con el catálogo viejo no
- * pasaba, porque el id del bordado sobrevivía a que el modelo lo quitara del BOM.
+ * Si el modelo vuelve a tener un arte IGUAL (se recapturó, o la migración no pudo re-apuntar el
+ * renglón viejo), `recalcularDesdeBom` metería el arte otra vez y el borrador mostraría el
+ * concepto DUPLICADO: el ajustado huérfano + el regenerado. Con el catálogo viejo no pasaba,
+ * porque el id del bordado sobrevivía a que el modelo lo quitara del BOM.
  *
- * La identidad de un arte dentro de su modelo es su NOMBRE (así lo exige el unique de
- * `modelo_arte`, y así lo resolvió la migración), y la `descripcion` del renglón BOM es
- * exactamente ese nombre — de ahí sale esta clave. Se normaliza (trim + minúsculas) igual que la
- * unicidad del arte. Límite honesto: si el usuario además RENOMBRÓ la descripción del renglón
- * ajustado, ya no hay por dónde reconocerlo y el renglón sobrevive junto al regenerado (es el
- * comportamiento de cualquier ajustado que no casa; el usuario lo ve y lo quita).
+ * El texto que se compara es la **descripción del arte** —el campo visible desde V1-E3f
+ * (§Post-F9.52 punto 1; antes era el `nombre`, que ya no existe)—, y la `descripcion` del renglón
+ * BOM es exactamente esa. Se normaliza (trim + minúsculas). Límites honestos: si el usuario
+ * además RENOMBRÓ la descripción del renglón ajustado, ya no hay por dónde reconocerlo y el
+ * renglón sobrevive junto al regenerado; y como al retirarse el nombre **el texto ya no es único
+ * dentro del modelo**, dos artes con la misma descripción comparten esta clave de respaldo — el
+ * empate lo resuelve el primero que la consuma. En los dos casos el usuario ve el duplicado y lo
+ * quita, igual que con cualquier ajustado que no casa.
  */
 function claveArtePorNombre(l: { descripcion?: string | null }): string {
   return `bom_arte::nombre:${(l.descripcion ?? '').trim().toLocaleLowerCase()}`;
@@ -379,7 +383,7 @@ function lineasBomDesdeModelo(
       idConceptoCosto: conceptos.bordado,
       origen: 'bom_arte',
       idModeloArte: a.id,
-      descripcion: a.nombre,
+      descripcion: a.descripcion,
       consumo: null,
       precioUnit: precio,
       importe: precio,

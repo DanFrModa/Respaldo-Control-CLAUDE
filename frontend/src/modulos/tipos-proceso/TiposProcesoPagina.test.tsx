@@ -39,6 +39,10 @@ function tipoProceso(
     codigo,
     nombre,
     generaEntradaPt,
+    // V1-E3f (catálogo único): banderas del arte, apagadas salvo que la prueba diga otra cosa.
+    esArte: false,
+    usaPuntadas: false,
+    codigoRolProveedor: null,
     activo,
     creadoEn: '2026-06-17T00:00:00.000Z',
     creadoPorId: null,

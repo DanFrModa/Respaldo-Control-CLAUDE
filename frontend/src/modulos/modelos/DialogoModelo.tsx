@@ -14,7 +14,6 @@ import {
 } from '@/api/modelos';
 import { useTiposProductoActivos } from '@/api/calidad';
 import { useDificultad } from '@/api/dificultad';
-import { useProveedores, useRolesProveedor } from '@/api/proveedores';
 import { useCurvas } from '@/api/tallas';
 import { useTemporadas } from '@/api/temporadas';
 import {
@@ -43,6 +42,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import {
   esquemaModeloFormulario,
@@ -189,17 +189,6 @@ export function DialogoModelo({
   const curvas = useCurvas(QUERY_SELECTOR);
   const generos = useGeneros();
   const tiposProducto = useTiposProductoActivos();
-  // Maquileros (costura) para el selector del maquilero cotizado (R5/B9): filtra por rol `maquila-costura`
-  // (código sembrado en `ROLES_PROVEEDOR_BASE`; el backend re-valida ese mismo rol, A1).
-  const rolesProveedor = useRolesProveedor();
-  const idRolCostura = rolesProveedor.data?.find((r) => r.codigo === 'maquila-costura')?.id;
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRolCostura === undefined ? {} : { rol: idRolCostura }),
-  });
 
   const formulario = useForm<DatosModeloFormulario>({
     resolver: zodResolver(esquemaModeloFormulario),
@@ -241,6 +230,7 @@ export function DialogoModelo({
 
   // Dificultad EN VIVO (R5/B7): deriva del # de operaciones capturado contra la tabla de rangos (R4).
   const numOpsTexto = formulario.watch('numOperaciones');
+  const idMaquileroElegido = formulario.watch('idMaquileroCotizado');
   const opsNum =
     numOpsTexto.trim() !== '' && Number.isInteger(Number(numOpsTexto)) && Number(numOpsTexto) >= 0
       ? Number(numOpsTexto)
@@ -289,9 +279,13 @@ export function DialogoModelo({
 
           <div className="max-h-[60vh] space-y-3 overflow-y-auto py-4 pr-1">
             <LeyendaObligatorios />
+            {/* «Clasificación» abre por DEFECTO desde V1-E3f: ahí vive la CURVA DE TALLAS y
+                Daniel no la encontraba con la sección cerrada (*"no sé dónde hacerlo… no lo veo"*).
+                Su razón para abrirla: *"es información que vamos a tener en la mayoría de los
+                modelos"* — dejó de ser el rincón de lo excepcional. */}
             <Accordion
               type="multiple"
-              defaultValue={['identidad', 'costos']}
+              defaultValue={['identidad', 'costos', 'clasificacion']}
               className="flex flex-col gap-2"
             >
               {/* ── Identidad ────────────────────────────────────────────────── */}
@@ -395,18 +389,26 @@ export function DialogoModelo({
                       <FieldLabel htmlFor="modelo-maquilero">
                         Maquilero cotizado (costura)
                       </FieldLabel>
-                      <SelectNativo
-                        id="modelo-maquilero"
-                        disabled={guardando}
-                        {...registrar('idMaquileroCotizado')}
-                      >
-                        <option value="">Sin definir</option>
-                        {(maquileros.data?.datos ?? []).map((p) => (
-                          <option key={p.id} value={String(p.id)}>
-                            {p.nombre}
-                          </option>
-                        ))}
-                      </SelectNativo>
+                      {/* V1-E3f (§Post-F9.52 punto 7): buscador en el SERVIDOR acotado al rol
+                          `maquila-costura` (el backend re-valida ese mismo rol, A1). Antes era un
+                          `<select>` con tope de 100 que escondía al maquilero buscado. */}
+                      <SelectorProveedor
+                        idInput="modelo-maquilero"
+                        idSeleccionado={
+                          idMaquileroElegido === '' ? undefined : Number(idMaquileroElegido)
+                        }
+                        nombreSeleccionado={modelo?.maquileroCotizado ?? undefined}
+                        alSeleccionar={(p) =>
+                          formulario.setValue('idMaquileroCotizado', String(p.id), {
+                            shouldDirty: true,
+                          })
+                        }
+                        alLimpiar={() =>
+                          formulario.setValue('idMaquileroCotizado', '', { shouldDirty: true })
+                        }
+                        rol="maquila-costura"
+                        testid="modelo-maquilero"
+                      />
                       <FieldDescription>
                         Con quién se coteó la costura; siembra el default del maquilero de
                         producción.
