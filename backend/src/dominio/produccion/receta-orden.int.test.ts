@@ -229,6 +229,81 @@ describe('copiarRecetaDelModelo — la receta nace con la orden', () => {
     expect(boton?.proveedorAmarrado).toBe('Avíos de la Orden');
   });
 
+  it('⭐ CONGELA el ARTE del modelo completo: descripción, posición, TIPO, puntadas y precio', async () => {
+    // El productor principal de `OrdenArte` es esta copia, y lo que copia MAL no se nota hasta que
+    // alguien lee la orden meses después. V1-E3f le agregó campos (`posicion`, `idTipoArte`) y la
+    // `descripcion` pasó a ser lo único que identifica el arte de cara al usuario: si alguno se
+    // quedara fuera de la copia, la orden nacería con historia incompleta y en silencio.
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Bordados SA' } });
+    const idTipoEstampado = await crearTipoArtePrueba(cliente, 'estampado', {
+      nombre: 'Estampado',
+    });
+    const arteModelo = await cliente.modeloArte.create({
+      data: {
+        idModelo,
+        descripcion: 'Águila a tres hilos',
+        posicion: 'manga izquierda',
+        idTipoArte: idTipoEstampado,
+        puntadas: 8000,
+        precio: 33.5,
+        idProveedor: proveedor.id,
+      },
+    });
+
+    const orden = await crearOrdenConReceta(3n);
+    const r = await obtenerRecetaOrden(sesion(), orden, bd());
+
+    expect(r.artes).toHaveLength(1);
+    expect(r.artes[0]).toMatchObject({
+      idModeloArte: arteModelo.id,
+      descripcion: 'Águila a tres hilos',
+      posicion: 'manga izquierda',
+      idTipoArte: idTipoEstampado,
+      tipoArte: 'Estampado',
+      codigoTipoArte: 'estampado',
+      usaPuntadas: false,
+      puntadas: 8000,
+      precio: 33.5,
+      idProveedor: proveedor.id,
+      agregadoAMano: false,
+      excluido: false,
+      enElModelo: true,
+    });
+
+    // Y en la FILA congelada, no solo en la proyección que la pantalla arma al vuelo.
+    const fila = await cliente.ordenArte.findFirstOrThrow({ where: { idOrden: orden } });
+    expect(fila).toMatchObject({
+      idModeloArte: arteModelo.id,
+      descripcion: 'Águila a tres hilos',
+      posicion: 'manga izquierda',
+      idTipoArte: idTipoEstampado,
+      puntadas: 8000,
+    });
+    expect(fila.precio?.toNumber()).toBe(33.5);
+  });
+
+  it('lo copiado queda CONGELADO: cambiar el arte del modelo después no lo mueve', async () => {
+    const arteModelo = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Escudo', posicion: 'frente', idTipoArte, precio: 20 },
+    });
+    const orden = await crearOrdenConReceta(4n);
+
+    // El modelo cambia DESPUÉS de que la orden nació: la orden conserva lo suyo (§Post-F9.43).
+    await cliente.modeloArte.update({
+      where: { id: arteModelo.id },
+      data: { descripcion: 'Escudo v2', posicion: 'espalda', precio: 99 },
+    });
+
+    const fila = await cliente.ordenArte.findFirstOrThrow({ where: { idOrden: orden } });
+    expect(fila.descripcion).toBe('Escudo');
+    expect(fila.posicion).toBe('frente');
+    expect(fila.precio?.toNumber()).toBe(20);
+
+    // Y la diferencia SE AVISA (para eso está el comparador), no se tapa.
+    const r = await obtenerRecetaOrden(sesion(), orden, bd());
+    expect(r.desalineacion.hayCambios).toBe(true);
+  });
+
   it('es IDEMPOTENTE: volver a copiar no duplica renglones', async () => {
     await enTransaccion(
       (tx) => copiarRecetaDelModelo(tx, sesion(), { id: ordenA, idEmpresa: empresa.id, idModelo }),
@@ -632,6 +707,110 @@ describe('Restaurar y desalineación (§Post-F9.43(f))', () => {
     await expect(
       agregarRenglonReceta(sesion(), ordenA, { tipo: 'arte', idModeloArte: ajeno.id }, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('⭐ restaurar un ARTE trae los datos de SU arte del modelo, no los de otro', async () => {
+    // Restaurar SOBRESCRIBE el renglón congelado: si resolviera el arte del modelo por algo que no
+    // sea su TRAZA —p. ej. "el primero del modelo"— escribiría encima de la historia de la orden
+    // los datos de OTRO arte (descripción, precio, proveedor y tipo). Eso es destruir historia sin
+    // decirlo (D3), y el usuario creería que "restauró" cuando en realidad re-tipificó.
+    const bordador = await cliente.proveedor.create({ data: { nombre: 'Bordados SA' } });
+    const idTipoEstampado = await crearTipoArtePrueba(cliente, 'estampado', {
+      nombre: 'Estampado',
+    });
+    // DOS artes en el modelo. El de la orden es el SEGUNDO: si la resolución tomara el primero,
+    // la restauración lo pisaría con «Logo del primero».
+    await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Logo del primero', posicion: 'frente', idTipoArte, orden: 0 },
+    });
+    const suyo = await cliente.modeloArte.create({
+      data: {
+        idModelo,
+        descripcion: 'Escudo de la espalda',
+        posicion: 'espalda',
+        idTipoArte: idTipoEstampado,
+        puntadas: 4200,
+        precio: 30,
+        idProveedor: bordador.id,
+        orden: 1,
+      },
+    });
+
+    // La orden congela SOLO el segundo y alguien lo AJUSTA a mano.
+    const rAlta = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', idModeloArte: suyo.id },
+      bd(),
+    );
+    const congelado = rAlta.artes.find((a) => a.idModeloArte === suyo.id);
+    expect(congelado).toBeDefined();
+    await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'arte',
+      congelado?.id ?? 0,
+      { descripcion: 'Escudo ajustado a mano', precio: 5, idProveedor: null },
+      bd(),
+    );
+
+    const r = await restaurarRenglonReceta(sesion(), ordenA, 'arte', congelado?.id ?? 0, bd());
+
+    const restaurado = r.artes.find((a) => a.id === congelado?.id);
+    expect(restaurado).toMatchObject({
+      idModeloArte: suyo.id,
+      descripcion: 'Escudo de la espalda',
+      posicion: 'espalda',
+      idTipoArte: idTipoEstampado,
+      puntadas: 4200,
+      precio: 30,
+      idProveedor: bordador.id,
+      agregadoAMano: false,
+      enElModelo: true,
+    });
+    // Y NADA del otro arte del modelo se coló en el renglón.
+    expect(restaurado?.descripcion).not.toBe('Logo del primero');
+
+    // D3: el `antes` ÍNTEGRO queda en la bitácora (lo que la restauración sobrescribió).
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Orden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      tipo: 'arte',
+      restaurado: true,
+      antes: { descripcion: 'Escudo ajustado a mano', precio: 5 },
+    });
+  });
+
+  it('restaurar un ARTE que ya no está en el modelo (o agregado a mano) se rechaza', async () => {
+    // Un renglón AGREGADO A MANO nunca tuvo traza: no hay a qué volver.
+    const rMano = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', descripcion: 'Parche de esta orden', idTipoArte },
+      bd(),
+    );
+    const aMano = rMano.artes.find((a) => a.descripcion === 'Parche de esta orden');
+    await expect(
+      restaurarRenglonReceta(sesion(), ordenA, 'arte', aMano?.id ?? 0, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y uno cuyo arte del modelo se BORRÓ (la traza cayó a NULL por SetNull) tampoco.
+    const arte = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Se va a borrar', idTipoArte },
+    });
+    const rTraza = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'arte', idModeloArte: arte.id },
+      bd(),
+    );
+    const conTraza = rTraza.artes.find((a) => a.idModeloArte === arte.id);
+    await cliente.modeloArte.delete({ where: { id: arte.id } });
+    await expect(
+      restaurarRenglonReceta(sesion(), ordenA, 'arte', conTraza?.id ?? 0, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
   it('restaurar un renglón que YA NO está en el modelo se rechaza con un mensaje claro', async () => {
