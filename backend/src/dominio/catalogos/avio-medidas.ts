@@ -103,7 +103,31 @@ function proyectarMedidas(filas: FilaMedida[], unidadMedida: string | null): Med
       : redondear2(activas.reduce((s, d) => s + d.precio, 0) / activas.length);
 
   const avisos: string[] = [];
-  const porRevisar = activas.filter((d) => d.requiereRevision);
+  // ⭐ El caso que justifica la etapa (§Post-F9.66, H2 del review): "53 cm", "53cm" y "53" son la
+  // MISMA medida escrita de tres formas. La migración las marca; aquí se DICE qué son, porque
+  // "necesita revisión" a secas dejaba al usuario adivinando cuál sobra. Se agrupan por valor para
+  // nombrar el conjunto completo, no una fila suelta.
+  const porValor = new Map<number, MedidaAvioSalida[]>();
+  for (const d of activas) {
+    if (d.valor === null) continue;
+    const grupo = porValor.get(d.valor);
+    if (grupo === undefined) porValor.set(d.valor, [d]);
+    else grupo.push(d);
+  }
+  const duplicadas = [...porValor.values()].filter((g) => g.length > 1);
+  const idsDuplicadas = new Set(duplicadas.flat().map((d) => d.id));
+  for (const grupo of duplicadas) {
+    avisos.push(
+      `${grupo.map((d) => `"${d.medida}"`).join(', ')} son LA MISMA medida ` +
+        `(${String(grupo[0]?.valor ?? '')}) escrita de formas distintas: por eso la compra salía ` +
+        'partida. Deja una sola y retira las demás.',
+    );
+  }
+
+  // Las que necesitan revisión por OTRA razón (etiqueta no convertible). Las duplicadas ya se
+  // explicaron arriba con su motivo real; repetirlas aquí sería decir dos veces lo mismo y encima
+  // con la razón equivocada.
+  const porRevisar = activas.filter((d) => d.requiereRevision && !idsDuplicadas.has(d.id));
   if (porRevisar.length > 0) {
     avisos.push(
       `${String(porRevisar.length)} medida(s) de este avío necesitan revisión manual ` +

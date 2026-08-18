@@ -57,3 +57,27 @@ UPDATE "avio_medida" m
   FROM "avios" a
  WHERE a."id" = m."id_avio"
    AND (m."valor" IS NULL OR m."valor" <= 0 OR a."unidad_medida" IS NULL);
+
+-- ── 5) ⭐ EL CASO QUE JUSTIFICA TODA LA DECISIÓN: el mismo número escrito de varias formas ───────
+-- §Post-F9.66, textual: *"'53 cm', '53cm' y '53' serían tres cosas distintas y la orden de compra
+-- saldría partida en tres"*. Esas tres etiquetas SÍ convierten —las tres dan 53— así que los pasos
+-- 2 a 4 las dejaban pasar limpias: tres filas activas indistinguibles, ninguna marcada. Y como la
+-- etiqueta nueva se DERIVA del número, al primer guardado las tres colisionan en el `@@unique` y el
+-- usuario recibe un error sin saber cuál sobra.
+--
+-- Aquí se marcan TODAS las filas de un avío que comparten `valor` con otra (sólo entre ACTIVAS: una
+-- desactivada ya no se compra ni estorba). No se borra ni se fusiona ninguna —cuál se queda es una
+-- decisión de negocio, y adivinar es justo lo que Daniel dijo que NO quería—: se dejan marcadas
+-- para que alguien las mire, que es el trato de esta migración.
+UPDATE "avio_medida" m
+   SET "requiere_revision" = true
+ WHERE m."activo"
+   AND m."valor" IS NOT NULL
+   AND EXISTS (
+     SELECT 1
+       FROM "avio_medida" o
+      WHERE o."id_avio" = m."id_avio"
+        AND o."id" <> m."id"
+        AND o."activo"
+        AND o."valor" = m."valor"
+   );

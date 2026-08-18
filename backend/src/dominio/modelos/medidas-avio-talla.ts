@@ -271,8 +271,25 @@ async function leerMedidasAvio(
  * de la medida vive en el catálogo del avío, que es donde se teclea).
  */
 function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDetalle[]): string[] {
-  if (contexto.modoCaptura === 'medida') return [];
   const avisos: string[] = [];
+
+  // ⭐ H3 del review — La CONTRADICCIÓN heredada (avío por medida + `consumoPorTalla` encendido) se
+  // avisaba en la receta de la ORDEN pero no aquí, en el BOM… que es **donde se arregla**. El
+  // usuario leía el aviso en la orden, venía al modelo y encontraba una pantalla que no mencionaba
+  // el problema. Igual que allá: se DICE, no se apaga al leer — apagarlo lo hace el guardado.
+  if (contexto.modoCaptura === 'medida') {
+    if (contexto.consumoPorTalla) {
+      avisos.push(
+        'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
+          '"se consume por talla" de una captura anterior: las cantidades por talla ya no se ' +
+          'capturan y siguen contando en el requerido. Guarda para normalizarlo.',
+      );
+    }
+    // En modo `medida` las cantidades no se capturan aquí, así que revisarlas sería ruido: el
+    // aviso del número absurdo de la MEDIDA vive en el catálogo del avío, que es donde se teclea.
+    return avisos;
+  }
+
   for (const t of tallas) {
     if (t.consumo === null) continue;
     const aviso = avisoValorFueraDeRango(

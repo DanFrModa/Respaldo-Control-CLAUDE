@@ -202,6 +202,41 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  it('⭐ H2: "53 cm", "53cm" y "53" se DICEN como lo que son (la misma medida), no como "revisar"', async () => {
+    // Estado que deja la migración para el caso textual de §Post-F9.66: tres filas activas con el
+    // MISMO valor, las tres marcadas. Sin este aviso el usuario abría, guardaba y recibía un
+    // ErrorValidacion sin saber cuál sobra — exactamente lo que Daniel dijo que no quería.
+    await cliente.avioMedida.createMany({
+      data: [
+        { idAvio, medida: '53 cm', valor: 53, precio: 6, requiereRevision: true, orden: 0 },
+        { idAvio, medida: '53cm', valor: 53, precio: 6, requiereRevision: true, orden: 1 },
+        { idAvio, medida: '53', valor: 53, precio: 6, requiereRevision: true, orden: 2 },
+      ],
+    });
+    await cliente.avio.update({ where: { id: idAvio }, data: { unidadMedida: 'cm' } });
+
+    const r = await listarMedidasDeAvio(sesion(), idAvio, bd());
+    const aviso = r.avisos.find((a) => a.includes('LA MISMA medida'));
+    expect(aviso).toBeDefined();
+    expect(aviso).toContain('"53 cm"');
+    expect(aviso).toContain('"53cm"');
+    expect(aviso).toContain('"53"');
+    // Y NO se las acusa además de "no convertibles": esa no es su razón.
+    expect(r.avisos.some((a) => a.includes('revisión manual'))).toBe(false);
+  });
+
+  it('H2: una duplicada DESACTIVADA no genera ruido (ya no se compra)', async () => {
+    await cliente.avioMedida.createMany({
+      data: [
+        { idAvio, medida: '53 cm', valor: 53, precio: 6, orden: 0 },
+        { idAvio, medida: '53cm', valor: 53, precio: 6, activo: false, orden: 1 },
+      ],
+    });
+    await cliente.avio.update({ where: { id: idAvio }, data: { unidadMedida: 'cm' } });
+    const r = await listarMedidasDeAvio(sesion(), idAvio, bd());
+    expect(r.avisos.some((a) => a.includes('LA MISMA medida'))).toBe(false);
+  });
+
   it('dos renglones que apuntan a la MISMA fila se rechazan (uno pisaría al otro)', async () => {
     const previa = await cliente.avioMedida.create({
       data: { idAvio, medida: '53 cm', valor: 53, precio: 5 },
