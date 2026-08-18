@@ -3144,3 +3144,40 @@ endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**
 
 - **Aplica en:** V1-E6b. Sin migración, sin permisos nuevos, sin contrato.
 - **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.69) — Las cinco reglas que la SEGMENTACIÓN de CxP obligó a fijar (V1-E3f pieza B, 18-ago-2026)
+
+Daniel pidió (§Post-F9.57) que la partición **con factura / sin factura** dejara de ser cosa de talleres:
+*"hay proveedores de avíos o de telas que puede pasar que algunas cosas sean con factura y otras sin
+factura"*. Al llevar el motor de EsMa a CxP hubo que fijar cinco cosas que él no dijo. Se registran porque
+**tocan dinero** y porque un reviewer las objetó una por una.
+
+1. **Un movimiento `entrada_sin_factura` NUNCA se vuelve fiscal**, ni siquiera con un proveedor marcado
+   `solo_con`, y **pedirlo se rechaza** en vez de corregirse en silencio. Sin esta regla, reusar el criterio
+   de EsMa metía cargos **sin CFDI** al reporte del contador.
+2. **`segmento` ≠ `vista: fiscal`.** Filtran la misma columna, pero el **segmento** pide solo
+   `terceros.ver`: la partición que pidió Daniel es **operativa**, no contable, y no puede quedar detrás
+   del candado del contador. La combinación contradictoria se **rechaza con mensaje**, no devuelve una
+   lista vacía muda.
+3. 🔴 **Los movimientos SIN DEFINIR (`conFactura = NULL`) van al segmento "sin".** La primera versión usó
+   `{ not: true }` creyendo que los incluía — **falso**: en lógica de tres valores `NULL <> true` es `NULL`
+   y la fila **se descarta igual**. La única forma que sí los trae es el `OR` explícito con `IS NULL`.
+   **Importa porque el encabezado sí los sumaba** (`saldoSinFactura = saldo − saldoFiscal`), así que
+   encabezado y renglones se contradecían y **los dos segmentos no daban el total**.
+4. **CxC hereda `segmento`** por compartir el contrato del motor. Nadie lo pidió; es inocuo (default
+   `todos`) y ahí la partición **sí es exacta**, porque `MovimientoTercero.esFiscal` es NOT NULL.
+5. **El campo corto sobreviviente es `nombreCorto`, no `corto`** — es el que Daniel señaló en la pantalla,
+   y los DTO de CxP/EsMa/CFDI se renombraron igual: *dejar dos nombres para un concepto es la
+   desincronización que este proyecto ya pagó*.
+
+**Y el criterio de la migración, que Daniel no dictó pero decide sobre sus datos:** la fusión de los dos
+campos cortos deduplica **sin distinguir mayúsculas**, y por eso el índice único de la base también va
+sobre `lower()` — si no, la base vuelve a permitir al día siguiente el estado que la migración se tomó el
+trabajo de eliminar. Las colisiones y el valor desplazado **quedan en bitácora**; una diferencia de **sola
+caja** se registra aparte, porque perder una tipografía no es lo mismo que perder un dato.
+
+- **Aplica en:** V1-E3f pieza B. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
+  `SEED_ON_START` (verificado por las dos partes; la nota vieja de §Post-F9.54 ya mintió sobre esto).
+- **Fecha:** 2026-08-18.
