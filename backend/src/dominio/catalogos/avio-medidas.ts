@@ -223,7 +223,11 @@ export async function reemplazarMedidasAvio(
   const unidadMedida = normalizarUnidad(datos.unidadMedida);
 
   return enTransaccion(async (tx) => {
-    await exigirAvio(tx, idAvio);
+    // La unidad ANTERIOR se lee antes de pisarla: un set que sólo conserva heredadas puede venir
+    // con `unidadMedida: null` y dejar el avío sin unidad. Es alcanzable sólo si alguien borra el
+    // campo a mano, pero sin el "antes" en la bitácora ese borrado no se podría deshacer (D3) —
+    // que es exactamente lo que sí guardan `renombradas` y `desactivadas`.
+    const { unidadMedida: unidadAnterior } = await exigirAvio(tx, idAvio);
 
     const actuales = await tx.avioMedida.findMany({ where: { idAvio }, select: SELECT_MEDIDA });
     const actualPorId = new Map(actuales.map((m) => [m.id, m]));
@@ -397,6 +401,9 @@ export async function reemplazarMedidasAvio(
         operacion: 'medidas',
         total: datos.medidas.length,
         unidadMedida,
+        ...(normalizarUnidad(unidadAnterior) === unidadMedida
+          ? {}
+          : { unidadMedidaAnterior: normalizarUnidad(unidadAnterior) }),
         ...(renombradas.length === 0 ? {} : { renombradas }),
         ...(desactivadas.length === 0 ? {} : { desactivadas }),
       },

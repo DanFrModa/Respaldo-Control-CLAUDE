@@ -172,6 +172,40 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
       expect(r.datos.some((d) => d.medida === '53 cm' && d.activo)).toBe(true);
     });
 
+    it('F2: a una heredada SÍ se le puede mover el precio (el caso de uso que motivó H4)', async () => {
+      // Sola en el set y sin nada más que cambie: si la rama "conservar" no mirara el precio, el
+      // renglón no contaría como cambio, no se escribiría y el usuario perdería su edición sin que
+      // nada se lo dijera. Es la razón de ser de H4, así que va con su propia aserción.
+      const heredada = await cliente.avioMedida.findFirstOrThrow({ where: { idAvio } });
+      expect(heredada.precio.toNumber()).toBe(4);
+      const r = await reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: null, medidas: [{ id: heredada.id, valor: null, precio: 11.5 }] },
+        bd(),
+      );
+      expect(r.datos.find((d) => d.id === heredada.id)?.precio).toBe(11.5);
+      // Y lo hizo SIN normalizarla: sigue siendo la misma medida por revisar.
+      const enBd = await cliente.avioMedida.findUniqueOrThrow({ where: { id: heredada.id } });
+      expect(enBd.precio.toNumber()).toBe(11.5);
+      expect(enBd.valor).toBeNull();
+      expect(enBd.medida).toBe('S');
+      expect(enBd.requiereRevision).toBe(true);
+    });
+
+    it('F2: una medida SIN número y SIN id se rechaza (no puede ser un alta encubierta)', async () => {
+      // `valor: null` significa "conserva la que ya existe". Sin `id` no hay ninguna que conservar:
+      // aceptarlo daría de alta una medida sin número, que es justo lo que la etapa vino a impedir.
+      await expect(
+        reemplazarMedidasAvio(
+          sesion(),
+          idAvio,
+          { unidadMedida: 'cm', medidas: [{ valor: null, precio: 5 }] },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
     it('H4: NO se le puede quitar el número a una medida ya normalizada', async () => {
       const buena = await cliente.avioMedida.create({
         data: { idAvio, medida: '53 cm', valor: 53, precio: 6 },
@@ -285,6 +319,43 @@ describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
     await cliente.avio.update({ where: { id: idAvio }, data: { unidadMedida: 'cm' } });
     const r = await listarMedidasDeAvio(sesion(), idAvio, bd());
     expect(r.avisos.some((a) => a.includes('LA MISMA medida'))).toBe(false);
+  });
+
+  it('la unidad ANTERIOR del avío queda en la bitácora al cambiarla (D3)', async () => {
+    await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 6 }] },
+      bd(),
+    );
+    // Se borra la unidad: sin el "antes" en la bitácora, este cambio no se podría deshacer.
+    await reemplazarMedidasAvio(sesion(), idAvio, { unidadMedida: null, medidas: [] }, bd());
+
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'Avio', idEntidad: String(idAvio) },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('"unidadMedidaAnterior":"cm"');
+  });
+
+  it('si la unidad NO cambia, la bitácora no se ensucia con el "antes"', async () => {
+    await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 6 }] },
+      bd(),
+    );
+    await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 9 }] },
+      bd(),
+    );
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'Avio', idEntidad: String(idAvio) },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).not.toContain('unidadMedidaAnterior');
   });
 
   it('dos renglones que apuntan a la MISMA fila se rechazan (uno pisaría al otro)', async () => {

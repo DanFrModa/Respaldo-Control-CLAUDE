@@ -1591,6 +1591,72 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     expect(hab.avios.find((a) => a.idAvio === avioBoton.id)?.requerido).toBe(20);
   });
 
+  /**
+   * ⚠️ **F2 del segundo review — la otra dirección, que es la que cuesta dinero.** La prueba de H1
+   * sólo miraba que el avío POR MEDIDA naciera apagado; cambiar la línea por `consumoPorTalla:
+   * false` a secas —apagárselo a TODOS, incluido el elástico legítimo— dejaba las 191 pruebas en
+   * verde. Un desliz de una línea ahí mata en silencio el consumo por talla de CADA elástico de
+   * CADA orden nueva, y lo mata justo en el código escrito para impedirlo.
+   */
+  it('⭐ F2: un avío SIN medidas CONSERVA su consumo por talla al nacer la orden', async () => {
+    // La jareta es de consumo (no tiene medidas en catálogo) y en el BOM va por talla: 0.75 en CH.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioJareta.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioJareta.id, idTalla: tallaCH.id, consumo: 0.75 },
+    });
+    // Y en la MISMA orden, un avío por medida: los dos caminos conviven en la misma corrida.
+    await botonPorMedida();
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+
+    const idOrdenNueva = await crearOrdenConReceta(78n);
+    const r = await obtenerRecetaOrden(sesion(), idOrdenNueva, bd());
+
+    const jareta = r.avios.find((a) => a.idAvio === avioJareta.id)!;
+    expect(jareta.modoCaptura).toBe('consumo');
+    expect(jareta.consumoPorTalla).toBe(true); // ⭐ NO se le apaga: su consumo SÍ varía por talla
+    expect(jareta.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(0.75);
+
+    // El por-medida sí nace apagado: la normalización distingue, no arrasa.
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.consumoPorTalla).toBe(false);
+
+    // Y el requerido de la jareta sale POR TALLA (0.75 × 10 piezas), no por prenda (1 × 10).
+    const hab = await habilitacionOrden(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['ordenes.habilitacion'] }),
+      idOrdenNueva,
+      bd(),
+    );
+    expect(hab.avios.find((a) => a.idAvio === avioJareta.id)?.requerido).toBe(7.5);
+  });
+
+  it('F2: sólo las medidas ACTIVAS vuelven "por medida" a un avío al nacer la orden', async () => {
+    // Un avío cuyas únicas medidas están DESACTIVADAS ya no se compra por medida: su consumo por
+    // talla tiene que sobrevivir. Sin el `activo: true` del lote, se le apagaría.
+    await cliente.avio.update({ where: { id: avioJareta.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioJareta.id, medida: '20 cm', valor: 20, precio: 3, activo: false },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioJareta.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioJareta.id, idTalla: tallaCH.id, consumo: 0.75 },
+    });
+
+    const idOrdenNueva = await crearOrdenConReceta(79n);
+    const jareta = (await obtenerRecetaOrden(sesion(), idOrdenNueva, bd())).avios.find(
+      (a) => a.idAvio === avioJareta.id,
+    )!;
+    expect(jareta.modoCaptura).toBe('consumo');
+    expect(jareta.consumoPorTalla).toBe(true);
+  });
+
   it('AGREGAR un renglón por medida tampoco puede encender el toggle', async () => {
     await botonPorMedida();
     // Se quita el botón (lápida) y se vuelve a agregar pidiendo el toggle encendido.
