@@ -1,0 +1,241 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import type { PrismaClient } from '../../datos/index.js';
+import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sesionDePrueba } from '../../pruebas/sesiones.js';
+
+import { listarMedidasDeAvio, reemplazarMedidasAvio } from './avio-medidas.js';
+
+/**
+ * MEDIDAS del avío tras V1-E3g (§Post-F9.66): la medida es un NÚMERO, la unidad vive una vez en el
+ * avío y la etiqueta la DERIVA el dominio. Lo que se prueba es lo que sostiene la decisión —que el
+ * texto libre ya no puede partir la compra en tres— y lo que protege D3: las medidas heredadas que
+ * la migración no pudo convertir NO se tiran, se marcan, y al corregirlas la etiqueta vieja queda
+ * en la bitácora.
+ */
+let cliente: PrismaClient;
+
+const bd = () => ({ cliente });
+const sesion = () => sesionDePrueba({ permisos: ['avios.ver', 'avios.administrar'] });
+
+let idAvio: number;
+
+beforeAll(() => {
+  cliente = clientePruebas();
+});
+
+afterAll(async () => {
+  await cliente.$disconnect();
+});
+
+beforeEach(async () => {
+  await limpiarBaseDatos(cliente);
+  const avio = await cliente.avio.create({
+    data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza' },
+  });
+  idAvio = avio.id;
+});
+
+describe('Medidas del avío (V1-E3g — número + unidad del avío)', () => {
+  it('exige permiso y avío existente', async () => {
+    await expect(listarMedidasDeAvio(sesionDePrueba(), idAvio, bd())).rejects.toBeInstanceOf(
+      ErrorPermiso,
+    );
+    await expect(listarMedidasDeAvio(sesion(), 999_999, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('captura NUMÉRICA: la etiqueta se DERIVA y la unidad se guarda en el avío', async () => {
+    const r = await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      {
+        unidadMedida: 'cm',
+        medidas: [
+          { valor: 53, precio: 5.8 },
+          { valor: 55, precio: 6.2 },
+        ],
+      },
+      bd(),
+    );
+    expect(r.unidadMedida).toBe('cm');
+    expect(r.datos.map((d) => d.medida)).toEqual(['53 cm', '55 cm']);
+    expect(r.datos.map((d) => d.valor)).toEqual([53, 55]);
+    expect(r.datos.every((d) => !d.requiereRevision)).toBe(true);
+    expect(r.promedioPreCosto).toBe(6);
+
+    const avio = await cliente.avio.findUniqueOrThrow({ where: { id: idAvio } });
+    expect(avio.unidadMedida).toBe('cm');
+  });
+
+  it('"53 cm", "53cm" y "53" ya NO pueden coexistir: se captura el mismo número una sola vez', async () => {
+    await expect(
+      reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 1 }, { valor: 53, precio: 2 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('sin unidad no se aceptan medidas: el número solo no dice nada', async () => {
+    await expect(
+      reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: null, medidas: [{ valor: 53, precio: 1 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('AVISA (no bloquea) cuando el número es absurdo para la unidad', async () => {
+    // Un cierre de 1 cm: casi seguro quiso ser 100. Se GUARDA igual y se avisa.
+    const r = await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 1, precio: 5 }] },
+      bd(),
+    );
+    expect(r.datos).toHaveLength(1);
+    expect(r.avisos.some((a) => a.includes('1 cm'))).toBe(true);
+  });
+
+  describe('medidas HEREDADAS marcadas para revisión (D3)', () => {
+    beforeEach(async () => {
+      // Lo que deja la migración cuando la etiqueta no se pudo convertir: valor NULL + la marca.
+      await cliente.avioMedida.create({
+        data: { idAvio, medida: 'S', precio: 4, requiereRevision: true, orden: 0 },
+      });
+    });
+
+    it('se listan vivas, promedian y salen con AVISO — nunca se tiran ni se adivinan', async () => {
+      const r = await listarMedidasDeAvio(sesion(), idAvio, bd());
+      expect(r.datos).toHaveLength(1);
+      expect(r.datos[0]?.valor).toBeNull();
+      expect(r.datos[0]?.requiereRevision).toBe(true);
+      expect(r.promedioPreCosto).toBe(4); // sigue costeando
+      expect(r.avisos.some((a) => a.includes('revisión manual'))).toBe(true);
+    });
+
+    it('corregirla POR ID la normaliza EN SU LUGAR, apaga la marca y deja la etiqueta vieja en la bitácora', async () => {
+      const previa = await cliente.avioMedida.findFirstOrThrow({ where: { idAvio } });
+      const r = await reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: 'cm', medidas: [{ id: previa.id, valor: 20, precio: 4 }] },
+        bd(),
+      );
+      expect(r.datos).toHaveLength(1); // la MISMA fila, no una nueva
+      expect(r.datos[0]?.id).toBe(previa.id);
+      expect(r.datos[0]?.medida).toBe('20 cm');
+      expect(r.datos[0]?.requiereRevision).toBe(false);
+
+      const bitacora = await cliente.bitacora.findFirst({
+        where: { entidad: 'Avio', idEntidad: String(idAvio) },
+        orderBy: { id: 'desc' },
+      });
+      expect(JSON.stringify(bitacora?.datos)).toContain('"antes":"S"');
+    });
+
+    it('un id de OTRO avío no se acepta (no se corrige la medida ajena)', async () => {
+      const otro = await cliente.avio.create({ data: { clave: 'X-1', descripcion: 'Otro' } });
+      const ajena = await cliente.avioMedida.create({
+        data: { idAvio: otro.id, medida: '9 cm', valor: 9, precio: 1 },
+      });
+      await expect(
+        reemplazarMedidasAvio(
+          sesion(),
+          idAvio,
+          { unidadMedida: 'cm', medidas: [{ id: ajena.id, valor: 9, precio: 1 }] },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+  });
+
+  it('normalizar una heredada hacia una etiqueta YA OCUPADA se rechaza con mensaje, no con un 500', async () => {
+    // "15 cm" ya existe en OTRA fila que el payload ni menciona. Al corregir la heredada "15cm" a
+    // 15 su etiqueta caería encima: sin la guarda esto revienta contra el `@@unique` a mitad de la
+    // transacción, con un error ilegible. Ojo: el payload trae UN SOLO renglón, así que el choque
+    // NO lo puede cazar la validación de repetidos dentro del cuerpo.
+    await cliente.avioMedida.create({
+      data: { idAvio, medida: '15 cm', valor: 15, precio: 5, orden: 0 },
+    });
+    const vieja = await cliente.avioMedida.create({
+      data: { idAvio, medida: '15cm', precio: 5, requiereRevision: true, orden: 1 },
+    });
+    await expect(
+      reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        { unidadMedida: 'cm', medidas: [{ id: vieja.id, valor: 15, precio: 5 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('dos renglones que derivan a la MISMA etiqueta se rechazan dentro del cuerpo', async () => {
+    await expect(
+      reemplazarMedidasAvio(
+        sesion(),
+        idAvio,
+        {
+          unidadMedida: 'cm',
+          // 53 y 53.0 son el mismo número: derivan a la misma etiqueta "53 cm".
+          medidas: [
+            { valor: 53, precio: 5 },
+            { valor: 53.0, precio: 6 },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('lo que ya no viene se DESACTIVA (borrado suave) y queda íntegro en la bitácora', async () => {
+    await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 5 }, { valor: 55, precio: 6 }] },
+      bd(),
+    );
+    const r = await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 5 }] },
+      bd(),
+    );
+    const desactivada = r.datos.find((d) => d.medida === '55 cm');
+    expect(desactivada?.activo).toBe(false);
+    expect(r.promedioPreCosto).toBe(5); // la desactivada NO promedia
+
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'Avio', idEntidad: String(idAvio) },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('"medida":"55 cm"');
+  });
+
+  it('re-capturar una medida desactivada la REACTIVA (no duplica)', async () => {
+    await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 5 }] },
+      bd(),
+    );
+    await reemplazarMedidasAvio(sesion(), idAvio, { unidadMedida: 'cm', medidas: [] }, bd());
+    const r = await reemplazarMedidasAvio(
+      sesion(),
+      idAvio,
+      { unidadMedida: 'cm', medidas: [{ valor: 53, precio: 7 }] },
+      bd(),
+    );
+    expect(r.datos).toHaveLength(1);
+    expect(r.datos[0]?.activo).toBe(true);
+    expect(r.datos[0]?.precio).toBe(7);
+  });
+});

@@ -389,3 +389,125 @@ describe('guardarMedidasAvio / obtenerMedidasAvio (R18)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });
+
+/**
+ * ⭐ V1-E3g (§Post-F9.66) — **dos modos de captura, nunca los dos vivos.** El modo lo deriva el
+ * servidor de un solo hecho: ¿el avío tiene medidas ACTIVAS en su catálogo? Un cierre las tiene y
+ * por talla se elige QUÉ se pide; un elástico no, y por talla se captura CUÁNTO se gasta.
+ */
+describe('modo de captura por talla (V1-E3g)', () => {
+  /** Le pone al avío un catálogo de medidas (con eso pasa a modo `medida`). */
+  async function volverPorMedida(idAvio: number): Promise<number> {
+    await cliente.avio.update({ where: { id: idAvio }, data: { unidadMedida: 'cm' } });
+    const m = await cliente.avioMedida.create({
+      data: { idAvio, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    return m.id;
+  }
+
+  it('sin medidas en el catálogo el modo es `consumo` y viaja la unidad del avío', async () => {
+    const { avio, modelo } = await prepararModeloConCurva();
+    await cliente.avio.update({ where: { id: avio.id }, data: { unidad: 'm' } });
+
+    const leido = await obtenerMedidasAvio(sesion(), modelo.id, avio.id, bd());
+    expect(leido.modoCaptura).toBe('consumo');
+    expect(leido.unidadConsumo).toBe('m');
+  });
+
+  it('con medidas activas el modo es `medida` y FUERZA `consumoPorTalla` a false (auditado)', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    const idMedida = await volverPorMedida(avio.id);
+
+    // El cliente insiste en encender el toggle: el dominio lo apaga y lo DICE.
+    const guardado = await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: true, tallas: [{ idTalla: tallaCh.id, idAvioMedida: idMedida }] },
+      bd(),
+    );
+    expect(guardado.modoCaptura).toBe('medida');
+    expect(guardado.consumoPorTalla).toBe(false);
+    expect(guardado.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(true);
+
+    const renglon = await cliente.modeloAvio.findUniqueOrThrow({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avio.id } },
+    });
+    expect(renglon.consumoPorTalla).toBe(false);
+
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'Modelo', idEntidad: String(modelo.id) },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('consumoPorTallaForzadoAFalse');
+  });
+
+  it('en modo `medida` el consumo NO se captura: lo siembra el consumo por prenda del renglón', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    const idMedida = await volverPorMedida(avio.id);
+
+    const guardado = await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: false, tallas: [{ idTalla: tallaCh.id, idAvioMedida: idMedida }] },
+      bd(),
+    );
+    const fila = guardado.tallas.find((t) => t.idTalla === tallaCh.id);
+    // `consumoPorPrenda` del BOM de prueba es 1 (una pieza por prenda), no un cero inventado.
+    expect(fila?.consumo).toBe(1);
+    expect(fila?.idAvioMedida).toBe(idMedida);
+    expect(fila?.medidaAmarrada).toBe('53 cm');
+  });
+
+  it('en modo `medida` re-guardar NO pisa la cantidad que la fila ya tenía (D3)', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    // Cantidad heredada de antes de V1-E3g: 3 piezas en CH.
+    await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: true, tallas: [{ idTalla: tallaCh.id, consumo: 3 }] },
+      bd(),
+    );
+    const idMedida = await volverPorMedida(avio.id);
+
+    const guardado = await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: false, tallas: [{ idTalla: tallaCh.id, idAvioMedida: idMedida }] },
+      bd(),
+    );
+    expect(guardado.tallas.find((t) => t.idTalla === tallaCh.id)?.consumo).toBe(3);
+  });
+
+  it('en modo `consumo` el consumo es OBLIGATORIO (mandar la talla sin él no crea un cero)', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    await expect(
+      guardarMedidasAvio(
+        sesion(),
+        modelo.id,
+        avio.id,
+        { consumoPorTalla: true, tallas: [{ idTalla: tallaCh.id }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('AVISA (no bloquea) cuando el consumo por talla es absurdo para la unidad del avío', async () => {
+    const { avio, modelo, tallaCh } = await prepararModeloConCurva();
+    await cliente.avio.update({ where: { id: avio.id }, data: { unidad: 'm' } });
+
+    // 75 m de elástico por prenda: casi seguro son 75 cm tecleados en la unidad equivocada.
+    const guardado = await guardarMedidasAvio(
+      sesion(),
+      modelo.id,
+      avio.id,
+      { consumoPorTalla: true, tallas: [{ idTalla: tallaCh.id, consumo: 75 }] },
+      bd(),
+    );
+    expect(guardado.tallas.find((t) => t.idTalla === tallaCh.id)?.consumo).toBe(75); // se guardó
+    expect(guardado.avisos.some((a) => a.includes('CH'))).toBe(true);
+  });
+});

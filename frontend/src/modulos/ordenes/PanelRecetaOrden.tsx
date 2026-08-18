@@ -501,7 +501,9 @@ function MedidasPorTalla({
   ocupado: boolean;
   alGuardar: (cuerpo: {
     consumoPorTalla?: boolean;
-    tallas?: { idTalla: number; consumo: number; idAvioMedida: number | null }[];
+    // `consumo` es OPCIONAL (V1-E3g): en modo `medida` no se captura por talla y lo resuelve el
+    // dominio con el consumo por prenda congelado del renglón.
+    tallas?: { idTalla: number; consumo?: number; idAvioMedida: number | null }[];
   }) => void;
 }): React.JSX.Element {
   const [abierto, setAbierto] = useState(false);
@@ -525,25 +527,48 @@ function MedidasPorTalla({
     setRenglones((prev) => prev.map((r) => (r.idTalla === idTalla ? { ...r, ...cambios } : r)));
   }
 
+  // ⭐ V1-E3g: el MODO lo manda el servidor (`modoCaptura`), no esta pantalla. En modo `medida`
+  // (cierres) por talla se elige QUÉ se pide y la cantidad ni se captura ni se manda; en modo
+  // `consumo` (elástico) se captura CUÁNTO, con la unidad del avío pegada al campo.
+  const porMedida = avio.modoCaptura === 'medida';
+
   function guardar(): void {
-    alGuardar({
-      // Las tallas en BLANCO NO se mandan: el set-completo las borra, que es justo cómo se
-      // "descaptura" una medida. Mandarlas como 0 crearía ceros reales que envenenan el MRP.
-      tallas: renglones
-        .filter((r) => r.consumo.trim() !== '')
-        .map((r) => ({
-          idTalla: r.idTalla,
-          consumo: Number(r.consumo.replace(',', '.')),
-          idAvioMedida: r.idAvioMedida,
-        })),
-    });
+    alGuardar(
+      porMedida
+        ? {
+            // Sólo viajan las tallas con medida elegida (set-completo: lo que no viene, no está —
+            // así se des-captura una talla dejándola en "Sin medida"). El `consumo` no se manda:
+            // lo resuelve el dominio con el consumo por prenda congelado del renglón.
+            consumoPorTalla: false,
+            tallas: renglones
+              .filter((r) => r.idAvioMedida !== null)
+              .map((r) => ({ idTalla: r.idTalla, idAvioMedida: r.idAvioMedida })),
+          }
+        : {
+            // Las tallas en BLANCO NO se mandan: el set-completo las borra, que es justo cómo se
+            // "descaptura" una cantidad. Mandarlas como 0 crearía ceros reales que envenenan el MRP.
+            tallas: renglones
+              .filter((r) => r.consumo.trim() !== '')
+              .map((r) => ({
+                idTalla: r.idTalla,
+                consumo: Number(r.consumo.replace(',', '.')),
+                idAvioMedida: r.idAvioMedida,
+              })),
+          },
+    );
   }
 
   const medidasCatalogo = (catalogoMedidas.data?.datos ?? []).filter((m) => m.activo);
-  const resumen = avio.tallas
-    .filter((t) => t.consumo !== null)
-    .map((t) => `${t.etiqueta} ${String(t.consumo)}`)
-    .join(' · ');
+  const resumen = porMedida
+    ? avio.tallas
+        .filter((t) => t.medidaAmarrada !== null)
+        .map((t) => `${t.etiqueta} ${String(t.medidaAmarrada)}`)
+        .join(' · ')
+    : avio.tallas
+        .filter((t) => t.consumo !== null)
+        .map((t) => `${t.etiqueta} ${String(t.consumo)}`)
+        .join(' · ');
+  const etiquetaPanel = porMedida ? 'medida' : 'consumo';
 
   return (
     <span className="ml-1 align-middle text-xs" data-testid={`receta-avio-tallas-${avio.id}`}>
@@ -554,7 +579,7 @@ function MedidasPorTalla({
         onClick={() => setAbierto((v) => !v)}
         data-testid={`toggle-medidas-receta-avio-${avio.id}`}
       >
-        (por talla: {resumen === '' ? 'sin medidas capturadas' : resumen})
+        (por talla: {resumen === '' ? `sin ${etiquetaPanel} capturado` : resumen})
       </button>
 
       {abierto ? (
@@ -562,22 +587,38 @@ function MedidasPorTalla({
           className="mt-1 block space-y-1.5 rounded-md border bg-card p-2"
           data-testid={`panel-medidas-receta-avio-${avio.id}`}
         >
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              className="size-4 rounded border-input accent-primary"
-              checked={avio.consumoPorTalla}
-              disabled={!editable || ocupado}
-              onChange={(e) => alGuardar({ consumoPorTalla: e.target.checked })}
-              data-testid={`consumo-por-talla-receta-${avio.id}`}
-            />
-            ¿Este avío se consume por talla EN ESTA ORDEN?
-          </label>
+          {avio.avisoCaptura === null ? null : (
+            <span
+              className="block rounded-md border border-warn/40 bg-warn-soft px-2 py-1.5"
+              data-testid={`aviso-captura-receta-avio-${avio.id}`}
+            >
+              {avio.avisoCaptura}
+            </span>
+          )}
+
+          {porMedida ? (
+            <span className="block text-muted-foreground" data-testid={`modo-medida-receta-${avio.id}`}>
+              Este avío se compra POR MEDIDA: por talla se elige <b>qué medida</b> se pide, no
+              cuánto se gasta. La cantidad es la del renglón y no cambia entre tallas.
+            </span>
+          ) : (
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-input accent-primary"
+                checked={avio.consumoPorTalla}
+                disabled={!editable || ocupado}
+                onChange={(e) => alGuardar({ consumoPorTalla: e.target.checked })}
+                data-testid={`consumo-por-talla-receta-${avio.id}`}
+              />
+              ¿Este avío se consume por talla EN ESTA ORDEN?
+            </label>
+          )}
 
           {!avio.tieneTallas ? (
             <span className="block text-muted-foreground" data-testid={`sin-tallas-${avio.id}`}>
               Esta orden todavía no tiene tallas capturadas en su matriz: captúralas para poder
-              definir el consumo por talla.
+              definir {porMedida ? 'la medida' : 'el consumo'} por talla.
             </span>
           ) : (
             <>
@@ -594,29 +635,39 @@ function MedidasPorTalla({
                       </ChipEstado>
                     )}
                   </label>
-                  <Input
-                    id={`medida-receta-avio-${String(avio.id)}-${String(r.idTalla)}`}
-                    type="number"
-                    min={0}
-                    step="0.0001"
-                    inputMode="decimal"
-                    className="h-7 w-24"
-                    placeholder="sin capturar"
-                    value={r.consumo}
-                    disabled={!editable || ocupado}
-                    onChange={(e) => cambiar(r.idTalla, { consumo: e.target.value })}
-                    data-testid={`medida-receta-avio-${avio.id}-${r.idTalla}`}
-                  />
+                  {porMedida ? null : (
+                    <>
+                      <Input
+                        id={`medida-receta-avio-${String(avio.id)}-${String(r.idTalla)}`}
+                        type="number"
+                        min={0}
+                        step="0.0001"
+                        inputMode="decimal"
+                        className="h-7 w-24"
+                        placeholder="sin capturar"
+                        value={r.consumo}
+                        disabled={!editable || ocupado}
+                        onChange={(e) => cambiar(r.idTalla, { consumo: e.target.value })}
+                        data-testid={`medida-receta-avio-${avio.id}-${r.idTalla}`}
+                      />
+                      {/* La unidad, PEGADA al campo (0.75 m ≠ 75 cm). */}
+                      {avio.unidad === null ? null : (
+                        <span className="text-muted-foreground" aria-hidden>
+                          {avio.unidad}
+                        </span>
+                      )}
+                    </>
+                  )}
                   {medidasCatalogo.length > 0 ? (
                     <SelectNativo
                       className="w-48"
                       aria-label={`Medida del avío para la talla ${r.etiqueta}`}
                       title={
-                        r.consumo.trim() === ''
+                        !porMedida && r.consumo.trim() === ''
                           ? 'Captura primero el consumo de esta talla para poder amarrarle una medida.'
                           : undefined
                       }
-                      disabled={!editable || ocupado || r.consumo.trim() === ''}
+                      disabled={!editable || ocupado || (!porMedida && r.consumo.trim() === '')}
                       value={r.idAvioMedida === null ? '' : String(r.idAvioMedida)}
                       onChange={(e) =>
                         cambiar(r.idTalla, {
@@ -644,7 +695,7 @@ function MedidasPorTalla({
                   disabled={ocupado}
                   data-testid={`guardar-medidas-receta-avio-${avio.id}`}
                 >
-                  Guardar consumo por talla
+                  Guardar {porMedida ? 'medida por talla' : 'consumo por talla'}
                 </Button>
               ) : null}
             </>

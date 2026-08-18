@@ -1482,3 +1482,141 @@ describe('⭐ CRITERIO DE CIERRE — dos órdenes del mismo modelo, una con jare
     expect(r.desalineacion.cambios.some((c) => c.que === 'quitado')).toBe(true);
   });
 });
+
+/**
+ * ⭐ V1-E3g (§Post-F9.66) — **medida vs. consumo en la receta de la ORDEN.** El renglón publica su
+ * `modoCaptura` (derivado de si el avío tiene medidas activas) y el toggle `consumoPorTalla` no
+ * puede quedar encendido en un avío "por medida": si quedara, unas cantidades por talla que la
+ * pantalla ya no muestra seguirían moviendo el requerido en la sombra.
+ */
+describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
+  /** Le pone al botón un catálogo de medidas → pasa a modo `medida`. */
+  async function botonPorMedida(): Promise<number> {
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    const m = await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    return m.id;
+  }
+
+  it('sin medidas en el catálogo el renglón sale en modo `consumo`', async () => {
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.modoCaptura).toBe('consumo');
+    expect(boton.unidadMedida).toBeNull();
+    expect(boton.avisoCaptura).toBeNull();
+  });
+
+  it('con medidas activas sale en modo `medida` y con la unidad de la especificación', async () => {
+    await botonPorMedida();
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.modoCaptura).toBe('medida');
+    expect(boton.unidadMedida).toBe('cm');
+    // La unidad de CONSUMO sigue siendo la suya (pza): son dos datos distintos.
+    expect(boton.unidad).toBe('pza');
+  });
+
+  it('el toggle NO se puede encender en un avío por medida (se normaliza al guardar)', async () => {
+    await botonPorMedida();
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      previo.id,
+      { consumoPorTalla: true },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.consumoPorTalla).toBe(false);
+  });
+
+  it('en modo `medida` se captura la MEDIDA por talla sin mandar cantidad (la siembra el dominio)', async () => {
+    const idMedida = await botonPorMedida();
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      previo.id,
+      { tallas: [{ idTalla: tallaCH.id, idAvioMedida: idMedida }] },
+      bd(),
+    );
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    const ch = boton.tallas.find((t) => t.idTalla === tallaCH.id)!;
+    // El consumo por prenda congelado del botón es 2: NO se inventa un cero.
+    expect(ch.consumo).toBe(2);
+    expect(ch.medidaAmarrada).toBe('53 cm');
+  });
+
+  it('AGREGAR un renglón por medida tampoco puede encender el toggle', async () => {
+    await botonPorMedida();
+    // Se quita el botón (lápida) y se vuelve a agregar pidiendo el toggle encendido.
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await quitarRenglonReceta(sesion(), ordenA, 'avio', previo.id, { motivo: 'prueba' }, bd());
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: avioBoton.id, consumoPorPrenda: 2, consumoPorTalla: true },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.consumoPorTalla).toBe(false);
+  });
+
+  it('RESTAURAR desde el modelo no es la rendija por la que el toggle vuelve a encenderse', async () => {
+    await botonPorMedida();
+    // El BOM del modelo trae el toggle encendido (dato anterior a V1-E3g).
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await editarRenglonReceta(sesion(), ordenA, 'avio', previo.id, { consumoPorPrenda: 9 }, bd());
+    const r = await restaurarRenglonReceta(sesion(), ordenA, 'avio', previo.id, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.consumoPorPrenda).toBe(2); // sí se restauró del modelo
+    expect(boton.consumoPorTalla).toBe(false); // pero el toggle NO revivió
+  });
+
+  it('la CONTRADICCIÓN heredada se AVISA en la lectura y se apaga al guardar (nunca en silencio)', async () => {
+    // Estado de antes de V1-E3g: el renglón trae el toggle encendido y el avío es "por medida".
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await cliente.ordenAvio.update({
+      where: { id: previo.id },
+      data: { consumoPorTalla: true },
+    });
+    const idMedida = await botonPorMedida();
+
+    // La LECTURA avisa pero NO cambia el dato (una consulta jamás voltea el cálculo de una orden).
+    const leido = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const conAviso = leido.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(conAviso.consumoPorTalla).toBe(true);
+    expect(conAviso.avisoCaptura).toContain('POR MEDIDA');
+    expect(
+      (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: previo.id } })).consumoPorTalla,
+    ).toBe(true);
+
+    // Al GUARDAR la captura por talla —que sí es una acción del usuario— se normaliza.
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      previo.id,
+      { tallas: [{ idTalla: tallaCH.id, idAvioMedida: idMedida }] },
+      bd(),
+    );
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.consumoPorTalla).toBe(false);
+    expect(boton.avisoCaptura).toBeNull();
+  });
+});

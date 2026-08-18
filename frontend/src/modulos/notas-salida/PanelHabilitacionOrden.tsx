@@ -1,4 +1,4 @@
-import { Boxes, FileText, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Boxes, FileText, Plus, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -46,6 +46,13 @@ function aNum(texto: string): number {
  * nota de salida (N)"** abre el constructor PRE-CARGADO con lo seleccionado + el maquilero de la
  * orden. Se abre desde el tile "Avíos" del centro de Órdenes (R2) y desde el banner de notas.
  * CERO lógica de negocio (A1): requerido/enviado/estado/% los agrega el backend (B13).
+ *
+ * ⭐ **V1-E3g (§Post-F9.64) — el aviso de tallas SIN MEDIDA aterriza aquí.** El mecanismo existía
+ * desde F8 (`tallasSinMedida` del helper R18) pero sólo lo pintaba el MRP; la habilitación —la
+ * pantalla que sí mira quien surte— lo tiraba a la basura. Ahora cada renglón dice qué tallas de la
+ * orden no tienen medida capturada (su requerido salió con el consumo por prenda) y el pie trae el
+ * conteo. **Avisa, NO bloquea**: la orden se surte igual, porque una talla de última hora es
+ * producción legítima. Las etiquetas y el conteo los AGREGA EL SERVIDOR.
  */
 export function PanelHabilitacionOrden({
   idOrden,
@@ -290,6 +297,11 @@ export function PanelHabilitacionOrden({
                 ) : (
                   <span className="font-medium text-ok">Orden surtida por completo ✓</span>
                 )}
+                {hab.aviosSinMedida > 0 ? (
+                  <span className="ml-2 text-warn" data-testid="hab-sin-medida-total">
+                    · <b>{hab.aviosSinMedida}</b> avío(s) con tallas sin medida capturada
+                  </span>
+                ) : null}
               </span>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={verNotas} data-testid="hab-ver-notas">
@@ -366,6 +378,18 @@ function FilaHab({
           {avio.descripcion}
           {avio.esExtra ? ' · fuera de receta' : ''}
         </div>
+        {/* ⭐ §Post-F9.64 — AVISA, NO BLOQUEA: la orden pide tallas para las que este avío no tiene
+            medida capturada, así que su requerido salió con el consumo por prenda. El servidor ya
+            trae las etiquetas agregadas (nunca se pivotea aquí). */}
+        {avio.tallasSinMedida.length > 0 ? (
+          <div className="mt-0.5 flex items-start gap-1 text-xs text-warn" data-testid="hab-sin-medida">
+            <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+            <span>
+              Sin medida por talla: <b>{avio.tallasSinMedida.join(', ')}</b> — se usó el consumo por
+              prenda.
+            </span>
+          </div>
+        ) : null}
       </td>
       <td className="py-2 pr-3 text-right tabular-nums">
         {avio.esExtra ? (

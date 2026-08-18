@@ -81,6 +81,9 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         paraProduccion: true,
         paraCosto: true,
         consumoPorTalla: false,
+        modoCaptura: 'consumo',
+        unidadMedida: null,
+        avisoCaptura: null,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -109,6 +112,9 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         paraProduccion: true,
         paraCosto: true,
         consumoPorTalla: false,
+        modoCaptura: 'consumo',
+        unidadMedida: null,
+        avisoCaptura: null,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -342,6 +348,9 @@ describe('Medidas por talla en la OP (§Post-F9.43(c))', () => {
           ? {
               ...a,
               consumoPorTalla: true,
+              modoCaptura: 'consumo',
+              unidadMedida: null,
+              avisoCaptura: null,
               tieneTallas: true,
               tallas: [
                 {

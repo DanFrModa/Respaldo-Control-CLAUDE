@@ -27698,7 +27698,22 @@
                           },
                           "medida": {
                             "type": "string",
-                            "description": "Etiqueta de la medida."
+                            "description": "ETIQUETA de la medida (\"53 cm\"), derivada de `valor` + la unidad del avío."
+                          },
+                          "valor": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "NÚMERO de la medida. `null` SOLO en filas heredadas cuya etiqueta no se pudo convertir (\"S\", \"vieja\", rangos): quedan marcadas `requiereRevision` en vez de perderse (D3)."
+                          },
+                          "requiereRevision": {
+                            "type": "boolean",
+                            "description": "¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando."
                           },
                           "precio": {
                             "type": "number",
@@ -27718,6 +27733,8 @@
                         "required": [
                           "id",
                           "medida",
+                          "valor",
+                          "requiereRevision",
                           "precio",
                           "orden",
                           "activo"
@@ -27726,6 +27743,17 @@
                         "description": "Medida de un avío \"por medida\"."
                       },
                       "description": "Medidas del avío (ordenadas)."
+                    },
+                    "unidadMedida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Unidad en que se expresan las medidas de este avío (cm, mm…), o null."
                     },
                     "promedioPreCosto": {
                       "anyOf": [
@@ -27737,11 +27765,20 @@
                         }
                       ],
                       "description": "Promedio de precios de las medidas activas (el que usa el precosto), o null."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo)."
                     }
                   },
                   "required": [
                     "datos",
-                    "promedioPreCosto"
+                    "unidadMedida",
+                    "promedioPreCosto",
+                    "avisos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas de un avío con el promedio del precosteo."
@@ -27908,17 +27945,35 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "unidadMedida": {
+                    "default": null,
+                    "description": "Unidad en que se expresan las medidas del avío (cm, mm, pulg…).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "medidas": {
                     "maxItems": 100,
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
-                        "medida": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 60,
-                          "description": "Etiqueta de la medida (ej. \"15 cm\", \"18 cm\")."
+                        "id": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "valor": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 999999,
+                          "description": "NÚMERO de la medida, en la `unidadMedida` del avío (ej. 53 para un cierre de 53 cm)."
                         },
                         "precio": {
                           "type": "number",
@@ -27933,7 +27988,7 @@
                         }
                       },
                       "required": [
-                        "medida",
+                        "valor",
                         "precio"
                       ]
                     }
@@ -27987,7 +28042,22 @@
                           },
                           "medida": {
                             "type": "string",
-                            "description": "Etiqueta de la medida."
+                            "description": "ETIQUETA de la medida (\"53 cm\"), derivada de `valor` + la unidad del avío."
+                          },
+                          "valor": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "NÚMERO de la medida. `null` SOLO en filas heredadas cuya etiqueta no se pudo convertir (\"S\", \"vieja\", rangos): quedan marcadas `requiereRevision` en vez de perderse (D3)."
+                          },
+                          "requiereRevision": {
+                            "type": "boolean",
+                            "description": "¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando."
                           },
                           "precio": {
                             "type": "number",
@@ -28007,6 +28077,8 @@
                         "required": [
                           "id",
                           "medida",
+                          "valor",
+                          "requiereRevision",
                           "precio",
                           "orden",
                           "activo"
@@ -28015,6 +28087,17 @@
                         "description": "Medida de un avío \"por medida\"."
                       },
                       "description": "Medidas del avío (ordenadas)."
+                    },
+                    "unidadMedida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Unidad en que se expresan las medidas de este avío (cm, mm…), o null."
                     },
                     "promedioPreCosto": {
                       "anyOf": [
@@ -28026,11 +28109,20 @@
                         }
                       ],
                       "description": "Promedio de precios de las medidas activas (el que usa el precosto), o null."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo)."
                     }
                   },
                   "required": [
                     "datos",
-                    "promedioPreCosto"
+                    "unidadMedida",
+                    "promedioPreCosto",
+                    "avisos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas de un avío con el promedio del precosteo."
@@ -58356,6 +58448,12 @@
                       "maximum": 9007199254740991,
                       "description": "# de avíos de la receta con faltante > 0."
                     },
+                    "aviosSinMedida": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de avíos de la receta con al menos una talla sin medida capturada (§Post-F9.64). El conteo se AGREGA EN SERVIDOR (nunca pivoteando en el cliente)."
+                    },
                     "avios": {
                       "type": "array",
                       "items": {
@@ -58420,6 +58518,17 @@
                               "extra"
                             ],
                             "description": "Estado de surtido del avío en la orden."
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿Este avío se captura POR TALLA (R18)? Sólo esos pueden tener tallas sin medida."
+                          },
+                          "tallasSinMedida": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Etiquetas de las tallas que la orden PIDE (piezas > 0) y que NO tienen medida capturada en este avío (§Post-F9.64). Su requerido se calculó con el consumo por prenda. AVISA, NO BLOQUEA. Vacío en avíos de consumo plano y en los que sí están completos. Un cero CAPTURADO no aparece aquí: es una decisión, no un olvido."
                           }
                         },
                         "required": [
@@ -58433,7 +58542,9 @@
                           "falta",
                           "porcentaje",
                           "esExtra",
-                          "estado"
+                          "estado",
+                          "consumoPorTalla",
+                          "tallasSinMedida"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de habilitación de un avío en la orden."
@@ -58457,6 +58568,7 @@
                     "pendientes",
                     "faltaTotal",
                     "faltanAvios",
+                    "aviosSinMedida",
                     "avios"
                   ],
                   "additionalProperties": false,
@@ -59873,6 +59985,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -60024,6 +60166,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -60655,8 +60800,7 @@
                             }
                           },
                           "required": [
-                            "idTalla",
-                            "consumo"
+                            "idTalla"
                           ]
                         }
                       },
@@ -61193,6 +61337,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -61344,6 +61518,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -61904,8 +62081,7 @@
                         }
                       },
                       "required": [
-                        "idTalla",
-                        "consumo"
+                        "idTalla"
                       ]
                     }
                   },
@@ -62420,6 +62596,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -62571,6 +62777,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -63505,6 +63714,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -63656,6 +63895,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -64574,6 +64816,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -64725,6 +64997,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -65618,6 +65893,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -65769,6 +66074,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -66662,6 +66970,36 @@
                             "type": "boolean",
                             "description": "¿El consumo se captura por TALLA (R18)?"
                           },
+                          "modoCaptura": {
+                            "type": "string",
+                            "enum": [
+                              "consumo",
+                              "medida"
+                            ],
+                            "description": "⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez."
+                          },
+                          "unidadMedida": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo)."
+                          },
+                          "avisoCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null."
+                          },
                           "idAvioProveedor": {
                             "anyOf": [
                               {
@@ -66813,6 +67151,9 @@
                           "paraProduccion",
                           "paraCosto",
                           "consumoPorTalla",
+                          "modoCaptura",
+                          "unidadMedida",
+                          "avisoCaptura",
                           "idAvioProveedor",
                           "proveedorAmarrado",
                           "tallas",
@@ -195218,6 +195559,43 @@
                       "type": "boolean",
                       "description": "¿El modelo tiene curva de tallas asignada?"
                     },
+                    "modoCaptura": {
+                      "type": "string",
+                      "enum": [
+                        "consumo",
+                        "medida"
+                      ],
+                      "description": "¿Por talla se captura la CANTIDAD (consumo) o la ESPECIFICACIÓN (medida)?"
+                    },
+                    "unidadConsumo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "`Avio.unidad` — la unidad del CONSUMO (m, pza…). La UI la pega al campo."
+                    },
+                    "unidadMedida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "`Avio.unidadMedida` — la unidad de las MEDIDAS del avío (cm, mm…), o null."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante)."
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -195242,7 +195620,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Consumo capturado del avío para esta talla; null = sin capturar (no hay fila)."
+                            "description": "CANTIDAD capturada del avío para esta talla (en `Avio.unidad`); null = sin capturar (no hay fila). NO es la medida/especificación: eso es `idAvioMedida`."
                           },
                           "enCurva": {
                             "type": "boolean",
@@ -195294,7 +195672,7 @@
                           "precioMedida"
                         ],
                         "additionalProperties": false,
-                        "description": "Medida (consumo) de un avío del BOM para una talla."
+                        "description": "Renglón por talla de un avío del BOM: su CANTIDAD y/o su MEDIDA amarrada."
                       },
                       "description": "Medidas por talla del avío."
                     }
@@ -195304,6 +195682,10 @@
                     "idAvio",
                     "consumoPorTalla",
                     "tieneCurva",
+                    "modoCaptura",
+                    "unidadConsumo",
+                    "unidadMedida",
+                    "avisos",
                     "tallas"
                   ],
                   "additionalProperties": false,
@@ -195504,8 +195886,7 @@
                         }
                       },
                       "required": [
-                        "idTalla",
-                        "consumo"
+                        "idTalla"
                       ]
                     }
                   }
@@ -195577,6 +195958,43 @@
                       "type": "boolean",
                       "description": "¿El modelo tiene curva de tallas asignada?"
                     },
+                    "modoCaptura": {
+                      "type": "string",
+                      "enum": [
+                        "consumo",
+                        "medida"
+                      ],
+                      "description": "¿Por talla se captura la CANTIDAD (consumo) o la ESPECIFICACIÓN (medida)?"
+                    },
+                    "unidadConsumo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "`Avio.unidad` — la unidad del CONSUMO (m, pza…). La UI la pega al campo."
+                    },
+                    "unidadMedida": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "`Avio.unidadMedida` — la unidad de las MEDIDAS del avío (cm, mm…), o null."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante)."
+                    },
                     "tallas": {
                       "type": "array",
                       "items": {
@@ -195601,7 +196019,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Consumo capturado del avío para esta talla; null = sin capturar (no hay fila)."
+                            "description": "CANTIDAD capturada del avío para esta talla (en `Avio.unidad`); null = sin capturar (no hay fila). NO es la medida/especificación: eso es `idAvioMedida`."
                           },
                           "enCurva": {
                             "type": "boolean",
@@ -195653,7 +196071,7 @@
                           "precioMedida"
                         ],
                         "additionalProperties": false,
-                        "description": "Medida (consumo) de un avío del BOM para una talla."
+                        "description": "Renglón por talla de un avío del BOM: su CANTIDAD y/o su MEDIDA amarrada."
                       },
                       "description": "Medidas por talla del avío."
                     }
@@ -195663,6 +196081,10 @@
                     "idAvio",
                     "consumoPorTalla",
                     "tieneCurva",
+                    "modoCaptura",
+                    "unidadConsumo",
+                    "unidadMedida",
+                    "avisos",
                     "tallas"
                   ],
                   "additionalProperties": false,

@@ -23,6 +23,8 @@ function avio(over: Partial<HabilitacionAvio> = {}): HabilitacionAvio {
     porcentaje: 55.5,
     esExtra: false,
     estado: 'parcial',
+    consumoPorTalla: false,
+    tallasSinMedida: [],
     ...over,
   };
 }
