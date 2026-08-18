@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '@/api/tipos';
 import { CascaronSistema } from '@/modulos/CascaronSistema';
+import { NoEncontrado } from '@/paginas/NoEncontrado';
+import { Proximamente } from '@/paginas/Proximamente';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 
@@ -54,6 +56,47 @@ describe('GuardiaPermisoRuta', () => {
   it('una ruta sin declaración no se cierra (la capa es de presentación, A4)', () => {
     renderGuardia('/ruta-inventada-que-no-existe');
     expect(screen.getByText(TEXTO_PANTALLA)).toBeInTheDocument();
+  });
+});
+
+describe('el texto de permisos vive en UN solo lugar', () => {
+  // §Post-F9.68 (hallazgo MEDIA del reviewer, 18-ago-2026): el 404 decía "no
+  // existe O NO TIENES PERMISO PARA VERLA" — el único texto de la app que le
+  // hablaba de permisos al usuario, y falso desde que existe la capa de ruta.
+  it('el 404 ya no habla de permisos: solo dice que la página no existe', () => {
+    renderConProveedores(<NoEncontrado />, { sesion: estadoSesionDePrueba([]) });
+    expect(screen.getByText(/no existe/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/permiso/i);
+  });
+
+  it('un módulo que los permisos esconden responde con el texto aprobado, no con el 404', () => {
+    // `/costos` es entrada del menú con permisos; sin ellos NO es "no existe".
+    renderConProveedores(
+      <Routes>
+        <Route path=":modulo" element={<Proximamente />} />
+      </Routes>,
+      { sesion: estadoSesionDePrueba([]), rutaInicial: '/costos' },
+    );
+    expect(screen.getByText(TEXTO_AVISO)).toBeInTheDocument();
+    expect(screen.queryByText(/no existe/i)).toBeNull();
+  });
+
+  it('un módulo que SÍ es visible se pinta (gemela positiva) y una ruta inventada da 404', () => {
+    renderConProveedores(
+      <Routes>
+        <Route path=":modulo" element={<Proximamente />} />
+      </Routes>,
+      { sesion: estadoSesionDePrueba(['costos.ver']), rutaInicial: '/costos' },
+    );
+    expect(screen.queryByText(TEXTO_AVISO)).toBeNull();
+
+    renderConProveedores(
+      <Routes>
+        <Route path=":modulo" element={<Proximamente />} />
+      </Routes>,
+      { sesion: estadoSesionDePrueba(['costos.ver']), rutaInicial: '/modulo-inventado' },
+    );
+    expect(screen.getByText(/no existe/i)).toBeInTheDocument();
   });
 });
 

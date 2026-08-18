@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 import fuenteApp from '@/App.tsx?raw';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { esRutaComodin, exigenciaDeRuta, rutaPermitida } from '@/modulos/catalogo';
+import {
+  declaracionDeRuta,
+  esRutaComodin,
+  exigenciaDeRuta,
+  RUTAS_HUB,
+  rutaPermitida,
+} from '@/modulos/catalogo';
 
 /**
  * LA CAPA DE RUTA (V1-E6b · `DECISIONES.md §Post-F9.68`).
@@ -102,6 +108,66 @@ describe('deriva: toda ruta de App.tsx declara su permiso', () => {
   it('NINGUNA ruta se quedó sin declaración', () => {
     const sinGate = rutas.filter((ruta) => exigenciaDeRuta(comoPathname(ruta)) === undefined);
     expect(sinGate).toEqual([]);
+  });
+
+  /**
+   * TERCERA ASERCIÓN (hallazgo ALTA del reviewer, 18-ago-2026). Las otras dos
+   * cubren *sin declaración* y *abierta por herencia*, pero son CIEGAS a un
+   * tercer hueco: **gateada DE MÁS por herencia**.
+   *
+   * Una PORTADA-HUB se abre con la UNIÓN de los permisos de sus tarjetas —para
+   * que quien tenga una sola aterrice ahí y vea esa tarjeta—. Esa unión es
+   * correcta para el hub y VENENOSA hacia abajo: heredada, abre cada pantalla
+   * hija a cualquiera que tenga el permiso de OTRA. Pasó de verdad: las cinco
+   * pantallas de Administración heredaban de `/administracion` y un usuario de
+   * pura bitácora entraba a Usuarios, Roles y Empresas. Esas rutas se veían
+   * perfectamente "gateadas" y pasaban las dos aserciones de arriba.
+   *
+   * La regla: ninguna ruta puede resolver contra un HUB que no sea ella misma.
+   */
+  it('ninguna pantalla hereda el gate de una portada-hub (unión de tarjetas)', () => {
+    const heredadas = rutas
+      .map((ruta) => ({ ruta, origen: declaracionDeRuta(comoPathname(ruta))?.ruta }))
+      .filter(
+        ({ ruta, origen }) =>
+          origen !== undefined && RUTAS_HUB.includes(origen) && comoPathname(ruta) !== origen,
+      )
+      .map(({ ruta, origen }) => `${ruta} ← ${String(origen)}`);
+    expect(heredadas).toEqual([]);
+  });
+
+  /**
+   * Regresión del hallazgo ALTA, medida como la midió el reviewer: con SOLO
+   * `admin.ver-bitacora` se entra a la Bitácora y a NADA más de Administración.
+   */
+  it('un usuario de pura bitácora no entra a las otras pantallas de Administración', () => {
+    const soloBitacora = permisosDe('admin.ver-bitacora');
+    expect(rutaPermitida('/administracion/bitacora', soloBitacora)).toBe(true);
+    // El HUB sí (aterriza con su única tarjeta) — la unión es correcta ahí.
+    expect(rutaPermitida('/administracion', soloBitacora)).toBe(true);
+    for (const hija of [
+      '/administracion/usuarios',
+      '/administracion/roles',
+      '/administracion/empresas',
+      '/administracion/conceptos-costo',
+      '/administracion/estados-lista',
+    ]) {
+      expect(rutaPermitida(hija, soloBitacora)).toBe(false);
+    }
+    // Gemelas positivas: con SU permiso, cada una sí abre.
+    expect(rutaPermitida('/administracion/usuarios', permisosDe('usuarios.administrar'))).toBe(
+      true,
+    );
+    expect(rutaPermitida('/administracion/roles', permisosDe('roles.administrar'))).toBe(true);
+    expect(rutaPermitida('/administracion/empresas', permisosDe('empresas.administrar'))).toBe(
+      true,
+    );
+    expect(
+      rutaPermitida('/administracion/conceptos-costo', permisosDe('concepto-costo.administrar')),
+    ).toBe(true);
+    expect(
+      rutaPermitida('/administracion/estados-lista', permisosDe('estado-lista.administrar')),
+    ).toBe(true);
   });
 
   /**

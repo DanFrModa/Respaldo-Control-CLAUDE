@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 
 import { buscarModuloPorClave, esEntradaVisible, ICONOS_MODULO } from '@/modulos/catalogo';
+import { PantallaNoDisponible } from '@/sesion/PantallaNoDisponible';
 import { useSesion } from '@/sesion/useSesion';
 
 import { NoEncontrado } from './NoEncontrado';
@@ -13,17 +14,23 @@ import { NoEncontrado } from './NoEncontrado';
  * (/produccion, /compras). Cuando una pantalla real exista, su ruta especifica
  * tiene prioridad y reemplaza a este comodin sin tocarlo.
  *
- * Un primer segmento que no es entrada del menu, o una entrada que los permisos
- * del usuario no hacen visible, responde "no encontrado" (sin permiso ->
- * oculto, A4).
+ * Un primer segmento que NO es entrada del menú responde "no encontrado" (esa
+ * página de verdad no existe). Si la entrada existe pero los permisos no la
+ * hacen visible, responde con el texto aprobado de §Post-F9.68 —el mismo que da
+ * la capa de ruta—, porque es el caso del ENLACE COMPARTIDO: la pantalla existe
+ * y no le toca a este usuario. Antes las dos salidas eran el 404, cuyo texto
+ * hablaba de permisos aunque el módulo ni existiera.
  */
 export function Proximamente(): React.JSX.Element {
   const { modulo: claveModulo } = useParams();
   const { permisos } = useSesion();
   const modulo = buscarModuloPorClave(claveModulo ?? '');
 
-  if (!modulo || !esEntradaVisible(modulo, permisos)) {
+  if (!modulo) {
     return <NoEncontrado />;
+  }
+  if (!esEntradaVisible(modulo, permisos)) {
+    return <PantallaNoDisponible />;
   }
 
   const Icono = ICONOS_MODULO[modulo.icono];

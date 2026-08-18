@@ -1,8 +1,8 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
 import { rutaPermitida } from '@/modulos/catalogo';
 
+import { PantallaNoDisponible } from './PantallaNoDisponible';
 import { useSesion } from './useSesion';
 
 /**
@@ -31,16 +31,5 @@ export function GuardiaPermisoRuta({ children }: { children: React.ReactNode }):
     return <>{children}</>;
   }
 
-  return (
-    <div className="h-full overflow-y-auto" data-testid="pantalla-no-disponible">
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-4 py-16 text-center">
-        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-          Esta pantalla no está disponible para tu usuario.
-        </h1>
-        <Button asChild className="mt-6">
-          <Link to="/">Ir al inicio</Link>
-        </Button>
-      </div>
-    </div>
-  );
+  return <PantallaNoDisponible />;
 }

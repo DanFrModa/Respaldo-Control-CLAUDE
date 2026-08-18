@@ -1913,11 +1913,11 @@ export type ExigenciaRuta = readonly ClavePermiso[] | 'autenticado';
  *  - COMODINES (`:modulo` → «Próximamente», `*` → «No encontrado»): ambas ya
  *    resuelven por su cuenta lo que el usuario puede ver.
  */
+const RUTAS_HUB_EXTRA: readonly `/${string}`[] = ['/catalogos', '/inventarios', '/produccion'];
+
 const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: ExigenciaRuta])[] = [
   // ── Portadas-hub (sus tarjetas se filtran solas) ──
-  ['/catalogos', 'autenticado'],
-  ['/inventarios', 'autenticado'],
-  ['/produccion', 'autenticado'],
+  ...RUTAS_HUB_EXTRA.map((ruta) => [ruta, 'autenticado'] as const),
   // ── Redirecciones puras (el destino es el que gatea) ──
   ['/produccion/corte', 'autenticado'],
   ['/produccion/envios', 'autenticado'],
@@ -1937,6 +1937,36 @@ const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: Exige
   // enlace pegado, así que la ruta pide el permiso de escritura y no el de ver.
   ['/cxp/importar-cfdi', ['cxp.administrar']],
   ['/cxc/importar-cfdi', ['cxc.administrar']],
+  // ── Las CINCO pantallas de Administración que no son hoja del catálogo ──
+  //
+  // ⚠️ SIN estas líneas heredaban de `/administracion`, cuyo gate es la UNIÓN de
+  // los permisos de sus tarjetas (incluida `admin.ver-bitacora`): un usuario de
+  // pura bitácora abría Usuarios, Roles y Empresas, veía encabezado y el botón
+  // «Nuevo», y la consulta reventaba — el síntoma exacto que §Post-F9.68 manda
+  // matar, en el módulo más sensible. La unión es correcta PARA EL HUB (ahí
+  // aterriza con su única tarjeta) pero NO puede heredarse hacia abajo.
+  //
+  // El permiso de cada una es el de SU TARJETA en `AdministracionPagina`
+  // (`SECCIONES_LISTAS`), la misma fuente que decide si la tarjeta se ve.
+  ['/administracion/usuarios', ['usuarios.administrar']],
+  ['/administracion/roles', ['roles.administrar']],
+  ['/administracion/empresas', ['empresas.administrar']],
+  ['/administracion/conceptos-costo', ['concepto-costo.administrar']],
+  ['/administracion/estados-lista', ['estado-lista.administrar']],
+];
+
+/**
+ * Las PORTADAS-HUB: rutas cuyo gate es la UNIÓN de los permisos de sus tarjetas
+ * (o `autenticado`), porque el hub existe para mostrar las tarjetas que cada
+ * quien puede abrir. Esa unión vale SOLO para el hub: heredarla hacia una
+ * pantalla hija la abriría de más. La prueba `catalogo-rutas.test.ts` exige que
+ * ninguna ruta hija resuelva contra su hub.
+ */
+export const RUTAS_HUB: readonly string[] = [
+  ...ESPEC_RIEL.flatMap((grupo) =>
+    grupo.entradas.flatMap((entrada) => (entrada.tipo === 'colapsar' ? [entrada.ruta] : [])),
+  ),
+  ...RUTAS_HUB_EXTRA,
 ];
 
 /** Rutas comodín de `App.tsx` que resuelven por su cuenta lo que se puede ver. */
@@ -2010,32 +2040,49 @@ const DECLARACIONES_RUTA: readonly (readonly [string, ExigenciaRuta])[] = [
  * declarar caería en ella y el gate se apagaría en silencio.
  */
 export function exigenciaDeRuta(pathname: string): ExigenciaRuta | undefined {
+  return declaracionDeRuta(pathname)?.exige;
+}
+
+/**
+ * Igual que {@link exigenciaDeRuta} pero diciendo TAMBIÉN de QUÉ declaración
+ * salió el permiso. La prueba de deriva lo necesita: sin saber el origen no se
+ * puede distinguir una ruta con gate PROPIO de una que HEREDÓ el de su
+ * portada-hub —que es la unión de las tarjetas y abre de más—; las dos se ven
+ * igual de "gateadas" si solo se mira el permiso resultante.
+ */
+export function declaracionDeRuta(
+  pathname: string,
+): { ruta: string; exige: ExigenciaRuta } | undefined {
   if (pathname === '/') {
-    return 'autenticado';
+    return { ruta: '/', exige: 'autenticado' };
   }
   const segmentos = segmentosDe(pathname);
   if (segmentos.length === 0) {
-    return 'autenticado';
+    return { ruta: '/', exige: 'autenticado' };
   }
-  let mejor: { exige: ExigenciaRuta; especificidad: number } | undefined;
+  let mejor: { ruta: string; exige: ExigenciaRuta; especificidad: number } | undefined;
   for (const [ruta, exige] of DECLARACIONES_RUTA) {
     const especificidad = especificidadPatron(ruta, segmentos);
     if (especificidad === null) {
       continue;
     }
     if (mejor === undefined || especificidad > mejor.especificidad) {
-      mejor = { exige, especificidad };
+      mejor = { ruta, exige, especificidad };
     } else if (especificidad === mejor.especificidad) {
-      // EMPATE (la misma ruta declarada dos veces): se toma la UNIÓN, nunca la
+      // EMPATE (la MISMA ruta declarada dos veces): se toma la UNIÓN, nunca la
       // más estricta. El caso real es `/administracion`, hoja del catálogo con
       // los cuatro `*.administrar` y entrada del riel con esos MÁS
       // `admin.ver-bitacora` (quien solo tiene la bitácora ve la entrada en el
       // menú y aterriza en el hub con esa única tarjeta). La capa de ruta NUNCA
-      // debe cerrar una pantalla que el menú sí ofrece.
-      mejor = { exige: unirExigencias(mejor.exige, exige), especificidad };
+      // debe cerrar una pantalla que el menú sí ofrece. El empate solo se da
+      // entre patrones idénticos, así que la ruta de origen es la misma.
+      mejor = { ruta: mejor.ruta, exige: unirExigencias(mejor.exige, exige), especificidad };
     }
   }
-  return mejor?.exige;
+  if (mejor === undefined) {
+    return undefined;
+  }
+  return { ruta: mejor.ruta, exige: mejor.exige };
 }
 
 /**
