@@ -3031,3 +3031,37 @@ abierta.
 - **Aplica en:** etapa de perfiles y permisos (previa al go-live). **Sin migración** — el modelo ya lo
   soporta.
 - **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.68) — Esconder, no negar: la UI no enseña lo que el usuario no puede usar (DANIEL, 18-ago-2026)
+
+> Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen
+> acceso a costos, en lugar de mandarle un mensaje diciendo que no tienen permiso para verlo, mejor que
+> les borre esa opción.**"*
+
+**El principio ya existía** (A4: *"la UI esconde lo que no le toca al usuario, no lo informa"*) y **el
+menú ya lo cumple**: `frontend/src/modulos/catalogo.ts` declara el permiso de cada una de sus ~116
+entradas y un grupo aparece solo si alguna hoja hija es visible; ⌘K usa el mismo filtro.
+
+⚠️ **Pero adentro de las pantallas NO se aplica parejo** (verificado, no supuesto): `ImportarCfdiPagina`
+dice *"No tienes permiso para importar CFDI (requiere administrar CxP)"* —que además **nombra el permiso
+que falta**, o sea le cuenta al usuario la forma del sistema—, `ProgramarRcPagina` dice *"No tienes
+permiso para programar la Ruta Crítica"*, y `SeccionDesarrolloOrden` pinta *"Sin permiso de importes"*
+donde va el precio. **Medido:** 124 pantallas, **39 sin ninguna consulta de permiso**.
+
+**Las dos reglas finas, cerradas con Daniel:**
+
+1. **Columna entera, no celda vacía.** Si un dato desaparece por permiso, se va **con su encabezado**.
+   Una celda vacía haría creer que el dato **no existe** o que el sistema falló — peor que el letrero que
+   se está quitando.
+2. **La excepción legítima es el enlace compartido.** Quien reciba la URL de una pantalla que no puede
+   ver **sí** debe leer algo, o parecería que el sistema se rompió: *"Esta pantalla no está disponible
+   para tu usuario."* **Sin** nombrar el permiso, sin sugerir a quién pedirlo, sin código de error.
+
+**Regla que NO se negocia:** esconder es **de presentación**. El backend sigue devolviendo 403/404 como
+corresponde; **la seguridad nunca depende de que la UI no muestre el botón**. Si al barrer aparece un
+endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**, no una nota.
+
+- **Aplica en:** V1-E6b. Sin migración, sin permisos nuevos, sin contrato.
+- **Fecha:** 2026-08-18.
