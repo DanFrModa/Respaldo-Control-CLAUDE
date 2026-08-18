@@ -82,7 +82,11 @@ const seleccionOrdenHabilitacion = {
   },
   lineas: {
     select: {
-      tallas: { select: { idTalla: true, cantidad: true } },
+      // La ETIQUETA de la talla viaja para poder NOMBRAR las tallas sin medida en el aviso
+      // (§Post-F9.64) sin una segunda consulta ni un pivote en el cliente.
+      tallas: {
+        select: { idTalla: true, cantidad: true, talla: { select: { etiqueta: true } } },
+      },
     },
   },
 } satisfies Prisma.OrdenSelect;

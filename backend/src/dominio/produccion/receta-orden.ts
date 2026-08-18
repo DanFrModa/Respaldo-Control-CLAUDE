@@ -91,6 +91,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
@@ -355,7 +356,19 @@ const SELECT_AVIO = {
   agregadoAMano: true,
   excluido: true,
   notas: true,
-  avio: { select: { clave: true, descripcion: true, unidad: true, esGenerico: true } },
+  avio: {
+    select: {
+      clave: true,
+      descripcion: true,
+      unidad: true,
+      // ⭐ V1-E3g: la unidad de las MEDIDAS (cm) NO es la de consumo (pza) — son dos datos.
+      unidadMedida: true,
+      esGenerico: true,
+      // ¿Tiene medidas ACTIVAS? Es el hecho del que sale `modoCaptura` — el MISMO con el que el
+      // precosto decide promediar las medidas (`costos/resolucion-precios.ts`).
+      _count: { select: { medidas: { where: { activo: true } } } },
+    },
+  },
   tallas: {
     select: {
       idTalla: true,
@@ -452,6 +465,46 @@ function fotoAvio(f: FilaAvio): object {
       idAvioMedida: t.idAvioMedida,
     })),
   };
+}
+
+/**
+ * MODO DE CAPTURA por talla de un renglón de avío (V1-E3g, §Post-F9.66). Sale de un solo hecho:
+ * ¿el avío tiene medidas ACTIVAS en su catálogo? Un cierre las tiene y por talla se elige QUÉ se
+ * pide; un elástico no, y por talla se captura CUÁNTO se gasta. Es exactamente el mismo criterio
+ * que usa el precosto para promediar las medidas: una sola definición de "avío por medida".
+ */
+function modoCapturaAvio(f: FilaAvio): 'consumo' | 'medida' {
+  return f.avio._count.medidas > 0 ? 'medida' : 'consumo';
+}
+
+/**
+ * AVISO —que NO bloquea— sobre la captura por talla de un renglón de avío.
+ *
+ * ⚠️ El caso que importa es la CONTRADICCIÓN HEREDADA: un avío "por medida" con el toggle
+ * `consumoPorTalla` encendido de antes de V1-E3g. La pantalla ya no muestra esas cantidades (en
+ * modo `medida` no se capturan), pero seguirían moviendo el requerido del MRP. No se apagan aquí a
+ * la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin que nadie lo
+ * pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga al guardar el renglón.
+ */
+function avisoCapturaAvio(f: FilaAvio): string | null {
+  if (modoCapturaAvio(f) === 'medida' && f.consumoPorTalla) {
+    return (
+      'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
+      '"se consume por talla" de una captura anterior: las cantidades por talla ya no se capturan ' +
+      'y siguen contando en el requerido. Guarda el renglón para normalizarlo.'
+    );
+  }
+  if (modoCapturaAvio(f) === 'consumo') {
+    for (const t of f.tallas) {
+      const aviso = avisoValorFueraDeRango(
+        `El consumo de la talla ${t.talla.etiqueta}`,
+        num(t.consumo),
+        f.avio.unidad,
+      );
+      if (aviso !== null) return aviso;
+    }
+  }
+  return null;
 }
 
 /**
@@ -842,6 +895,9 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       paraProduccion: f.paraProduccion,
       paraCosto: f.paraCosto,
       consumoPorTalla: f.consumoPorTalla,
+      modoCaptura: modoCapturaAvio(f),
+      unidadMedida: f.avio.unidadMedida,
+      avisoCaptura: avisoCapturaAvio(f),
       idAvioProveedor: f.idAvioProveedor,
       proveedorAmarrado:
         f.idAvioProveedor === null ? null : (nombreProveedor.get(f.idAvioProveedor) ?? null),
