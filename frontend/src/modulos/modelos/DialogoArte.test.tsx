@@ -195,6 +195,40 @@ describe('<DialogoArte> — la captura del arte (V1-E3f)', () => {
     expect(crearMutate).toHaveBeenCalledTimes(1);
   });
 
+  it('⭐ un TIPO retirado del catálogo NO se pierde al editar: se inyecta como opción', async () => {
+    // Un admin desactiva «lavado» (o le quita `esArte`): el catálogo deja de traerlo. Sin inyectar
+    // el tipo del arte, el selector abriría en «Elige el tipo…» y guardar lo RE-TIPIFICARÍA con
+    // otra cosa — un dato que nadie tocó, cambiado en silencio.
+    const usuario = userEvent.setup();
+    const conTipoRetirado = arte({
+      id: 55,
+      idTipoArte: 77,
+      tipoArte: 'Lavado',
+      codigoTipoArte: 'lavado',
+      usaPuntadas: false,
+      descripcion: 'Lavado piedra',
+    });
+    pintar(conTipoRetirado);
+
+    const selector = screen.getByTestId<HTMLSelectElement>('arte-tipo');
+    // Sigue seleccionado SU tipo (no cayó al vacío), y la opción dice por qué no está en la lista.
+    expect(selector.value).toBe('77');
+    expect(screen.getByRole('option', { name: /Lavado \(ya no disponible\)/ })).toBeInTheDocument();
+    // Y como ese tipo NO usa puntadas, el campo sigue oculto (la bandera viaja en el arte).
+    expect(screen.queryByTestId('arte-puntadas')).not.toBeInTheDocument();
+
+    // Cambiar a un tipo vigente sigue funcionando (la inyección no estorba).
+    await usuario.selectOptions(selector, '9');
+    expect(screen.getByTestId('arte-puntadas')).toBeInTheDocument();
+  });
+
+  it('el tipo VIGENTE no se duplica en la lista al editar', () => {
+    pintar(arte({ idTipoArte: 9 }));
+
+    expect(screen.getAllByRole('option', { name: 'Bordado' })).toHaveLength(1);
+    expect(screen.queryByRole('option', { name: /ya no disponible/ })).not.toBeInTheDocument();
+  });
+
   it('editando el PROPIO arte no se avisa de repetición contra sí mismo', () => {
     const elEditado = arte({ id: 77, descripcion: 'Águila bordada' });
     artesDelModelo = [elEditado];

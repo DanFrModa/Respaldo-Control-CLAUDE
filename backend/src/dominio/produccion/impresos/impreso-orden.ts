@@ -403,16 +403,18 @@ export async function armarDatosImpresoOrden(
   const idsArteOrden = new Set(
     receta.artes.flatMap((a) => (a.idModeloArte === null ? [] : [a.idModeloArte])),
   );
-  const artesBom = bom.artes
-    .filter((a) => idsArteOrden.has(a.id))
-    .flatMap((a, i) =>
-      a.fotos.map((foto, j) => ({
-        titulo: a.descripcion,
-        key: foto.key,
-        // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
-        principal: i === 0 && j === 0,
-      })),
-    );
+  const artesBom = porRondas(
+    bom.artes
+      .filter((a) => idsArteOrden.has(a.id))
+      .map((a, i) =>
+        a.fotos.map((foto, j) => ({
+          titulo: a.descripcion,
+          key: foto.key,
+          // Solo la PRIMERA foto del PRIMER arte es la principal (la que nunca se recorta).
+          principal: i === 0 && j === 0,
+        })),
+      ),
+  );
   const presignados = await Promise.allSettled(
     artesBom.map(async (arte) => ({
       titulo: arte.titulo,
@@ -715,10 +717,41 @@ export function anteponerPrincipal(imagenes: FotoImpreso[]): FotoImpreso[] {
 }
 
 /**
+ * ⭐ Reparte las fotos de VARIOS artes **por rondas**: primero la 1ª foto de cada arte, luego la 2ª
+ * de cada uno, y así. Pura y estable (conserva el orden de los artes dentro de cada ronda).
+ *
+ * **Por qué existe** (V1-E3f, §Post-F9.52 punto 5): al pasar las fotos del arte a PLURAL, un arte
+ * con 5 fotos se comía la rejilla entera —tope {@link MAX_ARTES}— y **sacaba del impreso a todos
+ * los demás artes**. Antes no podía pasar: cada arte aportaba exactamente una imagen.
+ *
+ * **La decisión, dicha completa:** el papel del piso tiene que enseñar *qué artes lleva la prenda*,
+ * no cinco ángulos de uno. Con las rondas, mientras quepan artes distintos NINGUNO se queda sin su
+ * primera foto, y las fotos extra solo entran con el espacio que sobra. El arte PRINCIPAL sigue
+ * garantizado: su primera foto va en la ronda 1, posición 0, y `recortarArtes` la antepone.
+ * Lo que se recorta NO se esconde: el título de la sección dice cuántas se muestran del total y la
+ * lista de texto "Arte" sigue enumerando todos los artes de la orden.
+ */
+export function porRondas<T>(porArte: readonly (readonly T[])[]): T[] {
+  const maximo = porArte.reduce((max, fotos) => Math.max(max, fotos.length), 0);
+  const salida: T[] = [];
+  for (let ronda = 0; ronda < maximo; ronda += 1) {
+    for (const fotos of porArte) {
+      const foto = fotos[ronda];
+      if (foto !== undefined) {
+        salida.push(foto);
+      }
+    }
+  }
+  return salida;
+}
+
+/**
  * Aplica el tope de la rejilla de ARTES: la principal al frente ({@link anteponerPrincipal}) y las
  * primeras {@link MAX_ARTES} imágenes; devuelve además cuántas quedaron fuera (para el aviso del
  * título). Como el tope es ≥ 1 y la principal quedó en la posición 0, el ARTE PRINCIPAL nunca se
- * recorta. Función pura, exportada para probar el criterio sin renderizar.
+ * recorta. Las fotos de los artes llegan repartidas {@link porRondas}, así que el tope se lleva
+ * primero las fotos EXTRA de un arte y solo después la única foto de otro. Función pura, exportada
+ * para probar el criterio sin renderizar.
  */
 export function recortarArtes(artes: FotoImpreso[]): { mostradas: FotoImpreso[]; ocultas: number } {
   const mostradas = anteponerPrincipal(artes).slice(0, MAX_ARTES);

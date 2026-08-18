@@ -63,17 +63,29 @@ export type TipoProcesoDetalle = TipoProceso & { codigoRolProveedor: string | nu
 
 /**
  * Resuelve el ROL DE PROVEEDOR de cada tipo: **el rol ACTIVO cuyo `codigo` es el mismo que el del
- * proceso**. No hay columna que los ligue, y es a propósito.
+ * proceso**. No hay columna que los ligue: es una CONVENCIÓN, y conviene leerla con sus dos
+ * límites antes de apoyarse en ella.
  *
- * El catálogo único (§Post-F9.58) fusionó dos listas que ya compartían vocabulario: los cuatro
- * procesos que son arte —`bordado`, `estampado`, `lavado`, `aplicacion`— existen con EXACTAMENTE
- * ese código en `RolProveedor` (`prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`). Aprovecharlo evita una
- * columna, una migración y una pantalla de administración para algo que hoy es una coincidencia
- * exacta, y **degrada con gracia**: un tipo nuevo («embosado») sin rol homónimo devuelve `null` y
- * el selector muestra TODOS los proveedores en vez de ninguno — que es lo que quiere el
- * principio del "proceso raro" (§Post-F9.54: *"no justifica hacer todo un desarrollo"*). Si algún
- * día hace falta desacoplar los dos códigos, se agrega la FK sin tocar a los consumidores: este
- * campo ya es parte del contrato.
+ * **Por qué funciona hoy.** El catálogo único (§Post-F9.58) fusionó dos listas que ya compartían
+ * vocabulario: los cuatro procesos que son arte —`bordado`, `estampado`, `lavado`, `aplicacion`—
+ * existen con EXACTAMENTE ese código en `RolProveedor` (`prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`).
+ * Aprovecharlo evita una columna, una migración y una pantalla de administración.
+ *
+ * ⚠️ **La identidad de códigos NO es universal, y el repo ya lo sabía.** `produccion/recibos.ts`
+ * (`MAPEO_PROCESO_A_ROL`, espejo del de `etapas.ts`) mantiene el mapeo ESCRITO A MANO justamente
+ * porque `costura` no se llama igual en los dos catálogos: mapea a `maquila-costura`. La
+ * coincidencia se da en los cuatro procesos que son arte y se rompe en el único que no lo es. Y el
+ * `codigo` es EDITABLE por pantalla, así que la convención se puede romper sin tocar código.
+ *
+ * ⚠️ **El degradado es SILENCIOSO, no una virtud.** Un tipo sin rol homónimo —un «embosado» nuevo,
+ * o uno al que le renombraron el código— devuelve `null`, y entonces el selector ofrece TODOS los
+ * proveedores: el usuario no ve nada raro, solo una lista más larga, y puede asignar a quien no
+ * presta ese servicio. Es un ENSANCHAMIENTO callado del universo elegible; se acepta porque el
+ * daño es acotado (el proveedor del arte es informativo: no mueve inventario ni dinero) y porque
+ * ofrecer una lista VACÍA sería peor.
+ *
+ * Si algún día hace falta desacoplar los dos códigos —o hacer explícito el caso `costura`— se
+ * agrega la FK sin tocar a los consumidores: este campo ya es parte del contrato.
  *
  * Una sola consulta para toda la página (no N+1).
  */

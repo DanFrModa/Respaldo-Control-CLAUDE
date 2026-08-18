@@ -153,7 +153,43 @@ export function DialogoArte({
   const idTipoElegido = formulario.watch('idTipoArte');
   const descripcionCapturada = formulario.watch('descripcion');
   const idProveedorElegido = formulario.watch('idProveedor');
-  const tipoElegido = (tipos.data?.datos ?? []).find((t) => String(t.id) === idTipoElegido);
+
+  /**
+   * ⚠️ Opciones del selector de tipo = el catálogo **más el tipo que el arte YA tiene**, si ése no
+   * viene en la lista.
+   *
+   * El catálogo se pide con `incluirInactivos=false` y `soloArte=true`, así que basta con que un
+   * admin desactive «lavado» —o le quite la marca de arte— para que el tipo de un arte existente
+   * desaparezca de las opciones. Sin esta inyección, abrir ese arte mostraba «Elige el tipo…» y
+   * guardar lo RE-TIPIFICABA con otra cosa: una pérdida silenciosa de un dato que nadie tocó.
+   * Inyectándolo, el arte conserva su tipo mientras no se cambie a propósito, y la opción se rotula
+   * «(ya no disponible)» para que quede claro por qué no está en la lista de los demás.
+   *
+   * `usaPuntadas` viaja en el propio arte, así que el campo de puntadas sigue decidiéndose bien
+   * aunque el tipo ya no esté en el catálogo. Lo que NO se puede recuperar de ahí es el rol de
+   * proveedor (no viaja en el arte): en ese caso el buscador de proveedor no se acota — igual que
+   * con un tipo sin rol homónimo.
+   */
+  const tiposDelCatalogo = tipos.data?.datos ?? [];
+  const tipoRetirado =
+    arte !== undefined && !tiposDelCatalogo.some((t) => t.id === arte.idTipoArte)
+      ? {
+          id: arte.idTipoArte,
+          nombre: `${arte.tipoArte} (ya no disponible)`,
+          usaPuntadas: arte.usaPuntadas,
+          codigoRolProveedor: null as string | null,
+        }
+      : undefined;
+  const opcionesTipo = [
+    ...tiposDelCatalogo.map((t) => ({
+      id: t.id,
+      nombre: t.nombre,
+      usaPuntadas: t.usaPuntadas,
+      codigoRolProveedor: t.codigoRolProveedor,
+    })),
+    ...(tipoRetirado === undefined ? [] : [tipoRetirado]),
+  ];
+  const tipoElegido = opcionesTipo.find((t) => String(t.id) === idTipoElegido);
 
   /**
    * Aviso —NO bloqueo— cuando la descripción ya existe en este modelo. Al retirarse el `nombre`
@@ -258,7 +294,7 @@ export function DialogoArte({
                 data-testid="arte-tipo"
               >
                 <option value="">Elige el tipo…</option>
-                {(tipos.data?.datos ?? []).map((tipo) => (
+                {opcionesTipo.map((tipo) => (
                   <option key={tipo.id} value={String(tipo.id)}>
                     {tipo.nombre}
                   </option>

@@ -28,6 +28,7 @@ import {
   descargarImagenComoDataUrl,
   generarPdfOrden,
   generarPdfOrdenes,
+  porRondas,
   recortarArtes,
   recortarFotos,
   textoTelaComprada,
@@ -361,6 +362,36 @@ describe('generarPdfOrden', () => {
 
     const buffer = await generarPdfOrden({ ...densa, fotos });
     expect(paginasPdf(buffer)).toBe(1);
+  });
+});
+
+describe('porRondas — un arte con muchas fotos NO se come la rejilla (V1-E3f)', () => {
+  it('reparte primero la 1ª foto de cada arte, luego las siguientes', () => {
+    expect(porRondas([['a1', 'a2', 'a3'], ['b1'], ['c1', 'c2']])).toEqual([
+      'a1',
+      'b1',
+      'c1',
+      'a2',
+      'c2',
+      'a3',
+    ]);
+  });
+
+  it('es estable con listas vacías, con una sola y sin artes', () => {
+    expect(porRondas([])).toEqual([]);
+    expect(porRondas([[], ['b1'], []])).toEqual(['b1']);
+    expect(porRondas([['a1', 'a2']])).toEqual(['a1', 'a2']);
+  });
+
+  it('⭐ con el tope real, 5 fotos de UN arte no dejan fuera a los demás', () => {
+    // El caso que la etapa destapó: antes de repartir por rondas, `recortarArtes` se llevaba las
+    // 4 primeras imágenes —las 4 del MISMO arte— y los otros tres artes no salían en el papel.
+    const conCinco = ['A-1', 'A-2', 'A-3', 'A-4', 'A-5'];
+    const repartidas = porRondas([conCinco, ['B-1'], ['C-1'], ['D-1']]);
+    const { mostradas } = recortarArtes(
+      repartidas.map((titulo) => ({ dataUrl: `data:${titulo}`, titulo })),
+    );
+    expect(mostradas.map((m) => m.titulo)).toEqual(['A-1', 'B-1', 'C-1', 'D-1']);
   });
 });
 
@@ -866,6 +897,49 @@ describe('armarDatosImpresoOrden', () => {
       { descripcion: 'Logo pecho', tipoArte: 'Bordado' },
       { descripcion: 'Estampa espalda', tipoArte: 'Estampado' },
     ]);
+  });
+
+  it('⭐ un ARTE con VARIAS fotos: todas se incrustan, y el tope reparte por rondas', async () => {
+    // V1-E3f (§Post-F9.52 punto 5): las fotos del arte son plurales. Dos cosas que fijar aquí:
+    //  1. las N fotos de un arte SÍ se incrustan (antes solo cabía una);
+    //  2. con el tope de la rejilla, un arte con muchas fotos NO expulsa a los demás artes.
+    const bom: BomModelo = {
+      telas: [],
+      avios: [],
+      artes: [
+        arteBom({
+          id: 1,
+          nombre: 'Logo pecho',
+          keysFoto: ['bor/1a.png', 'bor/1b.png', 'bor/1c.png', 'bor/1d.png', 'bor/1e.png'],
+        }),
+        arteBom({ id: 2, nombre: 'Estampa espalda', keysFoto: ['est/2a.png'] }),
+        arteBom({ id: 3, nombre: 'Etiqueta', keysFoto: ['eti/3a.png'] }),
+      ],
+    };
+
+    const datos = await armarDatosImpresoOrden(sesionConVer(), 1, undefined, {
+      ...depsCon(ordenSalida(), bom, [], (url) => Promise.resolve(`data:img;${url}`)),
+      archivos: archivosQuePresignan(),
+    });
+
+    // Las SIETE fotos llegan al bloque (la rejilla las capa después, no la lectura).
+    expect(datos.artes).toHaveLength(7);
+    // Y llegan REPARTIDAS: la 1ª de cada arte antes que la 2ª de ninguno, así que las primeras
+    // MAX_ARTES —lo que de verdad se imprime— cubren los TRES artes.
+    expect(datos.artes.slice(0, MAX_ARTES).map((a) => a.titulo)).toEqual([
+      'Logo pecho',
+      'Estampa espalda',
+      'Etiqueta',
+      'Logo pecho',
+    ]);
+    expect(datos.artes[0]).toMatchObject({
+      dataUrl: 'data:img;https://r2/bor/1a.png',
+      titulo: 'Logo pecho',
+      principal: true,
+    });
+    // Solo la PRIMERA foto del PRIMER arte es la principal (la que el tope nunca recorta).
+    expect(datos.artes.filter((a) => a.principal === true)).toHaveLength(1);
+    expect(esPdf(await generarPdfOrden(datos))).toBe(true);
   });
 
   /** Servicio de archivos que presigna cualquier key (`key` → `https://r2/<key>`). */

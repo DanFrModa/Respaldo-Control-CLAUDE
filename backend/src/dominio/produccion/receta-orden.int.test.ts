@@ -247,14 +247,27 @@ describe('copiarRecetaDelModelo — la receta nace con la orden', () => {
         puntadas: 8000,
         precio: 33.5,
         idProveedor: proveedor.id,
+        orden: 0,
       },
+    });
+    // Un SEGUNDO arte de OTRO tipo: cada renglón congelado tiene que llevar EL SUYO. Con uno solo
+    // no se distinguiría "copia el tipo de cada arte" de "copia el tipo del primero".
+    const arteBordado = await cliente.modeloArte.create({
+      data: { idModelo, descripcion: 'Etiqueta bordada', idTipoArte, orden: 1 },
     });
 
     const orden = await crearOrdenConReceta(3n);
     const r = await obtenerRecetaOrden(sesion(), orden, bd());
 
-    expect(r.artes).toHaveLength(1);
-    expect(r.artes[0]).toMatchObject({
+    expect(r.artes).toHaveLength(2);
+    expect(r.artes.find((a) => a.idModeloArte === arteBordado.id)).toMatchObject({
+      descripcion: 'Etiqueta bordada',
+      posicion: null,
+      idTipoArte,
+      codigoTipoArte: 'bordado',
+      usaPuntadas: true,
+    });
+    expect(r.artes.find((a) => a.idModeloArte === arteModelo.id)).toMatchObject({
       idModeloArte: arteModelo.id,
       descripcion: 'Águila a tres hilos',
       posicion: 'manga izquierda',
@@ -271,7 +284,9 @@ describe('copiarRecetaDelModelo — la receta nace con la orden', () => {
     });
 
     // Y en la FILA congelada, no solo en la proyección que la pantalla arma al vuelo.
-    const fila = await cliente.ordenArte.findFirstOrThrow({ where: { idOrden: orden } });
+    const fila = await cliente.ordenArte.findFirstOrThrow({
+      where: { idOrden: orden, idModeloArte: arteModelo.id },
+    });
     expect(fila).toMatchObject({
       idModeloArte: arteModelo.id,
       descripcion: 'Águila a tres hilos',
@@ -773,7 +788,7 @@ describe('Restaurar y desalineación (§Post-F9.43(f))', () => {
 
     // D3: el `antes` ÍNTEGRO queda en la bitácora (lo que la restauración sobrescribió).
     const bitacora = await cliente.bitacora.findFirstOrThrow({
-      where: { entidad: 'Orden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+      where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
       orderBy: { id: 'desc' },
     });
     expect(bitacora.datos).toMatchObject({
