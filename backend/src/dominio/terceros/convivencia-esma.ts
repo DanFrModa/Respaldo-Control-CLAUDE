@@ -70,18 +70,30 @@ function rangoCreado(
  * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa (V1-E3f pieza B).
  *
  * ⚠️ `EsMaCargo.conFactura` es NULLABLE ("sin definir": así quedaron los movimientos que migraron
- * del Access, donde la pregunta jamás se hizo). El segmento `sin` filtra por **`not: true`** —o sea
- * los `false` **y** los sin definir— y NO por `= false`. Es a propósito, y es la única diferencia
- * con el filtro de la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que sí usa `= false`):
+ * del Access, donde la pregunta jamás se hizo). El segmento `sin` tiene que traer los `false`
+ * **Y** los sin definir, porque los dos segmentos deben ser una PARTICIÓN EXACTA del saldo —es lo
+ * que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*)— y
+ * porque el encabezado ya los cuenta ahí: `saldoSinFactura = saldo − saldoFiscal`. Si la lista los
+ * dejara fuera, el total y los renglones se contradirían. Toca dinero.
  *
- *   aquí los dos segmentos tienen que ser una PARTICIÓN EXACTA del saldo, porque eso es justo lo
- *   que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*).
- *   Con `= false`, los movimientos sin definir se caerían de los DOS lados y la suma de los
- *   segmentos no daría el saldo total — un hueco silencioso en un número de dinero.
+ * 🔴 **Por eso NO se usa `{ not: true }`, que es lo que parecía natural y estuvo aquí un rato.**
+ * En lógica de tres valores `NULL <> true` evalúa a NULL, así que la fila se descarta igual que
+ * con `= false`: **las dos formas son idénticas en efecto** y ninguna incluye los NULL. Verificado
+ * en Postgres sobre `(true, false, NULL)`: `<> true` → 1 fila, `= false` → 1 fila, el OR → 2.
+ * La única forma que sí los trae es la explícita.
+ *
+ * Es también la diferencia deliberada con la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que
+ * filtra `= false`): allí el segmento es un filtro de consulta; aquí es una partición que debe
+ * cuadrar con un saldo.
  */
-function facturaWhere(segmento: 'todos' | 'con' | 'sin'): { conFactura?: boolean | { not: true } } {
+function facturaWhere(segmento: 'todos' | 'con' | 'sin'): {
+  conFactura?: boolean;
+  OR?: { conFactura: boolean | null }[];
+} {
   if (segmento === 'todos') return {};
-  return segmento === 'con' ? { conFactura: true } : { conFactura: { not: true } };
+  if (segmento === 'con') return { conFactura: true };
+  // Explícito a propósito: `{ not: true }` NO trae los NULL (ver arriba).
+  return { OR: [{ conFactura: false }, { conFactura: null }] };
 }
 
 /**

@@ -685,6 +685,37 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       ).resolves.toBeTruthy();
     });
 
+    it('⭐ la BASE bloquea la carrera con distinta caja, no solo el dominio', async () => {
+      // La validación del dominio es insensible a mayúsculas, pero DOS transacciones simultáneas
+      // no se ven entre sí: la red final tiene que ser la base. El `@unique` de Prisma es EXACTO
+      // y por sí solo dejaría pasar "TCD" y "tcd"; por eso la migración crea además el índice
+      // funcional `unique(lower(nombre_corto))`. Aquí se escribe SALTÁNDOSE el dominio, que es la
+      // única forma de comprobar que el índice existe de verdad.
+      await crearProveedor(
+        sesionAdmin(),
+        { nombre: 'Taller caja', roles: [rolMaquila], nombreCorto: 'TCD' },
+        bd(),
+      );
+
+      // Misma caja → lo caza el índice exacto.
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Otro exacto', nombreCorto: 'TCD' } }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      // ⭐ Distinta caja → lo caza el índice funcional (antes de esta etapa, PASABA).
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Otro caja', nombreCorto: 'tcd' } }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      // Y los acentos SÍ distinguen: "Kañon" y "Kanon" son claves distintas, no un choque.
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Con eñe', nombreCorto: 'KAÑON' } }),
+      ).resolves.toBeTruthy();
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Sin eñe', nombreCorto: 'KANON' } }),
+      ).resolves.toBeTruthy();
+    });
+
     it('dos proveedores con el MISMO corto SÍ chocan → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
       await crearProveedor(

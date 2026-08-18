@@ -285,7 +285,7 @@ describe('red de seguridad: una etiqueta colada se detecta y se avisa', () => {
   it('etiquetaColada encuentra la etiqueta metida en un valor', () => {
     expect(etiquetaColada('MIGUEL HIDALGO')).toBeNull();
     expect(
-      etiquetaColada('NAUCALPAN Nombre del Municipio o Demarcación Territorial: NAUCALPAN'),
+      etiquetaColada('TLALNEPANTLA Nombre del Municipio o Demarcación Territorial: TLALNEPANTLA'),
     ).not.toBeNull();
   });
 
@@ -367,5 +367,51 @@ describe('el catálogo del SAT no se confunde entre regímenes parecidos', () =>
     expect(parsearRegimenes(t)).toEqual([
       { clave: '626', descripcion: 'Régimen Simplificado de Confianza' },
     ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Un dato fiscal DUDOSO se avisa, nunca se guarda callado (§Post-F9.55)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('el CP y el RFC dudosos avisan en vez de colarse', () => {
+  /** Arma un documento mínimo legible con el CP y el RFC que se le pidan. */
+  function conFiscales(rfc: string, cp: string): string {
+    return [
+      `RFC: ${rfc}`,
+      'Denominación/Razón Social: TEXTILES DEL VALLE',
+      `Código Postal:${cp} Tipo de Vialidad: CALLE`,
+      'Nombre de Vialidad: LERDO DE TEJADA Número Exterior: 27',
+      'Regímenes:',
+      'Régimen General de Ley Personas Morales 01/01/2020',
+      'Obligaciones:',
+    ].join('\n');
+  }
+
+  it('⭐ un CP con MÁS de 5 dígitos avisa (antes se recortaba en silencio a 5)', () => {
+    const r = parsearTextoConstancia([conFiscales('TDV010203AB1', '540001')]);
+    expect(r.advertencias.some((a) => a.includes('no tiene 5 dígitos'))).toBe(true);
+  });
+
+  it('⭐ un CP con basura entre los dígitos avisa (no se "limpia" a un CP que nadie escribió)', () => {
+    const r = parsearTextoConstancia([conFiscales('TDV010203AB1', '04-5400-9')]);
+    expect(r.advertencias.some((a) => a.includes('no tiene 5 dígitos'))).toBe(true);
+  });
+
+  it('un CP correcto de 5 dígitos NO avisa', () => {
+    const r = parsearTextoConstancia([conFiscales('TDV010203AB1', '54080')]);
+    expect(r.codigoPostalExpedicion).toBe('54080');
+    expect(r.advertencias.filter((a) => a.includes('código postal'))).toEqual([]);
+  });
+
+  it('⭐ un RFC con texto pegado avisa (el corte se llevó algo de más)', () => {
+    const r = parsearTextoConstancia([conFiscales('TDV010203AB1VIGENTEDESDE2001', '54080')]);
+    expect(r.advertencias.some((a) => a.includes('no tiene la forma esperada'))).toBe(true);
+  });
+
+  it('los RFC válidos de moral (12) y de física (13) NO avisan', () => {
+    for (const rfc of ['TDV010203AB1', 'GORL850214J38']) {
+      const r = parsearTextoConstancia([conFiscales(rfc, '54080')]);
+      expect(r.advertencias.filter((a) => a.includes('forma esperada'))).toEqual([]);
+    }
   });
 });

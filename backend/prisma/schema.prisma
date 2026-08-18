@@ -595,6 +595,12 @@ model Proveedor {
   /// talleres necesitamos el campo corto. Podría ser el mismo campo"* y *"sí debe de ser
   /// único"*. Por eso es `@unique` global (nullable: los NULL no chocan entre sí en Postgres,
   /// así que los cientos de proveedores sin clave corta conviven sin problema).
+  ///
+  /// ⚠️ Este `@unique` es EXACTO y por sí solo dejaría convivir "TCD" y "tcd". La unicidad que
+  /// pidió Daniel es la que usa la gente —sin distinguir mayúsculas—, así que la migración
+  /// `20260818140000_proveedores_como_daniel_los_usa` crea ADEMÁS un índice funcional
+  /// `unique(lower(nombre_corto))`, que Prisma no sabe declarar aquí. Los dos conviven: éste
+  /// documenta el campo, el otro cierra la carrera concurrente con distinta caja.
   nombreCorto String? @unique @map("nombre_corto")
   razonSocial String? @map("razon_social")
   telefono    String?

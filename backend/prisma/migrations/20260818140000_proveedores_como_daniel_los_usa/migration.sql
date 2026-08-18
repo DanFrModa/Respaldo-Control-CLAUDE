@@ -96,6 +96,25 @@ SELECT 'Proveedor', p."id"::text, 'OTRO',
    AND btrim(COALESCE(p."corto", '')) <> ''
    AND lower(btrim(p."nombre_corto")) <> lower(btrim(p."corto"));
 
+-- 3.a-bis Y si la única diferencia es la CAJA ("Verde" vs "VERDE"), también se deja constancia.
+--     No es un valor distinto —es la misma clave escrita de otro modo, y por eso gana el del
+--     taller sin más trámite—, pero pisarlo MUDO sería decidir en silencio (D3). Se separa del
+--     reporte de arriba porque no es lo mismo perder un dato que perder una tipografía.
+INSERT INTO "bitacora" ("entidad", "id_entidad", "accion", "datos", "fecha")
+SELECT 'Proveedor', p."id"::text, 'OTRO',
+       jsonb_build_object(
+         'operacion', 'fusion-campo-corto-solo-caja',
+         'migracion', '20260818140000_proveedores_como_daniel_los_usa',
+         'motivo', 'El nombre corto y la clave del taller eran la misma clave con distinta caja: gano la del taller.',
+         'nombreCortoDesplazado', btrim(p."nombre_corto"),
+         'nombreCortoFinal', btrim(p."corto")
+       ), CURRENT_TIMESTAMP
+  FROM "proveedores" p
+ WHERE btrim(COALESCE(p."nombre_corto", '')) <> ''
+   AND btrim(COALESCE(p."corto", '')) <> ''
+   AND lower(btrim(p."nombre_corto")) = lower(btrim(p."corto"))
+   AND btrim(p."nombre_corto") <> btrim(p."corto");
+
 -- 3.b El `corto` del taller entra al campo fusionado (Daniel: *"en la migración hay que meter el
 --     que ya está ahorita como campo corto de los maquileros"*).
 UPDATE "proveedores"
@@ -142,6 +161,19 @@ UPDATE "proveedores" p
 ALTER TABLE "proveedores" DROP COLUMN "corto";
 
 CREATE UNIQUE INDEX "proveedores_nombre_corto_key" ON "proveedores"("nombre_corto");
+
+-- 3.d ⭐ La unicidad, DE VERDAD: sin distinguir mayúsculas.
+--
+-- El índice de arriba (el que declara Prisma) es EXACTO, así que deja convivir "TCD" y "tcd" — y
+-- este paso 3 se tomó el trabajo de deduplicar SIN distinguir caja justamente para que ese estado
+-- no existiera. Sin este segundo índice, la base vuelve a permitirlo al día siguiente: dos altas
+-- concurrentes con distinta caja pasan las dos (la validación del dominio, que sí es insensible,
+-- no ve a la otra transacción). Daniel fue tajante —*"sí debe de ser único"*— y una clave que la
+-- gente teclea no distingue mayúsculas.
+--
+-- Va como índice funcional aparte porque Prisma no sabe declarar `lower(...)` en el esquema; el
+-- `@unique` del modelo sigue describiendo el de arriba y los dos conviven sin estorbarse.
+CREATE UNIQUE INDEX "proveedores_nombre_corto_lower_key" ON "proveedores"(lower("nombre_corto"));
 
 -- ── 4. El TIPO se traduce a rol y se retira ──────────────────────────────────
 -- Primero se GARANTIZA que existan los tres roles destino (mismo cuidado que la migración del

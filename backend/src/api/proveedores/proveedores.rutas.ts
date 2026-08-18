@@ -277,7 +277,8 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
     },
   });
 
-  // ── Listar (búsqueda + filtro por tipo y por rol + orden + paginación) ──────
+  // ── Listar (búsqueda + filtro por ROL + orden + paginación) ────────────────
+  // El filtro por `tipo` se retiró con el campo en V1-E3f pieza B (§Post-F9.56 punto 3).
   app.route({
     method: 'GET',
     url: '/proveedores',

@@ -139,9 +139,15 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
  * único"*). Al fusionarse el `nombreCorto` de display con el `corto` del taller, el campo pasó a
  * ser una CLAVE de uso diario: dos proveedores con "TCD" confunden a quien opera.
  *
- * Se compara SIN distinguir mayúsculas ni acentos de la caja ("TCD" ≡ "tcd"), igual que el
- * `nombre` — el índice de la base es exacto y es la red de seguridad para la carrera concurrente
- * (P2002), pero la regla de negocio es la insensible: es la que la gente teclea.
+ * Se compara SIN distinguir MAYÚSCULAS ("TCD" ≡ "tcd"), igual que el `nombre`: es la clave que la
+ * gente teclea. ⚠️ `mode: 'insensitive'` **NO ignora los acentos** — "Kañón" y "Kanon" son claves
+ * distintas para esta comprobación y también para la base. Es lo correcto (son textos distintos),
+ * pero decirlo importa: el comentario anterior afirmaba lo contrario.
+ *
+ * La red de la carrera concurrente son DOS índices de la base, no uno: el `@unique` exacto del
+ * modelo y el funcional `unique(lower(nombre_corto))` que crea la migración. Sin el segundo, dos
+ * altas simultáneas con distinta caja pasaban las dos (ninguna transacción ve a la otra), y el
+ * estado que la migración deduplicó a propósito volvía a aparecer al día siguiente.
  *
  * Vacío/`null` NO se valida: los NULL no chocan entre sí en Postgres y cientos de proveedores no
  * tienen clave corta.
@@ -244,7 +250,8 @@ function datosEnriquecidosCrear(
   datos: z.output<typeof esquemaProveedorCrear>,
 ): Partial<Prisma.ProveedorCreateInput> {
   const data: Partial<Prisma.ProveedorCreateInput> = {};
-  // Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL; A1.1). Display, sin unicidad.
+  // Campo corto ÚNICO de uso diario ("Bloom" para BLOOM TEXTIL; A1.1 + §Post-F9.57/.58). La
+  // unicidad (insensible a mayúsculas) la valida `exigirCortoLibre` y la respaldan los dos índices.
   if (datos.nombreCorto !== undefined) data.nombreCorto = datos.nombreCorto;
   if (datos.razonSocial !== undefined) data.razonSocial = datos.razonSocial;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;

@@ -349,7 +349,7 @@ function leerCampo(texto: string, etiqueta: string, campo: string, advertencias:
 /**
  * Une con ', ' las partes que traen algo (una parte vacía no deja hueco ni coma suelta) y colapsa
  * las REPETICIONES seguidas: en las constancias reales la localidad y el municipio suelen traer el
- * mismo texto ("NAUCALPAN DE JUAREZ, NAUCALPAN DE JUAREZ"), y repetirlo en el domicilio se lee
+ * mismo texto ("TLALNEPANTLA DE BAZ, TLALNEPANTLA DE BAZ"), y repetirlo en el domicilio se lee
  * como un error. No se inventa nada: sólo se deja de escribir dos veces lo mismo.
  */
 function unir(partes: (string | undefined)[], separador = ', '): string {
@@ -407,9 +407,16 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
   const tipoPersona: 'fisica' | 'moral' = curp === '' ? 'moral' : 'fisica';
 
   // El RFC aparece dos veces (cédula + datos de identificación) con el MISMO valor: la primera basta.
+  // El RFC alimenta el CFDI: si lo leído no tiene la FORMA de un RFC (12 para moral, 13 para
+  // física), se avisa. El contrato lo frena al guardar, pero enterarse aquí —viendo el papel— es
+  // mucho más barato que un error de captura descubierto en la primera factura.
   const rfc = leerCampo(texto, 'RFC', 'RFC', advertencias).toUpperCase().replace(/\s+/g, '');
   if (rfc === '') {
     advertencias.push('No se encontró el RFC en el documento.');
+  } else if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$/.test(rfc)) {
+    advertencias.push(
+      `El RFC leído ("${rfc}") no tiene la forma esperada: revísalo antes de aceptarlo.`,
+    );
   }
 
   let razonSocial: string;
@@ -435,12 +442,20 @@ export function parsearTextoConstancia(paginas: string[]): ConstanciaParseada {
     }
   }
 
-  const codigoPostal = leerCampo(texto, 'C[oó]digo Postal', 'código postal', advertencias)
-    .replace(/\D/g, '')
-    .slice(0, 5);
-  if (codigoPostal.length !== 5) {
-    advertencias.push('No se encontró un código postal de 5 dígitos.');
+  // ⚠️ El control va ANTES de recortar. Al revés —recortar y luego medir— el `.slice(0, 5)`
+  // garantiza cinco dígitos y el aviso NUNCA se dispara: un "540001" se guardaba como "54000" y un
+  // "04-5400-9" como "04540", los dos SIN una queja. Un CP de expedición equivocado no se nota
+  // hasta que una factura sale mal (§Post-F9.55: el documento propone, pero avisando).
+  const cpCrudo = leerCampo(texto, 'C[oó]digo Postal', 'código postal', advertencias);
+  const cpDigitos = cpCrudo.replace(/\D/g, '');
+  if (cpDigitos.length !== 5) {
+    advertencias.push(
+      cpDigitos === ''
+        ? 'No se encontró un código postal de 5 dígitos.'
+        : `El código postal leído ("${cpCrudo}") no tiene 5 dígitos: revísalo antes de aceptarlo.`,
+    );
   }
+  const codigoPostal = cpDigitos.slice(0, 5);
 
   // Domicilio: cada parte se corta en la siguiente etiqueta, así que las VACÍAS quedan vacías y no
   // arrastran el texto de la de al lado.

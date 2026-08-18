@@ -609,3 +609,105 @@ describe('segmentación con/sin factura en CxP', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 });
+
+// ── (l) ⭐ SEGMENTACIÓN sobre movimientos de EsMa: los "sin definir" NO se pueden caer ────────────
+//
+// El agujero que esto cierra: `EsMaCargo.conFactura` es NULLABLE —así quedaron los movimientos que
+// migraron del Access, donde la pregunta nunca se hizo— y el encabezado los cuenta como SIN factura
+// (`saldoSinFactura = saldo − saldoFiscal`). Si la LISTA los dejara fuera, el total y los renglones
+// se contradirían y los dos segmentos no darían el saldo.
+//
+// Los movimientos del MOTOR no sirven para probar esto: su `esFiscal` es NOT NULL, así que la
+// partición es exacta por construcción. Hace falta un cargo EsMa con `conFactura: null`.
+describe('segmentación con/sin factura sobre movimientos de EsMa (conFactura NULLABLE)', () => {
+  /** Siembra un cargo EsMa validado con la marca de factura que se le pida (incluido `null`). */
+  async function cargoEsMa(conFactura: boolean | null, importe: number): Promise<void> {
+    const tipoProceso = await cliente.tipoProceso.upsert({
+      where: { codigo: 'costura' },
+      update: {},
+      create: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const clienteNegocio = await cliente.cliente.create({
+      data: { nombre: `Cliente ${String(importe)}-${String(conFactura)}` },
+    });
+    const pedido = await cliente.pedido.create({
+      data: { folio: BigInt(importe), idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+    });
+    const modelo = await cliente.modelo.create({
+      data: { codigo: `MOD-${String(importe)}-${String(conFactura)}`, descripcion: 'Modelo' },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 1, precio: importe },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: BigInt(importe),
+        idEmpresa: empresa.id,
+        idPedidoLinea: linea.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocio.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+      },
+    });
+    await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: proveedor.id,
+        idOrden: orden.id,
+        idTipoProceso: tipoProceso.id,
+        estado: 'validado',
+        cantidadReal: 1,
+        precioReal: importe,
+        conFactura,
+      },
+    });
+  }
+
+  it('⭐ un cargo EsMa SIN DEFINIR aparece en el segmento "sin", no se cae de los dos', async () => {
+    await cargoEsMa(null, 300);
+
+    const sin = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'sin' }, bd());
+    const con = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'con' }, bd());
+
+    expect(sin.total).toBe(1);
+    expect(con.total).toBe(0);
+  });
+
+  it('⭐ con + sin SUMAN el total, con los tres estados de la marca mezclados', async () => {
+    await cargoEsMa(true, 100); // con factura
+    await cargoEsMa(false, 50); // sin factura
+    await cargoEsMa(null, 300); // sin DEFINIR: cuenta como "sin"
+
+    const todos = await estadoCuentaProveedorCxp(sesion(), proveedor.id, {}, bd());
+    const con = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'con' }, bd());
+    const sin = await estadoCuentaProveedorCxp(sesion(), proveedor.id, { segmento: 'sin' }, bd());
+
+    // Ni un renglón se pierde por el camino.
+    expect(todos.total).toBe(3);
+    expect(con.total + sin.total).toBe(todos.total);
+    expect(con.total).toBe(1);
+    expect(sin.total).toBe(2);
+
+    // Y el ENCABEZADO cuadra con los renglones: el saldo se parte en dos exactas.
+    expect(todos.saldo.saldo).toBe(450);
+    expect(todos.saldo.saldoFiscal).toBe(100);
+    expect(todos.saldo.saldoSinFactura).toBe(350); // 50 + 300 (el "sin definir" incluido)
+    expect((todos.saldo.saldoFiscal ?? 0) + (todos.saldo.saldoSinFactura ?? 0)).toBe(
+      todos.saldo.saldo,
+    );
+  });
+
+  it('la vista fiscal (la del contador) sigue trayendo SOLO los que tienen factura', async () => {
+    await cargoEsMa(true, 100);
+    await cargoEsMa(null, 300);
+
+    const fiscal = await estadoCuentaProveedorCxp(
+      sesion(),
+      proveedor.id,
+      { vista: 'fiscal' },
+      bd(),
+    );
+    expect(fiscal.total).toBe(1);
+  });
+});
