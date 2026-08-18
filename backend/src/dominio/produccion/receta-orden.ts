@@ -254,6 +254,17 @@ export async function copiarRecetaDelModelo(
 
   const auditoria = sesion === null ? {} : datosCreacion(sesion);
 
+  // ⭐ V1-E3g (H1 del review) — La receta NACE aquí, y por aquí pasa el 100 % de las órdenes. Si el
+  // BOM trae la combinación heredada "avío por medida + `consumoPorTalla` encendido", copiarla tal
+  // cual **fabrica de nuevo** el mismo defecto que esta etapa vino a cerrar: cantidades por talla
+  // que la pantalla ya no muestra moviendo el requerido del MRP en la sombra. Normalizar sólo en
+  // agregar/editar/restaurar era tapar las tres puertas laterales dejando abierta la principal.
+  // Las CANTIDADES por talla se copian igual (D3: no se pierde nada); simplemente dejan de mandar.
+  const porMedida = await aviosPorMedida(
+    tx,
+    avios.map((a) => a.idAvio),
+  );
+
   if (telas.length > 0) {
     await tx.ordenTela.createMany({
       data: telas.map((t) => ({
@@ -282,7 +293,7 @@ export async function copiarRecetaDelModelo(
         paraPreCosto: a.paraPreCosto,
         paraProduccion: a.paraProduccion,
         paraCosto: a.paraCosto,
-        consumoPorTalla: a.consumoPorTalla,
+        consumoPorTalla: porMedida.has(a.idAvio) ? false : a.consumoPorTalla,
         idAvioProveedor: a.idAvioProveedor,
         ...auditoria,
       },
@@ -2013,12 +2024,27 @@ async function reemplazarMedidasAvio(
 }
 
 /**
+ * Cuáles de estos avíos son "por medida" (≥1 `AvioMedida` ACTIVA), EN UNA sola consulta. Mismo
+ * criterio que `modoCapturaAvio` y que el precosto. Se resuelve en lote porque el nacimiento de la
+ * receta recorre TODOS los avíos del modelo: preguntar uno por uno sería un N+1 en el camino por el
+ * que pasa cada orden.
+ */
+async function aviosPorMedida(tx: Tx, ids: number[]): Promise<Set<number>> {
+  if (ids.length === 0) return new Set();
+  const filas = await tx.avioMedida.findMany({
+    where: { idAvio: { in: ids }, activo: true },
+    select: { idAvio: true },
+    distinct: ['idAvio'],
+  });
+  return new Set(filas.map((f) => f.idAvio));
+}
+
+/**
  * ¿El avío es "por medida"? (≥1 `AvioMedida` ACTIVA). Mismo criterio que `modoCapturaAvio` y que el
  * precosto — se consulta aquí porque en las rutas de escritura no siempre hay la fila proyectada.
  */
 async function avioEsPorMedida(tx: Tx, idAvio: number): Promise<boolean> {
-  const n = await tx.avioMedida.count({ where: { idAvio, activo: true } });
-  return n > 0;
+  return (await aviosPorMedida(tx, [idAvio])).has(idAvio);
 }
 
 /**

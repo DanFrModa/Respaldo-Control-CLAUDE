@@ -1553,6 +1553,44 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     expect(ch.medidaAmarrada).toBe('53 cm');
   });
 
+  it('⭐ H1: la receta NACE normalizada — el camino por el que pasa toda orden nueva', async () => {
+    // El BOM del modelo trae la combinación heredada: avío por medida + toggle encendido + 2
+    // cantidades por talla. Antes se copiaban tal cual y CADA orden nueva volvía a fabricar el
+    // "MRP en la sombra": el requerido salía por talla en vez de por prenda.
+    await botonPorMedida();
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 2 } });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 7 },
+        { idModelo, idAvio: avioBoton.id, idTalla: tallaG.id, consumo: 9 },
+      ],
+    });
+
+    const idOrdenNueva = await crearOrdenConReceta(77n);
+    const r = await obtenerRecetaOrden(sesion(), idOrdenNueva, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+
+    expect(boton.modoCaptura).toBe('medida');
+    expect(boton.consumoPorTalla).toBe(false); // ⭐ nace apagado, no heredado
+    expect(boton.avisoCaptura).toBeNull(); // y por lo tanto sin contradicción que avisar
+
+    // D3: las CANTIDADES no se pierden, sólo dejan de mandar.
+    const filaCh = boton.tallas.find((t) => t.idTalla === tallaCH.id);
+    expect(filaCh?.consumo).toBe(7);
+
+    // Lo que importa de verdad: el REQUERIDO sale por prenda (2 × 10 piezas), no por talla.
+    const hab = await habilitacionOrden(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['ordenes.habilitacion'] }),
+      idOrdenNueva,
+      bd(),
+    );
+    expect(hab.avios.find((a) => a.idAvio === avioBoton.id)?.requerido).toBe(20);
+  });
+
   it('AGREGAR un renglón por medida tampoco puede encender el toggle', async () => {
     await botonPorMedida();
     // Se quita el botón (lápida) y se vuelve a agregar pidiendo el toggle encendido.
