@@ -11,7 +11,7 @@
 -- lo que se ve en pantalla.
 
 -- ── 1) Columnas nuevas (aditivo puro; nada se borra ni cambia de tipo) ──────────────────────────
-ALTER TABLE "avio" ADD COLUMN "unidad_medida" TEXT;
+ALTER TABLE "avios" ADD COLUMN "unidad_medida" TEXT;
 
 ALTER TABLE "avio_medida" ADD COLUMN "valor" DECIMAL(12,2);
 ALTER TABLE "avio_medida" ADD COLUMN "requiere_revision" BOOLEAN NOT NULL DEFAULT false;
@@ -22,8 +22,8 @@ ALTER TABLE "avio_medida" ADD COLUMN "requiere_revision" BOOLEAN NOT NULL DEFAUL
 -- rangos ("15-18 cm"), las tallas ("S", "M", "XL") y cualquier texto ("vieja"): convertirlos sería
 -- adivinar. La coma decimal se normaliza a punto ANTES de decidir, no después.
 UPDATE "avio_medida"
-   SET "valor" = (substring(replace(btrim("medida"), ',', '.') from '^[0-9]+(\.[0-9]+)?'))::numeric(12,2)
- WHERE replace(btrim("medida"), ',', '.') ~ '^[0-9]+(\.[0-9]+)?[[:space:]]*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ"''°]*\.?$';
+   SET "valor" = (substring(replace(btrim("medida"), ',', '.') from '^[0-9]+(?:\.[0-9]+)?'))::numeric(12,2)
+ WHERE replace(btrim("medida"), ',', '.') ~ '^[0-9]+(?:\.[0-9]+)?[[:space:]]*[A-Za-zÁÉÍÓÚÜÑáéíóúüñ"''°]*\.?$';
 
 -- ── 3) Backfill de la UNIDAD de las medidas, por avío ───────────────────────────────────────────
 -- El sufijo de la etiqueta ("cm" en "15 cm") es la unidad. Se adopta SOLO si TODAS las medidas
@@ -32,7 +32,7 @@ UPDATE "avio_medida"
 WITH sufijos AS (
   SELECT
     m."id_avio",
-    lower(btrim(regexp_replace(replace(btrim(m."medida"), ',', '.'), '^[0-9]+(\.[0-9]+)?', ''))) AS sufijo
+    rtrim(lower(btrim(regexp_replace(replace(btrim(m."medida"), ',', '.'), '^[0-9]+(?:\.[0-9]+)?', ''))), '.') AS sufijo
   FROM "avio_medida" m
   WHERE m."valor" IS NOT NULL
 ),
@@ -42,7 +42,7 @@ unicos AS (
   GROUP BY "id_avio"
   HAVING count(DISTINCT sufijo) = 1 AND min(sufijo) <> ''
 )
-UPDATE "avio" a
+UPDATE "avios" a
    SET "unidad_medida" = u.unidad
   FROM unicos u
  WHERE a."id" = u."id_avio";
@@ -50,9 +50,10 @@ UPDATE "avio" a
 -- ── 4) Lo que quedó sin resolver se MARCA (nunca se adivina) ────────────────────────────────────
 -- (a) etiquetas no convertibles a número;
 -- (b) medidas de un avío cuyas etiquetas MEZCLAN unidades (o no traen ninguna y el avío se quedó
---     sin `unidad_medida`): el número existe, pero nadie sabe si es cm, mm o pulgadas.
+--     sin `unidad_medida`): el número existe, pero nadie sabe si es cm, mm o pulgadas;
+-- (c) medidas que sí convirtieron pero a CERO ("0"): un cierre de 0 cm no es una especificación.
 UPDATE "avio_medida" m
    SET "requiere_revision" = true
-  FROM "avio" a
+  FROM "avios" a
  WHERE a."id" = m."id_avio"
-   AND (m."valor" IS NULL OR a."unidad_medida" IS NULL);
+   AND (m."valor" IS NULL OR m."valor" <= 0 OR a."unidad_medida" IS NULL);
