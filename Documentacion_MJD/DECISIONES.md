@@ -2925,9 +2925,27 @@ pasa a listarse **por antigüedad de captura y no alfabéticamente**; se corrige
 capturadas que ya no están en ella, marcadas `enCurva: false`, con la razón escrita en el propio código:
 *"para no perderlas en silencio si alguien cambió la curva después"*.
 
-**El hueco que sí había:** si la orden pide una talla y ese avío **no tiene medida capturada**, nadie
-avisa — el renglón sale en cero y se pasa hacia producción y hacia el MRP. Daniel: **"Sí. Haz el ajuste
-porfa. Que sí avise."**
+**El hueco:** si la orden pide una talla y ese avío **no tiene medida capturada**. Daniel: **"Sí. Haz el
+ajuste porfa. Que sí avise."**
+
+🔴 **CORRECCIÓN (18-ago-2026) — la primera redacción de este párrafo era FALSA en dos puntos.** Decía que
+*"el renglón sale en cero"* y que *"nadie avisa"*. Lo escribió el lead a partir de su propia lectura del
+código, sin verificarlo; lo desmintió el reviewer de V1-E3f, ejecutando:
+
+1. **NO sale en cero.** `receta-avios.ts:56` cae al **consumo por prenda**: `requerido += consumoPorPrenda
+   * piezas`.
+2. **El MRP SÍ avisa.** `mrp.ts:510-514` empuja el aviso literal *"Avío …: sin medida por talla (R18)
+   para \<tallas\>; se usó el consumo por prenda"*, y la cabecera del módulo declara la política: *"los
+   casos ambiguos NO truenan en silencio: van a `avisos`"*.
+
+**El hueco real es más chico y más preciso**, y lo dice el propio código en `receta-avios.ts:9-10`: *"se
+reportan en `tallasSinMedida` para que el llamador decida si avisa (**el MRP arma un aviso con las
+etiquetas; la habilitación lo ignora**)"*. O sea: **el mecanismo YA EXISTE y YA ES COMPARTIDO** — lo que
+falta es que **la habilitación/producción y la pantalla lo usen**.
+
+⚠️ **Por qué importa la corrección:** si se construye sobre la redacción vieja, se construye **un aviso
+que ya existe** y se duplica. Y es la **segunda** nota de este archivo que se quema por lo mismo en dos
+días (ver §Post-F9.54): **una afirmación sobre el sistema, escrita sin ejecutar**.
 
 **Criterios cerrados con él:**
 

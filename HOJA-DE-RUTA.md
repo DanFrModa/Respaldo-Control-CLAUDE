@@ -439,8 +439,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   (V1-E3f):** con más de 100 proveedores, el que buscas **no aparece** — es la cuarta vez que este mismo
   defecto sale en el proyecto. V1-E3f lo convirtió a `ComboboxBuscable` (que **sí** busca contra el
   servidor, verificado) en ocho pantallas, pero quedan al menos `notas-salida/DialogoEditarNota.tsx:94`,
-  `ordenes-compra/DialogoEditarOc.tsx:94`, `inventarios/CapturaEntradaTelaPagina.tsx:101` y los filtros
+  `ordenes-compra/DialogoEditarOc.tsx:94`, `inventarios/CapturaEntradaTelaPagina.tsx:108`+`:517` (el tope
+  de 100 vive en `api/proveedores.ts:230`) y los filtros
   de maquilero de producción y calidad. Fuera del alcance de esa etapa — **se dice, no se calla**.
+- **El impreso de la orden descarga TODAS las fotos de arte aunque pinte 4 (V1-E3f, 18-ago-2026):** con
+  las fotos en plural, `armarDatosImpresoOrden` presigna y baja de R2 **todas** las fotos de todos los
+  artes, y la rejilla recorta después (`impreso-orden.ts:418-425`, `:455`). En impresión **por lotes**
+  —`impresoOrdenes` recorre las órdenes **en serie**— eso son cientos de viajes a R2 antes de que arranque
+  el worker de PDF. **Degrada en lentitud, no en fallo** (la descarga ocurre fuera del
+  `PDF_WORKER_TIMEOUT_MS`) y **no lo introdujo esa etapa**. Ahora que `porRondas` deja las importantes al
+  frente, recortar **antes** de descargar es viable — pero **no es la línea única que parece**: el conteo
+  *"se muestran 4 de 7"* se calcula del total y habría que llevarlo aparte, y las fotos que fallan al
+  bajar se descartan **después**, así que el recorte necesita margen.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

@@ -1047,7 +1047,7 @@ Los siete del arte: **el nombre se retira** y la descripción toma su lugar (§P
 **texto libre**, tipo del catálogo, **fotos en plural**, puntadas **atadas al tipo** en vez de borradas, y
 el proveedor deja de ser un select con tope de 100 — **barrido en 8 pantallas**, no solo la del arte.
 
-### Nota de cierre — ⬜ EN CORRECCIÓN (18-ago-2026)
+### Nota de cierre — ✅ HECHA (18-ago-2026)
 
 **Primera vuelta: RECHAZADO — y el rechazo NO fue por el código.** El reviewer lo dice textual: *"no
 encontré ni un solo defecto funcional"*. Verificó ejecutando que la migración aplica sobre una base al
@@ -1071,14 +1071,49 @@ probaba. **La suite completa en verde no dice que algo esté cubierto — dice q
 roles de proveedor era **falsa** (`update: {}` no toca el nombre). Corregida en su lugar — importa porque
 de ahí cuelga la pieza B.
 
+**Segunda vuelta: APROBADO.** El reviewer repitió sus dos mutaciones y **mueren**; repitió la que el coder
+declaró que se le había escapado y **también muere**; y muto además `puntadas`+`idProveedor` a la vez y el
+`antes` de la bitácora — las tres matan. Su veredicto sobre la cobertura: *"es real, no perimetral"*.
+
+**El coder se cachó solo un fallo que nadie le habría visto:** su mutación del tipo del arte **sobrevivió
+en el primer intento**, porque con **un solo arte** en el modelo "el tipo del primero" y "su tipo" son lo
+mismo. Rehízo la prueba con dos artes de tipos distintos. El reviewer lo anotó: *"reportó honestamente un
+fallo propio que nadie le habría visto — eso vale más que el arreglo"*.
+
+**Decisión avalada como decisión, no solo como prueba:** con las fotos en plural había que decidir qué
+hacer cuando un arte trae más fotos de las que caben en el impreso. Se reparten **por rondas** —la 1ª de
+cada arte antes que la 2ª de ninguno—, porque *el papel del piso tiene que enseñar qué artes lleva la
+prenda, no cinco ángulos de uno*. El reviewer lo ejercitó contra cinco escenarios y **dijo también dónde
+reparte peor**: un arte complejo con 4 tomas junto a tres etiquetas triviales pierde sus tomas de detalle.
+Gana igual, por principio: `MAX_ARTES` es una restricción de **maquetación**, no una declaración de
+importancia, y el número de fotos que alguien alcanzó a subir no es señal de prioridad. Nada se esconde:
+el título dice *"se muestran 4 de 7"*, calculado sobre el total.
+
+**⚠️ Y un hallazgo contra la documentación del LEAD** (§Post-F9.64): decía que una talla sin medida *"sale
+en cero"* y que *"nadie avisa"*. **Falso en los dos puntos** — cae al consumo por prenda y el MRP ya arma
+el aviso. Corregido en su lugar. Es la **segunda** nota quemada en dos días por lo mismo: una afirmación
+sobre el sistema escrita **sin ejecutar**. La regla de verificar antes de afirmar **no es solo para los
+coders**.
+
+**Deuda anotada, no callada** (§4): con las fotos en plural, `armarDatosImpresoOrden` presigna y descarga
+**todas** las fotos aunque la rejilla pinte 4 — en impresión por lotes son cientos de viajes a R2 antes de
+que arranque el worker. Degrada en lentitud, no en fallo, y no lo introdujo esta etapa.
+
 ---
 
 ## V1-E3g · Que avise cuando una talla de la orden no tiene medida capturada ⬜ (pedida 17-ago-2026)
 
 > Nace de una pregunta de Daniel sobre la curva de tallas. Decisión y criterios en `DECISIONES.md`
 > **§Post-F9.64**. La curva **ya** es una guía y no una jaula —capturar el XCH fuera de curva se puede
-> hoy—; lo que falta es que **avise** cuando la orden pide una talla sin medida capturada, en vez de
-> sacar el renglón en cero rumbo a producción y al MRP. **Avisa, no bloquea.**
+> hoy—; y el aviso **ya existe y ya es compartido** (`receta-avios.ts` lo reporta en `tallasSinMedida`),
+> solo que **hoy únicamente lo usa el MRP**: la habilitación lo ignora y la pantalla no lo enseña. Lo que
+> falta es **usarlo donde Daniel lo necesita**, no construirlo. **Avisa, no bloquea.**
+>
+> ⚠️ La primera redacción decía *"sale en cero y nadie avisa"* — **falso en los dos puntos**, corregido en
+> §Post-F9.64 tras verificarlo el reviewer. Se deja dicho porque construir sobre la versión vieja
+> **duplicaría un aviso que ya existe**.
+>
+> Se le suma **§Post-F9.66** (medida vs. consumo por talla): son la misma pantalla.
 
 ---
 
