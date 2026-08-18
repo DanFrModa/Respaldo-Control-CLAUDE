@@ -1128,7 +1128,7 @@ medidas activas?—, el mismo con el que el precosto decide promediar: **sin ban
 usable**. Y el aviso de tallas sin medida se **REUSÓ** —la habilitación lo tiraba a la basura— en vez de
 construir uno nuevo; de paso dejó de señalar tallas con 0 piezas, que nadie iba a cortar.
 
-### Nota de cierre — ⬜ EN CORRECCIÓN (18-ago-2026)
+### Nota de cierre — 🔨 en segunda corrección (18-ago-2026)
 
 **Primera vuelta: RECHAZADA.** El reviewer confirmó lo más caro de verificar —la migración **no pierde un
 solo dato** (22 filas antes → 22 después contra datos sucios reales), el elástico **no se movió**, y el
@@ -1151,11 +1151,31 @@ coinciden. **La aserción no discrimina.**
 **Del lado del lead:** la ficha describía solo §Post-F9.64 —la mitad chica de la etapa—, `HOJA-DE-RUTA.md`
 no la mencionaba y las deudas declaradas no estaban escritas en §4. Reparado aquí.
 
-⚠️ **Acción de despliegue que NO puede saltarse:** el forzado **mueve dinero** para la combinación
-heredada (avío con medidas activas **y** `consumoPorTalla = true`): pasa de promediar consumos por talla a
-usar el consumo por prenda en el primer guardado. Daniel lo decidió, así que no se discute — pero **hay
-que contar cuántas filas están en ese estado en `prueba` y enseñárselo a Gabriel antes de subir**.
-Cambiar costos a ciegas no es opción.
+### ⭐ El hallazgo que cambia el sentido de la etapa: el sistema estaba costeando 54× de más
+
+🔴 **CORRECCIÓN (18-ago-2026).** La primera redacción de esta ficha decía que el forzado *"mueve dinero"*
+y que había que contar las filas afectadas para **autorizar un cambio de costos**. **Es al revés**, y lo
+midió el reviewer **ejecutando `calcularPreCosto` real** sobre el cierre de Daniel (1 pza/prenda, medidas
+53 y 55 capturadas en el campo de consumo por talla):
+
+```
+ANTES    consumoPorPrenda: 54   importe: 432
+DESPUÉS  consumoPorPrenda:  1   importe:   8
+costo TOTAL del modelo:  432 → 8
+```
+
+**El forzado no mueve costos: REPARA un sobrecosto de 54×.** El mecanismo es exactamente el hallazgo de
+Daniel — **la medida se estaba leyendo como cantidad**, así que el sistema costeaba *54 cierres por
+prenda* (54 = promedio de 53 y 55) en vez de 1. **El estado actual es el error; el cambio es la
+corrección.**
+
+⚠️ **El conteo previo al despliegue SIGUE siendo obligatorio, pero mide otra cosa:** no autoriza un
+cambio, **mide cuánto está mal hoy**. Sin él nadie sabe cuántos modelos y órdenes vivas traen precios
+inflados. Consultas en `scratchpad/v1-e3g-conteo-antes-del-deploy.sql`.
+
+*(Se deja escrito el error en vez de borrarlo: el texto viejo se redactó **antes** de que apareciera el
+54×, y es lo que Gabriel habría leído para decidir. Es la tercera nota de este proyecto que se quema por
+lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ### El aviso de tallas sin medida (§Post-F9.64) ⬜ (pedida 17-ago-2026)
 
