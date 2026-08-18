@@ -1262,13 +1262,19 @@ export async function agregarRenglonReceta(
           (a) => a.idAvio === datos.idAvio,
         );
 
+        // ⭐ V1-E3g: si el avío se compra POR MEDIDA, la cantidad no va por talla (ver
+        // `normalizarConsumoPorTalla`). Se normaliza aquí, ANTES de escribir, para que el toggle
+        // heredado del modelo tampoco reviva la contradicción al copiar la receta.
+        const porMedida = await avioEsPorMedida(tx, datos.idAvio);
+        const consumoPorTallaPedido = normalizarConsumoPorTalla(datos.consumoPorTalla, porMedida);
+
         const delCuerpo = {
           consumoPorPrenda: new Prisma.Decimal(datos.consumoPorPrenda),
           precio: datos.precio === undefined ? undefined : precioDecimal(datos.precio),
           paraPreCosto: datos.paraPreCosto,
           paraProduccion: datos.paraProduccion,
           paraCosto: datos.paraCosto,
-          consumoPorTalla: datos.consumoPorTalla,
+          consumoPorTalla: consumoPorTallaPedido,
           idAvioProveedor: datos.idAvioProveedor,
         };
 
@@ -1291,8 +1297,9 @@ export async function agregarRenglonReceta(
                     paraPreCosto: datos.paraPreCosto ?? delModeloAvio?.paraPreCosto ?? true,
                     paraProduccion: datos.paraProduccion ?? delModeloAvio?.paraProduccion ?? true,
                     paraCosto: datos.paraCosto ?? delModeloAvio?.paraCosto ?? true,
-                    consumoPorTalla:
-                      datos.consumoPorTalla ?? delModeloAvio?.consumoPorTalla ?? false,
+                    consumoPorTalla: porMedida
+                      ? false
+                      : (datos.consumoPorTalla ?? delModeloAvio?.consumoPorTalla ?? false),
                     idAvioProveedor:
                       datos.idAvioProveedor ?? delModeloAvio?.idAvioProveedor ?? null,
                     agregadoAMano: delModeloAvio === undefined,
@@ -1509,6 +1516,14 @@ export async function editarRenglonReceta(
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
         const antes = fotoAvio(fila);
         if (fila.excluido) ctx.cayoSobreLapida();
+        // ⭐ V1-E3g: el toggle que llega se normaliza contra el modo del avío. Además, si el
+        // renglón trae la contradicción HEREDADA (por medida + toggle encendido) y se está
+        // guardando su captura por talla, se apaga aquí: es el momento en que el usuario sí pidió
+        // tocar ese renglón, y queda en la bitácora con el resto del cambio (nunca en una lectura).
+        const porMedida = await avioEsPorMedida(tx, fila.idAvio);
+        const consumoPorTallaPedido =
+          normalizarConsumoPorTalla(datos.consumoPorTalla, porMedida) ??
+          (porMedida && fila.consumoPorTalla && datos.tallas !== undefined ? false : undefined);
         await tx.ordenAvio.update({
           where: { id: fila.id },
           data: {
@@ -1521,9 +1536,9 @@ export async function editarRenglonReceta(
             ...(datos.paraPreCosto === undefined ? {} : { paraPreCosto: datos.paraPreCosto }),
             ...(datos.paraProduccion === undefined ? {} : { paraProduccion: datos.paraProduccion }),
             ...(datos.paraCosto === undefined ? {} : { paraCosto: datos.paraCosto }),
-            ...(datos.consumoPorTalla === undefined
+            ...(consumoPorTallaPedido === undefined
               ? {}
-              : { consumoPorTalla: datos.consumoPorTalla }),
+              : { consumoPorTalla: consumoPorTallaPedido }),
             ...(datos.idAvioProveedor === undefined
               ? {}
               : { idAvioProveedor: datos.idAvioProveedor }),
@@ -1748,7 +1763,10 @@ export async function restaurarRenglonReceta(
             paraPreCosto: delModelo.paraPreCosto,
             paraProduccion: delModelo.paraProduccion,
             paraCosto: delModelo.paraCosto,
-            consumoPorTalla: delModelo.consumoPorTalla,
+            // V1-E3g: el modelo ya viene normalizado, pero restaurar NO debe ser la rendija por
+            // la que un toggle viejo vuelva a encenderse en un avío "por medida".
+            consumoPorTalla:
+              (await avioEsPorMedida(tx, fila.idAvio)) ? false : delModelo.consumoPorTalla,
             idAvioProveedor: delModelo.idAvioProveedor,
             agregadoAMano: false,
             ...marca,
@@ -1950,24 +1968,71 @@ async function bitacoraReceta(
   });
 }
 
-/** Reemplaza el juego COMPLETO de medidas por talla de un renglón de avío (set-completo, A2). */
+/**
+ * Reemplaza el juego COMPLETO de medidas por talla de un renglón de avío (set-completo, A2).
+ *
+ * ⭐ V1-E3g: `consumo` puede venir SIN capturar (avío "por medida": por talla sólo se elige QUÉ se
+ * pide). En ese caso NO se inventa un cero —envenenaría el requerido— ni se pisa lo que había: se
+ * conserva la cantidad que la fila ya tenía y, si la fila es nueva, se siembra el `consumoPorPrenda`
+ * CONGELADO del renglón, que es la cantidad correcta (1 pza por prenda).
+ */
 async function reemplazarMedidasAvio(
   tx: Tx,
   sesion: SesionUsuario,
   idOrdenAvio: number,
-  tallas: { idTalla: number; consumo: number; idAvioMedida?: number | null | undefined }[],
+  tallas: {
+    idTalla: number;
+    consumo?: number | undefined;
+    idAvioMedida?: number | null | undefined;
+  }[],
 ): Promise<void> {
+  const previas = await tx.ordenAvioTalla.findMany({
+    where: { idOrdenAvio },
+    select: { idTalla: true, consumo: true },
+  });
   await tx.ordenAvioTalla.deleteMany({ where: { idOrdenAvio } });
   if (tallas.length === 0) return;
+
+  const consumoPrevio = new Map(previas.map((p) => [p.idTalla, num(p.consumo)]));
+  const renglon = await tx.ordenAvio.findUniqueOrThrow({
+    where: { id: idOrdenAvio },
+    select: { consumoPorPrenda: true },
+  });
+  const porPrenda = num(renglon.consumoPorPrenda);
+
   await tx.ordenAvioTalla.createMany({
     data: tallas.map((t) => ({
       idOrdenAvio,
       idTalla: t.idTalla,
-      consumo: new Prisma.Decimal(t.consumo),
+      consumo: new Prisma.Decimal(t.consumo ?? consumoPrevio.get(t.idTalla) ?? porPrenda),
       idAvioMedida: t.idAvioMedida ?? null,
       ...datosCreacion(sesion),
     })),
   });
+}
+
+/**
+ * ¿El avío es "por medida"? (≥1 `AvioMedida` ACTIVA). Mismo criterio que `modoCapturaAvio` y que el
+ * precosto — se consulta aquí porque en las rutas de escritura no siempre hay la fila proyectada.
+ */
+async function avioEsPorMedida(tx: Tx, idAvio: number): Promise<boolean> {
+  const n = await tx.avioMedida.count({ where: { idAvio, activo: true } });
+  return n > 0;
+}
+
+/**
+ * Normaliza el toggle `consumoPorTalla` que llega del cliente: en un avío "por medida" la cantidad
+ * NO varía por talla (el cierre es 1 pza), así que el toggle queda en **false**. Si se dejara
+ * encendido, unas cantidades por talla que la pantalla ya ni muestra seguirían mandando en el
+ * requerido del MRP, en la sombra (V1-E3g, §Post-F9.66). `undefined` (el PATCH no lo trae) se
+ * respeta tal cual: una lectura o un cambio de otro campo no toca lo que nadie pidió tocar.
+ */
+function normalizarConsumoPorTalla(
+  deseado: boolean | undefined,
+  porMedida: boolean,
+): boolean | undefined {
+  if (deseado === undefined) return undefined;
+  return porMedida ? false : deseado;
 }
 
 /** Renglón de tela de ESTA orden, o `ErrorNoEncontrado` (A9 del sub-recurso). */
