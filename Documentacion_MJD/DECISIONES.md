@@ -3059,6 +3059,23 @@ donde va el precio. **Medido:** 124 pantallas, **39 sin ninguna consulta de perm
    ver **sí** debe leer algo, o parecería que el sistema se rompió: *"Esta pantalla no está disponible
    para tu usuario."* **Sin** nombrar el permiso, sin sugerir a quién pedirlo, sin código de error.
 
+**⭐ Y las TRES CAPAS, petición expresa de Daniel:** *"Podemos intentar ocultar botones mientras se pueda
+y al mismo tiempo bloquear pantallas para asegurarnos que no haya una puerta que no estemos viendo. Así
+aseguramos que no entran, y al mismo tiempo intentamos que no sea ofensivo para el usuario."*
+
+| Capa | Qué hace | Estado (verificado 18-ago) |
+|---|---|---|
+| **Menú** | esconde la opción | ✅ ya funciona |
+| **Ruta** | cierra la pantalla | 🔴 **NO EXISTE** |
+| **Backend** | rechaza la operación | ✅ ya funciona |
+
+🔴 **La capa de en medio falta.** `sesion/RutaProtegida.tsx` verifica **solo que haya sesión** —lo dice su
+propio comentario: *"Es solo la PRIMERA barrera (UX)"*— y de las **135 rutas de `App.tsx` solo 2 mencionan
+permisos**. Quien teclee la URL de una pantalla que no le toca **entra**, ve encabezados y botones, y la
+pantalla falla al cargar. **No es agujero de seguridad** (el backend rechaza), pero es exactamente la
+puerta que Daniel intuyó sin verla. Las rutas deben tomar su permiso de `catalogo.ts` —**una sola
+fuente**—, no de una lista nueva que se desalinearía con el tiempo.
+
 **Regla que NO se negocia:** esconder es **de presentación**. El backend sigue devolviendo 403/404 como
 corresponde; **la seguridad nunca depende de que la UI no muestre el botón**. Si al barrer aparece un
 endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**, no una nota.
