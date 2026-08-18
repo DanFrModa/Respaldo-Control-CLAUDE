@@ -82,6 +82,7 @@ import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
 import { rutasBitacora } from './api/admin/bitacora.rutas.js';
+import { rutasDiagnostico } from './api/admin/diagnostico.rutas.js';
 import { rutasAuditorias } from './api/calidad/auditorias.rutas.js';
 import { rutasDefectos } from './api/calidad/defectos.rutas.js';
 import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
@@ -440,6 +441,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasRoles, { prefix: '/api' });
   // Consulta de BITÁCORA (F6-E1, transversal) — lectura del log de auditoría A7 (admin.ver-bitacora).
   await app.register(rutasBitacora, { prefix: '/api' });
+  // DIAGNÓSTICO de infraestructura (almacenamiento R2 + respaldo mensual): la pantalla que dice por
+  // qué no se suben las fotos y si de verdad se está respaldando la base, sin abrir Railway ni
+  // Cloudflare. Lectura con `admin.ver-bitacora`; la corrida manual del respaldo, con
+  // `admin.respaldo-ejecutar`.
+  await app.register(rutasDiagnostico, { prefix: '/api' });
 
   return app;
 }

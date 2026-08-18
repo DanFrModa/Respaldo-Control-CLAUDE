@@ -144,6 +144,7 @@ export interface paths {
                 | 'usuarios.administrar'
                 | 'roles.administrar'
                 | 'admin.ver-bitacora'
+                | 'admin.respaldo-ejecutar'
                 | 'almacenes.ver'
                 | 'almacenes.administrar'
                 | 'empresas.administrar'
@@ -93678,6 +93679,229 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/diagnostico': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Diagnosticar el almacenamiento de archivos (R2) y el respaldo mensual */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Diagnóstico de infraestructura: almacenamiento de archivos y respaldo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * Format: date-time
+               * @description Cuándo se corrió el diagnóstico.
+               */
+              hora: string;
+              /** @description Diagnóstico del almacenamiento de archivos (R2). */
+              almacenamiento: {
+                /** @description Bucket configurado en este ambiente. */
+                bucket: string;
+                /** @description Id de cuenta de Cloudflare, enmascarado. */
+                cuenta: string;
+                /** @description Access Key del token S3, enmascarado. */
+                accessKeyId: string;
+                /** @description Origen público del frontend contra el que se probó CORS. */
+                origenProbado: string;
+                /** @description Política CORS que hoy tiene el bucket (JSON), o null si no se pudo leer. */
+                corsActual: string | null;
+                /** @description Política CORS que el sistema necesita, lista para pegar. */
+                corsSugerido: string;
+                pruebas: {
+                  /** @description Identificador estable de la prueba. */
+                  clave: string;
+                  /** @description Qué se probó, en una línea. */
+                  titulo: string;
+                  /**
+                   * @description Cómo salió.
+                   * @enum {string}
+                   */
+                  estado: 'ok' | 'falla' | 'aviso' | 'no-probado';
+                  /** @description Qué pasó exactamente (incluye el código de error de R2). */
+                  detalle: string;
+                  /** @description Qué hacer para arreglarlo. */
+                  sugerencia?: string;
+                }[];
+                /** @description Qué está pasando y qué sigue, en una frase. */
+                veredicto: string;
+                /** @description ¿El navegador puede subir archivos ahora mismo? */
+                puedeSubirFotos: boolean;
+              };
+              /** @description Diagnóstico del respaldo mensual cifrado a R2. */
+              respaldo: {
+                /**
+                 * @description Cómo quedó el respaldo al arrancar.
+                 * @enum {string}
+                 */
+                estado: 'programado' | 'apagado' | 'sin-configurar';
+                /** @description Explicación del estado (qué falta, o desde cuándo está apagado). */
+                mensaje: string;
+                /** @description Cron UTC de la corrida. */
+                cron: string;
+                /** @description El cron traducido a lenguaje humano. */
+                cuando: string;
+                /** @description Cuántos respaldos se conservan. */
+                retencion: number;
+                /** @description Las últimas corridas registradas. */
+                ultimasCorridas: {
+                  /** @description Id de la corrida (BigInt como texto). */
+                  id: string;
+                  /**
+                   * Format: date-time
+                   * @description Cuándo arrancó.
+                   */
+                  iniciadoEn: string;
+                  /** @description Cuándo terminó (null si sigue en curso). */
+                  terminadoEn: string | null;
+                  /** @description EN_CURSO / EXITO / FALLO. */
+                  estado: string;
+                  /** @description Paso alcanzado (o donde tronó). */
+                  paso: string;
+                  /** @description Key del objeto en R2 (la que pide el restaurador). */
+                  key: string | null;
+                  /** @description Tamaño del archivo cifrado que confirmó R2, en bytes. */
+                  tamanoSubidoBytes: string | null;
+                  /** @description Huella SHA-256 del archivo cifrado. */
+                  sha256: string | null;
+                  /** @description El error, si falló. */
+                  error: string | null;
+                }[];
+                /** @description Si hay o no segundo respaldo, y qué hacer. */
+                veredicto: string;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/diagnostico/respaldo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pedir una corrida del respaldo ahora mismo (sin esperar al cron) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultado de pedir un respaldo ahora mismo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description ¿Se pudo encolar la corrida? */
+              encolado: boolean;
+              /** @description Qué pasó y qué esperar. */
+              mensaje: string;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

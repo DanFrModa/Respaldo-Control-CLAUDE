@@ -755,6 +755,13 @@ export const CATALOGO_PERMISOS = [
     modulo: 'admin',
     descripcion: 'Consultar la bitácora de cambios del sistema (auditoría A7)',
   },
+  // Corrida MANUAL del respaldo mensual desde el diagnóstico del sistema. Es permiso propio y no
+  // `admin.ver-bitacora` porque no es una consulta: vuelca la base entera, la cifra y la sube a R2.
+  {
+    clave: 'admin.respaldo-ejecutar',
+    modulo: 'admin',
+    descripcion: 'Pedir una corrida del respaldo de la base ahora mismo (diagnóstico del sistema)',
+  },
   {
     clave: 'almacenes.ver',
     modulo: 'almacenes',

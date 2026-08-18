@@ -159,6 +159,7 @@
                           "usuarios.administrar",
                           "roles.administrar",
                           "admin.ver-bitacora",
+                          "admin.respaldo-ejecutar",
                           "almacenes.ver",
                           "almacenes.administrar",
                           "empresas.administrar",
@@ -222251,6 +222252,446 @@
                   ],
                   "additionalProperties": false,
                   "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/diagnostico": {
+      "get": {
+        "summary": "Diagnosticar el almacenamiento de archivos (R2) y el respaldo mensual",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnóstico de infraestructura: almacenamiento de archivos y respaldo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hora": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se corrió el diagnóstico."
+                    },
+                    "almacenamiento": {
+                      "type": "object",
+                      "properties": {
+                        "bucket": {
+                          "type": "string",
+                          "description": "Bucket configurado en este ambiente."
+                        },
+                        "cuenta": {
+                          "type": "string",
+                          "description": "Id de cuenta de Cloudflare, enmascarado."
+                        },
+                        "accessKeyId": {
+                          "type": "string",
+                          "description": "Access Key del token S3, enmascarado."
+                        },
+                        "origenProbado": {
+                          "type": "string",
+                          "description": "Origen público del frontend contra el que se probó CORS."
+                        },
+                        "corsActual": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Política CORS que hoy tiene el bucket (JSON), o null si no se pudo leer."
+                        },
+                        "corsSugerido": {
+                          "type": "string",
+                          "description": "Política CORS que el sistema necesita, lista para pegar."
+                        },
+                        "pruebas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "clave": {
+                                "type": "string",
+                                "description": "Identificador estable de la prueba."
+                              },
+                              "titulo": {
+                                "type": "string",
+                                "description": "Qué se probó, en una línea."
+                              },
+                              "estado": {
+                                "type": "string",
+                                "enum": [
+                                  "ok",
+                                  "falla",
+                                  "aviso",
+                                  "no-probado"
+                                ],
+                                "description": "Cómo salió."
+                              },
+                              "detalle": {
+                                "type": "string",
+                                "description": "Qué pasó exactamente (incluye el código de error de R2)."
+                              },
+                              "sugerencia": {
+                                "description": "Qué hacer para arreglarlo.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "clave",
+                              "titulo",
+                              "estado",
+                              "detalle"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Resultado de una prueba del diagnóstico."
+                          }
+                        },
+                        "veredicto": {
+                          "type": "string",
+                          "description": "Qué está pasando y qué sigue, en una frase."
+                        },
+                        "puedeSubirFotos": {
+                          "type": "boolean",
+                          "description": "¿El navegador puede subir archivos ahora mismo?"
+                        }
+                      },
+                      "required": [
+                        "bucket",
+                        "cuenta",
+                        "accessKeyId",
+                        "origenProbado",
+                        "corsActual",
+                        "corsSugerido",
+                        "pruebas",
+                        "veredicto",
+                        "puedeSubirFotos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Diagnóstico del almacenamiento de archivos (R2)."
+                    },
+                    "respaldo": {
+                      "type": "object",
+                      "properties": {
+                        "estado": {
+                          "type": "string",
+                          "enum": [
+                            "programado",
+                            "apagado",
+                            "sin-configurar"
+                          ],
+                          "description": "Cómo quedó el respaldo al arrancar."
+                        },
+                        "mensaje": {
+                          "type": "string",
+                          "description": "Explicación del estado (qué falta, o desde cuándo está apagado)."
+                        },
+                        "cron": {
+                          "type": "string",
+                          "description": "Cron UTC de la corrida."
+                        },
+                        "cuando": {
+                          "type": "string",
+                          "description": "El cron traducido a lenguaje humano."
+                        },
+                        "retencion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántos respaldos se conservan."
+                        },
+                        "ultimasCorridas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Id de la corrida (BigInt como texto)."
+                              },
+                              "iniciadoEn": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                                "description": "Cuándo arrancó."
+                              },
+                              "terminadoEn": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cuándo terminó (null si sigue en curso)."
+                              },
+                              "estado": {
+                                "type": "string",
+                                "description": "EN_CURSO / EXITO / FALLO."
+                              },
+                              "paso": {
+                                "type": "string",
+                                "description": "Paso alcanzado (o donde tronó)."
+                              },
+                              "key": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Key del objeto en R2 (la que pide el restaurador)."
+                              },
+                              "tamanoSubidoBytes": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Tamaño del archivo cifrado que confirmó R2, en bytes."
+                              },
+                              "sha256": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Huella SHA-256 del archivo cifrado."
+                              },
+                              "error": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "El error, si falló."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "iniciadoEn",
+                              "terminadoEn",
+                              "estado",
+                              "paso",
+                              "key",
+                              "tamanoSubidoBytes",
+                              "sha256",
+                              "error"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Una corrida del respaldo mensual a R2."
+                          },
+                          "description": "Las últimas corridas registradas."
+                        },
+                        "veredicto": {
+                          "type": "string",
+                          "description": "Si hay o no segundo respaldo, y qué hacer."
+                        }
+                      },
+                      "required": [
+                        "estado",
+                        "mensaje",
+                        "cron",
+                        "cuando",
+                        "retencion",
+                        "ultimasCorridas",
+                        "veredicto"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Diagnóstico del respaldo mensual cifrado a R2."
+                    }
+                  },
+                  "required": [
+                    "hora",
+                    "almacenamiento",
+                    "respaldo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Diagnóstico de infraestructura: almacenamiento de archivos y respaldo."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/diagnostico/respaldo": {
+      "post": {
+        "summary": "Pedir una corrida del respaldo ahora mismo (sin esperar al cron)",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de pedir un respaldo ahora mismo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "encolado": {
+                      "type": "boolean",
+                      "description": "¿Se pudo encolar la corrida?"
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Qué pasó y qué esperar."
+                    }
+                  },
+                  "required": [
+                    "encolado",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de pedir un respaldo ahora mismo."
                 }
               }
             }

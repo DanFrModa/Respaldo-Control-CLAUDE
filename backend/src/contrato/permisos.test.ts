@@ -45,6 +45,8 @@ describe('catálogo de permisos', () => {
     const nuevos = catalogo.filter((p) => p.origen === undefined).map((p) => p.clave);
     expect(nuevos.sort()).toEqual([
       // Consulta de la bitácora del sistema (F6-E1, transversal): lectura del motor A7.
+      // Corrida manual del respaldo desde el diagnóstico del sistema (V1-E6b).
+      'admin.respaldo-ejecutar',
       'admin.ver-bitacora',
       'almacenes.administrar',
       'almacenes.ver',

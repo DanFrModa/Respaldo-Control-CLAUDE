@@ -4,6 +4,7 @@ import {
   Coins,
   ListChecks,
   ShieldCheck,
+  Stethoscope,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -57,6 +58,15 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     ruta: '/administracion/empresas',
     icono: Building2,
     permiso: 'empresas.administrar',
+  },
+  {
+    clave: 'diagnostico',
+    titulo: 'Diagnóstico del sistema',
+    descripcion:
+      'Prueba el almacenamiento de fotos y archivos, y revisa el respaldo de la base de datos.',
+    ruta: '/administracion/diagnostico',
+    icono: Stethoscope,
+    permiso: 'admin.ver-bitacora',
   },
   {
     clave: 'bitacora',

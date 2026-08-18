@@ -1884,3 +1884,15 @@ export type DirectorioTercero = DirectorioTercerosPagina['datos'][number];
 export type DirectorioTercerosQuery = NonNullable<
   paths['/api/directorio-terceros']['get']['parameters']['query']
 >;
+
+// ── Diagnóstico de infraestructura (almacenamiento R2 + respaldo mensual) ─────
+
+/** Respuesta de `GET /api/admin/diagnostico`: almacenamiento de archivos + respaldo. */
+export type Diagnostico =
+  paths['/api/admin/diagnostico']['get']['responses']['200']['content']['application/json'];
+
+/** Una prueba del diagnóstico (una fila de la pantalla). */
+export type PruebaDiagnostico = Diagnostico['almacenamiento']['pruebas'][number];
+
+/** Una corrida del respaldo mensual, como la muestra el diagnóstico. */
+export type CorridaRespaldo = Diagnostico['respaldo']['ultimasCorridas'][number];

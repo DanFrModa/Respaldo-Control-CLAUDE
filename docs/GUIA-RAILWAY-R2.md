@@ -228,6 +228,29 @@ environment) → arranque → healthcheck `/api/health`.
    repo.
 6. No hay que configurar endpoint en ningún dashboard: el backend lo arma como
    `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`.
+7. **⭐ Configurar la política CORS de CADA bucket — SIN esto las fotos NO suben.** Este paso
+   faltaba en la guía y es la causa raíz de que «subir fotos» llevara meses roto. El navegador sube
+   el archivo **directo a R2** con una URL prefirmada, y R2 solo lo acepta si el bucket autoriza
+   expresamente al dominio del frontend. En **R2 → el bucket → Settings → CORS Policy → Edit**, pega:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://EL-DOMINIO-PUBLICO-DEL-FRONTEND"],
+       "AllowedMethods": ["GET", "PUT", "HEAD"],
+       "AllowedHeaders": ["content-type"],
+       "ExposeHeaders": ["etag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   Cada bucket con **su** dominio: el de `prueba` con el frontend de `prueba`, el de producción con
+   el de producción. ⚠️ **Si el dominio público cambia, hay que actualizar la política** — el origen
+   viejo deja de coincidir y el navegador vuelve a bloquear las subidas.
+
+   **No lo tecleas a mano:** entra a **Administración › Diagnóstico del sistema** y copia la política
+   que ya trae ahí, armada con el dominio real desde el que estás entrando.
 
 ## 7.1. ⭐ El respaldo MENSUAL cifrado a R2 (V1-E6a)
 
@@ -261,7 +284,13 @@ existe —Railway no está— te quedarías con los archivos cifrados y sin con 
 
 ### Cómo saber si está funcionando
 
-**Administración › Bitácora**, filtro de entidad **`RespaldoBd`** (permiso `admin.ver-bitacora`):
+**Administración › Diagnóstico del sistema** (V1-E6b) lo dice de frente: si el respaldo quedó
+programado / apagado / sin configurar, cuándo corre en hora de México, y **las últimas 12 corridas**
+con su paso, tamaño y error. Ahí mismo está **«Respaldar ahora»** (permiso `admin.respaldo-ejecutar`),
+que encola la corrida REAL: es la forma de comprobar la llave el mismo día que la pones, en vez de
+esperar al día 1 del mes que viene.
+
+También, en crudo: **Administración › Bitácora**, filtro de entidad **`RespaldoBd`** (permiso `admin.ver-bitacora`):
 acción `CREAR` = respaldo hecho; `OTRO` = corrida fallida, con el paso y el error en el detalle.
 También en la tabla `respaldo_corrida` y en el log de Railway (prefijo `⛔ RESPALDO A R2 FALLIDO`).
 
@@ -401,7 +430,19 @@ se vuelve a desplegar** (redeploy). El nginx del frontend está preparado para e
 > (`docs/hoja-de-ruta/F1-etapas.md:222`). Viven aquí porque es donde uno las busca. *(Pasó de nuevo el
 > 15-ago-2026: Daniel no pudo subir fotos en `prueba` y hubo que ir a arqueologiar la ficha vieja.)*
 
-**Primero: el mensaje de la pantalla te dice DÓNDE mirar.** Los dos textos salen de
+### ⭐ Lo primero, siempre: **Administración › Diagnóstico del sistema**
+
+Desde V1-E6b no hace falta adivinar cuál de las trampas es. Esa pantalla corre las pruebas **desde el
+servidor** —escribe, lee y borra un objeto de prueba en el bucket, y dispara el mismo preflight CORS
+que hace el navegador— y te dice **cuál de las cinco causas** es, con el arreglo puntual y la política
+CORS lista para copiar. Las trampas de abajo siguen aquí porque explican el porqué; la pantalla te
+dice el cuál en diez segundos y sin abrir dos dashboards.
+
+*(Requiere el permiso `admin.ver-bitacora`, el mismo de la bitácora.)*
+
+**Si no puedes entrar al sistema** (o el deploy es anterior a V1-E6b), sigue con el método de abajo.
+
+**Segundo: el mensaje de la pantalla te dice DÓNDE mirar.** Los dos textos salen de
 `frontend/src/api/subida-archivo.ts` y significan cosas distintas:
 
 | Lo que dice la pantalla | Qué pasó | Dónde está la causa |

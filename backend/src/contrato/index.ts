@@ -2071,3 +2071,18 @@ export {
   type DirectorioTercero,
   type DirectorioTercerosPagina,
 } from './esquemas/directorio-terceros.js';
+
+// ── Diagnóstico de infraestructura: almacenamiento R2 + respaldo mensual ──
+export {
+  ESTADOS_PRUEBA,
+  ESTADOS_RESPALDO_CONFIG,
+  esquemaPruebaDiagnostico,
+  esquemaDiagnosticoAlmacenamiento,
+  esquemaCorridaRespaldo,
+  esquemaDiagnosticoRespaldo,
+  esquemaDiagnostico,
+  esquemaRespaldoEncolado,
+  type EstadoPruebaClave,
+  type Diagnostico,
+  type RespaldoEncolado,
+} from './esquemas/diagnostico.js';

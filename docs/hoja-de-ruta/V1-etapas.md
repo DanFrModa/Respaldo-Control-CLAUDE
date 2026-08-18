@@ -1136,6 +1136,66 @@ CERO seed.** Requiere que Gabriel ponga `RESPALDO_LLAVE` en Railway **y la guard
 
 ---
 
+## V1-E6b · El diagnóstico del sistema — por qué no suben las fotos, y si el respaldo está vivo (18-ago-2026)
+
+> **Nace de un atasco real, no de un plan.** El 18-ago Daniel volvió a toparse con que **no se pueden
+> subir fotos en `prueba`** — el mismo bloqueo del 15-ago, que ya había obligado a ir a arqueologiar
+> la ficha de una etapa de junio. Y al mismo tiempo el respaldo mensual (V1-E6a) quedó configurado a
+> medias, esperando su llave. Las dos cosas comparten síntoma: **el sistema sabía lo que estaba mal y
+> no tenía dónde decirlo.**
+
+### El hueco
+
+Cuando el navegador no puede subir una foto, **cinco causas muy distintas se ven idénticas**: token
+vencido, secreto que no cuadra, token de solo lectura, bucket mal escrito y política CORS ausente. R2
+rechaza el `PUT` **sin cabeceras CORS** y el navegador convierte todo eso en «falla de red». La única
+forma de distinguirlas era tener acceso a Railway *y* a Cloudflare *y* leer logs — o sea, no la tenía
+quien estaba atascado.
+
+El respaldo tenía el problema espejo: **corre una vez al mes**, así que si falla en enero nadie se
+entera hasta junio. Su rastro existía (`RespaldoCorrida` + bitácora), pero había que saber buscarlo.
+
+### Qué entrega
+
+**Administración › Diagnóstico del sistema** (`/administracion/diagnostico`, permiso
+`admin.ver-bitacora` — el mismo de la bitácora, a propósito: un permiso NUEVO no existe hasta correr
+el seed, y esta pantalla tiene que servir justo en el ambiente al que le falta configuración).
+
+- **Prueba el almacenamiento DE VERDAD**, desde el servidor, que es el único que tiene las
+  credenciales: escribe un objeto de prueba, lo lee, lo borra, lee la política CORS del bucket y
+  **dispara el mismo preflight `OPTIONS` que hace el navegador**. Desde Node no hay política del
+  mismo origen, así que ahí sí se ve la respuesta cruda de R2 en vez de la versión censurada.
+- **Traduce el error de Cloudflare a español y a un arreglo**: `InvalidAccessKeyId` → «el token se
+  venció o se rotó»; `SignatureDoesNotMatch` → «el secreto no es el de esa llave»; `AccessDenied` →
+  «es un token de solo lectura, o no alcanza a este bucket»; `NoSuchBucket` → «el nombre trae typo».
+- **Da la política CORS ya armada con el origen real de la petición**, lista para copiar y pegar en
+  Cloudflare. Se arma con el dominio desde el que la persona está entrando AHORA, no con una
+  constante del repo: si el dominio de Railway cambió, la política sale con el nuevo.
+- **Del respaldo**: si quedó programado, apagado o sin configurar (leyendo la MISMA función que usa
+  el arranque, no una copia), cuándo corre en hora de México, cuántas copias conserva, y las últimas
+  12 corridas con su paso, tamaño, huella y error. Y un botón **«Respaldar ahora»**
+  (`admin.respaldo-ejecutar`, permiso nuevo) que **encola la corrida real** — mismo worker, mismo
+  camino — para no tener que esperar semanas a saber si la llave sirvió.
+
+**Credenciales enmascaradas siempre:** del Access Key salen 4 caracteres y su largo; el secreto no
+sale nunca. Es un diagnóstico, no una filtración.
+
+### Nota de cierre — ✅ HECHA (18-ago-2026)
+
+Backend: `comun/diagnostico-r2.ts` (las pruebas y el mapa de errores), `dominio/admin/diagnostico.ts`
+(el criterio y los veredictos), `api/admin/diagnostico.rutas.ts` (GET del diagnóstico + POST del
+respaldo manual). Frontend: `modulos/administracion/DiagnosticoPagina.tsx` + `api/diagnostico.ts` +
+tarjeta en la portada de Administración. **SIN migración** (no toca el esquema); **+1 permiso**
+(`admin.respaldo-ejecutar`) → el deploy quiere `SEED_ON_START=true`, que esta tanda ya exigía por
+V1-E4b. 19 pruebas unitarias sobre el mapa de errores, la lectura del preflight, el enmascarado y la
+traducción del cron. `docs/GUIA-RAILWAY-R2.md` §7 estrena el **paso de CORS que nunca estuvo escrito**
+—la causa raíz de que las fotos llevaran meses sin subir— y §9.1 ahora empieza mandando a la pantalla.
+
+**Lo que esto NO arregla solo:** la configuración sigue siendo de Cloudflare. La pantalla dice
+exactamente qué tocar y con qué texto; tocarlo sigue siendo un paso manual de quien tenga la cuenta.
+
+---
+
 ## V1-E7 · El ensayo
 
 Sobre **base vaciada** (nunca encima de lo que hay en `prueba`, que mezcla la foto vieja con

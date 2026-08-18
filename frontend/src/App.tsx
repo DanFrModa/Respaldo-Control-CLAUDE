@@ -97,6 +97,7 @@ import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPag
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { DiagnosticoPagina } from '@/modulos/administracion/DiagnosticoPagina';
 import { RolesPagina } from '@/modulos/administracion/RolesPagina';
 import { ConceptosCostoPagina } from '@/modulos/conceptos-costo/ConceptosCostoPagina';
 import { EstadosListaPagina } from '@/modulos/estados-lista/EstadosListaPagina';
@@ -373,6 +374,9 @@ const router = createBrowserRouter([
           { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },
           // Bitácora de auditoría (A7, F6-E1).
           { path: 'administracion/bitacora', element: <BitacoraPagina /> },
+          // Diagnóstico del sistema: prueba real del almacenamiento (por qué no suben las fotos) y
+          // estado del respaldo de la base. Mismo permiso que la bitácora (admin.ver-bitacora).
+          { path: 'administracion/diagnostico', element: <DiagnosticoPagina /> },
           // Catálogos globales de Desarrollo (F8-E1), admin-only.
           { path: 'administracion/conceptos-costo', element: <ConceptosCostoPagina /> },
           { path: 'administracion/estados-lista', element: <EstadosListaPagina /> },
