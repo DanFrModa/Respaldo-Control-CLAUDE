@@ -423,6 +423,24 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   nueva. *(Corrección: la primera redacción de esta deuda citaba `Almacen.idCortador` como precedente de
   "campo del almacén que la UI no toca". **Es falso** — `DialogoAlmacen.tsx:179` lo pinta como select y lo
   manda al crear y al editar. El precedente válido es el otro: los `TipoMovimientoInventario` por código.)*
+- **⚠️ `codigoRolProveedor` ata proceso↔rol POR TEXTO, sin FK (V1-E3f, 18-ago-2026):** el selector de
+  proveedores del arte acota por rol resolviendo la **coincidencia del `codigo`** entre `TipoProceso` y
+  `RolProveedor`. **El reviewer lo aceptó, pero rechazó la razón que se dio** (*"degrada con gracia"*):
+  degradar a ofrecer **TODOS** los proveedores es un **ensanchamiento silencioso** — nadie ve nada raro,
+  solo una lista más larga. Lo que sí lo sostiene es que **la identidad de códigos ya no es universal y
+  el repo lo sabía**: `recibos.ts:96-102` tiene un `MAPEO_PROCESO_A_ROL` escrito a mano porque `costura`
+  mapea a `maquila-costura`. Es decir, el acoplamiento invisible funciona **justo en los cuatro que son
+  arte** y se rompe en el único que no lo es. Y el `codigo` **sí** es editable por UI
+  (`actualizarTipoProceso`), así que el riesgo no es teórico. Daño tope: el selector deja de acotar — no
+  corrompe dato, no cruza empresa, no toca inventario. El campo ya está en el contrato, así que **meter
+  la FK después no rompe consumidores**. **Atarlo a la etapa de proveedores**, que de todos modos toca
+  `RolProveedor`.
+- **`SelectNativo` de proveedor con tope de 100: barrido en 8 pantallas, pero SIGUE VIVO en otras
+  (V1-E3f):** con más de 100 proveedores, el que buscas **no aparece** — es la cuarta vez que este mismo
+  defecto sale en el proyecto. V1-E3f lo convirtió a `ComboboxBuscable` (que **sí** busca contra el
+  servidor, verificado) en ocho pantallas, pero quedan al menos `notas-salida/DialogoEditarNota.tsx:94`,
+  `ordenes-compra/DialogoEditarOc.tsx:94`, `inventarios/CapturaEntradaTelaPagina.tsx:101` y los filtros
+  de maquilero de producción y calidad. Fuera del alcance de esa etapa — **se dice, no se calla**.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

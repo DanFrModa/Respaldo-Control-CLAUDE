@@ -1021,6 +1021,67 @@ antes que escribir una prueba decorativa. Esta tanda ya destapó tres de ésas.
 
 ---
 
+## V1-E3f · Un solo catálogo de procesos, y el arte como Daniel lo usa ⭐ (17-ago-2026)
+
+> Decisiones en `DECISIONES.md` **§Post-F9.52 · .54 · .58 · .59 · .63 · .65**. Se partió de la etapa
+> original de "arte + proveedores": juntas eran catorce cosas más un lector de PDF, y como solo puede
+> haber **un coder a la vez sobre el árbol** iban a ser secuenciales de todos modos. **Pieza A = arte;
+> pieza B = proveedores.**
+
+### El hueco
+
+Convivían **dos listas casi idénticas**: `TipoProceso` (catálogo administrable) y un **enum fijo
+`TipoArte`** con solo BORDADO/ESTAMPADO. Daniel lo cerró textual: *"De acuerdo. Y un solo catálogo"*, y
+corrigió de paso que **aplicación TAMBIÉN es arte**. El objetivo de fondo es el **principio del proceso
+raro** (§Post-F9.54): que un «embosado» se dé de alta **una vez** y sirva para las dos cosas, porque *"hay
+procesos que hago muy muy poco, no justifica hacer todo un desarrollo"*.
+
+### Qué entrega
+
+`TipoProceso` gana `esArte` y `usaPuntadas`; el enum **desaparece** y `ModeloArte`/`OrdenArte` apuntan al
+catálogo. **No se arrastró el error de `generaEntradaPt`:** `esArte` **sí** es propiedad del tipo, a
+diferencia de la posición antes/después de costura, que V1-E4b acababa de mover al envío — y el porqué de
+la diferencia quedó escrito.
+
+Los siete del arte: **el nombre se retira** y la descripción toma su lugar (§Post-F9.63), posición como
+**texto libre**, tipo del catálogo, **fotos en plural**, puntadas **atadas al tipo** en vez de borradas, y
+el proveedor deja de ser un select con tope de 100 — **barrido en 8 pantallas**, no solo la del arte.
+
+### Nota de cierre — ⬜ EN CORRECCIÓN (18-ago-2026)
+
+**Primera vuelta: RECHAZADO — y el rechazo NO fue por el código.** El reviewer lo dice textual: *"no
+encontré ni un solo defecto funcional"*. Verificó ejecutando que la migración aplica sobre una base al
+estado de `prueba` con **0 filas perdidas y 0 reetiquetadas**, que el guardarraíl de duplicados hace
+**rollback atómico**, y que las dos rutas —base nueva por seed, base existente por migración— dejan
+**banderas idénticas**, confirmando que el deploy **no** requiere `SEED_ON_START`.
+
+**Lo que lo bloqueó fueron dos MUTACIONES VIVAS, y las dos tocan la historia congelada en la orden:**
+
+1. **`copiarRecetaDelModelo` no tenía NINGUNA prueba de arte.** Es el productor principal de `OrdenArte`.
+   El reviewer mutó `posicion: a.posicion` → `null` —**perder en el congelado un campo que Daniel acababa
+   de pedir**— y la suite **completa** siguió verde: 1865 + 1445, idénticos.
+2. **`restaurarRenglonReceta`, rama arte, sin prueba.** Mutó la resolución por traza a `artesModelo[0]`:
+   restaurar **pisaría el renglón congelado con los datos de OTRO arte**. Escribir encima de historia
+   (D3), con la suite en verde.
+
+**El patrón, otra vez:** en V1-E4b fueron tres afirmaciones no verificadas; aquí son dos rutas que nadie
+probaba. **La suite completa en verde no dice que algo esté cubierto — dice que nadie lo rompió hoy.**
+
+**Y un hallazgo del coder que el reviewer CONFIRMÓ:** la nota de §Post-F9.54 sobre cómo renombrar los
+roles de proveedor era **falsa** (`update: {}` no toca el nombre). Corregida en su lugar — importa porque
+de ahí cuelga la pieza B.
+
+---
+
+## V1-E3g · Que avise cuando una talla de la orden no tiene medida capturada ⬜ (pedida 17-ago-2026)
+
+> Nace de una pregunta de Daniel sobre la curva de tallas. Decisión y criterios en `DECISIONES.md`
+> **§Post-F9.64**. La curva **ya** es una guía y no una jaula —capturar el XCH fuera de curva se puede
+> hoy—; lo que falta es que **avise** cuando la orden pide una talla sin medida capturada, en vez de
+> sacar el renglón en cero rumbo a producción y al MRP. **Avisa, no bloquea.**
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
