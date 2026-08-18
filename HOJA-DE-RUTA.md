@@ -32,7 +32,15 @@
 > mentir. Con un **riesgo declarado abierto** (§4) · **`V1-E6a` ✅ (el respaldo mensual cifrado a R2,
 > 17-ago)** — adelantado del resto de E6 por ser lo único que protege de algo sin vuelta atrás.
 >
-> 🔨 **En curso: `V1-E4b` · el tránsito de las prendas enviadas a proceso después de costura** (etapa
+> ✅ **`V1-E4b` mergeada** (#185) y ✅ **`V1-E3f` mergeada** (#186, el catálogo único de procesos + el arte
+> como Daniel lo usa). 🔨 **En curso: `V1-E3g`** · medida vs. consumo por talla — **salió de Daniel
+> capturando un cierre**, no de un plan: dos ideas distintas vivían en el mismo campo (el elástico captura
+> *cuánto gastas*, el cierre *qué pides*). Primera vuelta **RECHAZADA**: la normalización cubría los tres
+> caminos secundarios y dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**.
+> ⚠️ Su despliegue exige **contar antes** las filas con medidas activas **y** `consumoPorTalla = true`:
+> el forzado **mueve costos** en esa combinación heredada.
+>
+> *(Texto histórico de V1-E4b, conservado:)* **`V1-E4b`** (etapa
 > NUEVA, nacida de Daniel el 16-ago: *"hay procesos que también son después de costura"* — y pasa HOY).
 > Primera vuelta **RECHAZADA** por el reviewer, en corrección: el modelo quedó avalado (reusa el almacén
 > «Tránsito» que ya existía desde F3-E1, y D3/A2 aguantaron seis envíos simultáneos), pero el stock del
@@ -451,6 +459,20 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   frente, recortar **antes** de descargar es viable — pero **no es la línea única que parece**: el conteo
   *"se muestran 4 de 7"* se calcula del total y habría que llevarlo aparte, y las fotos que fallan al
   bajar se descartan **después**, así que el recorte necesita margen.
+- **⭐ El MRP NO desglosa la compra por medida — la instrucción "pide el cierre de 53" no le llega al
+  proveedor por el sistema (declarada en V1-E3g, 18-ago-2026):** el `schema.prisma` **promete** que
+  *"la compra/MRP desglosa por medida×talla"* y **no está implementado** — verificado por el coder y
+  reconfirmado por el reviewer: **cero referencias a `idAvioMedida` en `src/dominio/compras/`**. La orden
+  de compra sigue saliendo con **una línea agregada por avío**. Es **anterior** a V1-E3g y por eso no la
+  bloqueó: esa etapa hizo lo que prometía —cerrar la ambigüedad **en el origen**, dejando la medida como
+  dato limpio y numérico—, que es justamente lo que hace viable el desglose. **Es el siguiente paso
+  natural de lo que Daniel pidió**, y sin él la mitad del valor de capturar la medida se queda en el
+  sistema. Relacionado: el **impreso de la orden tampoco muestra la medida por talla**
+  (`impreso-orden.ts` solo imprime `consumoPorPrenda`) — cambiar el PDF pide el visto bueno visual de
+  Daniel.
+- **No hay aviso para "cierre sin medida amarrada en una talla" (V1-E3g):** `tallasSinMedida` sólo cubre
+  el caso `consumoPorTalla`. Se dejó fuera **a propósito** —el encargo prohibía construir avisos nuevos,
+  justo para no duplicar el que ya existía— y se declara aquí en vez de callarse.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

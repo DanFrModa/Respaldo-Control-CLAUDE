@@ -1101,7 +1101,63 @@ que arranque el worker. Degrada en lentitud, no en fallo, y no lo introdujo esta
 
 ---
 
-## V1-E3g · Que avise cuando una talla de la orden no tiene medida capturada ⬜ (pedida 17-ago-2026)
+## V1-E3g · Medida vs. consumo por talla ⭐ + el aviso de tallas sin medida (18-ago-2026)
+
+> **Salió de Daniel CAPTURANDO**, no de un plan ni de una revisión técnica. Es el **segundo** hallazgo de
+> esa naturaleza en dos días (el otro fue el tránsito de prendas), y los dos encontraron cosas que **ningún
+> reviewer habría visto: el código estaba bien, lo que estaba mal era el modelo del negocio.**
+> Decisiones: `DECISIONES.md` **§Post-F9.66** (el grueso) y **§Post-F9.64** (el aviso).
+
+### El hueco de fondo
+
+Dos ideas distintas vivían en el mismo campo. En el **elástico**, el valor por talla **es el consumo**
+(0.75 m) y se multiplica por el precio del metro: los decimales son correctos. En el **cierre**, el
+consumo es **1 pza siempre** y lo que cambia por talla es **la especificación** (53 cm), que no se
+multiplica por nada — es una instrucción de compra. *No es que unos avíos usen decimales y otros no: unos
+capturan **cuánto gastas** y otros **qué pides**.*
+
+Y las etiquetas eran parte del defecto: el panel se llamaba *"Consumo por talla"* para las dos cosas y el
+esquema documentaba el campo como *"Medida (consumo)"* — **la confusión estaba escrita desde el origen**.
+
+### Qué entrega
+
+La medida deja de ser texto libre: `AvioMedida` gana valor numérico y **la etiqueta la DERIVA el dominio**
+de valor + unidad. El **modo** (consumo / medida) se deriva de un hecho que **ya existía** —¿el avío tiene
+medidas activas?—, el mismo con el que el precosto decide promediar: **sin bandera nueva**. Los dos modos
+**nunca** están vivos a la vez. La migración convierte lo convertible y deja el resto **marcado, vivo y
+usable**. Y el aviso de tallas sin medida se **REUSÓ** —la habilitación lo tiraba a la basura— en vez de
+construir uno nuevo; de paso dejó de señalar tallas con 0 piezas, que nadie iba a cortar.
+
+### Nota de cierre — ⬜ EN CORRECCIÓN (18-ago-2026)
+
+**Primera vuelta: RECHAZADA.** El reviewer confirmó lo más caro de verificar —la migración **no pierde un
+solo dato** (22 filas antes → 22 después contra datos sucios reales), el elástico **no se movió**, y el
+aviso **se reusó y no se duplicó**— y aun así encontró dos cosas que valían el rechazo:
+
+1. **⭐ La rendija estaba en el camino principal.** Se normalizó el toggle en `agregarRenglonReceta`,
+   `editarRenglonReceta` y `restaurarRenglonReceta` —los **tres secundarios**— y se dejó
+   `copiarRecetaDelModelo`, **por donde pasa el 100 % de las órdenes**. Sonda: orden nueva con toggle
+   heredado → requerido **70 cuando por prenda serían 10**. Es *exactamente el "MRP en la sombra" que la
+   etapa invocó como razón para forzar la bandera*, fabricándose en cada orden nueva.
+2. **⭐ La migración no marcaba el caso que justifica toda la decisión.** §Post-F9.66 dice textual que
+   *"`53 cm`, `53cm` y `53` serían tres cosas distintas"*. El reviewer migró **ese caso exacto**: tres
+   filas indistinguibles, **ninguna marcada, ningún aviso** — y al guardar, `ErrorValidacion` sin pista de
+   cuál borrar. Palabra por palabra lo que Daniel pidió evitar.
+
+**Y una prueba decorativa más:** la que se llama *"nombra las tallas SIN capturar EN ORDEN CANÓNICO"* pasa
+con el `.sort()` borrado, porque el fixture mete la M antes que la G y orden de inserción y orden canónico
+coinciden. **La aserción no discrimina.**
+
+**Del lado del lead:** la ficha describía solo §Post-F9.64 —la mitad chica de la etapa—, `HOJA-DE-RUTA.md`
+no la mencionaba y las deudas declaradas no estaban escritas en §4. Reparado aquí.
+
+⚠️ **Acción de despliegue que NO puede saltarse:** el forzado **mueve dinero** para la combinación
+heredada (avío con medidas activas **y** `consumoPorTalla = true`): pasa de promediar consumos por talla a
+usar el consumo por prenda en el primer guardado. Daniel lo decidió, así que no se discute — pero **hay
+que contar cuántas filas están en ese estado en `prueba` y enseñárselo a Gabriel antes de subir**.
+Cambiar costos a ciegas no es opción.
+
+### El aviso de tallas sin medida (§Post-F9.64) ⬜ (pedida 17-ago-2026)
 
 > Nace de una pregunta de Daniel sobre la curva de tallas. Decisión y criterios en `DECISIONES.md`
 > **§Post-F9.64**. La curva **ya** es una guía y no una jaula —capturar el XCH fuera de curva se puede
