@@ -27,10 +27,10 @@ declare module 'vitest' {
 const raizBackend = fileURLToPath(new URL('../..', import.meta.url));
 
 export default async function entornoGlobal(proyecto: TestProject): Promise<() => Promise<void>> {
-  const contenedor: StartedPostgreSqlContainer = await new PostgreSqlContainer(
-    'postgres:17',
-  ).start();
-  const url = contenedor.getConnectionUri();
+  const nativa = process.env.PG_PRUEBAS_NATIVA;
+  const contenedor: StartedPostgreSqlContainer | null =
+    nativa === undefined ? await new PostgreSqlContainer('postgres:17').start() : null;
+  const url = contenedor === null ? (nativa as string) : contenedor.getConnectionUri();
 
   // Migraciones reales del backend — el esquema de pruebas es EXACTAMENTE el de
   // producción. `npx` resuelve la prisma local (funciona igual en Windows y Linux).
@@ -44,6 +44,6 @@ export default async function entornoGlobal(proyecto: TestProject): Promise<() =
   proyecto.provide('urlBaseDatosPruebas', url);
 
   return async () => {
-    await contenedor.stop();
+    await contenedor?.stop();
   };
 }
