@@ -690,6 +690,10 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
  * tope se aplica al arreglo completo y el arte del BOM va primero, así que un ADJUNTO recortado no
  * aparece en ningún lado salvo en el conteo del título (los bordados del BOM sí quedan siempre en la
  * lista de texto). Con 5+ bordados con foto, los adjuntos de la orden no se ven.
+ *
+ * ⭐ V1-E3f: con las fotos del arte en PLURAL, el reparto {@link porRondas} garantiza que el tope se
+ * lleve primero las fotos EXTRA de un arte y no la única foto de otro — un arte con cinco fotos ya
+ * no expulsa de la rejilla a los demás artes. Sobre los ADJUNTOS no cambia nada: siguen detrás.
  */
 export const MAX_ARTES = 4;
 
