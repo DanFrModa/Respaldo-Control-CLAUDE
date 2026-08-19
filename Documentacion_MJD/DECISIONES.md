@@ -3184,6 +3184,47 @@ caja** se registra aparte, porque perder una tipografía no es lo mismo que perd
 
 ---
 
+#### (Post-F9.70) — Lo que Daniel encontró usando el importador de OC (DANIEL, 19-ago-2026)
+
+Daniel intentó importar una OC real de C&A (**orden 620672**, 1,744 pzas, packs A y B) y **no pudo
+avanzar**. Tres cosas, en orden de gravedad.
+
+**1. ⭐ El campo «Archivo de la OC (opcional)» del pedido manual PARECE un importador y NO lo es.**
+
+En `ConstructorPedido.tsx` («Nuevo pedido interno») hay un campo rotulado *"Archivo de la OC (opcional)"*.
+Daniel le subió su PDF y esperó que lo leyera; el campo **solo llama a `subirAdjunto`** — guarda el archivo
+pegado al pedido y nunca lo abre. Por eso el diálogo le seguía exigiendo **cantidad y precio a mano**, y su
+reclamo era exacto: *"ahí está mal, porque la cantidad la tiene el pedido, no debo dárselas yo"*.
+
+**No fue un malentendido suyo: es la lectura natural del rótulo.** Y el sistema **sí sabe leer ese PDF
+exacto** —verificado ejecutando el parser contra su archivo: sacó los 4 SKU con 436 pzas cada uno, el Pack
+A (8 u/pack × 168) y el Pack B (400 sueltas), **sin una sola advertencia**—, pero esa capacidad vive detrás
+de **otro botón, en otra pantalla** (`Pedidos → «Importar OC (PDF)»`), y al lado se ofrece un campo que
+aparenta lo mismo.
+
+⚠️ **El patrón, que ya se repitió dos veces en la misma sesión:** Daniel buscó el importador **desde el
+pedido**, no lo encontró; luego subió el PDF **al campo que parecía**. *Cuando el camino natural falla dos
+veces, el que está mal es el camino.*
+
+**Dos caminos, con recomendación del lead: (A)** que ese campo **sí lea** el PDF y proponga cargarlo
+(*"Reconocí una OC de C&A: 4 tallas, 1,744 piezas, 2 packs. ¿La cargo?"*) — lo que él esperaba; **(B)**
+dejarlo como adjunto pero **decirlo** y ofrecer ahí el acceso al importador. **(A) es la buena**: (B) solo
+pone un letrero encima del mismo tropiezo. *(Daniel encontró el botón y siguió; NO autorizó todavía el
+arreglo.)*
+
+**2. La plantilla de C&A no existe, así que el 7% de sobre-pedido NO se aplica.** Verificado:
+`prisma/seed.ts` no siembra ninguna `PlantillaImportacion`, y `leerConfigPlantillaPdf` cae al default
+**`porcentajeAdicional: 0`**. Consecuencia: las OPs nacen con las **cantidades exactas del cliente** en vez
+de las que se fabrican. **El 7% fue una decisión de Daniel (§Post-F9.2) y hoy no está operando.**
+Pendiente de decidir: sembrarla de fábrica o darla de alta desde la pantalla.
+
+**3. El botón «Generar pedido interno + OPs» se queda mudo cuando está deshabilitado.** Solo se enciende
+cuando **al menos un renglón está ligado a un modelo** —y en la primera OC de un modelo la liga no existe
+todavía, porque se aprende—. No dice qué falta. Es el mismo defecto que V1-E6b barrió en otras pantallas:
+**ofrecer una puerta y no explicar por qué no abre.**
+
+- **Aplica en:** el importador de OC por PDF y el constructor de pedido. Sin migración.
+
 #### (Post-F9.71) — Cada OC de la explosión lleva SU PROPIA fecha de entrega (DANIEL, 19-ago-2026)
 
 Daniel, usando la explosión de materiales sobre una orden real: *"me pide fecha de entrega, pero cada OC
