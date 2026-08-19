@@ -506,6 +506,21 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   mano** (`hitosOrden.test.ts:32`): el mismo patrón del fixture inventado que ya costó un rechazo en esta
   tanda — *una prueba que confirma la suposición de quien la escribió en vez de cazarla*. Al arreglarlo,
   la prueba tiene que construirse contra un P2002 **real**.
+- **🔴 Un parpadeo de red SACA AL USUARIO A LA PANTALLA DE LOGIN (descubierto 19-ago-2026, al diagnosticar
+  un e2e flaky):** `sesion/ProveedorSesion.tsx` consulta la sesión con **`retry: false`** y luego hace
+  `consulta.data?.autenticado ? … : null`. Un **401 legítimo** se maneja bien — pero **cualquier otro
+  fallo** (500, corte, timeout) deja `data` en `undefined` → `sesion = null` → `RutaProtegida` hace
+  `Navigate to="/login"`. **No distingue "no hay sesión" de "no pude preguntar".**
+  ⚠️ **Importa especialmente en Railway**, donde los baches de conexión están documentados (§8 de
+  `CLAUDE.md`: el backend arranca antes que Postgres y hubo que hacer el entrypoint resiliente). El
+  usuario pierde lo que estaba capturando por un parpadeo.
+  **Cómo se descubrió:** `pedidos.spec.ts:193` es **flaky crónico en `prueba`** —falla el intento 1 y se
+  salva con el reintento en las 3 corridas del 18-ago— y el patrón es **binario, no gradual** (quema los
+  10 s enteros o encuentra el encabezado al instante), lo que apunta a *aterrizó en otra pantalla*, no a
+  *tardó*. **NO está confirmado**: la traza de Playwright vive en un artefacto que el sandbox no puede
+  descargar. **Para confirmarlo bastan 5 minutos con internet**: bajar `playwright-report` del run
+  32209748934 y mirar la URL del screenshot. Mientras tanto, el e2e afirma primero la URL para que el
+  fallo **diga dónde acabó** en vez de "element(s) not found".
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

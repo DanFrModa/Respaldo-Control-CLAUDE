@@ -1,6 +1,21 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 import { cerrarCajon, entrarComoAdmin } from './ayudas';
+
+/**
+ * Encabezado de una sección plegable del diálogo de proveedor (el acordeón: General, Roles /
+ * servicios, Fiscal, Contacto, Pago, Operativo, Contactos, Adjuntos…).
+ *
+ * ⚠️ El nombre va **EXACTO** a propósito. El matcher por nombre de Playwright es por SUBSTRING, y
+ * el diálogo tiene campos cuyo nombre accesible CONTIENE el de una sección: el de la Constancia de
+ * Situación Fiscal (V1-E3f pieza B) se llama "Constancia de Situación Fiscal (opcional)" y casaba
+ * con la sección "Fiscal" → `getByRole('button', { name: 'Fiscal' })` resolvía a DOS elementos y
+ * reventaba por strict mode. Con `exact`, ningún campo nuevo que lleve el nombre de una sección
+ * DENTRO del suyo vuelve a colarse (y "Contacto" tampoco arrastra a "Contactos").
+ */
+function seccionDelDialogo(dialogo: Locator, nombre: string): Locator {
+  return dialogo.getByRole('button', { name: nombre, exact: true });
+}
 
 /**
  * E2E del CRUD de Proveedores contra el stack real, en la estructura LISTA +
@@ -157,7 +172,7 @@ test.describe('Proveedor enriquecido (R15)', () => {
     const nombrePrimerRol = (await selectorRoles.locator('label').first().innerText()).trim();
 
     // Expande "Fiscal" y captura RFC + régimen (forma de persona moral: 12 chars).
-    await dialogo.getByRole('button', { name: 'Fiscal' }).click();
+    await seccionDelDialogo(dialogo, 'Fiscal').click();
     await dialogo.getByTestId('proveedor-factura').check();
     await dialogo.getByLabel('RFC').fill('ABC120101T1A');
     await dialogo.getByLabel('Régimen fiscal (SAT)').fill('601');
@@ -223,7 +238,7 @@ test.describe('Proveedor enriquecido (R15)', () => {
     // Abre la edición y expande Adjuntos.
     await page.getByTestId('editar-proveedor').click();
     const dialogoEdicion = page.getByRole('dialog');
-    await dialogoEdicion.getByRole('button', { name: 'Adjuntos' }).click();
+    await seccionDelDialogo(dialogoEdicion, 'Adjuntos').click();
     await expect(dialogoEdicion.getByTestId('adjuntador-proveedor')).toBeVisible();
 
     // Elige tipo y sube un PDF en memoria (sin archivo en disco).
