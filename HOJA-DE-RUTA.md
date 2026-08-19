@@ -59,6 +59,14 @@
 > porque el mock volvía el fallo imposible**: la plantilla devolvía `undefined` en todas las pruebas.
 > **Exige `SEED_ON_START=true`** para que la plantilla se siembre.
 >
+> ✅ **`V1-E3i` mergeada** (#192, **0.005**) · ✅ **`V1-E3j` · la receta merece pantalla propia** (**0.006**): salió de
+> Daniel probando 0.005 en vivo y **el defecto no fue de lógica sino de VISIBILIDAD** — el mecanismo de
+> §Post-F9.73 estaba cableado y verificado, pero el cartel *"la receta está vacía"* tapaba el botón que
+> resolvía su problema, **justo debajo**. Entrega una pantalla completa (`desarrollo.ver`), el bloque de la
+> OP como resumen, y la bandeja llevando al detalle. Cierra además un hueco de V1-E3h: **se podía FIRMAR una
+> receta que no se podía LEER** (§Post-F9.78). **Tres vueltas** (dos rechazos): de los cinco hallazgos de la
+> primera, **cuatro fueron pruebas que no probaban lo que decían** y el quinto un defecto de comportamiento
+> contra §Post-F9.68 — ninguno en los dos cambios de backend, que resistieron las dos revisiones.
 > *(histórico)* **`V1-E3f pieza B` (proveedores)**: renombres de rol, contactos como tabla, **el campo corto
 > fusionado en uno y único**, el `tipo` retirado, el **lector de la Constancia de Situación Fiscal** y la
 > **segmentación con/sin factura en CxP**. Su hallazgo caro: `{ not: true }` **no incluye los NULL** —los
@@ -585,6 +593,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **VERIFICACIÓN DE DESPLIEGUE de V1-E3i (no es deuda de código):** tras `SEED_ON_START=true` en `prueba`,
   confirmar que C&A quedó con su plantilla **`pdf-cya` vigente al 7%**, y revisar el catálogo real de
   clientes por un falso positivo de la lista cerrada (`ca` pelón cazaría un «C.A.»).
+
+- **DEUDA de V1-E3j (19-ago-2026) — la fecha de entrega se pinta en crudo** (`2026-09-30`) en el encabezado
+  de la receta y en la bandeja, mientras el resto del sistema usa `formatearFecha` (*"30 sep 2026"*).
+  ⚠️ **No se "arregla" a la ligera:** `formatearFecha` hace `new Date('2026-09-30')`, que es medianoche
+  **UTC** y en UTC-6 se pinta **29 sep**. Unificarlo exige formatear la fecha-sin-hora **sin** conversión de
+  zona; hacerlo mal empeora el dato en vez de mejorarlo.
+- **DEUDA de V1-E3j — la explosión del MRP no lleva a la pantalla nueva.** El comprador sigue viendo el
+  texto de `DONDE_SE_LIBERA`, que **sigue siendo cierto** (el resumen de la OP lleva ahí), pero es un salto
+  manual pudiendo ser un enlace.
+- **APRENDIZAJE de V1-E3j, para toda prueba de permisos:** **la validación del cuerpo corre ANTES del guard
+  de permiso**. Un payload inválido devuelve **500 en vez del 403** que la prueba cree estar comprobando —
+  la forma más silenciosa de que una prueba de seguridad pase por la razón equivocada. Documentado en
+  `backend/src/api/produccion/receta-orden.rutas.test.ts`.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

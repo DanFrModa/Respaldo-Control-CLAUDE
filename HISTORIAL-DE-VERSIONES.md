@@ -32,6 +32,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.006 · 19-ago-2026 · **en prueba** — La receta, en una pantalla donde sí se ve
+
+### Qué se puede hacer ahora que antes no
+
+- **La receta de la orden tiene pantalla propia**, ancha, con las telas, los avíos y el arte en tablas
+  donde caben el consumo, el precio, el proveedor y el estado de cada renglón. Antes vivía apretada en el
+  cajón lateral de la orden.
+- **Se llega desde los dos lados y es la misma pantalla**: desde la orden, y desde «Recetas por liberar».
+  Antes la bandeja solo ofrecía firmar todo junto, sin manera de entrar a ver el detalle.
+- **Firmar renglón por renglón es un botón que dice «Liberar»**, no un ícono mudo.
+- **Lo que falta traer del modelo va arriba y bien visible**, en tono de acción y no de alarma.
+
+### Qué cambió y puede sorprender
+
+- **Con la receta vacía ya no se ofrece el botón de liberar.** Ese clic solo servía para que el sistema
+  contestara *"la receta está vacía"* — y ese cartel era justo el que tapaba la salida. **La regla no
+  cambió**: el sistema sigue sin dejar liberar una receta vacía. Lo que se quitó fue el botón que solo
+  servía para chocar contra ella.
+- **La columna «Acciones» ya no aparece vacía** para quien no puede firmar: se va con su encabezado.
+- El bloque de la receta en el detalle de la orden ahora es **un resumen** con su botón a la pantalla.
+
+### Notas
+
+- ⚠️ **De dónde salió esta versión:** probando la anterior, Daniel no encontró cómo meter a una OP unos
+  avíos agregados al modelo después. **El mecanismo estaba completo y funcionando** — el botón que lo
+  resolvía estaba en pantalla, debajo de un mensaje más llamativo, y no se veía. *Una función que el
+  usuario no encuentra no existe.*
+- Se corrigió de paso algo que no se notaba: alguien de Desarrollo podía **firmar** una receta que no tenía
+  permiso de **leer**. No mordía porque hoy los perfiles traen los dos permisos juntos, pero habría mordido
+  el día que exista un perfil de Desarrollo puro.
+- Esta versión **no necesita nada especial al desplegar**: sin cambios de base de datos y sin permisos
+  nuevos.
+
+---
+
 ## 0.005 · 19-ago-2026 · **en prueba** — Importar la OC del cliente, y comprar con fechas de verdad
 
 ### Qué se puede hacer ahora que antes no

@@ -98,7 +98,11 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
   app.route({
     method: 'GET',
     url: '/ordenes/:id/receta',
-    preHandler: app.conPermiso('ordenes.ver'),
+    // ⭐ V1-E3j — `ordenes.ver` O `desarrollo.ver`. La receta tiene PANTALLA PROPIA, gobernada por
+    // `desarrollo.ver` (§Post-F9.72: firmar materiales no puede exigir permiso sobre la OP entera).
+    // Con el guard viejo, un usuario de Desarrollo puro podía FIRMAR la receta (las 7 mutaciones ya
+    // son `desarrollo.administrar`) pero no LEERLA. El dominio reaplica la misma regla (A1).
+    preHandler: app.conAlgunPermiso('ordenes.ver', 'desarrollo.ver'),
     schema: {
       tags: ['ordenes'],
       summary: 'Receta congelada de una orden (con la desalineación contra el BOM del modelo)',

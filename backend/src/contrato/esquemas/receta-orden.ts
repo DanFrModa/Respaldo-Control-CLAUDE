@@ -14,6 +14,8 @@
  */
 import { z } from 'zod';
 
+import { esquemaEstadoOrden } from './orden.js';
+
 // ── Vocabulario ────────────────────────────────────────────────────────────────
 
 /**
@@ -358,6 +360,31 @@ export const esquemaRecetaOrden = z
     folio: z.number().int(),
     idModelo: z.number().int(),
     codigoModelo: z.string(),
+    /*
+     * ⭐ V1-E3j — EL ENCABEZADO DE LA ORDEN, dentro de la receta.
+     *
+     * La receta dejó de vivir sólo dentro del panel de la OP: tiene PANTALLA PROPIA
+     * (`/produccion/ordenes/:id/receta`), a la que se llega también desde la bandeja «Recetas por
+     * liberar». Ahí no hay una orden alrededor de la cual leerse, y Daniel pidió *"saber en qué OP
+     * estás sin volver atrás"*.
+     *
+     * Van AQUÍ y no en una segunda llamada a `GET /ordenes/:id` por dos razones:
+     *  1. **Permisos.** La pantalla la gobierna `desarrollo.ver` (§Post-F9.72: firmar la receta NO
+     *     puede exigir permiso sobre la OP entera). Pedir el encabezado a la ruta de órdenes lo
+     *     ataría a `ordenes.ver` y volvería a meter el permiso que la etapa anterior sacó.
+     *  2. **A1.** El encabezado lo arma el servidor, en la misma lectura y con la misma regla de
+     *     empresa activa (A9): la pantalla no cruza dos respuestas para saber de qué orden habla.
+     */
+    cliente: z.string().describe('Nombre del cliente de la orden (encabezado de la pantalla).'),
+    fechaEntrega: z.iso
+      .date()
+      .nullable()
+      .describe('Fecha de entrega comprometida de la orden, o null.'),
+    estado: esquemaEstadoOrden.describe('Estado de la orden (una CANCELADA no se toca).'),
+    totalPiezas: z
+      .number()
+      .int()
+      .describe('Total de prendas de la orden (Σ de su matriz color×talla).'),
     liberadaEn: z
       .string()
       .nullable()

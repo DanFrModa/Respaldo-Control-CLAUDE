@@ -89,8 +89,13 @@ import {
 import { EstadoRenglonReceta, Prisma } from '../../datos/index.js';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -133,6 +138,9 @@ interface OrdenParaReceta {
   recetaLiberadaEn: Date | null;
   recetaLiberadaPorId: string | null;
   modelo: { codigo: string };
+  /** V1-E3j: el encabezado que la PANTALLA PROPIA de la receta necesita para decir en qué OP estás. */
+  fechaEntrega: Date | null;
+  cliente: { nombre: string };
 }
 
 /** Carga la orden de la empresa ACTIVA (A9) o lanza `ErrorNoEncontrado`. */
@@ -153,6 +161,8 @@ async function exigirOrdenDeLaEmpresa(
       recetaLiberadaEn: true,
       recetaLiberadaPorId: true,
       modelo: { select: { codigo: true } },
+      fechaEntrega: true,
+      cliente: { select: { nombre: true } },
     },
   });
   if (orden === null) {
@@ -806,17 +816,40 @@ export function resumirReceta(
 }
 
 /**
- * LEE la receta congelada de una orden (permiso `ordenes.ver`, A9) con la DESALINEACIÓN contra el
- * BOM del modelo calculada AL VUELO (regla 5). Los renglones traen embebido lo que el modelo dice
- * HOY (`consumoModelo`/`precioModelo`), para que la pantalla pinte la diferencia sin una segunda
+ * Exige poder VER la receta: `ordenes.ver` (se llega desde la OP) **o** `desarrollo.ver` (se llega
+ * desde la bandeja o desde la pantalla propia). Mismo patrón que las lecturas compartidas del
+ * inventario cíclico (`exigirAlgunPermisoCiclico`): las MUTACIONES siguen exigiendo su permiso fino
+ * con `verificarPermiso` — aquí no se afloja ninguna.
+ */
+function exigirVerLaReceta(sesion: SesionUsuario): void {
+  if (!tienePermiso(sesion, 'ordenes.ver') && !tienePermiso(sesion, 'desarrollo.ver')) {
+    throw new ErrorPermiso(undefined, 'desarrollo.ver');
+  }
+}
+
+/**
+ * LEE la receta congelada de una orden (A9) con la DESALINEACIÓN contra el BOM del modelo calculada
+ * AL VUELO (regla 5). Los renglones traen embebido lo que el modelo dice HOY
+ * (`consumoModelo`/`precioModelo`), para que la pantalla pinte la diferencia sin una segunda
  * llamada.
+ *
+ * ⭐ V1-E3j — LA LECTURA ACEPTA `ordenes.ver` **O** `desarrollo.ver`, y esto NO es una relajación:
+ * es cerrar el hueco que dejó §Post-F9.72. Ahí las SIETE mutaciones de la receta bajaron a
+ * `desarrollo.administrar` —*"nadie va a tener permiso de modificar la OP más que yo"*— y la bandeja
+ * «Recetas por liberar» quedó en `desarrollo.ver`, pero **esta lectura se quedó en `ordenes.ver`**.
+ * Resultado: un usuario de Desarrollo puro entraba a su bandeja, podía FIRMAR una receta… y no podía
+ * LEERLA. Con la pantalla propia de V1-E3j eso deja de ser teórico: la ruta abre con `desarrollo.ver`
+ * y su primera consulta sería un 403 — exactamente el síntoma que §Post-F9.68 manda matar.
+ *
+ * (En los roles sembrados hoy los dos permisos van juntos, así que nadie ve más de lo que veía; el
+ * agujero vive en los roles a la medida, que es donde estas cosas se rompen.)
  */
 export async function obtenerRecetaOrden(
   sesion: SesionUsuario,
   idOrden: number,
   bd?: ContextoBd,
 ): Promise<RecetaOrden> {
-  verificarPermiso(sesion, 'ordenes.ver');
+  exigirVerLaReceta(sesion);
   const cliente = clienteLectura(bd);
   const orden = await exigirOrdenDeLaEmpresa(cliente, idOrden, sesion.idEmpresaActiva);
   return armarReceta(cliente, orden);
@@ -824,44 +857,59 @@ export async function obtenerRecetaOrden(
 
 /** Arma la salida completa de la receta (compartido por la lectura y por cada mutación). */
 async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden> {
-  const [filasTela, filasAvio, filasArte, telasModelo, aviosModelo, artesModelo, ocs, tallasOrden] =
-    await Promise.all([
-      tx.ordenTela.findMany({
-        where: { idOrden: orden.id },
-        select: SELECT_TELA,
-        orderBy: { tela: { nombre: 'asc' } },
-      }),
-      tx.ordenAvio.findMany({
-        where: { idOrden: orden.id },
-        select: SELECT_AVIO,
-        orderBy: { avio: { clave: 'asc' } },
-      }),
-      tx.ordenArte.findMany({
-        where: { idOrden: orden.id },
-        select: SELECT_ARTE,
-        // V1-E3f: al retirarse el `nombre`, el orden estable es por descripción y luego por id.
-        orderBy: [{ descripcion: 'asc' }, { id: 'asc' }],
-      }),
-      leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
-      leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
-      leerArtesModelo(tx, orden.idModelo),
-      // ¿Ya se comprometió dinero? (decide DÓNDE se enseña el aviso, §Post-F9.43(d)). Cuenta
-      // cualquier renglón de OC NO cancelada ligado a la orden.
-      tx.ordenCompraLinea.count({
-        where: { idOrden: orden.id, ordenCompra: { estatus: { not: 'cancelada' } } },
-      }),
-      // ⭐ V1-E3d/N4: el universo de tallas de la RECETA es el de la ORDEN (su matriz color×talla),
-      // no la curva del modelo — es lo que esta orden de verdad produce y lo que el MRP explota.
-      // Extiende a la OP la regla de V1-E3c: la matriz se arma desde el universo, no desde las
-      // filas que alguien haya alcanzado a capturar (si no, un avío por talla sin medidas nunca
-      // se podía capturar desde la orden).
-      tx.ordenLineaTalla.findMany({
-        where: { ordenLinea: { idOrden: orden.id } },
-        select: { idTalla: true, talla: { select: { etiqueta: true, orden: true } } },
-        distinct: ['idTalla'],
-        orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
-      }),
-    ]);
+  const [
+    filasTela,
+    filasAvio,
+    filasArte,
+    telasModelo,
+    aviosModelo,
+    artesModelo,
+    ocs,
+    tallasOrden,
+    piezas,
+  ] = await Promise.all([
+    tx.ordenTela.findMany({
+      where: { idOrden: orden.id },
+      select: SELECT_TELA,
+      orderBy: { tela: { nombre: 'asc' } },
+    }),
+    tx.ordenAvio.findMany({
+      where: { idOrden: orden.id },
+      select: SELECT_AVIO,
+      orderBy: { avio: { clave: 'asc' } },
+    }),
+    tx.ordenArte.findMany({
+      where: { idOrden: orden.id },
+      select: SELECT_ARTE,
+      // V1-E3f: al retirarse el `nombre`, el orden estable es por descripción y luego por id.
+      orderBy: [{ descripcion: 'asc' }, { id: 'asc' }],
+    }),
+    leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
+    leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
+    leerArtesModelo(tx, orden.idModelo),
+    // ¿Ya se comprometió dinero? (decide DÓNDE se enseña el aviso, §Post-F9.43(d)). Cuenta
+    // cualquier renglón de OC NO cancelada ligado a la orden.
+    tx.ordenCompraLinea.count({
+      where: { idOrden: orden.id, ordenCompra: { estatus: { not: 'cancelada' } } },
+    }),
+    // ⭐ V1-E3d/N4: el universo de tallas de la RECETA es el de la ORDEN (su matriz color×talla),
+    // no la curva del modelo — es lo que esta orden de verdad produce y lo que el MRP explota.
+    // Extiende a la OP la regla de V1-E3c: la matriz se arma desde el universo, no desde las
+    // filas que alguien haya alcanzado a capturar (si no, un avío por talla sin medidas nunca
+    // se podía capturar desde la orden).
+    tx.ordenLineaTalla.findMany({
+      where: { ordenLinea: { idOrden: orden.id } },
+      select: { idTalla: true, talla: { select: { etiqueta: true, orden: true } } },
+      distinct: ['idTalla'],
+      orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
+    }),
+    // V1-E3j: la CANTIDAD de la orden para el encabezado de la pantalla propia de la receta. Se
+    // deriva por SUMA de la matriz (misma regla que `aOrdenSalida`: el total nunca se guarda).
+    tx.ordenLineaTalla.aggregate({
+      where: { ordenLinea: { idOrden: orden.id } },
+      _sum: { cantidad: true },
+    }),
+  ]);
 
   // El nombre del proveedor amarrado del AVÍO se resuelve contra el `idAvioProveedor` de LA ORDEN
   // (no contra el del modelo): el amarre es congelado y editable por orden, así que tomar el nombre
@@ -1034,6 +1082,14 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     folio: Number(orden.folio),
     idModelo: orden.idModelo,
     codigoModelo: orden.modelo.codigo,
+    // ⭐ V1-E3j — el encabezado de la orden viaja CON la receta: su pantalla propia se abre desde la
+    // bandeja de Desarrollo, donde no hay una OP alrededor de la cual leerse (y pedirlo aparte
+    // ataría la pantalla a `ordenes.ver`, el permiso que §Post-F9.72 sacó de en medio).
+    cliente: orden.cliente.nombre,
+    fechaEntrega:
+      orden.fechaEntrega === null ? null : orden.fechaEntrega.toISOString().slice(0, 10),
+    estado: orden.estado,
+    totalPiezas: piezas._sum.cantidad ?? 0,
     liberadaEn: orden.recetaLiberadaEn?.toISOString() ?? null,
     liberadaPor: orden.recetaLiberadaPorId,
     // ⭐ V1-E3h: la puerta dejó de ser todo-o-nada. `puedeComprar` = **hay algo firmado**, que es

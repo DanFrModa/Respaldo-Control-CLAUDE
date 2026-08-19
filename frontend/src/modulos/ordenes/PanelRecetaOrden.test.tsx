@@ -55,6 +55,10 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     folio: 7,
     idModelo: 9,
     codigoModelo: 'A-100',
+    cliente: 'C&A',
+    fechaEntrega: '2026-09-30',
+    estado: 'capturada',
+    totalPiezas: 1200,
     liberadaEn: null,
     liberadaPor: null,
     puedeComprar: false,
@@ -171,10 +175,9 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
 
 function render(receta: RecetaOrden, puedeAdministrar = true): void {
   useRecetaOrdenMock.mockReturnValue({ data: receta, isPending: false, isError: false });
-  renderConProveedores(
-    <PanelRecetaOrden idOrden={50} puedeAdministrar={puedeAdministrar} ordenCancelada={false} />,
-    { sesion: estadoSesionDePrueba(['ordenes.ver', 'desarrollo.administrar']) },
-  );
+  renderConProveedores(<PanelRecetaOrden idOrden={50} puedeAdministrar={puedeAdministrar} />, {
+    sesion: estadoSesionDePrueba(['ordenes.ver', 'desarrollo.administrar']),
+  });
 }
 
 /**
@@ -918,5 +921,197 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     expect(screen.getByTestId('receta-desalineacion')).toBeInTheDocument();
     expect(screen.queryByTestId('traer-del-modelo-avio-77')).not.toBeInTheDocument();
     expect(screen.queryByTestId('traer-del-modelo-todo')).not.toBeInTheDocument();
+    // …y como el llamado no se pinta, el aviso SÍ tiene que seguir enumerando los faltantes: si se
+    // los "omitiera" también aquí, un usuario de solo lectura no se enteraría de que faltan.
+    expect(screen.getByText(/El modelo ahora lleva "Rib"/)).toBeInTheDocument();
+  });
+
+  // ══ V1-E3j · LA JERARQUÍA ES EL ENTREGABLE ═══════════════════════════════════════════════════
+  //
+  // El defecto que originó la etapa NO fue de lógica: el botón que resolvía el problema de Daniel
+  // estaba en pantalla y no lo vio, porque un mensaje más ruidoso se llevó la atención. Estas
+  // pruebas fijan el ORDEN y el TONO, que es lo único que puede volver a romperse en silencio: un
+  // refactor que "solo mueve bloques" pasaría todas las demás pruebas de este archivo.
+
+  it('⭐ V1-E3j: el llamado de «traer del modelo» va ANTES del estado de la receta, en el DOM', () => {
+    render(conFaltantes());
+
+    const llamado = screen.getByTestId('receta-traer-llamado');
+    const cabecera = screen.getByTestId('receta-cabecera');
+    // `DOCUMENT_POSITION_FOLLOWING` = la cabecera viene DESPUÉS del llamado. Si alguien vuelve a
+    // poner el aviso arriba y la salida abajo, esto se pone rojo — que es el punto entero.
+    expect(llamado.compareDocumentPosition(cabecera) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('⭐ V1-E3j: con el llamado arriba, el aviso amarillo NO repite los mismos faltantes', () => {
+    render(conFaltantes());
+
+    // Los dos cambios de `conFaltantes()` son faltantes: el aviso se queda sin nada que decir y no
+    // se pinta. Un recuadro de alarma junto a la salida es exactamente lo que la escondió.
+    expect(screen.getByTestId('receta-traer-llamado')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-desalineacion')).not.toBeInTheDocument();
+  });
+
+  it('⭐ V1-E3j: un faltante y un cambio normal → el faltante arriba, el otro en el aviso', () => {
+    const base = conFaltantes();
+    render({
+      ...base,
+      desalineacion: {
+        ...base.desalineacion,
+        cambios: [
+          base.desalineacion.cambios[0] as (typeof base.desalineacion.cambios)[number],
+          {
+            tipo: 'tela',
+            idRenglon: 1,
+            material: 'Jersey',
+            idMaterialModelo: null,
+            que: 'consumo',
+            detalle: 'La cantidad de "Jersey" pasó de 1.5 a 2 en el modelo.',
+          },
+        ],
+      },
+    });
+
+    const llamado = screen.getByTestId('receta-traer-llamado');
+    expect(within(llamado).getByText(/Etiqueta de lavado/)).toBeInTheDocument();
+    expect(within(llamado).queryByText(/Jersey/)).toBeNull();
+    const aviso = screen.getByTestId('receta-desalineacion');
+    expect(within(aviso).getByText(/pasó de 1.5 a 2/)).toBeInTheDocument();
+    expect(within(aviso).queryByText(/Etiqueta de lavado/)).toBeNull();
+  });
+
+  it('⭐ V1-E3j: con UN SOLO faltante ya hay botón de «traer»; antes exigía dos', () => {
+    const base = conFaltantes();
+    render({
+      ...base,
+      desalineacion: {
+        ...base.desalineacion,
+        cambios: [base.desalineacion.cambios[0] as (typeof base.desalineacion.cambios)[number]],
+      },
+    });
+
+    // El caso de Daniel era EXACTAMENTE éste (unos avíos que el modelo ganó después): con un solo
+    // faltante, la única salida era un enlacito de texto dentro de una viñeta.
+    expect(screen.getByTestId('traer-del-modelo-todo')).toHaveTextContent('(1)');
+  });
+
+  it('⭐ V1-E3j: un «agregado» SIN id de material no se ofrece traer (no hay qué pedirle al servidor)', () => {
+    const base = conFaltantes();
+    render({
+      ...base,
+      desalineacion: {
+        ...base.desalineacion,
+        cambios: [
+          {
+            tipo: 'avio',
+            idRenglon: null,
+            material: 'Fantasma',
+            // Sin traza al BOM no hay material que mandar: pedirlo con un id inventado sería una
+            // llamada que el backend tendría que rechazar. Se informa, pero no se ofrece.
+            idMaterialModelo: null,
+            que: 'agregado',
+            detalle: 'El modelo ahora lleva "Fantasma", y esta orden no lo tiene.',
+          },
+        ],
+      },
+    });
+
+    expect(screen.queryByTestId('receta-traer-llamado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('traer-del-modelo-todo')).not.toBeInTheDocument();
+    // Pero NO se calla (D3): sigue enunciado en el aviso.
+    expect(
+      within(screen.getByTestId('receta-desalineacion')).getByText(/Fantasma/),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ V1-E3j — ORDEN CANCELADA + FALTANTES (hallazgo del reviewer). El llamado cuelga de
+   * `editable`, que es `puedeAdministrar` **y** orden viva; el código era correcto pero NADA lo
+   * sostenía: relajarlo a solo `puedeAdministrar` dejaba las 51 pruebas verdes. Con esa mutación,
+   * una OP cancelada con faltantes pinta «Traer del modelo» — y el backend los rechaza por
+   * `exigirOrdenViva`, o sea el letrero de error que esta etapa vino a eliminar.
+   */
+  it('⭐ V1-E3j: una orden CANCELADA con faltantes NO ofrece traer del modelo', () => {
+    render({ ...conFaltantes(), estado: 'cancelada' });
+
+    expect(screen.queryByTestId('receta-traer-llamado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('traer-del-modelo-todo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('traer-del-modelo-avio-77')).not.toBeInTheDocument();
+    // Pero NO se calla lo que pasa (D3): el aviso vuelve a hacerse cargo de enunciar los faltantes.
+    expect(screen.getByText(/El modelo ahora lleva "Rib"/)).toBeInTheDocument();
+  });
+
+  it('…y la MISMA receta con la orden VIVA sí lo ofrece (la gemela positiva)', () => {
+    render(conFaltantes());
+    expect(screen.getByTestId('receta-traer-llamado')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ V1-E3j — §Post-F9.68 regla 1 (hallazgo del reviewer). La columna de acciones se ensanchó y
+   * ganó título («Acciones»), y con eso se volvió VISIBLE que existía siempre: quien solo tiene
+   * `desarrollo.ver` —o cualquiera mirando una OP cancelada— veía tres tablas con una columna de
+   * 13rem enteramente vacía. Daniel: *"si un dato desaparece por permiso, se va con su encabezado;
+   * una celda vacía haría creer que falló"*.
+   */
+  it('⭐ V1-E3j: sin poder firmar, la columna «Acciones» se va CON SU ENCABEZADO', () => {
+    render(recetaDePrueba(), false);
+
+    expect(screen.queryByText('Acciones')).toBeNull();
+    // Y no queda una celda huérfana: la fila tiene una columna menos que su encabezado si se rompe.
+    const filaTela = screen.getByText('Jersey').closest('tr') as HTMLElement;
+    const encabezados = screen.getAllByRole('columnheader');
+    expect(filaTela.querySelectorAll('td')).toHaveLength(
+      encabezados.filter((h) => h.closest('table') === filaTela.closest('table')).length,
+    );
+  });
+
+  it('…y CON `desarrollo.administrar` la columna «Acciones» sí está (gemela positiva)', () => {
+    render(recetaDePrueba());
+    // Dos, no tres: la receta base no lleva arte, y una sección vacía no pinta tabla.
+    expect(screen.getAllByText('Acciones')).toHaveLength(2);
+  });
+
+  it('⭐ V1-E3j: con la orden CANCELADA tampoco hay columna de acciones (no es solo el permiso)', () => {
+    render({ ...recetaDePrueba(), estado: 'cancelada' });
+    expect(screen.queryByText('Acciones')).toBeNull();
+  });
+
+  it('⭐ V1-E3j: una receta VACÍA no ofrece «liberar» (era el clic que disparaba el cartel rojo)', () => {
+    render(
+      recetaDePrueba({
+        telas: [],
+        avios: [],
+        artes: [],
+        resumen: {
+          sinRevisar: 0,
+          revisados: 0,
+          ajustados: 0,
+          excluidos: 0,
+          total: 0,
+          liberados: 0,
+          porLiberar: 0,
+        },
+      }),
+    );
+
+    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
+    expect(screen.getByText(/todavía no tiene ningún material/)).toBeInTheDocument();
+  });
+
+  it('…y con renglones el botón de «liberar» SÍ está (la gemela positiva de la de arriba)', () => {
+    render(recetaDePrueba());
+    expect(screen.getByTestId('receta-liberar')).toBeInTheDocument();
+    expect(screen.queryByText(/todavía no tiene ningún material/)).toBeNull();
+  });
+
+  it('⭐ V1-E3j: firmar UNO POR UNO es un botón CON TEXTO, no un ícono mudo', () => {
+    render(recetaDePrueba());
+
+    // Daniel, sobre la bandeja: *"no veo dónde pueda ver todo completo e ir liberando una por
+    // una"*. El nombre accesible es lo que hace visible la acción.
+    expect(screen.getByTestId('liberar-receta-avio-2')).toHaveAccessibleName(/liberar/i);
+    expect(screen.getByTestId('liberar-receta-avio-2')).toHaveTextContent('Liberar');
   });
 });

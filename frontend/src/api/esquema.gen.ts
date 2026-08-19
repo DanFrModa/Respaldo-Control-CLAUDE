@@ -24889,6 +24889,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -25292,6 +25303,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -25659,6 +25681,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -26030,6 +26063,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -26385,6 +26429,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -26740,6 +26795,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -27120,6 +27186,17 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
               /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
               /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
@@ -27500,6 +27577,17 @@ export interface paths {
                 folio: number;
                 idModelo: number;
                 codigoModelo: string;
+                /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+                cliente: string;
+                /** @description Fecha de entrega comprometida de la orden, o null. */
+                fechaEntrega: string | null;
+                /**
+                 * @description Estado de la orden (una CANCELADA no se toca).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+                totalPiezas: number;
                 /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
                 liberadaEn: string | null;
                 /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */

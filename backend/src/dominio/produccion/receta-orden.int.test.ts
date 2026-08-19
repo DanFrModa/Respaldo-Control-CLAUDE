@@ -1650,9 +1650,134 @@ describe('⭐ El renglón traído del modelo SÍ vuelve a avisar (2º hallazgo d
   });
 });
 
+/**
+ * ⭐ V1-E3j — EL ENCABEZADO DE LA ORDEN VIAJA CON LA RECETA.
+ *
+ * La receta tiene PANTALLA PROPIA, a la que se llega también desde la bandeja de Desarrollo: ahí no
+ * hay una OP alrededor de la cual leerse, y Daniel pidió *"saber en qué OP estás sin volver atrás"*.
+ * Pedirle el encabezado a `GET /ordenes/:id` ataría la pantalla a `ordenes.ver`, que es justo el
+ * permiso que §Post-F9.72 sacó de en medio — por eso va aquí, en la misma lectura.
+ */
+describe('⭐ V1-E3j — el encabezado de la orden, dentro de la receta', () => {
+  it('trae cliente, entrega, estado y la CANTIDAD derivada de la matriz', async () => {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 9101n,
+        idEmpresa: empresa.id,
+        idModelo,
+        idCliente,
+        fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+        lineas: {
+          create: [
+            { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaCH.id, cantidad: 7 }] } },
+          ],
+        },
+      },
+    });
+
+    const receta = await obtenerRecetaOrden(sesion(), orden.id, bd());
+
+    expect(receta.folio).toBe(9101);
+    expect(receta.codigoModelo).toBe('A-100');
+    expect(receta.cliente).toBe('C&A');
+    expect(receta.fechaEntrega).toBe('2026-09-30');
+    expect(receta.estado).toBe('capturada');
+    // La cantidad se DERIVA por suma de la matriz (nunca se guarda), igual que en `aOrdenSalida`.
+    expect(receta.totalPiezas).toBe(7);
+  });
+
+  /**
+   * ⚠️ HALLAZGO DEL REVIEWER: con UNA sola fila de matriz, `_sum` ≡ `_max` ≡ `_min` ≡ `_avg`, así
+   * que cambiar el agregado del servidor **sobrevivía** a las pruebas. Y `totalPiezas` es el ÚNICO
+   * número DERIVADO que V1-E3j agregó. Este caso lo distingue: 4 renglones cuyo total (26) no
+   * coincide con ninguna fila (3/5/7/11), ni con su máximo, ni con su mínimo, ni con su promedio
+   * (6.5), ni con el conteo (4).
+   */
+  it('⭐ la CANTIDAD es la SUMA de toda la matriz — no el máximo, ni una fila, ni el promedio', async () => {
+    const colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    const tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 2 } });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 9102n,
+        idEmpresa: empresa.id,
+        idModelo,
+        idCliente,
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 3 },
+                  { idTalla: tallaG.id, cantidad: 5 },
+                ],
+              },
+            },
+            {
+              idColor: colorAzul.id,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 7 },
+                  { idTalla: tallaG.id, cantidad: 11 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const receta = await obtenerRecetaOrden(sesion(), orden.id, bd());
+
+    expect(receta.totalPiezas).toBe(26);
+    // Las gemelas negativas, explícitas: ninguno de los otros agregados da 26.
+    expect(receta.totalPiezas).not.toBe(11); // _max
+    expect(receta.totalPiezas).not.toBe(3); // _min
+    expect(receta.totalPiezas).not.toBe(4); // _count
+  });
+
+  it('sin fecha de entrega el encabezado dice null (no una fecha inventada)', async () => {
+    const receta = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(receta.fechaEntrega).toBeNull();
+    // `ordenA` la creó `crearOrdenConReceta`: 10 piezas de una talla.
+    expect(receta.totalPiezas).toBe(10);
+  });
+
+  it('una orden CANCELADA lo dice en la receta (la pantalla apaga la edición con eso)', async () => {
+    await cliente.orden.update({ where: { id: ordenA }, data: { estado: 'cancelada' } });
+    const receta = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(receta.estado).toBe('cancelada');
+  });
+});
+
 describe('RBAC y empresa (A4/A9)', () => {
-  it('leer sin `ordenes.ver` → 403', async () => {
+  it('leer sin NINGUNO de los dos permisos de lectura → 403', async () => {
     await expect(obtenerRecetaOrden(sesion([]), ordenA, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  /**
+   * ⭐ V1-E3j — LA LECTURA ACEPTA `ordenes.ver` **O** `desarrollo.ver`.
+   *
+   * §Post-F9.72 bajó las SIETE mutaciones de la receta a `desarrollo.administrar` y puso la bandeja
+   * en `desarrollo.ver` —*"nadie va a tener permiso de modificar la OP más que yo"*—, pero dejó
+   * ESTA lectura en `ordenes.ver`: un usuario de Desarrollo puro podía FIRMAR una receta que no
+   * podía LEER. Con la pantalla propia de V1-E3j deja de ser teórico (la ruta abre con
+   * `desarrollo.ver` y su primera consulta reventaría con 403).
+   */
+  it('⭐ V1-E3j: se lee con SOLO `desarrollo.ver` (quien firma tiene que poder leer)', async () => {
+    const receta = await obtenerRecetaOrden(sesion(['desarrollo.ver']), ordenA, bd());
+    expect(receta.idOrden).toBe(ordenA);
+  });
+
+  it('⭐ V1-E3j: y se sigue leyendo con SOLO `ordenes.ver` (desde la OP, como siempre)', async () => {
+    const receta = await obtenerRecetaOrden(sesion(['ordenes.ver']), ordenA, bd());
+    expect(receta.idOrden).toBe(ordenA);
+  });
+
+  it('⭐ V1-E3j: `desarrollo.ver` NO abre las MUTACIONES (siguen en `.administrar`)', async () => {
+    await expect(
+      marcarRecetaRevisada(sesion(['desarrollo.ver']), ordenA, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
   it('tocar sin `desarrollo.administrar` → 403', async () => {

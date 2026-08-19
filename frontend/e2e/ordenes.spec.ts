@@ -201,22 +201,32 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     const folio1 = await generarOp(page, { cliente, color, talla }, '20');
     const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
-    // ── ⭐ V1-E3h (§Post-F9.72): LA RECETA SE MIRA Y SE LIBERA EN EL PANEL DE LA OP ─────────────
-    //    Hasta esta etapa vivía DENTRO del diálogo de «Modificar», y con ella el botón de LIBERAR —
-    //    *la puerta que abre la compra*. Daniel: *"ahí está y no tendría que estar ahí… nadie va a
-    //    tener permiso de modificar la OP más que yo"*. O él se volvía el cuello de botella firmando
-    //    todas las recetas, o había que darle a Desarrollo permiso sobre la OP entera (cantidades,
-    //    fechas, matriz) solo para aprobar una lista de materiales. Por eso estas afirmaciones van
+    // ── ⭐ V1-E3h + V1-E3j: LA RECETA SE MIRA DESDE EL PANEL DE LA OP, Y SE TRABAJA EN SU PANTALLA ─
+    //    V1-E3h (§Post-F9.72) la sacó del diálogo de «Modificar», donde vivía con el botón de
+    //    LIBERAR —*la puerta que abre la compra*—. Daniel: *"ahí está y no tendría que estar ahí…
+    //    nadie va a tener permiso de modificar la OP más que yo"*. Por eso estas afirmaciones van
     //    ANTES de abrir «Modificar» y cuelgan de `centro-panel`: si algún día la receta volviera a
     //    pedir el diálogo, la etapa se habría deshecho y esta prueba tiene que ser la que lo grite.
+    //    V1-E3j movió el TRABAJO a una pantalla propia y dejó aquí un RESUMEN con su camino
+    //    (*"ahí mismo en el cuadrito chiquito no se ve toda la información"*): el vistazo se
+    //    conserva, el botón lleva a `/produccion/ordenes/:id/receta`, y **sigue sin pasar por
+    //    «Modificar»** — que es la invariante que esta prueba cuida.
     const panelOp = await seleccionarOrdenEnCentro(page, folio1, codigoModelo);
     // La receta se acaba de copiar del modelo y Desarrollo todavía no la firma.
     await expect(panelOp.getByTestId('receta-sin-liberar')).toBeVisible();
-    // Y la puerta se abre desde aquí mismo. (El modelo de esta prueba no tiene BOM, así que la
-    // receta nace VACÍA y liberar se RECHAZA — que es justamente la regla: liberar "nada" dejaría
-    // al MRP explotando cero y a alguien creyendo que ya lo revisaron.)
-    await panelOp.getByTestId('receta-liberar').click();
-    await expect(page.getByText(/no hay nada que liberar/i)).toBeVisible();
+    await panelOp.getByTestId('receta-abrir-pantalla').click();
+
+    // ── La pantalla propia de la receta: encabezado de la OP + la receta completa ────────────
+    await expect(page.getByRole('heading', { name: `Receta de la OP ${folio1}` })).toBeVisible();
+    await expect(page.getByTestId('receta-encabezado-orden')).toContainText(codigoModelo);
+    await expect(page.getByTestId('receta-encabezado-orden')).toContainText(cliente);
+    // El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA. V1-E3j: en ese caso NO
+    // se ofrece «liberar» —el clic solo servía para que el backend contestara *"no hay nada que
+    // liberar"*, y ese cartel rojo fue exactamente el que le tapó a Daniel la salida—; se dice en
+    // tono neutro y ya. La regla no cambió: sigue siendo el servidor quien la impone.
+    await expect(page.getByTestId('receta-orden')).toBeVisible();
+    await expect(page.getByTestId('receta-liberar')).toHaveCount(0);
+    await expect(page.getByText(/todavía no tiene ningún material/i)).toBeVisible();
 
     // ── En el DIÁLOGO de «Modificar» queda la edición de la OP (estado, matriz, referencias) ────
     //    La OP nace con matriz (R3) pero NO completa. Desde V1-E3d (§Post-F9.43) el estado
