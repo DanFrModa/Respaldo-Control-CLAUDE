@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
@@ -77,10 +77,15 @@ async function generarOp(
 }
 
 /**
- * Abre la edición de una orden por folio en el DIÁLOGO del mosaico "Modificar" (centro de comando):
- * el panel viejo `/produccion/ordenes/captura` fue retirado. Deja visible el detalle editable.
+ * Busca una orden por folio en el CENTRO DE ÓRDENES y la deja seleccionada. Devuelve el panel de
+ * detalle persistente (`centro-panel`), que es donde viven los mosaicos y —desde V1-E3h— la RECETA
+ * de la orden. NO abre el diálogo de «Modificar»: para eso está `abrirOrdenEnCaptura`.
  */
-async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: string): Promise<void> {
+async function seleccionarOrdenEnCentro(
+  page: Page,
+  folio: string,
+  codigoModelo: string,
+): Promise<Locator> {
   await page.goto('/produccion/ordenes');
   await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
   // La búsqueda del centro filtra en SERVIDOR con debounce: si se clickea al instante, la lista
@@ -99,8 +104,24 @@ async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: stri
     });
   await fila.first().click();
   // El panel persistente (escritorio) hospeda los mosaicos; se espera a que cargue la orden.
+  //
+  // ⚠️ SIEMPRE acotado a `centro-panel`: el panel de detalle se renderiza DOS veces —el `aside` de
+  // escritorio y el cajón de móvil, ambos en el DOM—, así que un `page.getByTestId(...)` suelto
+  // sobre cualquier cosa de su interior cazaría dos elementos y reventaría por modo estricto.
   const panel = page.getByTestId('centro-panel');
   await expect(panel.getByText(`OP ${folio}`)).toBeVisible();
+  return panel;
+}
+
+/**
+ * Selecciona la orden en el Centro **y abre «Modificar»** (el diálogo `detalle-orden`, F2-E3).
+ *
+ * ⚠️ Lo que vive en el DIÁLOGO y lo que vive en el PANEL son cosas distintas desde V1-E3h: la
+ * RECETA se mira/ libera en el panel (ver `seleccionarOrdenEnCentro`), y aquí solo queda la edición
+ * de la OP (encabezado, matriz, referencias).
+ */
+async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: string): Promise<void> {
+  const panel = await seleccionarOrdenEnCentro(page, folio, codigoModelo);
   await panel.getByTestId('mosaico-modificar').click();
   await expect(page.getByTestId('detalle-orden')).toBeVisible();
 }
@@ -180,7 +201,25 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     const folio1 = await generarOp(page, { cliente, color, talla }, '20');
     const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
-    // ── La OP nace con matriz (R3) pero NO completa. Desde V1-E3d (§Post-F9.43) el estado
+    // ── ⭐ V1-E3h (§Post-F9.72): LA RECETA SE MIRA Y SE LIBERA EN EL PANEL DE LA OP ─────────────
+    //    Hasta esta etapa vivía DENTRO del diálogo de «Modificar», y con ella el botón de LIBERAR —
+    //    *la puerta que abre la compra*. Daniel: *"ahí está y no tendría que estar ahí… nadie va a
+    //    tener permiso de modificar la OP más que yo"*. O él se volvía el cuello de botella firmando
+    //    todas las recetas, o había que darle a Desarrollo permiso sobre la OP entera (cantidades,
+    //    fechas, matriz) solo para aprobar una lista de materiales. Por eso estas afirmaciones van
+    //    ANTES de abrir «Modificar» y cuelgan de `centro-panel`: si algún día la receta volviera a
+    //    pedir el diálogo, la etapa se habría deshecho y esta prueba tiene que ser la que lo grite.
+    const panelOp = await seleccionarOrdenEnCentro(page, folio1, codigoModelo);
+    // La receta se acaba de copiar del modelo y Desarrollo todavía no la firma.
+    await expect(panelOp.getByTestId('receta-sin-liberar')).toBeVisible();
+    // Y la puerta se abre desde aquí mismo. (El modelo de esta prueba no tiene BOM, así que la
+    // receta nace VACÍA y liberar se RECHAZA — que es justamente la regla: liberar "nada" dejaría
+    // al MRP explotando cero y a alguien creyendo que ya lo revisaron.)
+    await panelOp.getByTestId('receta-liberar').click();
+    await expect(page.getByText(/no hay nada que liberar/i)).toBeVisible();
+
+    // ── En el DIÁLOGO de «Modificar» queda la edición de la OP (estado, matriz, referencias) ────
+    //    La OP nace con matriz (R3) pero NO completa. Desde V1-E3d (§Post-F9.43) el estado
     //    AUTOMÁTICO es **tallas + receta LIBERADA, y arte si aplica**: la receta se acaba de copiar
     //    del modelo y Desarrollo todavía no la libera, y el modelo de la prueba tampoco tiene arte
     //    ("lleva arte" viene MARCADO por default, decisión de Daniel). La pantalla tiene que DECIR
@@ -191,13 +230,6 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await expect(detalle.getByTestId('faltantes-orden').first()).toHaveText(
       'Falta: liberar la receta y arte',
     );
-    // ⭐ V1-E3d: la RECETA DE LA ORDEN se ve en su propio bloque, y dice que aún no está liberada.
-    await expect(detalle.getByTestId('receta-sin-liberar')).toBeVisible();
-    // …y la puerta de Desarrollo se abre desde aquí: un clic marca todo revisado y otro libera.
-    // (El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA y liberar se RECHAZA —
-    // que es justamente la regla: liberar "nada" no le sirve a nadie.)
-    await detalle.getByTestId('receta-liberar').click();
-    await expect(page.getByText(/no hay nada que liberar/i)).toBeVisible();
     const matriz = detalle.getByTestId('matriz-orden');
     await matriz.getByTestId('matriz-orden-celda').first().fill('25');
     // Guardado ÚNICO (Daniel 24-jul-2026): un solo botón en el pie del diálogo, para TODO.
