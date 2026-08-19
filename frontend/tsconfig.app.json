@@ -34,5 +34,10 @@
 
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* `src/version.test.ts` usa APIs de Node (lee HISTORIAL-DE-VERSIONES.md de la
+     raíz del repo), así que se typechecka en tsconfig.node.json — el proyecto de
+     la app NO trae los tipos de Node a proposito: el codigo del navegador no debe
+     poder usar `process` ni `node:fs` sin que TypeScript lo note. */
+  "exclude": ["src/version.test.ts"]
 }

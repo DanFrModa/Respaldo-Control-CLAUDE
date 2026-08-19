@@ -23,5 +23,7 @@
     "skipLibCheck": true,
     "types": ["node", "vitest/config"]
   },
-  "include": ["vite.config.ts"]
+  /* `src/version.test.ts` vive aqui (y NO en el proyecto de la app) porque lee
+     el historial de versiones del disco con `node:fs`. */
+  "include": ["vite.config.ts", "src/version.test.ts"]
 }
