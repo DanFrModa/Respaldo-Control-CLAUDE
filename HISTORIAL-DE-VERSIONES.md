@@ -32,6 +32,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.005 · 19-ago-2026 · **en prueba** — Importar la OC del cliente, y comprar con fechas de verdad
+
+### Qué se puede hacer ahora que antes no
+
+- **Cada orden de compra lleva SU fecha de entrega.** Antes la explosión pedía **una sola fecha para
+  todas**, y la tela se necesita semanas antes que los avíos: ponerles la misma **convertía el dato en
+  decorativo**, y un dato que nadie cree no sirve para reclamar. Ahora cada proveedor tiene la suya, con la
+  de arriba como punto de partida.
+- ⭐ **El campo «Archivo de la OC» del pedido SÍ lee el PDF.** Antes solo lo guardaba pegado al pedido sin
+  abrirlo nunca —por eso seguía pidiendo cantidad y precio a mano, teniéndolos el propio pedido—. Ahora lo
+  lee y **propone**: *"Reconocí una OC de C&A: 4 tallas, 1,744 piezas, 2 packs. ¿La cargo?"*. La persona
+  confirma. Si no lo reconoce, **lo dice** y lo deja como adjunto; nunca se traga el archivo en silencio.
+- **El 7% de sobre-pedido vuelve a operar.** La plantilla de C&A no existía, así que el sistema aplicaba
+  **0%** y las OPs nacían con las cantidades exactas del cliente en vez de las que se fabrican. Ahora se
+  siembra de fábrica, y sigue siendo editable.
+- **El botón apagado dice qué le falta**, con el conteo: *"Falta ligar 3 de 4 renglones…"*. Antes se
+  quedaba mudo, que es ofrecer una puerta sin explicar por qué no abre.
+- 🔴 **Un parpadeo de red ya no te saca del sistema.** Antes, cualquier tropiezo de conexión —no una sesión
+  cerrada: un corte, un servidor lento— te mandaba a la pantalla de login **perdiendo lo que estabas
+  capturando**, porque el sistema no distinguía *"no hay sesión"* de *"no pude preguntar"*. Ahora te dice
+  «no pudimos confirmar tu sesión — **no cerramos tu sesión**» y te deja reintentar.
+
+### Qué cambió y puede sorprender
+
+- En la explosión, **vaciar la fecha de un proveedor no la deja en blanco**: vuelve a seguir a la de
+  arriba. Es a propósito —vacío significa *"la que pusiste arriba"*, no *"ninguna"*—, pero sorprende.
+- El **porcentaje adicional** distingue ahora entre *"cero por ciento"* y *"usa el del cliente"*. El campo
+  vacío significa lo segundo.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Esta versión exige que se encienda el sembrado al desplegar**, o la plantilla de C&A no se crea.
+  Conviene confirmar después que C&A quedó con su plantilla al 7%.
+- 🔴 **Si alguien guarda un formato de Excel para C&A, el 7% se apaga en silencio** y hay que reponerlo a
+  mano. El sistema solo admite **un formato vigente por cliente** desde hace tiempo, y arreglarlo de raíz
+  es trabajo mayor; queda anotado, no escondido.
+
+---
+
 ## 0.004 · 19-ago-2026 · **en prueba** — La receta se firma en la OP, y por partes
 
 ### Qué se puede hacer ahora que antes no

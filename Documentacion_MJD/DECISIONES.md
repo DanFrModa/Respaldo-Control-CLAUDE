@@ -3209,14 +3209,23 @@ veces, el que está mal es el camino.*
 **Dos caminos, con recomendación del lead: (A)** que ese campo **sí lea** el PDF y proponga cargarlo
 (*"Reconocí una OC de C&A: 4 tallas, 1,744 piezas, 2 packs. ¿La cargo?"*) — lo que él esperaba; **(B)**
 dejarlo como adjunto pero **decirlo** y ofrecer ahí el acceso al importador. **(A) es la buena**: (B) solo
-pone un letrero encima del mismo tropiezo. *(Daniel encontró el botón y siguió; NO autorizó todavía el
-arreglo.)*
+pone un letrero encima del mismo tropiezo. ✅ **Daniel autorizó (A) el 19-ago**, dentro de la tanda de siete puntos; construido en **V1-E3i**:
+el campo lee el PDF y **propone** cargarlo (*"Reconocí una OC de C&A…"*), la persona confirma, y si no
+se reconoce **se dice** y queda como adjunto — nunca se traga el archivo en silencio (D3).
 
 **2. La plantilla de C&A no existe, así que el 7% de sobre-pedido NO se aplica.** Verificado:
 `prisma/seed.ts` no siembra ninguna `PlantillaImportacion`, y `leerConfigPlantillaPdf` cae al default
 **`porcentajeAdicional: 0`**. Consecuencia: las OPs nacen con las **cantidades exactas del cliente** en vez
 de las que se fabrican. **El 7% fue una decisión de Daniel (§Post-F9.2) y hoy no está operando.**
-Pendiente de decidir: sembrarla de fábrica o darla de alta desde la pantalla.
+✅ **Decidido (LEAD, 19-ago, V1-E3i): va SEMBRADA de fábrica**, no "que alguien la dé de alta" — *una
+plantilla que hay que acordarse de crear es una plantilla que no existe el día que se necesita*, y ésta
+lleva meses sin operar justo por eso. Sigue siendo editable desde la pantalla. El seed **busca** al cliente
+por nombre normalizado contra una **lista cerrada** (`ca`, `cya`, `camexico`, `cyamexico` — un `contains`
+cazaría "Calzado"), **nunca lo crea**, y **solo siembra si ese cliente no tiene ninguna plantilla**: jamás
+pisa lo que configuró una persona. Si no lo encuentra, **lo dice en la salida del seed**.
+⚠️ **Exige `SEED_ON_START=true`** al desplegar, y conviene confirmar en `prueba` que C&A quedó con su
+plantilla vigente: si ya tenía una de Excel (R8), el seed **no la toca** a propósito y el 7% habría que
+ponerlo desde la pantalla.
 
 **3. El botón «Generar pedido interno + OPs» se queda mudo cuando está deshabilitado.** Solo se enciende
 cuando **al menos un renglón está ligado a un modelo** —y en la primera OC de un modelo la liga no existe

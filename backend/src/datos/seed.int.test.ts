@@ -171,3 +171,68 @@ describe('seed de fundación', () => {
     expect(cuenta.get('Basico')).toBe(0);
   });
 });
+
+/**
+ * ⭐ §Post-F9.70 punto 2 (V1-E3i) — la plantilla de C&A con su 7%. El agujero real era que NO EXISTÍA
+ * ninguna `PlantillaImportacion`, así que `leerConfigPlantillaPdf` caía a 0% y las OPs nacían con las
+ * cantidades exactas del cliente. Aquí se prueba las cuatro cosas que hacen que la siembra sirva: que
+ * la cree, que la cree BIEN (7% + campos variables + vigente), que no se duplique al re-sembrar y que
+ * NO pise lo que un humano ya configuró.
+ */
+describe('seed — plantilla de importación de C&A (§Post-F9.70)', () => {
+  beforeAll(async () => {
+    // Punto de partida limpio para esta batería (el archivo comparte base con las de arriba).
+    await prisma.plantillaImportacion.deleteMany();
+    await prisma.cliente.deleteMany();
+  });
+
+  it('sin el cliente C&A no inventa nada (el cliente lo carga el ETL, no el seed)', async () => {
+    await sembrar(prisma);
+    expect(await prisma.plantillaImportacion.count()).toBe(0);
+  });
+
+  it('con el cliente dado de alta le siembra la plantilla pdf-cya con el 7% de Daniel', async () => {
+    // "C & A" con espacios: el seed compara el nombre NORMALIZADO, no letra por letra.
+    const cya = await prisma.cliente.create({ data: { nombre: 'C & A' } });
+    await sembrar(prisma);
+
+    const plantilla = await prisma.plantillaImportacion.findFirstOrThrow({
+      where: { idCliente: cya.id },
+    });
+    expect(plantilla.formato).toBe('pdf-cya');
+    expect(plantilla.vigente).toBe(true);
+    expect(plantilla.porcentajeAdicional.toNumber()).toBe(7);
+    // Los campos variables llegan sembrados y con el NÚMERO DE ORDEN primero (§Post-F9.2: es la
+    // referencia principal del cliente, la que sale como "Pedido cliente").
+    const campos = plantilla.camposVariables as { campo: string }[] | null;
+    expect(campos?.[0]?.campo).toBe('numeroOrden');
+    expect(campos?.length).toBeGreaterThan(1);
+  });
+
+  it('re-sembrar no la duplica ni la revive (idempotente)', async () => {
+    await sembrar(prisma);
+    await sembrar(prisma);
+    expect(await prisma.plantillaImportacion.count()).toBe(1);
+  });
+
+  it('NO toca al cliente que ya tiene plantilla configurada por una persona', async () => {
+    const otro = await prisma.cliente.create({ data: { nombre: 'CYA' } });
+    await prisma.plantillaImportacion.create({
+      data: {
+        idCliente: otro.id,
+        nombre: 'La que configuró alguien',
+        version: 1,
+        vigente: true,
+        formato: 'excel',
+        mapeo: [{ indice: 0, columna: 'A', rol: 'modeloCliente' }],
+        porcentajeAdicional: 3,
+      },
+    });
+    await sembrar(prisma);
+
+    const suyas = await prisma.plantillaImportacion.findMany({ where: { idCliente: otro.id } });
+    expect(suyas).toHaveLength(1);
+    expect(suyas[0]?.formato).toBe('excel');
+    expect(suyas[0]?.porcentajeAdicional.toNumber()).toBe(3);
+  });
+});

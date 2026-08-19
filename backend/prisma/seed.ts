@@ -11,6 +11,8 @@
  *     (doc 00-Arranque-Login-y-Menu.md §2) con una asignación de permisos APROXIMADA
  *     que Daniel validará en la pantalla de roles (ver mapeo abajo).
  *  4. El usuario `admin` con contraseña temporal y rol Administrador.
+ *  5. La plantilla de importación de C&A (formato `pdf-cya`, 7% de sobre-pedido) SI el cliente
+ *     ya existe — §Post-F9.70 punto 2: sin ella el 7% de Daniel no operaba.
  */
 import { pathToFileURL } from 'node:url';
 
@@ -18,6 +20,11 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+import {
+  CAMPOS_VARIABLES_DEFAULT_CYA,
+  esNombreDeCya,
+  PORCENTAJE_ADICIONAL_CYA,
+} from '../src/dominio/pedidos/plantilla-cya.js';
 
 import { sembrarCalidad } from './seed-calidad.js';
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
@@ -854,6 +861,69 @@ async function sembrarEstadosLista(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3.bis Plantilla de importación de C&A (formato pdf-cya, 7% de sobre-pedido)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ §Post-F9.70 punto 2 — SIEMBRA LA PLANTILLA DE C&A para que el 7% de sobre-pedido (§Post-F9.2)
+ * OPERE DE VERDAD. Sin ninguna `PlantillaImportacion`, `leerConfigPlantillaPdf` caía a
+ * `porcentajeAdicional: 0` y las OPs nacían con las cantidades EXACTAS del cliente en vez de las que
+ * se fabrican.
+ *
+ * **Decisión (lead, V1-E3i): va en el SEED y no "que alguien la dé de alta desde la pantalla".** Una
+ * plantilla que hay que acordarse de crear es una plantilla que NO existe el día que se necesita — y
+ * el día que se necesita es el día que se importa la primera OC, cuando ya nadie se acuerda. Sigue
+ * siendo editable desde la pantalla del importador (guardar ahí crea una versión nueva que deja a
+ * ésta fuera de vigencia).
+ *
+ * Dos cuidados, ambos deliberados:
+ *  • El CLIENTE lo trae el ETL de Access, no el seed: aquí se BUSCA por nombre ({@link esNombreDeCya})
+ *    y NO se inventa. Si no aparece, se dice en la salida del seed en vez de callarse (D3).
+ *  • Sólo se siembra si el cliente NO tiene NINGUNA plantilla. Si ya tiene una (aunque sea `excel`,
+ *    o una que alguien editó), NO se toca: el seed no pisa lo que un humano configuró.
+ */
+async function sembrarPlantillaImportacionCya(prisma: PrismaClient): Promise<void> {
+  const clientes = await prisma.cliente.findMany({ select: { id: true, nombre: true } });
+  const cya = clientes.filter((c) => esNombreDeCya(c.nombre));
+  if (cya.length === 0) {
+    console.log(
+      'Seed: no hay ningún cliente que se llame C&A todavía (lo carga el ETL), así que no se ' +
+        'sembró su plantilla de importación. Cuando exista, se siembra al volver a correr el seed ' +
+        '(o se da de alta desde el importador de OC).',
+    );
+    return;
+  }
+  for (const cliente of cya) {
+    const yaTiene = await prisma.plantillaImportacion.count({ where: { idCliente: cliente.id } });
+    if (yaTiene > 0) {
+      console.log(
+        `Seed: el cliente "${cliente.nombre}" ya tiene plantilla de importación configurada; no se ` +
+          'toca (el % adicional se ajusta desde el importador de OC).',
+      );
+      continue;
+    }
+    await prisma.plantillaImportacion.create({
+      data: {
+        idCliente: cliente.id,
+        nombre: 'OC en PDF (C&A) v1',
+        version: 1,
+        vigente: true,
+        formato: 'pdf-cya',
+        // `pdf-cya` no mapea columnas (el extractor es código); la config viva son los campos
+        // variables + el %.
+        mapeo: [],
+        camposVariables: CAMPOS_VARIABLES_DEFAULT_CYA,
+        porcentajeAdicional: PORCENTAJE_ADICIONAL_CYA,
+      },
+    });
+    console.log(
+      `Seed: plantilla pdf-cya sembrada para "${cliente.nombre}" con ` +
+        `${String(PORCENTAJE_ADICIONAL_CYA)}% de sobre-pedido (§Post-F9.2).`,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -923,6 +993,9 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // migración) → el deploy a `prueba` requiere SEED_ON_START=true.
   await sembrarConceptosCosto(prisma);
   await sembrarEstadosLista(prisma);
+  // Importador de OC por PDF (§Post-F9.70 punto 2): la plantilla de C&A con su 7% de
+  // sobre-pedido. Depende de que el cliente exista (lo carga el ETL): si no está, avisa y sigue.
+  await sembrarPlantillaImportacionCya(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").

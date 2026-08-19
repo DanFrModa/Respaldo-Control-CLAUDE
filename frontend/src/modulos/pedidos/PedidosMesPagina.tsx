@@ -182,6 +182,15 @@ export function PedidosMesPagina(): React.JSX.Element {
   const [constructorAbierto, setConstructorAbierto] = useState(false);
   const [importadorAbierto, setImportadorAbierto] = useState(false);
   const [importadorPdfAbierto, setImportadorPdfAbierto] = useState(false);
+  /**
+   * ⭐ §Post-F9.70 punto 1 — el PDF que el constructor reconoció y el usuario mandó cargar: se abre
+   * el importador YA cargado con ese archivo y ese cliente. Es el mismo importador de siempre (no
+   * una copia): lo único que cambia es por dónde se entra.
+   */
+  const [ocDesdeConstructor, setOcDesdeConstructor] = useState<{
+    archivo: File;
+    idCliente: number;
+  } | null>(null);
   const [generarOpDe, setGenerarOpDe] = useState<{
     pedido: PedidoMesFila;
     renglon: PedidoMesRenglon;
@@ -771,6 +780,15 @@ export function PedidosMesPagina(): React.JSX.Element {
             setConstructorAbierto(false);
             void consulta.refetch();
           }}
+          {...(puedeCrearOp
+            ? {
+                alCargarConImportador: (datos: { archivo: File; idCliente: number }) => {
+                  setConstructorAbierto(false);
+                  setOcDesdeConstructor(datos);
+                  setImportadorPdfAbierto(true);
+                },
+              }
+            : {})}
         />
       ) : null}
       {importadorAbierto ? (
@@ -784,11 +802,19 @@ export function PedidosMesPagina(): React.JSX.Element {
       ) : null}
       {importadorPdfAbierto ? (
         <ImportadorPedidoPdf
-          alCerrar={() => setImportadorPdfAbierto(false)}
+          alCerrar={() => {
+            setImportadorPdfAbierto(false);
+            setOcDesdeConstructor(null);
+          }}
           alImportado={() => {
             setImportadorPdfAbierto(false);
+            setOcDesdeConstructor(null);
             void consulta.refetch();
           }}
+          idClienteInicial={ocDesdeConstructor?.idCliente ?? null}
+          {...(ocDesdeConstructor === null
+            ? {}
+            : { archivosIniciales: [ocDesdeConstructor.archivo] })}
         />
       ) : null}
       {generarOpDe !== null ? (

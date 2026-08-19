@@ -971,11 +971,59 @@ export async function explosionarOrden(
 // ── Operación 2: GENERAR OC desde la explosión (R3) ─────────────────────────────────────────────────
 
 /**
+ * ⭐ §Post-F9.71 — RESUELVE LA FECHA DE CADA OC (función PURA, sin BD: la regla se prueba sin
+ * levantar Postgres). Para cada proveedor al que se le va a comprar: su fecha propia si la pantalla
+ * la mandó, si no la `fechaBase` (la del formulario o, en su defecto, la de la orden de producción).
+ * Los que se quedan sin ninguna salen en `sinFecha` para que quien llama los nombre en el error.
+ *
+ * Las fechas de proveedores que NO están comprando se IGNORAN a propósito: la pantalla enseña las
+ * fechas de todos los grupos y el usuario puede comprar sólo unos renglones — reventar por una fecha
+ * que sobra sería castigar una compra parcial perfectamente válida.
+ *
+ * Dos fechas DISTINTAS para el mismo proveedor sí se rechazan (D3): quedarse con la última sería
+ * inventar cuál de las dos quiso la persona.
+ */
+export function resolverFechasDeOc(
+  idsProveedor: number[],
+  fechaBase: string | null,
+  fechasPorProveedor: DatosGenerarOc['fechasPorProveedor'],
+): { fechas: Map<number, string>; sinFecha: number[] } {
+  const propias = new Map<number, string>();
+  for (const fila of fechasPorProveedor ?? []) {
+    const previa = propias.get(fila.idProveedor);
+    if (previa !== undefined && previa !== fila.fechaEntrega) {
+      throw new ErrorValidacion(
+        `Llegaron dos fechas de entrega distintas (${previa} y ${fila.fechaEntrega}) para el ` +
+          `mismo proveedor: manda una sola por proveedor.`,
+      );
+    }
+    propias.set(fila.idProveedor, fila.fechaEntrega);
+  }
+
+  const fechas = new Map<number, string>();
+  const sinFecha: number[] = [];
+  for (const idProveedor of idsProveedor) {
+    const fecha = propias.get(idProveedor) ?? fechaBase;
+    if (fecha === null) {
+      sinFecha.push(idProveedor);
+      continue;
+    }
+    fechas.set(idProveedor, fecha);
+  }
+  return { fechas, sinFecha };
+}
+
+/**
  * Genera una o varias OC desde el snapshot de explosión (R3): toma el requerido PENDIENTE
  * (`cantidadAComprar > 0`) seleccionado, lo agrupa POR PROVEEDOR sugerido y crea UNA OC por
  * proveedor en UNA transacción (A2), REUSANDO `crearOC` (folio atómico A3, auditoría A7, ligas N:N).
  * Cada línea liga la orden de producción (`idOrden`) para que R7 cruce sin prorrateos. La OC nace en
  * `borrador`. `idsRequerimiento` vacío = generar para TODO lo pendiente. Permiso `compras.administrar`.
+ *
+ * ⭐ §Post-F9.71 — CADA OC LLEVA SU PROPIA FECHA DE ENTREGA. La tela se necesita semanas antes que
+ * los avíos: `fechasPorProveedor` manda la fecha de cada proveedor y `fechaEntrega` queda como el
+ * valor de arranque para los que no traen la suya. Ponerles a todas la misma fecha volvía el dato
+ * decorativo — y un dato que nadie cree no sirve para reclamar.
  *
  * Los renglones SIN proveedor sugerido (telas, o avíos sin proveedor con precio) se agrupan en una OC
  * "sin proveedor", que NO puede crearse (la OC exige proveedor): esos renglones se OMITEN y se
@@ -1009,15 +1057,14 @@ export async function generarOCDesdeExplosion(
     // se toman de lo que ya existe — la fecha de entrega de la ORDEN de producción y la dirección
     // FAVORITA del catálogo — salvo que la pantalla mande las suyas. Si no hay de dónde, se dice
     // exactamente qué falta en vez de generar una OC a medias.
-    const fechaEntrega =
+    //
+    // ⭐ §Post-F9.71 — la fecha de arriba es el VALOR INICIAL, no la verdad de todas: cada proveedor
+    // puede traer la suya (`fechasPorProveedor`) y ésa gana. La comprobación de "falta fecha" ya no
+    // puede hacerse aquí de un golpe, porque un proveedor con fecha propia NO necesita la de arriba:
+    // se hace PROVEEDOR POR PROVEEDOR, más abajo, cuando ya se sabe a quién se le va a comprar.
+    const fechaBase =
       cuerpo.fechaEntrega ??
       (orden.fechaEntrega === null ? null : orden.fechaEntrega.toISOString().slice(0, 10));
-    if (fechaEntrega === null) {
-      throw new ErrorValidacion(
-        `La orden ${String(orden.folio)} no tiene fecha de entrega, y toda orden de compra la ` +
-          `necesita. Captúrala en la orden, o indica la fecha de entrega al generar las compras.`,
-      );
-    }
     let idDireccionEntrega = cuerpo.idDireccionEntrega;
     if (idDireccionEntrega === undefined) {
       const favorita = await tx.direccionEntrega.findFirst({
@@ -1071,8 +1118,34 @@ export async function generarOCDesdeExplosion(
       porProveedor.set(idProv, lista);
     }
 
+    // ⭐ §Post-F9.71 — la fecha de CADA OC. Se resuelve ANTES de crear la primera (A2: o nacen todas
+    // o no nace ninguna), y si a alguna no le queda fecha por ningún lado se dice CON NOMBRE Y
+    // APELLIDO: "falta la fecha" sin decir de quién obliga al usuario a adivinar cuál proveedor es.
+    const { fechas, sinFecha } = resolverFechasDeOc(
+      [...porProveedor.keys()],
+      fechaBase,
+      cuerpo.fechasPorProveedor,
+    );
+    if (sinFecha.length > 0) {
+      const nombres = await tx.proveedor.findMany({
+        where: { id: { in: sinFecha } },
+        select: { nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+      const lista = nombres.map((p) => p.nombre).join(', ');
+      throw new ErrorValidacion(
+        `La orden ${String(orden.folio)} no tiene fecha de entrega, y toda orden de compra la ` +
+          `necesita. Captúrala en la orden, o indica la fecha de entrega (la de arriba o la de ` +
+          `cada proveedor) al generar las compras. Sin fecha se quedarían: ${lista}.`,
+      );
+    }
+
     const ordenesCompra: OcGeneradaSalida[] = [];
     for (const [idProveedor, lista] of porProveedor) {
+      // A estas alturas TODO proveedor del mapa tiene fecha (si no, se rechazó arriba con sus
+      // nombres). El `?? ''` es inalcanzable, y si algún día dejara de serlo `crearOC` lo rechaza
+      // en su `validarEntrada` — nunca se escribe una OC con fecha inventada.
+      const fechaEntrega = fechas.get(idProveedor) ?? '';
       const entrada: EntradaCrearOC = {
         idProveedor,
         fechaEntrega,

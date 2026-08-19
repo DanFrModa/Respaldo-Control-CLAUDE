@@ -85441,13 +85441,38 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "fechasPorProveedor": {
+                    "description": "Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idProveedor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Proveedor al que aplica la fecha."
+                        },
+                        "fechaEntrega": {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                          "description": "Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD)."
+                        }
+                      },
+                      "required": [
+                        "idProveedor",
+                        "fechaEntrega"
+                      ]
+                    }
                   }
                 },
-                "description": "Selección de la explosión para generar OC (una OC por proveedor)."
+                "description": "Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha)."
               }
             }
           },
-          "description": "Selección de la explosión para generar OC (una OC por proveedor)."
+          "description": "Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha)."
         },
         "parameters": [
           {

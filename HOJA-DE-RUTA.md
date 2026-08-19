@@ -49,6 +49,16 @@
 > en realidad **4 de 8 sobreviviendo**, entre ellas la **mitad avío de la puerta de compra** — justo el caso
 > que originó la decisión.
 >
+> ✅ **`V1-E3h` mergeada** (#191, **0.004**) · 🔨 **`V1-E3i` · la cadena de importar y comprar** (**0.005**):
+> fecha de entrega **por OC** en la explosión · «Archivo de la OC» que **sí lee** el PDF y propone cargarlo ·
+> la **plantilla de C&A sembrada con su 7%** (llevaba meses sin operar) · el botón mudo que ahora dice qué
+> le falta · **el parpadeo de red que sacaba al usuario al login** · y un límite de tiempo en el paso de CI
+> que se colgó dos veces esa noche. 🔴 Su hallazgo: **dos piezas de la misma etapa se cancelaban** — el
+> arranque automático mandaba `0` de porcentaje desde una clausura vieja, y el cero explícito **le ganaba a
+> la plantilla recién sembrada**, así que la OC de Daniel proponía 1,744 en vez de 1,866. ⚠️ **Sobrevivió
+> porque el mock volvía el fallo imposible**: la plantilla devolvía `undefined` en todas las pruebas.
+> **Exige `SEED_ON_START=true`** para que la plantilla se siembre.
+>
 > *(histórico)* **`V1-E3f pieza B` (proveedores)**: renombres de rol, contactos como tabla, **el campo corto
 > fusionado en uno y único**, el `tipo` retirado, el **lector de la Constancia de Situación Fiscal** y la
 > **segmentación con/sin factura en CxP**. Su hallazgo caro: `{ not: true }` **no incluye los NULL** —los
@@ -546,6 +556,35 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   revisado». Es el comportamiento de V1-E3d extendido a los botones nuevos y el mensaje nombra la salida,
   así que **no se bloqueó**; pero si Daniel se topa con ello, la respuesta es *"así se decidió"* — y la
   bandeja sí lo resuelve en un acto (`DECISIONES.md §Post-F9.75`).
+
+- **DEUDA de V1-E3i (19-ago-2026) — `refetchOnReconnect: 'always'` sin prueba.** Lo declaró el coder. El
+  resto del camino de sesión sí quedó cubierto y mutado.
+- **DEUDA de V1-E3i — la siembra de la plantilla de C&A solo tiene cobertura de INTEGRACIÓN**, y esas
+  pruebas son **dependientes del orden** dentro de `seed.int.test.ts` (la de idempotencia se apoya en el
+  cliente que creó la anterior). Funciona, pero es frágil: si alguien reordena el archivo, se cae sin que
+  el defecto esté en el código.
+- **DEUDA de V1-E3i — si C&A ya tuviera una plantilla de Excel (R8) vigente en `prueba`, el seed NO la
+  toca** (a propósito: nunca pisa lo que configuró una persona) y **el 7% seguiría sin operar**. La única
+  señal es una línea en el log del arranque. Hay que confirmarlo en `prueba` tras el `SEED_ON_START=true`.
+  ⚠️ Y como la lista cerrada acepta `ca` pelón, vale una ojeada al catálogo real por un falso positivo.
+
+- **DEUDA de V1-E3i — 🔴 el importador de EXCEL puede tumbar el 7% de C&A, en silencio.** Guardar un
+  formato Excel para ese cliente (`ImportadorPedido.tsx:207-212` → `guardarPlantilla`) manda solo `{mapeo}`,
+  así que `formato` cae a `excel` y el porcentaje a `0`; y `guardarPlantilla` **no edita: baja la vigente y
+  crea una versión nueva**. Desde ese instante `leerConfigPlantillaPdf` exige `formato === 'pdf-cya'` y
+  vuelve a **0%** — el 7% deja de operar sin aviso, y **el seed no lo repara nunca** porque solo siembra
+  cuando el cliente no tiene ninguna plantilla. **Por qué no se arregló en V1-E3i (razón de diseño, no
+  "menor"):** la vigencia **única por cliente** es arquitectura preexistente de R8, compartida por los dos
+  importadores y documentada así en `schema.prisma:1195`; hacerla **por formato** exige migración y cambio
+  de dominio, fuera del alcance de una etapa cuyo trabajo era sembrar la plantilla. **Guardarraíl mientras
+  tanto:** si alguien guarda un formato Excel para C&A, el 7% hay que reponerlo a mano desde la pantalla del
+  importador de PDF.
+- **DEUDA de V1-E3i — el `<input>` del % ya tiene prueba de que se ve vacío**, pero la mitad visible de
+  *"0 no es vacío"* vive solo ahí: si mañana alguien lo pinta como `0`, la pantalla mentiría sobre lo que se
+  va a aplicar. Cazado por mutación en la tercera vuelta; se anota para que no se "simplifique".
+- **VERIFICACIÓN DE DESPLIEGUE de V1-E3i (no es deuda de código):** tras `SEED_ON_START=true` en `prueba`,
+  confirmar que C&A quedó con su plantilla **`pdf-cya` vigente al 7%**, y revisar el catálogo real de
+  clientes por un falso positivo de la lista cerrada (`ca` pelón cazaría un «C.A.»).
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

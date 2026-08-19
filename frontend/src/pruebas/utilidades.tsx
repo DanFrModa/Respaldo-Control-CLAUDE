@@ -37,6 +37,9 @@ export function estadoSesionDePrueba(
   return {
     sesion: sesionDePrueba(permisos),
     cargando: false,
+    // Por defecto, una sesión resuelta y presente (V1-E3i: hay cuatro estados, no dos).
+    estado: 'con-sesion',
+    errorConsulta: null,
     permisos: conjunto,
     tienePermiso: (clave) => conjunto.has(clave),
     refrescar: () => Promise.resolve(),

@@ -69,6 +69,10 @@ import {
 } from './oc-duplicada.js';
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
 import { parsearPdfCya, type RenglonPdfCyaParseado } from './parseo-pdf-cya.js';
+// La config de fábrica de C&A vive aparte porque también la siembra `prisma/seed.ts`
+// (§Post-F9.70 punto 2): una plantilla que hay que acordarse de crear no existe el día que
+// se necesita.
+import { CAMPOS_VARIABLES_DEFAULT_CYA } from './plantilla-cya.js';
 import {
   calcularSobrepedidoCya,
   type GrupoPackEntrada,
@@ -80,28 +84,6 @@ const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024;
 
 /** Carpeta R2 de los adjuntos (la subida es server-side ANTES de la tx: no hay id de orden aún, A5). */
 const CARPETA_ADJUNTOS = 'ordenes';
-
-/**
- * Campos variables por DEFECTO de una OC de C&A (Daniel: capturables como referencia del cliente). Se
- * usan cuando la plantilla del cliente aún no define los suyos; al guardar el formato pdf-cya se
- * SIEMBRAN éstos para que queden editables (más variables sin migración).
- *
- * ORDEN IMPORTANTE (precisión de Daniel): la referencia PRINCIPAL del cliente es el NÚMERO DE ORDEN de
- * su OC (p. ej. 620884), NO el Modelo ID. El Centro de comando y el detalle muestran como "Pedido
- * cliente" la PRIMERA referencia de la orden (`referencias[0]`, ordenadas por id de creación), así que
- * el número de orden va PRIMERO. El resto (Modelo ID, División, Sub División, Código único, Semana C&A,
- * Descripción) quedan como referencias/campos ADICIONALES (información). El número de orden va ADEMÁS
- * en `Orden.ocCliente` (snapshot que alimenta la cadena de trazabilidad "OC cliente").
- */
-export const CAMPOS_VARIABLES_DEFAULT_CYA: CampoVariableImportacion[] = [
-  { campo: 'numeroOrden', etiqueta: 'Pedido cliente' },
-  { campo: 'modeloCliente', etiqueta: 'Modelo ID' },
-  { campo: 'division', etiqueta: 'División' },
-  { campo: 'subDivision', etiqueta: 'Sub División' },
-  { campo: 'descripcionArticulo', etiqueta: 'Descripción C&A' },
-  { campo: 'codigoUnico', etiqueta: 'Código único' },
-  { campo: 'semanaCliente', etiqueta: 'Semana C&A' },
-];
 
 /** Valor de un campo del PDF parseado (para armar las referencias configuradas). */
 function valorCampo(campo: CampoPdfCya, r: RenglonPdfCyaParseado): string {

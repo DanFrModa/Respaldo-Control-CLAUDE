@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { ErrorPermiso } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { ErrorValidacion } from '../../comun/errores.js';
 import {
   calcularEstatusMaterial,
   estadoGenerico,
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
+  resolverFechasDeOc,
 } from './mrp.js';
 
 /**
@@ -119,5 +121,79 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     expect(
       estadoGenerico({ ...base, esGenerico: true, existenciaStock: 30, cantidadAComprar: 70 }),
     ).toBe('faltante-parcial');
+  });
+});
+
+/**
+ * ⭐ §Post-F9.71 (V1-E3i) — LA FECHA DE CADA OC. Daniel: *"cada OC interna va a tener una fecha de
+ * entrega diferente"*. La regla es pura (no toca BD) para poder probarla aquí; el efecto real sobre
+ * las OC creadas va en `mrp.int.test.ts`.
+ */
+describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
+  it('cada proveedor recibe la SUYA cuando la manda la pantalla', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 2, fechaEntrega: '2026-12-20' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+    expect(fechas.get(2)).toBe('2026-12-20');
+    expect(sinFecha).toEqual([]);
+  });
+
+  it('el que no trae la suya cae a la de arriba (valor inicial, no imposición)', () => {
+    const { fechas } = resolverFechasDeOc([1, 2], '2026-11-30', [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+    expect(fechas.get(2)).toBe('2026-11-30');
+  });
+
+  it('sin fecha de arriba, basta con que cada uno traiga la suya', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 2, fechaEntrega: '2026-12-20' },
+    ]);
+    expect(sinFecha).toEqual([]);
+    expect(fechas.size).toBe(2);
+  });
+
+  it('el que se queda sin ninguna sale nombrado en `sinFecha` (para decirlo con su nombre)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(sinFecha).toEqual([2]);
+    expect(fechas.has(2)).toBe(false);
+  });
+
+  it('la fecha de un proveedor que NO está comprando se ignora (no revienta una compra parcial)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1], '2026-11-30', [
+      { idProveedor: 99, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-11-30');
+    expect(fechas.has(99)).toBe(false);
+    expect(sinFecha).toEqual([]);
+  });
+
+  it('dos fechas DISTINTAS para el mismo proveedor se rechazan (D3, no se elige en silencio)', () => {
+    expect(() =>
+      resolverFechasDeOc([1], '2026-11-30', [
+        { idProveedor: 1, fechaEntrega: '2026-10-05' },
+        { idProveedor: 1, fechaEntrega: '2026-10-06' },
+      ]),
+    ).toThrow(ErrorValidacion);
+  });
+
+  it('la MISMA fecha repetida no estorba (no es una contradicción)', () => {
+    const { fechas } = resolverFechasDeOc([1], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+  });
+
+  it('sin fechas por proveedor, todos caen a la de arriba (comportamiento previo intacto)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', undefined);
+    expect([...fechas.values()]).toEqual(['2026-11-30', '2026-11-30']);
+    expect(sinFecha).toEqual([]);
   });
 });

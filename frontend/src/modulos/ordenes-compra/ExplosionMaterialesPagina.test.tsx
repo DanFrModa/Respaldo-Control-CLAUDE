@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -529,5 +529,190 @@ describe('ExplosionMaterialesPagina · lo que falta liberar (V1-E3h)', () => {
     expect(screen.queryByTestId('exp-ir-a-liberar')).toBeNull();
     // Pero SÍ se le dice quién lo resuelve (nunca un callejón sin salida).
     expect(screen.getByTestId('exp-pendientes-liberar')).toHaveTextContent(/Pídeselo a Desarrollo/);
+  });
+});
+
+/**
+ * ⭐ §Post-F9.71 (V1-E3i) — CADA OC CON SU FECHA. Daniel, sobre una orden real: *"me pide fecha de
+ * entrega, pero cada OC interna va a tener una fecha de entrega diferente"*. La tela se necesita
+ * semanas antes que los avíos: una sola fecha para todas convierte el dato en decorativo.
+ */
+describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
+  /** Explosión con DOS proveedores comprables (una sola OC no puede demostrar nada de fechas). */
+  function conDosProveedores() {
+    const base = explosionDePrueba();
+    return {
+      ...base,
+      grupos: [
+        ...base.grupos,
+        {
+          idProveedor: 22,
+          proveedor: 'Telas del Norte',
+          renglones: [
+            {
+              id: 4,
+              tipo: 'tela',
+              idTela: 4,
+              idAvio: null,
+              material: 'Felpa amarrada',
+              cantidadRequerida: 45,
+              unidad: 'm',
+              esGenerico: false,
+              estadoGenerico: 'no-aplica',
+              existenciaStock: 0,
+              cantidadAComprar: 45,
+              idProveedorSugerido: 22,
+              proveedorSugerido: 'Telas del Norte',
+              precioSugerido: 10,
+              diff: 'sin-cambio',
+              cambiosReceta: [],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  beforeEach(() => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    mutateMock.mockReset();
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: conDosProveedores(),
+      isPending: false,
+      isError: false,
+    });
+  });
+
+  async function abrirExplosion(): Promise<void> {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+  }
+
+  it('cada grupo CON proveedor lleva su propia fecha; el grupo sin proveedor no (no genera OC)', async () => {
+    await abrirExplosion();
+
+    const fechas = screen.getAllByTestId('exp-fecha-grupo');
+    expect(fechas).toHaveLength(2);
+    expect(fechas.map((f) => f.getAttribute('data-proveedor'))).toEqual(['11', '22']);
+  });
+
+  it('la fecha de arriba es el VALOR INICIAL: las que nadie tocó la siguen', async () => {
+    await abrirExplosion();
+
+    fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: '2026-11-30' } });
+    for (const campo of screen.getAllByTestId('exp-fecha-grupo')) {
+      expect(campo).toHaveValue('2026-11-30');
+    }
+  });
+
+  it('la fecha tocada de un proveedor NO arrastra a los demás, y viaja al servidor', async () => {
+    const usuario = userEvent.setup();
+    await abrirExplosion();
+
+    fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: '2026-11-30' } });
+    const campos = screen.getAllByTestId('exp-fecha-grupo');
+    fireEvent.change(campos[1] as HTMLElement, { target: { value: '2026-10-05' } });
+
+    // El campo tocado SE QUEDA con lo que se escribió…
+    expect(campos[1] as HTMLElement).toHaveValue('2026-10-05');
+    // …y el otro proveedor sigue con la de arriba (no se movió con el vecino).
+    expect(campos[0] as HTMLElement).toHaveValue('2026-11-30');
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [args] = mutateMock.mock.calls[0] as [
+      {
+        cuerpo: {
+          fechaEntrega?: string;
+          fechasPorProveedor?: { idProveedor: number; fechaEntrega: string }[];
+        };
+      },
+    ];
+    expect(args.cuerpo.fechaEntrega).toBe('2026-11-30');
+    // Sólo viaja la EXCEPCIÓN: la del proveedor que nadie tocó la resuelve el servidor con la de
+    // arriba (mandar las dos sería mandar como decisión lo que es un default).
+    expect(args.cuerpo.fechasPorProveedor).toEqual([
+      { idProveedor: 22, fechaEntrega: '2026-10-05' },
+    ]);
+  });
+
+  it('sin tocar ninguna fecha de grupo, el cuerpo NO lleva fechas por proveedor (gemela)', async () => {
+    const usuario = userEvent.setup();
+    await abrirExplosion();
+
+    fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: '2026-11-30' } });
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+    const [args] = mutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
+    expect(args.cuerpo).not.toHaveProperty('fechasPorProveedor');
+    expect(args.cuerpo.fechaEntrega).toBe('2026-11-30');
+  });
+
+  it('vaciar la fecha de un grupo lo devuelve a seguir a la de arriba (y no viaja vacía)', async () => {
+    const usuario = userEvent.setup();
+    await abrirExplosion();
+
+    fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: '2026-11-30' } });
+    const campos = screen.getAllByTestId('exp-fecha-grupo');
+    fireEvent.change(campos[1] as HTMLElement, { target: { value: '2026-10-05' } });
+    fireEvent.change(campos[1] as HTMLElement, { target: { value: '' } });
+
+    // Vuelve a mostrar la de arriba (no se queda en blanco significando otra cosa).
+    expect(screen.getAllByTestId('exp-fecha-grupo')[1] as HTMLElement).toHaveValue('2026-11-30');
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [args] = mutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
+    expect(args.cuerpo).not.toHaveProperty('fechasPorProveedor');
+  });
+
+  it('al cambiar de orden, las fechas por proveedor NO se arrastran', async () => {
+    const usuario = userEvent.setup();
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 51, folio: 8, codigoModelo: 'A-101', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    fireEvent.change(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement, {
+      target: { value: '2026-10-05' },
+    });
+
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    expect(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement).toHaveValue('');
   });
 });

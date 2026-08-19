@@ -1449,6 +1449,97 @@ Equivalente en resultado, pero lo dijo de más y lo reconoció sin defenderlo.
 
 ---
 
+## V1-E3i · La cadena de importar y comprar, y el parpadeo que sacaba al usuario ⭐ (19-ago-2026)
+
+> Cinco de las seis piezas salieron de **Daniel recorriendo el flujo con una OC real de C&A** (orden
+> 620672, 1,744 pzas) y atorándose. Decisiones en `DECISIONES.md` **§Post-F9.70** y **§Post-F9.71**. La
+> sexta es el paso del CI que se colgó dos veces esa misma noche.
+
+### Qué entrega
+
+**Fecha de entrega POR OC** en la explosión (*"cada OC interna va a tener una fecha diferente"*) ·
+**«Archivo de la OC» que SÍ lee el PDF** y propone cargarlo · la **plantilla de C&A sembrada con su 7%** ·
+el **botón mudo que ahora dice qué le falta** · el **parpadeo de red que sacaba al usuario al login** · y
+un **límite de tiempo** en el paso de CI que se cuelga.
+
+### Nota de cierre — ✅ HECHA (19-ago-2026)
+
+**TRES vueltas: dos RECHAZADAS y la tercera APROBADA.**
+
+> ⚠️ *Este encabezado dijo «✅ HECHA — primera vuelta RECHAZADA; segunda APROBADA» **antes de que la
+> segunda vuelta terminara**: lo escribió el lead dando por hecho el resultado. Lo cazó el reviewer. Al
+> corregirlo, el reemplazo pegó en la **nota de V1-E3h** —que tenía el texto idéntico y era correcta—
+> dejando intacta la equivocada; también lo cazó el reviewer. Se deja anotado porque es **exactamente la
+> lección que esta ficha viene documentando**, dos veces seguidas y del lado de quien la escribía.*
+
+**🔴 El defecto que valía el rechazo: dos piezas de esta MISMA etapa se cancelaban entre sí.** El arranque
+automático del importador —la puerta nueva de la pieza 2— llamaba al análisis desde un efecto de montaje
+cuya **clausura se creó en el primer render**, cuando el porcentaje aún valía `0`; el valor real llega
+**por red** desde la plantilla. Y `0` **no es "no mandé nada"**: el backend hace
+`datos.porcentajeAdicional ?? config.porcentajeAdicional`, así que **el cero explícito le ganaba a la
+plantilla recién sembrada**.
+
+En el caso de Daniel: sube el PDF → «Sí, cargar la OC» → la matriz propone **1,744 en vez de 1,866**, y las
+OPs nacen con las cantidades exactas del cliente. *Es textualmente el defecto de §Post-F9.70 punto 2 que
+esta etapa vino a cerrar, reintroducido por la puerta nueva* — y **en silencio**, porque el campo del
+porcentaje vive solo en el paso que ese camino se salta.
+
+**⚠️ Y la razón por la que sobrevivió es la lección, no el defecto: la prueba estaba montada de forma que
+el fallo no podía ocurrir.** El mock de la plantilla devolvía `undefined`, así que **en ninguna prueba el
+porcentaje podía ser distinto de 0**; y la aserción del cuerpo miraba `idCliente`, que pasa igual con el
+porcentaje equivocado. *Mismo patrón que el fixture inventado de V1-E3f pieza B: una prueba que confirma la
+suposición de quien la escribió en vez de cazarla.* El reviewer no lo dedujo — **imprimió el cuerpo real
+que viaja al servidor** y comprobó que por el camino manual sí iba el 7.
+
+**🔴 Y una TERCERA puerta, en la segunda vuelta: el % del cliente anterior se pegaba al siguiente — y se
+GUARDABA en él.** El efecto que carga el % de la plantilla trae un `if (pctGuardado !== null)` —correcto
+para no pisar lo que el usuario tecleó cuando la consulta refresca— que **también impide volver a "sin
+opinión" al cambiar de cliente**. Escenario: alguien abre el importador, elige C&A, se da cuenta de que la
+OC es de otro cliente, **cambia el cliente**, carga y confirma → las OPs de ese cliente nacen con **+7% que
+nadie pidió**, y el backend le crea al **cliente equivocado** una plantilla vigente al 7% con los campos
+variables de C&A encima. Reproducido ejecutando (`PCT TRAS CAMBIAR DE CLIENTE = 7`).
+
+**⚠️ Y el patrón que ya no es anécdota: TRES veces en esta sola etapa, el ANDAMIO DE PRUEBAS era lo que
+volvía el fallo imposible.** Primero el mock de la plantilla devolvía `undefined` **constante**, así que en
+ninguna prueba el porcentaje podía ser distinto de 0. Luego la aserción del cuerpo miraba `idCliente`, que
+pasa igual con el porcentaje equivocado. Y por último el mock no recibía el `idCliente`, con lo que *"el %
+del cliente anterior se pega al siguiente"* era **inexpresable**: no había forma de escribir el escenario.
+*Una prueba montada de modo que el fallo no pueda ocurrir no prueba nada* — y en las tres, arreglar el
+andamio fue lo que destapó el defecto.
+
+**Las tres variantes salen de la MISMA raíz**, y ése es el aprendizaje que vale más que los tres arreglos:
+**un valor que significa dos cosas**. Mientras `0` quisiera decir a la vez *"cero por ciento"* y *"no tengo
+opinión"*, cada vuelta destapaba una salida nueva —analizar, confirmar, cambiar de cliente— y taparlas de
+una en una no cerraba la familia.
+
+### Lo que resistió, que fue casi todo
+
+El reviewer corrió **19 mutaciones propias**, incluidas las que el coder no había hecho: **17 cazadas**.
+Verificó la **pieza 1** invariante por invariante (A1 con la función pura en el dominio, A2 —las fechas se
+resuelven antes de crear la primera OC y el int test asevera `count() === 0` tras el rechazo—, D3 —nombra
+a los proveedores sin fecha y **rechaza** dos fechas contradictorias en vez de quedarse con la última—).
+
+A la **pieza 5** (sesión) **le buscó la puerta trasera y no la tiene**: un 401 real **sigue cerrando
+sesión**, porque `obtenerSesion` traduce el 401 a **dato** y no a error, así que llega como «sin sesión» y
+**no se reintenta**; los reintentos solo alcanzan a lo que *lanza* (5xx y red). Y *"lo conocido gana sobre
+el fallo"* no deja a nadie dentro con permisos ajenos: el guard es solo experiencia de usuario y cada ruta
+del backend re-verifica.
+
+La **pieza 6** la reprodujo en bash: después de `fi`, `$?` da **0** —por eso leerlo dentro del `else` era
+obligatorio, y la primera versión del coder estaba mal—, y un `timeout` que corta (código **124**) se ve
+como fallo del intento sin abortar el paso pese al `set -e`.
+
+### Dos cosas que el propio coder confesó, y que conviene no perder
+
+1. **Su primera pasada salió VERDE en las pruebas con typecheck y lint en ROJO.** El juez sigue siendo el
+   CI, y las pruebas pasando no significan que el proyecto compile.
+2. De sus **26 mutaciones, 2 sobrevivieron** y las arregló él mismo: una prueba que miraba el campo vecino
+   pero **nunca el que tocaba**, y un filtro que resultó ser **código muerto** — lo eliminó en vez de
+   taparlo con una prueba, y dejó la regla en un solo camino (vaciar la fecha de un grupo **borra la
+   excepción** y vuelve a seguir a la de arriba).
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
