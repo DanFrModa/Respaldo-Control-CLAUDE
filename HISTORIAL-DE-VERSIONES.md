@@ -12,23 +12,27 @@
 
 ## Cómo se numeran
 
-**`2.xxx`** — el **2** es CONTROL v2 (el sistema de Access era la v1); los tres dígitos avanzan de uno en
-uno. `2.001`, `2.002`, `2.003`…
+**`0.xxx`** mientras **nada esté en producción** (decisión de Daniel: *"empezamos mejor en 0.001, porque
+es antes de producción"*). El **cero se ve a simple vista** y dice lo que hay que saber: esto todavía no
+opera el negocio. `0.001`, `0.002`, `0.003`…
 
 ⚠️ **Se sube la versión CADA VEZ que se actualiza `prueba`** (regla de Daniel, 19-ago-2026), no cuando se
 junta un lote. Cada merge a `prueba` = una entrada nueva aquí, aunque traiga una sola cosa. Así siempre se
 puede decir qué versión se está mirando.
 
-**El número es UNO SOLO y VIAJA.** Se asigna cuando algo entra a **`prueba`**, y **esa misma versión** es
-la que después pasa a **producción** — no se re-numera. Así se puede decir *"producción corre la 2.014,
-que es exactamente la que se probó el 18 de agosto"*, en vez de tener dos numeraciones paralelas que en
-tres meses nadie sabe emparejar.
+**El número es UNO SOLO y VIAJA.** Se asigna al entrar a **`prueba`** y **esa misma versión** es la que
+después sube a producción — **no se re-numera**. Así se puede decir *"producción corre la 0.014, que es
+exactamente la que probé el 18 de agosto"*, en vez de tener dos numeraciones paralelas que en tres meses
+nadie sabe emparejar.
+
+**El día del arranque:** la versión que salga a producción se **rebautiza `1.000`**, dejando escrito de
+cuál `0.xxx` viene (*"1.000 — antes 0.014"*). De ahí en adelante, `1.001`, `1.002`… con la misma regla.
 
 Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en producción` cuando sube.
 
 ---
 
-## 2.001 · 18-ago-2026 · **en prueba** — Diez etapas de golpe
+## 0.001 · 18-ago-2026 · **en prueba** — Diez etapas de golpe
 
 La tanda más grande hasta ahora. Nace de dos sesiones seguidas de **Daniel capturando modelos reales**:
 de ahí salieron los dos hallazgos más caros, y **ninguno lo habría encontrado una revisión técnica**,

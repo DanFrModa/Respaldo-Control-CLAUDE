@@ -163,8 +163,10 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    - **Sesiones acotadas.** Cerrar y arrancar chat nuevo al terminar una etapa sale más barato que arrastrar una conversación larguísima (cada turno reprocesa todo).
 5. **HISTORIAL DE VERSIONES (regla de Daniel, 19-ago-2026):** **cada vez que se actualiza `prueba` se
    sube la versión** y se agrega su entrada en **`HISTORIAL-DE-VERSIONES.md`** (raíz). Numeración
-   **`2.xxx`** correlativa; **el número es UNO SOLO y VIAJA**: se asigna al entrar a `prueba` y **esa
-   misma versión** pasa a producción, sin re-numerar. Se escribe **en lenguaje del negocio**, no técnico,
+   **`0.xxx`** correlativa **mientras nada esté en producción** (el cero lo dice a simple vista); al
+   arrancar producción, esa versión se rebautiza **`1.000`** anotando de cuál `0.xxx` viene. **El número
+   es UNO SOLO y VIAJA**: se asigna al entrar a `prueba` y **esa misma versión** sube a producción, sin
+   re-numerar. Se escribe **en lenguaje del negocio**, no técnico,
    con tres bloques: *qué se puede hacer ahora que antes no* · *qué cambió y puede sorprender* · *qué sigue
    pendiente o roto*. **NO es un changelog de commits** — para eso están `DECISIONES.md` (el porqué) y
    `HOJA-DE-RUTA.md` (el qué sigue).
