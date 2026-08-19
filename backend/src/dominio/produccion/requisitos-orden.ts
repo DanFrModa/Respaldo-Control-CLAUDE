@@ -7,7 +7,10 @@
  *
  * REGLA ELEGIDA por él — **"tallas + receta liberada, y arte si aplica"**:
  *  • `tallas` — la orden tiene su matriz capturada (≥1 renglón color×talla).
- *  • `receta` — **Desarrollo LIBERÓ la receta congelada de ESTA orden** (`Orden.recetaLiberadaEn`).
+ *  • `receta` — **Desarrollo liberó la receta congelada de ESTA orden POR COMPLETO**
+ *    (`Orden.recetaLiberadaEn`, que desde V1-E3h/§Post-F9.72 es un DERIVADO de los renglones:
+ *    "no queda ninguno vivo sin firmar"). Una receta liberada a medias ya deja COMPRAR lo
+ *    firmado, pero la orden todavía no está completa.
  *  • `arte`   — se exige cuando el modelo LLEVA arte (`Modelo.llevaArte`); las prendas lisas se
  *               completan normal (el propio impreso de Daniel dice "NO LLEVA BORDADO/ESTAMPADO").
  *               El arte se cuenta en la **receta de la ORDEN**, no en el BOM del modelo.

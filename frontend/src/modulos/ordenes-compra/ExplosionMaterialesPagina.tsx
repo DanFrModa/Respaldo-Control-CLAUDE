@@ -1,6 +1,6 @@
-import { Info, Printer, ShoppingCart } from 'lucide-react';
+import { Info, LockOpen, Printer, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
@@ -14,6 +14,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
+import { useSesion } from '@/sesion/useSesion';
 
 /**
  * EXPLOSIÓN DE MATERIALES por orden (F4-E4, R3): se elige una orden de producción y el backend
@@ -21,8 +22,18 @@ import { useDebounce } from '@/lib/useDebounce';
  * sugerido (R1), con el neteo de genéricos visible (decisión d) y las DIFERENCIAS contra el snapshot
  * previo marcadas. Desde aquí se generan las OC (una por proveedor) con selección múltiple en un clic.
  * Solo presenta: el cálculo, el neteo, el snapshot y la generación los hace el SERVIDOR (A1).
+ *
+ * ⭐ V1-E3h (§Post-F9.72): desde que la receta se libera POR PARTES, esta explosión sale SOLO de los
+ * renglones que Desarrollo firmó — y lo que quedó fuera se enseña aquí, con nombre y cantidad. Es
+ * requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de liberar"*.
+ * No es un "no se puede": es un **qué** y un **cuánto**, con el camino a donde se resuelve.
  */
 export function ExplosionMaterialesPagina(): React.JSX.Element {
+  const navigate = useNavigate();
+  const { tienePermiso } = useSesion();
+  // §Post-F9.68 — el enlace a "donde se libera" solo se pinta si esta sesión puede abrir el destino
+  // (el panel de la OP y, dentro, la receta). Un enlace muerto sería peor que no tenerlo.
+  const puedeIrALiberar = tienePermiso('ordenes.ver') && tienePermiso('desarrollo.ver');
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [idOrden, setIdOrden] = useState<number | null>(null);
@@ -313,6 +324,44 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               </div>
             ) : null}
 
+            {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ. Antes la explosión frenaba en seco (409) si la
+                receta no estaba liberada, y ni siquiera decía a qué pantalla ir. Ahora sale lo
+                firmado y lo que falta se lista con su cantidad. El servidor lo agrega (A1). */}
+            {(datos?.pendientesLiberar ?? []).length > 0 ? (
+              <div
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                data-testid="exp-pendientes-liberar"
+              >
+                <p className="flex items-center gap-1.5 font-medium">
+                  <LockOpen className="size-4 shrink-0" aria-hidden />
+                  Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
+                  material(es) de esta orden, así que NO entran en esta explosión:
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {(datos?.pendientesLiberar ?? []).map((p) => (
+                    <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
+                      <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
+                      {p.unidad === null ? '' : ` ${p.unidad}`} por prenda
+                    </li>
+                  ))}
+                </ul>
+                {puedeIrALiberar && idOrden !== null ? (
+                  <button
+                    type="button"
+                    className="mt-1 underline"
+                    onClick={() => void navigate('/produccion/ordenes', { state: { idOrden } })}
+                    data-testid="exp-ir-a-liberar"
+                  >
+                    Abrir la orden para liberar su receta
+                  </button>
+                ) : (
+                  <p className="mt-1">
+                    Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             {datos?.huboCambios ? (
               <p
                 className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
@@ -407,7 +456,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
                 data-testid="exp-vacio"
               >
-                Esta orden no requiere materiales (BOM vacío o sin piezas capturadas).
+                {/* No mentir sobre la causa: con renglones pendientes de firma, el vacío NO es un
+                    BOM vacío — es que todavía no se autoriza nada de lo que esta orden lleva. */}
+                {(datos?.pendientesLiberar ?? []).length > 0
+                  ? 'Nada que comprar todavía: lo que esta orden lleva está pendiente de que Desarrollo lo libere (ver arriba).'
+                  : 'Esta orden no requiere materiales (BOM vacío o sin piezas capturadas).'}
               </p>
             ) : (
               <div className="space-y-5" data-testid="exp-grupos">

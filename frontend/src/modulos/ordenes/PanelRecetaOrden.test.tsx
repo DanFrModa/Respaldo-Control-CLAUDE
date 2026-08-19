@@ -13,6 +13,7 @@ const liberarMutateMock = vi.fn();
 const quitarMutateMock = vi.fn();
 const restaurarMutateMock = vi.fn();
 const editarMutateMock = vi.fn();
+const traerMutateMock = vi.fn();
 
 /**
  * El catálogo de medidas del avío (para el amarre por talla). Por defecto VACÍO: sólo las pruebas
@@ -44,6 +45,7 @@ vi.mock('@/api/receta-orden', () => ({
   useRestaurarRenglonReceta: () => ({ mutate: restaurarMutateMock, isPending: false }),
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarRenglonReceta: () => ({ mutate: editarMutateMock, isPending: false }),
+  useTraerDelModelo: () => ({ mutate: traerMutateMock, isPending: false }),
 }));
 
 /** Receta base: una tela y dos avíos (uno de ellos, la jareta), sin revisar y sin liberar. */
@@ -56,7 +58,16 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaEn: null,
     liberadaPor: null,
     puedeComprar: false,
-    resumen: { sinRevisar: 3, revisados: 0, ajustados: 0, excluidos: 0, total: 3 },
+    todoLiberado: false,
+    resumen: {
+      sinRevisar: 3,
+      revisados: 0,
+      ajustados: 0,
+      excluidos: 0,
+      total: 3,
+      liberados: 0,
+      porLiberar: 3,
+    },
     telas: [
       {
         id: 1,
@@ -65,6 +76,8 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         agregadoAMano: false,
         excluido: false,
         notas: null,
+        liberadoEn: null,
+        liberadoPor: null,
         enElModelo: true,
         cambios: [],
         idTela: 10,
@@ -90,6 +103,8 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         agregadoAMano: false,
         excluido: false,
         notas: null,
+        liberadoEn: null,
+        liberadoPor: null,
         enElModelo: true,
         cambios: [],
         idAvio: 20,
@@ -121,6 +136,8 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         agregadoAMano: false,
         excluido: false,
         notas: null,
+        liberadoEn: null,
+        liberadoPor: null,
         enElModelo: true,
         cambios: [],
         idAvio: 21,
@@ -179,18 +196,52 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
     expect(screen.getByText(/Cortar y producir NO están bloqueados/)).toBeInTheDocument();
   });
 
-  it('liberada: lo dice y anuncia que ya se puede comprar', () => {
+  it('liberada COMPLETA: lo dice y anuncia que ya se puede comprar', () => {
     render(
       recetaDePrueba({
         liberadaEn: '2026-08-15T10:00:00.000Z',
         liberadaPor: 'usuario-1',
         puedeComprar: true,
-        resumen: { sinRevisar: 0, revisados: 3, ajustados: 0, excluidos: 0, total: 3 },
+        todoLiberado: true,
+        resumen: {
+          sinRevisar: 0,
+          revisados: 3,
+          ajustados: 0,
+          excluidos: 0,
+          total: 3,
+          liberados: 3,
+          porLiberar: 0,
+        },
       }),
     );
 
     expect(screen.getByTestId('receta-liberada')).toBeInTheDocument();
     expect(screen.getByText(/ya se puede explotar el MRP/)).toBeInTheDocument();
+  });
+
+  it('⭐ V1-E3h: LIBERADA EN PARTE es un tercer estado, y dice cuánto falta firmar', () => {
+    render(
+      recetaDePrueba({
+        // Hay algo firmado (se puede comprar) pero NO todo: el caso que la etapa vino a habilitar.
+        puedeComprar: true,
+        todoLiberado: false,
+        resumen: {
+          sinRevisar: 0,
+          revisados: 3,
+          ajustados: 0,
+          excluidos: 0,
+          total: 3,
+          liberados: 1,
+          porLiberar: 2,
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('receta-en-parte')).toHaveTextContent('2 por firmar');
+    expect(screen.queryByTestId('receta-liberada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-sin-liberar')).not.toBeInTheDocument();
+    // Y se dice lo que de verdad importa: lo pendiente NO entra a la explosión del comprador.
+    expect(screen.getByText(/NO entran a la explosión de materiales/)).toBeInTheDocument();
   });
 
   it('⚠️ el botón de «marcar todo revisado» existe (no se pide el OK uno por uno)', async () => {
@@ -206,7 +257,15 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
   it('sin nada sin revisar, el botón de marcar todo se apaga (no hay qué marcar)', () => {
     render(
       recetaDePrueba({
-        resumen: { sinRevisar: 0, revisados: 3, ajustados: 0, excluidos: 0, total: 3 },
+        resumen: {
+          sinRevisar: 0,
+          revisados: 3,
+          ajustados: 0,
+          excluidos: 0,
+          total: 3,
+          liberados: 0,
+          porLiberar: 3,
+        },
       }),
     );
     expect(screen.getByTestId('receta-marcar-revisado')).toBeDisabled();
@@ -280,6 +339,7 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
               tipo: 'avio',
               idRenglon: 2,
               material: 'BOT-01 — Botón',
+              idMaterialModelo: null,
               que: 'consumo',
               detalle: 'La cantidad de "BOT-01 — Botón" pasó de 2 a 4 en el modelo.',
             },
@@ -305,6 +365,7 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
               tipo: 'avio',
               idRenglon: 2,
               material: 'BOT-01 — Botón',
+              idMaterialModelo: null,
               que: 'precio',
               detalle: 'El precio de "BOT-01 — Botón" pasó de $2.00 a $3.00 en el modelo.',
             },
@@ -331,6 +392,7 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
               tipo: 'tela',
               idRenglon: 1,
               material: 'Jersey',
+              idMaterialModelo: null,
               que: 'precio-mercado',
               detalle:
                 'La última COMPRA REAL de "Jersey" es de $52.00 y esta orden congeló $50.00. El modelo no cambió: cambió el precio de compra.',
@@ -631,5 +693,230 @@ describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
     const fila = screen.getByTestId('medida-receta-avio-2-100').closest('span');
     expect(fila).not.toBeNull();
     expect(within(fila as HTMLElement).getByText('pza')).toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ V1-E3h — LA RECETA SE LIBERA POR PARTES (§Post-F9.72) y lo que falta SE JALA DEL MODELO
+ * (§Post-F9.73). Lo que estas pruebas fijan es lo que la pantalla no puede dejar de hacer:
+ *
+ *  • que la firma se vea y se ponga POR RENGLÓN (sin esto, Desarrollo no puede liberar "el resto"
+ *    dejando fuera el cierre que el cliente no ha autorizado — el caso de Daniel);
+ *  • que existan los botones de bloque, y que NO se pinten cuando no hay nada que firmar ahí
+ *    (§Post-F9.68: lo que no sirve, no se pinta);
+ *  • que el aviso de "el modelo lleva X y esta orden no" traiga SU botón, y que mande el material
+ *    correcto — el `idMaterialModelo` es lo único que distingue "traer éste" de "traer todo".
+ */
+describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('cada renglón dice si está firmado o no', () => {
+    const base = recetaDePrueba();
+    render({
+      ...base,
+      telas: base.telas.map((t) => ({
+        ...t,
+        liberadoEn: '2026-08-19T10:00:00.000Z',
+        liberadoPor: 'u1',
+      })),
+    });
+
+    const filaTela = screen.getByTestId('consumo-receta-tela-1').closest('tr');
+    expect(within(filaTela as HTMLElement).getByText('Liberado')).toBeInTheDocument();
+    const filaAvio = screen.getByTestId('consumo-receta-avio-2').closest('tr');
+    expect(within(filaAvio as HTMLElement).getByText('Sin firmar')).toBeInTheDocument();
+  });
+
+  it('⭐ se firma UN renglón, y viaja como selección de ese renglón (no "todo")', async () => {
+    const usuario = userEvent.setup();
+    render(recetaDePrueba());
+
+    await usuario.click(screen.getByTestId('liberar-receta-avio-3'));
+
+    expect(liberarMutateMock).toHaveBeenCalledTimes(1);
+    expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { alcance: 'seleccion', renglones: [{ tipo: 'avio', id: 3 }] },
+    });
+  });
+
+  it('el renglón YA firmado no vuelve a ofrecer el botón de firmar', () => {
+    const base = recetaDePrueba();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 3 ? { ...a, liberadoEn: '2026-08-19T10:00:00.000Z', liberadoPor: 'u1' } : a,
+      ),
+    });
+    expect(screen.queryByTestId('liberar-receta-avio-3')).not.toBeInTheDocument();
+    expect(screen.getByTestId('liberar-receta-avio-2')).toBeInTheDocument();
+  });
+
+  it('«liberar todos los avíos» manda el alcance de la sección, con su conteo a la vista', async () => {
+    const usuario = userEvent.setup();
+    render(recetaDePrueba());
+
+    const boton = screen.getByTestId('receta-liberar-avios');
+    expect(boton).toHaveTextContent('(2)');
+    await usuario.click(boton);
+
+    expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { alcance: 'avios' },
+    });
+  });
+
+  it('sin nada pendiente en la sección, su botón de bloque NO se pinta (§Post-F9.68)', () => {
+    const base = recetaDePrueba();
+    render({
+      ...base,
+      telas: base.telas.map((t) => ({
+        ...t,
+        liberadoEn: '2026-08-19T10:00:00.000Z',
+        liberadoPor: 'u1',
+      })),
+    });
+    expect(screen.queryByTestId('receta-liberar-telas')).not.toBeInTheDocument();
+    expect(screen.getByTestId('receta-liberar-avios')).toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` no se pinta NINGÚN botón de firmar', () => {
+    render(recetaDePrueba(), false);
+    expect(screen.queryByTestId('receta-liberar-avios')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('liberar-receta-avio-3')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ LA LÁPIDA NO SE FIRMA (§Post-F9.72). Un renglón excluido no se compra, así que no le falta
+   * firma a nadie: ni cuenta en el botón de bloque, ni pinta chip de firma, ni ofrece firmarse.
+   * Sin esta prueba, contar lápidas dejaba el botón «Liberar todas las telas (2)» pegado en 2 para
+   * siempre — se firma, se recarga, y el número no baja porque lo que sobra no se puede firmar.
+   */
+  function conLapida(): RecetaOrden {
+    const base = recetaDePrueba();
+    return {
+      ...base,
+      // La JARETA queda quitada de esta orden (el caso de negocio de la etapa).
+      avios: base.avios.map((a) =>
+        a.id === 3 ? { ...a, excluido: true, estado: 'ajustado' as const } : a,
+      ),
+    };
+  }
+
+  it('⭐ la LÁPIDA no cuenta en el botón de bloque de su sección', () => {
+    render(conLapida());
+    // Vivo sin firmar queda UNO solo (el botón 2), no dos.
+    expect(screen.getByTestId('receta-liberar-avios')).toHaveTextContent('(1)');
+  });
+
+  it('⭐ con TODO lo vivo firmado, el botón de bloque desaparece aunque quede una lápida sin firma', () => {
+    const base = conLapida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.excluido ? a : { ...a, liberadoEn: '2026-08-19T10:00:00.000Z', liberadoPor: 'u1' },
+      ),
+    });
+    expect(screen.queryByTestId('receta-liberar-avios')).not.toBeInTheDocument();
+  });
+
+  it('⭐ la LÁPIDA no pinta chip de firma ni ofrece firmarse', () => {
+    render(conLapida());
+
+    // Un renglón excluido no es editable, así que su celda numérica no lleva testid: la fila se
+    // encuentra por el nombre del avío, que es lo que de verdad la identifica en pantalla.
+    const filaLapida = screen.getByText(/JAR-01/).closest('tr');
+    expect(within(filaLapida as HTMLElement).getByText('No va en esta orden')).toBeInTheDocument();
+    expect(within(filaLapida as HTMLElement).queryByText('Sin firmar')).toBeNull();
+    expect(within(filaLapida as HTMLElement).queryByText('Liberado')).toBeNull();
+    expect(screen.queryByTestId('liberar-receta-avio-3')).toBeNull();
+    // El renglón VIVO de al lado sí las tiene (si no, la prueba pasaría por no montarse nada).
+    expect(screen.getByTestId('liberar-receta-avio-2')).toBeInTheDocument();
+  });
+
+  /** Receta con DOS faltantes del modelo (los únicos que «traer del modelo» resuelve). */
+  function conFaltantes(): RecetaOrden {
+    return recetaDePrueba({
+      desalineacion: {
+        hayCambios: true,
+        conOrdenCompra: false,
+        critico: false,
+        cambios: [
+          {
+            tipo: 'avio',
+            idRenglon: null,
+            material: 'E01 — Etiqueta de lavado',
+            idMaterialModelo: 77,
+            que: 'agregado',
+            detalle: 'El modelo ahora lleva "E01 — Etiqueta de lavado", y esta orden no lo tiene.',
+          },
+          {
+            tipo: 'tela',
+            idRenglon: null,
+            material: 'Rib',
+            idMaterialModelo: 88,
+            que: 'agregado',
+            detalle: 'El modelo ahora lleva "Rib", y esta orden no lo tiene.',
+          },
+        ],
+      },
+    });
+  }
+
+  it('⭐ el aviso del FALTANTE trae su botón, y manda ESE material (§Post-F9.73)', async () => {
+    const usuario = userEvent.setup();
+    render(conFaltantes());
+
+    await usuario.click(screen.getByTestId('traer-del-modelo-avio-77'));
+
+    expect(traerMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { materiales: [{ tipo: 'avio', idAvio: 77 }] },
+    });
+  });
+
+  it('con varios faltantes hay además el botón de traerlos TODOS de un jalón', async () => {
+    const usuario = userEvent.setup();
+    render(conFaltantes());
+
+    const todos = screen.getByTestId('traer-del-modelo-todo');
+    expect(todos).toHaveTextContent('(2)');
+    await usuario.click(todos);
+
+    // Sin `cuerpo` = "todo lo que falte" (lo decide el servidor, no esta pantalla).
+    expect(traerMutateMock.mock.calls[0]?.[0]).toEqual({ idOrden: 50 });
+  });
+
+  it('un cambio que NO es faltante (el modelo movió el consumo) no ofrece traer nada', () => {
+    render(
+      recetaDePrueba({
+        desalineacion: {
+          hayCambios: true,
+          conOrdenCompra: false,
+          critico: false,
+          cambios: [
+            {
+              tipo: 'tela',
+              idRenglon: 1,
+              material: 'Jersey',
+              idMaterialModelo: null,
+              que: 'consumo',
+              detalle: 'La cantidad de "Jersey" pasó de 1.5 a 2 en el modelo.',
+            },
+          ],
+        },
+      }),
+    );
+    expect(screen.queryByTestId('traer-del-modelo-todo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/^traer-del-modelo-/)).not.toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` el aviso se ve pero SIN botones de traer (§Post-F9.68)', () => {
+    render(conFaltantes(), false);
+    expect(screen.getByTestId('receta-desalineacion')).toBeInTheDocument();
+    expect(screen.queryByTestId('traer-del-modelo-avio-77')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('traer-del-modelo-todo')).not.toBeInTheDocument();
   });
 });

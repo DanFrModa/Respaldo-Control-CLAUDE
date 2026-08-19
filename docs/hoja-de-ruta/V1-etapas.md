@@ -1382,6 +1382,73 @@ seguían en un comentario y una prueba pese a que se había reportado la anonimi
 
 ---
 
+## V1-E3h · La receta en la OP: verla, liberarla POR PARTES, y jalar del modelo lo que falte ⭐ (19-ago-2026)
+
+> Salió de Daniel recorriendo el flujo completo con una orden real y **no encontrando dónde autorizar los
+> avíos**. Decisiones en `DECISIONES.md` **§Post-F9.72 · .73 · .74**.
+
+### Qué entrega
+
+**La receta se ve y se libera desde la OP**, con `desarrollo.ver`/`.administrar` y **sin** `ordenes.administrar`
+· **liberación POR RENGLÓN** con acciones en bloque (todas las telas / todos los avíos / todo / selección)
+· la puerta de compra pasa de *«sin liberar no se compra»* a **«se compra lo liberado»** ·
+**el comprador ve qué falta** en la explosión, con nombre, cantidad y el camino a donde se firma ·
+**`traerDelModelo`**, por Desarrollo, que nunca pisa lo ajustado a mano · y la **bandeja «Recetas por
+liberar»**, aprobada por Daniel en vivo (*"está buenísima"*).
+
+De paso, el mosaico **«Modificar» quedó condicionado a `ordenes.administrar`** — no lo estaba, a diferencia
+de los de compras, ruta y telas.
+
+### Por qué era de fondo, y no un cambio de lugar
+
+El botón de liberar —*la puerta que abre la compra*— vivía dentro del diálogo de «Modificar». Con la frase
+de Daniel encima (**"nadie va a tener permiso de modificar la OP más que yo"**) eso dejaba dos salidas, las
+dos malas: **Daniel de cuello de botella** firmando todas las recetas, o **Desarrollo con permiso sobre la
+OP entera** —cantidades, fechas, matriz de tallas— solo para aprobar una lista de materiales. Los dos
+permisos ya existían separados; **lo que estaba mal era que la puerta física era una sola.**
+
+### Nota de cierre — ✅ HECHA (19-ago-2026)
+
+**Primera vuelta RECHAZADA; segunda APROBADA.** Los dos bloqueantes eran de los que no se ven leyendo:
+
+**🔴 El fixture que iba a poner el CI en rojo.** `sembrarRecetaDeOrden({liberada:true})` sellaba
+`Orden.recetaLiberadaEn` pero dejaba **todos los renglones sin firmar**. Como la puerta ya no consulta esa
+columna, `contarLiberados` daba 0 → `ErrorConflicto` en **46 llamadas a la explosión** de `mrp.int.test.ts`
+más 7 líneas de `ordenes-compra.int.test.ts`. El coder sí se acordó del ETL de go-live; se le pasó el
+fixture. Y el fondo pesa más que el arreglo: **el helper fabricaba un estado que el dominio ya no puede
+producir** — justo la invariante que la etapa introdujo. *Es la cicatriz de "nada de Docker local" en su
+forma pura: no se puede correr, así que no se vio.*
+
+**🔴 La bandeja no liberaba nada en su caso dominante.** `copiarRecetaDelModelo` no fija `estado` y el
+default del esquema es `sin_revisar`; liberar exige que no quede ninguno sin revisar. Resultado: orden
+recién creada → aparece en la bandeja → «Liberar todo» → error, y a dar la vuelta por el Centro de Órdenes
+**— exactamente lo que la bandeja existe para evitar**, y con el 100 % de las órdenes nunca tocadas, que
+son las que la pueblan. Se resolvió con `revisarPendientes`: marca revisado **dentro del alcance** y firma
+**en la misma transacción**, dejando `revisadosEnEsteActo` en la bitácora — **no se disfraza de "ya estaban
+revisados"**.
+
+**⚠️ Y el hallazgo que vuelve a repetir el patrón de la semana: «8 mutaciones, 8 cazadas» no era cobertura.**
+El reviewer mutó lo que el coder **no** había mutado y **4 de 8 sobrevivieron**. La peor: borrar la mitad
+**avío** de la puerta por material dejaba las 14 pruebas en verde —y la suite unitaria completa también—,
+porque los tests de integración compraban tela. **El código estaba bien; la verificación no existía** — y
+el avío es *precisamente* el caso que originó la decisión. También sobrevivían: `contarLiberados` sin el
+filtro de lápidas (una orden cuyos únicos firmados fueran lápidas pasaría la puerta con nada vivo
+autorizado), la guarda de receta vacía (`[].every(...) === true`: una receta vaciada se sellaba como
+«liberada completa»), y las lápidas en la UI. En la segunda vuelta **las 4 mueren**.
+
+**Lo que resistió desde la primera lectura:** el backfill contra datos adversarios (órdenes liberadas por la
+migración anterior con autor NULL, sin renglones, con lápidas, canceladas) · que **revivir una lápida borra
+su firma por las dos vías** y excluir no revoca · que **no hay puerta trasera de compras** (el snapshot se
+regenera entero y la generación re-verifica material por material en el momento del clic) · el SQL de la
+bandeja (parametrizado, A9, canceladas y lápidas fuera) · y las tres capas de §Post-F9.68.
+
+**Una afirmación inflada, corregida:** el coder dijo que su DDL coincidía *"carácter por carácter"* con el
+de Prisma. Lo exacto —verificado por los dos— es que **las seis columnas coinciden en nombre, tipo y
+nulabilidad y los tres índices se llaman igual**; lo que difiere es el agrupamiento de los `ALTER TABLE`.
+Equivalente en resultado, pero lo dijo de más y lo reconoció sin defenderlo.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

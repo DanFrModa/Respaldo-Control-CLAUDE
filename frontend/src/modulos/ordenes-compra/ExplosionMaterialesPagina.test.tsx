@@ -40,6 +40,8 @@ function explosionDePrueba() {
     avisos: [],
     // V1-E3d: la explosión trae la desalineación de la receta congelada vs. el BOM vivo.
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    // V1-E3h: y lo que quedó fuera por no estar liberado (vacío = no falta firmar nada).
+    pendientesLiberar: [],
     grupos: [
       {
         idProveedor: 11,
@@ -441,5 +443,91 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(screen.getByTestId('exp-renglon-desalineado')).toHaveTextContent(
       'Cambió el precio de compra',
     );
+  });
+});
+
+/**
+ * ⭐ V1-E3h (§Post-F9.72) — LO QUE EL COMPRADOR TIENE QUE VER. Requisito TEXTUAL de Daniel: que se
+ * vea *"transparentemente qué le falta de liberar"*. No un "no se puede": **qué** y **cuánto**, y el
+ * camino a donde se resuelve (antes la explosión frenaba en seco sin decir siquiera a qué pantalla
+ * ir — el hueco de navegación que la decisión nombra aparte).
+ */
+describe('ExplosionMaterialesPagina · lo que falta liberar (V1-E3h)', () => {
+  /** Explosión con un material fuera por no estar firmado. */
+  function conPendiente() {
+    return {
+      ...explosionDePrueba(),
+      pendientesLiberar: [
+        {
+          tipo: 'avio' as const,
+          idRenglon: 9,
+          idTela: null,
+          idAvio: 21,
+          material: 'CIE-53 — Cierre 53 cm',
+          consumoPorPrenda: 1,
+          unidad: 'pza',
+        },
+      ],
+    };
+  }
+
+  async function abrir(permisos: string[]): Promise<void> {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(permisos as never),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+  }
+
+  it('lista lo pendiente con NOMBRE y CANTIDAD (no un "no se puede")', async () => {
+    useExplosionMock.mockReturnValue({ data: conPendiente(), isPending: false, isError: false });
+    await abrir(['compras.ver']);
+
+    const aviso = screen.getByTestId('exp-pendientes-liberar');
+    expect(aviso).toHaveTextContent('CIE-53 — Cierre 53 cm');
+    expect(aviso).toHaveTextContent('1 pza por prenda');
+    // Y la explosión SIGUE mostrando lo que sí se puede comprar.
+    expect(screen.getAllByTestId('exp-grupo').length).toBeGreaterThan(0);
+  });
+
+  it('sin nada pendiente, el aviso NI SE PINTA', async () => {
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    await abrir(['compras.ver']);
+
+    expect(screen.queryByTestId('exp-pendientes-liberar')).toBeNull();
+  });
+
+  it('⭐ el aviso LLEVA a donde se libera, si esta sesión puede abrirlo', async () => {
+    useExplosionMock.mockReturnValue({ data: conPendiente(), isPending: false, isError: false });
+    await abrir(['compras.ver', 'ordenes.ver', 'desarrollo.ver']);
+
+    expect(screen.getByTestId('exp-ir-a-liberar')).toBeInTheDocument();
+  });
+
+  it('con TODO pendiente, el vacío NO miente diciendo "BOM vacío"', async () => {
+    useExplosionMock.mockReturnValue({
+      data: { ...conPendiente(), grupos: [] },
+      isPending: false,
+      isError: false,
+    });
+    await abrir(['compras.ver']);
+
+    expect(screen.getByTestId('exp-vacio')).toHaveTextContent(
+      /pendiente de que Desarrollo lo libere/,
+    );
+    expect(screen.getByTestId('exp-vacio')).not.toHaveTextContent(/BOM vacío/);
+  });
+
+  it('un comprador que NO puede ver la receta no recibe un enlace muerto (§Post-F9.68)', async () => {
+    useExplosionMock.mockReturnValue({ data: conPendiente(), isPending: false, isError: false });
+    await abrir(['compras.ver']);
+
+    expect(screen.queryByTestId('exp-ir-a-liberar')).toBeNull();
+    // Pero SÍ se le dice quién lo resuelve (nunca un callejón sin salida).
+    expect(screen.getByTestId('exp-pendientes-liberar')).toHaveTextContent(/Pídeselo a Desarrollo/);
   });
 });

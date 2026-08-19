@@ -84,6 +84,26 @@ export const esquemaGrupoProveedorSalida = z
 export type GrupoProveedorSalida = z.infer<typeof esquemaGrupoProveedorSalida>;
 
 /** Resultado de explosionar una orden: snapshot agrupado + diff + metadatos de la orden. */
+/**
+ * Un renglón de la receta que la explosión NO trajo porque Desarrollo todavía no lo firma
+ * (V1-E3h, §Post-F9.72). Lleva la CANTIDAD que se necesitaría, para que el aviso diga *qué* y
+ * *cuánto* falta — no un "no se puede".
+ */
+export const esquemaPendienteLiberar = z
+  .object({
+    tipo: z.enum(['tela', 'avio']).describe('Sección de la receta (el arte no se compra por MRP).'),
+    idRenglon: z.number().int().describe('Id del renglón de la receta de esta orden.'),
+    idTela: z.number().int().nullable(),
+    idAvio: z.number().int().nullable(),
+    material: z.string().describe('Cómo se llama el material.'),
+    consumoPorPrenda: z.number().describe('Consumo por prenda congelado en la receta.'),
+    unidad: z.string().nullable().describe('Unidad de consumo del material, o null.'),
+  })
+  .describe('Material de la receta pendiente de que Desarrollo lo libere.');
+
+/** Un material pendiente de liberar. */
+export type PendienteLiberar = z.infer<typeof esquemaPendienteLiberar>;
+
 export const esquemaExplosionSalida = z
   .object({
     idOrden: z.number().int().describe('Orden de producción explosionada.'),
@@ -110,6 +130,15 @@ export const esquemaExplosionSalida = z
         'modelo, calculada al vuelo y entregada AQUÍ —el lugar de la decisión— porque es donde se ' +
         'está a punto de gastar. Los renglones afectados lo repiten en `cambiosReceta`.',
     ),
+    pendientesLiberar: z
+      .array(esquemaPendienteLiberar)
+      .describe(
+        '⭐ V1-E3h (§Post-F9.72) — QUÉ NO ESTÁ EN ESTA EXPLOSIÓN Y POR QUÉ. Desde que la receta se ' +
+          'libera POR PARTES, la explosión sale SOLO de los renglones firmados por Desarrollo; los ' +
+          'que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el ' +
+          'requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de ' +
+          'liberar"*. Vacío = no falta nada por firmar.',
+      ),
   })
   .describe('Explosión de materiales de una orden (R3).');
 

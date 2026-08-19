@@ -58,12 +58,24 @@ vi.mock('@/api/proveedores', () => ({
 vi.mock('@/api/liga-orden', () => ({
   useSugerenciaLiga: () => ({ data: undefined }),
   useExpedienteOrden: () => ({ data: undefined }),
+  // Con `desarrollo.ver` el panel monta también el expediente (F8-E6), que usa estos hooks.
+  useLigarOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarLiga: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
   imprimirOrden: vi.fn(),
 }));
 // Paneles pesados del detalle: no intervienen en estas pruebas.
 vi.mock('./PanelPreciosOrden', () => ({ PanelPreciosOrden: () => null }));
+// El expediente Desarrollo↔Producción (F8-E6) tampoco interviene aquí.
+vi.mock('./SeccionDesarrolloOrden', () => ({ SeccionDesarrolloOrden: () => null }));
+// ⭐ V1-E3h: la RECETA vive ahora en el panel de la OP. Aquí solo importa QUE ESTÉ y con qué
+// permiso; su contenido lo prueba `PanelRecetaOrden.test.tsx`.
+vi.mock('./PanelRecetaOrden', () => ({
+  PanelRecetaOrden: ({ puedeAdministrar }: { puedeAdministrar: boolean }) => (
+    <div data-testid="panel-receta" data-puede-administrar={String(puedeAdministrar)} />
+  ),
+}));
 vi.mock('@/modulos/ruta-critica/PanelRutaOrden', () => ({ PanelRutaOrden: () => null }));
 // El panel de avance se simula: aquí solo importa DÓNDE se abre, no su contenido.
 vi.mock('@/modulos/produccion/AvanceProduccion', () => ({
@@ -432,10 +444,13 @@ describe('<CentroOrdenesPagina>', () => {
       for (const testid of MOSAICOS) {
         expect(screen.queryByTestId(testid)).toBeNull();
       }
-      // Los que no dependen de otro módulo siguen ahí (si no, la prueba de
+      // El que no depende de otro módulo sigue ahí (si no, la prueba de
       // arriba pasaría solo porque el detalle no se montó).
       expect(screen.getByTestId('mosaico-imprimir')).toBeInTheDocument();
-      expect(screen.getByTestId('mosaico-modificar')).toBeInTheDocument();
+      // ⭐ V1-E3h (§Post-F9.72): «Modificar» TAMBIÉN se esconde. Abre el diálogo que edita la OP
+      // entera —cantidades, fechas, matriz—, así que exige `ordenes.administrar`; estaba sin gate,
+      // a diferencia de los otros. Lo detectó el repaso de Daniel del 19-ago.
+      expect(screen.queryByTestId('mosaico-modificar')).toBeNull();
       // Y NADA habla de permisos (ni tooltip ni letrero).
       expect(screen.getByTestId('centro-mosaicos').textContent).not.toMatch(/permiso/i);
     });
@@ -456,6 +471,53 @@ describe('<CentroOrdenesPagina>', () => {
       for (const testid of MOSAICOS) {
         expect(screen.getByTestId(testid)).toBeInTheDocument();
       }
+      // Esta sesión NO trae `ordenes.administrar`, así que «Modificar» sigue escondido.
+      expect(screen.queryByTestId('mosaico-modificar')).toBeNull();
+    });
+
+    /**
+     * ⭐ V1-E3h (§Post-F9.72) — EL PUNTO ENTERO DE LA ETAPA. Daniel: *"nadie va a tener permiso de
+     * modificar la OP más que yo"*. Si la receta —y con ella el botón de LIBERAR, que es la puerta
+     * que abre la compra— sigue viviendo tras «Modificar», o Daniel se vuelve el cuello de botella
+     * firmando todas las recetas, o hay que darle a Desarrollo permiso sobre la OP entera.
+     */
+    it('⭐ V1-E3h: la RECETA vive en el panel de la OP, con `desarrollo.ver` y SIN `ordenes.administrar`', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']),
+      });
+
+      const panel = screen.getByTestId('panel-receta');
+      expect(panel).toHaveAttribute('data-puede-administrar', 'true');
+      // Y sin poder tocar la OP: el mosaico de «Modificar» no está.
+      expect(screen.queryByTestId('mosaico-modificar')).toBeNull();
+    });
+
+    it('con `desarrollo.ver` pero SIN `.administrar`, la receta se ve en SOLO LECTURA', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['desarrollo.ver']),
+      });
+
+      expect(screen.getByTestId('panel-receta')).toHaveAttribute('data-puede-administrar', 'false');
+    });
+
+    it('sin `desarrollo.ver` la receta NI SE PINTA (§Post-F9.68)', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['ordenes.administrar']),
+      });
+
+      expect(screen.queryByTestId('panel-receta')).toBeNull();
+    });
+
+    it('⭐ V1-E3h: «Modificar» aparece SOLO con `ordenes.administrar` (gemela positiva)', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['ordenes.administrar']),
+      });
+
+      expect(screen.getByTestId('mosaico-modificar')).toBeInTheDocument();
     });
 
     it('un mosaico aparece SOLO con su propio permiso, no con el de otro', () => {

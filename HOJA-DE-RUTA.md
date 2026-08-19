@@ -38,8 +38,18 @@
 > *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
 > primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
 >
-> ✅ **`V1-E3g` mergeada** (#187) · ✅ **`V1-E6b` mergeada** (#188) · 🔨 **`V1-E3f pieza B` (proveedores)**
-> aprobada en segunda vuelta, lista para PR: renombres de rol, contactos como tabla, **el campo corto
+> ✅ **`V1-E3g` mergeada** (#187) · ✅ **`V1-E6b` mergeada** (#188) · ✅ **`V1-E3f pieza B` mergeada** (#189)
+> · ✅ **el historial de versiones mergeado** (#190: `HISTORIAL-DE-VERSIONES.md` en lenguaje de negocio, la
+> versión junto a «Control v2» y el candado que impide que mienta — versiones **0.001–0.003**) · ✅
+> **`V1-E3h` · la receta en la OP** (19-ago, **0.004**): verla y liberarla desde la OP y no desde
+> «Modificar», **liberación por renglón** con la puerta pasando a *«se compra lo liberado»*, el comprador
+> viendo qué falta, `traerDelModelo` y la **bandeja «Recetas por liberar»**. Dos bloqueantes en la primera
+> vuelta —un **fixture que iba a dejar el CI en rojo** en 46 llamadas a la explosión, y **la bandeja sin
+> poder liberar en su caso dominante**—, y otra vez el patrón de la tanda: *«8 mutaciones, 8 cazadas»* eran
+> en realidad **4 de 8 sobreviviendo**, entre ellas la **mitad avío de la puerta de compra** — justo el caso
+> que originó la decisión.
+>
+> *(histórico)* **`V1-E3f pieza B` (proveedores)**: renombres de rol, contactos como tabla, **el campo corto
 > fusionado en uno y único**, el `tipo` retirado, el **lector de la Constancia de Situación Fiscal** y la
 > **segmentación con/sin factura en CxP**. Su hallazgo caro: `{ not: true }` **no incluye los NULL** —los
 > cargos migrados se caían de los dos segmentos mientras el encabezado sí los sumaba— y **ninguna de las
@@ -521,6 +531,21 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   descargar. **Para confirmarlo bastan 5 minutos con internet**: bajar `playwright-report` del run
   32209748934 y mirar la URL del screenshot. Mientras tanto, el e2e afirma primero la URL para que el
   fallo **diga dónde acabó** en vez de "element(s) not found".
+
+- **DEUDA de V1-E3h (19-ago-2026) — no existe "des-liberar" explícito.** La única forma de revocar una
+  firma puesta por error es **tocar el contenido del renglón** (editarlo o restaurarlo), que es lo que
+  dispara el re-cierre. Funciona, pero obliga a un cambio real para deshacer un clic. No lo pedía
+  §Post-F9.72; si Daniel lo quiere, es etapa aparte.
+- **DEUDA de V1-E3h — la puerta de la OC a mano bloquea de más, a propósito.** Mira **todas** las líneas
+  de la orden en esa OC, no solo las que se agregan (`dominio/compras/ordenes-compra.ts:522-543`), para
+  conservar la protección de V1-E3d y que un material fuera de la receta no sirva de caballo de Troya. El
+  costo: **agregar una línea de un material ya firmado se bloquea si otro renglón de esa orden se
+  re-cerró**. Decisión escrita en `DECISIONES.md §Post-F9.76`.
+- **DEUDA de V1-E3h — fricción de dos pasos en el panel de la orden.** En una orden recién creada (todos
+  los renglones `sin_revisar`), los botones de firmar **rebotan** hasta que se pulsa «marcar todo
+  revisado». Es el comportamiento de V1-E3d extendido a los botones nuevos y el mensaje nombra la salida,
+  así que **no se bloqueó**; pero si Daniel se topa con ello, la respuesta es *"así se decidió"* — y la
+  bandeja sí lo resuelve en un acto (`DECISIONES.md §Post-F9.75`).
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

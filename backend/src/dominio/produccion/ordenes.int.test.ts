@@ -331,7 +331,7 @@ async function liberarRecetaDe(_s: SesionUsuario, idOrden: number): Promise<void
   // pruebas es la de Órdenes, así que aquí se usa la de Desarrollo a propósito.
   const sDesarrollo = sesion(['desarrollo.administrar', ...PERM_TODOS]);
   await marcarRecetaRevisada(sDesarrollo, idOrden, bd());
-  await liberarReceta(sDesarrollo, idOrden, bd());
+  await liberarReceta(sDesarrollo, idOrden, {}, bd());
 }
 
 describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {

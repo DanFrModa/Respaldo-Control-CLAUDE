@@ -15,9 +15,12 @@
  *  • `DELETE /ordenes/:id/receta/renglones/:tipo/:idRenglon`   — quitar (excluye, o borra si era manual)
  *  • `POST   /ordenes/:id/receta/renglones/:tipo/:idRenglon/restaurar` — volver al BOM del modelo
  *  • `POST   /ordenes/:id/receta/revisar`                      — marcar TODO revisado (un solo clic)
- *  • `POST   /ordenes/:id/receta/liberar`                      — abrir la puerta de compra
+ *  • `POST   /ordenes/:id/receta/liberar`                      — firmar (todo, una sección o una selección)
+ *  • `POST   /ordenes/:id/receta/traer-del-modelo`             — traer lo que le falta (§Post-F9.73)
+ *  • `GET    /recetas-por-liberar`                             — la BANDEJA de Desarrollo (§Post-F9.72)
  *
- * Las siete devuelven la receta COMPLETA para que la pantalla no tenga que re-consultar.
+ * Las de mutación devuelven la receta COMPLETA para que la pantalla no tenga que re-consultar
+ * («traer del modelo» la devuelve junto con el resumen de qué se trajo y qué se respetó).
  *
  * NOTA DE INTEGRACIÓN: este plugin se registra en `app.ts`
  * (`await app.register(rutasRecetaOrden, { prefix: '/api' })`).
@@ -27,11 +30,16 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaErrorApi,
+  esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
   esquemaRecetaEditarCuerpo,
   esquemaRecetaOrden,
   esquemaRecetaQuitarCuerpo,
+  esquemaRecetasPorLiberarPagina,
+  esquemaRecetasPorLiberarQuery,
   esquemaTipoRenglonReceta,
+  esquemaTraerDelModeloCuerpo,
+  esquemaTraerDelModeloResultado,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -43,7 +51,9 @@ import {
   obtenerRecetaOrden,
   quitarRenglonReceta,
   restaurarRenglonReceta,
+  traerDelModelo,
 } from '../../dominio/produccion/receta-orden.js';
+import { consultarRecetasPorLiberar } from '../../dominio/produccion/recetas-por-liberar.js';
 
 /** Parámetro `:id` (orden). */
 const esquemaParamOrden = z.object({
@@ -213,14 +223,57 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
     preHandler: app.conPermiso('desarrollo.administrar'),
     schema: {
       tags: ['ordenes'],
-      summary: 'Liberar la receta: abre la puerta al MRP y a las órdenes de compra',
+      summary: 'Liberar la receta — entera, por sección o renglón por renglón (§Post-F9.72)',
       security: SEGURIDAD_SESION,
       params: esquemaParamOrden,
+      body: esquemaLiberarRecetaCuerpo.optional(),
       response: { 200: esquemaRecetaOrden, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return liberarReceta(sesion, request.params.id);
+      return liberarReceta(sesion, request.params.id, request.body ?? {});
+    },
+  });
+
+  // ⭐ §Post-F9.73 — «traer del modelo» lo que le falta a la receta. Mismo permiso que FIRMAR
+  // (`desarrollo.administrar`), y a propósito: Daniel puso las dos manos en el mismo equipo
+  // (*"si desarrollo es quien libera la receta, debe seguir haciéndolo con lo que falte"*).
+  // Compras EXPLOTA, no captura.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/traer-del-modelo',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Traer del modelo lo que le falta a la receta (nace SIN liberar)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      body: esquemaTraerDelModeloCuerpo.optional(),
+      response: { 200: esquemaTraerDelModeloResultado, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return traerDelModelo(sesion, request.params.id, request.body ?? {});
+    },
+  });
+
+  // ⭐ §Post-F9.72 — LA BANDEJA de Desarrollo. `desarrollo.ver` para verla; liberar desde ahí pasa
+  // por el endpoint de liberar, que exige `desarrollo.administrar`. No cuelga de `/ordenes/:id`
+  // porque no es de UNA orden: es la cartera entera.
+  app.route({
+    method: 'GET',
+    url: '/recetas-por-liberar',
+    preHandler: app.conPermiso('desarrollo.ver'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Bandeja «Recetas por liberar»: órdenes con receta pendiente de firma',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaRecetasPorLiberarQuery,
+      response: { 200: esquemaRecetasPorLiberarPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarRecetasPorLiberar(sesion, request.query);
     },
   });
 

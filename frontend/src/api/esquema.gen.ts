@@ -20219,7 +20219,7 @@ export interface paths {
                 requisitos: {
                   /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                   tallas: boolean;
-                  /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                  /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                   receta: boolean;
                   /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                   arte: 'no-aplica' | boolean;
@@ -21783,7 +21783,7 @@ export interface paths {
                 requisitos: {
                   /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                   tallas: boolean;
-                  /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                  /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                   receta: boolean;
                   /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                   arte: 'no-aplica' | boolean;
@@ -22086,7 +22086,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -22349,7 +22349,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -22629,7 +22629,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -22913,7 +22913,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -23186,7 +23186,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -23458,7 +23458,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -23734,7 +23734,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -24677,7 +24677,7 @@ export interface paths {
               requisitos: {
                 /** @description La orden tiene su matriz de tallas capturada (≥1 renglón). */
                 tallas: boolean;
-                /** @description Desarrollo LIBERÓ la receta congelada de esta orden. */
+                /** @description Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h (§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que es exactamente lo que este requisito dice. */
                 receta: boolean;
                 /** @description La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte. */
                 arte: 'no-aplica' | boolean;
@@ -24889,13 +24889,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -24903,6 +24905,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -24927,6 +24933,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -24974,6 +24984,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -25050,6 +25064,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -25091,6 +25109,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -25272,13 +25292,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -25286,6 +25308,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -25310,6 +25336,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -25357,6 +25387,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -25433,6 +25467,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -25474,6 +25512,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -25619,13 +25659,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -25633,6 +25675,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -25657,6 +25703,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -25704,6 +25754,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -25780,6 +25834,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -25821,6 +25879,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -25970,13 +26030,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -25984,6 +26046,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -26008,6 +26074,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -26055,6 +26125,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -26131,6 +26205,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -26172,6 +26250,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -26305,13 +26385,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -26319,6 +26401,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -26343,6 +26429,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -26390,6 +26480,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -26466,6 +26560,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -26507,6 +26605,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -26640,13 +26740,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -26654,6 +26756,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -26678,6 +26784,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -26725,6 +26835,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -26801,6 +26915,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -26842,6 +26960,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -26951,7 +27071,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Liberar la receta: abre la puerta al MRP y a las órdenes de compra */
+    /** Liberar la receta — entera, por sección o renglón por renglón (§Post-F9.72) */
     post: {
       parameters: {
         query?: never;
@@ -26962,7 +27082,32 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      /** @description Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Qué parte de la receta se libera.
+             * @default todo
+             * @enum {string}
+             */
+            alcance?: 'todo' | 'telas' | 'avios' | 'artes' | 'seleccion';
+            renglones?: {
+              /**
+               * @description Sección de la receta a la que pertenece el renglón.
+               * @enum {string}
+               */
+              tipo: 'tela' | 'avio' | 'arte';
+              id: number;
+            }[];
+            /**
+             * @description Marca como revisado lo que esté sin revisar DENTRO DEL ALCANCE y lo firma en el mismo acto (lo usa la bandeja «Recetas por liberar», donde los renglones no están a la vista).
+             * @default false
+             */
+            revisarPendientes?: boolean;
+          };
+        };
+      };
       responses: {
         /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
         200: {
@@ -26975,13 +27120,15 @@ export interface paths {
               folio: number;
               idModelo: number;
               codigoModelo: string;
-              /** @description Cuándo la liberó Desarrollo (ISO), o null = sin liberar. */
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
               liberadaEn: string | null;
-              /** @description Quién la liberó. null con fecha presente = la liberó la migración. */
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
               liberadaPor: string | null;
-              /** @description ¿Se puede explotar el MRP / generar OC? (= la receta está liberada). */
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
               puedeComprar: boolean;
-              /** @description Conteo de renglones de la receta por estado. */
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
                 revisados: number;
@@ -26989,6 +27136,10 @@ export interface paths {
                 excluidos: number;
                 /** @description Renglones vivos (los excluidos NO cuentan). */
                 total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
               };
               telas: {
                 /** @description Id del renglón de la receta de ESTA orden. */
@@ -27013,6 +27164,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -27060,6 +27215,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -27136,6 +27295,10 @@ export interface paths {
                 enElModelo: boolean;
                 /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
                 cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -27177,6 +27340,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -27271,6 +27436,559 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/traer-del-modelo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Traer del modelo lo que le falta a la receta (nace SIN liberar) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Qué le falta a la receta y se quiere traer del modelo. Vacío = todo lo que falte. */
+      requestBody: {
+        content: {
+          'application/json': {
+            materiales?: (
+              | {
+                  /** @enum {string} */
+                  tipo: 'tela';
+                  idTela: number;
+                }
+              | {
+                  /** @enum {string} */
+                  tipo: 'avio';
+                  idAvio: number;
+                }
+              | {
+                  /** @enum {string} */
+                  tipo: 'arte';
+                  idModeloArte: number;
+                }
+            )[];
+          };
+        };
+      };
+      responses: {
+        /** @description Qué se trajo del modelo y qué se respetó (§Post-F9.73). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+              receta: {
+                idOrden: number;
+                folio: number;
+                idModelo: number;
+                codigoModelo: string;
+                /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
+                liberadaEn: string | null;
+                /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
+                liberadaPor: string | null;
+                /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
+                puedeComprar: boolean;
+                /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+                todoLiberado: boolean;
+                /** @description Conteo de renglones de la receta por estado y por firma. */
+                resumen: {
+                  sinRevisar: number;
+                  revisados: number;
+                  ajustados: number;
+                  excluidos: number;
+                  /** @description Renglones vivos (los excluidos NO cuentan). */
+                  total: number;
+                  /** @description Renglones vivos ya liberados (se pueden comprar). */
+                  liberados: number;
+                  /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                  porLiberar: number;
+                };
+                telas: {
+                  /** @description Id del renglón de la receta de ESTA orden. */
+                  id: number;
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /**
+                   * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                   * @enum {string}
+                   */
+                  estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                  /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                  agregadoAMano: boolean;
+                  /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                  excluido: boolean;
+                  /** @description Por qué se ajustó/excluyó, si se escribió. */
+                  notas: string | null;
+                  /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                  enElModelo: boolean;
+                  /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                  cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                  /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                  liberadoEn: string | null;
+                  /** @description Quién firmó este renglón, o null. */
+                  liberadoPor: string | null;
+                  /** @description Id de la tela. */
+                  idTela: number;
+                  /** @description Nombre de la tela. */
+                  nombre: string;
+                  /** @description Unidad de medida de la tela. */
+                  unidad: string | null;
+                  /** @description Consumo por prenda CONGELADO en esta orden. */
+                  consumoPorPrenda: number;
+                  /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                  precio: number | null;
+                  paraPreCosto: boolean;
+                  paraProduccion: boolean;
+                  paraCosto: boolean;
+                  /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                  idTelaProveedor: number | null;
+                  /** @description Nombre del proveedor amarrado, o null. */
+                  proveedorAmarrado: string | null;
+                  /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                  consumoModelo: number | null;
+                  /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                  precioModelo: number | null;
+                  /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                  precioModeloDeCompra: boolean;
+                }[];
+                avios: {
+                  /** @description Id del renglón de la receta de ESTA orden. */
+                  id: number;
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /**
+                   * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                   * @enum {string}
+                   */
+                  estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                  /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                  agregadoAMano: boolean;
+                  /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                  excluido: boolean;
+                  /** @description Por qué se ajustó/excluyó, si se escribió. */
+                  notas: string | null;
+                  /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                  enElModelo: boolean;
+                  /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                  cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                  /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                  liberadoEn: string | null;
+                  /** @description Quién firmó este renglón, o null. */
+                  liberadoPor: string | null;
+                  /** @description Id del avío. */
+                  idAvio: number;
+                  /** @description Clave del avío. */
+                  clave: string;
+                  /** @description Descripción del avío. */
+                  descripcion: string;
+                  unidad: string | null;
+                  /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                  esGenerico: boolean;
+                  /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                  consumoPorPrenda: number;
+                  /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                  precio: number | null;
+                  paraPreCosto: boolean;
+                  paraProduccion: boolean;
+                  paraCosto: boolean;
+                  /** @description ¿El consumo se captura por TALLA (R18)? */
+                  consumoPorTalla: boolean;
+                  /**
+                   * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                   * @enum {string}
+                   */
+                  modoCaptura: 'consumo' | 'medida';
+                  /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                  unidadMedida: string | null;
+                  /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                  avisoCaptura: string | null;
+                  /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                  idAvioProveedor: number | null;
+                  proveedorAmarrado: string | null;
+                  /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                  tallas: {
+                    idTalla: number;
+                    /** @description Etiqueta de la talla (CH, M, G…). */
+                    etiqueta: string;
+                    /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                    consumo: number | null;
+                    /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                    enLaOrden: boolean;
+                    /** @description Amarre medida×talla (R5/B11), o null. */
+                    idAvioMedida: number | null;
+                    /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                    medidaAmarrada: string | null;
+                    /** @description Precio de la medida amarrada, o null. */
+                    precioMedida: number | null;
+                  }[];
+                  /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                  tieneTallas: boolean;
+                  consumoModelo: number | null;
+                  precioModelo: number | null;
+                  /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                  precioModeloDeCompra: boolean;
+                }[];
+                artes: {
+                  /** @description Id del renglón de la receta de ESTA orden. */
+                  id: number;
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  /**
+                   * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                   * @enum {string}
+                   */
+                  estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                  /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                  agregadoAMano: boolean;
+                  /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                  excluido: boolean;
+                  /** @description Por qué se ajustó/excluyó, si se escribió. */
+                  notas: string | null;
+                  /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                  enElModelo: boolean;
+                  /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                  cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                  /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                  liberadoEn: string | null;
+                  /** @description Quién firmó este renglón, o null. */
+                  liberadoPor: string | null;
+                  /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
+                  idModeloArte: number | null;
+                  /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                  descripcion: string;
+                  /** @description Dónde va en la prenda (texto libre), o null. */
+                  posicion: string | null;
+                  puntadas: number | null;
+                  /** @description Id del tipo de arte (catálogo TipoProceso). */
+                  idTipoArte: number;
+                  /** @description Nombre del tipo de arte, resuelto. */
+                  tipoArte: string;
+                  /** @description Código estable del tipo de arte (ej. "bordado"). */
+                  codigoTipoArte: string;
+                  /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                  usaPuntadas: boolean;
+                  /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                  precio: number | null;
+                  idProveedor: number | null;
+                  /** @description Proveedor que hace el arte, o null. */
+                  proveedor: string | null;
+                  /** @description Precio que trae HOY el arte del modelo, o null. */
+                  precioModelo: number | null;
+                  precioModeloDeCompra: boolean;
+                }[];
+                /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+                desalineacion: {
+                  /** @description ¿Algo se movió respecto de esta receta congelada? */
+                  hayCambios: boolean;
+                  /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                  conOrdenCompra: boolean;
+                  /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                  critico: boolean;
+                  cambios: {
+                    /**
+                     * @description Sección de la receta a la que pertenece el renglón.
+                     * @enum {string}
+                     */
+                    tipo: 'tela' | 'avio' | 'arte';
+                    idRenglon: number | null;
+                    /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                    material: string;
+                    /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                    idMaterialModelo: number | null;
+                    /**
+                     * @description Qué cambió respecto de la receta congelada de la orden.
+                     * @enum {string}
+                     */
+                    que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                    /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                    detalle: string;
+                  }[];
+                };
+              };
+              /** @description Lo que sí entró a la receta (SIN LIBERAR: pasa por la misma firma). */
+              traidos: {
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                material: string;
+              }[];
+              /** @description Lo que NO se trajo, con su motivo: la orden ya decidió otra cosa (lápida o ajuste propio), o el modelo ya no lo lleva. Lo que ya estaba IDÉNTICO no se reporta. */
+              respetados: {
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /** @description Cómo se llama el material, para nombrarlo. */
+                material: string;
+                /** @description Por qué NO se trajo, ya redactado. */
+                motivo: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/recetas-por-liberar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Bandeja «Recetas por liberar»: órdenes con receta pendiente de firma */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (tope 100). */
+          porPagina?: number;
+          /** @description Solo órdenes que ya tienen OC por otra parte de su receta. */
+          soloConOrdenCompra?: string;
+          /** @description Folio, modelo o cliente (contiene, sin acentos-sensible). */
+          busqueda?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de la bandeja «Recetas por liberar». */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                idOrden: number;
+                /** @description Folio de la orden de producción. */
+                folio: number;
+                idModelo: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                cliente: string;
+                /** @description Fecha de entrega comprometida (YYYY-MM-DD), o null. Es el orden de la bandeja. */
+                fechaEntrega: string | null;
+                /** @description Telas vivas sin liberar. */
+                telas: number;
+                /** @description Avíos vivos sin liberar. */
+                avios: number;
+                /** @description Artes vivos sin liberar. */
+                artes: number;
+                /** @description Total de renglones vivos sin liberar (Σ de los tres). */
+                porLiberar: number;
+                /** @description ⭐ YA ESTÁ FRENANDO DINERO: la orden ya tiene OC (no cancelada) por OTRA parte de su receta, así que alguien está comprando y esperando el resto. No es lo mismo que una orden recién nacida a la que todavía nadie le pide nada. */
+                conOrdenCompra: boolean;
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -32569,6 +33287,8 @@ export interface paths {
                   idRenglon: number | null;
                   /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
                   material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
                   /**
                    * @description Qué cambió respecto de la receta congelada de la orden.
                    * @enum {string}
@@ -32578,6 +33298,24 @@ export interface paths {
                   detalle: string;
                 }[];
               };
+              /** @description ⭐ V1-E3h (§Post-F9.72) — QUÉ NO ESTÁ EN ESTA EXPLOSIÓN Y POR QUÉ. Desde que la receta se libera POR PARTES, la explosión sale SOLO de los renglones firmados por Desarrollo; los que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de liberar"*. Vacío = no falta nada por firmar. */
+              pendientesLiberar: {
+                /**
+                 * @description Sección de la receta (el arte no se compra por MRP).
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio';
+                /** @description Id del renglón de la receta de esta orden. */
+                idRenglon: number;
+                idTela: number | null;
+                idAvio: number | null;
+                /** @description Cómo se llama el material. */
+                material: string;
+                /** @description Consumo por prenda congelado en la receta. */
+                consumoPorPrenda: number;
+                /** @description Unidad de consumo del material, o null. */
+                unidad: string | null;
+              }[];
             };
           };
         };

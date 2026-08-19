@@ -32,6 +32,49 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.004 · 19-ago-2026 · **en prueba** — La receta se firma en la OP, y por partes
+
+### Qué se puede hacer ahora que antes no
+
+- **Ver y liberar la receta desde la orden misma**, no desde «Modificar». Antes el botón de liberar
+  —que es *la puerta que abre la compra*— vivía dentro de la pantalla de modificar la OP. O sea: o
+  Daniel firmaba todas las recetas del taller, o había que darle a Desarrollo permiso para cambiar
+  cantidades, fechas y tallas nada más para aprobar una lista de materiales.
+- ⭐ **Liberar POR PARTES.** *"Podría haber algún cierre que aún no autoriza el cliente, pero ya
+  podríamos ir comprando lo demás."* Ahora se firma renglón por renglón, o por bloques («todas las
+  telas», «todos los avíos»), y **se compra lo que está firmado** en vez de esperar a que esté todo.
+- **El comprador ve qué falta liberar**, en la explosión de materiales, con nombre y cantidad — y con
+  el camino a donde se firma. Antes solo decía que no se podía, sin decir a qué pantalla ir.
+- **Traer del modelo lo que le falte a la receta.** El sistema ya sabía qué faltaba y hasta lo
+  nombraba, pero obligaba a teclearlo a mano mirando otra pantalla — y quien lo tecleaba era compras,
+  que no es quien sabe si ese material va o no va. Ahora lo trae Desarrollo de un clic. **Nunca pisa
+  lo que se ajustó a mano para esa orden**: si hay choque, lo dice.
+- **Bandeja «Recetas por liberar»** para Desarrollo: una pantalla con lo que está deteniendo, ordenada
+  por fecha de entrega, marcando las órdenes que **ya tienen compras hechas** de otra parte de la
+  receta. Antes, para saber qué faltaba firmar, había que abrir orden por orden — así que solo se
+  liberaba lo que alguien venía a reclamar, y lo que nadie reclamaba se detenía solo.
+
+### Qué cambió y puede sorprender
+
+- **Una orden con la receta a medio firmar ya no cuenta como «completa».** Es coherente —falta una
+  firma— y la pantalla lo dice, pero órdenes que antes se completaban al liberar ahora esperan la
+  última.
+- **La receta ya no aparece dentro de «Modificar»**: se movió a la OP. Dejarla en los dos lados habría
+  dejado el botón de liberar detrás del permiso equivocado, que era justo el problema.
+- **El mosaico «Modificar» ahora solo se le pinta a quien puede usarlo.**
+- **Las órdenes que ya estaban liberadas siguen liberadas**: la actualización firmó sus renglones con
+  la misma fecha y el mismo autor. Nadie amanece con la puerta cerrada.
+
+### Lo que sigue pendiente
+
+- **Firmar desde la bandeja se hace sin los renglones a la vista** (se ve *"3 avíos, 1 tela"*, no la
+  lista). Queda anotado como decisión, no como descuido: desde la orden sí se firma con todo enfrente.
+- **No hay «des-liberar»**: revocar una firma puesta por error obliga a tocar el contenido del renglón.
+- En una orden recién creada, los botones de firmar del panel **piden antes «marcar todo revisado»** —
+  la bandeja sí lo resuelve de un acto.
+
+---
+
 ## 0.003 · 19-ago-2026 · **en prueba** — Proveedores, como se usan de verdad
 
 ### Qué se puede hacer ahora que antes no

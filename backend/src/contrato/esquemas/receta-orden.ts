@@ -90,6 +90,17 @@ const camposComunesRenglon = {
   cambios: z
     .array(esquemaTipoCambioReceta)
     .describe('Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar).'),
+  /**
+   * ⭐ V1-E3h (§Post-F9.72) — CUÁNDO firmó Desarrollo ESTE renglón (ISO), o `null` = todavía no.
+   * La firma bajó de la receta al renglón porque Daniel pidió liberar POR PARTES: *"podría haber
+   * algún cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*.
+   */
+  liberadoEn: z
+    .string()
+    .nullable()
+    .describe('Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra.'),
+  /** Quién firmó este renglón. `null` con fecha presente = lo firmó la migración. */
+  liberadoPor: z.string().nullable().describe('Quién firmó este renglón, o null.'),
 };
 
 /** Renglón de TELA de la receta de la orden. */
@@ -275,6 +286,17 @@ export const esquemaCambioReceta = z
     /** Id del renglón de la receta de la orden, o null cuando el insumo solo existe en el modelo. */
     idRenglon: z.number().int().nullable(),
     material: z.string().describe('Cómo se llama el insumo, para nombrarlo en el aviso.'),
+    /**
+     * ⭐ V1-E3h (§Post-F9.73): el id del material EN EL MODELO (`idTela`/`idAvio`/`idModeloArte`
+     * según `tipo`), presente SOLO en los cambios `agregado`. Es lo que le permite al botón
+     * «traer del modelo» señalar UN faltante — un faltante no tiene `idRenglon` porque no existe
+     * todavía en la orden, así que sin este id solo se podría traer todo de un jalón.
+     */
+    idMaterialModelo: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del material en el BOM del modelo (solo en `agregado`), o null.'),
     que: esquemaTipoCambioReceta,
     detalle: z.string().describe('El aviso ya redactado ("la cantidad pasó de 1 a 2").'),
   })
@@ -319,8 +341,12 @@ export const esquemaResumenReceta = z
     ajustados: z.number().int(),
     excluidos: z.number().int(),
     total: z.number().int().describe('Renglones vivos (los excluidos NO cuentan).'),
+    /** V1-E3h: renglones VIVOS ya firmados por Desarrollo (los que sí se compran). */
+    liberados: z.number().int().describe('Renglones vivos ya liberados (se pueden comprar).'),
+    /** V1-E3h: renglones VIVOS que Desarrollo todavía no firma (lo que el comprador NO ve). */
+    porLiberar: z.number().int().describe('Renglones vivos SIN liberar (no se compran todavía).'),
   })
-  .describe('Conteo de renglones de la receta por estado.');
+  .describe('Conteo de renglones de la receta por estado y por firma.');
 
 /** Resumen por estado de la receta. */
 export type ResumenReceta = z.infer<typeof esquemaResumenReceta>;
@@ -335,14 +361,24 @@ export const esquemaRecetaOrden = z
     liberadaEn: z
       .string()
       .nullable()
-      .describe('Cuándo la liberó Desarrollo (ISO), o null = sin liberar.'),
+      .describe(
+        'Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. ' +
+          'DERIVADO de los renglones desde V1-E3h (§Post-F9.72).',
+      ),
     liberadaPor: z
       .string()
       .nullable()
-      .describe('Quién la liberó. null con fecha presente = la liberó la migración.'),
+      .describe('Quién la dejó completa. null con fecha presente = la liberó la migración.'),
     puedeComprar: z
       .boolean()
-      .describe('¿Se puede explotar el MRP / generar OC? (= la receta está liberada).'),
+      .describe(
+        '⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se ' +
+          'compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado ' +
+          'nada de esta receta y no hay qué comprar.',
+      ),
+    todoLiberado: z
+      .boolean()
+      .describe('¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null).'),
     resumen: esquemaResumenReceta,
     telas: z.array(esquemaRecetaOrdenTela),
     avios: z.array(esquemaRecetaOrdenAvio),
@@ -480,3 +516,232 @@ export type DatosRecetaQuitar = z.input<typeof esquemaRecetaQuitarCuerpo>;
 
 /** Parámetro de ruta `:tipo` de un renglón de receta. */
 export const esquemaRecetaTipoParam = z.object({ tipo: esquemaTipoRenglonReceta });
+
+// ── V1-E3h · LIBERAR POR PARTES (§Post-F9.72) ──────────────────────────────────
+
+/**
+ * QUÉ se libera de un jalón. Daniel pidió que *"lo rutinario no cueste veinte clics"*, así que la
+ * firma admite alcances en bloque además de la selección fina:
+ *  • `todo`      — todos los renglones vivos de la receta (lo que hacía el botón de V1-E3d).
+ *  • `telas` / `avios` / `artes` — la sección entera.
+ *  • `seleccion` — exactamente los renglones que se listan en `renglones`.
+ */
+export const esquemaAlcanceLiberacion = z
+  .enum(['todo', 'telas', 'avios', 'artes', 'seleccion'])
+  .describe('Qué parte de la receta se libera.');
+
+/** Alcance de una liberación. */
+export type AlcanceLiberacion = z.infer<typeof esquemaAlcanceLiberacion>;
+
+/** Referencia a un renglón concreto de la receta (tipo + id dentro de la orden). */
+export const esquemaReferenciaRenglonReceta = z
+  .object({ tipo: esquemaTipoRenglonReceta, id: z.number().int().positive() })
+  .describe('Un renglón de la receta de esta orden.');
+
+/** Referencia a un renglón de la receta. */
+export type ReferenciaRenglonReceta = z.infer<typeof esquemaReferenciaRenglonReceta>;
+
+/**
+ * Cuerpo de LIBERAR. Sin cuerpo (o con `alcance: 'todo'`) se comporta como el botón de siempre.
+ * `renglones` SOLO se lee con `alcance: 'seleccion'`; el dominio rechaza una selección vacía en vez
+ * de liberar "nada" en silencio (D3).
+ */
+export const esquemaLiberarRecetaCuerpo = z
+  .object({
+    alcance: esquemaAlcanceLiberacion.default('todo'),
+    renglones: z.array(esquemaReferenciaRenglonReceta).max(500).optional(),
+    /**
+     * ⭐ REVISAR Y FIRMAR EN UN SOLO ACTO — lo que hace usable la BANDEJA (§Post-F9.72).
+     *
+     * Sin esto, el botón de la bandeja no sirve **en su caso dominante**: una orden recién creada
+     * copia la receta del modelo y sus renglones nacen `sin_revisar` (el default del esquema), así
+     * que «liberar» contesta *"quedan 3 renglones sin revisar"* y obliga a ir al Centro de Órdenes a
+     * marcarlos y volver — **exactamente la vuelta que la bandeja existe para evitar**, y para el
+     * 100 % de las órdenes que nadie ha tocado, que son justo las que la pueblan.
+     *
+     * `true` marca como `revisado` lo que esté `sin_revisar` DENTRO DEL ALCANCE y firma, todo en la
+     * MISMA transacción (A2). No relaja la regla: es el mismo acto deliberado que el botón «marcar
+     * todo revisado» —el que el módulo tiene desde V1-E3d justamente porque *"obligar a 8 clics por
+     * OP entrena a la gente a clickear sin leer"*—, solo que sin la vuelta. Los `ajustado`
+     * conservan su marca y las lápidas siguen fuera del alcance.
+     *
+     * Default `false`: en el panel de la orden los dos botones existen por separado y ahí la
+     * fricción sí compra algo (los renglones están a la vista).
+     */
+    revisarPendientes: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Marca como revisado lo que esté sin revisar DENTRO DEL ALCANCE y lo firma en el mismo ' +
+          'acto (lo usa la bandeja «Recetas por liberar», donde los renglones no están a la vista).',
+      ),
+  })
+  .describe('Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES).');
+
+/** Datos de una liberación por partes. */
+export type DatosLiberarReceta = z.input<typeof esquemaLiberarRecetaCuerpo>;
+
+// ── V1-E3h · TRAER DEL MODELO lo que le falta a la receta (§Post-F9.73) ────────
+
+/**
+ * QUÉ material del modelo se quiere traer. Un faltante NO tiene renglón en la orden (por eso se
+ * identifica por el MATERIAL, no por un `idRenglon` que no existe).
+ */
+export const esquemaMaterialDelModelo = z
+  .discriminatedUnion('tipo', [
+    z.object({ tipo: z.literal('tela'), idTela: z.number().int().positive() }),
+    z.object({ tipo: z.literal('avio'), idAvio: z.number().int().positive() }),
+    z.object({ tipo: z.literal('arte'), idModeloArte: z.number().int().positive() }),
+  ])
+  .describe('Material del BOM del modelo que la orden no tiene.');
+
+/** Un material del modelo señalado para traer. */
+export type MaterialDelModelo = z.infer<typeof esquemaMaterialDelModelo>;
+
+/**
+ * Cuerpo de TRAER DEL MODELO. Sin `materiales` se traen **todos** los faltantes de un jalón
+ * (§Post-F9.73 punto 1: *"renglón por renglón, o todos de un jalón"*).
+ */
+export const esquemaTraerDelModeloCuerpo = z
+  .object({ materiales: z.array(esquemaMaterialDelModelo).max(500).optional() })
+  .describe('Qué le falta a la receta y se quiere traer del modelo. Vacío = todo lo que falte.');
+
+/** Datos de "traer del modelo". */
+export type DatosTraerDelModelo = z.input<typeof esquemaTraerDelModeloCuerpo>;
+
+/**
+ * Un material que NO se trajo, y por qué. Daniel: *"no debe de jalarlo en silencio"*.
+ *
+ * Cubre los DOS motivos por los que algo pedido no entra: **la orden ya decidió otra cosa** (lo
+ * quitó a mano, o lo ajustó para ESTA orden) y **el modelo ya no lo lleva** (se pidió por un aviso
+ * viejo). Los dos se dicen con nombre; ninguno se resuelve callando (D3).
+ *
+ * ⚠️ Un renglón que ya está en la orden **idéntico al modelo NO es un choque** y no aparece aquí:
+ * nadie decidió nada distinto sobre él. Reportarlo llenaría de "choques" falsos una operación que
+ * salió bien (12 avisos por 1 material traído).
+ */
+export const esquemaChoqueTraerDelModelo = z
+  .object({
+    tipo: esquemaTipoRenglonReceta,
+    material: z.string().describe('Cómo se llama el material, para nombrarlo.'),
+    motivo: z.string().describe('Por qué NO se trajo, ya redactado.'),
+  })
+  .describe('Material que NO se trajo del modelo, con su motivo (§Post-F9.73).');
+
+/** Un choque al traer del modelo. */
+export type ChoqueTraerDelModelo = z.infer<typeof esquemaChoqueTraerDelModelo>;
+
+/**
+ * Resultado de traer del modelo: la receta ya recargada + el resumen de **qué se trajo** y **qué se
+ * respetó** (§Post-F9.73 punto 4: nunca en silencio y nunca pisando lo ajustado).
+ */
+export const esquemaTraerDelModeloResultado = z
+  .object({
+    receta: esquemaRecetaOrden,
+    traidos: z
+      .array(z.object({ tipo: esquemaTipoRenglonReceta, material: z.string() }))
+      .describe('Lo que sí entró a la receta (SIN LIBERAR: pasa por la misma firma).'),
+    respetados: z
+      .array(esquemaChoqueTraerDelModelo)
+      .describe(
+        'Lo que NO se trajo, con su motivo: la orden ya decidió otra cosa (lápida o ajuste ' +
+          'propio), o el modelo ya no lo lleva. Lo que ya estaba IDÉNTICO no se reporta.',
+      ),
+  })
+  .describe('Qué se trajo del modelo y qué se respetó (§Post-F9.73).');
+
+/** Resultado de traer del modelo. */
+export type TraerDelModeloResultado = z.infer<typeof esquemaTraerDelModeloResultado>;
+
+// ── V1-E3h · LA BANDEJA «Recetas por liberar» (§Post-F9.72) ────────────────────
+
+/**
+ * Una ORDEN con receta pendiente de firma, tal como la recorre Desarrollo.
+ *
+ * ⭐ **Una fila por ORDEN, no por material**: así trabaja Daniel. Y **ordenada por FECHA DE
+ * ENTREGA**, no por folio: lo que estorba primero, arriba. Los conteos y el `conOrdenCompra` los
+ * agrega el SERVIDOR (misma regla que el concentrado de F5-E7: nunca se suma en el cliente).
+ */
+export const esquemaRecetaPorLiberar = z
+  .object({
+    idOrden: z.number().int(),
+    folio: z.number().int().describe('Folio de la orden de producción.'),
+    idModelo: z.number().int(),
+    modelo: z.string().describe('Código del modelo.'),
+    cliente: z.string(),
+    fechaEntrega: z
+      .string()
+      .nullable()
+      .describe('Fecha de entrega comprometida (YYYY-MM-DD), o null. Es el orden de la bandeja.'),
+    telas: z.number().int().describe('Telas vivas sin liberar.'),
+    avios: z.number().int().describe('Avíos vivos sin liberar.'),
+    artes: z.number().int().describe('Artes vivos sin liberar.'),
+    porLiberar: z.number().int().describe('Total de renglones vivos sin liberar (Σ de los tres).'),
+    conOrdenCompra: z
+      .boolean()
+      .describe(
+        '⭐ YA ESTÁ FRENANDO DINERO: la orden ya tiene OC (no cancelada) por OTRA parte de su ' +
+          'receta, así que alguien está comprando y esperando el resto. No es lo mismo que una ' +
+          'orden recién nacida a la que todavía nadie le pide nada.',
+      ),
+  })
+  .describe('Una orden con renglones de receta pendientes de liberar (§Post-F9.72).');
+
+/** Fila de la bandeja «Recetas por liberar». */
+export type RecetaPorLiberar = z.infer<typeof esquemaRecetaPorLiberar>;
+
+/** Filtros de la bandeja «Recetas por liberar» (querystring): paginación estándar + búsqueda. */
+export const esquemaRecetasPorLiberarQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (tope 100).'),
+    /** Solo las que YA tienen OC: lo que está frenando dinero, primero. */
+    soloConOrdenCompra: z
+      .stringbool()
+      .default(false)
+      .describe('Solo órdenes que ya tienen OC por otra parte de su receta.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Folio, modelo o cliente (contiene, sin acentos-sensible).'),
+  })
+  .describe('Filtros de la bandeja «Recetas por liberar».');
+
+/**
+ * Filtros de la bandeja **en su forma NATIVA** (números y booleanos ya resueltos) — lo que recibe el
+ * dominio. En la URL todo es texto, así que el esquema de la ruta coacciona
+ * (`esquemaRecetasPorLiberarQuery`) y el dominio re-valida con `esquemaRecetasPorLiberarDominio`.
+ * Mismo patrón que la bandeja de la Ruta Crítica: sin él, re-validar la salida de la ruta con el
+ * esquema de la URL tira un 400 espurio (cicatriz del hotfix F2, PR #56).
+ */
+export const esquemaRecetasPorLiberarDominio = z.object({
+  pagina: z.number().int().min(1).default(1),
+  porPagina: z.number().int().min(1).max(100).default(20),
+  soloConOrdenCompra: z.boolean().default(false),
+  busqueda: z.string().trim().max(200).optional(),
+});
+
+/** Filtros de la bandeja (forma nativa, no la de la URL). */
+export type FiltrosRecetasPorLiberar = z.input<typeof esquemaRecetasPorLiberarDominio>;
+
+/** Respuesta paginada de la bandeja «Recetas por liberar» (forma estándar `Pagina<T>`). */
+export const esquemaRecetasPorLiberarPagina = z
+  .object({
+    datos: z.array(esquemaRecetaPorLiberar),
+    total: z.number().int(),
+    pagina: z.number().int(),
+    porPagina: z.number().int(),
+    totalPaginas: z.number().int(),
+  })
+  .describe('Página de la bandeja «Recetas por liberar».');
+
+/** Página de la bandeja. */
+export type RecetasPorLiberarPagina = z.infer<typeof esquemaRecetasPorLiberarPagina>;

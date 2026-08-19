@@ -3297,8 +3297,8 @@ liberada, pero **no lleva a donde se libera**. Deja al usuario adivinando en qu�
   *"transparentemente qué le falta de liberar"*.
 - **Se conserva** la protección de que **tocar una receta ya liberada la vuelve a cerrar** (*"Desarrollo
   tiene que volver a firmarla"*) — ahora por renglón.
-- **Pendiente de diseño:** si además de la firma por renglón conviene una **bandeja «Recetas por
-  liberar»** para Desarrollo, en vez de ir orden por orden. El lead lo propuso; Daniel no lo cerró.
+- ✅ **Cerrado el 19-ago:** sí conviene la **bandeja «Recetas por liberar»**. Daniel la aprobó en vivo
+  (*"está buenísima"*) — ver **§Post-F9.74**.
 
 - **Aplica en:** etapa propia (toca la puerta de compra: es camino de dinero). Migración probable —el
   estado de liberación pasa de la orden al renglón.
@@ -3340,4 +3340,77 @@ desarrollo corre en paralelo con la venta, que es como trabaja FR Moda.
    **el modelo propone, la orden manda** (D3).
 
 - **Aplica en:** la misma etapa de §Post-F9.72 (la receta en la OP). Sin migración propia.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.74) — ⭐ La bandeja «Recetas por liberar» (DANIEL, 19-ago-2026)
+
+Cierra el *pendiente de diseño* que §Post-F9.72 había dejado abierto. Daniel preguntó *"¿qué es recetas por
+liberar? ¿una pantalla especial solo para los pendientes de la gente de desarrollo?"* y, con la explicación
+enfrente, la aprobó: **"está buenísima"**.
+
+**El problema que resuelve.** Con la firma por renglón, para saber qué le falta autorizar, Desarrollo
+tendría que abrir **orden por orden**. Nadie hace eso: **solo se libera lo que alguien viene a reclamar**, y
+lo que nadie reclama **se detiene solo**. Es exactamente lo que le pasó a Daniel con los avíos, que fue el
+origen de toda esta tanda.
+
+### Cómo quedó
+
+1. **Una fila por ORDEN**, no por material — es como Daniel recorre el trabajo. *(La alternativa, agrupar
+   por insumo —"todos los cierres sin liberar de todas las órdenes"—, serviría si se liberara por tandas de
+   material; se descartó por eso.)*
+2. **Ordenada por fecha de entrega, no por folio.** Lo que estorba primero, arriba.
+3. **Marca las que ya están frenando dinero**: la orden que **ya tiene OC** de otra parte de la receta no es
+   lo mismo que una recién nacida.
+4. **Se libera desde ahí**, sin dar la vuelta por el Centro de Órdenes.
+5. Permisos: `desarrollo.ver` para verla, `desarrollo.administrar` para liberar. Sin permisos nuevos.
+
+- **Aplica en:** V1-E3h, la misma etapa de §Post-F9.72/.73.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.75) — Firmar desde la bandeja se hace SIN los renglones a la vista (LEAD, 19-ago-2026)
+
+**Nace de un defecto, y por eso conviene que quede escrita.** La primera versión de la bandeja **no podía
+liberar nada** en su caso dominante: una orden recién creada nace con sus renglones `sin_revisar`, y liberar
+exige que no quede ninguno — así que el botón mandaba al Centro de Órdenes a «marcar todo revisado» y
+volver, *la vuelta que la bandeja existe para evitar*.
+
+**Cómo se resolvió:** liberar desde la bandeja marca revisado lo que esté sin revisar **dentro del alcance**
+y firma **en el mismo acto y la misma transacción**, y lo deja anotado en la bitácora (`revisadosEnEsteActo`)
+— **no se disfraza de "ya estaban revisados"**. Los renglones `ajustado` conservan su marca y las lápidas
+quedan fuera. El botón dice lo que hace: **«Revisar y liberar»**.
+
+⚠️ **La consecuencia de negocio, que Daniel debe conocer:** desde el panel de la orden se firma **con los
+renglones en pantalla**; desde la bandeja se firma viendo solo *"3 avíos, 1 tela"*. No relaja ninguna
+invariante (mismo permiso, todo auditado, todo en transacción) y es el mismo colapso que «marcar todo
+revisado» ya hacía desde V1-E3d —que existe porque *"obligar a 8 clics por OP entrena a la gente a
+clickear sin leer"*—, **pero es una decisión de producto, no un detalle de implementación**. En el panel de
+la orden los dos botones siguen separados a propósito: ahí los renglones están a la vista y la fricción sí
+compra algo.
+
+- **Aplica en:** V1-E3h. Señalado por el reviewer, que pidió explícitamente que no quedara solo en el código.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.76) — Dos decisiones de diseño de V1-E3h que no deben vivir solo en comentarios (LEAD, 19-ago-2026)
+
+Las señaló el reviewer: están bien resueltas, pero hoy solo existían en TSDoc y en el `migration.sql`.
+
+1. **`Orden.recetaLiberadaEn` se CONSERVA, pero como DERIVADO** = *"no queda ningún renglón vivo sin
+   firmar"*, mantenido únicamente por el dominio (`sincronizarLiberacionOrden`). **Ya no es la puerta de
+   compra** —esa es por renglón—: lo que la lee es el **semáforo de "orden completa"** y el detalle de la
+   orden. Retirarla obligaba a re-derivar ese semáforo con un `NOT EXISTS` por orden a cambio de nada.
+   Verificado que **no hay ningún escritor suelto**: solo tres sitios escriben renglones de receta, y los
+   tres sincronizan la bandera.
+2. **La puerta de la OC capturada a mano mira TODAS las líneas de esa orden, no solo las que se agregan.**
+   Es deliberado y del lado seguro: conserva la protección de V1-E3d (con la firma revocada no se le meten
+   líneas nuevas a una OC ligada), y mirando solo lo agregado un material fuera de la receta serviría de
+   caballo de Troya. **Tiene un costo real**: agregar una línea de un material ya firmado se bloquea si otro
+   renglón de esa orden se re-cerró. Anotado también en `HOJA-DE-RUTA.md §4`.
+
+- **Aplica en:** V1-E3h. Sin migración adicional.
 - **Fecha:** 2026-08-19.

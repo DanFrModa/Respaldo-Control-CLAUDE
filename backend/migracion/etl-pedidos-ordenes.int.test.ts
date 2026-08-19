@@ -235,6 +235,12 @@ describe('ETL de pedidos y órdenes F2-E5 (integración, fixtures committeados)'
       expect(r.estado).toBe('sin_revisar');
       expect(r.agregadoAMano).toBe(false);
       expect(r.excluido).toBe(false);
+      // ⭐ V1-E3h (§Post-F9.72): la firma bajó AL RENGLÓN, y la PUERTA DE COMPRA ya no consulta la
+      // columna de la orden. Sellar solo `recetaLiberadaEn` dejaría la puerta cerrada de hecho el
+      // día del go-live: cada renglón tiene que nacer firmado, con la MISMA fecha.
+      expect(r.liberadoEn).not.toBeNull();
+      expect(r.liberadoEn?.getTime()).toBe(orden.recetaLiberadaEn?.getTime());
+      expect(r.liberadoPorId).toBeNull();
     }
   });
 

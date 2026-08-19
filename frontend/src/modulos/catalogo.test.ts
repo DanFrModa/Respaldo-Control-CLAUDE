@@ -58,7 +58,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 104 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -66,9 +66,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // −3 en V1-E3a: se RETIRARON «Captura de corte», «Envío a maquila» y «Recibo de maquila», las
     // tres pantallas del mismo acto que ya vive en el panel de avance — una sola pantalla por acto,
     // §Post-F9.36 punto 2); −1 en V1-E3d: el CATÁLOGO de arte desapareció —el arte vive dentro
-    // del modelo (§Post-F9.35)— y solo sobrevive su galería. Lo que cambia es SOLO qué se ve en
-    // el riel.
-    expect(MODULOS_MENU).toHaveLength(104);
+    // del modelo (§Post-F9.35)— y solo sobrevive su galería; +1 en V1-E3h: la bandeja «Recetas
+    // por liberar» de Desarrollo (§Post-F9.72). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(105);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -236,7 +236,13 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     {
       titulo: 'Operación',
       entradas: [
-        { clave: 'g-desarrollo', padre: true, hijos: ['modelos', 'desarrollo', 'listas-precios'] },
+        {
+          clave: 'g-desarrollo',
+          padre: true,
+          // V1-E3h (§Post-F9.72): «Recetas por liberar» entra al RIEL — es trabajo DIARIO de
+          // Desarrollo, y una bandeja que hay que buscar no se abre.
+          hijos: ['modelos', 'recetas-por-liberar', 'desarrollo', 'listas-precios'],
+        },
         { clave: 'pedidos', padre: false },
         {
           // V1-E3a (13-ago-2026): Producción DESTAPADA. Tenía 2 hijos de 17 y el resto no tenía

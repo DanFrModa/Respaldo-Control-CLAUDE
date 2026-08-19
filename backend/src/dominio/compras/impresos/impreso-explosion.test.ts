@@ -40,6 +40,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
     avisos: [],
     // V1-E3d: la explosión trae la desalineación contra el BOM vivo (el impreso no la pinta).
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    // V1-E3h: y lo que quedó sin firmar (tampoco va al impreso: es de la pantalla del comprador).
+    pendientesLiberar: [],
     grupos: [
       {
         idProveedor: 7,

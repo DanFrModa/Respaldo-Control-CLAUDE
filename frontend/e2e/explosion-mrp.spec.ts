@@ -55,8 +55,12 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
       // migradas), liberar responde 409 y entonces lo que se exige es la puerta dicha con todas sus
       // letras. Lo que NUNCA se acepta es que la pantalla se quede muda.
       await page.request.post(`/api/ordenes/${String(idOrden)}/receta/revisar`);
+      // V1-E3h (§Post-F9.72): liberar admite ALCANCE; aquí se firma TODO explícitamente (el cuerpo
+      // es opcional, pero mandarlo deja escrito qué se está probando).
       const liberada = (
-        await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`)
+        await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`, {
+          data: { alcance: 'todo' },
+        })
       ).ok();
 
       await primera.click();

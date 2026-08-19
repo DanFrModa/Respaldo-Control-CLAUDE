@@ -238,6 +238,20 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['listas.ver'],
             subVista: true,
           },
+          // ⭐ V1-E3h (§Post-F9.72) — LA BANDEJA de Desarrollo. Daniel: *"está buenísima"*. Sin
+          // ella, para saber qué le falta firmar habría que abrir orden por orden: nadie lo hace,
+          // así que solo se libera lo que alguien viene a reclamar — y lo que no se reclama se
+          // detiene solo (le pasó con los avíos). Gate `desarrollo.ver`: verla es de Desarrollo;
+          // liberar desde ahí exige además `desarrollo.administrar`, que valida el backend.
+          {
+            clave: 'recetas-por-liberar',
+            titulo: 'Recetas por liberar',
+            descripcion:
+              'Órdenes con receta pendiente de firma, por fecha de entrega — y cuáles ya están frenando compras',
+            ruta: '/desarrollo/recetas-por-liberar',
+            icono: 'lista-tareas',
+            permisos: ['desarrollo.ver'],
+          },
           // ── Legados re-colgados (antes en Modelos / Catálogos) ──
           {
             clave: 'galeria-modelos',
@@ -1430,7 +1444,13 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
   {
     grupo: 'operacion',
     entradas: [
-      { tipo: 'padre', clave: 'g-desarrollo', hijos: ['modelos', 'desarrollo', 'listas-precios'] },
+      {
+        tipo: 'padre',
+        clave: 'g-desarrollo',
+        // «Recetas por liberar» entra al RIEL (no solo a ⌘K): es trabajo DIARIO de Desarrollo, y
+        // una bandeja que hay que buscar no se abre. Va después de Modelos, junto a lo demás suyo.
+        hijos: ['modelos', 'recetas-por-liberar', 'desarrollo', 'listas-precios'],
+      },
       { tipo: 'hoja', clave: 'pedidos' },
       {
         // Producción DESTAPADA (V1-E3a, 13-ago-2026): hasta hoy el padre solo mostraba «Órdenes

@@ -618,6 +618,8 @@ export type Explosion =
 export type ExplosionGrupo = Explosion['grupos'][number];
 /** Un material requerido (renglón de la explosión). */
 export type Requerimiento = ExplosionGrupo['renglones'][number];
+/** V1-E3h: un material que la explosión NO trajo porque Desarrollo no lo ha liberado. */
+export type PendienteLiberar = Explosion['pendientesLiberar'][number];
 /** Cuerpo de generar OC desde la explosión (`POST .../explosion/generar-oc`). */
 export type GenerarOcCuerpo =
   paths['/api/ordenes/{id}/explosion/generar-oc']['post']['requestBody']['content']['application/json'];
@@ -897,6 +899,27 @@ export type RecetaAgregarCuerpo =
 /** Cuerpo para EDITAR un renglón de la receta. */
 export type RecetaEditarCuerpo =
   paths['/api/ordenes/{id}/receta/renglones/{tipo}/{idRenglon}']['patch']['requestBody']['content']['application/json'];
+
+// ── V1-E3h: la receta se libera POR PARTES (§Post-F9.72) y se JALA del modelo (§Post-F9.73) ──
+
+/** Cuerpo de LIBERAR: todo, una sección, o una selección de renglones. */
+export type LiberarRecetaCuerpo = NonNullable<
+  paths['/api/ordenes/{id}/receta/liberar']['post']['requestBody']
+>['content']['application/json'];
+/** Qué parte de la receta se firma. */
+export type AlcanceLiberacion = NonNullable<LiberarRecetaCuerpo['alcance']>;
+/** Cuerpo de TRAER DEL MODELO (sin `materiales` = todo lo que falte). */
+export type TraerDelModeloCuerpo = NonNullable<
+  paths['/api/ordenes/{id}/receta/traer-del-modelo']['post']['requestBody']
+>['content']['application/json'];
+/** Qué se trajo del modelo y qué se respetó (nunca en silencio, §Post-F9.73). */
+export type TraerDelModeloResultado =
+  paths['/api/ordenes/{id}/receta/traer-del-modelo']['post']['responses']['200']['content']['application/json'];
+/** Página de la bandeja «Recetas por liberar». */
+export type RecetasPorLiberarPagina =
+  paths['/api/recetas-por-liberar']['get']['responses']['200']['content']['application/json'];
+/** Una orden con receta pendiente de firma. */
+export type RecetaPorLiberar = RecetasPorLiberarPagina['datos'][number];
 
 /** Página de la bandeja "mis tareas" de la RC (`GET /api/ruta-critica/bandeja`). */
 export type BandejaRcPagina =
