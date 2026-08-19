@@ -32,6 +32,31 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.002 · 19-ago-2026 · **en prueba** — La versión, a la vista
+
+### Qué se puede hacer ahora que antes no
+
+- **Saber qué versión se está usando, sin preguntar.** Arriba a la izquierda, junto a «Control v2», aparece
+  el número en chiquito: **`Control v2  0.002  › Modelos`**. Sirve para reportar: *"estoy viendo la 0.002 y
+  me pasó esto"*, y que la respuesta sea sobre el sistema correcto.
+
+### Qué cambió y puede sorprender
+
+- Nada más. Es un cambio de una línea en pantalla; **ningún dato, ningún cálculo, ninguna pantalla se
+  tocó**.
+
+### Notas
+
+- El número **no se puede quedar viejo**: si alguien sube la versión aquí y olvida cambiarla en pantalla
+  —o al revés—, **el CI se pone rojo** y dice los dos números. *Una versión que miente en pantalla es peor
+  que no tenerla.*
+- El candado se endureció tras la revisión, que encontró **tres formas de evadirlo en verde**: agregar la
+  entrada **al final** en vez de arriba (la costumbre más normal del mundo en un archivo así), o escribirla
+  con un formato distinto (`## v0.002`, `## 0.0025`) — el candado **no la veía** y dejaba pasar el olvido.
+  Ahora exige **orden descendente** y que **todo** encabezado parsee como versión.
+
+---
+
 ## 0.001 · 18-ago-2026 · **en prueba** — Diez etapas de golpe
 
 La tanda más grande hasta ahora. Nace de dos sesiones seguidas de **Daniel capturando modelos reales**:
