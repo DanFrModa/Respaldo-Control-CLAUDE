@@ -13,7 +13,11 @@
 ## Cómo se numeran
 
 **`2.xxx`** — el **2** es CONTROL v2 (el sistema de Access era la v1); los tres dígitos avanzan de uno en
-uno con cada despliegue. `2.001`, `2.002`, `2.003`…
+uno. `2.001`, `2.002`, `2.003`…
+
+⚠️ **Se sube la versión CADA VEZ que se actualiza `prueba`** (regla de Daniel, 19-ago-2026), no cuando se
+junta un lote. Cada merge a `prueba` = una entrada nueva aquí, aunque traiga una sola cosa. Así siempre se
+puede decir qué versión se está mirando.
 
 **El número es UNO SOLO y VIAJA.** Se asigna cuando algo entra a **`prueba`**, y **esa misma versión** es
 la que después pasa a **producción** — no se re-numera. Así se puede decir *"producción corre la 2.014,

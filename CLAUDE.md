@@ -161,10 +161,17 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    - **A cada agente se le pasa SOLO su pedazo.** El lead extrae de `docs/hoja-de-ruta/F#-etapas.md` el alcance de ESA etapa/sub-pieza y se lo da en el prompt. Los agentes NO cargan el plan completo ni las 7 fichas de etapa ni `Documentacion_MJD/` entera — solo lo que su tarea necesita.
    - **NUNCA leer archivos generados completos.** `backend/openapi.json` y `frontend/openapi.json` (~100k tokens c/u) y `frontend/src/api/esquema.gen.ts` (~74k) son GENERADOS: se **regeneran con su comando**, no se leen ni se vuelcan al chat enteros. Si hay que mirar algo puntual, `Grep` del fragmento — jamás `Read` del archivo completo. Lo mismo con cualquier dump grande (logs de tests, CSV de `Respaldo CLAUDE/`, lockfiles): mirar el pedazo, no todo.
    - **Sesiones acotadas.** Cerrar y arrancar chat nuevo al terminar una etapa sale más barato que arrastrar una conversación larguísima (cada turno reprocesa todo).
-5. **El contrato OpenAPI** se regenera en cada cambio del backend y el cliente del frontend queda sincronizado en la misma tarea.
-6. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
-7. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
-8. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
+5. **HISTORIAL DE VERSIONES (regla de Daniel, 19-ago-2026):** **cada vez que se actualiza `prueba` se
+   sube la versión** y se agrega su entrada en **`HISTORIAL-DE-VERSIONES.md`** (raíz). Numeración
+   **`2.xxx`** correlativa; **el número es UNO SOLO y VIAJA**: se asigna al entrar a `prueba` y **esa
+   misma versión** pasa a producción, sin re-numerar. Se escribe **en lenguaje del negocio**, no técnico,
+   con tres bloques: *qué se puede hacer ahora que antes no* · *qué cambió y puede sorprender* · *qué sigue
+   pendiente o roto*. **NO es un changelog de commits** — para eso están `DECISIONES.md` (el porqué) y
+   `HOJA-DE-RUTA.md` (el qué sigue).
+6. **El contrato OpenAPI** se regenera en cada cambio del backend y el cliente del frontend queda sincronizado en la misma tarea.
+7. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
+8. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
+9. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
 
 ---
 
