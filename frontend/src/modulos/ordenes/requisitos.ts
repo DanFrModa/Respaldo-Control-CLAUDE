@@ -4,7 +4,8 @@
  *
  * El estado de la orden es AUTOMÁTICO —**tallas + receta liberada, y arte si aplica** (V1-E3d,
  * §Post-F9.43: el segundo requisito dejó de preguntarle al MODELO si tiene avíos y le pregunta a
- * ESTA orden si Desarrollo liberó su receta)— y el backend manda
+ * ESTA orden si Desarrollo liberó su receta; V1-E3h/§Post-F9.72: **por COMPLETO** — una receta
+ * liberada a medias ya deja comprar lo firmado, pero la orden todavía no está completa)— y el backend manda
  * qué le falta (`requisitos.faltantes` en el detalle, `faltantes` en la fila del centro de
  * órdenes). Aquí SOLO se traduce esa lista a la frase que ve el usuario: la regla NO se recalcula
  * en el cliente (A1), para que pantalla y servidor nunca digan cosas distintas.

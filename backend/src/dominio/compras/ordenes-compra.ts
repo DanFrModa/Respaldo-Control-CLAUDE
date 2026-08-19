@@ -76,7 +76,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { exigirRecetaLiberada } from '../produccion/receta-orden.js';
+import { exigirMaterialesLiberados, exigirRecetaLiberada } from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -519,7 +519,25 @@ async function validarLineas(
     // filtrar la existencia de una orden ajena (misma razón que en `explosionarOrden`).
     for (const idOrden of idsOrdenLigada) {
       if (!agregaLineas(idOrden, lineas, yaComprado)) continue;
+      // Puerta 1 (V1-E3d): nadie ha firmado NADA de esta receta → no hay qué comprarle.
       await exigirRecetaLiberada(tx, idOrden, idEmpresa);
+      // ⭐ Puerta 2 (V1-E3h, §Post-F9.72): "se compra LO LIBERADO". Desde que la firma es por
+      // renglón, que la orden tenga algo autorizado no autoriza ESTA línea. Se verifica el MATERIAL
+      // que se está comprando, y se dice con nombre cuál falta firmar. Una línea de descripción
+      // LIBRE (sin material del catálogo) no tiene renglón de receta contra el cual verificarse: se
+      // queda solo con la puerta 1, igual que antes.
+      //
+      // ⚠️ **Deliberadamente CONSERVADOR**: se miran TODAS las líneas de esa orden en la OC, no solo
+      // las que se están agregando. Es lo que CONSERVA la protección de antes de esta etapa — con la
+      // firma revocada no se le metían líneas nuevas a una OC ligada—, y sin ello un material que NO
+      // está en la receta serviría de caballo de Troya para editar una OC cuya orden tiene renglones
+      // des-autorizados. El camino para desatorarlo es el correcto: que Desarrollo firme el renglón.
+      await exigirMaterialesLiberados(
+        tx,
+        idOrden,
+        idEmpresa,
+        lineas.filter((l) => (l.idOrden ?? null) === idOrden),
+      );
     }
   }
 

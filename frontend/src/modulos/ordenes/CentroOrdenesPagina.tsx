@@ -53,6 +53,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
+import { PanelRecetaOrden } from './PanelRecetaOrden';
 import { textoFaltantes } from './requisitos';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
@@ -1387,12 +1388,19 @@ function DetalleCentroOrden({
             onClick={() => imprimirOrden(orden.id)}
             testid="mosaico-imprimir"
           />
-          <Mosaico
-            icono={Pencil}
-            etiqueta="Modificar"
-            onClick={() => alModificar(orden.id)}
-            testid="mosaico-modificar"
-          />
+          {/* §Post-F9.68 — «Modificar» abre el diálogo que edita la OP entera (cantidades, fechas,
+              matriz), y eso exige `ordenes.administrar`. Estaba SIN gate, a diferencia de los de
+              compras, ruta y telas (lo detectó el repaso de §Post-F9.72). Ahora Desarrollo —que
+              solo tiene `desarrollo.*`— ya no lo ve, y no lo necesita: la receta se libera aquí
+              mismo, en su propia sección. */}
+          {puedeAdministrarOrden ? (
+            <Mosaico
+              icono={Pencil}
+              etiqueta="Modificar"
+              onClick={() => alModificar(orden.id)}
+              testid="mosaico-modificar"
+            />
+          ) : null}
         </div>
 
         <PanelRutaOrden
@@ -1499,6 +1507,28 @@ function DetalleCentroOrden({
             <CampoPanel k="Prov. de Arte">{fila?.estampador ?? '—'}</CampoPanel>
           </div>
         </section>
+
+        {/* ⭐ V1-E3h (§Post-F9.72) — LA RECETA DE LA ORDEN, AQUÍ. Daniel, recorriendo el flujo con
+            una orden real, no encontró dónde autorizar los avíos: el panel vivía DENTRO del diálogo
+            de «Modificar». Y la frase que lo volvió grave: *"nadie va a tener permiso de modificar
+            la OP más que yo"* — o Daniel se volvía el cuello de botella firmando todas las recetas,
+            o había que darle a Desarrollo permiso sobre la OP entera para aprobar una lista de
+            materiales. Los dos permisos ya existían separados; lo que estaba mal era que la puerta
+            física fuera una sola.
+            Se ve con `desarrollo.ver` y se edita/libera con `desarrollo.administrar` — SIN exigir
+            `ordenes.administrar`. El backend re-decide (A1). */}
+        {puedeVerDesarrollo ? (
+          <section>
+            <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              Receta de la orden
+            </h4>
+            <PanelRecetaOrden
+              idOrden={orden.id}
+              puedeAdministrar={puedeAdministrarDesarrollo}
+              ordenCancelada={orden.estado === 'cancelada'}
+            />
+          </section>
+        ) : null}
 
         {/* Expediente Desarrollo↔Producción 360 (F8-E6), re-vestido al estándar del panel. */}
         {puedeVerDesarrollo ? (

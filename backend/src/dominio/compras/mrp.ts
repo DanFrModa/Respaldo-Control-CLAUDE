@@ -93,7 +93,7 @@ import type {
   EstatusMaterialFila,
   EstatusMaterial,
 } from '../../contrato/index.js';
-import type { TipoCambioRecetaClave } from '../../contrato/index.js';
+import type { PendienteLiberar, TipoCambioRecetaClave } from '../../contrato/index.js';
 import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -121,7 +121,11 @@ import {
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
 import { requeridoAvioReceta } from '../produccion/receta-avios.js';
-import { desalineacionDeOrden, exigirRecetaLiberada } from '../produccion/receta-orden.js';
+import {
+  desalineacionDeOrden,
+  exigirMaterialesLiberados,
+  exigirRecetaLiberada,
+} from '../produccion/receta-orden.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 
@@ -162,8 +166,13 @@ const seleccionOrdenExplosion = {
   // modelo. Los renglones EXCLUIDOS (la jareta que esta orden no lleva) se filtran en la consulta:
   // para el MRP simplemente no existen. El filtro `paraProduccion` se conserva TAL CUAL, solo que
   // ahora sobre la bandera de la orden → cero cambio de alcance.
+  //
+  // ⭐⭐ V1-E3h (§Post-F9.72): **y se explota SOLO LO LIBERADO**. Daniel: *"podría haber algún cierre
+  // que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*. Lo que Desarrollo no
+  // ha firmado NO entra al requerido — pero tampoco desaparece en silencio (D3): sale por
+  // `pendientesLiberar`, con nombre y cantidad, en la MISMA respuesta.
   recetaTelas: {
-    where: { excluido: false },
+    where: { excluido: false, liberadoEn: { not: null } },
     select: {
       idTela: true,
       consumoPorPrenda: true,
@@ -182,7 +191,7 @@ const seleccionOrdenExplosion = {
     },
   },
   recetaAvios: {
-    where: { excluido: false },
+    where: { excluido: false, liberadoEn: { not: null } },
     select: {
       idAvio: true,
       consumoPorPrenda: true,
@@ -771,10 +780,24 @@ export async function explosionarOrden(
     // La orden PRIMERO (A9): si es de otra empresa se responde 404 y no se dice nada más de ella —
     // ni siquiera si su receta está liberada.
     const orden = await cargarOrden(tx, idOrden, idEmpresa);
-    // ⭐ LA PUERTA (V1-E3d, §Post-F9.43(c)): sin la receta liberada por Desarrollo no se explota el
-    // MRP. La puerta va antes de COMPRAR, no antes de producir: cortar, enviar a maquila, recibir y
-    // entregar NO pasan por aquí.
-    await exigirRecetaLiberada(tx, idOrden, idEmpresa);
+    // ⭐ LA PUERTA (V1-E3d §Post-F9.43(c), re-cortada por V1-E3h §Post-F9.72): ya no es todo-o-nada.
+    // Con ALGO liberado se explota lo liberado y se REPORTA lo que faltó firmar; con NADA liberado
+    // frena (no hay qué comprar) y el mensaje dice dónde se libera. La puerta va antes de COMPRAR,
+    // no antes de producir: cortar, enviar a maquila, recibir y entregar NO pasan por aquí.
+    const porLiberar = await exigirRecetaLiberada(tx, idOrden, idEmpresa);
+    // El ARTE no se compra por MRP (igual que en el reparto de la desalineación): listarlo aquí
+    // sería ruido para quien está viendo materiales.
+    const pendientesLiberar: PendienteLiberar[] = porLiberar
+      .filter((r) => r.tipo !== 'arte')
+      .map((r) => ({
+        tipo: r.tipo as 'tela' | 'avio',
+        idRenglon: r.idRenglon,
+        idTela: r.idTela,
+        idAvio: r.idAvio,
+        material: r.material,
+        consumoPorPrenda: r.consumoPorPrenda,
+        unidad: r.unidad,
+      }));
     const totalPiezas = totalPiezasOrden(orden);
 
     // Existencia de un avío genérico = total (todos los almacenes) de la empresa activa (Σ kardex,
@@ -920,6 +943,9 @@ export async function explosionarOrden(
         totalPiezas,
         regenerado,
         desalineada: desalineacion.hayCambios,
+        // V1-E3h: queda escrito CONTRA QUÉ se explotó — cuántos renglones se quedaron fuera por no
+        // estar firmados. Sin esto, una explosión corta parecería un BOM incompleto.
+        pendientesLiberar: pendientesLiberar.length,
       },
     });
 
@@ -937,6 +963,7 @@ export async function explosionarOrden(
       regenerado,
       avisos,
       desalineacion,
+      pendientesLiberar,
     };
   }, bd);
 }
@@ -1027,6 +1054,13 @@ export async function generarOCDesdeExplosion(
       if (seleccion.size > 0 && !seleccion.has(r.id)) return false;
       return true;
     });
+
+    // ⭐⭐ V1-E3h — Y AHORA, MATERIAL POR MATERIAL (§Post-F9.72). Con la firma por renglón, "algo
+    // liberado" ya no basta aquí: el SNAPSHOT se escribió con lo que estaba firmado en su momento, y
+    // entre la explosión y este clic alguien pudo tocar un renglón (lo que lo vuelve a cerrar). Sin
+    // esta segunda verificación, la compra parcial abriría justo el agujero que la firma tapa —
+    // comprar contra un renglón que Desarrollo ya des-autorizó. Se dice CON NOMBRE cuál (D3).
+    await exigirMaterialesLiberados(tx, idOrden, idEmpresa, elegibles);
 
     // Agrupa por proveedor sugerido → una OC por proveedor.
     const porProveedor = new Map<number, typeof elegibles>();

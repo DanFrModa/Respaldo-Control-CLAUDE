@@ -211,11 +211,24 @@ export async function crearOrdenMigrada(
     //    lo revisaron. No es un caso raro: **2,577 órdenes del viejo (2 de cada 3) tienen un modelo
     //    sin BOM**, así que su receta solo puede nacer vacía y hay que capturarla en la OP —que es
     //    exactamente como funcionaba el viejo—. Cerrarles la puerta es la señal correcta.
+    //
+    // ⭐ V1-E3h (§Post-F9.72): la firma bajó AL RENGLÓN, así que aquí se firman TODOS los renglones
+    // con la MISMA fecha —igual que el backfill de `20260819120000_receta_liberada_por_renglon`— y
+    // `ordenes.receta_liberada_en` se sella con ella como DERIVADO ("todo liberado"). Sellar solo la
+    // columna de la orden dejaría la puerta CERRADA de hecho: la puerta ya no la consulta, pregunta
+    // renglón por renglón.
     const recetaVacia = receta.telas + receta.avios + receta.artes === 0;
     if (entrada.estado !== 'cancelada' && !recetaVacia) {
+      const firmadaEn = new Date();
+      const firma = { liberadoEn: firmadaEn, liberadoPorId: null };
+      await Promise.all([
+        tx.ordenTela.updateMany({ where: { idOrden: orden.id }, data: firma }),
+        tx.ordenAvio.updateMany({ where: { idOrden: orden.id }, data: firma }),
+        tx.ordenArte.updateMany({ where: { idOrden: orden.id }, data: firma }),
+      ]);
       await tx.orden.update({
         where: { id: orden.id },
-        data: { recetaLiberadaEn: new Date(), recetaLiberadaPorId: null },
+        data: { recetaLiberadaEn: firmadaEn, recetaLiberadaPorId: null },
       });
     }
 

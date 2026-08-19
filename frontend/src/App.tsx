@@ -88,6 +88,7 @@ import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { VentasPagina } from '@/modulos/ventas/VentasPagina';
 import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
+import { RecetasPorLiberarPagina } from '@/modulos/desarrollo/RecetasPorLiberarPagina';
 import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
 import { EntregaClientePagina } from '@/modulos/produccion/EntregaClientePagina';
@@ -187,6 +188,10 @@ const router = createBrowserRouter([
           { path: 'pedidos/administrar', element: <PedidosPagina /> },
           // Desarrollo (Módulo 15, F8-E2/E6): pestañas Proyectos (lista+detalle) y Tablero por estado.
           { path: 'desarrollo', element: <DesarrolloPagina /> },
+          // ⭐ V1-E3h (§Post-F9.72) — Bandeja «Recetas por liberar» de Desarrollo. Ruta ESTÁTICA y
+          // declarada en el catálogo con `desarrollo.ver`, así que la capa de ruta la cierra a quien
+          // no lo tenga (§Post-F9.68).
+          { path: 'desarrollo/recetas-por-liberar', element: <RecetasPorLiberarPagina /> },
           // Listas de precios (Módulo 15, F8-E4): lista + detalle con la vista de aprobación del dueño.
           { path: 'listas-precios', element: <ListasPreciosPagina /> },
           // Portada-hub del módulo Producción (V1-E3a): antes `/produccion` caía en el comodín

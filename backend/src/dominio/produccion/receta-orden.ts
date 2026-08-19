@@ -61,8 +61,13 @@
  * en silencio: lo que desaparece queda ÍNTEGRO en la bitácora).
  */
 import type {
+  AlcanceLiberacion,
   CambioReceta,
+  ChoqueTraerDelModelo,
+  DatosLiberarReceta,
   DatosRecetaAgregar,
+  DatosTraerDelModelo,
+  TraerDelModeloResultado,
   DatosRecetaEditar,
   DatosRecetaQuitar,
   DesalineacionReceta,
@@ -75,9 +80,11 @@ import type {
   TipoRenglonRecetaClave,
 } from '../../contrato/index.js';
 import {
+  esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
   esquemaRecetaEditarCuerpo,
   esquemaRecetaQuitarCuerpo,
+  esquemaTraerDelModeloCuerpo,
 } from '../../contrato/index.js';
 import { EstadoRenglonReceta, Prisma } from '../../datos/index.js';
 
@@ -348,6 +355,8 @@ const SELECT_TELA = {
   agregadoAMano: true,
   excluido: true,
   notas: true,
+  liberadoEn: true,
+  liberadoPorId: true,
   tela: { select: { nombre: true, unidadMedida: true } },
   telaProveedor: { select: { proveedor: { select: { nombre: true } } } },
 } satisfies Prisma.OrdenTelaSelect;
@@ -367,6 +376,8 @@ const SELECT_AVIO = {
   agregadoAMano: true,
   excluido: true,
   notas: true,
+  liberadoEn: true,
+  liberadoPorId: true,
   avio: {
     select: {
       clave: true,
@@ -405,6 +416,8 @@ const SELECT_ARTE = {
   agregadoAMano: true,
   excluido: true,
   notas: true,
+  liberadoEn: true,
+  liberadoPorId: true,
   proveedor: { select: { nombre: true } },
   tipoArte: { select: { nombre: true, codigo: true, usaPuntadas: true } },
 } satisfies Prisma.OrdenArteSelect;
@@ -609,7 +622,7 @@ export function calcularDesalineacion(
   telas: RecetaOrdenTela[],
   avios: RecetaOrdenAvio[],
   artes: RecetaOrdenArte[],
-  faltantes: { tipo: TipoRenglonRecetaClave; material: string }[],
+  faltantes: { tipo: TipoRenglonRecetaClave; material: string; idMaterialModelo: number }[],
   conOrdenCompra: boolean,
 ): DesalineacionReceta {
   const cambios: CambioReceta[] = [];
@@ -642,6 +655,7 @@ export function calcularDesalineacion(
         tipo,
         idRenglon: r.id,
         material,
+        idMaterialModelo: null,
         que: 'quitado',
         detalle: `El modelo ya no lleva "${material}", y esta orden sí lo tiene congelado.`,
       });
@@ -652,6 +666,7 @@ export function calcularDesalineacion(
         tipo,
         idRenglon: r.id,
         material,
+        idMaterialModelo: null,
         que: 'consumo',
         detalle: `La cantidad de "${material}" pasó de ${cifra(consumo.orden)} a ${cifra(consumo.modelo)} en el modelo.`,
       });
@@ -672,6 +687,7 @@ export function calcularDesalineacion(
               tipo,
               idRenglon: r.id,
               material,
+              idMaterialModelo: null,
               que: 'precio-mercado',
               detalle:
                 `La última COMPRA REAL de "${material}" es de ${pesos(precio.modelo)} y esta orden ` +
@@ -681,6 +697,7 @@ export function calcularDesalineacion(
               tipo,
               idRenglon: r.id,
               material,
+              idMaterialModelo: null,
               que: 'precio',
               detalle: `El precio de "${material}" pasó de ${pesos(precio.orden)} a ${pesos(precio.modelo)} en el modelo.`,
             },
@@ -729,6 +746,9 @@ export function calcularDesalineacion(
       tipo: f.tipo,
       idRenglon: null,
       material: f.material,
+      // ⭐ V1-E3h: el id del material EN EL MODELO viaja con el aviso, para que «traer del modelo»
+      // pueda señalar ESTE faltante y no solo "todo lo que falte" (§Post-F9.73 punto 1).
+      idMaterialModelo: f.idMaterialModelo,
       que: 'agregado',
       detalle: `El modelo ahora lleva "${f.material}", y esta orden no lo tiene.`,
     });
@@ -746,12 +766,23 @@ export function calcularDesalineacion(
   };
 }
 
-/** Cuenta los renglones por estado (los excluidos NO cuentan como vivos). */
-function resumirReceta(filas: { estado: EstadoRenglonReceta; excluido: boolean }[]): ResumenReceta {
+/**
+ * Cuenta los renglones por estado y por FIRMA (los excluidos NO cuentan como vivos).
+ *
+ * V1-E3h: `liberados`/`porLiberar` son de renglones VIVOS. Una lápida firmada no suma —no se compra
+ * de todos modos— y una lápida sin firmar no falta: esta orden ya decidió sobre ella. Es la MISMA
+ * definición que usan la puerta (`leerPorLiberar`) y la bandeja; se exporta porque es pura y esa
+ * coincidencia hay que poder probarla sin base de datos.
+ */
+export function resumirReceta(
+  filas: { estado: EstadoRenglonReceta; excluido: boolean; liberadoEn: Date | null }[],
+): ResumenReceta {
   let sinRevisar = 0;
   let revisados = 0;
   let ajustados = 0;
   let excluidos = 0;
+  let liberados = 0;
+  let porLiberar = 0;
   for (const f of filas) {
     if (f.excluido) {
       excluidos += 1;
@@ -760,6 +791,8 @@ function resumirReceta(filas: { estado: EstadoRenglonReceta; excluido: boolean }
     if (f.estado === EstadoRenglonReceta.sin_revisar) sinRevisar += 1;
     else if (f.estado === EstadoRenglonReceta.revisado) revisados += 1;
     else ajustados += 1;
+    if (f.liberadoEn === null) porLiberar += 1;
+    else liberados += 1;
   }
   return {
     sinRevisar,
@@ -767,6 +800,8 @@ function resumirReceta(filas: { estado: EstadoRenglonReceta; excluido: boolean }
     ajustados,
     excluidos,
     total: sinRevisar + revisados + ajustados,
+    liberados,
+    porLiberar,
   };
 }
 
@@ -866,6 +901,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       agregadoAMano: f.agregadoAMano,
       excluido: f.excluido,
       notas: f.notas,
+      liberadoEn: f.liberadoEn?.toISOString() ?? null,
+      liberadoPor: f.liberadoPorId,
       enElModelo: delModelo !== undefined,
       cambios: [],
       idTela: f.idTela,
@@ -893,6 +930,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       agregadoAMano: f.agregadoAMano,
       excluido: f.excluido,
       notas: f.notas,
+      liberadoEn: f.liberadoEn?.toISOString() ?? null,
+      liberadoPor: f.liberadoPorId,
       enElModelo: delModelo !== undefined,
       cambios: [],
       idAvio: f.idAvio,
@@ -929,6 +968,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       agregadoAMano: f.agregadoAMano,
       excluido: f.excluido,
       notas: f.notas,
+      liberadoEn: f.liberadoEn?.toISOString() ?? null,
+      liberadoPor: f.liberadoPorId,
       enElModelo: delModelo !== undefined,
       cambios: [],
       idModeloArte: f.idModeloArte,
@@ -954,18 +995,27 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
   const idsArteOrden = new Set(
     filasArte.flatMap((f) => (f.idModeloArte === null ? [] : [f.idModeloArte])),
   );
-  const faltantes: { tipo: TipoRenglonRecetaClave; material: string }[] = [
+  const faltantes: {
+    tipo: TipoRenglonRecetaClave;
+    material: string;
+    idMaterialModelo: number;
+  }[] = [
     ...telasModelo
       .filter((t) => !idsTelaOrden.has(t.idTela))
-      .map((t) => ({ tipo: 'tela' as const, material: t.nombre })),
+      .map((t) => ({ tipo: 'tela' as const, material: t.nombre, idMaterialModelo: t.idTela })),
     ...aviosModelo
       .filter((a) => !idsAvioOrden.has(a.idAvio))
-      .map((a) => ({ tipo: 'avio' as const, material: `${a.clave} — ${a.descripcion}` })),
+      .map((a) => ({
+        tipo: 'avio' as const,
+        material: `${a.clave} — ${a.descripcion}`,
+        idMaterialModelo: a.idAvio,
+      })),
     ...artesModelo
       .filter((a) => !idsArteOrden.has(a.id))
-      .map((a) => ({ tipo: 'arte' as const, material: a.descripcion })),
+      .map((a) => ({ tipo: 'arte' as const, material: a.descripcion, idMaterialModelo: a.id })),
   ];
 
+  const resumen = resumirReceta([...filasTela, ...filasAvio, ...filasArte]);
   const desalineacion = calcularDesalineacion(telas, avios, artes, faltantes, ocs > 0);
   // Cada renglón se lleva SUS cambios (para pintarlos en su fila sin que la pantalla los cruce).
   for (const c of desalineacion.cambios) {
@@ -986,8 +1036,12 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     codigoModelo: orden.modelo.codigo,
     liberadaEn: orden.recetaLiberadaEn?.toISOString() ?? null,
     liberadaPor: orden.recetaLiberadaPorId,
-    puedeComprar: orden.recetaLiberadaEn !== null,
-    resumen: resumirReceta([...filasTela, ...filasAvio, ...filasArte]),
+    // ⭐ V1-E3h: la puerta dejó de ser todo-o-nada. `puedeComprar` = **hay algo firmado**, que es
+    // exactamente lo que el MRP necesita para tener qué explotar; `todoLiberado` es la bandera
+    // DERIVADA de la orden ("no queda nada por firmar"), la que lee el semáforo de orden completa.
+    puedeComprar: resumen.liberados > 0,
+    todoLiberado: orden.recetaLiberadaEn !== null,
+    resumen,
     telas,
     avios,
     artes,
@@ -1017,33 +1071,189 @@ export async function desalineacionDeOrden(
 
 // ── 3. LA PUERTA: sin liberar no se compra ─────────────────────────────────────────────────
 
+/** Dónde se libera, dicho una sola vez: el aviso tiene que llevar a la pantalla, no adivinarla. */
+const DONDE_SE_LIBERA =
+  'Se libera desde la receta de la orden (Centro de Órdenes → la orden → «Receta de la orden»), o ' +
+  'de un jalón desde Desarrollo → «Recetas por liberar».';
+
+/** Un renglón VIVO de la receta que Desarrollo todavía no firma (V1-E3h, §Post-F9.72). */
+export interface RenglonPorLiberar {
+  tipo: TipoRenglonRecetaClave;
+  idRenglon: number;
+  /** Material comprable: uno de los dos viene con id, el otro en null (el arte no trae ninguno). */
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  consumoPorPrenda: number;
+  unidad: string | null;
+}
+
 /**
- * EXIGE que la receta de la orden esté LIBERADA por Desarrollo (§Post-F9.43(c)). La usan el MRP
- * (explotar), la generación de OC desde la explosión y el alta de OC **capturada a mano** ligada a
- * la orden — y **solo ellos**: cortar, enviar a maquila, recibir y entregar NO pasan por aquí a
- * propósito (el piso no se detiene porque Desarrollo no haya terminado; lo único que se frena es
- * gastar dinero contra una receta que nadie miró).
+ * Lee los renglones VIVOS de la receta que siguen SIN firmar. Los `excluido` no cuentan: esta orden
+ * ya decidió que no los lleva, así que no le faltan a nadie.
+ */
+async function leerPorLiberar(tx: Tx, idOrden: number): Promise<RenglonPorLiberar[]> {
+  const donde = { idOrden, excluido: false, liberadoEn: null } as const;
+  const [telas, avios, artes] = await Promise.all([
+    tx.ordenTela.findMany({
+      where: donde,
+      select: {
+        id: true,
+        idTela: true,
+        consumoPorPrenda: true,
+        tela: { select: { nombre: true, unidadMedida: true } },
+      },
+      orderBy: { tela: { nombre: 'asc' } },
+    }),
+    tx.ordenAvio.findMany({
+      where: donde,
+      select: {
+        id: true,
+        idAvio: true,
+        consumoPorPrenda: true,
+        avio: { select: { clave: true, descripcion: true, unidad: true } },
+      },
+      orderBy: { avio: { clave: 'asc' } },
+    }),
+    tx.ordenArte.findMany({
+      where: donde,
+      select: { id: true, descripcion: true },
+      orderBy: [{ descripcion: 'asc' }, { id: 'asc' }],
+    }),
+  ]);
+  return [
+    ...telas.map((t) => ({
+      tipo: 'tela' as const,
+      idRenglon: t.id,
+      idTela: t.idTela,
+      idAvio: null,
+      material: t.tela.nombre,
+      consumoPorPrenda: num(t.consumoPorPrenda),
+      unidad: t.tela.unidadMedida,
+    })),
+    ...avios.map((a) => ({
+      tipo: 'avio' as const,
+      idRenglon: a.id,
+      idTela: null,
+      idAvio: a.idAvio,
+      material: `${a.avio.clave} — ${a.avio.descripcion}`,
+      consumoPorPrenda: num(a.consumoPorPrenda),
+      unidad: a.avio.unidad,
+    })),
+    ...artes.map((r) => ({
+      tipo: 'arte' as const,
+      idRenglon: r.id,
+      idTela: null,
+      idAvio: null,
+      material: r.descripcion,
+      consumoPorPrenda: 0,
+      unidad: null,
+    })),
+  ];
+}
+
+/**
+ * ⭐ LA PUERTA, ahora "SE COMPRA LO LIBERADO" (V1-E3h, §Post-F9.72 — antes era todo-o-nada).
  *
- * ⚠️ **`idEmpresa` es OBLIGATORIO (A9)**, aunque hoy los tres llamadores ya filtran antes: sin él,
- * una orden ajena contestaría 409 «sin liberar» —confirmando que existe y en qué estado está— en vez
- * de 404. Pedirlo aquí quita el pie de banco para el próximo que la llame (hallazgo del reviewer).
+ * Daniel: *"podría haber algún cierre que aún no autoriza el cliente, pero ya podríamos ir comprando
+ * lo demás"*. Así que ya NO se exige que la receta entera esté firmada:
+ *
+ *  • Con **algo** liberado, PASA — y devuelve la lista de lo que quedó fuera, con nombre y
+ *    cantidad, para que quien está comprando lo VEA (requisito textual de Daniel: *"transparentemente
+ *    qué le falta de liberar"*). Lo no firmado no entra a la explosión, pero tampoco desaparece en
+ *    silencio (D3).
+ *  • Con **nada** liberado, FRENA: no hay literalmente nada que comprar, y decirlo con un aviso
+ *    vacío sería peor que un error. El mensaje dice **dónde se libera** — el hueco de navegación
+ *    que §Post-F9.72 nombra aparte.
+ *
+ * La usan el MRP (explotar), la generación de OC desde la explosión y el alta de OC **capturada a
+ * mano** ligada a la orden — y **solo ellos**: cortar, enviar a maquila, recibir y entregar NO pasan
+ * por aquí a propósito (el piso no se detiene porque Desarrollo no haya terminado; lo único que se
+ * frena es gastar dinero contra una receta que nadie miró).
+ *
+ * ⚠️ **`idEmpresa` es OBLIGATORIO (A9)**: sin él, una orden ajena contestaría 409 «sin liberar»
+ * —confirmando que existe y en qué estado está— en vez de 404.
  */
 export async function exigirRecetaLiberada(
   tx: Tx,
   idOrden: number,
   idEmpresa: number,
-): Promise<void> {
+): Promise<RenglonPorLiberar[]> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
-    select: { folio: true, recetaLiberadaEn: true },
+    select: { folio: true },
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
-  if (orden.recetaLiberadaEn === null) {
+  const [pendientes, liberados] = await Promise.all([
+    leerPorLiberar(tx, idOrden),
+    contarLiberados(tx, idOrden),
+  ]);
+  if (liberados === 0) {
     throw new ErrorConflicto(
-      `La receta de la orden ${String(orden.folio)} todavía no la libera Desarrollo: no se puede ` +
-        'explotar el MRP ni generar órdenes de compra. (Cortar y producir no están bloqueados.)',
+      `La receta de la orden ${String(orden.folio)} todavía no la libera Desarrollo: no hay nada ` +
+        `autorizado que comprar. ${DONDE_SE_LIBERA} (Cortar y producir no están bloqueados.)`,
+    );
+  }
+  return pendientes;
+}
+
+/** Cuántos renglones VIVOS de la receta están ya firmados (los excluidos no cuentan). */
+async function contarLiberados(tx: Tx, idOrden: number): Promise<number> {
+  const donde = { idOrden, excluido: false, liberadoEn: { not: null } } as const;
+  const [telas, avios, artes] = await Promise.all([
+    tx.ordenTela.count({ where: donde }),
+    tx.ordenAvio.count({ where: donde }),
+    tx.ordenArte.count({ where: donde }),
+  ]);
+  return telas + avios + artes;
+}
+
+/**
+ * EXIGE que los MATERIALES concretos que se van a comprar estén firmados (V1-E3h). Es la otra mitad
+ * de "se compra lo liberado": la puerta general solo garantiza que **algo** está firmado, y con la
+ * liberación por partes eso ya no basta para una OC capturada a mano —o para una selección de
+ * requerimientos hecha antes de que un renglón se re-cerrara—. Sin esto, la compra parcial abriría
+ * exactamente el agujero que la firma existe para tapar.
+ *
+ * Un material que NO está en la receta de la orden **no se rechaza aquí**: comprarle algo extra a
+ * una orden es legal (la OC a mano lo permite a propósito) y la receta no es una lista blanca de
+ * compra. Lo que se prohíbe es comprar un renglón que SÍ está en la receta y que Desarrollo todavía
+ * no firmó.
+ */
+export async function exigirMaterialesLiberados(
+  tx: Tx,
+  idOrden: number,
+  idEmpresa: number,
+  materiales: readonly { idTela?: number | null | undefined; idAvio?: number | null | undefined }[],
+): Promise<void> {
+  const orden = await tx.orden.findFirst({
+    where: { id: idOrden, idEmpresa },
+    select: { folio: true },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', idOrden);
+  }
+  const pendientes = await leerPorLiberar(tx, idOrden);
+  if (pendientes.length === 0) return;
+  const telasPendientes = new Map(
+    pendientes.flatMap((p) => (p.idTela === null ? [] : [[p.idTela, p.material] as const])),
+  );
+  const aviosPendientes = new Map(
+    pendientes.flatMap((p) => (p.idAvio === null ? [] : [[p.idAvio, p.material] as const])),
+  );
+  const chocan = new Set<string>();
+  for (const m of materiales) {
+    const porTela = m.idTela == null ? undefined : telasPendientes.get(m.idTela);
+    const porAvio = m.idAvio == null ? undefined : aviosPendientes.get(m.idAvio);
+    if (porTela !== undefined) chocan.add(porTela);
+    if (porAvio !== undefined) chocan.add(porAvio);
+  }
+  if (chocan.size > 0) {
+    throw new ErrorConflicto(
+      `Desarrollo todavía no libera ${[...chocan].map((m) => `"${m}"`).join(', ')} en la receta de ` +
+        `la orden ${String(orden.folio)}: no se puede comprar. ${DONDE_SE_LIBERA}`,
     );
   }
 }
@@ -1057,6 +1267,12 @@ export async function exigirRecetaLiberada(
  */
 interface ContextoMutacionReceta {
   cayoSobreLapida: () => void;
+  /**
+   * ⭐ V1-E3h: la mutación DECLARA qué renglón tocó, para que la firma se revoque **solo en ese
+   * renglón** y no en toda la receta (§Post-F9.72: se libera por partes, así que también se
+   * re-cierra por partes). Una mutación que no declara nada no revoca nada.
+   */
+  tocoRenglon: (tipo: TipoRenglonRecetaClave, idRenglon: number) => void;
 }
 
 /** Lo que toda mutación de la receta comparte: permiso, orden viva, transacción y salida completa. */
@@ -1072,37 +1288,51 @@ async function enRecetaEditable<T>(
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
     exigirOrdenViva(orden);
     let sobreLapida = false;
+    const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
     await accion(tx, orden, {
       cayoSobreLapida: () => {
         sobreLapida = true;
       },
+      tocoRenglon: (tipo, idRenglon) => {
+        tocados.push({ tipo, idRenglon });
+      },
     });
 
-    // ⭐ TOCAR EL CONTENIDO DE UNA RECETA YA LIBERADA LA RE-ABRE (hallazgo del reviewer).
+    // ⭐ TOCAR EL CONTENIDO DE UN RENGLÓN YA LIBERADO LO VUELVE A CERRAR (hallazgo del reviewer,
+    // ahora POR RENGLÓN — V1-E3h/§Post-F9.72).
     //
     // La firma de Desarrollo es sobre LO QUE SE FIRMÓ. Sin esto se podía meter material nuevo a una
     // receta ya liberada —o cambiarle el precio, o el amarre— y comprarlo sin que nadie lo volviera
-    // a mirar: justo el agujero que la puerta existe para tapar. Al re-abrir, los renglones tocados
-    // ya quedaron en `ajustado`, así que "marcar todo revisado" + "liberar" es un par de clics.
+    // a mirar: justo el agujero que la puerta existe para tapar. Al re-cerrarse, el renglón tocado
+    // ya quedó en `ajustado`, así que revisarlo y volver a firmarlo es un par de clics.
     //
-    // NO re-abren: "marcar todo revisado" y "liberar" (no cambian QUÉ se compra), ni las lecturas.
-    // De paso, esto ES el camino de revocación que `mrp.ts` mencionaba y no existía.
+    // ⚠️ **Lo que cambia respecto de V1-E3d**: antes se revocaba LA RECETA ENTERA. Con la firma por
+    // renglón eso sería un castigo colectivo — tocar el consumo de una tela cerraría de golpe los
+    // avíos que ya se estaban comprando, que es justo lo contrario de lo que Daniel pidió. Ahora se
+    // cierra SOLO el renglón que se tocó.
+    //
+    // NO re-cierran: "marcar todo revisado" y "liberar" (no cambian QUÉ se compra), editar una
+    // LÁPIDA (no se compra de todos modos), EXCLUIR un renglón (quita algo de la compra: no hay
+    // firma ajena que invalidar) ni las lecturas.
     //
     // ⚠️ Revocar NO des-completa la orden (el recálculo de abajo va con `permitirDesCompletar:
     // false`): una orden a medio producir no se saca de los tableros por un cambio de receta —es la
     // misma regla de Daniel del 26-jul—. Quien mira la orden lo ve igual, porque este panel dice
-    // "Sin liberar" en grande y la puerta de compra está cerrada de verdad.
-    if (opciones.cambiaElContenido === true && !sobreLapida && orden.recetaLiberadaEn !== null) {
-      await tx.orden.update({
-        where: { id: orden.id },
-        data: { recetaLiberadaEn: null, recetaLiberadaPorId: null, ...datosModificacion(sesion) },
-      });
-      await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
-        accion: 'liberacion-revocada',
-        motivo:
-          'se cambió el contenido de una receta ya liberada: Desarrollo tiene que volver a firmarla',
-      });
+    // qué falta firmar y la puerta de compra está cerrada de verdad para ese renglón.
+    if (opciones.cambiaElContenido === true && !sobreLapida && tocados.length > 0) {
+      const revocados = await revocarFirmaDeRenglones(tx, sesion, orden.id, tocados);
+      if (revocados.length > 0) {
+        await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+          accion: 'liberacion-renglon-revocada',
+          renglones: revocados,
+          motivo:
+            'se cambió el contenido de un renglón ya liberado: Desarrollo tiene que volver a firmarlo',
+        });
+      }
     }
+    // La bandera de la ORDEN es DERIVADA desde V1-E3h ("todo lo vivo está liberado"): se recalcula
+    // SIEMPRE, porque hasta quitar un renglón pendiente puede dejar la receta completa.
+    await sincronizarLiberacionOrden(tx, sesion, orden.id);
     // El semáforo de "orden completa" depende AHORA de la receta (liberada + arte), así que se
     // recalcula en la MISMA transacción (A2). `permitirDesCompletar: false`: tocar la receta nunca
     // degrada una orden en curso — el des-completar sigue viviendo solo en la edición de su matriz.
@@ -1185,10 +1415,19 @@ export async function agregarRenglonReceta(
         excluido: false,
         notas: datos.notas ?? null,
       });
-      /** Lo que marca a una lápida REVIVIDA (sin tocar `agregadoAMano`: su origen no cambia). */
+      /**
+       * Lo que marca a una lápida REVIVIDA (sin tocar `agregadoAMano`: su origen no cambia).
+       *
+       * ⭐ V1-E3h: revivir **borra la firma** del renglón. Una lápida pudo quedar firmada (el
+       * backfill firmó todo, y liberar «todo» no la toca porque no se compra); resucitarla con esa
+       * firma puesta la metería a la compra sin que nadie la volviera a mirar — que es exactamente
+       * el agujero que la puerta existe para tapar.
+       */
       const comunesRevivido = {
         estado: EstadoRenglonReceta.ajustado,
         excluido: false,
+        liberadoEn: null,
+        liberadoPorId: null,
         ...(datos.notas === undefined ? {} : { notas: datos.notas }),
         ...datosModificacion(sesion),
       };
@@ -1460,7 +1699,9 @@ export async function agregarRenglonReceta(
           : { antes: fotoArte(previo) }),
       });
     },
-    // Cambia QUÉ se compra: si la receta ya estaba liberada, se re-abre (ver `enRecetaEditable`).
+    // Cambia QUÉ se compra. El renglón NUEVO nace SIN firma; al REVIVIR una lápida la firma se
+    // borra explícitamente (`comunesRevivido`). En los dos casos la bandera derivada de la orden
+    // se recalcula (ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
 }
@@ -1492,6 +1733,7 @@ export async function editarRenglonReceta(
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
         // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de Desarrollo.
         if (fila.excluido) ctx.cayoSobreLapida();
+        else ctx.tocoRenglon(tipo, fila.id);
         await tx.ordenTela.update({
           where: { id: fila.id },
           data: {
@@ -1527,6 +1769,7 @@ export async function editarRenglonReceta(
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
         const antes = fotoAvio(fila);
         if (fila.excluido) ctx.cayoSobreLapida();
+        else ctx.tocoRenglon(tipo, fila.id);
         // ⭐ V1-E3g: el toggle que llega se normaliza contra el modo del avío. Además, si el
         // renglón trae la contradicción HEREDADA (por medida + toggle encendido) y se está
         // guardando su captura por talla, se apaga aquí: es el momento en que el usuario sí pidió
@@ -1572,6 +1815,7 @@ export async function editarRenglonReceta(
 
       const fila = await exigirRenglonArte(tx, orden.id, idRenglon);
       if (fila.excluido) ctx.cayoSobreLapida();
+      else ctx.tocoRenglon(tipo, fila.id);
       if (datos.idProveedor != null) {
         await exigirProveedorExiste(tx, datos.idProveedor);
       }
@@ -1604,7 +1848,8 @@ export async function editarRenglonReceta(
         cambios: datos,
       });
     },
-    // Cambia QUÉ se compra: si la receta ya estaba liberada, se re-abre (ver `enRecetaEditable`).
+    // Cambia QUÉ se compra: el renglón tocado se re-cierra y hay que volver a firmarlo — SOLO él,
+    // no la receta entera (V1-E3h, ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
 }
@@ -1680,7 +1925,10 @@ export async function quitarRenglonReceta(
         await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', { ...copia, excluido: true });
       }
     },
-    // Cambia QUÉ se compra: si la receta ya estaba liberada, se re-abre (ver `enRecetaEditable`).
+    // ⚠️ QUITAR **no revoca ninguna firma**, y es a propósito: excluir un renglón le quita algo a
+    // la compra, no le agrega nada sin revisar. Lo único que pasa es que la bandera derivada de
+    // la orden se recalcula — y puede quedar COMPLETA, si lo que faltaba por firmar era justo
+    // lo que se acaba de excluir (ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
 }
@@ -1706,7 +1954,7 @@ export async function restaurarRenglonReceta(
     sesion,
     idOrden,
     bd,
-    async (tx, orden) => {
+    async (tx, orden, ctx) => {
       const marca = {
         estado: EstadoRenglonReceta.revisado,
         excluido: false,
@@ -1715,6 +1963,10 @@ export async function restaurarRenglonReceta(
 
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
+        // Restaurar PISA consumo, precio, banderas y amarre: cambia QUÉ y a QUIÉN se compra, así
+        // que el renglón vuelve a necesitar firma (V1-E3h). También aplica sobre una lápida:
+        // restaurar la levanta (`excluido: false`), y volver a la compra sin firmar sería el hueco.
+        ctx.tocoRenglon(tipo, fila.id);
         const delModelo = (await leerTelasBom(tx, orden.idModelo, orden.idEmpresa)).find(
           (t) => t.idTela === fila.idTela,
         );
@@ -1753,6 +2005,7 @@ export async function restaurarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+        ctx.tocoRenglon(tipo, fila.id);
         // La foto se toma ANTES de tocar nada: `reemplazarMedidasAvio` borra el juego completo de
         // medidas por talla, y sin esto se irían sin dejar rastro (D3, mismo cierre que la pieza A).
         const antes = fotoAvio(fila);
@@ -1817,6 +2070,7 @@ export async function restaurarRenglonReceta(
       }
 
       const fila = await exigirRenglonArte(tx, orden.id, idRenglon);
+      ctx.tocoRenglon(tipo, fila.id);
       // V1-E3f: restaurar sigue la TRAZA (`idModeloArte`), no el nombre. Un renglón que la perdió
       // —porque el arte del modelo se borró— ya no tiene a qué volver, y tampoco lo tenía antes:
       // el nombre solo lo disimulaba mientras existiera un arte llamado igual.
@@ -1852,7 +2106,8 @@ export async function restaurarRenglonReceta(
         precio: delModelo.precio,
       });
     },
-    // Cambia QUÉ se compra: si la receta ya estaba liberada, se re-abre (ver `enRecetaEditable`).
+    // Cambia QUÉ se compra (pisa consumo, precio, banderas y amarre): el renglón restaurado se
+    // re-cierra y vuelve a necesitar firma (V1-E3h, ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
 }
@@ -1898,16 +2153,27 @@ export async function marcarRecetaRevisada(
 }
 
 /**
- * LIBERA la receta (`desarrollo.administrar`) — la firma de Desarrollo que abre la puerta de compra
- * (§Post-F9.43(c)).
+ * ⭐ LIBERA la receta, ENTERA O POR PARTES (`desarrollo.administrar`) — la firma de Desarrollo que
+ * abre la puerta de compra (§Post-F9.43(c), partida en renglones por §Post-F9.72).
  *
- * DOS condiciones, y las dos tienen razón de ser:
- *  • **Ningún renglón `sin_revisar`.** No son 8 clics: el botón "marcar todo revisado" lo resuelve
- *    de un golpe para el 89 % de las órdenes que vienen limpias. Sin esta condición, el estado por
- *    renglón sería decorativo.
- *  • **La receta no puede estar VACÍA.** Liberar "nada" dejaría al MRP explotando cero y a alguien
+ * Daniel (19-ago-2026): *"podría haber algún cierre que aún no autoriza el cliente, pero ya podríamos
+ * ir comprando lo demás"*. Por eso el `alcance`: `todo` (el botón de siempre), `telas`/`avios`/`artes`
+ * (lo que evita los veinte clics de lo rutinario) o `seleccion` (renglón por renglón).
+ *
+ * TRES condiciones, y las tres tienen razón de ser:
+ *  • **Ningún renglón `sin_revisar` DENTRO DEL ALCANCE.** No son 8 clics: "marcar todo revisado" lo
+ *    resuelve de un golpe para el 89 % de las órdenes que vienen limpias. Sin esta condición, el
+ *    estado por renglón sería decorativo. Se mide sobre el alcance y no sobre la receta entera: si
+ *    fuera global, un avío que nadie ha mirado bloquearía la firma de las telas — justo lo que la
+ *    decisión vino a desbloquear.
+ *  • **El alcance no puede estar VACÍO.** Firmar "nada" dejaría al MRP explotando cero y a alguien
  *    creyendo que ya lo revisaron. Si el modelo no tiene BOM (2 de cada 3 órdenes del viejo), la
  *    receta se captura a mano en la OP — que es exactamente como funcionaba el viejo.
+ *  • **Los renglones de `seleccion` tienen que ser de ESTA orden** (A9/D3: un id ajeno se dice, no
+ *    se ignora en silencio).
+ *
+ * Las LÁPIDAS quedan fuera del alcance a propósito: un renglón excluido no se compra, así que
+ * firmarlo no significa nada.
  *
  * Liberar es IDEMPOTENTE en el sentido útil: volver a liberar re-sella quién y cuándo (Desarrollo
  * revisó de nuevo), no truena.
@@ -1915,50 +2181,665 @@ export async function marcarRecetaRevisada(
 export async function liberarReceta(
   sesion: SesionUsuario,
   idOrden: number,
+  cuerpo: DatosLiberarReceta = {},
   bd?: ContextoBd,
 ): Promise<RecetaOrden> {
+  const datos = validarEntrada(esquemaLiberarRecetaCuerpo, cuerpo);
   return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
+    const seleccion = datos.renglones ?? [];
+    if (datos.alcance === 'seleccion' && seleccion.length === 0) {
+      throw new ErrorValidacion(
+        'No se indicó ningún renglón que liberar. Elige al menos uno (o libera la sección completa).',
+      );
+    }
+    const idsPorTipo = (tipo: TipoRenglonRecetaClave): number[] =>
+      seleccion.filter((r) => r.tipo === tipo).map((r) => r.id);
+
+    /** El `where` del alcance para una de las tres tablas (o `null` = esa sección no entra). */
+    const dondeDe = (
+      tipo: TipoRenglonRecetaClave,
+      seccion: AlcanceLiberacion,
+    ): { idOrden: number; excluido: false; id?: { in: number[] } } | null => {
+      const base = { idOrden: orden.id, excluido: false as const };
+      if (datos.alcance === 'todo') return base;
+      if (datos.alcance === 'seleccion') {
+        const ids = idsPorTipo(tipo);
+        return ids.length === 0 ? null : { ...base, id: { in: ids } };
+      }
+      return datos.alcance === seccion ? base : null;
+    };
+
+    const dondeTela = dondeDe('tela', 'telas');
+    const dondeAvio = dondeDe('avio', 'avios');
+    const dondeArte = dondeDe('arte', 'artes');
+
     const [telas, avios, artes] = await Promise.all([
-      tx.ordenTela.findMany({
-        where: { idOrden: orden.id },
-        select: { estado: true, excluido: true },
-      }),
-      tx.ordenAvio.findMany({
-        where: { idOrden: orden.id },
-        select: { estado: true, excluido: true },
-      }),
-      tx.ordenArte.findMany({
-        where: { idOrden: orden.id },
-        select: { estado: true, excluido: true },
-      }),
+      dondeTela === null
+        ? Promise.resolve([])
+        : tx.ordenTela.findMany({
+            where: dondeTela,
+            select: { id: true, estado: true, excluido: true, liberadoEn: true },
+          }),
+      dondeAvio === null
+        ? Promise.resolve([])
+        : tx.ordenAvio.findMany({
+            where: dondeAvio,
+            select: { id: true, estado: true, excluido: true, liberadoEn: true },
+          }),
+      dondeArte === null
+        ? Promise.resolve([])
+        : tx.ordenArte.findMany({
+            where: dondeArte,
+            select: { id: true, estado: true, excluido: true, liberadoEn: true },
+          }),
     ]);
+
+    // D3: un id que no es de esta orden (o que es una lápida) se DICE, no se traga en silencio —
+    // si no, "liberé 3 renglones" mentiría cuando en realidad se firmó uno.
+    //
+    // ⚠️ Y se dice la CAUSA CORRECTA. El `where` del alcance excluye las lápidas, así que un
+    // renglón excluido caía en el mismo saco que un id de otra orden y contestaba "no encontrado":
+    // el renglón SÍ existe, lo que pasa es que esta orden decidió que no lo lleva. Un mensaje que
+    // describe mal su causa manda a buscar el error donde no está.
+    if (datos.alcance === 'seleccion') {
+      const encontrados = new Set([
+        ...telas.map((t) => `tela-${String(t.id)}`),
+        ...avios.map((a) => `avio-${String(a.id)}`),
+        ...artes.map((a) => `arte-${String(a.id)}`),
+      ]);
+      const perdidos = seleccion.filter((r) => !encontrados.has(`${r.tipo}-${String(r.id)}`));
+      const primero = perdidos[0];
+      if (primero !== undefined) {
+        const lapida = await esLapidaDeLaOrden(tx, orden.id, primero.tipo, primero.id);
+        if (lapida !== null) {
+          throw new ErrorConflicto(
+            `"${lapida}" está QUITADO de esta orden: no se compra, así que no hay nada que ` +
+              'firmarle. Si de verdad va, tráelo de vuelta desde su renglón y entonces fírmalo.',
+          );
+        }
+        throw new ErrorNoEncontrado('Renglón de la receta', primero.id);
+      }
+    }
+
+    // ⭐ B2 — REVISAR Y FIRMAR EN UN SOLO ACTO (§Post-F9.72). Sin esto la BANDEJA no sirve en su
+    // caso dominante: la receta se copia del modelo al crear la orden y sus renglones nacen
+    // `sin_revisar`, así que «liberar todo» rebotaría con *"quedan 3 sin revisar"* y obligaría a ir
+    // al Centro de Órdenes a marcarlos y volver — la vuelta que la bandeja existe para evitar, y
+    // para el 100 % de las órdenes que nadie ha tocado (las que la pueblan).
+    //
+    // No relaja la regla: es el MISMO acto que el botón «marcar todo revisado» —que existe desde
+    // V1-E3d justo porque *"obligar a 8 clics por OP entrena a la gente a clickear sin leer"*—,
+    // en la misma transacción (A2) y acotado AL ALCANCE. Los `ajustado` conservan su marca.
+    let revisadosAhora = 0;
+    if (datos.revisarPendientes) {
+      const soloSinRevisar = { estado: EstadoRenglonReceta.sin_revisar } as const;
+      const marca = { estado: EstadoRenglonReceta.revisado, ...datosModificacion(sesion) };
+      const [t, a, r] = await Promise.all([
+        dondeTela === null
+          ? Promise.resolve({ count: 0 })
+          : tx.ordenTela.updateMany({ where: { ...dondeTela, ...soloSinRevisar }, data: marca }),
+        dondeAvio === null
+          ? Promise.resolve({ count: 0 })
+          : tx.ordenAvio.updateMany({ where: { ...dondeAvio, ...soloSinRevisar }, data: marca }),
+        dondeArte === null
+          ? Promise.resolve({ count: 0 })
+          : tx.ordenArte.updateMany({ where: { ...dondeArte, ...soloSinRevisar }, data: marca }),
+      ]);
+      revisadosAhora = t.count + a.count + r.count;
+      // Las filas ya leídas se ponen al día en memoria (la escritura de arriba es la autoridad):
+      // así el `resumen` de abajo cuenta lo que la base tiene AHORA y no re-consulta.
+      for (const fila of [...telas, ...avios, ...artes]) {
+        if (fila.estado === EstadoRenglonReceta.sin_revisar) {
+          fila.estado = EstadoRenglonReceta.revisado;
+        }
+      }
+    }
+
     const resumen = resumirReceta([...telas, ...avios, ...artes]);
     if (resumen.total === 0) {
       throw new ErrorConflicto(
-        'La receta de esta orden está vacía: no hay nada que liberar. Captura lo que lleva la ' +
-          'prenda (o restaura los renglones del modelo) antes de liberarla.',
+        datos.alcance === 'todo'
+          ? 'La receta de esta orden está vacía: no hay nada que liberar. Captura lo que lleva la ' +
+              'prenda (o restaura los renglones del modelo) antes de liberarla.'
+          : `Esta orden no tiene ${NOMBRE_SECCION[datos.alcance]} que liberar.`,
       );
     }
     if (resumen.sinRevisar > 0) {
       throw new ErrorConflicto(
         `Quedan ${String(resumen.sinRevisar)} renglones sin revisar. Revísalos (o usa "marcar todo ` +
-          'revisado") antes de liberar la receta.',
+          'revisado") antes de liberar.',
       );
     }
-    await tx.orden.update({
-      where: { id: orden.id },
-      data: {
-        recetaLiberadaEn: new Date(),
-        recetaLiberadaPorId: sesion.id,
-        ...datosModificacion(sesion),
-      },
-    });
+
+    const firma = {
+      liberadoEn: new Date(),
+      liberadoPorId: sesion.id,
+      ...datosModificacion(sesion),
+    };
+    await Promise.all([
+      dondeTela === null
+        ? Promise.resolve()
+        : tx.ordenTela.updateMany({ where: dondeTela, data: firma }).then(() => undefined),
+      dondeAvio === null
+        ? Promise.resolve()
+        : tx.ordenAvio.updateMany({ where: dondeAvio, data: firma }).then(() => undefined),
+      dondeArte === null
+        ? Promise.resolve()
+        : tx.ordenArte.updateMany({ where: dondeArte, data: firma }).then(() => undefined),
+    ]);
+
     await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
       accion: 'liberar-receta',
+      alcance: datos.alcance,
       renglones: resumen.total,
+      // Cuántos de los firmados NO lo estaban: es el número que dice si esta firma movió algo.
+      nuevos: resumen.porLiberar,
       ajustados: resumen.ajustados,
-      excluidos: resumen.excluidos,
+      // A7: si la firma vino acompañada de la revisión (bandeja), queda escrito cuántos se
+      // marcaron en ese mismo acto — no se disfraza de "ya estaban revisados".
+      ...(datos.revisarPendientes ? { revisadosEnEsteActo: revisadosAhora } : {}),
+      ...(datos.alcance === 'seleccion' ? { seleccion } : {}),
     });
+  });
+}
+
+/**
+ * ⭐ TRAE DEL MODELO lo que le falta a la receta (`desarrollo.administrar`) — §Post-F9.73.
+ *
+ * Daniel (19-ago-2026): *"Si le falta algo a la receta y se genera la OP… ¿ya no puede jalar la info
+ * del modelo? Podría llegar a ser común que le falte algo a la receta."* Tenía razón: el sistema YA
+ * detectaba el faltante y hasta lo nombraba (`calcularDesalineacion` → *"El modelo ahora lleva «X», y
+ * esta orden no lo tiene"*), pero la única salida era **volver a teclearlo** mirando el modelo en
+ * otra pantalla. Y quien lo tecleaba era COMPRAS, que no es quien sabe si ese material va o no va.
+ *
+ * LAS CUATRO REGLAS, y las cuatro son de la decisión:
+ *
+ *  1. **Renglón por renglón, o todos de un jalón.** Sin `materiales` entra todo lo que falte.
+ *  2. **Lo jala DESARROLLO.** Mismo permiso que firmar (`desarrollo.administrar`): *"las mismas
+ *     manos que firman son las que jalan"*. Compras EXPLOTA, no captura.
+ *  3. **Lo que se jala nace SIN LIBERAR**, para que pase por la misma firma que todo lo demás: entra
+ *     como un pendiente más en la lista que el comprador ya está viendo (§Post-F9.72). Nace
+ *     `revisado`, no `sin_revisar`: es una copia FIEL del modelo traída a propósito por quien
+ *     revisa — el mismo criterio de `agregarRenglonReceta` — pero **sin firma**, que es lo que la
+ *     decisión pide.
+ *  4. 🔴 **NUNCA en silencio y NUNCA pisando lo ajustado.** Esta operación **solo CREA lo que no
+ *     está**. Jamás toca un renglón existente:
+ *       • el que ya está VIVO se respeta (si difiere del modelo, el camino es «Restaurar» en su
+ *         renglón, que sí avisa de lo que pisa y lo deja en la bitácora);
+ *       • la LÁPIDA se respeta con más razón: alguien decidió que esta orden NO lo lleva (la
+ *         jareta), y resucitarla desde un botón masivo desharía esa decisión de negocio en silencio.
+ *     Los dos casos vuelven en `respetados` **con su motivo redactado**: el modelo propone, la orden
+ *     manda (D3).
+ *
+ * ⚠️ **No es "restaurar la receta".** Restaurar existe aparte y es por renglón, deliberado y con
+ * `antes` íntegro en la bitácora. Traer del modelo no pisa nada, así que puede ser masivo sin miedo.
+ */
+export async function traerDelModelo(
+  sesion: SesionUsuario,
+  idOrden: number,
+  cuerpo: DatosTraerDelModelo = {},
+  bd?: ContextoBd,
+): Promise<TraerDelModeloResultado> {
+  const datos = validarEntrada(esquemaTraerDelModeloCuerpo, cuerpo);
+  const traidos: { tipo: TipoRenglonRecetaClave; material: string }[] = [];
+  const respetados: ChoqueTraerDelModelo[] = [];
+
+  const receta = await enRecetaEditable(
+    sesion,
+    idOrden,
+    bd,
+    async (tx, orden) => {
+      const pedidos = datos.materiales;
+      /** ¿Este material lo pidió el usuario EXPLÍCITAMENTE? (sin lista = "todo lo que falte"). */
+      const loPidieronPorSuNombre = (tipo: TipoRenglonRecetaClave, id: number): boolean =>
+        pedidos !== undefined &&
+        pedidos.some((m) =>
+          m.tipo !== tipo
+            ? false
+            : m.tipo === 'tela'
+              ? m.idTela === id
+              : m.tipo === 'avio'
+                ? m.idAvio === id
+                : m.idModeloArte === id,
+        );
+      /** ¿Este material entra en esta corrida? */
+      const loPidieron = (tipo: TipoRenglonRecetaClave, id: number): boolean =>
+        pedidos === undefined || loPidieronPorSuNombre(tipo, id);
+
+      /**
+       * ⚠️ **QUÉ CUENTA COMO CHOQUE, y qué NO** (hallazgo del reviewer).
+       *
+       * Un renglón que ya está en la orden **idéntico al modelo no decidió nada distinto**: no es
+       * un choque, es simplemente que no falta. Reportarlo convertía una operación exitosa en un
+       * muro de avisos falsos —una orden con 12 avíos alineados y 1 faltante daba 1 éxito y 12
+       * "choques"— y ensuciaba la bitácora con 12 conflictos que nunca ocurrieron.
+       *
+       * Se reporta cuando:
+       *  • lo PIDIERON por su nombre (preguntaron por ese material: merecen la respuesta), o
+       *  • la orden se desvió A PROPÓSITO — lápida, ajuste propio o agregado a mano. Es la MISMA
+       *    definición que usa la desalineación (`desviadoAProposito`), no una copia: "esta
+       *    diferencia la puso una persona" es lo que hace que sea un choque y no un dato.
+       */
+      const hayQueReportar = (
+        tipo: TipoRenglonRecetaClave,
+        id: number,
+        fila: { estado: EstadoRenglonReceta; agregadoAMano: boolean; excluido: boolean },
+      ): boolean => loPidieronPorSuNombre(tipo, id) || desviadoAProposito(fila);
+
+      const [telasModelo, aviosModelo, artesModelo] = await Promise.all([
+        leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
+        leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
+        leerArtesModelo(tx, orden.idModelo),
+      ]);
+
+      const auditoria = datosCreacion(sesion);
+      /** Un renglón traído del modelo: copia FIEL (revisado) y, sobre todo, SIN FIRMA. */
+      const nace = {
+        estado: EstadoRenglonReceta.revisado,
+        agregadoAMano: false,
+        excluido: false,
+        liberadoEn: null,
+        liberadoPorId: null,
+        ...auditoria,
+      } as const;
+
+      /** Qué decir cuando la orden ya tiene el material y por eso no se trae. */
+      const motivoDe = (excluido: boolean, ajustado: boolean): string =>
+        excluido
+          ? 'Esta orden decidió que NO lo lleva (se quitó a mano). Traerlo de vuelta es una decisión ' +
+            'de negocio: si de verdad va, agrégalo desde su renglón.'
+          : ajustado
+            ? 'Ya está en esta orden con un ajuste propio, y el ajuste manda sobre el modelo. Si ' +
+              'quieres el valor del modelo, usa «Restaurar» en su renglón.'
+            : 'Ya está en la receta de esta orden. Si el modelo cambió y quieres su valor de hoy, ' +
+              'usa «Restaurar» en su renglón.';
+
+      // ── TELAS ──
+      const filasTela = await tx.ordenTela.findMany({
+        where: { idOrden: orden.id },
+        select: {
+          idTela: true,
+          excluido: true,
+          estado: true,
+          agregadoAMano: true,
+          tela: { select: { nombre: true } },
+        },
+      });
+      const telaPorId = new Map(filasTela.map((f) => [f.idTela, f]));
+      for (const t of telasModelo) {
+        if (!loPidieron('tela', t.idTela)) continue;
+        const ya = telaPorId.get(t.idTela);
+        if (ya !== undefined) {
+          if (hayQueReportar('tela', t.idTela, ya)) {
+            respetados.push({
+              tipo: 'tela',
+              material: ya.tela.nombre,
+              motivo: motivoDe(ya.excluido, ya.estado === EstadoRenglonReceta.ajustado),
+            });
+          }
+          continue;
+        }
+        await tx.ordenTela.create({
+          data: {
+            idOrden: orden.id,
+            idTela: t.idTela,
+            consumoPorPrenda: new Prisma.Decimal(t.consumoPorPrenda),
+            precio: precioDecimal(t.precioCosteo),
+            paraPreCosto: t.paraPreCosto,
+            paraProduccion: t.paraProduccion,
+            paraCosto: t.paraCosto,
+            idTelaProveedor: t.idTelaProveedor,
+            ...nace,
+          },
+        });
+        traidos.push({ tipo: 'tela', material: t.nombre });
+      }
+
+      // ── AVÍOS (con sus medidas por talla, R18) ──
+      const filasAvio = await tx.ordenAvio.findMany({
+        where: { idOrden: orden.id },
+        select: {
+          idAvio: true,
+          excluido: true,
+          estado: true,
+          agregadoAMano: true,
+          avio: { select: { clave: true, descripcion: true } },
+        },
+      });
+      const avioPorId = new Map(filasAvio.map((f) => [f.idAvio, f]));
+      for (const a of aviosModelo) {
+        if (!loPidieron('avio', a.idAvio)) continue;
+        const ya = avioPorId.get(a.idAvio);
+        if (ya !== undefined) {
+          if (hayQueReportar('avio', a.idAvio, ya)) {
+            respetados.push({
+              tipo: 'avio',
+              material: `${ya.avio.clave} — ${ya.avio.descripcion}`,
+              motivo: motivoDe(ya.excluido, ya.estado === EstadoRenglonReceta.ajustado),
+            });
+          }
+          continue;
+        }
+        // V1-E3g: un avío que se compra POR MEDIDA no lleva cantidad por talla, aunque el BOM traiga
+        // el toggle heredado encendido (misma normalización que la copia al crear la orden).
+        const porMedida = await avioEsPorMedida(tx, a.idAvio);
+        const fila = await tx.ordenAvio.create({
+          data: {
+            idOrden: orden.id,
+            idAvio: a.idAvio,
+            consumoPorPrenda: new Prisma.Decimal(a.consumoPorPrenda),
+            precio: precioDecimal(a.precioCosteo),
+            paraPreCosto: a.paraPreCosto,
+            paraProduccion: a.paraProduccion,
+            paraCosto: a.paraCosto,
+            consumoPorTalla: porMedida ? false : a.consumoPorTalla,
+            idAvioProveedor: a.idAvioProveedor,
+            ...nace,
+          },
+          select: { id: true },
+        });
+        const medidas = await tx.modeloAvioTalla.findMany({
+          where: { idModelo: orden.idModelo, idAvio: a.idAvio },
+          select: { idTalla: true, consumo: true, idAvioMedida: true },
+        });
+        if (medidas.length > 0) {
+          await tx.ordenAvioTalla.createMany({
+            data: medidas.map((m) => ({
+              idOrdenAvio: fila.id,
+              idTalla: m.idTalla,
+              consumo: m.consumo,
+              idAvioMedida: m.idAvioMedida,
+              ...auditoria,
+            })),
+          });
+        }
+        traidos.push({ tipo: 'avio', material: `${a.clave} — ${a.descripcion}` });
+      }
+
+      // ── ARTES (casados por su TRAZA `idModeloArte`, V1-E3f) ──
+      const filasArte = await tx.ordenArte.findMany({
+        where: { idOrden: orden.id },
+        select: {
+          idModeloArte: true,
+          excluido: true,
+          estado: true,
+          agregadoAMano: true,
+          descripcion: true,
+        },
+      });
+      const artePorTraza = new Map(
+        filasArte.flatMap((f) => (f.idModeloArte === null ? [] : [[f.idModeloArte, f] as const])),
+      );
+      for (const ar of artesModelo) {
+        if (!loPidieron('arte', ar.id)) continue;
+        const ya = artePorTraza.get(ar.id);
+        if (ya !== undefined) {
+          if (hayQueReportar('arte', ar.id, ya)) {
+            respetados.push({
+              tipo: 'arte',
+              material: ya.descripcion,
+              motivo: motivoDe(ya.excluido, ya.estado === EstadoRenglonReceta.ajustado),
+            });
+          }
+          continue;
+        }
+        await tx.ordenArte.create({
+          data: {
+            idOrden: orden.id,
+            idModeloArte: ar.id,
+            descripcion: ar.descripcion,
+            posicion: ar.posicion,
+            puntadas: ar.puntadas,
+            precio: precioDecimal(ar.precio),
+            idTipoArte: ar.idTipoArte,
+            idProveedor: ar.idProveedor,
+            ...nace,
+          },
+        });
+        traidos.push({ tipo: 'arte', material: ar.descripcion });
+      }
+
+      // ⚠️ H6 — LO QUE SE PIDIÓ Y EL MODELO YA NO LLEVA (D3: se dice con nombre, no se calla).
+      //
+      // El aviso de faltante que trae el `idMaterialModelo` puede venir de una pantalla abierta hace
+      // rato: entre medias alguien pudo quitar ese material del BOM. Sin esto, los tres bucles de
+      // arriba simplemente no encontraban qué traer, las dos listas volvían vacías y el panel decía
+      // *"No hay nada del modelo que traer: esta orden ya lo tiene todo"* — **falso**, y peor: la
+      // acción que el usuario pidió no ocurrió y nadie se lo dijo.
+      for (const m of pedidos ?? []) {
+        const enElModelo =
+          m.tipo === 'tela'
+            ? telasModelo.some((t) => t.idTela === m.idTela)
+            : m.tipo === 'avio'
+              ? aviosModelo.some((a) => a.idAvio === m.idAvio)
+              : artesModelo.some((a) => a.id === m.idModeloArte);
+        if (enElModelo) continue;
+        const id = m.tipo === 'tela' ? m.idTela : m.tipo === 'avio' ? m.idAvio : m.idModeloArte;
+        respetados.push({
+          tipo: m.tipo,
+          material: (await nombreDelMaterial(tx, m.tipo, id)) ?? `#${String(id)}`,
+          motivo:
+            'El modelo YA NO lo lleva, así que no hay de dónde traerlo. El aviso que lo pedía es ' +
+            'de antes de que se quitara del modelo: vuelve a abrir la receta para verla al día.',
+        });
+      }
+
+      // D3/A7: la bitácora guarda LAS DOS listas — lo que entró y lo que se respetó con su motivo.
+      // "No lo trajo en silencio" no es solo la pantalla: tiene que quedar escrito.
+      await bitacoraReceta(tx, sesion, orden.id, 'CREAR', {
+        accion: 'traer-del-modelo',
+        ...(datos.materiales === undefined
+          ? { alcance: 'todo-lo-que-falte' }
+          : { pedidos: datos.materiales }),
+        traidos,
+        respetados,
+      });
+    },
+    // Agrega material a la receta, pero SOLO material NUEVO y SIN FIRMA: no hay ninguna firma ajena
+    // que invalidar, así que no se declara ningún renglón tocado (ver `enRecetaEditable`).
+    { cambiaElContenido: true },
+  );
+
+  return { receta, traidos, respetados };
+}
+
+/**
+ * Cómo se llama un material del CATÁLOGO (no de la receta), para poder nombrarlo en un aviso aunque
+ * ni la orden ni el modelo lo lleven ya. `null` si el id no existe.
+ */
+async function nombreDelMaterial(
+  tx: Tx,
+  tipo: TipoRenglonRecetaClave,
+  id: number,
+): Promise<string | null> {
+  if (tipo === 'tela') {
+    const fila = await tx.tela.findUnique({ where: { id }, select: { nombre: true } });
+    return fila?.nombre ?? null;
+  }
+  if (tipo === 'avio') {
+    const fila = await tx.avio.findUnique({
+      where: { id },
+      select: { clave: true, descripcion: true },
+    });
+    return fila === null ? null : `${fila.clave} — ${fila.descripcion}`;
+  }
+  const fila = await tx.modeloArte.findUnique({ where: { id }, select: { descripcion: true } });
+  return fila?.descripcion ?? null;
+}
+
+/**
+ * ¿Ese id es una LÁPIDA de esta orden? Devuelve cómo se llama el material (para nombrarlo en el
+ * mensaje) o `null` si el renglón no existe aquí. Solo para explicar por qué un id de una selección
+ * no entró al alcance — la diferencia entre *"no existe"* y *"existe pero está quitado"*.
+ */
+async function esLapidaDeLaOrden(
+  tx: Tx,
+  idOrden: number,
+  tipo: TipoRenglonRecetaClave,
+  idRenglon: number,
+): Promise<string | null> {
+  if (tipo === 'tela') {
+    const fila = await tx.ordenTela.findFirst({
+      where: { id: idRenglon, idOrden, excluido: true },
+      select: { tela: { select: { nombre: true } } },
+    });
+    return fila === null ? null : fila.tela.nombre;
+  }
+  if (tipo === 'avio') {
+    const fila = await tx.ordenAvio.findFirst({
+      where: { id: idRenglon, idOrden, excluido: true },
+      select: { avio: { select: { clave: true, descripcion: true } } },
+    });
+    return fila === null ? null : `${fila.avio.clave} — ${fila.avio.descripcion}`;
+  }
+  const fila = await tx.ordenArte.findFirst({
+    where: { id: idRenglon, idOrden, excluido: true },
+    select: { descripcion: true },
+  });
+  return fila === null ? null : fila.descripcion;
+}
+
+/** Cómo se nombra cada sección en los mensajes de alcance. */
+const NOMBRE_SECCION: Record<AlcanceLiberacion, string> = {
+  todo: 'renglones',
+  telas: 'telas',
+  avios: 'avíos',
+  artes: 'artes',
+  seleccion: 'renglones',
+};
+
+/**
+ * QUITA la firma de los renglones tocados que la tenían, y devuelve cuáles se re-cerraron (para la
+ * bitácora). Se re-lee el `liberadoEn` desde la base a propósito: la mutación ya escribió, así que
+ * lo que valga la pena revocar es lo que la base diga AHORA.
+ */
+async function revocarFirmaDeRenglones(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idOrden: number,
+  tocados: readonly { tipo: TipoRenglonRecetaClave; idRenglon: number }[],
+): Promise<{ tipo: TipoRenglonRecetaClave; idRenglon: number }[]> {
+  const ids = (tipo: TipoRenglonRecetaClave): number[] => [
+    ...new Set(tocados.filter((t) => t.tipo === tipo).map((t) => t.idRenglon)),
+  ];
+  const limpiar = { liberadoEn: null, liberadoPorId: null, ...datosModificacion(sesion) };
+  const revocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
+
+  const idsTela = ids('tela');
+  if (idsTela.length > 0) {
+    const filas = await tx.ordenTela.findMany({
+      where: { idOrden, id: { in: idsTela }, liberadoEn: { not: null } },
+      select: { id: true },
+    });
+    if (filas.length > 0) {
+      await tx.ordenTela.updateMany({
+        where: { id: { in: filas.map((f) => f.id) } },
+        data: limpiar,
+      });
+      revocados.push(...filas.map((f) => ({ tipo: 'tela' as const, idRenglon: f.id })));
+    }
+  }
+  const idsAvio = ids('avio');
+  if (idsAvio.length > 0) {
+    const filas = await tx.ordenAvio.findMany({
+      where: { idOrden, id: { in: idsAvio }, liberadoEn: { not: null } },
+      select: { id: true },
+    });
+    if (filas.length > 0) {
+      await tx.ordenAvio.updateMany({
+        where: { id: { in: filas.map((f) => f.id) } },
+        data: limpiar,
+      });
+      revocados.push(...filas.map((f) => ({ tipo: 'avio' as const, idRenglon: f.id })));
+    }
+  }
+  const idsArte = ids('arte');
+  if (idsArte.length > 0) {
+    const filas = await tx.ordenArte.findMany({
+      where: { idOrden, id: { in: idsArte }, liberadoEn: { not: null } },
+      select: { id: true },
+    });
+    if (filas.length > 0) {
+      await tx.ordenArte.updateMany({
+        where: { id: { in: filas.map((f) => f.id) } },
+        data: limpiar,
+      });
+      revocados.push(...filas.map((f) => ({ tipo: 'arte' as const, idRenglon: f.id })));
+    }
+  }
+  return revocados;
+}
+
+/**
+ * ⭐ LA INVARIANTE DEL DERIVADO, en una sola línea y PURA: *"no queda ningún renglón vivo sin
+ * firmar"*. Vive aparte —y exportada— porque es la regla que decide si `Orden.recetaLiberadaEn` se
+ * sella, y de ahí cuelga el semáforo de "orden completa".
+ *
+ * ⚠️ **Una receta VACÍA es `false`, no `true`.** `[].every(...)` contesta `true`, así que sin el
+ * `length > 0` una receta que se quedó sin renglones vivos se sellaría como "liberada completa" y
+ * el semáforo diría *orden completa* con una receta que no tiene nada — la misma mentira que
+ * `liberarReceta` rechaza de frente ("liberar nada sería mentir"). El caso llega solo: excluir el
+ * último renglón vivo pasa por aquí.
+ */
+export function recetaCompletamenteLiberada(
+  vivos: readonly { liberadoEn: Date | null }[],
+): boolean {
+  return vivos.length > 0 && vivos.every((f) => f.liberadoEn !== null);
+}
+
+/**
+ * ⭐ MANTIENE `Orden.recetaLiberadaEn` como DERIVADO (V1-E3h): *"no queda ningún renglón vivo sin
+ * firmar"*. Es lo que leen el semáforo de "orden completa" (`requisitos-orden.ts`) y el detalle de
+ * la orden; la PUERTA DE COMPRA ya no lo consulta (pregunta renglón por renglón).
+ *
+ * Lo mantiene el DOMINIO y solo el dominio (nunca la UI, nunca una vista): se llama al final de
+ * TODA mutación de receta, porque hasta excluir un renglón pendiente puede dejar la receta completa.
+ * La fecha que se sella es la de la firma MÁS RECIENTE, no `now()`: "cuándo quedó completa" es
+ * cuándo se firmó el último renglón que faltaba.
+ *
+ * Una receta VACÍA (sin renglones vivos) NO cuenta como liberada: sería decir que se revisó nada.
+ */
+async function sincronizarLiberacionOrden(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idOrden: number,
+): Promise<void> {
+  const donde = { idOrden, excluido: false } as const;
+  const [telas, avios, artes] = await Promise.all([
+    tx.ordenTela.findMany({ where: donde, select: { liberadoEn: true, liberadoPorId: true } }),
+    tx.ordenAvio.findMany({ where: donde, select: { liberadoEn: true, liberadoPorId: true } }),
+    tx.ordenArte.findMany({ where: donde, select: { liberadoEn: true, liberadoPorId: true } }),
+  ]);
+  const vivos = [...telas, ...avios, ...artes];
+  const todoFirmado = recetaCompletamenteLiberada(vivos);
+
+  const actual = await tx.orden.findUniqueOrThrow({
+    where: { id: idOrden },
+    select: { recetaLiberadaEn: true, recetaLiberadaPorId: true },
+  });
+
+  if (!todoFirmado) {
+    if (actual.recetaLiberadaEn === null) return;
+    await tx.orden.update({
+      where: { id: idOrden },
+      data: { recetaLiberadaEn: null, recetaLiberadaPorId: null, ...datosModificacion(sesion) },
+    });
+    return;
+  }
+
+  // La última firma manda (y con ella, quién la puso).
+  let ultima = vivos[0] as { liberadoEn: Date | null; liberadoPorId: string | null };
+  for (const f of vivos) {
+    if ((f.liberadoEn?.getTime() ?? 0) >= (ultima.liberadoEn?.getTime() ?? 0)) ultima = f;
+  }
+  if (actual.recetaLiberadaEn?.getTime() === ultima.liberadoEn?.getTime()) return;
+  await tx.orden.update({
+    where: { id: idOrden },
+    data: {
+      recetaLiberadaEn: ultima.liberadoEn,
+      recetaLiberadaPorId: ultima.liberadoPorId,
+      ...datosModificacion(sesion),
+    },
   });
 }
 

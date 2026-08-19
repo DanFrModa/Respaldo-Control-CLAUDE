@@ -115,9 +115,26 @@ export async function sembrarRecetaDeOrden(
     (await cliente.ordenAvio.count({ where: { idOrden, excluido: false } })) +
     (await cliente.ordenArte.count({ where: { idOrden, excluido: false } }));
   if (liberada && renglones > 0) {
+    // ⭐ V1-E3h (§Post-F9.72) — LA FIRMA VIVE EN EL RENGLÓN, y la puerta de compra pregunta AHÍ.
+    //
+    // ⚠️ La lección de este helper: sellar solo `ordenes.receta_liberada_en` fabricaba un estado
+    // que **el dominio ya no puede producir** (una orden "liberada" con cero renglones firmados), y
+    // con él la puerta contestaba 409 en 46 explosiones de `mrp.int.test.ts` y en dos altas de
+    // `ordenes-compra.int.test.ts`. Un fixture que inventa un estado imposible no simplifica: miente.
+    //
+    // Se firma con la MISMA fecha en los renglones y en la orden —igual que el backfill de
+    // `20260819120000_receta_liberada_por_renglon` y que `crearOrdenMigrada`—, y `liberado_por_id`
+    // queda NULL, que es como se lee *"la firmó la migración, no una persona"*.
+    const firmadaEn = new Date();
+    const firma = { liberadoEn: firmadaEn, liberadoPorId: null };
+    await Promise.all([
+      cliente.ordenTela.updateMany({ where: { idOrden }, data: firma }),
+      cliente.ordenAvio.updateMany({ where: { idOrden }, data: firma }),
+      cliente.ordenArte.updateMany({ where: { idOrden }, data: firma }),
+    ]);
     await cliente.orden.update({
       where: { id: idOrden },
-      data: { recetaLiberadaEn: new Date(), recetaLiberadaPorId: null },
+      data: { recetaLiberadaEn: firmadaEn, recetaLiberadaPorId: null },
     });
   }
 }

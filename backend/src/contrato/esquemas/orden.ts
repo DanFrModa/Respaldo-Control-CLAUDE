@@ -317,7 +317,14 @@ export const esquemaEstadoOrden = z
 export const esquemaRequisitosOrden = z
   .object({
     tallas: z.boolean().describe('La orden tiene su matriz de tallas capturada (≥1 renglón).'),
-    receta: z.boolean().describe('Desarrollo LIBERÓ la receta congelada de esta orden.'),
+    receta: z
+      .boolean()
+      .describe(
+        'Desarrollo liberó la receta congelada de esta orden POR COMPLETO. Desde V1-E3h ' +
+          '(§Post-F9.72) la firma es por renglón y se puede liberar por partes: una orden con la ' +
+          'receta a medio firmar SÍ puede comprar lo liberado, pero todavía NO está completa — que ' +
+          'es exactamente lo que este requisito dice.',
+      ),
     arte: z
       .union([z.literal('no-aplica'), z.boolean()])
       .describe('La receta de la orden tiene su arte; "no-aplica" si el modelo no lleva arte.'),

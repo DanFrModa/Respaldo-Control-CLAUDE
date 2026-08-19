@@ -2833,13 +2833,21 @@ model Orden {
   //    (telas + avíos con sus medidas por talla + artes) con su CANTIDAD y su PRECIO; a partir de
   //    ahí la orden vive de SU receta y el modelo sigue siendo la plantilla. Ver `orden_tela`.
 
-  /// Cuándo Desarrollo LIBERÓ la receta de esta orden (§Post-F9.43(c)). NULL = sin liberar: **no
-  /// se puede explotar el MRP ni generar OC** (la puerta va antes de COMPRAR). Cortar y producir
-  /// NO se bloquean: el piso no se detiene porque Desarrollo no haya terminado de revisar.
+  /// ⚠️ **DERIVADO desde V1-E3h (§Post-F9.72): "TODO lo vivo de esta receta está liberado".** La
+  /// firma dejó de ser una sola para toda la receta y bajó AL RENGLÓN
+  /// (`orden_tela/avio/arte.liberado_en`), porque Daniel pidió liberar POR PARTES: *"podría haber
+  /// algún cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*.
+  ///
+  /// Se CONSERVA —y lo mantiene el DOMINIO, nunca la UI ni una vista— porque es lo que leen el
+  /// semáforo de "orden completa" (`requisitos-orden.ts`) y el detalle de la orden: ahí la pregunta
+  /// sigue siendo *"¿la receta está completa?"*, que es exactamente "no queda ningún renglón vivo
+  /// sin firmar". NULL = queda algo por liberar (o no hay nada liberado).
+  ///
+  /// ⚠️ La PUERTA DE COMPRA ya NO se decide con esta columna: se compra lo LIBERADO, renglón por
+  /// renglón (ver `exigirRecetaLiberada`). Cortar y producir siguen SIN bloquearse.
   recetaLiberadaEn    DateTime? @map("receta_liberada_en")
-  /// Quién liberó la receta. NULL con `recetaLiberadaEn` presente = la liberó la MIGRACIÓN
-  /// (backfill de V1-E3d: las órdenes que ya existían nacieron liberadas para no parar la
-  /// operación el día del deploy; sus renglones sí quedaron `sin_revisar`).
+  /// Quién dejó la receta COMPLETAMENTE liberada. NULL con `recetaLiberadaEn` presente = la liberó
+  /// la MIGRACIÓN (backfill de V1-E3d).
   recetaLiberadaPorId String?   @map("receta_liberada_por_id")
 
   /// Renglones de TELA de la receta congelada de esta orden. Cascade.
@@ -3160,6 +3168,17 @@ model OrdenTela {
   /// Por qué se ajustó/excluyó (texto libre, opcional). Viaja a la bitácora.
   notas         String?             @db.Text
 
+  /// ⭐ V1-E3h (§Post-F9.72) — LA FIRMA DE DESARROLLO, POR RENGLÓN. Daniel: *"podría haber algún
+  /// cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*. NULL = este
+  /// renglón todavía no lo firma Desarrollo: **no se compra** (la explosión del MRP no lo trae, y
+  /// lo REPORTA aparte para que el comprador vea qué le falta). Tocar el CONTENIDO de un renglón ya
+  /// liberado lo vuelve a poner en NULL (`enRecetaEditable`).
+  liberadoEn    DateTime? @map("liberado_en")
+  /// Quién firmó ESTE renglón. NULL con `liberadoEn` presente = lo firmó la MIGRACIÓN (backfill de
+  /// V1-E3h: los renglones de las órdenes que ya estaban liberadas nacieron firmados, para que
+  /// nadie se despierte con la puerta cerrada el día del deploy).
+  liberadoPorId String?   @map("liberado_por_id")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -3167,6 +3186,7 @@ model OrdenTela {
 
   @@unique([idOrden, idTela])
   @@index([idOrden])
+  @@index([liberadoEn])
   @@index([idTela])
   @@index([idTelaProveedor])
   @@map("orden_tela")
@@ -3204,6 +3224,17 @@ model OrdenAvio {
   /// Medidas por talla de ESTE avío en ESTA orden (R18). Cascade.
   tallas OrdenAvioTalla[]
 
+  /// ⭐ V1-E3h (§Post-F9.72) — LA FIRMA DE DESARROLLO, POR RENGLÓN. Daniel: *"podría haber algún
+  /// cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*. NULL = este
+  /// renglón todavía no lo firma Desarrollo: **no se compra** (la explosión del MRP no lo trae, y
+  /// lo REPORTA aparte para que el comprador vea qué le falta). Tocar el CONTENIDO de un renglón ya
+  /// liberado lo vuelve a poner en NULL (`enRecetaEditable`).
+  liberadoEn    DateTime? @map("liberado_en")
+  /// Quién firmó ESTE renglón. NULL con `liberadoEn` presente = lo firmó la MIGRACIÓN (backfill de
+  /// V1-E3h: los renglones de las órdenes que ya estaban liberadas nacieron firmados, para que
+  /// nadie se despierte con la puerta cerrada el día del deploy).
+  liberadoPorId String?   @map("liberado_por_id")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -3211,6 +3242,7 @@ model OrdenAvio {
 
   @@unique([idOrden, idAvio])
   @@index([idOrden])
+  @@index([liberadoEn])
   @@index([idAvio])
   @@index([idAvioProveedor])
   @@map("orden_avio")
@@ -3284,6 +3316,17 @@ model OrdenArte {
   excluido      Boolean             @default(false)
   notas         String?             @db.Text
 
+  /// ⭐ V1-E3h (§Post-F9.72) — LA FIRMA DE DESARROLLO, POR RENGLÓN. Daniel: *"podría haber algún
+  /// cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo demás"*. NULL = este
+  /// renglón todavía no lo firma Desarrollo: **no se compra** (la explosión del MRP no lo trae, y
+  /// lo REPORTA aparte para que el comprador vea qué le falta). Tocar el CONTENIDO de un renglón ya
+  /// liberado lo vuelve a poner en NULL (`enRecetaEditable`).
+  liberadoEn    DateTime? @map("liberado_en")
+  /// Quién firmó ESTE renglón. NULL con `liberadoEn` presente = lo firmó la MIGRACIÓN (backfill de
+  /// V1-E3h: los renglones de las órdenes que ya estaban liberadas nacieron firmados, para que
+  /// nadie se despierte con la puerta cerrada el día del deploy).
+  liberadoPorId String?   @map("liberado_por_id")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -3291,6 +3334,7 @@ model OrdenArte {
 
   @@unique([idOrden, idModeloArte])
   @@index([idOrden])
+  @@index([liberadoEn])
   @@index([idModeloArte])
   @@index([idProveedor])
   @@index([idTipoArte])

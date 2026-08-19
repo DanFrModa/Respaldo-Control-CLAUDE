@@ -10,10 +10,14 @@ import { CLAVE_ORDENES } from './ordenes';
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  LiberarRecetaCuerpo,
   RecetaAgregarCuerpo,
   RecetaEditarCuerpo,
   RecetaOrden,
+  RecetasPorLiberarPagina,
   TipoRenglonReceta,
+  TraerDelModeloCuerpo,
+  TraerDelModeloResultado,
 } from './tipos';
 
 /**
@@ -206,19 +210,110 @@ export function useMarcarRecetaRevisada(): UseMutationResult<RecetaOrden, ErrorD
   });
 }
 
-/** LIBERA la receta: abre la puerta al MRP y a las órdenes de compra (§Post-F9.43(c)). */
-export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, number> {
+/** Argumentos de liberar: qué parte de la receta se firma (V1-E3h, §Post-F9.72). */
+export interface ArgsLiberarReceta {
+  idOrden: number;
+  /** Sin cuerpo = `alcance: 'todo'` (el botón de siempre). */
+  cuerpo?: LiberarRecetaCuerpo;
+}
+
+/**
+ * LIBERA la receta — entera, por sección, o renglón por renglón (§Post-F9.72).
+ *
+ * La puerta dejó de ser todo-o-nada: se compra lo liberado. Qué se puede firmar y qué no (que no
+ * queden renglones sin revisar dentro del alcance, que el alcance no esté vacío) lo decide el
+ * BACKEND — aquí no se replica ninguna de esas reglas (A1).
+ */
+export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, ArgsLiberarReceta> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (idOrden: number) => {
+    mutationFn: async ({ idOrden, cuerpo }: ArgsLiberarReceta) => {
       const { data, error } = await api.POST('/api/ordenes/{id}/receta/liberar', {
         params: { path: { id: idOrden } },
+        body: cuerpo ?? { alcance: 'todo' },
       });
       if (!data) throw new ErrorDeApi(error);
       return data;
     },
-    onSuccess: (receta, idOrden) => {
+    onSuccess: (receta, { idOrden }) => {
       trasMutar(qc, idOrden, receta);
+      // La bandeja de Desarrollo cuenta pendientes por orden: firmar cambia lo que muestra.
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+/** Argumentos de traer del modelo (sin `materiales` = todo lo que falte). */
+export interface ArgsTraerDelModelo {
+  idOrden: number;
+  cuerpo?: TraerDelModeloCuerpo;
+}
+
+/**
+ * TRAE DEL MODELO lo que le falta a la receta (§Post-F9.73). Lo jala **Desarrollo**
+ * (`desarrollo.administrar`), no compras.
+ *
+ * Devuelve la receta ya recargada MÁS el resumen de qué se trajo y qué se respetó: el backend nunca
+ * pisa un renglón existente y dice por qué (aquí solo se pinta ese resumen — A1).
+ */
+export function useTraerDelModelo(): UseMutationResult<
+  TraerDelModeloResultado,
+  ErrorDeApi,
+  ArgsTraerDelModelo
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, cuerpo }: ArgsTraerDelModelo) => {
+      const { data, error } = await api.POST('/api/ordenes/{id}/receta/traer-del-modelo', {
+        params: { path: { id: idOrden } },
+        body: cuerpo ?? {},
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (resultado, { idOrden }) => {
+      trasMutar(qc, idOrden, resultado.receta);
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+/** Clave de la caché de la bandeja «Recetas por liberar». */
+export const CLAVE_RECETAS_POR_LIBERAR = ['recetas-por-liberar'] as const;
+
+/** Filtros de la bandeja (lo que viaja en la URL del endpoint). */
+export interface FiltrosRecetasPorLiberar {
+  pagina?: number;
+  porPagina?: number;
+  soloConOrdenCompra?: boolean;
+  busqueda?: string;
+}
+
+/**
+ * BANDEJA «Recetas por liberar» (§Post-F9.72, DANIEL: *"está buenísima"*). Una fila por ORDEN,
+ * ordenada por fecha de entrega, con los conteos por tipo y la marca de "ya está frenando dinero"
+ * **agregados en el servidor** (A1: aquí no se suma nada).
+ */
+export function useRecetasPorLiberar(
+  filtros: FiltrosRecetasPorLiberar = {},
+): UseQueryResult<RecetasPorLiberarPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_RECETAS_POR_LIBERAR, filtros],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/recetas-por-liberar', {
+        params: {
+          query: {
+            pagina: filtros.pagina ?? 1,
+            porPagina: filtros.porPagina ?? 20,
+            soloConOrdenCompra: filtros.soloConOrdenCompra === true ? 'true' : 'false',
+            ...(filtros.busqueda === undefined || filtros.busqueda === ''
+              ? {}
+              : { busqueda: filtros.busqueda }),
+          },
+        },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
     },
   });
 }
