@@ -3262,3 +3262,41 @@ liberada, pero **no lleva a donde se libera**. Deja al usuario adivinando en qu�
 - **Aplica en:** etapa propia (toca la puerta de compra: es camino de dinero). Migración probable —el
   estado de liberación pasa de la orden al renglón.
 - **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.73) — Lo que le falta a la receta se JALA del modelo, y lo jala Desarrollo (DANIEL, 19-ago-2026)
+
+Daniel, sobre el flujo completo: *"Si le falta algo a la receta y se genera la OP… ¿ya no puede jalar la
+info del modelo? Creo que está mal planteado. **Podría llegar a ser común que le falte algo a la
+receta.**"*
+
+**Tiene razón, y el diagnóstico exacto es éste:** el sistema **YA detecta** la desalineación y hasta la
+nombra —`calcularDesalineacion` empuja el aviso literal *"El modelo ahora lleva «X», y esta orden no lo
+tiene"*— pero **no hay forma de traerlo**. Las operaciones existentes son agregar **a mano**, editar,
+quitar y `restaurarRenglonReceta` — y **restaurar solo aplica a renglones que YA están** en la orden. Para
+lo que falta, alguien tiene que **volver a capturarlo mirando el modelo en otra pantalla**.
+
+⚠️ **El sistema sabe qué falta, sabe de dónde sacarlo, lo dice con nombre y apellido — y aun así obliga a
+teclearlo.** Y quien lo teclearía es **compras**, que no es quien sabe si ese material va o no va.
+
+**Y el caso no es la excepción:** una receta incompleta al generar la OP es lo **normal** cuando el
+desarrollo corre en paralelo con la venta, que es como trabaja FR Moda.
+
+### Lo decidido
+
+1. **El aviso trae su botón de «traer del modelo»** — renglón por renglón, o todos de un jalón.
+2. ⭐ **Lo jala DESARROLLO, no compras.** Daniel: *"al final es el mismo quien lo va a liberar, para que
+   compras solo haga la explosión del material… **si desarrollo es quien libera la receta, debe seguir
+   haciéndolo con lo que falte** (aunque él mismo sea quien lo mete en el desarrollo)"*. **Las mismas manos
+   que firman son las que jalan**; compras **explota**, no captura.
+3. **Lo que se jala nace SIN LIBERAR**, para que pase por la misma firma que todo lo demás — encaja con la
+   liberación por partes de §Post-F9.72: *lo que llega tarde entra como un renglón más pendiente*, y el
+   comprador lo ve en la misma lista de "qué me falta".
+4. 🔴 **NUNCA en silencio, y NUNCA pisando lo ajustado a mano.** Daniel: *"no debe de jalarlo en
+   silencio"*. Si un renglón de la orden ya se ajustó para ESTA orden en concreto, traer del modelo
+   **respeta el ajuste o avisa del choque** — jamás sobrescribe. Es la misma regla de la receta congelada:
+   **el modelo propone, la orden manda** (D3).
+
+- **Aplica en:** la misma etapa de §Post-F9.72 (la receta en la OP). Sin migración propia.
+- **Fecha:** 2026-08-19.
