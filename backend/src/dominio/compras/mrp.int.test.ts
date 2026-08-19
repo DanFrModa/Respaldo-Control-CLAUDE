@@ -834,6 +834,154 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
   });
 });
 
+// ── V1-E3i · §Post-F9.71 (DANIEL, 19-ago-2026): cada OC de la explosión, con SU fecha ─────────────
+
+describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', () => {
+  /**
+   * Con el seed base sólo el BOTÓN tiene proveedor sugerido → una sola OC, y una sola OC no puede
+   * demostrar nada sobre fechas distintas. Aquí se le pone proveedor al HILO (genérico sin stock,
+   * así que va completo a compra) para que la explosión produzca DOS grupos: Baratos (botón) y
+   * Caros (hilo).
+   */
+  async function dosProveedoresComprables(): Promise<void> {
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioHilo.id, idProveedor: provCaro.id, precio: 1 },
+    });
+    await explosionarConRecetaFresca();
+  }
+
+  /** Fecha de entrega (YYYY-MM-DD) de la OC generada para ese proveedor. */
+  async function fechaDeLaOcDe(
+    resultado: Awaited<ReturnType<typeof generarOCDesdeExplosion>>,
+    idProveedor: number,
+  ): Promise<string | null> {
+    const generada = resultado.ordenesCompra.find((o) => o.idProveedor === idProveedor);
+    expect(generada).toBeDefined();
+    const oc = await obtenerOC(sesion(), generada!.idOrdenCompra, bd());
+    return oc.fechaEntrega;
+  }
+
+  it('cada proveedor recibe SU fecha (la tela semanas antes que los avíos)', async () => {
+    await dosProveedoresComprables();
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      {
+        idsRequerimiento: [],
+        fechaEntrega: '2026-11-30',
+        fechasPorProveedor: [
+          { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
+          { idProveedor: provCaro.id, fechaEntrega: '2026-12-20' },
+        ],
+      },
+      bd(),
+    );
+
+    expect(resultado.ordenesCompra).toHaveLength(2);
+    expect(await fechaDeLaOcDe(resultado, provBarato.id)).toBe('2026-10-05');
+    expect(await fechaDeLaOcDe(resultado, provCaro.id)).toBe('2026-12-20');
+  });
+
+  it('el proveedor SIN fecha propia toma la de arriba (valor inicial, no imposición)', async () => {
+    await dosProveedoresComprables();
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      {
+        idsRequerimiento: [],
+        fechaEntrega: '2026-11-30',
+        fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
+      },
+      bd(),
+    );
+
+    expect(await fechaDeLaOcDe(resultado, provBarato.id)).toBe('2026-10-05');
+    expect(await fechaDeLaOcDe(resultado, provCaro.id)).toBe('2026-11-30');
+  });
+
+  it('sin fecha de arriba NI en la orden, basta con que cada proveedor traiga la suya', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
+    await dosProveedoresComprables();
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      {
+        idsRequerimiento: [],
+        fechasPorProveedor: [
+          { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
+          { idProveedor: provCaro.id, fechaEntrega: '2026-12-20' },
+        ],
+      },
+      bd(),
+    );
+
+    expect(await fechaDeLaOcDe(resultado, provBarato.id)).toBe('2026-10-05');
+    expect(await fechaDeLaOcDe(resultado, provCaro.id)).toBe('2026-12-20');
+  });
+
+  it('si a un proveedor no le queda fecha por ningún lado, lo dice CON SU NOMBRE y no crea nada', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
+    await dosProveedoresComprables();
+
+    await expect(
+      generarOCDesdeExplosion(
+        sesion(),
+        idOrden,
+        {
+          idsRequerimiento: [],
+          fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Avíos Caros/);
+    // A2: no nace ni la OC del proveedor que sí tenía fecha.
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('dos fechas distintas para el MISMO proveedor se rechazan (no se resuelve en silencio, D3)', async () => {
+    await dosProveedoresComprables();
+    await expect(
+      generarOCDesdeExplosion(
+        sesion(),
+        idOrden,
+        {
+          idsRequerimiento: [],
+          fechasPorProveedor: [
+            { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
+            { idProveedor: provBarato.id, fechaEntrega: '2026-10-06' },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/dos fechas de entrega distintas/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('la fecha de un proveedor que NO entró en la selección no estorba', async () => {
+    await dosProveedoresComprables();
+    const soloBoton = await cliente.requerimientoOrden.findFirstOrThrow({
+      where: { idOrden, idAvio: avioBoton.id },
+      select: { id: true },
+    });
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      {
+        idsRequerimiento: [soloBoton.id],
+        fechaEntrega: '2026-11-30',
+        fechasPorProveedor: [
+          { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
+          { idProveedor: provCaro.id, fechaEntrega: '2026-12-20' },
+        ],
+      },
+      bd(),
+    );
+
+    expect(resultado.ordenesCompra).toHaveLength(1);
+    expect(await fechaDeLaOcDe(resultado, provBarato.id)).toBe('2026-10-05');
+  });
+});
+
 // ── V1-E3e · D1 (DANIEL, 15-ago-2026): la OC nace con lo último que ESE proveedor cobró ───────────
 
 describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última compra AL MISMO proveedor', () => {

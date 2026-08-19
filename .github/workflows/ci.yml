@@ -126,12 +126,26 @@ jobs:
       # el `pg_dump --version` que cerraba este paso NO delataba nada: el wrapper contestaba 16 y el
       # paso salia con exito — la misma clase de "verificacion que no verifica" que esta etapa vino
       # a eliminar. Ahora se COMPRUEBA la major y, si no es 17, el paso falla diciendo por que.
+      #
+      # ⏱️ Y LOS REINTENTOS NO SALVAN DE UN CUELGUE (V1-E3i — se colgo DOS VECES la noche del
+      # 19-ago: 32 min y 23 min contra los ~11 s que tarda cuando funciona, y hubo que cancelar y
+      # relanzar a mano). El bucle de abajo atrapa FALLOS, no cuelgues: `apt-get` sin limite de
+      # tiempo simplemente NUNCA REGRESA si la red se pasma a media descarga, asi que el reintento
+      # jamas llega a ejecutarse. Era una defensa escrita para "falla y reintento" contra un mundo
+      # que hace "no contesta nunca".
+      # El arreglo: cada comando de red lleva su tope (`timeout` en apt, `--max-time` en curl) para
+      # que un cuelgue SE VUELVA UN FALLO y el reintento que ya existe haga su trabajo. `timeout`
+      # devuelve 124 al cortar, y como los comandos van dentro de un `if` eso NO aborta el paso pese
+      # a `set -e` (la condicion de un `if` esta exenta): cuenta como intento fallido, que es
+      # justo lo que se quiere. Y `timeout-minutes` en el paso es el cinturon: aunque se cuelgue
+      # algo que no previmos, no vuelve a comerse media hora del runner.
       - name: Cliente PostgreSQL 17 (pruebas de respaldo/restauracion)
+        timeout-minutes: 10
         run: |
           set -e
           sudo install -d /usr/share/postgresql-common/pgdg
           for intento in 1 2 3; do
-            if sudo curl -fsSL --retry 3 --retry-delay 5 \
+            if sudo curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 \
                  https://www.postgresql.org/media/keys/ACCC4CF8.asc \
                  -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc; then
               break
@@ -143,11 +157,20 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           instalado=0
           for intento in 1 2 3; do
-            if sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-17; then
+            # `timeout` va DENTRO de sudo para que corra como root y pueda matar a su hijo.
+            if sudo timeout 180 apt-get update && sudo timeout 180 apt-get install -y --no-install-recommends postgresql-client-17; then
               instalado=1
               break
+            else
+              # El codigo se lee DENTRO del else: despues de `fi`, `$?` es el del `if` (0) y no el
+              # del comando que fallo — se veria siempre "codigo 0" y el 124 no se distinguiria.
+              codigo=$?
+              if [ "$codigo" -eq 124 ]; then
+                echo "apt se COLGO y se corto por tiempo (intento $intento/3); reintento..."
+              else
+                echo "apt fallo con codigo $codigo (intento $intento/3); reintento..."
+              fi
             fi
-            echo "apt fallo (intento $intento/3); reintento..."
             sleep $((intento * 15))
           done
           if [ "$instalado" -ne 1 ]; then

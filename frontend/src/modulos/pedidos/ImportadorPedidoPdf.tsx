@@ -8,7 +8,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { archivoABase64 } from '@/api/importacion-pedido';
@@ -112,21 +112,47 @@ function totalFilas(filas: RenglonPackEditable[] | undefined): number {
 export function ImportadorPedidoPdf({
   alCerrar,
   alImportado,
+  idClienteInicial = null,
+  archivosIniciales,
 }: {
   alCerrar: () => void;
   /** Callback tras crear el pedido (refresca la consulta y cierra). */
   alImportado: () => void;
+  /**
+   * ⭐ §Post-F9.70 punto 1 — ENTRADA DESDE EL PEDIDO. El campo "Archivo de la OC" del constructor
+   * reconoce el PDF y, si el usuario dice que sí, abre ESTE importador ya cargado: mismo cliente,
+   * mismo archivo. Sin esto habría que reusar el importador copiándolo, que es como se acaban
+   * teniendo dos importadores que se parecen.
+   */
+  idClienteInicial?: number | null;
+  /** PDFs con los que arranca el asistente (cuando lo abre el constructor con el archivo ya elegido). */
+  archivosIniciales?: File[];
 }): React.JSX.Element {
   const [paso, setPaso] = useState<1 | 2>(1);
 
   // Paso 1 — origen.
-  const [idCliente, setIdCliente] = useState<number | null>(null);
+  const [idCliente, setIdCliente] = useState<number | null>(idClienteInicial);
   const [textoCliente, setTextoCliente] = useState('');
   const busquedaCliente = useDebounce(textoCliente.trim(), 250);
   const [referencia, setReferencia] = useState('');
-  const [archivos, setArchivos] = useState<File[]>([]);
-  // % ADICIONAL de producción por cliente (C&A ~7%): se pre-carga del formato guardado del cliente.
-  const [pct, setPct] = useState(0);
+  const [archivos, setArchivos] = useState<File[]>(archivosIniciales ?? []);
+  /**
+   * % ADICIONAL de producción por cliente (C&A = 7%, §Post-F9.2): se pre-carga del formato guardado
+   * del cliente.
+   *
+   * ⭐ V1-E3i — `null` NO es `0`. Antes arrancaba en `0` y ese cero VIAJABA: el backend hace
+   * `datos.porcentajeAdicional ?? config.porcentajeAdicional`, así que un `0` explícito le GANA a la
+   * plantilla del cliente. Mientras el % del cliente no haya llegado (viene por red), la pantalla no
+   * tiene opinión: `null` = "usa el del cliente" y no se manda el campo. Un `0` sólo sale de aquí
+   * cuando una persona lo escribió, que es cuando de verdad significa "cero por ciento".
+   *
+   * Esto NO es cosmético: el arranque automático desde el pedido (§Post-F9.70 punto 1) analiza al
+   * montar, cuando el % del cliente todavía no llegó — con el cero de arranque, la OC de Daniel
+   * (1,744 pzas) se proponía con 1,744 en vez de 1,866 y las OPs nacían con la cantidad exacta del
+   * cliente: EL MISMO defecto (§Post-F9.70 punto 2) que esta etapa vino a cerrar, por la puerta
+   * nueva. Y al confirmar, ese cero se GUARDABA como % del cliente, tumbando el 7% sembrado.
+   */
+  const [pct, setPct] = useState<number | null>(null);
 
   // Análisis del backend (un renglón por PDF).
   const [analisis, setAnalisis] = useState<AnalizarPdf | null>(null);
@@ -158,6 +184,25 @@ export function ImportadorPedidoPdf({
     if (pctGuardado !== null) setPct(pctGuardado);
   }, [pctGuardado]);
 
+  /**
+   * ⭐ V1-E3i — CAMBIAR DE CLIENTE DEVUELVE LA DECISIÓN DEL % AL CLIENTE NUEVO.
+   *
+   * El efecto de arriba sólo escribe `pct` cuando el cliente TIENE plantilla (`pctGuardado !== null`)
+   * —y así debe ser, para no pisar lo que la persona tecleó cuando la consulta se refresca—, pero por
+   * eso mismo no puede devolver `pct` a "sin opinión": si el cliente nuevo NO tiene plantilla, el %
+   * del ANTERIOR se quedaba pegado. Consecuencia real: elegir C&A (7%), darse cuenta de que la OC es
+   * de otro cliente, cambiarlo y confirmar → las OPs del otro cliente nacen con +7% que nadie pidió y
+   * el backend le CREA una plantilla vigente al 7% con los campos variables de C&A encima. Silencioso
+   * y permanente (`guardarPlantilla` no edita: crea versión nueva y baja la anterior, y el seed sólo
+   * siembra cuando el cliente no tiene ninguna).
+   *
+   * Se limpia sólo cuando el cliente CAMBIA de verdad: volver a elegir al mismo no borra lo tecleado.
+   */
+  function elegirCliente(id: number | null): void {
+    if (id !== idCliente) setPct(null);
+    setIdCliente(id);
+  }
+
   const analizar = useAnalizarPdf();
   const confirmar = useConfirmarPdf();
   const ocupado = analizar.isPending || confirmar.isPending;
@@ -181,6 +226,32 @@ export function ImportadorPedidoPdf({
     return r.error !== null ? null : (ligas[r.modeloCliente] ?? r.idModeloSugerido ?? null);
   }
   const cuantosImportan = renglones.filter((r) => idModeloDe(r) !== null).length;
+  /**
+   * ⭐ §Post-F9.70 punto 3 — EL BOTÓN MUDO. «Generar pedido interno + OPs» solo se enciende cuando al
+   * menos un renglón está ligado a un modelo nuestro… y en la PRIMERA OC de un modelo esa liga
+   * todavía no existe, porque se APRENDE. Deshabilitado y callado, la pantalla ofrecía una puerta sin
+   * decir por qué no abre (el mismo defecto que V1-E6b barrió en otras pantallas). Aquí se dice qué
+   * falta y CUÁNTOS renglones. `null` = no hay nada que explicar (el botón sí abre).
+   */
+  const motivoBloqueo: string | null = (() => {
+    if (cuantosImportan > 0) return null;
+    if (renglones.length === 0) return 'Todavía no hay ningún PDF analizado.';
+    const conError = renglones.filter((r) => r.error !== null).length;
+    const sinLiga = renglones.length - conError;
+    if (sinLiga === 0) {
+      return conError === 1
+        ? 'El PDF no se pudo leer, así que no hay nada que importar. Revisa que sea una OC del cliente y vuelve a cargarlo.'
+        : `Ninguno de los ${String(conError)} PDF se pudo leer, así que no hay nada que importar. Revisa que sean OC del cliente y vuelve a cargarlos.`;
+    }
+    return (
+      `Falta ligar ${String(sinLiga)} de ${String(renglones.length)} renglón(es) con un modelo ` +
+      'nuestro: elígelo en «Liga a nuestro modelo». La primera vez de cada modelo del cliente se ' +
+      'elige a mano; a partir de ahí el sistema lo propone solo.' +
+      (conError > 0
+        ? ` (${String(conError)} PDF no se pudo leer y queda fuera aunque ligues los demás.)`
+        : '')
+    );
+  })();
 
   // ── Acciones ──────────────────────────────────────────────────────────────
 
@@ -203,7 +274,12 @@ export function ImportadorPedidoPdf({
     }
     void archivosABase64(archivos).then((archivosB64) => {
       analizar.mutate(
-        { idCliente, archivos: archivosB64, porcentajeAdicional: pct },
+        {
+          idCliente,
+          archivos: archivosB64,
+          // Sin opinión de la pantalla, manda el CLIENTE (su plantilla). Ver el comentario de `pct`.
+          ...(pct === null ? {} : { porcentajeAdicional: pct }),
+        },
         {
           onSuccess: (res) => {
             setAnalisis(res);
@@ -229,6 +305,27 @@ export function ImportadorPedidoPdf({
     });
   }
 
+  /**
+   * ⭐ §Post-F9.70 punto 1 — si el importador se abrió DESDE el pedido (con cliente y archivo ya
+   * puestos), el usuario ya dijo "sí, cárgala": obligarlo a pulsar "Continuar" otra vez sería
+   * cobrarle un clic por una decisión que ya tomó. El `ref` es el guardia: el efecto se dispara UNA
+   * sola vez aunque React vuelva a montar (StrictMode) o el análisis cambie el estado.
+   *
+   * Se re-analiza aquí en lugar de recibir el análisis del constructor: es una lectura sin efectos,
+   * y pasar el resultado a medias obligaría a sincronizar dos copias del mismo estado — la clase de
+   * atajo que después se paga.
+   */
+  const arranqueAutomatico = useRef(false);
+  useEffect(() => {
+    if (arranqueAutomatico.current) return;
+    if (idClienteInicial === null || (archivosIniciales ?? []).length === 0) return;
+    arranqueAutomatico.current = true;
+    continuarDesdeOrigen();
+    // Sólo debe correr en el montaje con lo precargado; `continuarDesdeOrigen` lee estado que en ese
+    // momento ya viene de las props (los `useState` se inicializan con ellas).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Paso 2 → confirma: crea pedido + OPs + RC + adjuntos. */
   function confirmarImportacion(): void {
     if (idCliente === null) return;
@@ -253,7 +350,9 @@ export function ImportadorPedidoPdf({
           referenciaGeneral: referencia.trim() === '' ? null : referencia.trim(),
           archivos: archivosConAjuste,
           ligas: resoluciones,
-          porcentajeAdicional: pct,
+          // Igual que al analizar: sin opinión, no se manda — el backend RECUERDA el % que reciba,
+          // así que mandar un 0 de arranque borraría el 7% del cliente.
+          ...(pct === null ? {} : { porcentajeAdicional: pct }),
         },
         {
           onSuccess: (res) => {
@@ -341,7 +440,7 @@ export function ImportadorPedidoPdf({
               opcionesCliente={opcionesCliente}
               cargandoClientes={clientes.isFetching}
               idCliente={idCliente}
-              onIdCliente={setIdCliente}
+              onIdCliente={elegirCliente}
               onTextoCliente={setTextoCliente}
               referencia={referencia}
               onReferencia={setReferencia}
@@ -384,7 +483,17 @@ export function ImportadorPedidoPdf({
         </div>
 
         {/* Pie de acciones */}
-        <footer className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3">
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+          {/* §Post-F9.70 punto 3: el porqué del botón apagado va A LA VISTA, no escondido en un
+              tooltip que en móvil ni existe. */}
+          {paso === 2 && motivoBloqueo !== null ? (
+            <p
+              className="mr-auto max-w-xl rounded-md border border-warn/30 bg-warn-soft px-2 py-1.5 text-xs text-warn"
+              data-testid="importador-pdf-motivo-bloqueo"
+            >
+              {motivoBloqueo}
+            </p>
+          ) : null}
           <Button variant="outline" onClick={alCerrar} disabled={ocupado}>
             Cancelar
           </Button>
@@ -402,6 +511,7 @@ export function ImportadorPedidoPdf({
             <Button
               onClick={confirmarImportacion}
               disabled={ocupado || cuantosImportan === 0}
+              {...(motivoBloqueo === null ? {} : { title: motivoBloqueo })}
               data-testid="importador-pdf-confirmar"
             >
               {confirmar.isPending ? (
@@ -439,8 +549,9 @@ function PasoOrigen({
   onTextoCliente: (texto: string) => void;
   referencia: string;
   onReferencia: (valor: string) => void;
-  pct: number;
-  onPct: (valor: number) => void;
+  /** `null` = sin opinión de la pantalla: manda el % guardado del cliente. */
+  pct: number | null;
+  onPct: (valor: number | null) => void;
   archivos: File[];
   onArchivos: (files: FileList | null) => void;
 }): React.JSX.Element {
@@ -480,14 +591,14 @@ function PasoOrigen({
               min={0}
               max={100}
               step={0.5}
-              value={pct}
-              onChange={(e) => onPct(Number(e.target.value) || 0)}
-              placeholder="0"
+              value={pct === null ? '' : pct}
+              onChange={(e) => onPct(e.target.value === '' ? null : Number(e.target.value) || 0)}
+              placeholder="el del cliente"
               data-testid="importador-pdf-pct"
             />
             <span className="text-[11px] text-faint">
               C&amp;A acepta entregar hasta 5% de más; con la merma se fabrica ~7% arriba. Se
-              recuerda por cliente.
+              recuerda por cliente; en blanco se usa el suyo.
             </span>
           </label>
         </div>

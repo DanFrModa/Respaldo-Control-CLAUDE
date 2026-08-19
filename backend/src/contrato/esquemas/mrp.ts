@@ -171,8 +171,29 @@ export const esquemaGenerarOcCuerpo = z
       .positive()
       .optional()
       .describe('Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo.'),
+    // ⭐ §Post-F9.71 (opción A de Daniel): CADA OC LLEVA SU PROPIA FECHA. Esta pantalla crea una OC
+    // POR PROVEEDOR de un clic, y la tela se necesita semanas antes que los avíos: una sola fecha
+    // para todas convierte el dato en decorativo — y un dato que nadie cree no sirve para reclamar.
+    // La fecha de arriba (`fechaEntrega`) es el VALOR INICIAL; lo que venga aquí GANA para ese
+    // proveedor. Un proveedor sin entrada propia usa la de arriba (y si tampoco hay, la de la orden).
+    fechasPorProveedor: z
+      .array(
+        z.object({
+          idProveedor: z.number().int().positive().describe('Proveedor al que aplica la fecha.'),
+          fechaEntrega: z.iso
+            .date({ error: 'La fecha de entrega del proveedor no es válida' })
+            .describe('Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD).'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese ' +
+          'proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).',
+      ),
   })
-  .describe('Selección de la explosión para generar OC (una OC por proveedor).');
+  .describe(
+    'Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha).',
+  );
 
 /** Datos validados del cuerpo de generar OC. */
 export type DatosGenerarOc = z.infer<typeof esquemaGenerarOcCuerpo>;

@@ -33427,7 +33427,7 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Selección de la explosión para generar OC (una OC por proveedor). */
+      /** @description Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha). */
       requestBody: {
         content: {
           'application/json': {
@@ -33443,6 +33443,16 @@ export interface paths {
             fechaEntrega?: string;
             /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
             idDireccionEntrega?: number;
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            fechasPorProveedor?: {
+              /** @description Proveedor al que aplica la fecha. */
+              idProveedor: number;
+              /**
+               * Format: date
+               * @description Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD).
+               */
+              fechaEntrega: string;
+            }[];
           };
         };
       };

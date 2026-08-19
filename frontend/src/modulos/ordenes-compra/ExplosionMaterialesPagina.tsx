@@ -39,6 +39,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const [idOrden, setIdOrden] = useState<number | null>(null);
   // Selección de renglones a comprar; vacío = todo lo pendiente con proveedor.
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
+  /**
+   * ⭐ §Post-F9.71 (opción A de Daniel) — FECHA POR OC. Aquí nace UNA OC POR PROVEEDOR de un clic, y
+   * *"cada OC interna va a tener una fecha de entrega diferente"*: la tela se necesita semanas antes
+   * que los avíos. Sólo se guardan las fechas que el usuario TOCÓ; las demás siguen a la de arriba
+   * (por eso es un mapa de excepciones y no una copia de todas: si cambia la de arriba, las que
+   * nadie tocó se mueven con ella, que es lo que "valor inicial" significa).
+   */
+  const [fechasProveedor, setFechasProveedor] = useState<Record<number, string>>({});
 
   const ordenes = useConsultaOrdenes({
     pagina: 1,
@@ -105,7 +113,33 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   function elegirOrden(id: number): void {
     setIdOrden(id);
     setSeleccion(new Set());
+    // Otra orden = otras entregas: arrastrar las fechas de la orden anterior sería peor que no
+    // proponer ninguna.
+    setFechasProveedor({});
     generar.reset();
+  }
+
+  /** Fecha efectiva de un proveedor: la suya si la tocaron, si no la de arriba (valor inicial). */
+  function fechaDe(idProveedor: number): string {
+    return fechasProveedor[idProveedor] ?? fechaEntrega;
+  }
+
+  /**
+   * Cambia la fecha de UN proveedor. Vaciar el campo NO guarda una fecha vacía: BORRA la excepción,
+   * o sea que ese proveedor vuelve a seguir a la de arriba. Guardar el vacío dejaría un estado que
+   * se ve igual (campo en blanco) pero significa otra cosa según quién lo mire, y nadie podría
+   * deshacer un cambio de fecha sin recargar.
+   */
+  function cambiarFechaDe(idProveedor: number, valor: string): void {
+    setFechasProveedor((prev) => {
+      const siguiente = { ...prev };
+      if (valor === '') {
+        delete siguiente[idProveedor];
+      } else {
+        siguiente[idProveedor] = valor;
+      }
+      return siguiente;
+    });
   }
 
   function alternar(id: number): void {
@@ -124,6 +158,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (idOrden === null) {
       return;
     }
+    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
+    // tampoco hay, con la de la orden — sin que la pantalla tenga que adivinarlas. (Vaciar la fecha
+    // de un grupo BORRA su entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
+    const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
+      idProveedor: Number(id),
+      fechaEntrega: fecha,
+    }));
     generar.mutate(
       {
         idOrden,
@@ -131,6 +172,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           idsRequerimiento: [...seleccion],
           ...(fechaEntrega === '' ? {} : { fechaEntrega }),
           ...(direccionEfectiva === null ? {} : { idDireccionEntrega: direccionEfectiva }),
+          ...(fechasPorProveedor.length === 0 ? {} : { fechasPorProveedor }),
         },
       },
       { onSuccess: () => setSeleccion(new Set()) },
@@ -234,13 +276,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 </Button>
                 {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
                     En blanco, el servidor usa la fecha de la orden y la dirección favorita. */}
+                {/* §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
+                    llevar la suya en su propio grupo (la tela no llega cuando llegan los avíos). */}
                 <label className="text-xs text-muted-foreground">
-                  Entrega
+                  Entrega (inicial)
                   <Input
                     className="mt-1"
                     type="date"
                     value={fechaEntrega}
                     onChange={(e) => setFechaEntrega(e.target.value)}
+                    title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
                     data-testid="exp-fecha-entrega"
                   />
                 </label>
@@ -470,10 +515,30 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     className="rounded-lg border"
                     data-testid="exp-grupo"
                   >
-                    <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
                       <span className="font-medium">{grupo.proveedor}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="flex items-center gap-3 text-xs text-muted-foreground">
                         {grupo.renglones.length} material(es)
+                        {/* ⭐ §Post-F9.71 — LA FECHA DE ESTA OC. Sólo en los grupos que SÍ generan
+                            OC: el grupo "sin proveedor sugerido" no nace de aquí (se captura a
+                            mano), así que pedirle fecha sería pedir un dato que no va a ningún
+                            lado. */}
+                        {grupo.idProveedor !== null ? (
+                          <label className="flex items-center gap-1.5">
+                            Entrega
+                            <Input
+                              type="date"
+                              className="h-8 w-[9.5rem]"
+                              value={fechaDe(grupo.idProveedor)}
+                              onChange={(e) =>
+                                cambiarFechaDe(grupo.idProveedor as number, e.target.value)
+                              }
+                              aria-label={`Fecha de entrega de la OC de ${grupo.proveedor}`}
+                              data-testid="exp-fecha-grupo"
+                              data-proveedor={grupo.idProveedor}
+                            />
+                          </label>
+                        ) : null}
                       </span>
                     </div>
                     <ul>
