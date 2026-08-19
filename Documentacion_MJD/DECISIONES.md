@@ -3209,3 +3209,56 @@ que hace que la gente deje de usar el sistema.)*
 
 - **Aplica en:** la pantalla de Explosión de materiales. Sin migración (la fecha ya existe por OC).
 - **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.72) — ⭐ La receta se libera POR PARTES, y desde la OP — no desde «Modificar» (DANIEL, 19-ago-2026)
+
+Salió de Daniel recorriendo el flujo completo con una orden real y **no encontrando dónde autorizar los
+avíos**.
+
+**El problema que destapó, y es de fondo.** El panel de receta —con el botón de **liberar**, que es *la
+puerta que abre la compra*— vive dentro del diálogo de **«Modificar»** de la orden
+(`CentroOrdenesPagina` → mosaico *Modificar* → `DialogoOrden` → `PanelRecetaOrden`). Daniel: *"ahí está y
+no tendría que estar ahí"*, y la frase que lo vuelve grave: **"nadie va a tener permiso de modificar la OP
+más que yo"**.
+
+O sea: si liberar vive detrás de «Modificar», o **Daniel se vuelve el cuello de botella** firmando todas
+las recetas, o **hay que darle a Desarrollo permiso sobre la OP entera** —cantidades, fechas, matriz de
+tallas— solo para que apruebe una lista de materiales. **Los dos permisos ya existen separados
+(`ordenes.administrar` vs `desarrollo.administrar`); lo que está mal es que la puerta física es una sola.**
+
+*(De paso: el mosaico «Modificar» **no está condicionado por permiso**, a diferencia de los de compras,
+ruta y telas que sí lo están — verificado en `CentroOrdenesPagina`.)*
+
+**Y el hueco de navegación:** la explosión de materiales **frena** diciendo que la receta no está
+liberada, pero **no lleva a donde se libera**. Deja al usuario adivinando en qué pantalla está el botón.
+
+### Lo que Daniel decidió
+
+1. **La receta se ve y se libera desde la OP**, no desde «Modificar».
+2. **Quien libera es el mismo equipo que hace el desarrollo.**
+3. **Las telas las autoriza Daniel** —hoy lo hace en la autorización de la OC—, y quiere **también poder
+   liberarlas** para que salgan sus OC.
+4. ⭐ **Se libera POR PARTES, y el comprador ve qué falta.** Textual: *"podría haber algún cierre que aún no
+   autoriza el cliente, pero ya podríamos ir comprando lo demás."*
+
+### Lo que esto implica (y lo que YA existe, que lo hace más chico de lo que parece)
+
+- ✅ **La compra parcial ya está medio resuelta:** `generarOCDesdeExplosion` acepta `idsRequerimiento` —se
+  puede generar solo para los renglones seleccionados—; vacío = todo lo pendiente. **No hay que
+  inventarla.**
+- 🔴 **La puerta es TODO-O-NADA:** hoy *"sin liberar no se compra"* aplica a la receta entera. Tiene que
+  pasar a **"se compra lo que está liberado"**.
+- 🔴 **La firma es una sola** para toda la receta. Tiene que ser **por renglón**, con acciones en bloque
+  (*"liberar todas las telas"*, *"liberar todos los avíos"*) para que lo rutinario no cueste veinte clics.
+- 🔴 **El comprador no tiene dónde ver lo que falta liberar.** Es requisito explícito de Daniel:
+  *"transparentemente qué le falta de liberar"*.
+- **Se conserva** la protección de que **tocar una receta ya liberada la vuelve a cerrar** (*"Desarrollo
+  tiene que volver a firmarla"*) — ahora por renglón.
+- **Pendiente de diseño:** si además de la firma por renglón conviene una **bandeja «Recetas por
+  liberar»** para Desarrollo, en vez de ir orden por orden. El lead lo propuso; Daniel no lo cerró.
+
+- **Aplica en:** etapa propia (toca la puerta de compra: es camino de dinero). Migración probable —el
+  estado de liberación pasa de la orden al renglón.
+- **Fecha:** 2026-08-19.
