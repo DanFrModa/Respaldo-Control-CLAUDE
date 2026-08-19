@@ -25,6 +25,7 @@ import { PaletaComandos } from '@/modulos/PaletaComandos';
 import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
 import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 import { useSesion } from '@/sesion/useSesion';
+import { VERSION } from '@/version';
 
 /**
  * CASCARON del sistema (rediseño R1 → fidelidad pixel-perfect R9, fiel al
@@ -32,7 +33,7 @@ import { useSesion } from '@/sesion/useSesion';
  * Ctrl/⌘+B, persistido) con la marca arriba y la TARJETA DE USUARIO abajo (ahí
  * vive el menú de usuario/cerrar sesión, como el proto — el topbar NO lleva
  * avatar). Barra superior del proto: [colapsar riel] + breadcrumb
- * «Control v2 › vista», buscador ⌘K empujado a la derecha, chip de empresa con
+ * «Control v2 {versión} › vista», buscador ⌘K empujado a la derecha, chip de empresa con
  * puntito de marca, campana de alertas RC y alternador de tema.
  *
  * La raiz ocupa el alto de la ventana y NO scrollea (`h-svh overflow-hidden`):
@@ -180,9 +181,19 @@ export function CascaronSistema(): React.JSX.Element {
               <PanelLeft className="size-[17px]" aria-hidden />
             </button>
 
-            {/* Breadcrumb del proto (`.crumbs`): «Control v2 › vista actual». */}
+            {/* Breadcrumb del proto (`.crumbs`): «Control v2 {versión} › vista actual». */}
             <div className="hidden min-w-0 items-center gap-[7px] text-sm text-muted-foreground lg:flex">
-              <span className="font-semibold text-foreground">Control v2</span>
+              {/* Nombre + versión van juntos y NO se encogen: lo que se recorta al
+                  faltar ancho es el nombre de la vista (el `truncate` de abajo). */}
+              <span className="flex shrink-0 items-baseline gap-[5px]">
+                <span className="font-semibold text-foreground">Control v2</span>
+                {/* Versión visible (dato de referencia, no título): chiquita y
+                    apagada, en monoespaciada como el resto de los códigos.
+                    Sale de `@/version` — ver ahí la regla de numeración. */}
+                <span className="mono text-[11px] text-faint" title={`Versión ${VERSION}`}>
+                  {VERSION}
+                </span>
+              </span>
               {tituloVista !== undefined ? (
                 <>
                   <ChevronRight className="size-3.5 shrink-0 opacity-40" aria-hidden />
