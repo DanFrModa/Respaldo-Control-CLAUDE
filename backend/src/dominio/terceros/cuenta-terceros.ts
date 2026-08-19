@@ -33,7 +33,7 @@ import { type Prisma, type OrigenMovimientoTercero, type TipoTercero } from '../
 import type { z } from 'zod';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -47,6 +47,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
 import { aporteEsMaSaldo, proyectarMovimientosEsMa } from './convivencia-esma.js';
+import { segmentoWhere } from './cxp/facturacion-cxp.js';
 
 /**
  * Clave de la secuencia de folios del motor de terceros (A3, por empresa). Se exporta para que el
@@ -404,6 +405,9 @@ export async function calcularSaldoTercero(
     tercero: nombre,
     saldo: oculto(saldo),
     saldoFiscal: oculto(saldoFiscal),
+    // El segmento SIN factura (§Post-F9.57) es el resto: lo calcula el servidor para que la
+    // partición en dos tenga UN solo lugar de verdad y nadie la reste a mano en una pantalla.
+    saldoSinFactura: oculto(redondear2(saldo - saldoFiscal)),
     saldoMovimientos: oculto(saldoMovimientos),
     saldoEsMa: oculto(saldoEsMa),
     incluyeEsMa: esProveedor,
@@ -415,8 +419,11 @@ export async function calcularSaldoTercero(
 /**
  * Estado de cuenta de un tercero: su saldo derivado + la página de movimientos (motor + —para un
  * proveedor— EsMa por convivencia), en una línea de tiempo por fecha desc. La vista `fiscal` filtra a
- * los movimientos con CFDI (motor) y con factura (EsMa) y EXIGE `terceros.fiscal` (A4). Permiso base
- * `terceros.ver`. La mezcla motor+EsMa se pagina en memoria (volumen por tercero moderado, igual que
+ * los movimientos con CFDI (motor) y con factura (EsMa) y EXIGE `terceros.fiscal` (A4). El
+ * `segmento` con/sin factura (V1-E3f pieza B, §Post-F9.57) filtra la MISMA columna pero es
+ * OPERATIVO y le basta `terceros.ver`: es la partición que pidió Daniel para los proveedores que
+ * *"algunas cosas sean con factura y otras sin factura"*, y no debe quedar tras el candado del
+ * contador. Permiso base `terceros.ver`. La mezcla motor+EsMa se pagina en memoria (volumen por tercero moderado, igual que
  * el estado de cuenta de EsMa). Empresa activa (A9). Importes ocultables.
  *
  * ALCANCE DEL PERMISO FISCAL (decisión D12, opción b): `terceros.fiscal` gatea SOLO esta VISTA
@@ -442,6 +449,15 @@ export async function estadoDeCuentaTercero(
   if (soloFiscal) {
     verificarPermiso(sesion, 'terceros.fiscal');
   }
+  // La vista fiscal ya es "solo con factura": pedir además `segmento: 'sin'` sería contradictorio
+  // y devolvería una lista vacía sin explicar por qué. Se corta con un mensaje claro.
+  if (soloFiscal && filtros.segmento === 'sin') {
+    throw new ErrorValidacion(
+      'La vista fiscal solo muestra movimientos CON factura: no se puede combinar con el segmento ' +
+        '"sin factura".',
+    );
+  }
+  const segmento = soloFiscal ? 'con' : filtros.segmento;
 
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
@@ -452,7 +468,7 @@ export async function estadoDeCuentaTercero(
   const where: Prisma.MovimientoTerceroWhereInput = {
     idEmpresa,
     ...camposTercero(tipoTercero, idTercero),
-    ...(soloFiscal ? { esFiscal: true } : {}),
+    ...segmentoWhere(segmento),
     ...(filtros.origen === undefined ? {} : { origen: filtros.origen }),
     ...rangoFechaMotor(filtros.desde, filtros.hasta),
     // Se muestra el libro COMPLETO (incluidos cancelados y sus inversos): es el rastro de auditoría
@@ -471,7 +487,8 @@ export async function estadoDeCuentaTercero(
       ? await proyectarMovimientosEsMa(cliente, idEmpresa, idTercero, nombre, {
           desde: filtros.desde,
           hasta: filtros.hasta,
-          soloFiscal,
+          // EsMa marca el segmento en su propia columna `conFactura`; el proyector la traduce.
+          segmento,
           puedeVerImportes,
         })
       : [];
@@ -496,6 +513,7 @@ export async function estadoDeCuentaTercero(
     idTercero,
     tercero: nombre,
     vista: filtros.vista,
+    segmento,
     desde: filtros.desde ?? null,
     hasta: filtros.hasta ?? null,
     saldo,

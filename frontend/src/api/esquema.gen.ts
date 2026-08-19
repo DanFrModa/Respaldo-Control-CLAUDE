@@ -1633,14 +1633,12 @@ export interface paths {
           porPagina?: number;
           /** @description Texto a buscar en el nombre (insensible a mayúsculas). */
           busqueda?: string;
-          /** @description Filtra por tipo de proveedor. */
-          tipo?: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
           /** @description Filtra por id de rol/servicio del proveedor (R15). */
           rol?: number;
           /** @description Incluye los desactivados ("true"/"false"). */
           incluirInactivos?: string;
           /** @description Columna de ordenamiento. */
-          ordenarPor?: 'nombre' | 'tipo' | 'creadoEn';
+          ordenarPor?: 'nombre' | 'creadoEn';
           /** @description Dirección del orden. */
           direccion?: 'asc' | 'desc';
         };
@@ -1663,19 +1661,12 @@ export interface paths {
                 id: number;
                 /** @description Nombre del proveedor. */
                 nombre: string;
-                /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+                /** @description Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null. */
                 nombreCorto: string | null;
                 /** @description Razón social, o null. */
                 razonSocial: string | null;
-                /**
-                 * @description Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.
-                 * @enum {string}
-                 */
-                tipo: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
                 /** @description Teléfono, o null. */
                 telefono: string | null;
-                /** @description Persona de contacto, o null. */
-                contacto: string | null;
                 /** @description Condiciones comerciales (texto libre), o null. */
                 condiciones: string | null;
                 /** @description ¿Emite CFDI? (formal/informal), o null. */
@@ -1714,8 +1705,6 @@ export interface paths {
                 leadTimeDias: number | null;
                 /** @description Notas, o null. */
                 notas: string | null;
-                /** @description Código corto del taller (ex maquilero), o null. */
-                corto: string | null;
                 /** @description ¿Está asegurado? (talleres), o null. */
                 asegurado: boolean | null;
                 /** @description Observaciones de pago (talleres), o null. */
@@ -1730,6 +1719,25 @@ export interface paths {
                   codigo: string;
                   /** @description Nombre legible del rol. */
                   nombre: string;
+                }[];
+                /** @description Contactos ACTIVOS del proveedor (V1-E3f pieza B). */
+                contactos: {
+                  /** @description Id del contacto. */
+                  id: number;
+                  /** @description Id del proveedor dueño del contacto. */
+                  idProveedor: number;
+                  /** @description Nombre de la persona. */
+                  nombre: string;
+                  /** @description Qué hace (texto libre), o null. */
+                  puesto: string | null;
+                  /** @description Teléfono, o null. */
+                  telefono: string | null;
+                  /** @description Email, o null. */
+                  email: string | null;
+                  /** @description Notas, o null. */
+                  notas: string | null;
+                  /** @description Falso si está archivado (borrado suave). */
+                  activo: boolean;
                 }[];
                 /** @description Cantidad de adjuntos del proveedor. */
                 cantidadAdjuntos: number;
@@ -1858,13 +1866,7 @@ export interface paths {
             nombre: string;
             nombreCorto?: string;
             razonSocial?: string;
-            /**
-             * @default SIN_CLASIFICAR
-             * @enum {string}
-             */
-            tipo?: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
             telefono?: string;
-            contacto?: string;
             condiciones?: string;
             roles?: number[];
             factura?: boolean;
@@ -1888,7 +1890,6 @@ export interface paths {
             limiteCredito?: number;
             leadTimeDias?: number;
             notas?: string;
-            corto?: string;
             asegurado?: boolean;
             obsPago?: string;
             /** @enum {string} */
@@ -1908,19 +1909,12 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
-              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              /** @description Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null. */
               nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
-              /**
-               * @description Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.
-               * @enum {string}
-               */
-              tipo: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
               /** @description Teléfono, o null. */
               telefono: string | null;
-              /** @description Persona de contacto, o null. */
-              contacto: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
               /** @description ¿Emite CFDI? (formal/informal), o null. */
@@ -1959,8 +1953,6 @@ export interface paths {
               leadTimeDias: number | null;
               /** @description Notas, o null. */
               notas: string | null;
-              /** @description Código corto del taller (ex maquilero), o null. */
-              corto: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
@@ -1975,6 +1967,25 @@ export interface paths {
                 codigo: string;
                 /** @description Nombre legible del rol. */
                 nombre: string;
+              }[];
+              /** @description Contactos ACTIVOS del proveedor (V1-E3f pieza B). */
+              contactos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del proveedor dueño del contacto. */
+                idProveedor: number;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
@@ -2116,19 +2127,12 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
-              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              /** @description Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null. */
               nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
-              /**
-               * @description Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.
-               * @enum {string}
-               */
-              tipo: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
               /** @description Teléfono, o null. */
               telefono: string | null;
-              /** @description Persona de contacto, o null. */
-              contacto: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
               /** @description ¿Emite CFDI? (formal/informal), o null. */
@@ -2167,8 +2171,6 @@ export interface paths {
               leadTimeDias: number | null;
               /** @description Notas, o null. */
               notas: string | null;
-              /** @description Código corto del taller (ex maquilero), o null. */
-              corto: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
@@ -2183,6 +2185,25 @@ export interface paths {
                 codigo: string;
                 /** @description Nombre legible del rol. */
                 nombre: string;
+              }[];
+              /** @description Contactos ACTIVOS del proveedor (V1-E3f pieza B). */
+              contactos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del proveedor dueño del contacto. */
+                idProveedor: number;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
@@ -2313,19 +2334,12 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
-              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              /** @description Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null. */
               nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
-              /**
-               * @description Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.
-               * @enum {string}
-               */
-              tipo: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
               /** @description Teléfono, o null. */
               telefono: string | null;
-              /** @description Persona de contacto, o null. */
-              contacto: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
               /** @description ¿Emite CFDI? (formal/informal), o null. */
@@ -2364,8 +2378,6 @@ export interface paths {
               leadTimeDias: number | null;
               /** @description Notas, o null. */
               notas: string | null;
-              /** @description Código corto del taller (ex maquilero), o null. */
-              corto: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
@@ -2380,6 +2392,25 @@ export interface paths {
                 codigo: string;
                 /** @description Nombre legible del rol. */
                 nombre: string;
+              }[];
+              /** @description Contactos ACTIVOS del proveedor (V1-E3f pieza B). */
+              contactos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del proveedor dueño del contacto. */
+                idProveedor: number;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
@@ -2503,10 +2534,7 @@ export interface paths {
             nombre?: string;
             nombreCorto?: string | null;
             razonSocial?: string | null;
-            /** @enum {string} */
-            tipo?: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
             telefono?: string | null;
-            contacto?: string | null;
             condiciones?: string | null;
             roles?: number[];
             activo?: boolean;
@@ -2528,7 +2556,6 @@ export interface paths {
             limiteCredito?: number | null;
             leadTimeDias?: number | null;
             notas?: string | null;
-            corto?: string | null;
             asegurado?: boolean;
             obsPago?: string | null;
             modalidadFacturacion?: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -2547,19 +2574,12 @@ export interface paths {
               id: number;
               /** @description Nombre del proveedor. */
               nombre: string;
-              /** @description Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL), o null (A1.1). */
+              /** @description Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null. */
               nombreCorto: string | null;
               /** @description Razón social, o null. */
               razonSocial: string | null;
-              /**
-               * @description Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.
-               * @enum {string}
-               */
-              tipo: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
               /** @description Teléfono, o null. */
               telefono: string | null;
-              /** @description Persona de contacto, o null. */
-              contacto: string | null;
               /** @description Condiciones comerciales (texto libre), o null. */
               condiciones: string | null;
               /** @description ¿Emite CFDI? (formal/informal), o null. */
@@ -2598,8 +2618,6 @@ export interface paths {
               leadTimeDias: number | null;
               /** @description Notas, o null. */
               notas: string | null;
-              /** @description Código corto del taller (ex maquilero), o null. */
-              corto: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
@@ -2614,6 +2632,25 @@ export interface paths {
                 codigo: string;
                 /** @description Nombre legible del rol. */
                 nombre: string;
+              }[];
+              /** @description Contactos ACTIVOS del proveedor (V1-E3f pieza B). */
+              contactos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del proveedor dueño del contacto. */
+                idProveedor: number;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
               }[];
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
@@ -3506,6 +3543,578 @@ export interface paths {
         };
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proveedores/{id}/contactos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los contactos del proveedor (puesto en texto libre) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Incluye los contactos archivados ("true"/"false"). */
+          incluirInactivos?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Contactos del proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                /** @description Id del contacto. */
+                id: number;
+                /** @description Id del proveedor dueño del contacto. */
+                idProveedor: number;
+                /** @description Nombre de la persona. */
+                nombre: string;
+                /** @description Qué hace (texto libre), o null. */
+                puesto: string | null;
+                /** @description Teléfono, o null. */
+                telefono: string | null;
+                /** @description Email, o null. */
+                email: string | null;
+                /** @description Notas, o null. */
+                notas: string | null;
+                /** @description Falso si está archivado (borrado suave). */
+                activo: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Agregar un contacto al proveedor */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de un contacto del proveedor (puesto en texto libre). */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre: string;
+            puesto?: string;
+            telefono?: string;
+            /** Format: email */
+            email?: string;
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Contacto de un proveedor. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del contacto. */
+              id: number;
+              /** @description Id del proveedor dueño del contacto. */
+              idProveedor: number;
+              /** @description Nombre de la persona. */
+              nombre: string;
+              /** @description Qué hace (texto libre), o null. */
+              puesto: string | null;
+              /** @description Teléfono, o null. */
+              telefono: string | null;
+              /** @description Email, o null. */
+              email: string | null;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está archivado (borrado suave). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proveedores/{id}/contactos/{idContacto}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar (o archivar con activo=false) un contacto del proveedor */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+          /** @description Id del contacto. */
+          idContacto: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición parcial de un contacto del proveedor. */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre?: string;
+            puesto?: string | null;
+            telefono?: string | null;
+            email?: string | null;
+            notas?: string | null;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Contacto de un proveedor. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del contacto. */
+              id: number;
+              /** @description Id del proveedor dueño del contacto. */
+              idProveedor: number;
+              /** @description Nombre de la persona. */
+              nombre: string;
+              /** @description Qué hace (texto libre), o null. */
+              puesto: string | null;
+              /** @description Teléfono, o null. */
+              telefono: string | null;
+              /** @description Email, o null. */
+              email: string | null;
+              /** @description Notas, o null. */
+              notas: string | null;
+              /** @description Falso si está archivado (borrado suave). */
+              activo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/proveedores/constancia/analizar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Leer una Constancia de Situación Fiscal y PROPONER los datos fiscales */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Constancia de Situación Fiscal a leer (no se guarda nada aquí). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description PDF de la Constancia de Situación Fiscal, en base64 (máx. 10 MB decodificado). */
+            archivoBase64: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Datos que PROPONE la constancia (la persona confirma). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description fisica (trae CURP) o moral (denominación).
+               * @enum {string}
+               */
+              tipoPersona: 'fisica' | 'moral';
+              /** @description RFC leído, o "". */
+              rfc: string;
+              /** @description Denominación (moral) o nombre + apellidos compuestos (física), o "". */
+              razonSocial: string;
+              /** @description CURP (solo persona física), o "". */
+              curp: string;
+              /** @description Regímenes encontrados. Con más de uno, la persona escoge. */
+              regimenes: {
+                /** @description Clave del catálogo c_RegimenFiscal del SAT (p. ej. "601"), o "" si no se reconoció. */
+                clave: string;
+                /** @description Nombre del régimen tal como se leyó/reconoció. */
+                descripcion: string;
+              }[];
+              /** @description CP del domicilio fiscal (5 dígitos), o "". */
+              codigoPostalExpedicion: string;
+              /** @description Domicilio armado con las partes que sí traen valor, o "". */
+              direccion: string;
+              /** @description Lo que no se pudo leer. NO bloquea: se captura a mano. */
+              advertencias: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -47816,8 +48425,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre del maquilero. */
                 nombre: string;
-                /** @description Clave corta del taller, o null. */
-                corto: string | null;
+                /** @description Campo corto del taller, o null. */
+                nombreCorto: string | null;
               }[];
             };
           };
@@ -47947,8 +48556,8 @@ export interface paths {
                 idMaquilero: number;
                 /** @description Nombre del maquilero. */
                 maquilero: string;
-                /** @description Clave corta del taller, o null. */
-                corto: string | null;
+                /** @description Campo corto del taller, o null. */
+                nombreCorto: string | null;
                 /** @description Σ cargos validados no sin-costo (o null). */
                 totalCargos: number | null;
                 /** @description Σ abonos (o null). */
@@ -49639,6 +50248,8 @@ export interface paths {
               saldo: number | null;
               /** @description Saldo FISCAL total (solo movimientos con CFDI). */
               saldoFiscal: number | null;
+              /** @description Saldo del segmento SIN factura (saldo − saldoFiscal). */
+              saldoSinFactura: number | null;
               /** @description Aporte del motor nuevo al saldo operativo. */
               saldoMovimientos: number | null;
               /** @description Aporte de EsMa (F6) al saldo operativo; 0 en clientes. */
@@ -49769,6 +50380,8 @@ export interface paths {
             | 'descuento';
           /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
           vista?: 'operativa' | 'fiscal';
+          /** @description todos | con (con factura) | sin (sin factura). */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path: {
@@ -49802,6 +50415,11 @@ export interface paths {
                * @enum {string}
                */
               vista: 'operativa' | 'fiscal';
+              /**
+               * @description Segmento aplicado (todos/con/sin factura).
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Fecha inicial del filtro o null. */
               desde: string | null;
               /** @description Fecha final del filtro o null. */
@@ -49821,6 +50439,8 @@ export interface paths {
                 saldo: number | null;
                 /** @description Saldo FISCAL total (solo movimientos con CFDI). */
                 saldoFiscal: number | null;
+                /** @description Saldo del segmento SIN factura (saldo − saldoFiscal). */
+                saldoSinFactura: number | null;
                 /** @description Aporte del motor nuevo al saldo operativo. */
                 saldoMovimientos: number | null;
                 /** @description Aporte de EsMa (F6) al saldo operativo; 0 en clientes. */
@@ -50024,8 +50644,8 @@ export interface paths {
                 idProveedor: number;
                 /** @description Nombre del proveedor. */
                 proveedor: string;
-                /** @description Clave corta del proveedor (o null). */
-                corto: string | null;
+                /** @description Campo corto del proveedor, o null. */
+                nombreCorto: string | null;
                 /** @description Días de crédito del proveedor (0 = contado). */
                 diasCredito: number;
                 /** @description Saldo por pagar combinado (motor + maquila EsMa). */
@@ -50193,6 +50813,8 @@ export interface paths {
             | 'descuento';
           /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
           vista?: 'operativa' | 'fiscal';
+          /** @description todos | con (con factura) | sin (sin factura). */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path: {
@@ -50224,6 +50846,11 @@ export interface paths {
                * @enum {string}
                */
               vista: 'operativa' | 'fiscal';
+              /**
+               * @description Segmento aplicado (todos/con/sin factura).
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Fecha inicial del filtro o null. */
               desde: string | null;
               /** @description Fecha final del filtro o null. */
@@ -50243,6 +50870,8 @@ export interface paths {
                 saldo: number | null;
                 /** @description Saldo FISCAL total (solo movimientos con CFDI). */
                 saldoFiscal: number | null;
+                /** @description Saldo del segmento SIN factura (saldo − saldoFiscal). */
+                saldoSinFactura: number | null;
                 /** @description Aporte del motor nuevo al saldo operativo. */
                 saldoMovimientos: number | null;
                 /** @description Aporte de EsMa (F6) al saldo operativo; 0 en clientes. */
@@ -50438,6 +51067,8 @@ export interface paths {
             | 'descuento';
           /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
           vista?: 'operativa' | 'fiscal';
+          /** @description todos | con (con factura) | sin (sin factura). */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path: {
@@ -50574,10 +51205,7 @@ export interface paths {
             origen: 'entrada_sin_factura' | 'nota_credito' | 'pago' | 'abono' | 'descuento';
             /** @description Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen). */
             importe: number;
-            /**
-             * @description ¿Movimiento fiscal (con CFDI)? El proveedor informal lo deja en false.
-             * @default false
-             */
+            /** @description ¿Movimiento CON factura (CFDI)? Lo resuelve el servidor con la modalidad del proveedor; obligatorio cuando el proveedor factura "de las dos formas". */
             esFiscal?: boolean;
             /** @description Discriminador de la operación real ligada (p. ej. "orden-compra"). */
             refTipo?: string;
@@ -51014,8 +51642,8 @@ export interface paths {
                 nombre: string;
                 /** @description RFC del proveedor (catálogo R15). */
                 rfc: string | null;
-                /** @description Clave corta del proveedor. */
-                corto: string | null;
+                /** @description Campo corto del proveedor, o null. */
+                nombreCorto: string | null;
               } | null;
               /** @description Órdenes de compra candidatas (mismo proveedor, total cercano), por cercanía. */
               candidatosOc: {
@@ -51525,6 +52153,8 @@ export interface paths {
             | 'descuento';
           /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
           vista?: 'operativa' | 'fiscal';
+          /** @description todos | con (con factura) | sin (sin factura). */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path: {
@@ -51556,6 +52186,11 @@ export interface paths {
                * @enum {string}
                */
               vista: 'operativa' | 'fiscal';
+              /**
+               * @description Segmento aplicado (todos/con/sin factura).
+               * @enum {string}
+               */
+              segmento: 'todos' | 'con' | 'sin';
               /** @description Fecha inicial del filtro o null. */
               desde: string | null;
               /** @description Fecha final del filtro o null. */
@@ -51575,6 +52210,8 @@ export interface paths {
                 saldo: number | null;
                 /** @description Saldo FISCAL total (solo movimientos con CFDI). */
                 saldoFiscal: number | null;
+                /** @description Saldo del segmento SIN factura (saldo − saldoFiscal). */
+                saldoSinFactura: number | null;
                 /** @description Aporte del motor nuevo al saldo operativo. */
                 saldoMovimientos: number | null;
                 /** @description Aporte de EsMa (F6) al saldo operativo; 0 en clientes. */
@@ -51770,6 +52407,8 @@ export interface paths {
             | 'descuento';
           /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
           vista?: 'operativa' | 'fiscal';
+          /** @description todos | con (con factura) | sin (sin factura). */
+          segmento?: 'todos' | 'con' | 'sin';
         };
         header?: never;
         path: {

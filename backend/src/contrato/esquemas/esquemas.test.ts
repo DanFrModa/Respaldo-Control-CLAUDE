@@ -93,12 +93,11 @@ describe('esquemaUsuario', () => {
 // REGRESIÓN (bug que cazó el CI): en Zod, `.partial()` NO elimina los `.default()`.
 // Un esquema de EDICIÓN parcial debe sobrescribir como `.optional()` los campos que
 // tienen `.default()` en el alta; si no, al omitir el campo en una edición, el parse lo
-// rellena con su default y PISA el valor real en la BD (p.ej. desactivar un proveedor sin
-// mandar `tipo` lo cambiaría a SIN_CLASIFICAR). Estos tests garantizan que el campo
-// omitido quede `undefined` (no presente) en la salida del parse.
+// rellena con su default y PISA el valor real en la BD. Estos tests garantizan que el campo
+// omitido quede `undefined` (no presente) en la salida del parse. (El caso original era el
+// `tipo` del proveedor, retirado en V1-E3f pieza B; la trampa sigue viva en otros esquemas.)
 describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .partial())', () => {
   it('el alta SÍ aplica el default (control: comprueba que el default existe)', () => {
-    expect(esquemaProveedorCrear.parse({ nombre: 'X' }).tipo).toBe('SIN_CLASIFICAR');
     expect(esquemaEtiquetaMarcaCrear.parse({ nombre: 'X' }).regalias).toBe(0);
     const empresa = esquemaEmpresaCrear.parse({ nombre: 'X' });
     expect(empresa.favorita).toBe(false);
@@ -106,14 +105,9 @@ describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .
     expect(empresa.paraEdr).toBe(false);
   });
 
-  it('esquemaProveedorEditar: omitir `tipo` lo deja undefined (no rellena SIN_CLASIFICAR)', () => {
+  it('esquemaProveedorEditar: una edición parcial no inventa campos que no se mandaron', () => {
     const datos = esquemaProveedorEditar.parse({ id: 1, activo: false });
-    expect('tipo' in datos).toBe(false);
-    expect(datos.tipo).toBeUndefined();
     expect(datos).toEqual({ id: 1, activo: false });
-    // pero si se manda, sigue validándose contra el enum
-    expect(esquemaProveedorEditar.parse({ id: 1, tipo: 'AVIOS' }).tipo).toBe('AVIOS');
-    expect(esquemaProveedorEditar.safeParse({ id: 1, tipo: 'OTRO' }).success).toBe(false);
   });
 
   it('esquemaEtiquetaMarcaEditar: omitir `regalias` lo deja undefined (no rellena 0)', () => {
@@ -222,12 +216,6 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     expect(esquemaProveedorEditar.parse({ id: 1, roles: [] }).roles).toEqual([]);
   });
 
-  it('edición: omitir `tipo` lo deja undefined (no rellena SIN_CLASIFICAR, trampa de .partial())', () => {
-    const datos = esquemaProveedorEditar.parse({ id: 1, activo: false });
-    expect('tipo' in datos).toBe(false);
-    expect(datos.tipo).toBeUndefined();
-  });
-
   // M1: en EDICIÓN los opcionales aceptan `null` (vaciar = borrar), distinto de
   // `undefined` (no tocar). El alta NO acepta `null` (omitir = el dominio lo deja null).
   it('edición: los campos opcionales (texto/num/enum) ACEPTAN null para borrarlos', () => {
@@ -272,41 +260,41 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
 
   it('edición: `nombre` y `tipo` NO aceptan null (clave de negocio / siempre con valor)', () => {
     expect(esquemaProveedorEditar.safeParse({ id: 1, nombre: null }).success).toBe(false);
-    expect(esquemaProveedorEditar.safeParse({ id: 1, tipo: null }).success).toBe(false);
   });
 
-  // Fusión de terceros (D12/R15): datos de taller (corto/asegurado/obsPago).
-  it('alta: acepta corto/asegurado/obsPago y NO les inyecta default (no son default-trap)', () => {
+  // Fusión de terceros (D12/R15): datos de taller. El `corto` se fusionó con `nombreCorto`
+  // en V1-E3f pieza B (§Post-F9.57 punto 2): un solo campo corto, y ÚNICO.
+  it('alta: acepta nombreCorto/asegurado/obsPago y NO les inyecta default (no son default-trap)', () => {
     const datos = esquemaProveedorCrear.parse({
       nombre: 'Taller',
-      corto: 'TLR',
+      nombreCorto: 'TLR',
       asegurado: true,
       obsPago: 'paga viernes',
     });
-    expect(datos.corto).toBe('TLR');
+    expect(datos.nombreCorto).toBe('TLR');
     expect(datos.asegurado).toBe(true);
     expect(datos.obsPago).toBe('paga viernes');
 
     // Omitirlos en el alta los deja undefined (sin default que pise valores).
     const sin = esquemaProveedorCrear.parse({ nombre: 'Taller' });
-    expect('corto' in sin).toBe(false);
+    expect('nombreCorto' in sin).toBe(false);
     expect('asegurado' in sin).toBe(false);
     expect('obsPago' in sin).toBe(false);
   });
 
-  it('edición: omitir corto/asegurado/obsPago los deja undefined (sin default que resetee)', () => {
+  it('edición: omitir nombreCorto/asegurado/obsPago los deja undefined (sin default que resetee)', () => {
     const datos = esquemaProveedorEditar.parse({ id: 1, telefono: '555' });
-    expect('corto' in datos).toBe(false);
+    expect('nombreCorto' in datos).toBe(false);
     expect('asegurado' in datos).toBe(false);
     expect('obsPago' in datos).toBe(false);
-    expect(datos.corto).toBeUndefined();
+    expect(datos.nombreCorto).toBeUndefined();
     expect(datos.asegurado).toBeUndefined();
     expect(datos.obsPago).toBeUndefined();
   });
 
-  it('edición: corto/obsPago ACEPTAN null para borrarlos (asegurado es bandera, no nullable)', () => {
-    const datos = esquemaProveedorEditar.parse({ id: 1, corto: null, obsPago: null });
-    expect(datos.corto).toBeNull();
+  it('edición: nombreCorto/obsPago ACEPTAN null para borrarlos (asegurado es bandera, no nullable)', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, nombreCorto: null, obsPago: null });
+    expect(datos.nombreCorto).toBeNull();
     expect(datos.obsPago).toBeNull();
     // `asegurado` es bandera (como factura): omitir = no tocar; null NO es válido.
     expect(esquemaProveedorEditar.safeParse({ id: 1, asegurado: null }).success).toBe(false);

@@ -42,7 +42,7 @@ export const LIMITES = {
     condiciones: 500,
     direccion: 300,
     notas: 2000,
-    corto: 50,
+    nombreCorto: 50,
     obsPago: 2000,
   },
 } as const;

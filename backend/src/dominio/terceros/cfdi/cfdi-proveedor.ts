@@ -128,7 +128,7 @@ async function matchProveedor(
 ): Promise<CfdiCandidatoProveedor | null> {
   const proveedor = await cliente.proveedor.findFirst({
     where: { rfc: { equals: emisorRfc, mode: 'insensitive' } },
-    select: { id: true, nombre: true, rfc: true, corto: true },
+    select: { id: true, nombre: true, rfc: true, nombreCorto: true },
   });
   if (proveedor === null) {
     return null;
@@ -137,7 +137,7 @@ async function matchProveedor(
     idProveedor: proveedor.id,
     nombre: proveedor.nombre,
     rfc: proveedor.rfc,
-    corto: proveedor.corto,
+    nombreCorto: proveedor.nombreCorto,
   };
 }
 

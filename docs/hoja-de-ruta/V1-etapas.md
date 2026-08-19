@@ -1289,6 +1289,99 @@ proveedores, con sus nombres y condiciones.
 
 ---
 
+## V1-E3f pieza B · Proveedores, como Daniel los usa ⭐ (18-ago-2026)
+
+> Las ocho piezas que Daniel dictó el 16-ago. Decisiones en `DECISIONES.md` **§Post-F9.54 · .55 · .56 ·
+> .57 · .58**. Se separó de la pieza A (el arte) porque juntas eran catorce cosas más un lector de PDF, y
+> como solo puede haber **un coder a la vez sobre el árbol**, iban a ser secuenciales de todos modos.
+
+### Qué entrega
+
+Renombres de rol (**Estampador**, **Bordador**, **Telas**, **Avíos**) · **contactos como TABLA** con el
+puesto en **texto libre** (*"sí un catálogo de contactos, pero deja el campo abierto qué rol tiene cada
+persona"*) · **el campo corto fusionado en UNO y ÚNICO** (*"sí debe de ser único"*) · el `tipo` retirado
+traduciéndose a rol de forma aditiva · la bandera de factura obedecida · «está asegurado» solo en talleres
+· el **lector de la Constancia de Situación Fiscal** · y la **segmentación con/sin factura en CxP**,
+reusando el motor de EsMa.
+
+### La trampa de §Post-F9.54, cerrada con evidencia
+
+La nota decía que **el seed actualiza el nombre del rol si el código ya existe** y que bastaba
+`SEED_ON_START`. **Era falsa** (`update: {}` no toca el nombre) y ya estaba corregida. Al construir se
+verificó lo que faltaba: **no existe CRUD de `RolProveedor`, solo un `GET`** — o sea que **renombrar a mano
+era imposible** y la vía correcta es el `UPDATE` en migración. Confirmado por el reviewer.
+
+### Nota de cierre — ✅ HECHA (18-ago-2026)
+
+**Segunda vuelta: APROBADA.** El reviewer no se fio de las pruebas del coder: **escribió la suya desde
+cero** —mezclando EsMa en los tres estados con movimientos del motor, sumando **montos** y no conteos— y
+verificó que **falla con el código viejo** (`expected 4 to be 5`). Montó el índice sobre `lower()` contra
+una base con **cuatro variantes de caja** del mismo corto (posible en la base real, porque `corto` era
+único **exacto**): migración en **exit 0, 13 → 13**, con los tres desplazados en bitácora. Y la carrera
+concurrente con distinta caja pasó de **2 filas a 1**.
+
+**Lo que resistió desde el principio, que era lo que más miedo daba:** la migración fusiona **dos columnas en una con
+unicidad**, convierte un campo en tabla y tira un enum. El reviewer la montó contra datos adversarios
+—cortos duplicados exactos y con distinta caja, con espacios, vacíos, contactos en blanco, acentos, roles
+destino faltantes— y salió **11 proveedores → 11**, los 6 contactos exactos, y **4 filas de bitácora** con
+el desplazado y las colisiones. **Nada se resolvió en silencio** (D3).
+
+**🔴 El hallazgo que valía el rechazo, y es el más sutil de todo el track.** El coder escribió
+`{ conFactura: { not: true } }` para separar los movimientos con y sin factura, con un comentario
+explicando que lo hacía así **precisamente para incluir los migrados** (`conFactura = NULL`). **La premisa
+era falsa:** en lógica de tres valores `NULL <> true` es `NULL`, así que la fila **se descarta igual**. Las
+dos formas son idénticas en efecto. Verificado en Postgres sobre `(true, false, NULL)`:
+
+```
+con_factura <> true        -> 1 fila        (lo que emite `not: true`)
+con_factura = false        -> 1 fila
+(= false OR IS NULL)       -> 2 filas       <- la unica que si los incluye
+```
+
+**Consecuencia en dinero:** los cargos EsMa migrados **se caían de los DOS segmentos** en la lista,
+mientras el encabezado (`saldoSinFactura = saldo - saldoFiscal`) **sí los sumaba**. Encabezado y renglones
+contradiciéndose, y **los dos segmentos sin dar el total**.
+
+**⚠️ Y lo que lo vuelve instructivo: ninguna prueba lo tocaba.** El reviewer mutó esa línea y las **74
+pruebas** de terceros/EsMa/CxP siguieron **en verde**, porque todas usaban movimientos del motor —donde el
+campo es NOT NULL y la partición es exacta por construcción—: **probaban algo que no podía fallar.** De las
+23 mutaciones del coder, **ninguna tocó esa consulta**.
+
+*Es el mismo patrón que ya costó tres veces esta semana, ahora en dinero: una afirmación sobre el sistema
+escrita sin ejecutarla, con una prueba al lado que parecía respaldarla.*
+
+**Los otros:** el aviso de código postal era **inalcanzable** —el recorte a 5 dígitos corría **antes** del
+control de longitud—, así que un CP de expedición equivocado **se persistía callado**; y **la unicidad del
+campo corto se violaba con distinta caja** en concurrencia — *la migración se tomó el trabajo de deduplicar
+sin distinguir caja para que ese estado no existiera, y la base lo volvía a permitir al día siguiente*.
+Cerrado con índice único sobre `lower()`.
+
+### El lector de la constancia: por qué el fixture inventado no sirve
+
+Antes de la revisión, el **lead probó el lector contra los dos PDF reales** que Daniel subió, y encontró
+que la etiqueta `Nombre del Municipio o Demarcación Territorial` **se colaba dentro del domicilio** — no
+tronaba, no avisaba: **guardaba basura**.
+
+**Sobrevivió por una razón que vale más que el defecto:** el fixture era **inventado**, y el coder había
+escrito en la prueba **la misma etiqueta corta que tenía mal en el código**. *La prueba confirmaba su
+suposición en vez de cazarla.* **Un fixture reconstruido no prueba el parser: prueba a quien lo escribió.**
+
+Al arreglarlo aparecieron **cuatro etiquetas más** —incluido un bloque entero de actividades económicas,
+sin el cual se comía media página—, encabezados **sin dos puntos**, y detalles del layout real que ninguna
+reconstrucción tenía: campos sin espacio tras los dos puntos y el municipio **partido en dos líneas**.
+
+**La guarda de fondo, que vale más que el arreglo:** cualquier `:` que sobreviva dentro de un valor delata
+una etiqueta desconocida, así que **el próximo cambio de formato del SAT avisa en vez de guardar basura**.
+El coder **rehízo su primera versión** al descubrir que era *prácticamente inalcanzable* —buscaba solo
+etiquetas conocidas, que el corte ya frenaba— y lo dijo en vez de entregarla. El reviewer le tiró **nueve
+constancias malformadas**: degrada con advertencias, nunca truena.
+
+⚠️ **Los PDF son documentos fiscales REALES, uno personal.** El fixture es texto **anonimizado** con la
+estructura intacta. En la verificación final el lead encontró **dos fragmentos del domicilio real** que
+seguían en un comentario y una prueba pese a que se había reportado la anonimización como hecha: retirados.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

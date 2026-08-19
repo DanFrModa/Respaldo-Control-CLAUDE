@@ -54,6 +54,10 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [vista, setVista] = useState<'operativa' | 'fiscal'>('operativa');
+  // §Post-F9.57: el segmento CON/SIN factura es OPERATIVO (no exige `terceros.fiscal`, a diferencia
+  // de la vista fiscal). Daniel: *"hay proveedores de avíos o de telas que puede pasar que algunas
+  // cosas sean con factura y otras sin factura"*.
+  const [segmento, setSegmento] = useState<'todos' | 'con' | 'sin'>('todos');
   const [pagina, setPagina] = useState(1);
 
   const [capturaAbierta, setCapturaAbierta] = useState(false);
@@ -68,6 +72,7 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
   // Los filtros (sin paginación) alimentan el PDF (que igual imprime hasta 100 movimientos).
   const query: CxpEstadoCuentaQuery = {
     vista,
+    segmento,
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
   };
@@ -173,6 +178,26 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                 {puedeFiscal ? <option value="fiscal">Fiscal (solo CFDI)</option> : null}
               </SelectNativo>
             </Field>
+            {/* La vista fiscal YA es "solo con factura": combinarla con el segmento sería
+                contradictorio (el backend lo rechaza), así que el selector solo sale en operativa. */}
+            {vista === 'operativa' ? (
+              <Field>
+                <FieldLabel htmlFor="cxp-edc-segmento">Facturación</FieldLabel>
+                <SelectNativo
+                  id="cxp-edc-segmento"
+                  value={segmento}
+                  onChange={(e) => {
+                    setSegmento(e.target.value as 'todos' | 'con' | 'sin');
+                    reiniciarPagina();
+                  }}
+                  data-testid="cxp-edc-segmento"
+                >
+                  <option value="todos">Con y sin factura</option>
+                  <option value="con">Solo con factura</option>
+                  <option value="sin">Solo sin factura</option>
+                </SelectNativo>
+              </Field>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -318,7 +343,9 @@ function SaldoProveedor({
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="cxp-edc-saldo">
       <Tarjeta etiqueta="Saldo por pagar" valor={moneda(s.saldo)} fuerte />
-      <Tarjeta etiqueta="Saldo fiscal" valor={moneda(s.saldoFiscal)} />
+      {/* §Post-F9.57: el saldo partido en dos. Los dos segmentos SUMAN el total. */}
+      <Tarjeta etiqueta="Con factura" valor={moneda(s.saldoFiscal)} />
+      <Tarjeta etiqueta="Sin factura" valor={moneda(s.saldoSinFactura)} />
       <Tarjeta etiqueta="Motor (CxP)" valor={moneda(s.saldoMovimientos)} />
       {s.incluyeEsMa ? <Tarjeta etiqueta="Maquila (EsMa)" valor={moneda(s.saldoEsMa)} /> : null}
     </div>

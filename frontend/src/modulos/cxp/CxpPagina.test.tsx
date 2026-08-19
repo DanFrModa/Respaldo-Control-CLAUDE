@@ -18,7 +18,7 @@ const conCartera: CxpBandeja = {
     {
       idProveedor: 7,
       proveedor: 'Hilaturas del Norte',
-      corto: 'HDN',
+      nombreCorto: 'HDN',
       diasCredito: 30,
       saldo: 88000,
       corriente: 40400,
@@ -31,7 +31,7 @@ const conCartera: CxpBandeja = {
     {
       idProveedor: 9,
       proveedor: 'Maquilas del Sur',
-      corto: 'MDS',
+      nombreCorto: 'MDS',
       diasCredito: 0,
       saldo: 15000,
       corriente: 0,

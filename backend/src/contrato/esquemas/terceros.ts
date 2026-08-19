@@ -55,6 +55,16 @@ export const VISTAS_TERCERO = ['operativa', 'fiscal'] as const;
 /** Clave de una vista del estado de cuenta. */
 export type VistaTerceroClave = (typeof VISTAS_TERCERO)[number];
 
+/**
+ * Segmento de facturación del estado de cuenta (V1-E3f pieza B, §Post-F9.57). Daniel: *"hay
+ * proveedores de avíos o de telas que puede pasar que algunas cosas sean con factura y otras sin
+ * factura"* — la partición dejó de ser cosa de talleres (EsMa) y pasó a ser general del proveedor.
+ * Es el mismo vocabulario que ya usa el estado de cuenta de EsMa (`conFactura: 'con' | 'sin'`).
+ */
+export const SEGMENTOS_FACTURACION = ['todos', 'con', 'sin'] as const;
+/** Clave del segmento de facturación. */
+export type SegmentoFacturacionClave = (typeof SEGMENTOS_FACTURACION)[number];
+
 /** Fuente de un renglón del estado de cuenta unificado: el motor nuevo o el histórico EsMa (F6). */
 export const FUENTES_MOVIMIENTO_TERCERO = ['motor', 'esma'] as const;
 /** Clave de la fuente de un renglón. */
@@ -217,6 +227,15 @@ export const esquemaSaldoTerceroSalida = z
     tercero: z.string().describe('Nombre del tercero.'),
     saldo: z.number().nullable().describe('Saldo OPERATIVO total (motor + EsMa).'),
     saldoFiscal: z.number().nullable().describe('Saldo FISCAL total (solo movimientos con CFDI).'),
+    /**
+     * Saldo del segmento SIN factura (§Post-F9.57): `saldo − saldoFiscal`. Se devuelve calculado en
+     * el servidor y no se deja restar al llamador, para que la partición en dos que pidió Daniel
+     * tenga UN solo lugar de verdad (A1) y no se conteste distinto en cada pantalla.
+     */
+    saldoSinFactura: z
+      .number()
+      .nullable()
+      .describe('Saldo del segmento SIN factura (saldo − saldoFiscal).'),
     saldoMovimientos: z.number().nullable().describe('Aporte del motor nuevo al saldo operativo.'),
     saldoEsMa: z
       .number()
@@ -252,6 +271,17 @@ export const esquemaEstadoCuentaTerceroQuery = z
       .enum(VISTAS_TERCERO)
       .default('operativa')
       .describe('operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal).'),
+    /**
+     * Segmento CON/SIN factura (V1-E3f pieza B, §Post-F9.57). NO es lo mismo que `vista: fiscal`:
+     * la vista fiscal es la del CONTADOR y exige el permiso `terceros.fiscal`; el segmento es
+     * OPERATIVO —*"hay proveedores de avíos o de telas que puede pasar que algunas cosas sean con
+     * factura y otras sin factura"*— y le basta `terceros.ver`. Filtran la misma columna, pero
+     * confundirlos habría dejado la partición de Daniel detrás del candado del contador.
+     */
+    segmento: z
+      .enum(SEGMENTOS_FACTURACION)
+      .default('todos')
+      .describe('todos | con (con factura) | sin (sin factura).'),
   })
   .describe('Filtros y paginación del estado de cuenta de un tercero.');
 
@@ -265,6 +295,7 @@ export const esquemaEstadoCuentaTerceroSalida = z
     idTercero: z.number().int().describe('Id del cliente o proveedor.'),
     tercero: z.string().describe('Nombre del tercero.'),
     vista: z.enum(VISTAS_TERCERO).describe('Vista aplicada (operativa/fiscal).'),
+    segmento: z.enum(SEGMENTOS_FACTURACION).describe('Segmento aplicado (todos/con/sin factura).'),
     desde: z.string().nullable().describe('Fecha inicial del filtro o null.'),
     hasta: z.string().nullable().describe('Fecha final del filtro o null.'),
     saldo: esquemaSaldoTerceroSalida.describe('Saldo derivado (all-time, no depende del periodo).'),

@@ -3855,21 +3855,6 @@
           },
           {
             "schema": {
-              "type": "string",
-              "enum": [
-                "TELAS",
-                "AVIOS",
-                "SERVICIOS",
-                "SIN_CLASIFICAR"
-              ]
-            },
-            "in": "query",
-            "name": "tipo",
-            "required": false,
-            "description": "Filtra por tipo de proveedor."
-          },
-          {
-            "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -3894,7 +3879,6 @@
               "type": "string",
               "enum": [
                 "nombre",
-                "tipo",
                 "creadoEn"
               ]
             },
@@ -3955,7 +3939,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Nombre corto de uso diario (\"Bloom\" para BLOOM TEXTIL), o null (A1.1)."
+                            "description": "Campo corto ÚNICO del proveedor (\"Bloom\", \"TCD\"), o null."
                           },
                           "razonSocial": {
                             "anyOf": [
@@ -3968,16 +3952,6 @@
                             ],
                             "description": "Razón social, o null."
                           },
-                          "tipo": {
-                            "type": "string",
-                            "enum": [
-                              "TELAS",
-                              "AVIOS",
-                              "SERVICIOS",
-                              "SIN_CLASIFICAR"
-                            ],
-                            "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
-                          },
                           "telefono": {
                             "anyOf": [
                               {
@@ -3988,17 +3962,6 @@
                               }
                             ],
                             "description": "Teléfono, o null."
-                          },
-                          "contacto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Persona de contacto, o null."
                           },
                           "condiciones": {
                             "anyOf": [
@@ -4213,17 +4176,6 @@
                             ],
                             "description": "Notas, o null."
                           },
-                          "corto": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Código corto del taller (ex maquilero), o null."
-                          },
                           "asegurado": {
                             "anyOf": [
                               {
@@ -4292,6 +4244,91 @@
                             },
                             "description": "Roles/servicios del proveedor."
                           },
+                          "contactos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del contacto."
+                                },
+                                "idProveedor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del proveedor dueño del contacto."
+                                },
+                                "nombre": {
+                                  "type": "string",
+                                  "description": "Nombre de la persona."
+                                },
+                                "puesto": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Qué hace (texto libre), o null."
+                                },
+                                "telefono": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Teléfono, o null."
+                                },
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Email, o null."
+                                },
+                                "notas": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Notas, o null."
+                                },
+                                "activo": {
+                                  "type": "boolean",
+                                  "description": "Falso si está archivado (borrado suave)."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "idProveedor",
+                                "nombre",
+                                "puesto",
+                                "telefono",
+                                "email",
+                                "notas",
+                                "activo"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Contacto de un proveedor."
+                            },
+                            "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
+                          },
                           "cantidadAdjuntos": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -4342,9 +4379,7 @@
                           "nombre",
                           "nombreCorto",
                           "razonSocial",
-                          "tipo",
                           "telefono",
-                          "contacto",
                           "condiciones",
                           "factura",
                           "rfc",
@@ -4364,11 +4399,11 @@
                           "limiteCredito",
                           "leadTimeDias",
                           "notas",
-                          "corto",
                           "asegurado",
                           "obsPago",
                           "modalidadFacturacion",
                           "roles",
+                          "contactos",
                           "cantidadAdjuntos",
                           "activo",
                           "creadoEn",
@@ -4591,23 +4626,9 @@
                     "type": "string",
                     "maxLength": 200
                   },
-                  "tipo": {
-                    "default": "SIN_CLASIFICAR",
-                    "type": "string",
-                    "enum": [
-                      "TELAS",
-                      "AVIOS",
-                      "SERVICIOS",
-                      "SIN_CLASIFICAR"
-                    ]
-                  },
                   "telefono": {
                     "type": "string",
                     "maxLength": 100
-                  },
-                  "contacto": {
-                    "type": "string",
-                    "maxLength": 150
                   },
                   "condiciones": {
                     "type": "string",
@@ -4700,10 +4721,6 @@
                     "type": "string",
                     "maxLength": 2000
                   },
-                  "corto": {
-                    "type": "string",
-                    "maxLength": 50
-                  },
                   "asegurado": {
                     "type": "boolean"
                   },
@@ -4759,7 +4776,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre corto de uso diario (\"Bloom\" para BLOOM TEXTIL), o null (A1.1)."
+                      "description": "Campo corto ÚNICO del proveedor (\"Bloom\", \"TCD\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -4772,16 +4789,6 @@
                       ],
                       "description": "Razón social, o null."
                     },
-                    "tipo": {
-                      "type": "string",
-                      "enum": [
-                        "TELAS",
-                        "AVIOS",
-                        "SERVICIOS",
-                        "SIN_CLASIFICAR"
-                      ],
-                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
-                    },
                     "telefono": {
                       "anyOf": [
                         {
@@ -4792,17 +4799,6 @@
                         }
                       ],
                       "description": "Teléfono, o null."
-                    },
-                    "contacto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Persona de contacto, o null."
                     },
                     "condiciones": {
                       "anyOf": [
@@ -5017,17 +5013,6 @@
                       ],
                       "description": "Notas, o null."
                     },
-                    "corto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código corto del taller (ex maquilero), o null."
-                    },
                     "asegurado": {
                       "anyOf": [
                         {
@@ -5096,6 +5081,91 @@
                       },
                       "description": "Roles/servicios del proveedor."
                     },
+                    "contactos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del contacto."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño del contacto."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la persona."
+                          },
+                          "puesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué hace (texto libre), o null."
+                          },
+                          "telefono": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Teléfono, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está archivado (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "nombre",
+                          "puesto",
+                          "telefono",
+                          "email",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Contacto de un proveedor."
+                      },
+                      "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -5146,9 +5216,7 @@
                     "nombre",
                     "nombreCorto",
                     "razonSocial",
-                    "tipo",
                     "telefono",
-                    "contacto",
                     "condiciones",
                     "factura",
                     "rfc",
@@ -5168,11 +5236,11 @@
                     "limiteCredito",
                     "leadTimeDias",
                     "notas",
-                    "corto",
                     "asegurado",
                     "obsPago",
                     "modalidadFacturacion",
                     "roles",
+                    "contactos",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -5385,7 +5453,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre corto de uso diario (\"Bloom\" para BLOOM TEXTIL), o null (A1.1)."
+                      "description": "Campo corto ÚNICO del proveedor (\"Bloom\", \"TCD\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -5398,16 +5466,6 @@
                       ],
                       "description": "Razón social, o null."
                     },
-                    "tipo": {
-                      "type": "string",
-                      "enum": [
-                        "TELAS",
-                        "AVIOS",
-                        "SERVICIOS",
-                        "SIN_CLASIFICAR"
-                      ],
-                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
-                    },
                     "telefono": {
                       "anyOf": [
                         {
@@ -5418,17 +5476,6 @@
                         }
                       ],
                       "description": "Teléfono, o null."
-                    },
-                    "contacto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Persona de contacto, o null."
                     },
                     "condiciones": {
                       "anyOf": [
@@ -5643,17 +5690,6 @@
                       ],
                       "description": "Notas, o null."
                     },
-                    "corto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código corto del taller (ex maquilero), o null."
-                    },
                     "asegurado": {
                       "anyOf": [
                         {
@@ -5722,6 +5758,91 @@
                       },
                       "description": "Roles/servicios del proveedor."
                     },
+                    "contactos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del contacto."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño del contacto."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la persona."
+                          },
+                          "puesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué hace (texto libre), o null."
+                          },
+                          "telefono": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Teléfono, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está archivado (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "nombre",
+                          "puesto",
+                          "telefono",
+                          "email",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Contacto de un proveedor."
+                      },
+                      "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -5772,9 +5893,7 @@
                     "nombre",
                     "nombreCorto",
                     "razonSocial",
-                    "tipo",
                     "telefono",
-                    "contacto",
                     "condiciones",
                     "factura",
                     "rfc",
@@ -5794,11 +5913,11 @@
                     "limiteCredito",
                     "leadTimeDias",
                     "notas",
-                    "corto",
                     "asegurado",
                     "obsPago",
                     "modalidadFacturacion",
                     "roles",
+                    "contactos",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -5998,31 +6117,11 @@
                       }
                     ]
                   },
-                  "tipo": {
-                    "type": "string",
-                    "enum": [
-                      "TELAS",
-                      "AVIOS",
-                      "SERVICIOS",
-                      "SIN_CLASIFICAR"
-                    ]
-                  },
                   "telefono": {
                     "anyOf": [
                       {
                         "type": "string",
                         "maxLength": 100
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "contacto": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 150
                       },
                       {
                         "type": "null"
@@ -6235,17 +6334,6 @@
                       }
                     ]
                   },
-                  "corto": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 50
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "asegurado": {
                     "type": "boolean"
                   },
@@ -6325,7 +6413,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre corto de uso diario (\"Bloom\" para BLOOM TEXTIL), o null (A1.1)."
+                      "description": "Campo corto ÚNICO del proveedor (\"Bloom\", \"TCD\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -6338,16 +6426,6 @@
                       ],
                       "description": "Razón social, o null."
                     },
-                    "tipo": {
-                      "type": "string",
-                      "enum": [
-                        "TELAS",
-                        "AVIOS",
-                        "SERVICIOS",
-                        "SIN_CLASIFICAR"
-                      ],
-                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
-                    },
                     "telefono": {
                       "anyOf": [
                         {
@@ -6358,17 +6436,6 @@
                         }
                       ],
                       "description": "Teléfono, o null."
-                    },
-                    "contacto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Persona de contacto, o null."
                     },
                     "condiciones": {
                       "anyOf": [
@@ -6583,17 +6650,6 @@
                       ],
                       "description": "Notas, o null."
                     },
-                    "corto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código corto del taller (ex maquilero), o null."
-                    },
                     "asegurado": {
                       "anyOf": [
                         {
@@ -6662,6 +6718,91 @@
                       },
                       "description": "Roles/servicios del proveedor."
                     },
+                    "contactos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del contacto."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño del contacto."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la persona."
+                          },
+                          "puesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué hace (texto libre), o null."
+                          },
+                          "telefono": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Teléfono, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está archivado (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "nombre",
+                          "puesto",
+                          "telefono",
+                          "email",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Contacto de un proveedor."
+                      },
+                      "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -6712,9 +6853,7 @@
                     "nombre",
                     "nombreCorto",
                     "razonSocial",
-                    "tipo",
                     "telefono",
-                    "contacto",
                     "condiciones",
                     "factura",
                     "rfc",
@@ -6734,11 +6873,11 @@
                     "limiteCredito",
                     "leadTimeDias",
                     "notas",
-                    "corto",
                     "asegurado",
                     "obsPago",
                     "modalidadFacturacion",
                     "roles",
+                    "contactos",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -6949,7 +7088,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Nombre corto de uso diario (\"Bloom\" para BLOOM TEXTIL), o null (A1.1)."
+                      "description": "Campo corto ÚNICO del proveedor (\"Bloom\", \"TCD\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -6962,16 +7101,6 @@
                       ],
                       "description": "Razón social, o null."
                     },
-                    "tipo": {
-                      "type": "string",
-                      "enum": [
-                        "TELAS",
-                        "AVIOS",
-                        "SERVICIOS",
-                        "SIN_CLASIFICAR"
-                      ],
-                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
-                    },
                     "telefono": {
                       "anyOf": [
                         {
@@ -6982,17 +7111,6 @@
                         }
                       ],
                       "description": "Teléfono, o null."
-                    },
-                    "contacto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Persona de contacto, o null."
                     },
                     "condiciones": {
                       "anyOf": [
@@ -7207,17 +7325,6 @@
                       ],
                       "description": "Notas, o null."
                     },
-                    "corto": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código corto del taller (ex maquilero), o null."
-                    },
                     "asegurado": {
                       "anyOf": [
                         {
@@ -7286,6 +7393,91 @@
                       },
                       "description": "Roles/servicios del proveedor."
                     },
+                    "contactos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del contacto."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño del contacto."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la persona."
+                          },
+                          "puesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué hace (texto libre), o null."
+                          },
+                          "telefono": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Teléfono, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está archivado (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "nombre",
+                          "puesto",
+                          "telefono",
+                          "email",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Contacto de un proveedor."
+                      },
+                      "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
+                    },
                     "cantidadAdjuntos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -7336,9 +7528,7 @@
                     "nombre",
                     "nombreCorto",
                     "razonSocial",
-                    "tipo",
                     "telefono",
-                    "contacto",
                     "condiciones",
                     "factura",
                     "rfc",
@@ -7358,11 +7548,11 @@
                     "limiteCredito",
                     "leadTimeDias",
                     "notas",
-                    "corto",
                     "asegurado",
                     "obsPago",
                     "modalidadFacturacion",
                     "roles",
+                    "contactos",
                     "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
@@ -8840,6 +9030,1192 @@
                   ],
                   "additionalProperties": false,
                   "description": "Avíos que surte un proveedor (B17)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/contactos": {
+      "get": {
+        "summary": "Listar los contactos del proveedor (puesto en texto libre)",
+        "tags": [
+          "proveedores"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye los contactos archivados (\"true\"/\"false\")."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contactos del proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del contacto."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proveedor dueño del contacto."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la persona."
+                          },
+                          "puesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Qué hace (texto libre), o null."
+                          },
+                          "telefono": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Teléfono, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está archivado (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProveedor",
+                          "nombre",
+                          "puesto",
+                          "telefono",
+                          "email",
+                          "notas",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Contacto de un proveedor."
+                      }
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Contactos del proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Agregar un contacto al proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "puesto": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "telefono": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "notas": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "nombre"
+                ],
+                "description": "Alta de un contacto del proveedor (puesto en texto libre)."
+              }
+            }
+          },
+          "description": "Alta de un contacto del proveedor (puesto en texto libre)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Contacto de un proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del contacto."
+                    },
+                    "idProveedor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del proveedor dueño del contacto."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la persona."
+                    },
+                    "puesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Qué hace (texto libre), o null."
+                    },
+                    "telefono": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Teléfono, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está archivado (borrado suave)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idProveedor",
+                    "nombre",
+                    "puesto",
+                    "telefono",
+                    "email",
+                    "notas",
+                    "activo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Contacto de un proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/contactos/{idContacto}": {
+      "patch": {
+        "summary": "Editar (o archivar con activo=false) un contacto del proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "puesto": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "telefono": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200,
+                        "format": "email",
+                        "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "notas": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                },
+                "description": "Edición parcial de un contacto del proveedor."
+              }
+            }
+          },
+          "description": "Edición parcial de un contacto del proveedor."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idContacto",
+            "required": true,
+            "description": "Id del contacto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contacto de un proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del contacto."
+                    },
+                    "idProveedor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del proveedor dueño del contacto."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la persona."
+                    },
+                    "puesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Qué hace (texto libre), o null."
+                    },
+                    "telefono": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Teléfono, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está archivado (borrado suave)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idProveedor",
+                    "nombre",
+                    "puesto",
+                    "telefono",
+                    "email",
+                    "notas",
+                    "activo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Contacto de un proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/constancia/analizar": {
+      "post": {
+        "summary": "Leer una Constancia de Situación Fiscal y PROPONER los datos fiscales",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archivoBase64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "PDF de la Constancia de Situación Fiscal, en base64 (máx. 10 MB decodificado)."
+                  }
+                },
+                "required": [
+                  "archivoBase64"
+                ],
+                "description": "Constancia de Situación Fiscal a leer (no se guarda nada aquí)."
+              }
+            }
+          },
+          "description": "Constancia de Situación Fiscal a leer (no se guarda nada aquí)."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos que PROPONE la constancia (la persona confirma).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tipoPersona": {
+                      "type": "string",
+                      "enum": [
+                        "fisica",
+                        "moral"
+                      ],
+                      "description": "fisica (trae CURP) o moral (denominación)."
+                    },
+                    "rfc": {
+                      "type": "string",
+                      "description": "RFC leído, o \"\"."
+                    },
+                    "razonSocial": {
+                      "type": "string",
+                      "description": "Denominación (moral) o nombre + apellidos compuestos (física), o \"\"."
+                    },
+                    "curp": {
+                      "type": "string",
+                      "description": "CURP (solo persona física), o \"\"."
+                    },
+                    "regimenes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del catálogo c_RegimenFiscal del SAT (p. ej. \"601\"), o \"\" si no se reconoció."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Nombre del régimen tal como se leyó/reconoció."
+                          }
+                        },
+                        "required": [
+                          "clave",
+                          "descripcion"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Régimen fiscal propuesto (la persona escoge si hay más de uno)."
+                      },
+                      "description": "Regímenes encontrados. Con más de uno, la persona escoge."
+                    },
+                    "codigoPostalExpedicion": {
+                      "type": "string",
+                      "description": "CP del domicilio fiscal (5 dígitos), o \"\"."
+                    },
+                    "direccion": {
+                      "type": "string",
+                      "description": "Domicilio armado con las partes que sí traen valor, o \"\"."
+                    },
+                    "advertencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Lo que no se pudo leer. NO bloquea: se captura a mano."
+                    }
+                  },
+                  "required": [
+                    "tipoPersona",
+                    "rfc",
+                    "razonSocial",
+                    "curp",
+                    "regimenes",
+                    "codigoPostalExpedicion",
+                    "direccion",
+                    "advertencias"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Datos que PROPONE la constancia (la persona confirma)."
                 }
               }
             }
@@ -120247,7 +121623,7 @@
                             "type": "string",
                             "description": "Nombre del maquilero."
                           },
-                          "corto": {
+                          "nombreCorto": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -120256,13 +121632,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Clave corta del taller, o null."
+                            "description": "Campo corto del taller, o null."
                           }
                         },
                         "required": [
                           "id",
                           "nombre",
-                          "corto"
+                          "nombreCorto"
                         ],
                         "additionalProperties": false,
                         "description": "Maquilero para el selector."
@@ -120491,7 +121867,7 @@
                             "type": "string",
                             "description": "Nombre del maquilero."
                           },
-                          "corto": {
+                          "nombreCorto": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -120500,7 +121876,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Clave corta del taller, o null."
+                            "description": "Campo corto del taller, o null."
                           },
                           "totalCargos": {
                             "anyOf": [
@@ -120561,7 +121937,7 @@
                         "required": [
                           "idMaquilero",
                           "maquilero",
-                          "corto",
+                          "nombreCorto",
                           "totalCargos",
                           "totalAbonos",
                           "totalPagos",
@@ -124297,6 +125673,17 @@
                       ],
                       "description": "Saldo FISCAL total (solo movimientos con CFDI)."
                     },
+                    "saldoSinFactura": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Saldo del segmento SIN factura (saldo − saldoFiscal)."
+                    },
                     "saldoMovimientos": {
                       "anyOf": [
                         {
@@ -124330,6 +125717,7 @@
                     "tercero",
                     "saldo",
                     "saldoFiscal",
+                    "saldoSinFactura",
                     "saldoMovimientos",
                     "saldoEsMa",
                     "incluyeEsMa"
@@ -124576,6 +125964,21 @@
           },
           {
             "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos | con (con factura) | sin (sin factura)."
+          },
+          {
+            "schema": {
               "type": "string",
               "enum": [
                 "cliente",
@@ -124637,6 +126040,15 @@
                         "fiscal"
                       ],
                       "description": "Vista aplicada (operativa/fiscal)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura)."
                     },
                     "desde": {
                       "anyOf": [
@@ -124703,6 +126115,17 @@
                           ],
                           "description": "Saldo FISCAL total (solo movimientos con CFDI)."
                         },
+                        "saldoSinFactura": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Saldo del segmento SIN factura (saldo − saldoFiscal)."
+                        },
                         "saldoMovimientos": {
                           "anyOf": [
                             {
@@ -124736,6 +126159,7 @@
                         "tercero",
                         "saldo",
                         "saldoFiscal",
+                        "saldoSinFactura",
                         "saldoMovimientos",
                         "saldoEsMa",
                         "incluyeEsMa"
@@ -124986,6 +126410,7 @@
                     "idTercero",
                     "tercero",
                     "vista",
+                    "segmento",
                     "desde",
                     "hasta",
                     "saldo",
@@ -125233,7 +126658,7 @@
                             "type": "string",
                             "description": "Nombre del proveedor."
                           },
-                          "corto": {
+                          "nombreCorto": {
                             "anyOf": [
                               {
                                 "type": "string"
@@ -125242,7 +126667,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Clave corta del proveedor (o null)."
+                            "description": "Campo corto del proveedor, o null."
                           },
                           "diasCredito": {
                             "type": "integer",
@@ -125320,7 +126745,7 @@
                         "required": [
                           "idProveedor",
                           "proveedor",
-                          "corto",
+                          "nombreCorto",
                           "diasCredito",
                           "saldo",
                           "corriente",
@@ -125697,6 +127122,21 @@
           },
           {
             "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos | con (con factura) | sin (sin factura)."
+          },
+          {
+            "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -125745,6 +127185,15 @@
                         "fiscal"
                       ],
                       "description": "Vista aplicada (operativa/fiscal)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura)."
                     },
                     "desde": {
                       "anyOf": [
@@ -125811,6 +127260,17 @@
                           ],
                           "description": "Saldo FISCAL total (solo movimientos con CFDI)."
                         },
+                        "saldoSinFactura": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Saldo del segmento SIN factura (saldo − saldoFiscal)."
+                        },
                         "saldoMovimientos": {
                           "anyOf": [
                             {
@@ -125844,6 +127304,7 @@
                         "tercero",
                         "saldo",
                         "saldoFiscal",
+                        "saldoSinFactura",
                         "saldoMovimientos",
                         "saldoEsMa",
                         "incluyeEsMa"
@@ -126094,6 +127555,7 @@
                     "idTercero",
                     "tercero",
                     "vista",
+                    "segmento",
                     "desde",
                     "hasta",
                     "saldo",
@@ -126345,6 +127807,21 @@
           },
           {
             "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos | con (con factura) | sin (sin factura)."
+          },
+          {
+            "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -126545,8 +128022,7 @@
                     "description": "Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen)."
                   },
                   "esFiscal": {
-                    "default": false,
-                    "description": "¿Movimiento fiscal (con CFDI)? El proveedor informal lo deja en false.",
+                    "description": "¿Movimiento CON factura (CFDI)? Lo resuelve el servidor con la modalidad del proveedor; obligatorio cuando el proveedor factura \"de las dos formas\".",
                     "type": "boolean"
                   },
                   "refTipo": {
@@ -127591,7 +129067,7 @@
                               ],
                               "description": "RFC del proveedor (catálogo R15)."
                             },
-                            "corto": {
+                            "nombreCorto": {
                               "anyOf": [
                                 {
                                   "type": "string"
@@ -127600,14 +129076,14 @@
                                   "type": "null"
                                 }
                               ],
-                              "description": "Clave corta del proveedor."
+                              "description": "Campo corto del proveedor, o null."
                             }
                           },
                           "required": [
                             "idProveedor",
                             "nombre",
                             "rfc",
-                            "corto"
+                            "nombreCorto"
                           ],
                           "additionalProperties": false,
                           "description": "Proveedor candidato por RFC."
@@ -128826,6 +130302,21 @@
           },
           {
             "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos | con (con factura) | sin (sin factura)."
+          },
+          {
+            "schema": {
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -128874,6 +130365,15 @@
                         "fiscal"
                       ],
                       "description": "Vista aplicada (operativa/fiscal)."
+                    },
+                    "segmento": {
+                      "type": "string",
+                      "enum": [
+                        "todos",
+                        "con",
+                        "sin"
+                      ],
+                      "description": "Segmento aplicado (todos/con/sin factura)."
                     },
                     "desde": {
                       "anyOf": [
@@ -128940,6 +130440,17 @@
                           ],
                           "description": "Saldo FISCAL total (solo movimientos con CFDI)."
                         },
+                        "saldoSinFactura": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Saldo del segmento SIN factura (saldo − saldoFiscal)."
+                        },
                         "saldoMovimientos": {
                           "anyOf": [
                             {
@@ -128973,6 +130484,7 @@
                         "tercero",
                         "saldo",
                         "saldoFiscal",
+                        "saldoSinFactura",
                         "saldoMovimientos",
                         "saldoEsMa",
                         "incluyeEsMa"
@@ -129223,6 +130735,7 @@
                     "idTercero",
                     "tercero",
                     "vista",
+                    "segmento",
                     "desde",
                     "hasta",
                     "saldo",
@@ -129471,6 +130984,21 @@
             "name": "vista",
             "required": false,
             "description": "operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal)."
+          },
+          {
+            "schema": {
+              "default": "todos",
+              "type": "string",
+              "enum": [
+                "todos",
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "segmento",
+            "required": false,
+            "description": "todos | con (con factura) | sin (sin factura)."
           },
           {
             "schema": {

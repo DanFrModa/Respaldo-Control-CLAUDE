@@ -555,27 +555,13 @@ model Archivo {
 // agregan F1-E3/E4: AvioProveedor→Proveedor, TelaColor→Color, Modelo→Temporada).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Clasificación del proveedor (doc funcional 03-Producción §Órdenes de Compra:
-/// el campo `TipoProv` del viejo usaba H/T/S — habilitación/avíos, telas, servicios).
-/// `SIN_CLASIFICAR` cubre los proveedores del viejo sin tipo capturado. El mapeo
-/// H/T/S → este enum lo hace el ETL en F1-E6; aquí solo se define el enum nuevo.
-enum TipoProveedor {
-  TELAS
-  AVIOS
-  SERVICIOS
-  SIN_CLASIFICAR
-
-  @@map("tipo_proveedor")
-}
-
 /// Proveedor (catálogo global, F1-E1 + enriquecido F1-E1B). Equivale a la tabla
 /// `Proveedores` del viejo (doc 03-Producción §Órdenes de Compra). Base de
 /// `AvioProveedor` (F1-E3, R1) y, sobre todo, cimiento de las CxP de la futura
 /// fase de Finanzas (F8, decisión D12, R15 — `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §4).
 ///
-/// F1-E1B agrega: roles/servicios multi-valor (relación `ProveedorRol`, que NO
-/// reemplaza a `tipo` — este se conserva como clasificador rápido, acta de Gabriel
-/// 13-jun-2026), campos fiscales para el CFDI, datos comerciales/de pago, lead time
+/// F1-E1B agrega: roles/servicios multi-valor (relación `ProveedorRol`),
+/// campos fiscales para el CFDI, datos comerciales/de pago, lead time
 /// para el MRP y adjuntos en R2 (`ProveedorArchivo`). TODOS los campos nuevos son
 /// NULLABLE: los 443 proveedores que migran en F1-E6 no traen estos datos; se
 /// capturan en altas/ediciones nuevas (la regla "factura ⇒ RFC" es de captura, no
@@ -586,20 +572,38 @@ enum TipoProveedor {
 /// tercero se da de alta UNA sola vez como Proveedor y marca sus servicios (maquila,
 /// corte, estampado, bordado, lavado, aplicación, venta de telas/avíos…) con CASILLAS de
 /// `RolProveedor`. Los atributos propios del maquilero se portaron como campos nullable
-/// (`corto`, `asegurado`, `obsPago`, abajo).
+/// (`asegurado`, `obsPago`, abajo; su `corto` vive hoy en `nombreCorto`).
+///
+/// V1-E3f pieza B (§Post-F9.56/.57/.58, Daniel 16-ago-2026) lo deja como Daniel lo usa:
+///  • **Fuera `tipo`** (enum `TipoProveedor`). Daniel: *"tienes un campo de TIPO y aparte
+///    tienes el rol (que pueden ser más de uno)… creo que el de tipo sale sobrando. Y es
+///    importante poner todo lo que puede hacer un proveedor, porque puede hasta llegar a
+///    vender telas y ser maquilero"*. Los roles N:N ya cubren ese caso; el tipo ÚNICO no.
+///    La migración TRADUCE el valor viejo a rol (TELAS→`vende-telas`, AVIOS→`vende-avios`,
+///    SERVICIOS→`otros-servicios`, SIN_CLASIFICAR→sin rol) de forma ADITIVA.
+///  • **Un solo campo corto** (`nombreCorto`), ÚNICO: absorbe al `corto` del taller.
+///  • **Fuera `contacto`** (un solo nombre suelto): los contactos son ahora N filas de
+///    `ProveedorContacto`, con el puesto en TEXTO LIBRE.
 model Proveedor {
-  id          Int           @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
-  nombre      String        @unique
-  /// Nombre CORTO de uso diario ("Bloom" para BLOOM TEXTIL), para armar el nombre compuesto
-  /// de la tela (A1.1, Daniel 6-ago-2026). Solo display: SIN unicidad, opcional.
-  nombreCorto String?       @map("nombre_corto")
-  razonSocial String?       @map("razon_social")
-  /// Clasificación rápida (telas/avíos/servicios); por defecto sin clasificar.
-  /// F1-E1B: SE CONSERVA junto a los roles multi-valor (acta Gabriel 13-jun-2026).
-  tipo        TipoProveedor @default(SIN_CLASIFICAR)
+  nombre      String  @unique
+  /// Nombre CORTO de uso diario — el ÚNICO campo corto del proveedor (V1-E3f pieza B,
+  /// §Post-F9.57 punto 2 + §Post-F9.58 punto 1). Nació como display para armar el nombre
+  /// compuesto de la tela ("Bloom" para BLOOM TEXTIL, A1.1) y ABSORBIÓ la clave corta del
+  /// taller (`corto`, ex `Maquilero.corto`): Daniel — *"tanto para proveedores como para
+  /// talleres necesitamos el campo corto. Podría ser el mismo campo"* y *"sí debe de ser
+  /// único"*. Por eso es `@unique` global (nullable: los NULL no chocan entre sí en Postgres,
+  /// así que los cientos de proveedores sin clave corta conviven sin problema).
+  ///
+  /// ⚠️ Este `@unique` es EXACTO y por sí solo dejaría convivir "TCD" y "tcd". La unicidad que
+  /// pidió Daniel es la que usa la gente —sin distinguir mayúsculas—, así que la migración
+  /// `20260818140000_proveedores_como_daniel_los_usa` crea ADEMÁS un índice funcional
+  /// `unique(lower(nombre_corto))`, que Prisma no sabe declarar aquí. Los dos conviven: éste
+  /// documenta el campo, el otro cierra la carrera concurrente con distinta caja.
+  nombreCorto String? @unique @map("nombre_corto")
+  razonSocial String? @map("razon_social")
   telefono    String?
-  contacto    String?
   /// Condiciones comerciales en texto libre (crédito, plazos…). Se conserva de E1;
   /// los datos comerciales estructurados (diasCredito, moneda…) los agrega E1B.
   condiciones String?
@@ -655,9 +659,10 @@ model Proveedor {
   // `notas` del maquilero ya viven en los campos homónimos de arriba (no se duplican).
   // El `precioReferencia` del cortador NO se porta: el costo del corte se definirá en la
   // orden de producción (pendiente F2/F3).
-  /// Clave corta de uso diario del taller (ex `Maquilero.corto`). Única global (nullable).
-  corto     String?  @unique
-  /// ¿Está asegurado? (ex `Maquilero.asegurado`). Nullable: solo aplica a talleres.
+  // La clave corta del taller (`corto`) se FUSIONÓ con `nombreCorto` (arriba) en V1-E3f
+  // pieza B: un solo campo corto, único, para el proveedor comercial y para el taller.
+  /// ¿Está asegurado? (ex `Maquilero.asegurado`). Nullable: solo aplica a talleres — la
+  /// pantalla solo lo muestra cuando el proveedor tiene algún rol de servicio (§Post-F9.56 punto 7).
   asegurado Boolean?
   /// Observaciones específicas de pago (ex `Maquilero.obsPago`).
   obsPago   String?  @map("obs_pago")
@@ -674,6 +679,8 @@ model Proveedor {
 
   /// Roles/servicios multi-valor del proveedor (F1-E1B, N:N vía `ProveedorRol`).
   roles                   ProveedorRol[]
+  /// Contactos del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1): N personas por proveedor.
+  contactos               ProveedorContacto[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
   archivos                ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
@@ -730,6 +737,49 @@ model Proveedor {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("proveedores")
+}
+
+/// CONTACTO de un proveedor (V1-E3f pieza B — §Post-F9.56 punto 1 y §Post-F9.57 punto 1).
+///
+/// Antes había UN solo campo `Proveedor.contacto` (un nombre suelto). Daniel: *"A veces es
+/// importante ir registrando al vendedor, a la de crédito y cobranza, al encargado del taller,
+/// a la supervisora… Depende qué tipo de proveedor y qué tipo de puestos se requieren."*
+///
+/// El **puesto es TEXTO LIBRE, no catálogo** — Daniel, cerrando la pregunta: *"O sea, sí un
+/// catálogo de contactos, pero deja el campo abierto qué rol tiene cada persona."* Mismo criterio
+/// que la posición del arte (§Post-F9.52 punto 2): abierto donde la realidad es variada.
+///
+/// El `contacto` viejo NO se pierde (D3): la migración lo convierte en el primer contacto de su
+/// proveedor (con el puesto vacío, porque nadie lo capturó) antes de tirar la columna.
+///
+/// `onDelete: Cascade` hacia `Proveedor`: los contactos son datos DEL proveedor (mismo criterio
+/// que `ProveedorArchivo`/`ProveedorRol`). Hoy el proveedor no se borra físicamente (borrado
+/// suave con `activo`), así que en la práctica no se dispara.
+model ProveedorContacto {
+  id          Int       @id @default(autoincrement())
+  idProveedor Int       @map("id_proveedor")
+  proveedor   Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Cascade)
+
+  /// Nombre de la persona. Es lo único obligatorio: un contacto sin nombre no sirve para nada.
+  nombre   String
+  /// Qué hace esa persona, en TEXTO LIBRE ("vendedor", "crédito y cobranza", "encargado del
+  /// taller", "supervisora"…). NO es catálogo, por decisión de Daniel.
+  puesto   String?
+  telefono String?
+  email    String?
+  notas    String?
+
+  /// Borrado SUAVE (plan §4, D3): un contacto que se fue se desactiva, no se borra — su nombre
+  /// puede seguir apareciendo en documentos viejos.
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idProveedor])
+  @@map("proveedor_contacto")
 }
 
 /// Rol/servicio que un proveedor puede prestar (F1-E1B, R15 §4.1). Catálogo
@@ -967,9 +1017,9 @@ model TipoProceso {
 
   /// Etapas de envío/recibo de maquila de este proceso (F3, Restrict): un tipo de
   /// proceso en uso por una etapa no se borra físico → se desactiva.
-  etapas     EtapaMovimiento[]
+  etapas      EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) de este proceso (F3, Restrict).
-  cargosEsMa EsMaCargo[]
+  cargosEsMa  EsMaCargo[]
   /// Artes del MODELO de este tipo (V1-E3f, Restrict): un tipo en uso no se borra físico.
   artesModelo ModeloArte[]
   /// Artes congelados en ÓRDENES de este tipo (V1-E3f, Restrict).
@@ -1898,27 +1948,27 @@ model AvioProveedor {
 /// medida×talla del BOM vive en `ModeloAvioTalla.idAvioMedida` (lo consume el MRP a futuro; hoy
 /// nullable → no cambia el MRP existente). Cascade hacia Avio (config del avío); borrado suave.
 model AvioMedida {
-  id     Int     @id @default(autoincrement())
-  idAvio Int     @map("id_avio")
-  avio   Avio    @relation(fields: [idAvio], references: [id], onDelete: Cascade)
+  id               Int      @id @default(autoincrement())
+  idAvio           Int      @map("id_avio")
+  avio             Avio     @relation(fields: [idAvio], references: [id], onDelete: Cascade)
   /// ⭐ V1-E3g (§Post-F9.66) — ETIQUETA de la medida ("53 cm"), para mostrar y para el diff del
   /// set-completo (`@@unique`). **Ya NO se captura a mano:** el dominio la DERIVA de `valor` +
   /// `Avio.unidadMedida`, porque el texto libre partía la compra en tres ("53 cm", "53cm", "53").
   /// Las filas viejas conservan su texto original mientras nadie las corrija (D3: no se tira nada).
-  medida String
+  medida           String
   /// ⭐ V1-E3g — El NÚMERO de la medida, en `Avio.unidadMedida`. Es lo único que se captura. NULL
   /// SOLO en filas heredadas cuya etiqueta no se pudo convertir ("S", "vieja", rangos): esas
   /// quedan `requiereRevision = true` en vez de perderse o de recibir un valor inventado.
-  valor  Decimal? @db.Decimal(12, 2)
+  valor            Decimal? @db.Decimal(12, 2)
   /// ⭐ V1-E3g — Bandera de REVISIÓN MANUAL (D3): la migración no pudo normalizar esta etiqueta a
   /// número+unidad y NO adivinó. Es un aviso, NO un bloqueo: la medida sigue viva, se sigue
   /// promediando en el precosto y se puede amarrar. Se apaga sola al re-capturarla con un número.
-  requiereRevision Boolean @default(false) @map("requiere_revision")
+  requiereRevision Boolean  @default(false) @map("requiere_revision")
   /// Precio real de compra de esta medida (por unidad de compra). Entra al PROMEDIO del precosto.
-  precio Decimal @db.Decimal(12, 2)
+  precio           Decimal  @db.Decimal(12, 2)
   /// Orden de despliegue dentro del avío (lo gestiona el dominio; no único en BD).
-  orden  Int     @default(0)
-  activo Boolean @default(true)
+  orden            Int      @default(0)
+  activo           Boolean  @default(true)
 
   /// Amarres medida↔talla del BOM que apuntan a esta medida (R5, B11). SetNull al borrarla.
   modeloAvioTallas ModeloAvioTalla[]
@@ -2236,8 +2286,8 @@ model ModeloAvio {
 /// suave) y Restrict hacia `Proveedor` y `TipoProceso` (un catálogo en uso no se borra físico,
 /// se desactiva). Auditoría COMPLETA (A7).
 model ModeloArte {
-  id          Int     @id @default(autoincrement())
-  idModelo    Int     @map("id_modelo")
+  id          Int      @id @default(autoincrement())
+  idModelo    Int      @map("id_modelo")
   /// Descripción del arte — el campo VISIBLE y la identidad de cara al usuario desde V1-E3f
   /// (§Post-F9.52 punto 1). REQUERIDA: sin nombre, es lo único que distingue un arte de otro.
   descripcion String
@@ -2555,9 +2605,9 @@ model PedidoReal {
   /// Pedido real CANCELADO — cancelación SUAVE (V1-E4 punto 6, decisión §Post-F9.37 punto 9:
   /// Daniel, *"Sí"*). Cierra el TODO que estaba abierto desde F2-E1. Nunca se borra: sigue
   /// consultable, igual que `Pedido.pedCancelado` y `Orden.estado = cancelada` (D3).
-  cancelado          Boolean   @default(false)
+  cancelado       Boolean @default(false)
   /// Motivo de la cancelación (OBLIGATORIO al cancelar, mismo criterio que `Orden.motivoCancelada`).
-  motivoCancelada    String?   @map("motivo_cancelada") @db.Text
+  motivoCancelada String? @map("motivo_cancelada") @db.Text
 
   lineas PedidoRealLinea[]
 
@@ -3221,13 +3271,13 @@ model OrdenArte {
   posicion    String?
   puntadas    Int?
   /// Precio del arte EN ESTA ORDEN (el override de §Post-F9.35). NULL = sin precio congelado.
-  precio      Decimal?   @db.Decimal(12, 2)
+  precio      Decimal?    @db.Decimal(12, 2)
   /// Tipo del arte: FK al catálogo ÚNICO (`TipoProceso.esArte`), ex enum `TipoArte` (V1-E3f).
   idTipoArte  Int         @map("id_tipo_arte")
   tipoArte    TipoProceso @relation(fields: [idTipoArte], references: [id], onDelete: Restrict)
   /// Proveedor que hace el arte. Restrict (un proveedor en uso no se borra físico).
-  idProveedor Int?       @map("id_proveedor")
-  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  idProveedor Int?        @map("id_proveedor")
+  proveedor   Proveedor?  @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
 
   estado        EstadoRenglonReceta @default(sin_revisar)
   agregadoAMano Boolean             @default(false) @map("agregado_a_mano")

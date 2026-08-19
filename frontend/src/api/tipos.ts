@@ -78,8 +78,17 @@ export type ProveedoresPagina =
 export type Proveedor = ProveedoresPagina['datos'][number];
 /** Parametros de consulta del listado de proveedores (querystring). */
 export type ProveedoresQuery = NonNullable<paths['/api/proveedores']['get']['parameters']['query']>;
-/** Tipo de proveedor (clasificacion de negocio). */
-export type TipoProveedor = Proveedor['tipo'];
+/** Un CONTACTO del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1). */
+export type ProveedorContacto = Proveedor['contactos'][number];
+/** Cuerpo de alta de un contacto (`POST /api/proveedores/{id}/contactos`). */
+export type ProveedorContactoCrear =
+  paths['/api/proveedores/{id}/contactos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de un contacto (`PATCH /api/proveedores/{id}/contactos/{idContacto}`). */
+export type ProveedorContactoEditar =
+  paths['/api/proveedores/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
+/** Datos que PROPONE la Constancia de Situacion Fiscal (`POST /api/proveedores/constancia/analizar`). */
+export type ConstanciaPropuesta =
+  paths['/api/proveedores/constancia/analizar']['post']['responses']['200']['content']['application/json'];
 /** Cuerpo de alta de proveedor (`POST /api/proveedores`). */
 export type ProveedorCrear =
   paths['/api/proveedores']['post']['requestBody']['content']['application/json'];

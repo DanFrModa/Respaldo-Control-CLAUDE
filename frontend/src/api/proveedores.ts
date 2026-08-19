@@ -11,11 +11,15 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import { subirArchivoPrefirmado } from './subida-archivo';
 import type {
+  ConstanciaPropuesta,
   Proveedor,
   ProveedorAdjunto,
   ProveedorAdjuntoCrear,
   ProveedorAvio,
   ProveedorAvioAsignar,
+  ProveedorContacto,
+  ProveedorContactoCrear,
+  ProveedorContactoEditar,
   ProveedorCrear,
   ProveedorEditar,
   ProveedoresPagina,
@@ -39,7 +43,7 @@ function claveListaProveedores(query: ProveedoresQuery): readonly unknown[] {
   return [...CLAVE_PROVEEDORES, 'lista', query];
 }
 
-/** Pide una pagina del listado de proveedores (busqueda + tipo + orden + paginacion en servidor). */
+/** Pide una pagina del listado de proveedores (busqueda + rol + orden + paginacion en servidor). */
 async function listarProveedores(query: ProveedoresQuery): Promise<ProveedoresPagina> {
   const { data, error } = await api.GET('/api/proveedores', { params: { query } });
   if (!data) {
@@ -465,4 +469,102 @@ export function useQuitarAvioProveedor(): UseMutationResult<
       });
     },
   });
+}
+
+// ── Contactos del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1) ────────────
+
+/** Agrega un contacto (`POST /api/proveedores/{id}/contactos`). */
+async function crearContactoProveedor(
+  id: number,
+  cuerpo: ProveedorContactoCrear,
+): Promise<ProveedorContacto> {
+  const { data, error } = await api.POST('/api/proveedores/{id}/contactos', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Edita (o ARCHIVA con `activo: false`) un contacto. */
+async function actualizarContactoProveedor(
+  id: number,
+  idContacto: number,
+  cuerpo: ProveedorContactoEditar,
+): Promise<ProveedorContacto> {
+  const { data, error } = await api.PATCH('/api/proveedores/{id}/contactos/{idContacto}', {
+    params: { path: { id, idContacto } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Argumentos de la mutacion de alta de contacto. */
+export interface ArgsCrearContacto {
+  id: number;
+  cuerpo: ProveedorContactoCrear;
+}
+
+/** Agrega un contacto al proveedor e invalida la lista (los contactos viajan en la ficha). */
+export function useCrearContactoProveedor(): UseMutationResult<
+  ProveedorContacto,
+  ErrorDeApi,
+  ArgsCrearContacto
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCrearContacto) => crearContactoProveedor(id, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
+  });
+}
+
+/** Argumentos de la mutacion de edicion/archivado de contacto. */
+export interface ArgsActualizarContacto {
+  id: number;
+  idContacto: number;
+  cuerpo: ProveedorContactoEditar;
+}
+
+/** Edita o archiva un contacto e invalida la lista. */
+export function useActualizarContactoProveedor(): UseMutationResult<
+  ProveedorContacto,
+  ErrorDeApi,
+  ArgsActualizarContacto
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, idContacto, cuerpo }: ArgsActualizarContacto) =>
+      actualizarContactoProveedor(id, idContacto, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
+  });
+}
+
+// ── Constancia de Situacion Fiscal (V1-E3f pieza B, §Post-F9.55) ─────────────
+
+/**
+ * Lee una Constancia de Situacion Fiscal y devuelve lo que PROPONE. No guarda nada: la pantalla
+ * llena los campos y una persona confirma antes de que se escriba (regla de §Post-F9.55).
+ */
+async function analizarConstancia(archivoBase64: string): Promise<ConstanciaPropuesta> {
+  const { data, error } = await api.POST('/api/proveedores/constancia/analizar', {
+    body: { archivoBase64 },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Analiza la constancia (mutacion: no cachea nada, cada archivo es distinto). */
+export function useAnalizarConstancia(): UseMutationResult<
+  ConstanciaPropuesta,
+  ErrorDeApi,
+  string
+> {
+  return useMutation({ mutationFn: analizarConstancia });
 }

@@ -192,8 +192,10 @@ export function CxpPagina(): React.JSX.Element {
                     <div className="flex items-start justify-between gap-2">
                       <p className="min-w-0 truncate font-medium">
                         {f.proveedor}
-                        {f.corto ? (
-                          <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
+                        {f.nombreCorto ? (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({f.nombreCorto})
+                          </span>
                         ) : null}
                       </p>
                       <span className="num shrink-0 font-semibold">{moneda(f.saldo)}</span>
@@ -253,8 +255,10 @@ export function CxpPagina(): React.JSX.Element {
                       >
                         <TablaDensaCelda className="font-medium">
                           {f.proveedor}
-                          {f.corto ? (
-                            <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
+                          {f.nombreCorto ? (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({f.nombreCorto})
+                            </span>
                           ) : null}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">

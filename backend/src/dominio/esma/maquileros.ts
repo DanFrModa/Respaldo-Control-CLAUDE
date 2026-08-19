@@ -62,7 +62,7 @@ export async function listarMaquilerosEsMa(
       activo: true,
       roles: { some: { rol: { codigo: { in: [...rolesDeTipo(filtros.tipo)] }, activo: true } } },
     },
-    select: { id: true, nombre: true, corto: true },
+    select: { id: true, nombre: true, nombreCorto: true },
     orderBy: { nombre: 'asc' },
   });
 

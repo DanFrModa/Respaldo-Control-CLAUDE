@@ -2980,6 +2980,68 @@ vivo el 17-ago—; lo que faltaba era esto.)*
 
 ---
 
+#### (Post-F9.66) — ⭐ Medida vs. consumo: dos ideas que vivían en el mismo campo (DANIEL, 17/18-ago-2026)
+
+> **Salió de Daniel capturando un modelo real** —un cierre—, no de un plan ni de una revisión técnica.
+> Es el segundo hallazgo de esa naturaleza en dos días (el otro fue el tránsito de prendas), y los dos
+> encontraron cosas que **ningún reviewer habría visto: el código estaba bien, lo que estaba mal era el
+> modelo del negocio**.
+
+**El hallazgo.** Daniel: *"En el caso del cierre el consumo por prenda es 1 pieza… pero lo que hay que
+poner por talla no es el consumo, sino **la medida a la que hay que pedir** ese cierre. Para cuestión de
+consumos es 1, pero para cuestión de información, es por medida."*
+
+Y después, la frase que destapó el fondo: *"Los costos de elástico o de jareta se expresan en metros.
+Cuesta 3 pesos el metro. Entonces poner .75 hace sentido porque el costo se calcula con una simple
+multiplicación."*
+
+| | Elástico / jareta | Cierre |
+|---|---|---|
+| El valor por talla **es** | el **CONSUMO** (0.75 m en CH) | la **ESPECIFICACIÓN** (cierre de 53 cm) |
+| La cantidad | varía por talla | **siempre 1 pza** |
+| ¿Se multiplica por el precio? | **sí** ($3/m × 0.75) | no — es una instrucción de compra |
+| Decimales | **naturales y correctos** | no tienen sentido |
+
+**No es que unos avíos usen decimales y otros no: es que unos capturan CUÁNTO GASTAS y otros QUÉ PIDES.**
+Por eso ninguna regla global funcionaba.
+
+**El camino de la decisión, con lo descartado y su razón** *(no re-abrir)*:
+
+- ❌ **"Siempre CM, sin decimales"** — lo propuso el **lead** y **Daniel lo tumbó con razón**: forzar el
+  elástico a centímetros obliga a dividir entre 100 en algún lado, y ahí nacen los errores.
+- ❌ **Medida como TEXTO LIBRE** — la pidió Daniel: *"un día pueden ser medidas de 52, 53, 54 cm y otro
+  modelo de 67, 68, 69… no tiene sentido tener un catálogo con todas las medidas posibles"*. **Su queja
+  era válida** (obligar a dar de alta cada centímetro es fricción absurda), pero el texto libre **rompe la
+  compra**: `"53 cm"`, `"53cm"` y `"53"` serían tres cosas distintas y la orden de compra saldría partida
+  en tres.
+- ✅ **Lo que Daniel propuso y ganó:** *"le ponemos la medida en que va cada avío (como default CM) y el
+  campo donde se captura lo dejamos solo numérico. Entonces obliga al usuario a evitar poner 53 cm, 53
+  centímetros o 53CM."*
+  **Quita la ambigüedad en el origen en vez de limpiarla después** — un campo que no admite el dato malo
+  vale más que una validación que avisa, porque los avisos se ignoran.
+
+**⚠️ El riesgo que queda, acotado:** que un avío tenga **mal puesta su unidad**. Contra eso, la unidad se
+ve **pegada al campo** al capturar (`0.75 m`, `53 cm`) y hay **aviso —no bloqueo— cuando el número es
+absurdo** para esa unidad (un `1` en un cierre casi seguro quiso ser `100`).
+
+**Cerrado con Daniel:** ningún avío necesita **cantidad por talla Y medida por talla a la vez**
+(*"no se me ocurre algo que lleve las dos cosas a la vez"*), así que **nunca se sostienen los dos modos
+vivos**.
+
+**Migración:** lo convertible se convierte; **lo que no, se marca para revisión manual** y sigue **vivo y
+usable** — Daniel lo pidió con esas palabras: *"que un puñado te aparezca marcado a que el sistema decida
+por ti y te enteres tres meses después"*.
+
+**Las etiquetas eran parte del defecto:** el panel se llamaba *"Consumo por talla"* para las dos cosas y el
+esquema documentaba el campo como *"Medida (consumo) del avío para esta talla"* — **la confusión estaba
+escrita desde el origen**, y por eso Daniel llegó a la misma duda que habría tenido cualquiera.
+
+- **Aplica en:** V1-E3g. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
+  `SEED_ON_START`. Sí requiere que alguien revise en el catálogo de Avíos las medidas marcadas.
+- **Fecha:** 2026-08-18.
+
+---
+
 #### (Post-F9.67) — ⭐ Los perfiles NO van en cascada: van por PUESTO, y se suman (DANIEL, 18-ago-2026)
 
 > Daniel, sin que se lo preguntaran: *"El sistema de perfiles en cascada lo hice al principio pero **dejó
@@ -3085,62 +3147,156 @@ endpoint que confiaba en que la pantalla lo escondiera, **es un hallazgo grave**
 
 ---
 
-#### (Post-F9.66) — ⭐ Medida vs. consumo: dos ideas que vivían en el mismo campo (DANIEL, 17/18-ago-2026)
+#### (Post-F9.69) — Las cinco reglas que la SEGMENTACIÓN de CxP obligó a fijar (V1-E3f pieza B, 18-ago-2026)
 
-> **Salió de Daniel capturando un modelo real** —un cierre—, no de un plan ni de una revisión técnica.
-> Es el segundo hallazgo de esa naturaleza en dos días (el otro fue el tránsito de prendas), y los dos
-> encontraron cosas que **ningún reviewer habría visto: el código estaba bien, lo que estaba mal era el
-> modelo del negocio**.
+Daniel pidió (§Post-F9.57) que la partición **con factura / sin factura** dejara de ser cosa de talleres:
+*"hay proveedores de avíos o de telas que puede pasar que algunas cosas sean con factura y otras sin
+factura"*. Al llevar el motor de EsMa a CxP hubo que fijar cinco cosas que él no dijo. Se registran porque
+**tocan dinero** y porque un reviewer las objetó una por una.
 
-**El hallazgo.** Daniel: *"En el caso del cierre el consumo por prenda es 1 pieza… pero lo que hay que
-poner por talla no es el consumo, sino **la medida a la que hay que pedir** ese cierre. Para cuestión de
-consumos es 1, pero para cuestión de información, es por medida."*
+1. **Un movimiento `entrada_sin_factura` NUNCA se vuelve fiscal**, ni siquiera con un proveedor marcado
+   `solo_con`, y **pedirlo se rechaza** en vez de corregirse en silencio. Sin esta regla, reusar el criterio
+   de EsMa metía cargos **sin CFDI** al reporte del contador.
+2. **`segmento` ≠ `vista: fiscal`.** Filtran la misma columna, pero el **segmento** pide solo
+   `terceros.ver`: la partición que pidió Daniel es **operativa**, no contable, y no puede quedar detrás
+   del candado del contador. La combinación contradictoria se **rechaza con mensaje**, no devuelve una
+   lista vacía muda.
+3. 🔴 **Los movimientos SIN DEFINIR (`conFactura = NULL`) van al segmento "sin".** La primera versión usó
+   `{ not: true }` creyendo que los incluía — **falso**: en lógica de tres valores `NULL <> true` es `NULL`
+   y la fila **se descarta igual**. La única forma que sí los trae es el `OR` explícito con `IS NULL`.
+   **Importa porque el encabezado sí los sumaba** (`saldoSinFactura = saldo − saldoFiscal`), así que
+   encabezado y renglones se contradecían y **los dos segmentos no daban el total**.
+4. **CxC hereda `segmento`** por compartir el contrato del motor. Nadie lo pidió; es inocuo (default
+   `todos`) y ahí la partición **sí es exacta**, porque `MovimientoTercero.esFiscal` es NOT NULL.
+5. **El campo corto sobreviviente es `nombreCorto`, no `corto`** — es el que Daniel señaló en la pantalla,
+   y los DTO de CxP/EsMa/CFDI se renombraron igual: *dejar dos nombres para un concepto es la
+   desincronización que este proyecto ya pagó*.
 
-Y después, la frase que destapó el fondo: *"Los costos de elástico o de jareta se expresan en metros.
-Cuesta 3 pesos el metro. Entonces poner .75 hace sentido porque el costo se calcula con una simple
-multiplicación."*
+**Y el criterio de la migración, que Daniel no dictó pero decide sobre sus datos:** la fusión de los dos
+campos cortos deduplica **sin distinguir mayúsculas**, y por eso el índice único de la base también va
+sobre `lower()` — si no, la base vuelve a permitir al día siguiente el estado que la migración se tomó el
+trabajo de eliminar. Las colisiones y el valor desplazado **quedan en bitácora**; una diferencia de **sola
+caja** se registra aparte, porque perder una tipografía no es lo mismo que perder un dato.
 
-| | Elástico / jareta | Cierre |
-|---|---|---|
-| El valor por talla **es** | el **CONSUMO** (0.75 m en CH) | la **ESPECIFICACIÓN** (cierre de 53 cm) |
-| La cantidad | varía por talla | **siempre 1 pza** |
-| ¿Se multiplica por el precio? | **sí** ($3/m × 0.75) | no — es una instrucción de compra |
-| Decimales | **naturales y correctos** | no tienen sentido |
-
-**No es que unos avíos usen decimales y otros no: es que unos capturan CUÁNTO GASTAS y otros QUÉ PIDES.**
-Por eso ninguna regla global funcionaba.
-
-**El camino de la decisión, con lo descartado y su razón** *(no re-abrir)*:
-
-- ❌ **"Siempre CM, sin decimales"** — lo propuso el **lead** y **Daniel lo tumbó con razón**: forzar el
-  elástico a centímetros obliga a dividir entre 100 en algún lado, y ahí nacen los errores.
-- ❌ **Medida como TEXTO LIBRE** — la pidió Daniel: *"un día pueden ser medidas de 52, 53, 54 cm y otro
-  modelo de 67, 68, 69… no tiene sentido tener un catálogo con todas las medidas posibles"*. **Su queja
-  era válida** (obligar a dar de alta cada centímetro es fricción absurda), pero el texto libre **rompe la
-  compra**: `"53 cm"`, `"53cm"` y `"53"` serían tres cosas distintas y la orden de compra saldría partida
-  en tres.
-- ✅ **Lo que Daniel propuso y ganó:** *"le ponemos la medida en que va cada avío (como default CM) y el
-  campo donde se captura lo dejamos solo numérico. Entonces obliga al usuario a evitar poner 53 cm, 53
-  centímetros o 53CM."*
-  **Quita la ambigüedad en el origen en vez de limpiarla después** — un campo que no admite el dato malo
-  vale más que una validación que avisa, porque los avisos se ignoran.
-
-**⚠️ El riesgo que queda, acotado:** que un avío tenga **mal puesta su unidad**. Contra eso, la unidad se
-ve **pegada al campo** al capturar (`0.75 m`, `53 cm`) y hay **aviso —no bloqueo— cuando el número es
-absurdo** para esa unidad (un `1` en un cierre casi seguro quiso ser `100`).
-
-**Cerrado con Daniel:** ningún avío necesita **cantidad por talla Y medida por talla a la vez**
-(*"no se me ocurre algo que lleve las dos cosas a la vez"*), así que **nunca se sostienen los dos modos
-vivos**.
-
-**Migración:** lo convertible se convierte; **lo que no, se marca para revisión manual** y sigue **vivo y
-usable** — Daniel lo pidió con esas palabras: *"que un puñado te aparezca marcado a que el sistema decida
-por ti y te enteres tres meses después"*.
-
-**Las etiquetas eran parte del defecto:** el panel se llamaba *"Consumo por talla"* para las dos cosas y el
-esquema documentaba el campo como *"Medida (consumo) del avío para esta talla"* — **la confusión estaba
-escrita desde el origen**, y por eso Daniel llegó a la misma duda que habría tenido cualquiera.
-
-- **Aplica en:** V1-E3g. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
-  `SEED_ON_START`. Sí requiere que alguien revise en el catálogo de Avíos las medidas marcadas.
+- **Aplica en:** V1-E3f pieza B. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
+  `SEED_ON_START` (verificado por las dos partes; la nota vieja de §Post-F9.54 ya mintió sobre esto).
 - **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.71) — Cada OC de la explosión lleva SU PROPIA fecha de entrega (DANIEL, 19-ago-2026)
+
+Daniel, usando la explosión de materiales sobre una orden real: *"me pide fecha de entrega, pero cada OC
+interna va a tener una fecha de entrega diferente"*.
+
+**Tiene razón, y hoy no se puede.** `generarOCDesdeExplosion` (`dominio/compras/mrp.ts`) agrupa lo
+pendiente **por proveedor** y crea **una OC por proveedor** en un clic — pero la **fecha de entrega es una
+sola para todas**: la del formulario, o la de la orden si se deja en blanco. La tela se necesita semanas
+antes que los avíos y cada proveedor tiene su propio tiempo: ponerles la misma fecha **convierte el dato
+en decorativo**, y un dato que nadie cree no sirve para reclamar.
+
+*(Se puede corregir cada OC después desde Órdenes de compra, pero es trabajo doble y es justo la fricción
+que hace que la gente deje de usar el sistema.)*
+
+**Dos caminos, y Daniel escogió el A:**
+
+- ✅ **(A) Fecha por OC en la misma pantalla.** La explosión ya muestra los grupos por proveedor: que cada
+  grupo tenga **su propia fecha**, con la de arriba como valor inicial. Resuelve el caso hoy.
+- ⬜ **(B) Que el sistema la PROPONGA**, calculándola hacia atrás desde la entrega de la orden con el
+  **tiempo de entrega guardado por proveedor**. Más potente, pero exige capturar ese dato. **Queda para
+  después**, cuando los tiempos estén capturados — la recomendación del lead fue empezar por A y no
+  bloquearse esperando datos que aún no existen.
+
+- **Aplica en:** la pantalla de Explosión de materiales. Sin migración (la fecha ya existe por OC).
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.72) — ⭐ La receta se libera POR PARTES, y desde la OP — no desde «Modificar» (DANIEL, 19-ago-2026)
+
+Salió de Daniel recorriendo el flujo completo con una orden real y **no encontrando dónde autorizar los
+avíos**.
+
+**El problema que destapó, y es de fondo.** El panel de receta —con el botón de **liberar**, que es *la
+puerta que abre la compra*— vive dentro del diálogo de **«Modificar»** de la orden
+(`CentroOrdenesPagina` → mosaico *Modificar* → `DialogoOrden` → `PanelRecetaOrden`). Daniel: *"ahí está y
+no tendría que estar ahí"*, y la frase que lo vuelve grave: **"nadie va a tener permiso de modificar la OP
+más que yo"**.
+
+O sea: si liberar vive detrás de «Modificar», o **Daniel se vuelve el cuello de botella** firmando todas
+las recetas, o **hay que darle a Desarrollo permiso sobre la OP entera** —cantidades, fechas, matriz de
+tallas— solo para que apruebe una lista de materiales. **Los dos permisos ya existen separados
+(`ordenes.administrar` vs `desarrollo.administrar`); lo que está mal es que la puerta física es una sola.**
+
+*(De paso: el mosaico «Modificar» **no está condicionado por permiso**, a diferencia de los de compras,
+ruta y telas que sí lo están — verificado en `CentroOrdenesPagina`.)*
+
+**Y el hueco de navegación:** la explosión de materiales **frena** diciendo que la receta no está
+liberada, pero **no lleva a donde se libera**. Deja al usuario adivinando en qué pantalla está el botón.
+
+### Lo que Daniel decidió
+
+1. **La receta se ve y se libera desde la OP**, no desde «Modificar».
+2. **Quien libera es el mismo equipo que hace el desarrollo.**
+3. **Las telas las autoriza Daniel** —hoy lo hace en la autorización de la OC—, y quiere **también poder
+   liberarlas** para que salgan sus OC.
+4. ⭐ **Se libera POR PARTES, y el comprador ve qué falta.** Textual: *"podría haber algún cierre que aún no
+   autoriza el cliente, pero ya podríamos ir comprando lo demás."*
+
+### Lo que esto implica (y lo que YA existe, que lo hace más chico de lo que parece)
+
+- ✅ **La compra parcial ya está medio resuelta:** `generarOCDesdeExplosion` acepta `idsRequerimiento` —se
+  puede generar solo para los renglones seleccionados—; vacío = todo lo pendiente. **No hay que
+  inventarla.**
+- 🔴 **La puerta es TODO-O-NADA:** hoy *"sin liberar no se compra"* aplica a la receta entera. Tiene que
+  pasar a **"se compra lo que está liberado"**.
+- 🔴 **La firma es una sola** para toda la receta. Tiene que ser **por renglón**, con acciones en bloque
+  (*"liberar todas las telas"*, *"liberar todos los avíos"*) para que lo rutinario no cueste veinte clics.
+- 🔴 **El comprador no tiene dónde ver lo que falta liberar.** Es requisito explícito de Daniel:
+  *"transparentemente qué le falta de liberar"*.
+- **Se conserva** la protección de que **tocar una receta ya liberada la vuelve a cerrar** (*"Desarrollo
+  tiene que volver a firmarla"*) — ahora por renglón.
+- **Pendiente de diseño:** si además de la firma por renglón conviene una **bandeja «Recetas por
+  liberar»** para Desarrollo, en vez de ir orden por orden. El lead lo propuso; Daniel no lo cerró.
+
+- **Aplica en:** etapa propia (toca la puerta de compra: es camino de dinero). Migración probable —el
+  estado de liberación pasa de la orden al renglón.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.73) — Lo que le falta a la receta se JALA del modelo, y lo jala Desarrollo (DANIEL, 19-ago-2026)
+
+Daniel, sobre el flujo completo: *"Si le falta algo a la receta y se genera la OP… ¿ya no puede jalar la
+info del modelo? Creo que está mal planteado. **Podría llegar a ser común que le falte algo a la
+receta.**"*
+
+**Tiene razón, y el diagnóstico exacto es éste:** el sistema **YA detecta** la desalineación y hasta la
+nombra —`calcularDesalineacion` empuja el aviso literal *"El modelo ahora lleva «X», y esta orden no lo
+tiene"*— pero **no hay forma de traerlo**. Las operaciones existentes son agregar **a mano**, editar,
+quitar y `restaurarRenglonReceta` — y **restaurar solo aplica a renglones que YA están** en la orden. Para
+lo que falta, alguien tiene que **volver a capturarlo mirando el modelo en otra pantalla**.
+
+⚠️ **El sistema sabe qué falta, sabe de dónde sacarlo, lo dice con nombre y apellido — y aun así obliga a
+teclearlo.** Y quien lo teclearía es **compras**, que no es quien sabe si ese material va o no va.
+
+**Y el caso no es la excepción:** una receta incompleta al generar la OP es lo **normal** cuando el
+desarrollo corre en paralelo con la venta, que es como trabaja FR Moda.
+
+### Lo decidido
+
+1. **El aviso trae su botón de «traer del modelo»** — renglón por renglón, o todos de un jalón.
+2. ⭐ **Lo jala DESARROLLO, no compras.** Daniel: *"al final es el mismo quien lo va a liberar, para que
+   compras solo haga la explosión del material… **si desarrollo es quien libera la receta, debe seguir
+   haciéndolo con lo que falte** (aunque él mismo sea quien lo mete en el desarrollo)"*. **Las mismas manos
+   que firman son las que jalan**; compras **explota**, no captura.
+3. **Lo que se jala nace SIN LIBERAR**, para que pase por la misma firma que todo lo demás — encaja con la
+   liberación por partes de §Post-F9.72: *lo que llega tarde entra como un renglón más pendiente*, y el
+   comprador lo ve en la misma lista de "qué me falta".
+4. 🔴 **NUNCA en silencio, y NUNCA pisando lo ajustado a mano.** Daniel: *"no debe de jalarlo en
+   silencio"*. Si un renglón de la orden ya se ajustó para ESTA orden en concreto, traer del modelo
+   **respeta el ajuste o avisa del choque** — jamás sobrescribe. Es la misma regla de la receta congelada:
+   **el modelo propone, la orden manda** (D3).
+
+- **Aplica en:** la misma etapa de §Post-F9.72 (la receta en la OP). Sin migración propia.
+- **Fecha:** 2026-08-19.

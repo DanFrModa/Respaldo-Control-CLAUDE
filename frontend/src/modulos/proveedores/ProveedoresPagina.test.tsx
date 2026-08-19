@@ -53,6 +53,13 @@ vi.mock('@/api/proveedores', () => ({
   }),
   useAsignarAvioProveedor: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarAvioProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  // Hooks que monta el diálogo de proveedor (adjuntos + V1-E3f pieza B: contactos y constancia).
+  useAdjuntosProveedor: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useSubirAdjuntoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarAdjuntoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useCrearContactoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarContactoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useAnalizarConstancia: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // El selector de avíos del cajón (B17) consulta el catálogo de avíos.
@@ -73,9 +80,7 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
     nombre,
     nombreCorto: null,
     razonSocial: null,
-    tipo: 'TELAS',
     telefono: null,
-    contacto: null,
     condiciones: null,
     factura: null,
     rfc: null,
@@ -95,11 +100,11 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
     limiteCredito: null,
     leadTimeDias: null,
     notas: null,
-    corto: null,
     asegurado: null,
     obsPago: null,
     modalidadFacturacion: null,
     roles: [],
+    contactos: [],
     cantidadAdjuntos: 0,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
@@ -227,20 +232,14 @@ describe('<ProveedoresPagina>', () => {
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
 
-  it('el filtro por tipo se refleja en la consulta del API', async () => {
-    const usuario = userEvent.setup();
+  // V1-E3f pieza B (§Post-F9.56 punto 3): el filtro por TIPO se retiró con el campo. Lo que queda
+  // es el filtro por ROL, que sí cubre el caso que el tipo único no podía (vender telas Y maquilar).
+  it('ya NO hay filtro por tipo: el selector desapareció de la barra', () => {
     useProveedores.mockReturnValue(consultaConDatos([proveedor(1, 'Telas del Norte')]));
     renderConProveedores(<ProveedoresPagina />, {
       sesion: estadoSesionDePrueba(['proveedores.ver']),
     });
-
-    // Sin filtro, la query no lleva `tipo` (todos los tipos).
-    expect(ultimaQuery?.tipo).toBeUndefined();
-
-    await usuario.selectOptions(screen.getByTestId('filtro-tipo-proveedor'), 'AVIOS');
-
-    // Tras elegir un tipo, la siguiente consulta lo incluye.
-    expect(ultimaQuery?.tipo).toBe('AVIOS');
+    expect(screen.queryByTestId('filtro-tipo-proveedor')).not.toBeInTheDocument();
   });
 
   it('el filtro por rol se refleja en la consulta del API (como id numérico)', async () => {
@@ -257,6 +256,46 @@ describe('<ProveedoresPagina>', () => {
     // como número (no como texto del `<select>`).
     await usuario.selectOptions(screen.getByTestId('filtro-rol-proveedor'), '2');
     expect(ultimaQuery?.rol).toBe(2);
+  });
+
+  // §Post-F9.56 punto 1: la columna Contacto muestra el PRIMER contacto activo con su puesto.
+  it('la columna Contacto muestra el primer contacto con su puesto (ya no un campo suelto)', () => {
+    const conGente = proveedor(7, 'Taller con gente');
+    conGente.contactos = [
+      {
+        id: 1,
+        idProveedor: 7,
+        nombre: 'Ana',
+        puesto: 'vendedor',
+        telefono: null,
+        email: null,
+        notas: null,
+        activo: true,
+      },
+      {
+        id: 2,
+        idProveedor: 7,
+        nombre: 'Beto',
+        puesto: 'crédito y cobranza',
+        telefono: null,
+        email: null,
+        notas: null,
+        activo: true,
+      },
+    ];
+    useProveedores.mockReturnValue(consultaConDatos([conGente]));
+    renderConProveedores(<ProveedoresPagina />, {
+      sesion: estadoSesionDePrueba(['proveedores.ver']),
+    });
+    expect(screen.getByText('Ana · vendedor')).toBeInTheDocument();
+  });
+
+  it('sin contactos, la columna Contacto queda con guion (no truena)', () => {
+    useProveedores.mockReturnValue(consultaConDatos([proveedor(8, 'Sin gente')]));
+    renderConProveedores(<ProveedoresPagina />, {
+      sesion: estadoSesionDePrueba(['proveedores.ver']),
+    });
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('muestra los roles del proveedor como chips en el detalle', async () => {

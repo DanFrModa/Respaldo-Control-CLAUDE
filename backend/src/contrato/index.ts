@@ -91,8 +91,6 @@ export {
 
 // ── Catálogos (F1-E1): maestros globales (ADR-0007) ──────────────────────────
 export {
-  TIPOS_PROVEEDOR,
-  ETIQUETAS_TIPO_PROVEEDOR,
   TIPOS_ARCHIVO_PROVEEDOR,
   ETIQUETAS_TIPO_ARCHIVO_PROVEEDOR,
   esquemaProveedorCrear,
@@ -109,13 +107,18 @@ export {
   esquemaProveedorAvioSalida,
   esquemaProveedorAviosLista,
   esquemaProveedorAvioAsignar,
+  esquemaProveedorContactoCrear,
+  esquemaProveedorContactoEditarCuerpo,
+  esquemaProveedorContactoSalida,
+  esquemaAnalizarConstanciaCuerpo,
+  esquemaAnalizarConstanciaSalida,
+  esquemaRegimenPropuesto,
   type DatosProveedorCrear,
   type DatosProveedorEditar,
   type DatosProveedorPatchCuerpo,
   type ProveedorSalida,
   type ProveedoresQuery,
   type ProveedoresPagina,
-  type TipoProveedorClave,
   type TipoArchivoProveedorClave,
   type RolProveedorSalida,
   type DatosProveedorAdjuntoCrear,
@@ -125,6 +128,11 @@ export {
   type ProveedorAvioSalida,
   type ProveedorAviosLista,
   type DatosProveedorAvioAsignar,
+  type DatosProveedorContactoCrear,
+  type DatosProveedorContactoEditarCuerpo,
+  type ProveedorContactoSalida,
+  type DatosAnalizarConstanciaCuerpo,
+  type AnalizarConstanciaSalida,
 } from './esquemas/proveedor.js';
 
 export {
@@ -1328,6 +1336,7 @@ export {
   ORIGENES_MOVIMIENTO_TERCERO,
   ETIQUETAS_ORIGEN_MOVIMIENTO_TERCERO,
   VISTAS_TERCERO,
+  SEGMENTOS_FACTURACION,
   FUENTES_MOVIMIENTO_TERCERO,
   esquemaLimitesAging,
   esquemaMovimientoTerceroCrear,
@@ -1339,6 +1348,7 @@ export {
   type TipoTerceroClave,
   type OrigenMovimientoTerceroClave,
   type VistaTerceroClave,
+  type SegmentoFacturacionClave,
   type FuenteMovimientoTerceroClave,
   type LimitesAgingSalida,
   type DatosMovimientoTerceroCrear,

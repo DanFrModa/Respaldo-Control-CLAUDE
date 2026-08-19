@@ -3,35 +3,14 @@
  * cubiertas por tests unitarios.
  */
 import type { TipoComponenteTelaClave } from '../../src/contrato/esquemas/tela.js';
-import type { TipoProveedorClave } from '../../src/contrato/esquemas/proveedor.js';
 
 import { parsearBandera } from './valores.js';
 
 /**
- * `Proveedores.TipoProv` (H/T/S, doc 03-Producción §Órdenes de Compra) → enum `TipoProveedor`.
- *  • H → AVIOS (habilitación)
- *  • T → TELAS
- *  • S → SERVICIOS
- *  • vacío / desconocido → SIN_CLASIFICAR
- */
-export function mapearTipoProveedor(tipoProv: string | undefined | null): TipoProveedorClave {
-  switch ((tipoProv ?? '').trim().toUpperCase()) {
-    case 'H':
-      return 'AVIOS';
-    case 'T':
-      return 'TELAS';
-    case 'S':
-      return 'SERVICIOS';
-    default:
-      return 'SIN_CLASIFICAR';
-  }
-}
-
-/**
  * `Proveedores.TipoProv` (H/T/S) → CÓDIGO de rol de `RolProveedor` (kebab-case sembrado en
- * `prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`). A diferencia de `mapearTipoProveedor` (que da el
- * enum `tipo`, clasificador rápido), este da el ROL de servicio que el proveedor presta —
- * lo que F4-Compras/MRP filtra:
+ * `prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`). Es el ÚNICO mapeo del TipoProv desde que se retiró
+ * el enum `tipo` (V1-E3f pieza B, §Post-F9.56 punto 3): da el ROL de servicio que el proveedor
+ * presta — lo que F4-Compras/MRP filtra:
  *  • T → `vende-telas`
  *  • H → `vende-avios` (habilitación)
  *  • S / vacío / desconocido → `otros-servicios`

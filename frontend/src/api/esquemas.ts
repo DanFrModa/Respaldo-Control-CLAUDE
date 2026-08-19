@@ -153,20 +153,6 @@ export type DatosAuditorFormulario = z.infer<typeof esquemaAuditorFormulario>;
 
 // ── Proveedores (espejo de `esquemaProveedorCrear`/`Editar` del backend) ──────
 
-/** Tipos de proveedor (clasificacion de negocio). */
-export const TIPOS_PROVEEDOR = ['TELAS', 'AVIOS', 'SERVICIOS', 'SIN_CLASIFICAR'] as const;
-
-/** Clave de tipo de proveedor. */
-export type TipoProveedorClave = (typeof TIPOS_PROVEEDOR)[number];
-
-/** Etiquetas para UI de cada tipo de proveedor (espejo del backend). */
-export const ETIQUETAS_TIPO_PROVEEDOR: Record<TipoProveedorClave, string> = {
-  TELAS: 'Telas',
-  AVIOS: 'Avíos',
-  SERVICIOS: 'Servicios',
-  SIN_CLASIFICAR: 'Sin clasificar',
-};
-
 /** Monedas del proveedor (espejo de `MONEDAS` del backend, R15 §4). */
 export const MONEDAS_PROVEEDOR = ['MXN', 'USD'] as const;
 /** Clave de moneda. */
@@ -262,18 +248,19 @@ export const esquemaProveedorFormulario = z
       .trim()
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-    /** Nombre corto de uso diario ("Bloom" para BLOOM TEXTIL). Display, sin unicidad (A1.1). */
+    /**
+     * Campo CORTO del proveedor — el único (V1-E3f pieza B). Sirve de nombre corto de display
+     * ("Bloom" para BLOOM TEXTIL) y de clave corta del taller. Es ÚNICO: la unicidad la valida el
+     * servidor (A1) y su choque llega como conflicto, no se adivina aquí.
+     */
     nombreCorto: z
       .string()
       .trim()
-      .max(50, { error: 'El nombre corto no puede tener más de 50 caracteres' }),
+      .max(50, { error: 'El campo corto no puede tener más de 50 caracteres' }),
     razonSocial: z
       .string()
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
-    tipo: z.enum(TIPOS_PROVEEDOR, {
-      error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR',
-    }),
     // ── Fiscal ──────────────────────────────────────────────────────────────────
     factura: z.boolean(),
     rfc: z
@@ -316,10 +303,6 @@ export const esquemaProveedorFormulario = z
       .string()
       .trim()
       .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' }),
-    contacto: z
-      .string()
-      .trim()
-      .max(150, { error: 'El contacto no puede tener más de 150 caracteres' }),
     // ── Pago ──────────────────────────────────────────────────────────────────────
     diasCredito: numeroOpcional({
       min: 0,
@@ -363,13 +346,9 @@ export const esquemaProveedorFormulario = z
       .trim()
       .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' }),
     // ── Datos de taller (fusión de terceros, D12/R15) ────────────────────────────
-    // Atributos del antiguo Maquilero, portados al Proveedor. Aplican cuando el
-    // tercero presta servicios de producción (maquila/corte/…); siempre visibles y
-    // opcionales (la lógica de negocio la valida el backend, A1).
-    corto: z
-      .string()
-      .trim()
-      .max(50, { error: 'El código corto no puede tener más de 50 caracteres' }),
+    // Atributos del antiguo Maquilero, portados al Proveedor. Su clave corta se fusionó con
+    // `nombreCorto` (arriba) en V1-E3f pieza B. `asegurado` SOLO se muestra si el proveedor tiene
+    // algún rol de servicio (§Post-F9.56 punto 7: *"«Está asegurado» solo aplica a maquila"*).
     asegurado: z.boolean(),
     obsPago: z
       .string()

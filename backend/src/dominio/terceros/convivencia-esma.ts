@@ -66,9 +66,34 @@ function rangoCreado(
   };
 }
 
-/** Cláusula `where` de facturación (solo la vista fiscal segmenta a `conFactura = true`). */
-function facturaWhere(soloFiscal: boolean): { conFactura?: boolean } {
-  return soloFiscal ? { conFactura: true } : {};
+/**
+ * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa (V1-E3f pieza B).
+ *
+ * ⚠️ `EsMaCargo.conFactura` es NULLABLE ("sin definir": así quedaron los movimientos que migraron
+ * del Access, donde la pregunta jamás se hizo). El segmento `sin` tiene que traer los `false`
+ * **Y** los sin definir, porque los dos segmentos deben ser una PARTICIÓN EXACTA del saldo —es lo
+ * que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*)— y
+ * porque el encabezado ya los cuenta ahí: `saldoSinFactura = saldo − saldoFiscal`. Si la lista los
+ * dejara fuera, el total y los renglones se contradirían. Toca dinero.
+ *
+ * 🔴 **Por eso NO se usa `{ not: true }`, que es lo que parecía natural y estuvo aquí un rato.**
+ * En lógica de tres valores `NULL <> true` evalúa a NULL, así que la fila se descarta igual que
+ * con `= false`: **las dos formas son idénticas en efecto** y ninguna incluye los NULL. Verificado
+ * en Postgres sobre `(true, false, NULL)`: `<> true` → 1 fila, `= false` → 1 fila, el OR → 2.
+ * La única forma que sí los trae es la explícita.
+ *
+ * Es también la diferencia deliberada con la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que
+ * filtra `= false`): allí el segmento es un filtro de consulta; aquí es una partición que debe
+ * cuadrar con un saldo.
+ */
+function facturaWhere(segmento: 'todos' | 'con' | 'sin'): {
+  conFactura?: boolean;
+  OR?: { conFactura: boolean | null }[];
+} {
+  if (segmento === 'todos') return {};
+  if (segmento === 'con') return { conFactura: true };
+  // Explícito a propósito: `{ not: true }` NO trae los NULL (ver arriba).
+  return { OR: [{ conFactura: false }, { conFactura: null }] };
 }
 
 /**
@@ -108,8 +133,8 @@ export async function aportesEsMaSaldoLote(
 export interface OpcionesProyeccionEsMa {
   desde?: string | undefined;
   hasta?: string | undefined;
-  /** Vista fiscal: solo movimientos con factura (conFactura = true). */
-  soloFiscal: boolean;
+  /** Segmento de facturación: `todos` | `con` (conFactura = true) | `sin` (false o sin definir). */
+  segmento: 'todos' | 'con' | 'sin';
   /** Si false, los `monto` viajan en null (se ocultan importes). */
   puedeVerImportes: boolean;
 }
@@ -127,8 +152,8 @@ export async function proyectarMovimientosEsMa(
   nombre: string,
   opciones: OpcionesProyeccionEsMa,
 ): Promise<MovimientoTerceroSalida[]> {
-  const { desde, hasta, soloFiscal, puedeVerImportes } = opciones;
-  const factura = facturaWhere(soloFiscal);
+  const { desde, hasta, segmento, puedeVerImportes } = opciones;
+  const factura = facturaWhere(segmento);
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
 
   const [cargos, abonos, descuentos, pagos] = await Promise.all([

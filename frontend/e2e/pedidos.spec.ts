@@ -188,9 +188,17 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');
+    // ⚠️ Esta recarga completa es FLAKY CRÓNICO desde antes de esta rama: falla en las 3 corridas de
+    // `prueba` del 18-ago y se salva con el reintento. Se afirma primero la URL para que, cuando
+    // falle, el mensaje DIGA dónde acabó la página en vez del inútil "element(s) not found" — si
+    // aterrizó en /login, la causa es la sesión (ver HOJA-DE-RUTA.md §4: `retry: false` trata un
+    // parpadeo de red como "no hay sesión"), no el encabezado.
+    await expect(page).toHaveURL(/\/pedidos\/administrar$/, { timeout: 30_000 });
     // `exact`: el matcher por nombre es substring y el panel de detalle trae un <h3>"Pedidos
     // reales"</h3> que aparece al auto-seleccionar un pedido (async) → sin exact, doble match flaky.
-    await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
     await page.getByTestId('buscar-pedido').fill(cliente);
     await page.getByTestId('fila-pedido').filter({ hasText: cliente }).first().click();
     const detallePedido = page.getByTestId('detalle-pedido');

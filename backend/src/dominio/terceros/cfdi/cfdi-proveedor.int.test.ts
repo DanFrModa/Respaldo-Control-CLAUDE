@@ -115,7 +115,7 @@ beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   empresa = await crearEmpresaPrueba(cliente, 'Empresa CFDI');
   proveedor = await cliente.proveedor.create({
-    data: { nombre: 'Telas del Norte SA', corto: 'TDN', rfc: RFC_EMISOR, diasCredito: 30 },
+    data: { nombre: 'Telas del Norte SA', nombreCorto: 'TDN', rfc: RFC_EMISOR, diasCredito: 30 },
   });
   subirContenidoSpy = vi.fn();
 });

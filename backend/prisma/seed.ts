@@ -356,15 +356,22 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  // Vocabulario unificado (Daniel, jul-2026): estampado y bordado son ARTE; el proveedor que los
-  // presta es un "Prov. de Arte". Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
-  { codigo: 'estampado', nombre: 'Prov. de Arte (estampado)' },
-  { codigo: 'bordado', nombre: 'Prov. de Arte (bordado)' },
+  // Nombres como los pide Daniel (§Post-F9.54 punto 1, 16-ago-2026): *"Yo cambiaría el nombre a
+  // Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como Telas y Avíos, le
+  // quitaría el «Vende»."* Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
+  //
+  // ⚠️ Esto de aquí SOLO cubre una base recién creada: el `upsert` de abajo usa `update: {}`, que
+  // NO pisa el nombre de un rol que ya existe. En una base con datos (p. ej. `prueba`) los cuatro
+  // renombres los hace la MIGRACIÓN `20260818140000_proveedores_como_daniel_los_usa`, por código.
+  // Los dos caminos coinciden a propósito. (La nota vieja de §Post-F9.54 decía que bastaba
+  // `SEED_ON_START=true`: era FALSO, y ya está corregida en el documento.)
+  { codigo: 'estampado', nombre: 'Estampador' },
+  { codigo: 'bordado', nombre: 'Bordador' },
   { codigo: 'lavado', nombre: 'Lavado' },
   { codigo: 'aplicacion', nombre: 'Aplicación' },
   // Venta de materiales (proveedores comerciales).
-  { codigo: 'vende-telas', nombre: 'Vende telas' },
-  { codigo: 'vende-avios', nombre: 'Vende avíos' },
+  { codigo: 'vende-telas', nombre: 'Telas' },
+  { codigo: 'vende-avios', nombre: 'Avíos' },
   { codigo: 'otros-servicios', nombre: 'Otros servicios' },
 ];
 

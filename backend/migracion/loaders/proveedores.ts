@@ -24,6 +24,7 @@
  */
 import {
   actualizarProveedor,
+  crearContactoProveedor,
   crearProveedor,
   listarRolesProveedor,
 } from '../../src/dominio/catalogos/proveedores.js';
@@ -34,11 +35,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { resolverProveedoresActivos, type FuenteTercero } from '../comun/proveedores-activos.js';
-import {
-  mapearRolProveedorComercial,
-  mapearTipoProveedor,
-  rolesDeMaquilero,
-} from '../comun/mapeos-enum.js';
+import { mapearRolProveedorComercial, rolesDeMaquilero } from '../comun/mapeos-enum.js';
 import {
   ENTIDAD_MAPEO,
   guardarMapeo,
@@ -174,14 +171,13 @@ export async function cargarProveedores(
     nombreCrudo: string,
     idsRol: number[],
     datosCrudos: Partial<{
-      tipo: ReturnType<typeof mapearTipoProveedor>;
       telefono: string | null;
       contacto: string | null;
       condiciones: string | null;
       razonSocial: string | null;
       direccion: string | null;
       notas: string | null;
-      corto: string | null;
+      nombreCorto: string | null;
       asegurado: boolean;
       obsPago: string | null;
     }>,
@@ -202,7 +198,7 @@ export async function cargarProveedores(
       razonSocial: tr('razonSocial', datosCrudos.razonSocial),
       direccion: tr('direccion', datosCrudos.direccion),
       notas: tr('notas', datosCrudos.notas),
-      corto: tr('corto', datosCrudos.corto),
+      nombreCorto: tr('nombreCorto', datosCrudos.nombreCorto),
       obsPago: tr('obsPago', datosCrudos.obsPago),
     };
 
@@ -225,22 +221,22 @@ export async function cargarProveedores(
       return existenteId;
     }
 
-    // Nuevo proveedor. `corto` es @unique global y nullable: si choca, se omite el corto y
-    // se reporta (no se pierde el tercero).
+    // Nuevo proveedor. `nombreCorto` (el campo corto fusionado, V1-E3f pieza B) es @unique global
+    // y nullable: si choca, se omite el corto y se reporta (no se pierde el tercero).
+    // El `contacto` del viejo ya NO es un campo del proveedor: se da de alta como su primer
+    // CONTACTO (§Post-F9.56 punto 1), con el puesto vacío porque el viejo nunca lo preguntó.
     try {
       const creado = await crearProveedor(
         sesion,
         {
           nombre,
           roles: idsRol,
-          ...(datosExtra.tipo === undefined ? {} : { tipo: datosExtra.tipo }),
           ...(datosExtra.telefono ? { telefono: datosExtra.telefono } : {}),
-          ...(datosExtra.contacto ? { contacto: datosExtra.contacto } : {}),
           ...(datosExtra.condiciones ? { condiciones: datosExtra.condiciones } : {}),
           ...(datosExtra.razonSocial ? { razonSocial: datosExtra.razonSocial } : {}),
           ...(datosExtra.direccion ? { direccion: datosExtra.direccion } : {}),
           ...(datosExtra.notas ? { notas: datosExtra.notas } : {}),
-          ...(datosExtra.corto ? { corto: datosExtra.corto } : {}),
+          ...(datosExtra.nombreCorto ? { nombreCorto: datosExtra.nombreCorto } : {}),
           ...(datosExtra.asegurado === undefined ? {} : { asegurado: datosExtra.asegurado }),
           ...(datosExtra.obsPago ? { obsPago: datosExtra.obsPago } : {}),
         },
@@ -248,15 +244,26 @@ export async function cargarProveedores(
       );
       idx.set(norm, creado.id);
       creados += 1;
+      if (datosExtra.contacto) {
+        await crearContactoProveedor(
+          sesion,
+          creado.id,
+          {
+            nombre: datosExtra.contacto,
+            ...(datosExtra.telefono ? { telefono: datosExtra.telefono } : {}),
+          },
+          bd,
+        );
+      }
       return creado.id;
     } catch (error) {
-      if (error instanceof ErrorConflicto && datosExtra.corto) {
-        // Probable choque de `corto` único: reintentar sin corto y reportar.
+      if (error instanceof ErrorConflicto && datosExtra.nombreCorto) {
+        // Probable choque del campo corto único: reintentar sin él y reportar.
         reporte.agregar(
           'Terceros con código corto duplicado (creados SIN corto)',
-          `"${nombre}" (${origen}) corto="${datosExtra.corto}"`,
+          `"${nombre}" (${origen}) corto="${datosExtra.nombreCorto}"`,
         );
-        const sinCorto = { ...datosExtra, corto: null };
+        const sinCorto = { ...datosExtra, nombreCorto: null };
         return crearOFusionar(nombre, idsRol, sinCorto, origen, idViejo);
       }
       if (error instanceof ErrorConflicto) {
@@ -306,15 +313,14 @@ export async function cargarProveedores(
       omitidos += 1;
       continue;
     }
-    // Rol según TipoProv: T→vende-telas, H→vende-avios, S/vacío→otros-servicios (F4/MRP
-    // filtra proveedores por rol). El `tipo` enum se conserva como clasificador rápido.
+    // Rol según TipoProv: T→vende-telas, H→vende-avios, S/vacío→otros-servicios (F4/MRP filtra
+    // proveedores por rol). El `tipo` enum se retiró en V1-E3f pieza B: el rol ya lo dice todo.
     if (!sigueVivo('comercial', fila.IdProveedor, nombre)) continue;
     const codRolComercial = mapearRolProveedorComercial(fila.TipoProv);
     const idNuevo = await crearOFusionar(
       nombre,
       [rolId(codRolComercial)],
       {
-        tipo: mapearTipoProveedor(fila.TipoProv),
         telefono: parsearTexto(fila.Telefono),
         contacto: parsearTexto(fila.Contacto),
         condiciones: parsearTexto(fila.Condiciones),
@@ -371,7 +377,7 @@ export async function cargarProveedores(
         telefono: parsearTexto(fila.Telefonos),
         direccion: parsearTexto(fila.Direccion),
         notas: parsearTexto(fila.Observaciones),
-        corto: parsearTexto(fila.Corto),
+        nombreCorto: parsearTexto(fila.Corto),
         asegurado: parsearBandera(fila.Asegurado),
         obsPago: parsearTexto(fila.ObsPago),
       },
@@ -396,7 +402,7 @@ export async function cargarProveedores(
         telefono: parsearTexto(fila.Telefonos),
         direccion: parsearTexto(fila.Direccion),
         notas: parsearTexto(fila.Observaciones),
-        corto: parsearTexto(fila.Corto),
+        nombreCorto: parsearTexto(fila.Corto),
       },
       'Estampadores',
       fila.IdEstampadores,

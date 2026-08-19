@@ -605,7 +605,7 @@ export const esquemaSaldoTodosFila = z
   .object({
     idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
     maquilero: z.string().describe('Nombre del maquilero.'),
-    corto: z.string().nullable().describe('Clave corta del taller, o null.'),
+    nombreCorto: z.string().nullable().describe('Campo corto del taller, o null.'),
     totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
     totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
     totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
@@ -751,7 +751,7 @@ export const esquemaMaquileroEsMaFila = z
   .object({
     id: z.number().int().describe('Maquilero (Proveedor).'),
     nombre: z.string().describe('Nombre del maquilero.'),
-    corto: z.string().nullable().describe('Clave corta del taller, o null.'),
+    nombreCorto: z.string().nullable().describe('Campo corto del taller, o null.'),
   })
   .describe('Maquilero para el selector.');
 
