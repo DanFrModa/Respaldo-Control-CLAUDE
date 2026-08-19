@@ -3181,3 +3181,31 @@ caja** se registra aparte, porque perder una tipografía no es lo mismo que perd
 - **Aplica en:** V1-E3f pieza B. Migración aditiva; **sin permisos nuevos, sin seed** → no requiere
   `SEED_ON_START` (verificado por las dos partes; la nota vieja de §Post-F9.54 ya mintió sobre esto).
 - **Fecha:** 2026-08-18.
+
+---
+
+#### (Post-F9.71) — Cada OC de la explosión lleva SU PROPIA fecha de entrega (DANIEL, 19-ago-2026)
+
+Daniel, usando la explosión de materiales sobre una orden real: *"me pide fecha de entrega, pero cada OC
+interna va a tener una fecha de entrega diferente"*.
+
+**Tiene razón, y hoy no se puede.** `generarOCDesdeExplosion` (`dominio/compras/mrp.ts`) agrupa lo
+pendiente **por proveedor** y crea **una OC por proveedor** en un clic — pero la **fecha de entrega es una
+sola para todas**: la del formulario, o la de la orden si se deja en blanco. La tela se necesita semanas
+antes que los avíos y cada proveedor tiene su propio tiempo: ponerles la misma fecha **convierte el dato
+en decorativo**, y un dato que nadie cree no sirve para reclamar.
+
+*(Se puede corregir cada OC después desde Órdenes de compra, pero es trabajo doble y es justo la fricción
+que hace que la gente deje de usar el sistema.)*
+
+**Dos caminos, y Daniel escogió el A:**
+
+- ✅ **(A) Fecha por OC en la misma pantalla.** La explosión ya muestra los grupos por proveedor: que cada
+  grupo tenga **su propia fecha**, con la de arriba como valor inicial. Resuelve el caso hoy.
+- ⬜ **(B) Que el sistema la PROPONGA**, calculándola hacia atrás desde la entrega de la orden con el
+  **tiempo de entrega guardado por proveedor**. Más potente, pero exige capturar ese dato. **Queda para
+  después**, cuando los tiempos estén capturados — la recomendación del lead fue empezar por A y no
+  bloquearse esperando datos que aún no existen.
+
+- **Aplica en:** la pantalla de Explosión de materiales. Sin migración (la fecha ya existe por OC).
+- **Fecha:** 2026-08-19.
