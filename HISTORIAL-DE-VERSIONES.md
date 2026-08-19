@@ -10,9 +10,21 @@
 > **Cada entrada trae tres cosas:** qué se puede hacer ahora que antes no · qué cambió y **puede
 > sorprender** · qué sigue **pendiente o roto**. Lo más reciente arriba.
 
+## Cómo se numeran
+
+**`2.xxx`** — el **2** es CONTROL v2 (el sistema de Access era la v1); los tres dígitos avanzan de uno en
+uno con cada despliegue. `2.001`, `2.002`, `2.003`…
+
+**El número es UNO SOLO y VIAJA.** Se asigna cuando algo entra a **`prueba`**, y **esa misma versión** es
+la que después pasa a **producción** — no se re-numera. Así se puede decir *"producción corre la 2.014,
+que es exactamente la que se probó el 18 de agosto"*, en vez de tener dos numeraciones paralelas que en
+tres meses nadie sabe emparejar.
+
+Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en producción` cuando sube.
+
 ---
 
-## `prueba` · 18-ago-2026 — Diez etapas de golpe
+## 2.001 · 18-ago-2026 · **en prueba** — Diez etapas de golpe
 
 La tanda más grande hasta ahora. Nace de dos sesiones seguidas de **Daniel capturando modelos reales**:
 de ahí salieron los dos hallazgos más caros, y **ninguno lo habría encontrado una revisión técnica**,
