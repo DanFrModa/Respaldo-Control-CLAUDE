@@ -32,6 +32,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.003 · 19-ago-2026 · **en prueba** — Proveedores, como se usan de verdad
+
+### Qué se puede hacer ahora que antes no
+
+- **Varios contactos por proveedor**, cada uno con su puesto escrito libremente: vendedor, crédito y
+  cobranza, encargado del taller, supervisora… Antes había **un solo campo** para todo.
+- **Dar de alta un proveedor leyendo su Constancia de Situación Fiscal.** Se sube el PDF y el sistema
+  **propone** RFC, razón social, régimen, código postal y domicilio; **la persona confirma**. Reconoce
+  persona física y moral, y si el SAT cambia el formato **avisa en vez de guardar datos equivocados**.
+- **Separar lo facturado de lo no facturado en cuentas por pagar**, no solo en talleres: un proveedor de
+  telas puede surtir unas cosas con factura y otras sin.
+- Los roles se llaman como se habla: **Estampador, Bordador, Telas, Avíos**.
+
+### Qué cambió y puede sorprender
+
+- **El campo corto ahora es UNO solo y único.** Antes había dos —uno para mostrar y otro para talleres—.
+  La migración lo sembró con el de los maquileros y **dejó registradas las colisiones** en vez de
+  resolverlas sola: hay que revisarlas y decidir cuál se queda.
+- **El «tipo» de proveedor desapareció.** Se tradujo a rol automáticamente (Telas, Avíos, Otros
+  servicios); los roles múltiples ya cubrían lo que hacía.
+- **«Está asegurado» solo aparece en talleres**, que es donde aplica.
+
+### Notas
+
+- 🔴 **Se corrigió un error que afectaba dinero:** los movimientos de maquileros migrados —los que no
+  traen marcada la factura— **se caían de los dos lados** al separar con y sin factura, mientras el total
+  del encabezado sí los contaba. Encabezado y renglones se contradecían.
+- El lector de la constancia **falló contra los PDF reales** y por eso se arregló: metía el nombre de una
+  etiqueta dentro del domicilio, **sin avisar**. Había pasado las pruebas porque el archivo de prueba
+  estaba **inventado** — *un archivo inventado no prueba el lector: prueba a quien lo escribió*.
+
+---
+
 ## 0.002 · 19-ago-2026 · **en prueba** — La versión, a la vista
 
 ### Qué se puede hacer ahora que antes no
