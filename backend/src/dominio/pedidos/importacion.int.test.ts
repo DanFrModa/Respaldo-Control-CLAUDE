@@ -31,6 +31,8 @@ import {
 let cliente: PrismaClient;
 let idEmpresa: number;
 let idClienteNegocio: number;
+let idTipoProducto: number;
+let idGenero: number;
 
 const PERMISOS: ClavePermiso[] = [
   'ordenes.ver',
@@ -86,7 +88,18 @@ async function sembrarDesarrollo(
   codigoModelo: string,
   numeroCliente: string | null,
 ): Promise<{ idModelo: number; idDesarrollo: number }> {
-  const modelo = await cliente.modelo.create({ data: { codigo: codigoModelo } });
+  // Modelo de DESARROLLO (V1-E3n): es el caso real del importador, y es lo que hace que generar
+  // la OP lo PASE a producción con su nº de 5 dígitos. Tipo de prenda + género dan los dos
+  // primeros dígitos (pantalón 7 + caballero 1 → serie 71).
+  const modelo = await cliente.modelo.create({
+    data: {
+      codigo: codigoModelo,
+      codigoDesarrollo: codigoModelo,
+      origen: 'desarrollo',
+      idTipoProducto,
+      idGenero,
+    },
+  });
   const depto = await cliente.clienteDepartamento.create({
     data: { idCliente: idClienteNegocio, nombre: `Depto ${codigoModelo}` },
   });
@@ -118,6 +131,14 @@ beforeEach(async () => {
   idEmpresa = empresa.id;
   const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'C&A' } });
   idClienteNegocio = clienteNegocio.id;
+  const tipo = await cliente.tipoProducto.create({
+    data: { nombre: 'Pantalón', digitoConcepto: 7 },
+  });
+  idTipoProducto = tipo.id;
+  const genero = await cliente.genero.create({
+    data: { nombre: 'Caballero', digitoNomenclatura: 1, digitoAlterno: 5 },
+  });
+  idGenero = genero.id;
   // Catálogo de colores/tallas que el archivo referencia (por nombre normalizado).
   for (const nombre of ['Rojo', 'Azul marino', 'Negro', 'Blanco']) {
     await cliente.color.create({ data: { nombre } });
@@ -235,7 +256,16 @@ describe('confirmar importación (alta transaccional)', () => {
     });
     expect(liga?.idDesarrollo).toBe(dev114.idDesarrollo);
 
-    // Nº de producción minteado y RC encolada (un evento por OP).
+    // ⭐ El modelo pasó a producción al generar la OP (§Post-F9.34): la serie 71 estaba vacía, así
+    // que el primero de los dos modelos importados se queda el 71001 y el otro el 71002.
+    const numeros = (
+      await cliente.modelo.findMany({
+        where: { numeroProduccion: { not: null } },
+        select: { numeroProduccion: true },
+        orderBy: { numeroProduccion: 'asc' },
+      })
+    ).map((m) => m.numeroProduccion);
+    expect(numeros).toEqual([71_001, 71_002]);
     expect(op114?.numeroProduccion).toBeGreaterThan(0);
     const eventos = await cliente.eventoOutbox.count({ where: { tipo: 'orden-creada' } });
     expect(eventos).toBe(2);

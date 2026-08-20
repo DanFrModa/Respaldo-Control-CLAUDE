@@ -32,6 +32,55 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.009 · 20-ago-2026 · **en prueba** — Modelos de desarrollo y modelos de producción
+
+### Qué se puede hacer ahora que antes no
+
+- **Los modelos de desarrollo y los de producción ya son cosas distintas.** El catálogo y la galería
+  enseñan **los de producción** por default; los de desarrollo están a un clic, detrás de un filtro. Se
+  acabó el catálogo lleno de muestras que nunca salieron.
+- **Los modelos de desarrollo se numeran solos**, con la forma `CYA-26-71-001`: la abreviatura del
+  cliente, el año en que se piensa **entregar**, el tipo de prenda y el género, y un consecutivo. Ya no
+  hay que inventar un código al dar de alta un modelo nuevo en un proyecto — el sistema lo arma.
+- **Esa numeración NO gasta números de producción.** Un modelo que nunca sale a fabricarse ya no quema uno
+  de los 999 que tiene cada combinación.
+- **Ya existen «Chamarra» y «Gorra» como tipo de prenda**, con su dígito (8 y 9). Faltaban, y sin ellos
+  no se podía desarrollar ni una chamarra ni una gorra — son el 9 % del catálogo histórico.
+- **El dígito del tipo de prenda se captura en su catálogo** (Calidad › Tipos de producto): es el primer
+  dígito del código de producción de sus modelos. No se puede repetir entre tipos activos.
+- ⭐ **Al generar la OP, el sistema PROPONE el número de producción y tú lo confirmas.** Llega ya escrito
+  con el siguiente libre; si quieres otro, lo borras y tecleas el tuyo. También se puede hacer desde el
+  catálogo, con el botón **«Pasar a producción»**.
+- **El sistema avisa cuando una serie se está acabando** ("a la serie 71 le quedan 39 números de 999") y
+  cuando los dos primeros dígitos no cuadran con el tipo de prenda y el género. **Avisa, no bloquea**: la
+  excepción sigue siendo tuya. Lo único que sí impide es repetir un número que ya es de otro modelo.
+- **El cliente tiene su abreviatura** (el `CYA`). Sin ella no se le pueden dar de alta modelos nuevos de
+  desarrollo, porque el código no se puede armar — y el sistema lo dice así.
+
+### Qué cambió y puede sorprender
+
+- **Un modelo que pasa a producción CAMBIA de código**: deja de llamarse `CYA-26-71-001` y pasa a llamarse
+  `71001`. **Su número de desarrollo NO se pierde**: se guarda, se enseña debajo y se puede buscar por
+  cualquiera de los dos. La receta, el arte, las fotos, el precosteo y sus órdenes no se tocan.
+- Como la orden **no guarda copia** del código, una OP creada antes de pasar el modelo a producción
+  empezará a enseñar el número nuevo. Es el mismo modelo; el cambio es sólo de nombre.
+- **El número interno que salía al generar la OP (1, 2, 3…) desaparece.** Nunca fue el número del negocio:
+  no cambiaba el código del modelo ni lo sacaba del catálogo de desarrollo — era justo el motivo de que
+  *"la OP 5558 heredara el modelo de desarrollo"*. Ahora el número es el de cinco dígitos de siempre.
+- El alta de un desarrollo con modelo nuevo **ya no pide el código**; pide el **tipo de prenda**, el
+  **género** y el **año de entrega**, que son de donde sale.
+
+### Lo que queda pendiente
+
+- Un **género** nuevo nace sin su dígito de nomenclatura (los ocho de siempre ya lo traen) y todavía no
+  hay pantalla para capturarlo — el catálogo de géneros nunca tuvo alta ni edición. Mientras no se
+  capture, el sistema **lo dice con el nombre del género** en vez de inventar un número. *(El dígito del
+  **tipo de prenda** sí se captura, en Calidad › Tipos de producto.)*
+- Los modelos de desarrollo **que ya existan en `prueba`** quedan marcados como de producción, porque su
+  código venía de la serie vieja. Los de desarrollo de verdad empiezan a partir de aquí.
+
+---
+
 ## 0.008 · 20-ago-2026 · **en prueba** — A quién le compramos
 
 ### Qué se puede hacer ahora que antes no

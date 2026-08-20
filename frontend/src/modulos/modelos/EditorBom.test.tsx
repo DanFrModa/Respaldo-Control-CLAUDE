@@ -152,6 +152,9 @@ function fichaBase(
   return {
     id: 1,
     codigo: '501',
+    origen: 'produccion',
+    codigoDesarrollo: null,
+    numeroProduccion: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,

@@ -76,6 +76,51 @@ export const esquemaDesarrolloCrear = z.object({
 export type DatosDesarrolloCrear = z.infer<typeof esquemaDesarrolloCrear>;
 
 /**
+ * Alta de un desarrollo CON UN MODELO NUEVO (§Post-F9.34, V1-E3n). El código del modelo **NO se
+ * captura**: lo arma el sistema entero (`CYA-26-71-001` = abreviatura del cliente del proyecto +
+ * año de ENTREGA + concepto/género + consecutivo), porque es mecánico y no tiene criterio de
+ * negocio. Por eso el tipo de producto y el género son OBLIGATORIOS aquí: de ellos salen los dos
+ * dígitos que después heredará el número de producción.
+ */
+export const esquemaDesarrolloModeloNuevoCuerpo = z.object({
+  anioEntrega: z
+    .number({ error: 'El año de entrega es obligatorio' })
+    .int({ error: 'El año de entrega debe ser entero' })
+    .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
+    .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' })
+    .describe('Año de ENTREGA del modelo (el que se congela en el código, no el de creación).'),
+  idTipoProducto: z
+    .number({ error: 'El tipo de producto es obligatorio' })
+    .int({ error: 'El id del tipo de producto debe ser entero' })
+    .positive({ error: 'El id del tipo de producto debe ser positivo' })
+    .describe('Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura.'),
+  idGenero: z
+    .number({ error: 'El género es obligatorio' })
+    .int({ error: 'El id del género debe ser entero' })
+    .positive({ error: 'El id del género debe ser positivo' })
+    .describe('Género: de él sale el 2º dígito de la nomenclatura.'),
+  descripcion: z
+    .string()
+    .trim()
+    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+    .optional()
+    .describe('Descripción del modelo (opcional).'),
+  idCurvaTalla: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Curva de tallas del modelo (opcional).'),
+  numeroCliente: numeroClienteCampo
+    .optional()
+    .describe('Número del cliente para este modelo (el "otro número"; opcional).'),
+  notas: notasDesarrollo.optional().describe('Notas del desarrollo (opcional).'),
+});
+
+/** Datos validados de alta de desarrollo con modelo nuevo. */
+export type DatosDesarrolloModeloNuevo = z.infer<typeof esquemaDesarrolloModeloNuevoCuerpo>;
+
+/**
  * Edición de un desarrollo: sólo `numeroCliente` y `notas` (el modelo y el proyecto NO se cambian;
  * el estado es derivado). PATCH parcial (M1): omitir = no tocar; `null` = vaciar. El `id` va en la
  * URL.

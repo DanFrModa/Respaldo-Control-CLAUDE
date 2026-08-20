@@ -175,3 +175,37 @@ export async function sembrarSecuencia(
     DO UPDATE SET "valor" = GREATEST("secuencias"."valor", ${valor})
   `;
 }
+
+/**
+ * Igual que {@link siguienteFolio} pero para una serie **GLOBAL**, sin empresa (tabla
+ * `secuencias_globales`). Existe porque los CATÁLOGOS GLOBALES (ADR-0007) numeran fuera de
+ * cualquier empresa: el código de DESARROLLO de un modelo (`CYA-26-71-001`) cae en
+ * `Modelo.codigoDesarrollo`, que es único GLOBAL — si el contador colgara de la empresa, dos
+ * empresas desarrollando para el mismo cliente sacarían el MISMO código y una chocaría contra el
+ * unique. Misma sentencia atómica (`INSERT … ON CONFLICT … DO UPDATE … RETURNING`), mismas
+ * garantías: N llamadas concurrentes devuelven N valores distintos, y un rollback deja hueco pero
+ * jamás un duplicado.
+ *
+ * @param tx    transacción activa (de `enTransaccion`) — el folio se reserva con el documento.
+ * @param clave serie a incrementar (p. ej. `"modelo-desarrollo-12-2026-71"`).
+ * @returns el folio asignado.
+ */
+export async function siguienteFolioGlobal(tx: Tx, clave: string): Promise<bigint> {
+  if (!PATRON_CLAVE_SECUENCIA.test(clave)) {
+    throw new ErrorValidacion(
+      `Clave de secuencia global inválida: "${clave}". Usa minúsculas, dígitos y guiones.`,
+    );
+  }
+  const filas = await tx.$queryRaw<{ valor: bigint }[]>`
+    INSERT INTO "secuencias_globales" ("clave", "valor")
+    VALUES (${clave}, 1)
+    ON CONFLICT ("clave")
+    DO UPDATE SET "valor" = "secuencias_globales"."valor" + 1
+    RETURNING "valor"
+  `;
+  const fila = filas[0];
+  if (fila === undefined) {
+    throw new Error(`La secuencia global ${clave} no devolvió valor.`);
+  }
+  return fila.valor;
+}

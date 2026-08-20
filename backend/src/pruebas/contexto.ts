@@ -24,11 +24,15 @@ export function clientePruebas(): PrismaClient {
  *
  * ⚠️ `RESTART IDENTITY` **NO alcanza a todas las secuencias**: sólo reinicia las que son PROPIEDAD
  * de una columna de las tablas truncadas (las de `SERIAL`/`autoincrement()`). Una secuencia
- * INDEPENDIENTE —creada con `CREATE SEQUENCE` y consumida con `nextval()`, como
- * `numero_produccion_seq` (migración `20260707180000_r3_pedidos_salida_produccion`)— sobrevive
- * intacta y sigue creciendo durante TODA la corrida. Efecto: un valor que aislado sale `1` sale
- * `68` en la suite completa, y una prueba que lo dé por hecho pasa sola y falla en CI. Por eso aquí
- * se reinician TAMBIÉN, a mano. Es idempotente para las ya reiniciadas por el TRUNCATE.
+ * INDEPENDIENTE —creada con `CREATE SEQUENCE` y consumida con `nextval()`— sobrevive intacta y
+ * sigue creciendo durante TODA la corrida. Efecto: un valor que aislado sale `1` sale `68` en la
+ * suite completa, y una prueba que lo dé por hecho pasa sola y falla en CI. Por eso aquí se
+ * reinician TAMBIÉN, a mano. Es idempotente para las ya reiniciadas por el TRUNCATE.
+ *
+ * Hoy la lista está VACÍA: la única independiente era `numero_produccion_seq`, que V1-E3n retiró
+ * (el consecutivo de producción se calcula sobre la ocupación real y el de desarrollo vive en la
+ * tabla `secuencias_globales`, que el TRUNCATE sí vacía). El barrido se conserva porque el problema
+ * vuelve en cuanto alguien estrene otra `CREATE SEQUENCE`.
  */
 export async function limpiarBaseDatos(cliente: PrismaClient): Promise<void> {
   const tablas = await cliente.$queryRaw<{ tablename: string }[]>`
@@ -42,8 +46,8 @@ export async function limpiarBaseDatos(cliente: PrismaClient): Promise<void> {
   await cliente.$executeRawUnsafe(`TRUNCATE TABLE ${lista} RESTART IDENTITY CASCADE`);
 
   // Sólo las INDEPENDIENTES: las que no tienen dependencia `a`(uto) de una columna son justo las
-  // que el `RESTART IDENTITY` no toca. Hoy es una (`numero_produccion_seq`) de 129; recorrerlas
-  // todas sería añadir ~128 viajes a la base en CADA `beforeEach` sin ganar nada.
+  // que el `RESTART IDENTITY` no toca. Hoy no hay ninguna (ver el comentario de arriba), pero la
+  // consulta es barata y deja el barrido listo para la próxima.
   const secuencias = await cliente.$queryRaw<{ nombre: string }[]>`
     SELECT c.relname AS nombre
     FROM pg_class c

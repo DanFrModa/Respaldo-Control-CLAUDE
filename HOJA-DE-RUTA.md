@@ -79,6 +79,23 @@
 > receta que no se podía LEER** (§Post-F9.78). **Tres vueltas** (dos rechazos): de los cinco hallazgos de la
 > primera, **cuatro fueron pruebas que no probaban lo que decían** y el quinto un defecto de comportamiento
 > contra §Post-F9.68 — ninguno en los dos cambios de backend, que resistieron las dos revisiones.
+> ✅ **`V1-E3n` · MODELOS DE DESARROLLO vs. DE PRODUCCIÓN** (20-ago): Daniel, probando, *"en la última OP
+> que hice de pruebas (la 5558) heredó el modelo de desarrollo… habíamos acordado que el sistema iba a
+> proponer un modelo de producción y yo solo lo confirmaría"*. 🔴 **Tenía razón, y la explicación es que la
+> decisión existía y NUNCA SE CONSTRUYÓ**: §Post-F9.34 la cerró entera el 12-ago y terminaba con *"Aplica
+> en: NADA todavía"*. Entrega: `Modelo.origen` + `Modelo.codigoDesarrollo` + `Cliente.abreviatura`; serie
+> propia de desarrollo `CYA-26-71-001` **armada entera por el sistema** y congelada al nacer, que **no
+> quema** consecutivo de producción; **«pasar a producción»** desde el catálogo y desde «Generar OP», con
+> el nº de 5 dígitos **precargado y editable** (§Post-F9.46); catálogo y galería en **producción por
+> default**; y el promovido **conservando sus dos números, los dos buscables** (D3). Daniel cerró la última
+> duda el 20-ago (**§Post-F9.83**): *"el concepto y género van FIJOS y los consecutivos disponibles son los
+> otros 3"*. ⚠️ **Su decisión técnica de fondo:** el consecutivo de producción **no puede salir de una
+> secuencia**, y se midió — el par `51` del Access tiene **535 usados de 999 con el 999 YA ocupado**, así
+> que una secuencia propondría `1000`; la propuesta es el **hueco libre más bajo** bajo advisory lock del
+> par. El de desarrollo sí es secuencia atómica pura. Y **`Modelo.numeroProduccion` se REDEFINE**: guardaba
+> un consecutivo global **sin significado** que se minteaba al generar la OP sin cambiar el código del
+> modelo — ése era exactamente el bug de la 5558.
+>
 > *(histórico)* **`V1-E3f pieza B` (proveedores)**: renombres de rol, contactos como tabla, **el campo corto
 > fusionado en uno y único**, el `tipo` retirado, el **lector de la Constancia de Situación Fiscal** y la
 > **segmentación con/sin factura en CxP**. Su hallazgo caro: `{ not: true }` **no incluye los NULL** —los
@@ -648,6 +665,50 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- **DEUDA de V1-E3n (20-ago-2026) — el dígito de nomenclatura del GÉNERO no tiene pantalla.** El del
+  TIPO DE PRENDA sí la tiene (se cerró en la ronda de corrección: era un **callejón sin salida**, el
+  sistema mandaba a *"captúralo en su catálogo"* y el catálogo no tenía el campo). `Genero` es un
+  catálogo **selector sin ABM desde F1** —igual que `RolProveedor` o `TipoProceso`—, así que abrirle uno
+  excede la etapa. Los ocho géneros del seed traen su dígito y la migración se lo pone a los existentes;
+  uno nuevo queda en NULL y el generador **lo dice con su nombre** (*"El género «Unisex» no tiene dígito
+  de nomenclatura capturado…"*) en vez de inventar un número. Sin riesgo de código equivocado, pero hay
+  que ir a la base si aparece un género nuevo.
+- **DEUDA de V1-E3n — «Pasar a producción» no tiene e2e.** Está cubierto por unit (**13**), integración
+  (**43** del motor + **12** de la salida a producción) y pruebas de componente (**27** de front), pero
+  ningún spec de Playwright recorre el camino completo catálogo → botón → número precargado → confirmar.
+  Mismo caso que el «asignar proveedor» de V1-E3m.
+- **APRENDIZAJE de V1-E3n — un COMENTARIO puede prometer una cobertura que no existe.** La prueba del
+  dígito repetido afirmaba en su comentario que protegía el `catch` de P2002 (*"esta tabla tiene DOS
+  únicos y culpar al nombre mandaría a corregir el campo equivocado"*), pero pasaba por la **guarda del
+  dominio**: mutar `mensajeDeUnicidad` dejaba 37/37 en verde. Es el vicio de toda la tanda —el título
+  afirma identidad, el cuerpo comprueba presencia— **mudado a la justificación**, donde nadie lo busca.
+  **La regla:** cuando un comentario diga *"esto protege X"*, la mutación que rompe X tiene que tirar
+  ESA prueba; si no, el comentario miente y hay que reescribirlo o escribir la prueba que falta.
+- **APRENDIZAJE de V1-E3n — la cifra de las pruebas se equivocó DOS veces, y la segunda ya se
+  contradecía entre tres documentos.** No es cosmético: el reviewer lee esos números para saber qué
+  está cubierto, y una cifra inflada es una promesa de cobertura que no existe —la misma familia del
+  "título que afirma identidad y cuerpo que comprueba presencia"—. **La regla:** las cifras se copian
+  de la SALIDA de la corrida (`Tests N passed`), archivo por archivo, y se escriben al final, después
+  de la última prueba agregada; nunca de memoria ni de una cuenta a mano de los `it(`.
+- 🔴 **APRENDIZAJE de V1-E3n — el reporte final se emite DESPUÉS de la última edición, no antes.** El
+  coder cerró diciendo *"los ocho comandos en 0"* y `npm run lint` del backend estaba **rojo**, con el
+  error **dentro del remate que acababa de escribir** (`calidad.int.test.ts`). Lo cazó el lead corriendo
+  los gates antes de comitear; de haber ido tal cual, el CI se caía. Esto **no** es la cicatriz de
+  «valida con los `npm run` del proyecto» (esa ya está escrita y se cumplió): es la de al lado —**quien
+  remata vuelve a correr los ocho**, aunque el remate "no toque lógica"—. Una corrida vieja pegada en el
+  reporte final vale lo mismo que no haber corrido nada.
+- **APRENDIZAJE de V1-E3n — una decisión "cerrada" no es una decisión CONSTRUIDA.** §Post-F9.34 quedó
+  redactada entera el 12-ago, con tabla de dígitos, formato del código y los siete puntos de qué construir
+  — y terminaba con *"Aplica en: **NADA todavía** — es decisión de rumbo"*. Ocho días después Daniel probó
+  la OP 5558 y se topó con el hueco. El texto era correcto; lo que faltó fue **una etapa que lo
+  implementara**. Cuando una decisión cierre sin etapa asignada, conviene que quede en el radar de
+  `HOJA-DE-RUTA.md` como pendiente, no sólo en `DECISIONES.md` como historia.
+- **APRENDIZAJE de V1-E3n — medir el dato viejo cambió el diseño.** El plan decía "consecutivo por
+  secuencia atómica (A3)". Contar los 4,987 modelos del Access enseñó que el par `51` tiene **535 usados
+  de 999 y el 999 ocupado**: una secuencia habría propuesto `1000` desde el primer día y dejado 464
+  números inalcanzables. La regla A3 sigue viva donde aplica (el consecutivo de DESARROLLO), y donde no
+  aplica se sustituyó por algo con la MISMA garantía —hueco libre bajo `pg_advisory_xact_lock` del par— y
+  se dijo por qué. Escrito en `DECISIONES.md §Post-F9.83`.
 - **APRENDIZAJE de V1-E3m (20-ago-2026) — un script de mutación que muere por timeout DEJA EL ÁRBOL
   MUTADO.** Al mutar contra integración (52 s por corrida), el script se pasó del tope de 2 min y murió
   **entre** la mutación y su restauración: `proveedor-de-orden.ts` se quedó con un `if (false)` que

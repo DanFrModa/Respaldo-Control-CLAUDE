@@ -43,6 +43,7 @@ vi.mock('@/api/proyectos', () => ({
 vi.mock('@/api/desarrollos', () => ({
   useReactivarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
   useCrearDesarrollo: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCrearDesarrolloModeloNuevo: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useApagarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -61,7 +62,12 @@ vi.mock('@/api/temporadas', () => ({
 }));
 vi.mock('@/api/modelos', () => ({
   useModelos: () => ({ data: { datos: [] }, isPending: false }),
-  useCrearModelo: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  // Selectores del alta de desarrollo con MODELO NUEVO (V1-E3n): de ellos salen los dos dígitos
+  // del código que arma el sistema.
+  useGeneros: () => ({ data: [], isPending: false }),
+}));
+vi.mock('@/api/calidad', () => ({
+  useTiposProductoActivos: () => ({ data: { datos: [] }, isPending: false }),
 }));
 // Candidatos a la lista: es la FUENTE DE VERDAD del botón «Generar lista de precios» (la misma
 // consulta que abre el diálogo). Se controla por prueba para cubrir los dos lados.

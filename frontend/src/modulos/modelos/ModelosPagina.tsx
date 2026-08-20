@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeftIcon,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -55,6 +56,7 @@ import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulo
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoModelo } from './DialogoModelo';
+import { DialogoPasarAProduccion } from './DialogoPasarAProduccion';
 import { EditorBom } from './EditorBom';
 import { FotosModelo } from './FotosModelo';
 
@@ -155,6 +157,9 @@ export function ModelosPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [temporadaFiltro, setTemporadaFiltro] = useState<string>(TEMPORADA_TODAS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
+  // Filtro de ORIGEN (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por default, para no
+  // llenarse de los modelos de desarrollo que nunca salen. Los de desarrollo quedan a un clic.
+  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('produccion');
   const [pagina, setPagina] = useState(1);
 
   const query: ModelosQuery = {
@@ -162,6 +167,7 @@ export function ModelosPagina(): React.JSX.Element {
     porPagina: POR_PAGINA,
     ordenarPor: 'codigo',
     direccion: 'asc',
+    origen,
     incluirInactivos: incluirInactivos ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(temporadaFiltro !== TEMPORADA_TODAS ? { idTemporada: Number(temporadaFiltro) } : {}),
@@ -185,6 +191,7 @@ export function ModelosPagina(): React.JSX.Element {
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [modeloEnEdicion, setModeloEnEdicion] = useState<Modelo | undefined>(undefined);
   const [aDescontinuar, setADescontinuar] = useState<Modelo | null>(null);
+  const [aPromover, setAPromover] = useState<Modelo | null>(null);
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);
@@ -226,6 +233,10 @@ export function ModelosPagina(): React.JSX.Element {
   }
   function alAlternarInactivos(): void {
     setIncluirInactivos((v) => !v);
+    setPagina(1);
+  }
+  function alCambiarOrigen(valor: string): void {
+    setOrigen(valor as 'produccion' | 'desarrollo' | 'todos');
     setPagina(1);
   }
 
@@ -272,9 +283,19 @@ export function ModelosPagina(): React.JSX.Element {
           <BuscadorToolbar
             valor={textoBusqueda}
             alCambiar={alBuscar}
-            placeholder="Buscar por código o nombre…"
-            etiqueta="Buscar modelos por código o nombre"
+            placeholder="Buscar por código, nº de desarrollo o nombre…"
+            etiqueta="Buscar modelos por código, nº de desarrollo o nombre"
             testid="buscar-modelo"
+          />
+          <ChipsFiltro
+            etiqueta="Filtrar por origen"
+            opciones={[
+              { valor: 'produccion', etiqueta: 'Producción', testid: 'origen-produccion' },
+              { valor: 'desarrollo', etiqueta: 'Desarrollo', testid: 'origen-desarrollo' },
+              { valor: 'todos', etiqueta: 'Todos', testid: 'origen-todos' },
+            ]}
+            valor={origen}
+            alCambiar={alCambiarOrigen}
           />
           <ChipsFiltro
             etiqueta="Filtrar por estado"
@@ -438,10 +459,22 @@ export function ModelosPagina(): React.JSX.Element {
                             <MiniaturaModelo modelo={m} />
                             <div className="min-w-0">
                               {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
-                              <div className="truncate font-semibold">{nombreModelo(m)}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate font-semibold">{nombreModelo(m)}</span>
+                                {m.origen === 'desarrollo' ? (
+                                  <ChipEstado tono="neutro">Desarrollo</ChipEstado>
+                                ) : null}
+                              </div>
+                              {/* El código VIGENTE y, si el modelo fue promovido, también su nº de
+                                  DESARROLLO: los dos son suyos y los dos son buscables (D3). */}
                               {m.descripcion !== null && m.descripcion.trim() !== '' ? (
                                 <div className="mono truncate text-xs text-muted-foreground">
                                   {m.codigo}
+                                </div>
+                              ) : null}
+                              {m.codigoDesarrollo !== null && m.codigoDesarrollo !== m.codigo ? (
+                                <div className="mono truncate text-xs text-faint">
+                                  desarrollo {m.codigoDesarrollo}
                                 </div>
                               ) : null}
                             </div>
@@ -531,6 +564,10 @@ export function ModelosPagina(): React.JSX.Element {
                 </span>
                 <span className="mono text-xs font-normal text-muted-foreground">
                   {seleccion.codigo}
+                  {seleccion.codigoDesarrollo !== null &&
+                  seleccion.codigoDesarrollo !== seleccion.codigo
+                    ? ` · desarrollo ${seleccion.codigoDesarrollo}`
+                    : ''}
                   {seleccion.temporada !== null ? ` · Temporada ${seleccion.temporada}` : ''}
                 </span>
               </span>
@@ -555,6 +592,17 @@ export function ModelosPagina(): React.JSX.Element {
                 <Pencil aria-hidden />
                 Editar
               </Button>
+              {seleccion.origen === 'desarrollo' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAPromover(seleccion)}
+                  data-testid="pasar-a-produccion"
+                >
+                  <ArrowRightLeftIcon aria-hidden />
+                  Pasar a producción
+                </Button>
+              ) : null}
               {seleccion.activo ? (
                 <Button
                   variant="outline"
@@ -593,6 +641,14 @@ export function ModelosPagina(): React.JSX.Element {
           </div>
         ) : null}
       </CajonDetalle>
+
+      <DialogoPasarAProduccion
+        abierto={aPromover !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setAPromover(null);
+        }}
+        modelo={aPromover}
+      />
 
       <DialogoModelo
         abierto={dialogoAbierto}

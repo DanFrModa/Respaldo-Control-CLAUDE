@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -28,6 +29,12 @@ import { Input } from '@/components/ui/input';
 /**
  * Dialogo de alta y edicion de tipo de producto. Si recibe un `tipo` edita (PATCH);
  * si no, da de alta (POST). Validacion solo de UX: el backend re-valida (A1).
+ *
+ * ⚠️ Además del nombre captura el **dígito de concepto** (V1-E3n): el 1er dígito del código de
+ * producción de los modelos de este tipo (§Post-F9.34). Sin él, dar de alta un tipo aquí y luego
+ * elegirlo al desarrollar un modelo terminaba en *"captúralo en su catálogo"* — un catálogo que no
+ * tenía el campo. Vaciarlo lo quita; el dígito es único entre los tipos activos (lo valida el
+ * backend y lo respalda un índice parcial).
  */
 export function DialogoTipoProducto({
   abierto,
@@ -45,19 +52,31 @@ export function DialogoTipoProducto({
 
   const formulario = useForm<DatosTipoProductoFormulario>({
     resolver: zodResolver(esquemaTipoProductoFormulario),
-    defaultValues: { nombre: '' },
+    defaultValues: { nombre: '', digitoConcepto: '' },
   });
 
   useEffect(() => {
     if (abierto) {
-      formulario.reset(tipo ? { nombre: tipo.nombre } : { nombre: '' });
+      formulario.reset(
+        tipo
+          ? {
+              nombre: tipo.nombre,
+              digitoConcepto: tipo.digitoConcepto === null ? '' : String(tipo.digitoConcepto),
+            }
+          : { nombre: '', digitoConcepto: '' },
+      );
     }
   }, [abierto, tipo, formulario]);
 
   const enviar = formulario.handleSubmit((datos) => {
+    const digito = datos.digitoConcepto.trim();
     if (esEdicion) {
       actualizar.mutate(
-        { id: tipo.id, cuerpo: datos },
+        // En edición el vacío viaja como `null` para QUITAR el dígito (M1).
+        {
+          id: tipo.id,
+          cuerpo: { nombre: datos.nombre, digitoConcepto: digito === '' ? null : Number(digito) },
+        },
         {
           onSuccess: (resultado) => {
             toast.success(`Tipo "${resultado.nombre}" actualizado.`);
@@ -68,13 +87,20 @@ export function DialogoTipoProducto({
       );
       return;
     }
-    crear.mutate(datos, {
-      onSuccess: (resultado) => {
-        toast.success(`Tipo "${resultado.nombre}" creado.`);
-        alCambiarAbierto(false);
+    // En el alta el vacío se OMITE (el backend lo deja en null).
+    crear.mutate(
+      {
+        nombre: datos.nombre,
+        ...(digito === '' ? {} : { digitoConcepto: Number(digito) }),
       },
-      onError: (error) => toast.error(error.message),
-    });
+      {
+        onSuccess: (resultado) => {
+          toast.success(`Tipo "${resultado.nombre}" creado.`);
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   });
 
   const { errors } = formulario.formState;
@@ -109,6 +135,27 @@ export function DialogoTipoProducto({
                 {...formulario.register('nombre')}
               />
               <FieldError errors={[errors.nombre]} />
+            </Field>
+
+            <Field data-invalid={Boolean(errors.digitoConcepto)}>
+              <FieldLabel htmlFor="tipo-digito-concepto">Dígito de concepto</FieldLabel>
+              <Input
+                id="tipo-digito-concepto"
+                inputMode="numeric"
+                maxLength={1}
+                className="mono w-20"
+                placeholder="Ej. 8"
+                aria-invalid={Boolean(errors.digitoConcepto)}
+                disabled={guardando}
+                data-testid="tipo-digito-concepto"
+                {...formulario.register('digitoConcepto')}
+              />
+              <FieldDescription>
+                El <b>primer dígito</b> del código de producción de los modelos de este tipo
+                (chamarra 8, gorra 9…). Del 2 al 9, y no se repite entre tipos activos. Déjalo vacío
+                si este tipo no se numera — pero entonces sus modelos no podrán salir a producción.
+              </FieldDescription>
+              <FieldError errors={[errors.digitoConcepto]} />
             </Field>
           </FieldGroup>
 

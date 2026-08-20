@@ -60,6 +60,8 @@ function archivoPdf(n = 1): { nombreArchivo: string; archivoBase64: string } {
 let cliente: PrismaClient;
 let idEmpresa: number;
 let idClienteNegocio: number;
+let idTipoProducto: number;
+let idGenero: number;
 
 const PERMISOS: ClavePermiso[] = [
   'ordenes.ver',
@@ -121,9 +123,22 @@ function archivosFalsos(): ServicioArchivos {
  * después. Por eso las OP importadas nacen `capturada` con "Falta: avíos y arte" — estado
  * automático (`dominio/produccion/requisitos-orden.ts`), no un fallo, y no impide operarlas.
  */
+/**
+ * Modelo de DESARROLLO (V1-E3n): es el caso real del importador —la OC del cliente llega con
+ * modelos que todavía están en desarrollo— y es el que hace que generar la OP los PASE a
+ * producción con su nº de 5 dígitos. Lleva tipo de prenda + género porque de ahí salen los dos
+ * primeros dígitos.
+ */
 async function crearModelo(codigo: string, composicion?: string): Promise<number> {
   const modelo = await cliente.modelo.create({
-    data: { codigo, ...(composicion === undefined ? {} : { composicion }) },
+    data: {
+      codigo,
+      codigoDesarrollo: codigo,
+      origen: 'desarrollo',
+      idTipoProducto,
+      idGenero,
+      ...(composicion === undefined ? {} : { composicion }),
+    },
   });
   return modelo.id;
 }
@@ -141,6 +156,15 @@ beforeEach(async () => {
   idEmpresa = empresa.id;
   const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'C&A' } });
   idClienteNegocio = clienteNegocio.id;
+  // Dígitos de la nomenclatura (§Post-F9.34): pantalón (7) + caballero (1) → serie 71.
+  const tipo = await cliente.tipoProducto.create({
+    data: { nombre: 'Pantalón', digitoConcepto: 7 },
+  });
+  idTipoProducto = tipo.id;
+  const genero = await cliente.genero.create({
+    data: { nombre: 'Caballero', digitoNomenclatura: 1, digitoAlterno: 5 },
+  });
+  idGenero = genero.id;
 });
 
 describe('confirmar importación por PDF (1 PDF)', () => {
@@ -254,9 +278,13 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     });
     expect(liga?.idModelo).toBe(idModelo);
 
-    // Nº interno de producción minteado al modelo (primera salida).
+    // ⭐ El modelo PASÓ A PRODUCCIÓN al generar la OP (§Post-F9.34): serie 71 vacía → 71001, el
+    // código sustituido y el de desarrollo conservado (D3).
     const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).not.toBeNull();
+    expect(modelo.numeroProduccion).toBe(71_001);
+    expect(modelo.codigo).toBe('71001');
+    expect(modelo.origen).toBe('produccion');
+    expect(modelo.codigoDesarrollo).toBe('DEV-CYA-1');
     // Evento outbox de la RC (orden-creada) encolado.
     const eventos = await cliente.eventoOutbox.count();
     expect(eventos).toBeGreaterThanOrEqual(1);
@@ -461,9 +489,9 @@ describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
     expect(await cliente.pedido.count()).toBe(1);
     expect(await cliente.orden.count()).toBe(1);
     expect(await cliente.pedidoLinea.count()).toBe(1);
-    // Y el nº interno de producción se minteó UNA sola vez.
+    // Y el modelo se promovió UNA sola vez: el primer libre de la serie, no el segundo.
     const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).not.toBeNull();
+    expect(modelo.numeroProduccion).toBe(71_001);
   });
 
   it('la OC de OTRO cliente no bloquea (el nº de orden solo identifica dentro de su cliente)', async () => {

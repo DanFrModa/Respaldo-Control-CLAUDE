@@ -59,6 +59,8 @@ vi.mock('@/api/modelos', () => ({
   useDescontinuarModelo: () => ({ mutate: descontinuarMutate, isPending: false }),
   useReactivarModelo: () => ({ mutate: reactivarMutate, isPending: false }),
   useGeneros: () => ({ data: [], isPending: false }),
+  usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
+  usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
   useSubirFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
@@ -101,6 +103,9 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
   return {
     id,
     codigo,
+    origen: 'produccion',
+    codigoDesarrollo: null,
+    numeroProduccion: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,
@@ -386,6 +391,80 @@ describe('<ModelosPagina>', () => {
 
     await usuario.selectOptions(screen.getByTestId('filtro-temporada-modelo'), '2');
     expect(ultimaQuery?.idTemporada).toBe(2);
+  });
+
+  /**
+   * Separación desarrollo/producción (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por
+   * default —Daniel pidió no llenarlo de los modelos de desarrollo que nunca salen— y los de
+   * desarrollo quedan detrás del filtro, no escondidos.
+   */
+  it('el catálogo pide SOLO producción por default, y el filtro cambia el origen en la query', async () => {
+    const usuario = userEvent.setup();
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '51001')]));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    // El valor concreto importa: con 'todos' (o sin el campo) la vitrina traería los desarrollos.
+    expect(ultimaQuery?.origen).toBe('produccion');
+
+    await usuario.click(screen.getByTestId('origen-desarrollo'));
+    expect(ultimaQuery?.origen).toBe('desarrollo');
+
+    await usuario.click(screen.getByTestId('origen-todos'));
+    expect(ultimaQuery?.origen).toBe('todos');
+  });
+
+  it('un modelo promovido enseña sus DOS números; uno de producción puro, sólo el suyo', () => {
+    const promovido = modelo(1, '71050', true, {
+      codigoDesarrollo: 'CYA-26-71-003',
+      numeroProduccion: 71_050,
+    });
+    const dePlano = modelo(2, '51001', true, { numeroProduccion: 51_001 });
+    useModelos.mockReturnValue(listaConDatos([promovido, dePlano]));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    const filas = screen.getAllByTestId('fila-modelo');
+    // El nº de desarrollo se conserva y se ve (D3): el texto exacto lo delata.
+    expect(filas[0]).toHaveTextContent('desarrollo CYA-26-71-003');
+    // Y al que nunca fue de desarrollo no se le inventa una segunda línea.
+    expect(filas[1]).not.toHaveTextContent('desarrollo');
+  });
+
+  it('«Pasar a producción» sólo se ofrece en los modelos de DESARROLLO', async () => {
+    const enDesarrollo = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([enDesarrollo]));
+    useFichaModelo.mockImplementation((id) =>
+      id === undefined
+        ? { data: undefined, isPending: false, isError: false, error: null }
+        : fichaCargada(ficha(enDesarrollo)),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(await screen.findByTestId('pasar-a-produccion')).toBeInTheDocument();
+  });
+
+  it('un modelo YA de producción no ofrece «Pasar a producción»', async () => {
+    const enProduccion = modelo(1, '71050', true, { numeroProduccion: 71_050 });
+    useModelos.mockReturnValue(listaConDatos([enProduccion]));
+    useFichaModelo.mockImplementation((id) =>
+      id === undefined
+        ? { data: undefined, isPending: false, isError: false, error: null }
+        : fichaCargada(ficha(enProduccion)),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await screen.findByTestId('editar-modelo');
+    expect(screen.queryByTestId('pasar-a-produccion')).toBeNull();
   });
 
   it('deep-link: abre la ficha del modelo de `state.idModelo` (estando en la página visible)', async () => {

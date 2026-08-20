@@ -15,4 +15,4 @@
  * `version.test.ts` compara las dos y se pone rojo en CI si no coinciden — una
  * versión que miente en pantalla es peor que no tener versión.
  */
-export const VERSION = '0.008';
+export const VERSION = '0.009';

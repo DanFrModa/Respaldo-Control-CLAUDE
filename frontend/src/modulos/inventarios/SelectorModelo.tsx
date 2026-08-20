@@ -10,6 +10,12 @@ import { useDebounce } from '@/lib/useDebounce';
  * traspasos, kardex y existencias para fijar el modelo sobre el que se opera. La lista vive en el
  * POPOVER del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera,
  * no infla el layout del toolbar). Presentación pura (A1): solo consulta y emite.
+ *
+ * ⚠️ **Busca en los DOS catálogos (`origen: 'todos'`) a propósito** (V1-E3n). El default del API es
+ * `produccion` porque §Post-F9.34 punto 2 habla del **catálogo y la galería** —lo que se NAVEGA—, y
+ * ahí Daniel no quiere "basura". Esto es otra cosa: un buscador donde alguien TECLEA un código que ya
+ * conoce; si escondiera los de desarrollo, ligar un modelo de desarrollo a un proyecto o mover una
+ * muestra de PT sería imposible sin explicación. Las opciones marcan cuál es de desarrollo.
  */
 export function SelectorModelo({
   idSeleccionado,
@@ -17,6 +23,7 @@ export function SelectorModelo({
   alLimpiar,
   idInput,
   testid = 'selector-modelo',
+  origen = 'todos',
 }: {
   idSeleccionado: number | undefined;
   alSeleccionar: (modelo: Modelo) => void;
@@ -25,6 +32,8 @@ export function SelectorModelo({
   /** `id` del input, para que un `<label htmlFor>` externo lo enfoque (formularios con Field). */
   idInput?: string | undefined;
   testid?: string;
+  /** Catálogo(s) donde buscar. Default `todos` — ver el encabezado del módulo. */
+  origen?: 'produccion' | 'desarrollo' | 'todos';
 }): React.JSX.Element {
   const [texto, setTexto] = useState('');
   const busqueda = useDebounce(texto.trim(), 300);
@@ -33,6 +42,7 @@ export function SelectorModelo({
     porPagina: 8,
     ordenarPor: 'codigo',
     direccion: 'asc',
+    origen,
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
 
@@ -57,7 +67,16 @@ export function SelectorModelo({
       }}
       alCambiarTexto={setTexto}
       busquedaServidor
-      renderOpcion={(o) => <OpcionRica principal={o.codigo} secundario={o.descripcion} />}
+      renderOpcion={(o) => (
+        <OpcionRica
+          principal={o.codigo}
+          secundario={
+            o.origen === 'desarrollo'
+              ? `Desarrollo · ${o.descripcion ?? 'sin descripción'}`
+              : o.descripcion
+          }
+        />
+      )}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
       conLupa
       permitirLimpiar={alLimpiar !== undefined}

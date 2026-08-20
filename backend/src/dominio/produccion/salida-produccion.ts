@@ -9,12 +9,16 @@
  *  2. Se capturan las REFERENCIAS del cliente (D7) si vienen (helpers compartidos de `ordenes.ts`).
  *  3. Se LIGA la orden a su desarrollo (`DesarrolloOrden`) REUSANDO el núcleo de `ligarOrden`
  *     (F8-E6) — si el renglón NO tiene desarrollo, la OP nace SIN liga (caso legado, proto §4.1).
- *  4. Se MINTEA el nº INTERNO de producción del modelo (`Modelo.numeroProduccion`) si es su
- *     PRIMERA salida a producción — secuencia Postgres `numero_produccion_seq` (A3: atómica,
- *     jamás Max()+1; global porque el catálogo de modelos es global, ADR-0007). Si el modelo ya
- *     salió antes, se REUSA su número (resurtidos). Aclaración Daniel 7-jul: Desarrollo y
- *     Producción son BASES DISTINTAS — este número es distinto del folio de OP y del nº de
- *     desarrollo (`Modelo.codigo`).
+ *  4. Se PASA A PRODUCCIÓN el modelo si todavía era de DESARROLLO (§Post-F9.34 punto 4 +
+ *     §Post-F9.46): se le asigna el nº de 5 dígitos —el que el usuario CONFIRMÓ en el panel, que
+ *     llegó precargado con la propuesta del sistema, o el propuesto si no mandó ninguno— y su
+ *     código pasa a ser ese número; el nº de desarrollo se CONSERVA y sigue buscable (D3). Si el
+ *     modelo ya estaba en producción, la OP hereda el número que ya tenía y nada se toca.
+ *
+ *     ⚠️ Esto CORRIGE lo que Daniel encontró probando (OP 5558): la OP se quedaba con el modelo de
+ *     DESARROLLO. Antes este paso minteaba un consecutivo global sin significado
+ *     (`numero_produccion_seq`) que no cambiaba el código del modelo ni lo sacaba del catálogo de
+ *     desarrollo — el número real del negocio nunca se asignaba.
  *
  * Reglas deliberadas (diferencias vs el prototipo, documentadas):
  *  • El proto AJUSTABA la cantidad del renglón del pedido al total de la matriz; aquí NO se
@@ -34,46 +38,15 @@ import { esquemaSalidaProduccionCuerpo } from '../../contrato/index.js';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
-import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
+import { enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { ligarOrdenNucleo } from '../desarrollo/liga-orden.js';
+import { promoverAProduccionNucleo } from '../modelos/nomenclatura.js';
 
 import { crearOrden, obtenerOrden, sincronizarReferencias, validarReferencias } from './ordenes.js';
-
-/**
- * MINTEA (o reusa) el nº interno de producción del modelo, de forma ATÓMICA: el UPDATE condicional
- * `numero_produccion IS NULL` con `nextval()` garantiza que dos primeras-salidas concurrentes del
- * MISMO modelo minteen UNA sola vez (la que pierde la carrera no actualiza y relee el número ya
- * minteado; a lo sumo se desperdicia un valor de la secuencia — aceptable, igual que los huecos
- * por rollback de folios A3). Devuelve el número y si ESTA llamada lo minteó.
- */
-async function mintearNumeroProduccion(
-  tx: Tx,
-  idModelo: number,
-): Promise<{ numero: number; minteado: boolean }> {
-  const minteadas = await tx.$queryRaw<{ numero_produccion: number }[]>`
-    UPDATE "modelos"
-    SET "numero_produccion" = nextval('numero_produccion_seq')
-    WHERE "id" = ${idModelo} AND "numero_produccion" IS NULL
-    RETURNING "numero_produccion"
-  `;
-  const minteada = minteadas[0];
-  if (minteada !== undefined) {
-    return { numero: Number(minteada.numero_produccion), minteado: true };
-  }
-  // Ya tenía número (salidas anteriores): se REUSA.
-  const modelo = await tx.modelo.findUnique({
-    where: { id: idModelo },
-    select: { numeroProduccion: true },
-  });
-  if (modelo?.numeroProduccion == null) {
-    // Imposible salvo corrupción: el UPDATE no minteó porque NO era null, pero al releer es null.
-    throw new Error(`El modelo ${idModelo} no tiene nº de producción tras intentar mintearlo.`);
-  }
-  return { numero: modelo.numeroProduccion, minteado: false };
-}
 
 /**
  * Genera la OP de un renglón de pedido (la "salida a producción", B4). Ver el encabezado del
@@ -150,8 +123,41 @@ export async function salidaAProduccion(
       ligaCreada = true;
     }
 
-    // 4) Nº interno de producción: mintea la primera vez; reusa después.
-    const numero = await mintearNumeroProduccion(tx, linea.idModelo);
+    // 4) Producción: si el modelo venía de DESARROLLO, aquí se promueve con el número que el
+    //    usuario confirmó (o el propuesto). Si ya era de producción, se hereda su número.
+    const modelo = await tx.modelo.findUniqueOrThrow({
+      where: { id: linea.idModelo },
+      select: { origen: true, numeroProduccion: true, codigo: true },
+    });
+    let numeroProduccion: number | null = modelo.numeroProduccion;
+    let promovido = false;
+    let codigoModeloAnterior: string | null = null;
+    let avisosNumero: string[] = [];
+    if (modelo.origen === 'desarrollo') {
+      // El núcleo ya rechaza el número repetido con un conflicto claro; el `catch` cubre la
+      // CARRERA residual (dos promociones simultáneas al mismo número desde pares distintos, que
+      // el lock del par no serializa) para que salga como 409 y no como un P2002 crudo en 500.
+      let promocion;
+      try {
+        promocion = await promoverAProduccionNucleo(
+          tx,
+          sesion,
+          linea.idModelo,
+          datos.numeroProduccion,
+        );
+      } catch (error) {
+        if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+          throw new ErrorConflicto('Ese número de producción ya está ocupado por otro modelo.', {
+            causa: error,
+          });
+        }
+        throw error;
+      }
+      numeroProduccion = promocion.numeroProduccion;
+      promovido = true;
+      codigoModeloAnterior = modelo.codigo;
+      avisosNumero = promocion.avisos;
+    }
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
@@ -163,8 +169,9 @@ export async function salidaAProduccion(
         folioPedido: Number(linea.pedido.folio),
         folioOrden: orden.folio,
         idDesarrollo: linea.idDesarrollo,
-        numeroProduccion: numero.numero,
-        numeroProduccionMinteado: numero.minteado,
+        numeroProduccion,
+        modeloPromovido: promovido,
+        codigoModeloAnterior,
         referencias: datos.referencias?.length ?? 0,
         totalPiezas,
       },
@@ -172,8 +179,10 @@ export async function salidaAProduccion(
 
     return {
       orden: ordenSalida,
-      numeroProduccion: numero.numero,
-      numeroProduccionMinteado: numero.minteado,
+      numeroProduccion,
+      numeroProduccionMinteado: promovido,
+      codigoModeloAnterior,
+      avisosNumeroProduccion: avisosNumero,
       idDesarrollo: linea.idDesarrollo,
       ligaCreada,
     };

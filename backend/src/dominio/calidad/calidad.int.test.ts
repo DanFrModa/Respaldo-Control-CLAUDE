@@ -20,6 +20,7 @@ import {
 } from './tipos-producto.js';
 import { actualizarDefecto, crearDefecto, desactivarDefecto, listarDefectos } from './defectos.js';
 import { crearPlanAql, resolverPlan } from './planes-aql.js';
+import { sembrarCalidad } from '../../../prisma/seed-calidad.js';
 
 let cliente: PrismaClient;
 
@@ -61,6 +62,51 @@ describe('Calidad — permisos (deny-by-default, §9.2)', () => {
   });
 });
 
+/**
+ * ⭐ EL SEED TIENE QUE TRAER LOS NUEVE CONCEPTOS DE DANIEL (V1-E3n).
+ *
+ * En la primera vuelta faltaban **Chamarra (8) y Gorra (9)** — 356 y 73 modelos en el Access, el 9 %
+ * del catálogo—, así que no había tipo que elegir para desarrollarlas: un callejón sin salida en el
+ * camino que la etapa construye. Esta prueba corre el seed REAL, no una copia de la lista.
+ */
+describe('Calidad — el seed de tipos de producto y sus dígitos de concepto', () => {
+  it('siembra los 8 tipos con el dígito de la tabla de Daniel, Chamarra y Gorra incluidas', async () => {
+    await sembrarCalidad(cliente);
+
+    const tipos = await cliente.tipoProducto.findMany({
+      select: { nombre: true, digitoConcepto: true },
+      orderBy: { nombre: 'asc' },
+    });
+    const porNombre = new Map(tipos.map((t) => [t.nombre, t.digitoConcepto]));
+
+    // Los dígitos CONCRETOS de la tabla de 2014: si alguno se moviera, el código de sus modelos
+    // saldría con el concepto equivocado y nada más lo notaría.
+    expect(porNombre.get('Conjunto')).toBe(2);
+    expect(porNombre.get('Short')).toBe(3);
+    expect(porNombre.get('Vestido')).toBe(4);
+    expect(porNombre.get('Playera')).toBe(5);
+    expect(porNombre.get('Sudadera')).toBe(6);
+    expect(porNombre.get('Pantalón')).toBe(7);
+    expect(porNombre.get('Chamarra')).toBe(8);
+    expect(porNombre.get('Gorra')).toBe(9);
+    // "Ropa interior" NO está en la tabla de Daniel: se queda sin dígito a propósito.
+    expect(porNombre.has('Ropa interior')).toBe(true);
+    expect(porNombre.get('Ropa interior')).toBeNull();
+
+    // Ningún dígito repetido entre los activos (cada concepto es su propia serie de 999).
+    const digitos = tipos.map((t) => t.digitoConcepto).filter((d): d is number => d !== null);
+    expect(new Set(digitos).size).toBe(digitos.length);
+  });
+
+  it('el seed es idempotente: re-correrlo no duplica ni pierde los dígitos', async () => {
+    await sembrarCalidad(cliente);
+    await sembrarCalidad(cliente);
+    const chamarras = await cliente.tipoProducto.findMany({ where: { nombre: 'Chamarra' } });
+    expect(chamarras).toHaveLength(1);
+    expect(chamarras[0]?.digitoConcepto).toBe(8);
+  });
+});
+
 describe('Calidad — tipos de producto (CRUD + borrado suave)', () => {
   it('crea, escribe bitácora (A7), edita, desactiva y reactiva', async () => {
     const sesion = sesionAdmin();
@@ -83,6 +129,146 @@ describe('Calidad — tipos de producto (CRUD + borrado suave)', () => {
     );
     const reactivado = await reactivarTipoProducto(sesion, tipo.id, bd());
     expect(reactivado.activo).toBe(true);
+  });
+
+  /**
+   * V1-E3n: el `digitoConcepto` (1er dígito del código de producción, §Post-F9.34) se captura AQUÍ.
+   * Antes no existía el campo en ningún lado, y el alta de un modelo de desarrollo mandaba a
+   * *"captúralo en su catálogo"* — un catálogo que no lo tenía.
+   */
+  it('captura, edita y QUITA el dígito de concepto, dejándolo en la bitácora', async () => {
+    const sesion = sesionAdmin();
+    const tipo = await crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 8 }, bd());
+    expect(tipo.digitoConcepto).toBe(8);
+
+    const editado = await actualizarTipoProducto(sesion, { id: tipo.id, digitoConcepto: 9 }, bd());
+    expect(editado.digitoConcepto).toBe(9);
+
+    const sinDigito = await actualizarTipoProducto(
+      sesion,
+      { id: tipo.id, digitoConcepto: null },
+      bd(),
+    );
+    expect(sinDigito.digitoConcepto).toBeNull();
+
+    // El cambio queda auditado con el ANTES y el DESPUÉS (no basta con que exista el renglón).
+    const bitacora = await cliente.bitacora.findMany({
+      where: { entidad: 'TipoProducto', idEntidad: String(tipo.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'asc' },
+    });
+    expect((bitacora[0]?.datos as Record<string, unknown>).digitoConcepto).toEqual({ de: 8, a: 9 });
+    expect((bitacora[1]?.datos as Record<string, unknown>).digitoConcepto).toEqual({
+      de: 9,
+      a: null,
+    });
+  });
+
+  it('rechaza un dígito fuera del 2–9 (el 0 y el 1 no se usan)', async () => {
+    const sesion = sesionAdmin();
+    for (const digito of [0, 1, 10]) {
+      await expect(
+        crearTipoProducto(sesion, { nombre: `T-${String(digito)}`, digitoConcepto: digito }, bd()),
+      ).rejects.toThrow();
+    }
+    expect(await cliente.tipoProducto.count()).toBe(0);
+  });
+
+  /**
+   * Cada concepto es una serie INDEPENDIENTE de 999: dos tipos activos con el mismo dígito se
+   * repartirían la misma serie sin saberlo, y el generador propondría para uno un número que el
+   * otro ya usó.
+   */
+  it('no deja repetir el dígito entre tipos ACTIVOS, y dice de quién es', async () => {
+    const sesion = sesionAdmin();
+    await crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 8 }, bd());
+    await expect(
+      crearTipoProducto(sesion, { nombre: 'Chaleco', digitoConcepto: 8 }, bd()),
+    ).rejects.toThrow(/ya es el concepto del tipo de producto "Chamarra"/);
+
+    // Editar otro tipo hacia un dígito tomado tampoco se puede.
+    const gorra = await crearTipoProducto(sesion, { nombre: 'Gorra', digitoConcepto: 9 }, bd());
+    await expect(
+      actualizarTipoProducto(sesion, { id: gorra.id, digitoConcepto: 8 }, bd()),
+    ).rejects.toThrow(ErrorConflicto);
+    // Y no se quedó a medias.
+    const tras = await cliente.tipoProducto.findUniqueOrThrow({ where: { id: gorra.id } });
+    expect(tras.digitoConcepto).toBe(9);
+  });
+
+  it('un tipo DESACTIVADO libera su dígito, y reactivarlo con el dígito ya tomado se rechaza', async () => {
+    const sesion = sesionAdmin();
+    const viejo = await crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 8 }, bd());
+    await desactivarTipoProducto(sesion, viejo.id, bd());
+
+    // Apagado ya no numera nada: el 8 queda libre para el tipo nuevo.
+    const nuevo = await crearTipoProducto(sesion, { nombre: 'Chaleco', digitoConcepto: 8 }, bd());
+    expect(nuevo.digitoConcepto).toBe(8);
+
+    // Pero encender el viejo partiría la serie 8 en dos, y el mensaje nombra al CULPABLE
+    // ("Chaleco"), no al tipo que se intenta encender.
+    //
+    // ⚠️ Esto ejercita la GUARDA DEL DOMINIO (`exigirDigitoLibre`), NO el `catch` de P2002 — el
+    // dominio se adelanta y la base nunca llega a quejarse. El `catch`, que es el que elige el
+    // mensaje cuando dos altas simultáneas se cuelan, tiene su propia prueba más abajo
+    // («el catch de P2002 culpa al constraint QUE chocó»). Decirlo importa: antes este comentario
+    // afirmaba cubrir el caso del `catch` y no lo cubría.
+    await expect(reactivarTipoProducto(sesion, viejo.id, bd())).rejects.toThrow(ErrorConflicto);
+    await expect(reactivarTipoProducto(sesion, viejo.id, bd())).rejects.toThrow(
+      /El dígito 8 ya es el concepto del tipo de producto "Chaleco"/,
+    );
+    const sigueApagado = await cliente.tipoProducto.findUniqueOrThrow({ where: { id: viejo.id } });
+    expect(sigueApagado.activo).toBe(false);
+  });
+
+  /**
+   * ⭐ EL `catch` DE P2002 CULPA AL CONSTRAINT QUE DE VERDAD CHOCÓ.
+   *
+   * `tipos_producto` tiene DOS únicos —el `nombre` y el índice parcial del `digito_concepto` entre
+   * activos— y el `catch` es quien decide el mensaje cuando la guarda del dominio no alcanza a
+   * adelantarse. Culpar siempre al nombre manda a corregir el campo equivocado.
+   *
+   * Se llega ahí con dos altas SIMULTÁNEAS: las dos leen antes de que la otra commitee, las dos
+   * pasan la guarda, y la que pierde choca contra la base. Es la única forma de ejercitar el
+   * `catch` — la guarda del dominio tapa cualquier intento secuencial.
+   */
+  it('el catch de P2002 culpa al constraint QUE chocó: el DÍGITO cuando choca el dígito', async () => {
+    const sesion = sesionAdmin();
+    const resultados = await Promise.allSettled([
+      crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 8 }, bd()),
+      crearTipoProducto(sesion, { nombre: 'Chaleco', digitoConcepto: 8 }, bd()),
+    ]);
+
+    // Una gana y la otra cae: el índice parcial impide que las dos entren.
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const perdedora = resultados.find((r) => r.status === 'rejected');
+    expect(perdedora).toBeDefined();
+    // `find` con el predicado ya lo estrecha a `PromiseRejectedResult | undefined`: repetirlo con
+    // un `as` no cambia el tipo y el lint lo marca. El `toBeDefined()` de arriba es la red.
+    const razon = perdedora?.reason as Error;
+    expect(razon).toBeInstanceOf(ErrorConflicto);
+    // El mensaje habla del DÍGITO. Los nombres son distintos, así que un mensaje de nombre sería
+    // una mentira redonda: mandaría a cambiar un nombre que no chocó con nada.
+    expect(razon.message).toBe('Ese dígito de concepto ya es de otro tipo de producto activo.');
+    expect(razon.message).not.toMatch(/nombre/i);
+    // Y la base quedó con UNO solo.
+    expect(await cliente.tipoProducto.count()).toBe(1);
+  });
+
+  it('…y el NOMBRE cuando choca el nombre (la dirección simétrica)', async () => {
+    const sesion = sesionAdmin();
+    const resultados = await Promise.allSettled([
+      // Mismo nombre, dígitos DISTINTOS: lo único que puede chocar es el nombre.
+      crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 8 }, bd()),
+      crearTipoProducto(sesion, { nombre: 'Chamarra', digitoConcepto: 9 }, bd()),
+    ]);
+
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const razon = (resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult)
+      .reason as Error;
+    expect(razon).toBeInstanceOf(ErrorConflicto);
+    expect(razon.message).toBe('Ya existe un tipo de producto llamado "Chamarra".');
+    expect(razon.message).not.toMatch(/dígito/i);
+    expect(await cliente.tipoProducto.count()).toBe(1);
   });
 
   it('rechaza nombre duplicado (insensible a mayúsculas)', async () => {

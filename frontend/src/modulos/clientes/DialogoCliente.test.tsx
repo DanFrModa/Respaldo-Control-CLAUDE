@@ -22,6 +22,7 @@ function clienteEjemplo(sobre: Partial<Cliente> = {}): Cliente {
   return {
     id: 10,
     nombre: 'Liverpool',
+    abreviatura: null,
     razonSocial: null,
     contacto: null,
     telefono: null,

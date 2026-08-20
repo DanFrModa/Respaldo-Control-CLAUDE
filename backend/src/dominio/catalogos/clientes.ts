@@ -109,6 +109,30 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
   }
 }
 
+/**
+ * Unicidad de la ABREVIATURA (§Post-F9.34): dos clientes no pueden compartir el `CYA`, porque el
+ * código de desarrollo dejaría de decir de quién es. Insensible a mayúsculas (el esquema ya la
+ * sube, pero un dato viejo podría no estarlo). Vacía/`null` no se valida: no reserva nada.
+ */
+async function exigirAbreviaturaLibre(
+  tx: Tx,
+  abreviatura: string,
+  idActual?: number,
+): Promise<void> {
+  const existente = await tx.cliente.findFirst({
+    where: {
+      abreviatura: { equals: abreviatura, mode: 'insensitive' },
+      ...(idActual === undefined ? {} : { id: { not: idActual } }),
+    },
+    select: { nombre: true },
+  });
+  if (existente !== null) {
+    throw new ErrorConflicto(
+      `La abreviatura "${abreviatura}" ya es del cliente "${existente.nombre}".`,
+    );
+  }
+}
+
 /** Busca un cliente por id o lanza `ErrorNoEncontrado`. */
 async function exigirCliente(tx: Tx, id: number): Promise<Cliente> {
   const cliente = await tx.cliente.findUnique({ where: { id } });
@@ -136,6 +160,7 @@ async function exigirClienteActivo(tx: Tx, id: number): Promise<Cliente> {
 /** Campos de texto editables del cliente (clave del payload === clave del modelo). Incluye el `rfc`
  * fiscal (F9-E4). El `diasCredito` (numérico) se maneja aparte en {@link aplicarContactoEditar}. */
 const CAMPOS_CONTACTO_EDITABLES = [
+  'abreviatura',
   'razonSocial',
   'contacto',
   'telefono',
@@ -188,6 +213,9 @@ function datosContactoCrear(
   datos: z.output<typeof esquemaClienteCrear>,
 ): Partial<Prisma.ClienteCreateInput> {
   const data: Partial<Prisma.ClienteCreateInput> = {};
+  // Abreviatura (§Post-F9.34): vacía se omite (queda null); con valor, ya viene en MAYÚSCULAS.
+  if (datos.abreviatura !== undefined && datos.abreviatura !== '')
+    data.abreviatura = datos.abreviatura;
   // Razón social (nombre legal): vacío ('') se omite (queda null); con valor, tal cual.
   if (datos.razonSocial !== undefined && datos.razonSocial !== '')
     data.razonSocial = datos.razonSocial;
@@ -253,6 +281,9 @@ export async function crearCliente(
   try {
     return await enTransaccion(async (tx) => {
       await exigirNombreLibre(tx, datos.nombre);
+      if (datos.abreviatura !== undefined && datos.abreviatura !== '') {
+        await exigirAbreviaturaLibre(tx, datos.abreviatura);
+      }
 
       const cliente = await tx.cliente.create({
         data: {
@@ -323,6 +354,17 @@ export async function actualizarCliente(
         await exigirNombreLibre(tx, datos.nombre ?? actual.nombre, datos.id);
       } else if (reactiva) {
         await exigirNombreLibre(tx, actual.nombre, datos.id);
+      }
+      // La abreviatura sólo se valida si de verdad CAMBIA a un valor no vacío (§Post-F9.34).
+      // Se lee del payload YA VALIDADO (`datos`), no del `update` de Prisma: ahí el valor puede
+      // venir envuelto (`{ set: … }`) y stringificarlo daría "[object Object]".
+      if (
+        detalleContacto.abreviatura !== undefined &&
+        datos.abreviatura !== undefined &&
+        datos.abreviatura !== null &&
+        datos.abreviatura !== ''
+      ) {
+        await exigirAbreviaturaLibre(tx, datos.abreviatura, datos.id);
       }
 
       const huboCambio =

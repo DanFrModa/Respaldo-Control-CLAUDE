@@ -1880,6 +1880,191 @@ nace en `false` y las columnas nuevas en NULL).
 
 ---
 
+## V1-E3n · Modelos de DESARROLLO vs. de PRODUCCIÓN ⭐ (20-ago-2026)
+
+> Daniel, probando: *"se supone que tenemos modelos de desarrollo y modelos de producción. En la última OP
+> que hice de pruebas (la 5558) heredó el modelo de desarrollo. Creo que habíamos acordado que el sistema
+> iba a proponer un modelo de producción y yo solo lo confirmaría. Pero el modelo que quedó en la OP es el
+> de desarrollo."*
+
+**Tenía razón, y la explicación es que la decisión existía y NUNCA SE CONSTRUYÓ.** `DECISIONES.md`
+**§Post-F9.34** (12-ago) la cerró entera y terminaba con *"Aplica en: **NADA todavía** — es decisión de
+rumbo"*; **§Post-F9.46** (15-ago) la corrigió en un punto (el nº de producción **sí se precarga**), y
+**§Post-F9.83** (20-ago) cerró la última duda: *"el concepto y género van FIJOS y los consecutivos
+disponibles son los otros 3"*.
+
+### Qué entrega
+
+1. **La marca y la numeración se separan; la TABLA no.** `Modelo.origen` (`desarrollo` | `produccion`) +
+   `Modelo.codigoDesarrollo`. Un modelo de desarrollo necesita lo mismo que uno de producción (BOM, arte,
+   fotos, precosteo), así que duplicar la entidad habría duplicado todo eso.
+2. **`Cliente.abreviatura`** — el `CYA` del código, único entre clientes. No existía.
+3. **Serie propia de desarrollo `CYA-26-71-001`**, armada ENTERA por el sistema (cliente + año de ENTREGA
+   + concepto/género + consecutivo por secuencia atómica **global**), que **no consume** consecutivo de
+   producción. El código se **congela** al nacer.
+4. **«Pasar a producción»** desde el catálogo **y** desde «Generar OP»: el campo llega **precargado** con
+   el siguiente libre y **es editable** (§Post-F9.46). Repetido **bloquea**; dígitos que no cuadran y serie
+   cerca del tope **avisan**.
+5. **Catálogo y galería enseñan PRODUCCIÓN por default**, con desarrollo detrás de un filtro; el modelo
+   promovido **conserva su nº de desarrollo** y los DOS son buscables (D3).
+6. **Los dígitos son DATOS**, no constantes: `TipoProducto.digitoConcepto` y
+   `Genero.digitoNomenclatura`/`digitoAlterno` (la continuación Caballero 1→5), sembrados con la tabla de
+   Daniel de 2014.
+
+### ⭐ Lo que la medición cambió: el consecutivo NO puede salir de una secuencia
+
+A3 manda folios por secuencia atómica, y el de **desarrollo** lo cumple al pie de la letra (serie nueva,
+arranca en 1, nadie más escribe: `secuencias_globales` + `siguienteFolioGlobal`). El de **producción no
+puede**, y esto se midió sobre los 4,987 modelos del Access: el par `51` tiene **535 usados de 999 y el
+999 YA OCUPADO**; igual `20`, `30`, `39`, `73`, `74`. Una secuencia —que sólo sabe avanzar— propondría
+`1000`, que no existe como modelo, y dejaría 464 números libres inalcanzables.
+
+La propuesta es por eso **el hueco libre más bajo del par**, calculada dentro de un
+`pg_advisory_xact_lock` del par (namespace 20_546): dentro del lock, elegir el hueco y escribirlo son un
+solo hecho serializado, y el `@unique` de `codigo`/`numeroProduccion` queda de última red. Misma garantía
+que la secuencia —nunca dos modelos con el mismo número— sobre una serie que la secuencia no modela.
+
+### La redefinición que hubo que hacer, dicha en voz alta
+
+`Modelo.numeroProduccion` **existía** desde el rediseño R3/B4, pero guardaba un consecutivo **global sin
+significado** (`numero_produccion_seq`: 1, 2, 3…) que se minteaba solo al generar la primera OP — sin
+cambiar el código del modelo ni sacarlo del catálogo de desarrollo. **Ése era el bug que Daniel vio.** La
+migración la redefine como el entero de 5 dígitos y la rellena desde el código (`^\d{5}$`): 4,702 de los
+4,987 migrados lo cumplen; los otros 285 (`51783a`, `71240-1`, `M-18`) se quedan en NULL a propósito y no
+ocupan consecutivo. Los valores viejos se limpian, **no en silencio**: cada minteo quedó en la `bitacora`
+(`Orden`/`OTRO`/`datos.numeroProduccion`) y el módulo sólo había corrido en `prueba`.
+
+### Ronda de corrección: tres caminos que la etapa dejaba rotos
+
+El reviewer aprobó el motor —incluida la desviación de A3, que **probó en vivo**: 20 promociones
+concurrentes dan 20 números distintos con el lock y 2 éxitos + 18 conflictos sin él— y rechazó por lo que
+la etapa dejaba **inalcanzable**:
+
+1. **Faltaban dos conceptos de Daniel y el dígito no se podía capturar.** El seed traía 6 tipos con
+   dígito y `Ropa interior` sin él; **faltaban Chamarra (8) y Gorra (9)** — 356 y 73 modelos en el Access,
+   el **9 % del catálogo**. Y aunque `TipoProducto` tiene CRUD, sus esquemas no llevaban el campo: el
+   combo de «modelo nuevo» ofrecía los tipos sin dígito y el alta reventaba con *"captúralo en su
+   catálogo"* → **una pantalla que no tenía el campo**. Se cierra con `digitoConcepto` de punta a punta
+   (contrato + dominio + ruta + diálogo + lista), Chamarra y Gorra sembradas **en el seed y en la
+   migración**, el dígito **único entre tipos activos** (dominio + índice único parcial: dos conceptos
+   con el mismo dígito se repartirían la misma serie de 999), y el combo enseñando **deshabilitados** los
+   tipos sin dígito en vez de dejar que fallen al enviar.
+2. **El default `origen: 'produccion'` escondía los modelos de desarrollo de 4 buscadores más.** El
+   criterio *"se NAVEGA vs. se TECLEA"* estaba bien, pero aplicado a 1 de 5 llamadas: faltaban el buscador
+   del **pre-costo** (precostear un modelo de desarrollo es el corazón de D13), la **liga manual** del
+   importador de OC por PDF, **copiar receta** y —el más grave— el **combo del renglón del pedido**, que
+   dejaba *inalcanzable por captura manual el camino que esta misma etapa construye*.
+3. **El lock que sustituye a A3 no tenía una sola prueba.** Volverlo un no-op dejaba 40/40 en verde.
+   Ahora hay dos pruebas de concurrencia (`Promise.all` de 20 promociones del mismo par → 20 números
+   distintos y consecutivos, sin fallos; y 3 simultáneas sobre una serie hueca → rellenan 002/004/005),
+   y mutar el lock a `SELECT 1` **las tira**.
+
+En una segunda vuelta corta salieron tres remates más, y el primero vale como lección: **un comentario
+que promete una cobertura que no existe.** La prueba del dígito repetido decía protegernos de que el
+`catch` de P2002 *"culpara al nombre"*, pero pasaba por la **guarda del dominio** — mutar
+`mensajeDeUnicidad` dejaba 37/37 en verde. Es el vicio de la tanda («el título afirma identidad, el
+cuerpo comprueba presencia») mudado a la **justificación**. Se cerró con dos altas SIMULTÁNEAS del
+mismo dígito —la única forma de llegar al `catch`, porque la guarda tapa cualquier intento
+secuencial— más la simétrica del nombre, y el comentario ahora dice exactamente qué ejercita y qué no.
+Los otros dos: las **cifras de las pruebas**, mal por segunda vez y contradiciéndose entre tres
+documentos, y **media línea de despliegue** sobre el `ON CONFLICT` del alta de Chamarra/Gorra.
+
+### Nota de cierre — ✅ HECHA (20-ago-2026)
+
+**Tres vueltas: dos RECHAZADAS y la tercera APROBADA.**
+
+**⭐ El hallazgo que corrige lo que Daniel reportó, y no era lo que parecía.** Yo le dije que la decisión
+*"estaba decidida y sin construir"* —cierto, pero incompleto—. La causa real: `Modelo.numeroProduccion`
+**sí existía**, pero guardaba un consecutivo **global y sin significado** (1, 2, 3…) que se minteaba al
+generar la OP **sin cambiar el código del modelo ni sacarlo del catálogo de desarrollo**. El sistema creía
+promover y no hacía nada visible. Eso es exactamente lo que vio en la 5558.
+
+**⭐ Y el hallazgo que solo aparece MIDIENDO, no razonando:** sobre los 4,987 modelos del Access, el par
+`51` tiene **535 usados de 999 y el 999 YA ocupado** (igual `20`, `30`, `39`, `73`, `74`). Una secuencia
+—que solo avanza— propondría **1000**, que no existe como modelo, dejando **464 huecos inalcanzables**. Por
+eso el consecutivo de producción sale del **hueco libre más bajo** bajo `pg_advisory_xact_lock` del par, y
+**no** de una secuencia. Es una desviación de **A3** y tiene su **ADR-0018**, con la tabla de dónde SÍ y
+dónde NO aplica la excepción. *El reviewer la aprobó probándola en vivo: 20 promociones concurrentes del
+mismo par → 20 números distintos; sin el lock, 2 éxitos y 18 conflictos.* Y **reprodujo cada cifra** de la
+medición contra el CSV: 4,987 / 4,702 / 285 / 61 pares / `{20,30,39,51,73,74}`. Exacta.
+
+**🔴 Lo que valió el primer rechazo: la etapa dejaba rotos caminos que ella misma necesitaba.**
+
+1. **Un callejón sin salida.** Faltaban los conceptos **8 (Chamarra)** y **9 (Gorra)** —**429 modelos, el
+   9 % del catálogo real**— y `digitoConcepto` **no se podía capturar por ninguna pantalla**. El combo
+   ofrecía tipos sin dígito y al enviar el sistema decía *"captúralo en su catálogo"*: **mandaba a una
+   pantalla que no existía**. Se cerró de verdad —no solo permitiendo capturarlo, sino **deshabilitando
+   con su motivo** los tipos sin dígito (§Post-F9.68: se ve, no se usa)—.
+2. **Una regresión de la propia etapa.** El default `origen: 'produccion'` **escondía los modelos de
+   desarrollo de cuatro buscadores**, entre ellos el del **pre-costo** (el corazón de D13) y el combo del
+   renglón del pedido — *sin ese último, «generar OP promueve el modelo» era inalcanzable por captura
+   manual*. Lo notable: el coder **tenía el criterio correcto y lo escribió** (*"se NAVEGA vs. se TECLEA"*)
+   pero lo aplicó en **1 de 5** llamadas.
+3. **El lock que sustituye a A3 no tenía una sola prueba**: mutarlo a no-op dejaba **40/40 en verde**.
+
+**⚠️ Y el remate final es la lección de la tanda mudada de sitio: un comentario que promete una cobertura
+que no existe.** Los comentarios de `calidad.int.test.ts` afirmaban que esa prueba protegía el `catch` de
+P2002 (*"culpar al nombre mandaría a corregir el campo equivocado"*), pero la prueba pasaba por la **guarda
+del dominio** — mutar el mensaje para que culpara siempre al nombre dejaba **37/37 en verde**. *El vicio ya
+no está en el título de la prueba sino en su justificación, que es donde nadie lo busca.* Se cerró con dos
+pruebas de `Promise.allSettled` que sí entran al `catch`, cada una asertando el mensaje exacto **y que no
+menciona el otro campo**.
+
+**Dos cicatrices que se repitieron, ahora del lado de quien revisa:**
+
+- El bucle de mutación **del reviewer** murió con el reinicio del contenedor **entre mutar y restaurar** y
+  dejó `PreCostoPagina.tsx` con el valor volteado — *justo el que hace desaparecer los modelos de
+  desarrollo del pre-costo*. Lo reparó y lo dijo. 🔴 **Y lo que lo vuelve importante: el barrido de
+  residuos NO puede cazarlo** — no es basura, es **un valor válido cambiado por otro válido** dentro de un
+  archivo que ya estaba modificado. `grep` de `if (false)`/`// MUT`/`.only` pasa limpio. Al recuperar un
+  agente muerto hay que **mirar el `git diff` de lo que tocó**, no solo buscar marcas.
+- **Las cifras de la ficha salieron mal DOS veces** —y la segunda se contradecían entre tres documentos—.
+  Regla que queda: *las cifras se copian de la salida `Tests N passed`, archivo por archivo, nunca de
+  memoria ni contando `it(`*.
+- 🔴 **Y la tercera, al ir a comitear: el coder reportó «los ocho comandos en 0» y `npm run lint` del
+  backend estaba en ROJO** —`no-unnecessary-type-assertion` en `calidad.int.test.ts:245`, o sea **dentro
+  del remate que acababa de escribir**—. Lo cazó el lead corriendo los gates antes del commit; de haber
+  ido tal cual, el CI se caía. *La lección no es «valida con los `npm run`» —eso ya estaba escrito— sino
+  la de al lado: **el reporte final se emite DESPUÉS de la última edición, no antes**. Quien remata
+  vuelve a correr los ocho, aunque el remate «no toque lógica».* Se cerró quitando el `as` (el `find`
+  con predicado ya estrecha el tipo) y re-corriendo lint/typecheck/format en verde.
+
+- **Migración** `20260820160000_modelos_desarrollo_vs_produccion`, validada con `prisma migrate diff`
+  contra un Postgres nativo. Aditiva salvo la redefinición de arriba. Trae un **CHECK** (un modelo de
+  desarrollo no puede tener nº de producción) y un **índice único parcial** del `digito_concepto` entre
+  tipos activos. **Sin permisos nuevos**; el seed sí cambia (dígitos de géneros y tipos de producto) →
+  el deploy a `prueba` quiere `SEED_ON_START=true`, aunque la migración ya siembra los dígitos de los
+  catálogos existentes por nombre.
+  ⚠️ **Un detalle del despliegue:** el alta de *Chamarra* y *Gorra* va con `ON CONFLICT ("nombre") DO
+  NOTHING`, así que **si `prueba` ya tiene un tipo con ese nombre capturado a mano, la migración lo
+  salta y ese tipo se queda SIN dígito**. No corrompe nada —el generador lo dirá con su nombre en vez
+  de inventar un número— y `SEED_ON_START=true` se lo pone; si no, se captura desde
+  Calidad › Tipos de producto.
+- **Backend:** `dominio/modelos/nomenclatura.ts` (motor completo), `pasarModeloAProduccion`,
+  `crearDesarrolloConModeloNuevo` (una sola transacción), `salidaAProduccion` promoviendo de verdad,
+  filtro de origen + búsqueda por los dos códigos, `siguienteFolioGlobal` en `comun/secuencias.ts`.
+  Endpoints nuevos: `GET /api/modelos/:id/propuesta-produccion`,
+  `POST /api/modelos/:id/pasar-a-produccion`, `POST /api/proyectos/:id/desarrollos/modelo-nuevo`.
+- **Frontend:** abreviatura en el cliente, chips de origen + segundo código + acción «Pasar a producción»
+  en el catálogo, filtro de origen en la galería, campo precargado en «Generar OP», y el alta de
+  desarrollo que **ya no pide el código**.
+- **Pruebas** *(cifras copiadas de la salida de cada corrida, archivo por archivo — la cuenta se
+  equivocó dos veces antes)*: **13** unit de las reglas puras · **43** de integración del motor
+  (`nomenclatura.int.test.ts`: hueco libre, encadenamiento Caballero 1→5, tope, promoción,
+  no-regresión de receta/arte/fotos/órdenes, minteo del código de desarrollo, unicidad cruzada de los
+  dos códigos, filtro y búsqueda, A9 y permisos, chamarra/gorra de punta a punta, y **2 de
+  CONCURRENCIA del lock**) · **12** de la salida a producción · **8** agregadas al de Calidad (el seed
+  real de los nueve conceptos, el dígito y **las dos direcciones del `catch` de P2002**) ·
+  **27** de front (**20** en cuatro archivos nuevos —`DialogoPasarAProduccion` 6, `PanelGenerarOP` 4,
+  `DialogoTipoProducto` 5, `origen-buscadores` 5— y 7 agregadas a los existentes). La integración se
+  corrió aquí contra **Postgres nativo** —138 archivos / 2068 pruebas—, no se dejó al CI.
+- **Queda fuera (dicho, no callado):** no se agregó e2e de la promoción, y el dígito de NOMENCLATURA del
+  GÉNERO sigue sin pantalla (el del tipo de producto sí la tiene desde la ronda de corrección; `Genero`
+  es un catálogo selector sin ABM desde F1 y abrirle uno excede la etapa — un género nuevo nace sin
+  dígito y el motor lo dice **con su nombre** en vez de inventarlo).
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

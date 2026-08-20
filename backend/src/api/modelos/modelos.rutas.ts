@@ -58,6 +58,9 @@ import {
   esquemaModeloSalida,
   esquemaModelosPagina,
   esquemaModelosQuery,
+  esquemaPasarAProduccionCuerpo,
+  esquemaPasarAProduccionSalida,
+  esquemaPropuestaProduccion,
 } from '../../contrato/esquemas/modelo.js';
 import type { Genero } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -68,8 +71,10 @@ import {
   descontinuarModelo,
   listarGeneros,
   listarModelos,
+  pasarModeloAProduccion,
   type ModeloConRelaciones,
 } from '../../dominio/modelos/modelos.js';
+import { consultarPropuestaProduccion } from '../../dominio/modelos/nomenclatura.js';
 import {
   copiarArteDeOtroModelo,
   crearArte,
@@ -112,6 +117,9 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
   return {
     id: modelo.id,
     codigo: modelo.codigo,
+    origen: modelo.origen,
+    codigoDesarrollo: modelo.codigoDesarrollo,
+    numeroProduccion: modelo.numeroProduccion,
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
@@ -488,6 +496,62 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aModeloBase(await descontinuarModelo(sesion, request.params.id));
+    },
+  });
+
+  // ── Propuesta de nº de producción (el campo llega YA LLENO, §Post-F9.46) ────
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/propuesta-produccion',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Consultar el nº de producción que el sistema propone para un modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaPropuestaProduccion, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const propuesta = await consultarPropuestaProduccion(sesion, request.params.id);
+      return {
+        numero: propuesta.numero,
+        codigo: propuesta.codigo,
+        serie: {
+          par: propuesta.serie.par,
+          libre: propuesta.serie.libre,
+          usados: propuesta.serie.usados,
+          libres: propuesta.serie.libres,
+        },
+        serieContinuada: propuesta.serieContinuada,
+        avisos: propuesta.avisos,
+        yaEnProduccion: propuesta.yaEnProduccion,
+      };
+    },
+  });
+
+  // ── Pasar a producción (asigna el nº de 5 dígitos; conserva el de desarrollo) ─
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/pasar-a-produccion',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Pasar un modelo de desarrollo al catálogo de producción',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaPasarAProduccionCuerpo,
+      response: { 200: esquemaPasarAProduccionSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const promovido = await pasarModeloAProduccion(sesion, request.params.id, request.body);
+      return {
+        modelo: aModeloBase(promovido.modelo),
+        numeroProduccion: promovido.numeroProduccion,
+        numeroCapturado: promovido.numeroCapturado,
+        avisos: promovido.avisos,
+      };
     },
   });
 

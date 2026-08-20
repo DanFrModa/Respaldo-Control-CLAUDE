@@ -41,6 +41,15 @@ const esquemaClienteFormulario = z.object({
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
+  // Abreviatura (§Post-F9.34): el "CYA" del código de desarrollo. Vacía = sin capturar; con
+  // valor, 2–6 letras/dígitos en MAYÚSCULAS (el backend re-valida y exige que sea única, A1).
+  abreviatura: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((v) => v === '' || /^[A-Z0-9]{2,6}$/.test(v), {
+      error: 'La abreviatura debe tener de 2 a 6 letras o dígitos, sin espacios',
+    }),
   razonSocial: z
     .string()
     .trim()
@@ -83,6 +92,7 @@ type DatosClienteFormulario = z.infer<typeof esquemaClienteFormulario>;
 /** Valores por defecto de un alta: todos los campos vacíos. */
 const VALORES_INICIALES: DatosClienteFormulario = {
   nombre: '',
+  abreviatura: '',
   razonSocial: '',
   contacto: '',
   telefono: '',
@@ -159,6 +169,7 @@ export function DialogoCliente({
     if (cliente) {
       formulario.reset({
         nombre: cliente.nombre,
+        abreviatura: texto(cliente.abreviatura),
         razonSocial: texto(cliente.razonSocial),
         contacto: texto(cliente.contacto),
         telefono: texto(cliente.telefono),
@@ -200,6 +211,7 @@ export function DialogoCliente({
       // Edición: los opcionales vacíos viajan como `null` para BORRARLOS (M1).
       const cuerpo: ClienteEditar = {
         nombre: datos.nombre,
+        abreviatura: textoONull(datos.abreviatura),
         razonSocial: textoONull(datos.razonSocial),
         contacto: textoONull(datos.contacto),
         telefono: textoONull(datos.telefono),
@@ -223,6 +235,7 @@ export function DialogoCliente({
 
     // Alta: los opcionales vacíos se OMITEN (el backend los deja en null).
     const cuerpo: ClienteCrear = { nombre: datos.nombre };
+    if (datos.abreviatura.length > 0) cuerpo.abreviatura = datos.abreviatura;
     if (datos.razonSocial.length > 0) cuerpo.razonSocial = datos.razonSocial;
     if (datos.contacto.length > 0) cuerpo.contacto = datos.contacto;
     if (datos.telefono.length > 0) cuerpo.telefono = datos.telefono;
@@ -276,6 +289,25 @@ export function DialogoCliente({
                     {...registrar('nombre')}
                   />
                   <FieldError errors={[errors.nombre]} />
+                </Field>
+
+                <Field data-invalid={Boolean(errors.abreviatura)}>
+                  <FieldLabel htmlFor="cliente-abreviatura">Abreviatura</FieldLabel>
+                  <Input
+                    id="cliente-abreviatura"
+                    placeholder="Ej. CYA"
+                    maxLength={6}
+                    className="uppercase"
+                    aria-invalid={Boolean(errors.abreviatura)}
+                    disabled={guardando}
+                    {...registrar('abreviatura')}
+                  />
+                  <FieldDescription>
+                    Las 2 a 6 letras con las que arranca el nº de DESARROLLO de sus modelos
+                    (CYA-26-71-001). Sin ella no se le pueden dar de alta modelos nuevos de
+                    desarrollo.
+                  </FieldDescription>
+                  <FieldError errors={[errors.abreviatura]} />
                 </Field>
 
                 <Field data-invalid={Boolean(errors.razonSocial)}>

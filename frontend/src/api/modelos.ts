@@ -70,6 +70,16 @@ export type TipoFotoModelo = ModeloFoto['tipo'];
 export type ModeloFotoEditar =
   paths['/api/modelos/{id}/fotos/{idFoto}']['patch']['requestBody']['content']['application/json'];
 
+/** Propuesta de nº de producción de un modelo (`GET /api/modelos/{id}/propuesta-produccion`). */
+export type PropuestaProduccion =
+  paths['/api/modelos/{id}/propuesta-produccion']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de «pasar a producción» (`POST /api/modelos/{id}/pasar-a-produccion`). */
+export type PasarAProduccionCuerpo =
+  paths['/api/modelos/{id}/pasar-a-produccion']['post']['requestBody']['content']['application/json'];
+/** Resultado de «pasar a producción». */
+export type PasarAProduccionResultado =
+  paths['/api/modelos/{id}/pasar-a-produccion']['post']['responses']['200']['content']['application/json'];
+
 /** Un género del catálogo selector (`GET /api/generos`). */
 export type GenerosLista =
   paths['/api/generos']['get']['responses']['200']['content']['application/json'];
@@ -206,6 +216,71 @@ export function useReactivarModelo(): UseMutationResult<Modelo, ErrorDeApi, numb
   return useMutation({
     mutationFn: reactivarModelo,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS }),
+  });
+}
+
+// ── Pasar a producción (§Post-F9.34 / §Post-F9.46) ─────────────────────────────
+
+async function obtenerPropuestaProduccion(id: number): Promise<PropuestaProduccion> {
+  const { data, error } = await api.GET('/api/modelos/{id}/propuesta-produccion', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lee el nº de producción que el sistema PROPONE para un modelo, con sus avisos. La pantalla lo
+ * usa para llegar con el campo ya lleno (§Post-F9.46); el usuario lo puede cambiar.
+ */
+export function usePropuestaProduccion(
+  id: number | undefined,
+): UseQueryResult<PropuestaProduccion, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MODELOS, 'propuesta-produccion', id ?? 0],
+    queryFn: () => obtenerPropuestaProduccion(id as number),
+    enabled: id !== undefined,
+    // La ocupación de la serie cambia con cada promoción: no se cachea entre aperturas.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/** Argumentos de «pasar a producción». */
+export interface ArgsPasarAProduccion {
+  id: number;
+  cuerpo: PasarAProduccionCuerpo;
+}
+
+async function pasarAProduccion(
+  id: number,
+  cuerpo: PasarAProduccionCuerpo,
+): Promise<PasarAProduccionResultado> {
+  const { data, error } = await api.POST('/api/modelos/{id}/pasar-a-produccion', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Pasa un modelo de desarrollo a producción e invalida la lista y su ficha. */
+export function usePasarAProduccion(): UseMutationResult<
+  PasarAProduccionResultado,
+  ErrorDeApi,
+  ArgsPasarAProduccion
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsPasarAProduccion) => pasarAProduccion(id, cuerpo),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
   });
 }
 

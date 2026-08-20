@@ -76,11 +76,15 @@ vi.mock('@/api/clientes', () => ({
     isFetching: false,
   }),
 }));
+let queryModelos: Record<string, unknown> | undefined;
 vi.mock('@/api/modelos', () => ({
-  useModelos: () => ({
-    data: { datos: [{ id: 42, codigo: 'DEV-1', descripcion: 'Playera' }] },
-    isFetching: false,
-  }),
+  useModelos: (query: Record<string, unknown>) => {
+    queryModelos = query;
+    return {
+      data: { datos: [{ id: 42, codigo: 'DEV-1', descripcion: 'Playera' }] },
+      isFetching: false,
+    };
+  },
 }));
 vi.mock('@/api/importacion-pedido', () => ({
   archivoABase64: vi.fn(() => Promise.resolve('QkFTRTY0')),
@@ -276,6 +280,16 @@ describe('ImportadorPedidoPdf', () => {
     toastErrorMock.mockReset();
     plantillaMock.mockReset();
     plantillaMock.mockReturnValue({ data: undefined, isFetching: false });
+  });
+
+  /**
+   * V1-E3n: la liga MANUAL de la vista previa busca modelos por texto. La primera OC de un modelo
+   * que sigue en DESARROLLO es exactamente el caso que hay que poder ligar, y el default del API
+   * (`produccion`) lo escondería.
+   */
+  it('el buscador de la liga manual pide los DOS catálogos (origen: todos)', async () => {
+    await irAVistaPrevia();
+    expect(queryModelos?.origen).toBe('todos');
   });
 
   it('la vista previa muestra el PDF con su liga aprendida, color y talla nuevos', async () => {

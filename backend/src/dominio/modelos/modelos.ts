@@ -45,6 +45,12 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { cantidadDeBase, cantidadesDeOrdenes } from '../costos/cantidades.js';
 import { redondear2 } from '../costos/decimales.js';
 import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
+import {
+  esquemaNumeroProduccion,
+  numeroProduccionDeCodigo,
+  promoverAProduccionNucleo,
+  type ResultadoPromocion,
+} from './nomenclatura.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
@@ -101,6 +107,12 @@ const esquemaListarModelosDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   /** Filtra por temporada. */
   idTemporada: z.number().int().positive().optional(),
+  /**
+   * Filtro de ORIGEN (§Post-F9.34, V1-E3n). Default `produccion`: Daniel pidió que el catálogo NO
+   * se llene con los modelos de desarrollo que nunca salen. `desarrollo` los enseña solos y
+   * `todos` no filtra.
+   */
+  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('produccion'),
   /** Por omisión solo activos; `true` muestra también los descontinuados. */
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
@@ -115,20 +127,33 @@ export type ParametrosListarModelos = z.input<typeof esquemaListarModelosDominio
  * sin importar mayúsculas. Se valida DENTRO de la transacción; la carrera residual la captura
  * el unique de la base (P2002 → `ErrorConflicto`). El mensaje distingue si el existente está
  * activo o descontinuado (invita a reactivar).
+ *
+ * ⚠️ Desde V1-E3n un modelo puede tener DOS números (`codigo` vigente + `codigoDesarrollo`
+ * conservado, §Post-F9.34 punto 5) y **los dos son buscables**. La base los guarda en columnas
+ * distintas, así que sus `@unique` NO impiden que el `codigo` de un modelo choque con el
+ * `codigoDesarrollo` de otro — y ahí una búsqueda por ese texto devolvería dos modelos sin manera
+ * de saber cuál es cuál. Por eso la comprobación mira las DOS columnas.
  */
 async function exigirCodigoLibre(tx: Tx, codigo: string, idActual?: number): Promise<void> {
   const existente = await tx.modelo.findFirst({
     where: {
-      codigo: { equals: codigo, mode: 'insensitive' },
+      OR: [
+        { codigo: { equals: codigo, mode: 'insensitive' } },
+        { codigoDesarrollo: { equals: codigo, mode: 'insensitive' } },
+      ],
       ...(idActual === undefined ? {} : { id: { not: idActual } }),
     },
-    select: { id: true, activo: true },
+    select: { id: true, activo: true, codigo: true, codigoDesarrollo: true },
   });
   if (existente !== null) {
+    const esDeDesarrollo = existente.codigo.toLowerCase() !== codigo.toLowerCase();
+    const donde = esDeDesarrollo
+      ? ` (es el nº de desarrollo del modelo "${existente.codigo}")`
+      : '';
     throw new ErrorConflicto(
       existente.activo
-        ? `Ya existe un modelo con el código "${codigo}".`
-        : `Ya existe un modelo con el código "${codigo}" (está descontinuado; puedes reactivarlo).`,
+        ? `Ya existe un modelo con el código "${codigo}"${donde}.`
+        : `Ya existe un modelo con el código "${codigo}"${donde} (está descontinuado; puedes reactivarlo).`,
     );
   }
 }
@@ -451,6 +476,10 @@ export async function crearModelo(
       const modelo = await tx.modelo.create({
         data: {
           codigo: datos.codigo,
+          // Un modelo dado de alta aquí nace en PRODUCCIÓN (el default de la columna) y su código
+          // ES su nº de producción cuando tiene la forma de 5 dígitos. Se deriva para que OCUPE su
+          // consecutivo: si no, el generador propondría un número que este modelo ya usa.
+          numeroProduccion: numeroProduccionDeCodigo(datos.codigo),
           ...datosOpcionalesCrear(datos),
           ...datosCreacion(sesion),
         },
@@ -504,6 +533,11 @@ export async function actualizarModelo(
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);
       if (cambiaCodigo && datos.codigo !== undefined) {
         cambios.codigo = datos.codigo;
+        // El nº de producción sigue al código: renombrar un modelo a `71005` lo hace ocupar ese
+        // consecutivo, y sacarlo de la forma de 5 dígitos lo libera. En un modelo de DESARROLLO
+        // se queda en null (lo exige el CHECK de la base; su número lo estrena la promoción).
+        cambios.numeroProduccion =
+          actual.origen === 'desarrollo' ? null : numeroProduccionDeCodigo(datos.codigo);
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
@@ -642,6 +676,55 @@ export async function reactivarModelo(
   }, bd);
 }
 
+/** Resultado de «pasar a producción»: el modelo ya promovido + el detalle de la promoción. */
+export interface ModeloPromovido extends ResultadoPromocion {
+  modelo: ModeloConRelaciones;
+}
+
+/**
+ * Pasa un modelo de DESARROLLO al catálogo de PRODUCCIÓN (§Post-F9.34 punto 4 / §Post-F9.46): le
+ * asigna el nº de 5 dígitos —el que propone el sistema, o el que capture Daniel— y lo saca del
+ * filtro de desarrollo. **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo
+ * lo que cuelga del modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada
+ * de eso apunta al código: apuntan al `id`, que no cambia.
+ *
+ * Todo en UNA transacción (A2) con el lock del par y la bitácora dentro (A7). El re-leído del
+ * modelo va en la MISMA transacción a propósito: así el llamador ve la promoción ya aplicada sin
+ * exigirle además `modelos.ver`.
+ */
+export async function pasarModeloAProduccion(
+  sesion: SesionUsuario,
+  id: number,
+  entrada: { numeroProduccion?: number | undefined } = {},
+  bd?: ContextoBd,
+): Promise<ModeloPromovido> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  const numero =
+    entrada.numeroProduccion === undefined
+      ? undefined
+      : esquemaNumeroProduccion.parse(entrada.numeroProduccion);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      const resultado = await promoverAProduccionNucleo(tx, sesion, id, numero);
+      const modelo = await tx.modelo.findUniqueOrThrow({
+        where: { id },
+        include: incluirRelacionesModelo,
+      });
+      return { ...resultado, modelo };
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      // Carrera residual contra otra promoción del mismo número (el lock cubre el par del
+      // catálogo; un número capturado de OTRO par se sale de él). Mensaje claro, no P2002 crudo.
+      throw new ErrorConflicto('Ese número de producción ya está ocupado por otro modelo.', {
+        causa: error,
+      });
+    }
+    throw error;
+  }
+}
+
 /** Obtiene un modelo por id (datos generales + relaciones + conteo de fotos), o lanza `ErrorNoEncontrado`. */
 export async function obtenerModelo(
   sesion: SesionUsuario,
@@ -678,12 +761,17 @@ export async function listarModelos(
 
   const where: Prisma.ModeloWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
+    // El filtro de origen es lo que separa los dos catálogos (§Post-F9.34 punto 2).
+    ...(filtros.origen === 'todos' ? {} : { origen: filtros.origen }),
     ...(filtros.idTemporada === undefined ? {} : { idTemporada: filtros.idTemporada }),
     ...(filtros.busqueda === undefined || filtros.busqueda === ''
       ? {}
       : {
           OR: [
             { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
+            // Un modelo promovido tiene DOS números y los DOS son buscables (§Post-F9.34 punto 5):
+            // buscar por su viejo `CYA-26-71-001` lo encuentra aunque hoy se llame `71001`.
+            { codigoDesarrollo: { contains: filtros.busqueda, mode: 'insensitive' } },
             { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
           ],
         }),

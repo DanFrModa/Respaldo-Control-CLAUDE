@@ -27,6 +27,9 @@ export type EstadoDesarrollo = Desarrollo['estado'];
 /** Cuerpo de alta de un desarrollo (`POST /api/proyectos/{idProyecto}/desarrollos`). */
 export type DesarrolloCrear =
   paths['/api/proyectos/{idProyecto}/desarrollos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta con MODELO NUEVO (`POST /api/proyectos/{idProyecto}/desarrollos/modelo-nuevo`). */
+export type DesarrolloModeloNuevo =
+  paths['/api/proyectos/{idProyecto}/desarrollos/modelo-nuevo']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de apagar un desarrollo (`POST /api/desarrollos/{id}/apagar`). */
 export type DesarrolloApagar =
   paths['/api/desarrollos/{id}/apagar']['post']['requestBody']['content']['application/json'];
@@ -95,6 +98,45 @@ export function useCrearDesarrollo(): UseMutationResult<
   return useMutation({
     mutationFn: ({ idProyecto, cuerpo }: ArgsCrearDesarrollo) => crear(idProyecto, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS }),
+  });
+}
+
+/** Argumentos del alta de desarrollo con modelo nuevo. */
+export interface ArgsCrearDesarrolloModeloNuevo {
+  idProyecto: number;
+  cuerpo: DesarrolloModeloNuevo;
+}
+
+async function crearConModeloNuevo(
+  idProyecto: number,
+  cuerpo: DesarrolloModeloNuevo,
+): Promise<Desarrollo> {
+  const { data, error } = await api.POST('/api/proyectos/{idProyecto}/desarrollos/modelo-nuevo', {
+    params: { path: { idProyecto } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * Crea un desarrollo CON un modelo nuevo, en UNA llamada (§Post-F9.34): el código
+ * `CYA-26-71-001` lo arma el backend con el cliente del proyecto, el año de entrega y los dos
+ * dígitos del tipo de prenda + género. Invalida proyectos y modelos (nace un modelo).
+ */
+export function useCrearDesarrolloModeloNuevo(): UseMutationResult<
+  Desarrollo,
+  ErrorDeApi,
+  ArgsCrearDesarrolloModeloNuevo
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idProyecto, cuerpo }: ArgsCrearDesarrolloModeloNuevo) =>
+      crearConModeloNuevo(idProyecto, cuerpo),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS });
+      void queryClient.invalidateQueries({ queryKey: ['modelos'] });
+    },
   });
 }
 

@@ -58,6 +58,7 @@ function cliente(id: number, nombre: string, activo = true): Cliente {
   return {
     id,
     nombre,
+    abreviatura: null,
     razonSocial: null,
     contacto: null,
     telefono: null,

@@ -62,7 +62,12 @@ export const esquemaPedidoMesRenglon = z
   .object({
     id: z.number().int().describe('Id del renglón (PedidoLinea).'),
     idModelo: z.number().int().describe('Modelo del renglón.'),
-    codigoModelo: z.string().describe('Nº de desarrollo (Modelo.codigo).'),
+    codigoModelo: z.string().describe('Código VIGENTE del modelo (Modelo.codigo).'),
+    origenModelo: z
+      .enum(['desarrollo', 'produccion'])
+      .describe(
+        'Origen del modelo (§Post-F9.34): con "desarrollo", generar la OP lo PASA a producción y hay que confirmar su nº de 5 dígitos.',
+      ),
     descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
     idDesarrollo: z.number().int().nullable().describe('Desarrollo del renglón (R3, B4), o null.'),
     numeroCliente: z
@@ -73,7 +78,7 @@ export const esquemaPedidoMesRenglon = z
       .number()
       .int()
       .nullable()
-      .describe('Nº interno de producción del modelo, o null si no ha salido a producción.'),
+      .describe('Nº de producción del modelo (5 dígitos), o null si aún no lo tiene.'),
     cantidad: z.number().int().describe('Cantidad pedida del renglón.'),
     precio: z.number().nullable().describe('Precio por prenda, o null sin `pedidos.importes`.'),
     importe: z

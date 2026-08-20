@@ -67,12 +67,29 @@ async function generarOp(
   await matriz.getByTestId('matriz-op-celda').first().fill(piezas);
   await page.getByTestId('confirmar-generar-op').click();
 
-  const toast = page.getByText(/OP \d+ creada/).first();
+  // El toast del éxito lo arma `PanelGenerarOP.tsx` (~L187) en UNA sola frase, con tres trozos
+  // CONDICIONALES en medio. En esta prueba los tres se apagan: el modelo nació en `/modelos` (o
+  // sea, ya es de PRODUCCIÓN → no hay promoción ni «· modelo de producción N» ni «(antes …)») y el
+  // pedido se capturó por la edición F2 (sin desarrollo → no hay «· ligado a su desarrollo»). Lo
+  // que queda, literal, es «OP <folio> creada · Ruta Crítica programándose sola», y así se exige:
+  // pegadas las dos puntas, para que un toast al que le falte la mitad no pase por bueno.
+  const toast = page.getByText(/OP \d+ creada · Ruta Crítica programándose sola/).first();
   await expect(toast).toBeVisible();
   const folio = /OP (\d+) creada/.exec((await toast.textContent()) ?? '')?.[1] ?? '';
   expect(folio).not.toBe('');
-  // El toast largo tapa botones; se espera a que se vaya antes de seguir interactuando.
-  await expect(page.getByText(/salió a producción como modelo #\d+/)).toBeVisible();
+  // El toast largo tapa botones; se espera a que SE VAYA antes de seguir interactuando (sonner lo
+  // retira solo a los ~4 s y lo desmonta 200 ms después, así que `toBeHidden` termina en cuanto
+  // desaparece del DOM). De paso deja el ayudante REENTRANTE: la siguiente llamada no puede leerle
+  // el folio al toast de la anterior.
+  //
+  // ⚠️ Aquí vivía una línea que esperaba a que APARECIERA `/salió a producción como modelo #\d+/`
+  // —lo contrario de lo que promete el comentario de arriba—. Y ojo con la historia, porque la
+  // lección está ahí: ese texto SÍ existía; era el toast de antes. `cd4cd88` (V1-E3n) lo reescribió
+  // en `PanelGenerarOP.tsx` para volverlo condicional y NO tocó `frontend/e2e/`. No fue una
+  // aserción inventada: fue una aserción que se quedó vieja. **Quien cambie un texto de la UI barre
+  // `frontend/e2e/` en el mismo cambio** — es la segunda vez que este repo lo aprende (la primera,
+  // cuando la receta se mudó de sitio en V1-E3j).
+  await expect(toast).toBeHidden({ timeout: 30_000 });
   return folio;
 }
 

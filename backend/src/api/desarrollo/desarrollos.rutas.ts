@@ -16,6 +16,7 @@ import {
   esquemaDesarrolloApagarCuerpo,
   esquemaDesarrolloCrear,
   esquemaDesarrolloEditar,
+  esquemaDesarrolloModeloNuevoCuerpo,
   esquemaDesarrolloSalida,
 } from '../../contrato/esquemas/desarrollo.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -24,6 +25,7 @@ import {
   actualizarDesarrollo,
   apagarDesarrollo,
   crearDesarrollo,
+  crearDesarrolloConModeloNuevo,
   obtenerDesarrollo,
   reactivarDesarrollo,
 } from '../../dominio/desarrollo/desarrollos.js';
@@ -83,6 +85,32 @@ export const rutasDesarrollos: FastifyPluginCallbackZod = (app, _opciones, done)
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const desarrollo = await crearDesarrollo(sesion, request.params.idProyecto, request.body);
+      return reply.code(201).send(desarrollo);
+    },
+  });
+
+  // Crear un desarrollo con un MODELO NUEVO: el código `CYA-26-71-001` lo arma el sistema
+  // (§Post-F9.34) y las dos altas van en UNA transacción. Exige los DOS permisos (el dominio
+  // re-valida `modelos.administrar`, A1) — esconder Y bloquear (§Post-F9.68).
+  app.route({
+    method: 'POST',
+    url: '/proyectos/:idProyecto/desarrollos/modelo-nuevo',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['desarrollo'],
+      summary: 'Agregar un desarrollo creando un modelo nuevo (código de desarrollo automático)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamProyecto,
+      body: esquemaDesarrolloModeloNuevoCuerpo,
+      response: { 201: esquemaDesarrolloSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion,
+        request.params.idProyecto,
+        request.body,
+      );
       return reply.code(201).send(desarrollo);
     },
   });
