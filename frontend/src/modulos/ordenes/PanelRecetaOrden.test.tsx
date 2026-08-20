@@ -277,7 +277,8 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
   it('sin `desarrollo.administrar` la receta es de SOLO LECTURA (sin botones de acción)', () => {
     render(recetaDePrueba(), false);
 
-    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
+    // El botón de firmar vive AHORA en cada renglón (V1-E3k): es ése el que no debe aparecer.
+    expect(screen.queryByTestId('liberar-receta-avio-3')).not.toBeInTheDocument();
     expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
     expect(screen.queryByTestId('quitar-receta-avio-3')).not.toBeInTheDocument();
     // Pero SÍ se ve lo que la orden lleva.
@@ -705,8 +706,9 @@ describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
  *
  *  • que la firma se vea y se ponga POR RENGLÓN (sin esto, Desarrollo no puede liberar "el resto"
  *    dejando fuera el cierre que el cliente no ha autorizado — el caso de Daniel);
- *  • que existan los botones de bloque, y que NO se pinten cuando no hay nada que firmar ahí
- *    (§Post-F9.68: lo que no sirve, no se pinta);
+ *  • ⭐ V1-E3k (§Post-F9.80): que NO exista ninguna forma de firmar en bloque — ni «Liberar todo lo
+ *    que falta» ni los tres botones por sección. Se comprueban POR NOMBRE, uno por uno: una prueba
+ *    que solo dijera "algún botón desapareció" no probaría nada;
  *  • que el aviso de "el modelo lleva X y esta orden no" traiga SU botón, y que mande el material
  *    correcto — el `idMaterialModelo` es lo único que distingue "traer éste" de "traer todo".
  */
@@ -732,16 +734,42 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     expect(within(filaAvio as HTMLElement).getByText('Sin firmar')).toBeInTheDocument();
   });
 
-  it('⭐ se firma UN renglón, y viaja como selección de ese renglón (no "todo")', async () => {
+  it('⭐ se firma UN renglón, y viaja NOMBRADO: solo ese id, sin comodín', async () => {
     const usuario = userEvent.setup();
     render(recetaDePrueba());
 
     await usuario.click(screen.getByTestId('liberar-receta-avio-3'));
 
     expect(liberarMutateMock).toHaveBeenCalledTimes(1);
+    // `toEqual` es lo que da valor a esta prueba: si el cuerpo volviera a llevar `alcance` (o el
+    // renglón del vecino), la comparación falla. El id 3 es la JARETA; el 2, el otro avío.
     expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
       idOrden: 50,
-      cuerpo: { alcance: 'seleccion', renglones: [{ tipo: 'avio', id: 3 }] },
+      cuerpo: { renglones: [{ tipo: 'avio', id: 3 }] },
+    });
+  });
+
+  it('⭐ y el renglón de al lado manda SU id, no el mismo (la firma identifica, no solo dispara)', async () => {
+    const usuario = userEvent.setup();
+    render(recetaDePrueba());
+
+    await usuario.click(screen.getByTestId('liberar-receta-avio-2'));
+
+    expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { renglones: [{ tipo: 'avio', id: 2 }] },
+    });
+  });
+
+  it('⭐ y la TELA manda tipo `tela` con su propio id (los tres tipos no se confunden)', async () => {
+    const usuario = userEvent.setup();
+    render(recetaDePrueba());
+
+    await usuario.click(screen.getByTestId('liberar-receta-tela-1'));
+
+    expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { renglones: [{ tipo: 'tela', id: 1 }] },
     });
   });
 
@@ -757,45 +785,48 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     expect(screen.getByTestId('liberar-receta-avio-2')).toBeInTheDocument();
   });
 
-  it('«liberar todos los avíos» manda el alcance de la sección, con su conteo a la vista', async () => {
-    const usuario = userEvent.setup();
+  /**
+   * ⭐⭐ V1-E3k (§Post-F9.80) — **YA NO SE OFRECE FIRMAR EN BLOQUE**, y se comprueba NOMBRANDO los
+   * cuatro botones que existían. DANIEL, 20-ago-2026: *"me parece una mala idea el botón de «Liberar
+   * todo lo que falta»… no tiene sentido liberar las cosas sin ver"*.
+   *
+   * Los cuatro testids son los que tenía la pantalla en V1-E3j: si alguien los reintroduce, esta
+   * prueba se pone roja. Y va acompañada de la gemela POSITIVA —la firma por renglón sigue viva—
+   * para que no pueda pasar por el trivial "no se montó nada".
+   */
+  it('⭐ NO existe ningún botón de firmar en bloque: ni el global ni los tres por sección', () => {
     render(recetaDePrueba());
 
-    const boton = screen.getByTestId('receta-liberar-avios');
-    expect(boton).toHaveTextContent('(2)');
-    await usuario.click(boton);
-
-    expect(liberarMutateMock.mock.calls[0]?.[0]).toEqual({
-      idOrden: 50,
-      cuerpo: { alcance: 'avios' },
-    });
+    expect(screen.queryByTestId('receta-liberar')).toBeNull(); // «Liberar todo lo que falta»
+    expect(screen.queryByTestId('receta-liberar-telas')).toBeNull(); // «Liberar todas las telas»
+    expect(screen.queryByTestId('receta-liberar-avios')).toBeNull(); // «Liberar todos los avíos»
+    expect(screen.queryByTestId('receta-liberar-artes')).toBeNull(); // «Liberar todo el arte»
+    // …y no es que la pantalla esté vacía: la firma UNO POR UNO sigue ahí, en cada renglón vivo.
+    expect(screen.getByTestId('liberar-receta-tela-1')).toBeInTheDocument();
+    expect(screen.getByTestId('liberar-receta-avio-2')).toBeInTheDocument();
+    expect(screen.getByTestId('liberar-receta-avio-3')).toBeInTheDocument();
   });
 
-  it('sin nada pendiente en la sección, su botón de bloque NO se pinta (§Post-F9.68)', () => {
-    const base = recetaDePrueba();
-    render({
-      ...base,
-      telas: base.telas.map((t) => ({
-        ...t,
-        liberadoEn: '2026-08-19T10:00:00.000Z',
-        liberadoPor: 'u1',
-      })),
-    });
-    expect(screen.queryByTestId('receta-liberar-telas')).not.toBeInTheDocument();
-    expect(screen.getByTestId('receta-liberar-avios')).toBeInTheDocument();
+  it('⭐ y tampoco por texto: no hay nada que diga «liberar todo/todas/todos» (§Post-F9.68)', () => {
+    render(recetaDePrueba());
+
+    // Por si el botón volviera con otro testid: lo que Daniel vio y rechazó fue el TEXTO.
+    expect(screen.queryByText(/liberar todo/i)).toBeNull();
+    expect(screen.queryByText(/liberar todas/i)).toBeNull();
+    // Lo que SÍ sobrevive —Daniel lo eligió— es «marcar todo revisado»: no libera nada.
+    expect(screen.getByTestId('receta-marcar-revisado')).toHaveTextContent('Marcar todo revisado');
   });
 
   it('sin `desarrollo.administrar` no se pinta NINGÚN botón de firmar', () => {
     render(recetaDePrueba(), false);
-    expect(screen.queryByTestId('receta-liberar-avios')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('liberar-receta-tela-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('liberar-receta-avio-3')).not.toBeInTheDocument();
   });
 
   /**
    * ⭐ LA LÁPIDA NO SE FIRMA (§Post-F9.72). Un renglón excluido no se compra, así que no le falta
-   * firma a nadie: ni cuenta en el botón de bloque, ni pinta chip de firma, ni ofrece firmarse.
-   * Sin esta prueba, contar lápidas dejaba el botón «Liberar todas las telas (2)» pegado en 2 para
-   * siempre — se firma, se recarga, y el número no baja porque lo que sobra no se puede firmar.
+   * firma a nadie: no pinta chip de firma ni ofrece firmarse. (Hasta V1-E3k esto también cuidaba
+   * el conteo del botón de bloque «Liberar todas las telas (2)», que ya no existe.)
    */
   function conLapida(): RecetaOrden {
     const base = recetaDePrueba();
@@ -807,23 +838,6 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
       ),
     };
   }
-
-  it('⭐ la LÁPIDA no cuenta en el botón de bloque de su sección', () => {
-    render(conLapida());
-    // Vivo sin firmar queda UNO solo (el botón 2), no dos.
-    expect(screen.getByTestId('receta-liberar-avios')).toHaveTextContent('(1)');
-  });
-
-  it('⭐ con TODO lo vivo firmado, el botón de bloque desaparece aunque quede una lápida sin firma', () => {
-    const base = conLapida();
-    render({
-      ...base,
-      avios: base.avios.map((a) =>
-        a.excluido ? a : { ...a, liberadoEn: '2026-08-19T10:00:00.000Z', liberadoPor: 'u1' },
-      ),
-    });
-    expect(screen.queryByTestId('receta-liberar-avios')).not.toBeInTheDocument();
-  });
 
   it('⭐ la LÁPIDA no pinta chip de firma ni ofrece firmarse', () => {
     render(conLapida());
@@ -1078,7 +1092,7 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     expect(screen.queryByText('Acciones')).toBeNull();
   });
 
-  it('⭐ V1-E3j: una receta VACÍA no ofrece «liberar» (era el clic que disparaba el cartel rojo)', () => {
+  it('⭐ V1-E3j: una receta VACÍA lo dice en tono neutro, y no ofrece firmar nada', () => {
     render(
       recetaDePrueba({
         telas: [],
@@ -1096,13 +1110,16 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
       }),
     );
 
-    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
     expect(screen.getByText(/todavía no tiene ningún material/)).toBeInTheDocument();
+    // Sin renglones no hay botón de firmar, porque el botón vive EN el renglón (V1-E3k).
+    expect(screen.queryByTestId('liberar-receta-tela-1')).toBeNull();
+    expect(screen.queryByTestId('liberar-receta-avio-2')).toBeNull();
   });
 
-  it('…y con renglones el botón de «liberar» SÍ está (la gemela positiva de la de arriba)', () => {
+  it('…y con renglones sí hay dónde firmar, uno por uno (la gemela positiva de la de arriba)', () => {
     render(recetaDePrueba());
-    expect(screen.getByTestId('receta-liberar')).toBeInTheDocument();
+    expect(screen.getByTestId('liberar-receta-tela-1')).toBeInTheDocument();
+    expect(screen.getByTestId('liberar-receta-avio-2')).toBeInTheDocument();
     expect(screen.queryByText(/todavía no tiene ningún material/)).toBeNull();
   });
 

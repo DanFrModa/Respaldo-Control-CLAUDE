@@ -24,8 +24,14 @@
  * de sumar en el cliente. Sumar en el cliente obligaría a bajar la receta entera de cada orden
  * pendiente, y la cifra dependería de la página que se esté viendo.
  *
- * Permisos: `desarrollo.ver` para verla; liberar desde ahí pasa por `liberarReceta` (que exige
- * `desarrollo.administrar`) — la bandeja NO libera nada por su cuenta. A9: solo la empresa activa.
+ * ⭐ V1-E3k (§Post-F9.80) — **LA BANDEJA NO FIRMA: LLEVA.** Tuvo un botón «Revisar y liberar» que
+ * daba por buena la receta entera de una orden desde aquí, viendo solo *"3 avíos, 1 tela"*, sin la
+ * lista enfrente. Daniel lo quitó: *"siempre se debe liberar uno por uno… no tiene sentido liberar
+ * las cosas sin ver"*. Esta consulta es de SOLO LECTURA y ése es ahora todo su trabajo: decir en qué
+ * órdenes hay firma pendiente y llevar a la receta, donde se firma viéndola.
+ *
+ * Permisos: `desarrollo.ver` para verla. Firmar es OTRO endpoint (`liberarReceta`, que exige
+ * `desarrollo.administrar`) y vive en la pantalla de la receta. A9: solo la empresa activa.
  */
 import type {
   FiltrosRecetasPorLiberar,

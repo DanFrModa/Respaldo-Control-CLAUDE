@@ -24,7 +24,6 @@ import {
 } from '@/api/receta-orden';
 import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
 import type {
-  AlcanceLiberacion,
   CambioReceta,
   RecetaOrden,
   RecetaOrdenArte,
@@ -82,11 +81,18 @@ import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './recet
  *     incluido el estado de la receta. Si vuelve a quedar debajo de un mensaje más ruidoso, la
  *     etapa no sirvió de nada.
  *  2. **Un aviso NO puede ser más fuerte que su remedio.** La receta vacía se dice en tono neutro y
- *     apuntando a la acción; el botón de «liberar» ni siquiera se ofrece cuando no hay qué firmar
- *     (`resumen.total === 0`, dato del servidor) — antes se ofrecía, se clickeaba, y el rechazo del
- *     backend era justo el cartel que tapaba la salida.
+ *     apuntando a la acción; si no hay renglones, no hay nada que firmar y las secciones lo dicen.
  *  3. **Firmar UNO POR UNO es evidente**: cada renglón lleva su botón «Liberar» CON TEXTO, no un
  *     ícono mudo. Es literalmente lo que Daniel vino a buscar y no encontró.
+ *
+ * ⭐⭐ V1-E3k (§Post-F9.80) — y desde el 20-ago-2026 **ES LA ÚNICA FORMA DE FIRMAR**. Se retiraron
+ * «Liberar todo lo que falta» y los tres botones por sección. DANIEL: *"me parece una mala idea el
+ * botón de «Liberar todo lo que falta». Creo que siempre se debe liberar uno por uno, para que se
+ * revise lo que se está haciendo. **No tiene sentido liberar las cosas sin ver**."* No eran decisión
+ * suya: los agregó el LEAD para que *"lo rutinario no cueste veinte clics"*, optimizando la prisa
+ * sobre una firma que **es la puerta que abre la compra**. Y no se quitaron solo de aquí: el
+ * contrato tampoco los acepta (§Post-F9.68: esconder *y* bloquear). Lo que SÍ se conserva —Daniel lo
+ * eligió— es «marcar todo revisado», que no libera nada: solo dice *"ya miré estos renglones"*.
  *
  * Daniel (14-ago-2026): *"en ocasiones se negocia con el cliente que ya no lleve alguna cosa (por
  * ejemplo, quitarle una jareta para abaratar el costo)… **El BOM debe de vivir en la OP**"*.
@@ -98,8 +104,9 @@ import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './recet
  *    uno**: el 89 % de las órdenes lleva la receta del modelo tal cual, y 8 clics por OP entrenan a
  *    la gente a clickear sin leer. Por eso hay UN botón de «marcar todo revisado» y el renglón
  *    desviado se pinta distinto para pedir atención solo.
- *  • **La puerta antes de COMPRAR**, que desde V1-E3h (§Post-F9.72) es **POR RENGLÓN**: se compra
- *    lo que Desarrollo firmó, y lo que falta se ve —aquí y en la explosión— con nombre. Daniel:
+ *  • **La puerta antes de COMPRAR**, que desde V1-E3h (§Post-F9.72) es **POR RENGLÓN** y desde
+ *    V1-E3k (§Post-F9.80) **se firma renglón por renglón, sin atajos**: se compra lo que Desarrollo
+ *    firmó, y lo que falta se ve —aquí y en la explosión— con nombre. Daniel:
  *    *"podría haber algún cierre que aún no autoriza el cliente, pero ya podríamos ir comprando lo
  *    demás"*. Cortar y producir NO se bloquean, y la pantalla lo dice para que nadie crea que paró
  *    la producción.
@@ -155,22 +162,21 @@ export function PanelRecetaOrden({
     agregar.isPending ||
     traer.isPending;
 
-  /** Firma un alcance (todo / una sección / una selección de renglones). */
-  function liberarAlcance(
-    alcance: AlcanceLiberacion,
-    renglones?: { tipo: TipoRenglonReceta; id: number }[],
-  ): void {
+  /**
+   * ⭐ V1-E3k (§Post-F9.80) — FIRMA **UN** RENGLÓN. No hay otra forma de liberar desde aquí, y ésa
+   * es la etapa: los botones de bloque («liberar todo lo que falta», «todas las telas»…) se
+   * retiraron de la pantalla **y del contrato**, porque un botón que aprueba diez cosas de un clic
+   * entrena exactamente lo que la firma existe para evitar.
+   */
+  function liberarRenglon(tipo: TipoRenglonReceta, id: number): void {
     liberar.mutate(
-      {
-        idOrden,
-        cuerpo: { alcance, ...(renglones === undefined ? {} : { renglones }) },
-      },
+      { idOrden, cuerpo: { renglones: [{ tipo, id }] } },
       {
         onSuccess: (r) =>
           toast.success(
             r.resumen.porLiberar === 0
-              ? 'Receta liberada: ya se puede comprar todo lo de esta orden.'
-              : `Liberado. Quedan ${r.resumen.porLiberar} renglones por firmar.`,
+              ? 'Renglón liberado: ya se puede comprar todo lo de esta orden.'
+              : `Renglón liberado. Quedan ${r.resumen.porLiberar} por firmar.`,
           ),
         onError: (error) => toast.error(error.message),
       },
@@ -257,7 +263,6 @@ export function PanelRecetaOrden({
             onError: (error) => toast.error(error.message),
           });
         }}
-        alLiberar={() => liberarAlcance('todo')}
       />
 
       <AvisosDesalineacion receta={d} omitirFaltantes={conLlamado} />
@@ -267,8 +272,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
-        alLiberarSeccion={() => liberarAlcance('telas')}
-        alLiberarRenglon={(id) => liberarAlcance('seleccion', [{ tipo: 'tela', id }])}
+        alLiberarRenglon={(id) => liberarRenglon('tela', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'tela', id, nombre });
         }}
@@ -297,8 +301,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
-        alLiberarSeccion={() => liberarAlcance('avios')}
-        alLiberarRenglon={(id) => liberarAlcance('seleccion', [{ tipo: 'avio', id }])}
+        alLiberarRenglon={(id) => liberarRenglon('avio', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'avio', id, nombre });
         }}
@@ -327,8 +330,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
-        alLiberarSeccion={() => liberarAlcance('artes')}
-        alLiberarRenglon={(id) => liberarAlcance('seleccion', [{ tipo: 'arte', id }])}
+        alLiberarRenglon={(id) => liberarRenglon('arte', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'arte', id, nombre });
         }}
@@ -398,19 +400,30 @@ export function PanelRecetaOrden({
 
 // ── Cabecera: estado de revisión + la puerta de compra ──────────────────────────────────────
 
-/** Resumen + los dos botones (marcar todo revisado / liberar). */
+/**
+ * Resumen + **el único botón de cabecera que queda**: «marcar todo revisado».
+ *
+ * ⭐ V1-E3k (§Post-F9.80) — aquí vivía «Liberar todo lo que falta», y se fue. DANIEL, 20-ago-2026:
+ * *"me parece una mala idea… siempre se debe liberar uno por uno, para que se revise lo que se está
+ * haciendo. **No tiene sentido liberar las cosas sin ver**."* La firma es la puerta que abre la
+ * compra, así que se cobra donde hay consecuencia: renglón por renglón, en su fila.
+ *
+ * ⚠️ **«Marcar todo revisado» SE QUEDA, y Daniel lo eligió explícitamente.** No libera nada: solo
+ * dice *"ya miré estos renglones y vienen bien del modelo"*, no compromete dinero, y existe desde
+ * V1-E3d porque la mayoría de las órdenes lleva la receta del modelo tal cual —pedir el visto bueno
+ * uno por uno **ahí sí** entrenaba a clickear sin leer—. La distinción es la etapa entera: la
+ * fricción se cobra donde hay consecuencia.
+ */
 function CabeceraReceta({
   receta,
   editable,
   ocupado,
   alMarcarTodo,
-  alLiberar,
 }: {
   receta: RecetaOrden;
   editable: boolean;
   ocupado: boolean;
   alMarcarTodo: () => void;
-  alLiberar: () => void;
 }): React.JSX.Element {
   const r = receta.resumen;
   // ⭐ V1-E3h: TRES estados, no dos. Los decide el SERVIDOR y los lee `estadoFirmaReceta` — UNA sola
@@ -451,23 +464,6 @@ function CabeceraReceta({
           >
             <CheckCircle2 aria-hidden /> Marcar todo revisado
           </Button>
-          {/* ⭐ V1-E3j — sin renglones NO se ofrece firmar. `resumen.total` es del SERVIDOR (la misma
-              cuenta con la que rechaza), así que la pantalla no adivina: solo deja de invitar a un
-              clic cuyo único resultado era el cartel rojo *"la receta de esta orden está vacía"* —
-              el mismo que tapó la salida en el reporte de Daniel. Si hay algo que traer, el llamado
-              de arriba ya dice qué hacer; si no, lo dice el vacío de cada sección. */}
-          {vacia ? null : (
-            <Button
-              type="button"
-              size="sm"
-              disabled={ocupado}
-              onClick={alLiberar}
-              data-testid="receta-liberar"
-            >
-              <LockOpen aria-hidden />{' '}
-              {receta.todoLiberado ? 'Re-liberar todo' : 'Liberar todo lo que falta'}
-            </Button>
-          )}
         </div>
       ) : null}
     </div>
@@ -1012,8 +1008,15 @@ function AccionesRenglon({
   if (!editable) return null;
   return (
     <span className="flex justify-end gap-1">
-      {/* ⭐ Firmar ESTE renglón (§Post-F9.72). No se pinta sobre una lápida (no se compra) ni sobre
-          lo ya firmado: para re-firmar está el botón de la sección o el de la cabecera.
+      {/* ⭐ Firmar ESTE renglón (§Post-F9.72) — desde V1-E3k (§Post-F9.80), la ÚNICA forma de firmar.
+          No se pinta sobre una lápida (no se compra) ni sobre lo ya firmado.
+
+          ⚠️ **Y no hay callejón sin salida por no poder re-firmar**: tocar el contenido de un
+          renglón ya liberado le QUITA la firma en el servidor (`enRecetaEditable`, la revocación por
+          renglón de V1-E3h), así que el botón reaparece solo sobre lo que de verdad volvió a estar
+          pendiente. Antes este comentario mandaba «al botón de la sección o al de la cabecera»:
+          ésos ya no existen, y un comentario que manda a buscar lo que no está es peor que ninguno.
+
           V1-E3j — VA CON TEXTO, no como ícono mudo. Daniel abrió la bandeja buscando *"dónde pueda
           ver todo completo e ir liberando una por una"* y no lo encontró: firmar uno por uno es lo
           que esta pantalla vino a hacer evidente, y un candado gris no lo es. */}
@@ -1081,15 +1084,14 @@ function Seccion({
   children,
   testid,
   agregar,
-  liberarSeccion,
 }: {
   titulo: string;
   vacio: boolean;
   children: React.ReactNode;
   testid: string;
   agregar?: React.ReactNode;
-  /** Botón «liberar toda la sección» (§Post-F9.72: que lo rutinario no cueste veinte clics). */
-  liberarSeccion?: React.ReactNode;
+  // ⭐ V1-E3k (§Post-F9.80): aquí había una ranura `liberarSeccion` con el botón «liberar todas las
+  // telas / todos los avíos / todo el arte». Se retiró: la firma es por renglón, en su fila.
 }): React.JSX.Element {
   return (
     <div className="space-y-2" data-testid={testid}>
@@ -1097,10 +1099,7 @@ function Seccion({
         <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {titulo}
         </h4>
-        <span className="flex flex-wrap items-center gap-2">
-          {liberarSeccion}
-          {agregar}
-        </span>
+        <span className="flex flex-wrap items-center gap-2">{agregar}</span>
       </div>
       {vacio ? (
         <p className="rounded-lg border border-dashed px-3 py-3 text-center text-sm text-muted-foreground">
@@ -1221,43 +1220,11 @@ function AgregarRenglon({
   );
 }
 
-/**
- * «Liberar todas las telas / todos los avíos / todos los artes» (§Post-F9.72). Solo se pinta si
- * QUEDA algo por firmar en esa sección: un botón que no cambia nada es ruido, y §Post-F9.68 dice
- * que lo que no se puede usar no se pinta.
+/*
+ * ⭐ V1-E3k (§Post-F9.80) — AQUÍ VIVÍAN `BotonLiberarSeccion` («Liberar todas las telas (3)») y su
+ * contador `sinFirmar`. Se retiraron enteros: firmar una sección de un clic es firmar sin ver.
+ * Lo que queda es el botón «Liberar» de CADA renglón, con texto, en su fila.
  */
-function BotonLiberarSeccion({
-  etiqueta,
-  pendientes,
-  ocupado,
-  alLiberar,
-  testid,
-}: {
-  etiqueta: string;
-  pendientes: number;
-  ocupado: boolean;
-  alLiberar: () => void;
-  testid: string;
-}): React.JSX.Element | null {
-  if (pendientes === 0) return null;
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={ocupado}
-      onClick={alLiberar}
-      data-testid={testid}
-    >
-      <LockOpen aria-hidden /> Liberar {etiqueta} ({pendientes})
-    </Button>
-  );
-}
-
-/** Cuántos renglones VIVOS de una sección siguen sin firma (la misma cuenta que hace el servidor). */
-function sinFirmar(filas: readonly { excluido: boolean; liberadoEn: string | null }[]): number {
-  return filas.filter((f) => !f.excluido && f.liberadoEn === null).length;
-}
 
 /** Sección de TELAS de la receta (el viejo no las congelaba; en v2 alimentan el MRP). */
 function SeccionTelas({
@@ -1268,7 +1235,6 @@ function SeccionTelas({
   alQuitar,
   alRestaurar,
   alAgregar,
-  alLiberarSeccion,
   alLiberarRenglon,
 }: {
   receta: RecetaOrden;
@@ -1278,7 +1244,6 @@ function SeccionTelas({
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
   alAgregar: (idTela: number, consumo: number) => void;
-  alLiberarSeccion: () => void;
   alLiberarRenglon: (id: number) => void;
 }): React.JSX.Element {
   const editar = useEditarRenglonReceta();
@@ -1287,17 +1252,6 @@ function SeccionTelas({
       titulo="Telas"
       testid="receta-seccion-telas"
       vacio={receta.telas.length === 0}
-      liberarSeccion={
-        editable ? (
-          <BotonLiberarSeccion
-            etiqueta="todas las telas"
-            pendientes={sinFirmar(receta.telas)}
-            ocupado={ocupado}
-            alLiberar={alLiberarSeccion}
-            testid="receta-liberar-telas"
-          />
-        ) : undefined
-      }
       agregar={
         editable ? (
           <AgregarRenglon
@@ -1406,7 +1360,6 @@ function SeccionAvios({
   alQuitar,
   alRestaurar,
   alAgregar,
-  alLiberarSeccion,
   alLiberarRenglon,
 }: {
   receta: RecetaOrden;
@@ -1416,7 +1369,6 @@ function SeccionAvios({
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
   alAgregar: (idAvio: number, consumo: number) => void;
-  alLiberarSeccion: () => void;
   alLiberarRenglon: (id: number) => void;
 }): React.JSX.Element {
   const editar = useEditarRenglonReceta();
@@ -1425,17 +1377,6 @@ function SeccionAvios({
       titulo="Avíos"
       testid="receta-seccion-avios"
       vacio={receta.avios.length === 0}
-      liberarSeccion={
-        editable ? (
-          <BotonLiberarSeccion
-            etiqueta="todos los avíos"
-            pendientes={sinFirmar(receta.avios)}
-            ocupado={ocupado}
-            alLiberar={alLiberarSeccion}
-            testid="receta-liberar-avios"
-          />
-        ) : undefined
-      }
       agregar={
         editable ? (
           <AgregarRenglon
@@ -1566,7 +1507,6 @@ function SeccionArtes({
   ocupado,
   alQuitar,
   alRestaurar,
-  alLiberarSeccion,
   alLiberarRenglon,
 }: {
   receta: RecetaOrden;
@@ -1575,27 +1515,11 @@ function SeccionArtes({
   ocupado: boolean;
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
-  alLiberarSeccion: () => void;
   alLiberarRenglon: (id: number) => void;
 }): React.JSX.Element {
   const editar = useEditarRenglonReceta();
   return (
-    <Seccion
-      titulo="Arte"
-      testid="receta-seccion-artes"
-      vacio={receta.artes.length === 0}
-      liberarSeccion={
-        editable ? (
-          <BotonLiberarSeccion
-            etiqueta="todos los artes"
-            pendientes={sinFirmar(receta.artes)}
-            ocupado={ocupado}
-            alLiberar={alLiberarSeccion}
-            testid="receta-liberar-artes"
-          />
-        ) : undefined
-      }
-    >
+    <Seccion titulo="Arte" testid="receta-seccion-artes" vacio={receta.artes.length === 0}>
       <TablaDensa>
         <TablaDensaEncabezado>
           <TablaDensaFila>

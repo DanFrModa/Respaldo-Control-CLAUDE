@@ -3300,8 +3300,11 @@ liberada, pero **no lleva a donde se libera**. Deja al usuario adivinando en qu�
   inventarla.**
 - 🔴 **La puerta es TODO-O-NADA:** hoy *"sin liberar no se compra"* aplica a la receta entera. Tiene que
   pasar a **"se compra lo que está liberado"**.
-- 🔴 **La firma es una sola** para toda la receta. Tiene que ser **por renglón**, con acciones en bloque
-  (*"liberar todas las telas"*, *"liberar todos los avíos"*) para que lo rutinario no cueste veinte clics.
+- 🔴 **La firma es una sola** para toda la receta. Tiene que ser **por renglón**. ~~Con acciones en bloque
+  (*"liberar todas las telas"*, *"liberar todos los avíos"*) para que lo rutinario no cueste veinte clics.~~
+  ⛔ **DEROGADO el 20-ago-2026 (§Post-F9.80).** Las acciones en bloque **no las pidió Daniel: las agregó el
+  lead**, y él las retiró al recorrer el flujo: *"no tiene sentido liberar las cosas sin ver"*. Se firma
+  **renglón por renglón**.
 - 🔴 **El comprador no tiene dónde ver lo que falta liberar.** Es requisito explícito de Daniel:
   *"transparentemente qué le falta de liberar"*.
 - **Se conserva** la protección de que **tocar una receta ya liberada la vuelve a cerrar** (*"Desarrollo
@@ -3372,8 +3375,11 @@ origen de toda esta tanda.
 2. **Ordenada por fecha de entrega, no por folio.** Lo que estorba primero, arriba.
 3. **Marca las que ya están frenando dinero**: la orden que **ya tiene OC** de otra parte de la receta no es
    lo mismo que una recién nacida.
-4. **Se libera desde ahí**, sin dar la vuelta por el Centro de Órdenes.
-5. Permisos: `desarrollo.ver` para verla, `desarrollo.administrar` para liberar. Sin permisos nuevos.
+4. ~~**Se libera desde ahí**, sin dar la vuelta por el Centro de Órdenes.~~ ⛔ **DEROGADO el 20-ago-2026
+   (§Post-F9.80):** la bandeja **ya no firma**. Lleva a la receta, y ahí se firma **viendo** — desde la lista
+   solo se veía *"3 avíos, 1 tela"*.
+5. Permisos: `desarrollo.ver` para verla. ~~`desarrollo.administrar` para liberar.~~ Al no firmar desde la
+   lista, la bandeja **solo necesita `desarrollo.ver`**. Sin permisos nuevos.
 
 - **Aplica en:** V1-E3h, la misma etapa de §Post-F9.72/.73.
 - **Fecha:** 2026-08-19.
@@ -3399,6 +3405,10 @@ revisado» ya hacía desde V1-E3d —que existe porque *"obligar a 8 clics por O
 clickear sin leer"*—, **pero es una decisión de producto, no un detalle de implementación**. En el panel de
 la orden los dos botones siguen separados a propósito: ahí los renglones están a la vista y la fricción sí
 compra algo.
+
+> ⚠️ **RETIRADA el 20-ago-2026 por §Post-F9.80.** Daniel quitó el botón «Revisar y liberar» de la bandeja
+> —*"no tiene sentido liberar las cosas sin ver"*— y con él se fue `revisarPendientes`, que solo existía
+> para servirlo. La consecuencia de negocio que esta decisión dejó anotada es justamente la que él resolvió.
 
 - **Aplica en:** V1-E3h. Señalado por el reviewer, que pidió explícitamente que no quedara solo en el código.
 - **Fecha:** 2026-08-19.
@@ -3453,9 +3463,11 @@ El problema que veo en «Recetas por liberar» es que solo está la OP con un bo
 
 1. **UNA sola pantalla**, y es **la misma** desde el detalle de la OP y desde la bandeja. No dos vistas que
    se parezcan: el mismo componente y la misma ruta, se llegue desde donde se llegue.
-2. **Desde la bandeja hay que poder ENTRAR**, no solo liberar en bloque. El «Revisar y liberar» de
-   §Post-F9.75 **se queda** (existe para no dar la vuelta cuando ya sabes lo que hay), pero deja de ser la
-   única salida.
+2. **Desde la bandeja hay que poder ENTRAR**, no solo liberar en bloque. ~~El «Revisar y liberar» de
+   §Post-F9.75 se queda (existe para no dar la vuelta cuando ya sabes lo que hay), pero deja de ser la
+   única salida.~~ ⛔ **DEROGADO el 20-ago-2026 (§Post-F9.80):** entrar dejó de ser *una* salida para ser
+   **la única**. El «Revisar y liberar» se retiró: desde la lista se firmaba viendo solo *"3 avíos, 1
+   tela"*.
 3. **Firmar uno por uno tiene que ser lo evidente** — es literalmente lo que fue a buscar y no encontró.
 4. **El bloque del detalle de la OP se queda como RESUMEN** con su botón: no se pierde el vistazo rápido
    desde la orden, y el trabajo de verdad se hace donde se ve.
@@ -3545,3 +3557,48 @@ corolario: quien reciba ese perfil recibe también esta llave.
   sin la marcha atrás sería una trampa — dejaría sin salida.
 - **Fecha:** 2026-08-19.
 
+
+---
+
+#### (Post-F9.80) — ⭐ La receta se firma UNO POR UNO: se van los botones de liberación en bloque (DANIEL, 20-ago-2026)
+
+Daniel, recorriendo el flujo: *"me parece una mala idea el botón de «Liberar todo lo que falta». Creo que
+siempre se debe liberar uno por uno, para que se revise lo que se está haciendo. **No tiene sentido liberar
+las cosas sin ver**."*
+
+⚠️ **Importa de dónde salieron los botones que se van: no eran decisión suya.** Su decisión en §Post-F9.72
+fue *"debería poder liberarse por partes, y que el comprador vea qué le falta"*. Las **acciones en bloque**
+las agregó el LEAD, razonando que *"lo rutinario no cueste veinte clics"* — un razonamiento que optimiza la
+prisa, cuando **la firma no es un trámite: es la puerta que abre la compra**. Un botón que aprueba diez
+cosas de un clic entrena exactamente lo que la firma existe para evitar.
+
+**Qué se retira, en los tres lugares donde estaba:**
+
+1. **«Liberar todo lo que falta»** en la pantalla de la receta y en el panel de la OP.
+2. Los tres botones **por sección** («todas las telas», «todos los avíos», «todo el arte»).
+3. **«Revisar y liberar»** de la bandeja «Recetas por liberar» — *el peor de los tres*, porque desde ahí se
+   firmaba viendo solo *"3 avíos, 1 tela"*, **sin la lista enfrente**. Nació de un defecto (§Post-F9.75).
+   **La bandeja pasa a hacer solo lo que debe: llevar a la receta**, donde se firma viendo.
+
+**Qué SE QUEDA, y Daniel lo eligió explícitamente: «marcar todo revisado».** No libera nada — solo dice
+*"ya miré estos renglones y vienen bien del modelo"*—, **no compromete dinero**, y existe desde V1-E3d
+porque la mayoría de las órdenes lleva la receta del modelo tal cual y pedir el visto bueno uno por uno
+**ahí sí** entrenaba a clickear sin leer. La distinción que Daniel confirmó es la regla de fondo:
+**la fricción se cobra donde hay consecuencia.**
+
+**Y se cumple EN EL SERVIDOR, no solo en la pantalla** (A1/A4 + §Post-F9.68: esconder *y* bloquear). El
+cuerpo de `POST /ordenes/:id/receta/liberar` perdió el `alcance` (`todo`/`telas`/`avios`/`artes`/`seleccion`)
+y la bandera `revisarPendientes` de §Post-F9.75, que queda **retirada** al desaparecer su único usuario.
+Hoy el cuerpo es **obligatorio** y lleva la lista de renglones: **quien firma NOMBRA lo que firma**.
+Se conserva lo que Daniel sí pidió en §Post-F9.72 —**liberar por partes**—: se puede firmar una parte y
+dejar el resto pendiente; lo que ya no se puede es que **el servidor expanda** un comodín a renglones que
+nadie nombró. Sin llamadores reales del bloque (el ETL de migración escribe la firma directo, no por esta
+función), retirarlo no rompió nada.
+
+⚠️ **Lo que esto NO pretende ser:** un cliente puede leer la receta, juntar los ids y mandarlos todos en
+una llamada. Es deliberado — es la línea que el servidor sí puede sostener: **jamás se firma un renglón
+cuyo id no se conocía**. Volver a ofrecerlo con un botón sería re-tomar esta decisión, no aprovechar un
+hueco.
+
+- **Aplica en:** V1-E3k. Sin migración, sin permisos nuevos, sin seed.
+- **Fecha:** 2026-08-20.

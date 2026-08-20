@@ -210,18 +210,23 @@ export function useMarcarRecetaRevisada(): UseMutationResult<RecetaOrden, ErrorD
   });
 }
 
-/** Argumentos de liberar: qué parte de la receta se firma (V1-E3h, §Post-F9.72). */
+/** Argumentos de liberar: QUÉ renglones se firman (V1-E3h §Post-F9.72, V1-E3k §Post-F9.80). */
 export interface ArgsLiberarReceta {
   idOrden: number;
-  /** Sin cuerpo = `alcance: 'todo'` (el botón de siempre). */
-  cuerpo?: LiberarRecetaCuerpo;
+  /**
+   * ⭐ V1-E3k (§Post-F9.80): **obligatorio**, y hay que nombrar los renglones. Antes se podía omitir
+   * y significaba «firma la receta entera»; Daniel quitó ese atajo (*"no tiene sentido liberar las
+   * cosas sin ver"*), y el contrato ya no lo acepta.
+   */
+  cuerpo: LiberarRecetaCuerpo;
 }
 
 /**
- * LIBERA la receta — entera, por sección, o renglón por renglón (§Post-F9.72).
+ * LIBERA renglones de la receta, **uno por uno** (§Post-F9.72 los partió, §Post-F9.80 quitó los
+ * atajos en bloque).
  *
  * La puerta dejó de ser todo-o-nada: se compra lo liberado. Qué se puede firmar y qué no (que no
- * queden renglones sin revisar dentro del alcance, que el alcance no esté vacío) lo decide el
+ * queden renglones sin revisar entre los firmados, que la lista no venga vacía) lo decide el
  * BACKEND — aquí no se replica ninguna de esas reglas (A1).
  */
 export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, ArgsLiberarReceta> {
@@ -230,7 +235,7 @@ export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, A
     mutationFn: async ({ idOrden, cuerpo }: ArgsLiberarReceta) => {
       const { data, error } = await api.POST('/api/ordenes/{id}/receta/liberar', {
         params: { path: { id: idOrden } },
-        body: cuerpo ?? { alcance: 'todo' },
+        body: cuerpo,
       });
       if (!data) throw new ErrorDeApi(error);
       return data;

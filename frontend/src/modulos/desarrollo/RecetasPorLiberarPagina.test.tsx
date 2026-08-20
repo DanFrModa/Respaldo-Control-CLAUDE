@@ -9,6 +9,11 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import { RecetasPorLiberarPagina, textoFalta } from './RecetasPorLiberarPagina';
 
 const useRecetasPorLiberarMock = vi.fn();
+/**
+ * ⭐ V1-E3k (§Post-F9.80): el mock de LIBERAR se conserva **a propósito, y tiene que quedar sin
+ * llamar**. La bandeja ya no firma: si alguien vuelve a colgar una firma de esta pantalla, la
+ * prueba de abajo lo delata contando las llamadas. Un mock retirado no habría podido hacerlo.
+ */
 const liberarMutateMock = vi.fn();
 
 vi.mock('@/api/receta-orden', () => ({
@@ -71,8 +76,12 @@ function render(
  * BANDEJA «Recetas por liberar» (V1-E3h, §Post-F9.72 — DANIEL: *"está buenísima"*).
  *
  * Lo que estas pruebas fijan es lo que la bandeja existe para hacer: que se pueda VER de un vistazo
- * qué falta firmar y CUÁL está frenando dinero, y que se pueda firmar SIN dar la vuelta por el
- * Centro de Órdenes. Si algo de eso se pierde, la bandeja deja de servir para lo que se pidió.
+ * qué falta firmar y CUÁL está frenando dinero, y que se ENTRE a la receta a resolverlo.
+ *
+ * ⭐ V1-E3k (§Post-F9.80) — **de aquí ya NO se firma.** El botón «Revisar y liberar» daba por buena
+ * la receta entera viendo solo *"3 avíos, 1 tela"*, sin la lista enfrente. DANIEL, 20-ago-2026:
+ * *"siempre se debe liberar uno por uno… no tiene sentido liberar las cosas sin ver"*. La bandeja
+ * LLEVA a la receta; firmar es allá.
  */
 describe('<RecetasPorLiberarPagina> (V1-E3h)', () => {
   beforeEach(() => {
@@ -97,33 +106,48 @@ describe('<RecetasPorLiberarPagina> (V1-E3h)', () => {
   });
 
   /**
-   * ⭐ EL BOTÓN TIENE QUE FUNCIONAR EN EL CASO NORMAL. La receta se copia del modelo al crear la
-   * orden y sus renglones nacen `sin_revisar`; sin `revisarPendientes` el servidor contesta
-   * *"quedan 3 renglones sin revisar"* y obliga a ir al Centro de Órdenes a marcarlos y volver —
-   * **la vuelta que esta bandeja existe para evitar**, y para el 100 % de las órdenes que nadie ha
-   * tocado, que son justo las que la llenan.
+   * ⭐⭐ V1-E3k (§Post-F9.80) — **LA BANDEJA NO FIRMA.** Tres aserciones, y cada una nombra el valor
+   * concreto que la pondría roja: el testid exacto del botón retirado, su texto exacto, y —la que
+   * de verdad cierra la puerta— que la mutación de liberar **no se llame ni una vez** por más que
+   * se recorra la fila entera a clics. Comprobar solo que "algún botón desapareció" no valdría nada.
    */
-  it('⭐ se REVISA Y LIBERA desde aquí, sin dar la vuelta por el Centro de Órdenes', async () => {
+  it('⭐ ya NO existe «Revisar y liberar»: ni su botón, ni su texto', () => {
+    render([fila()]);
+
+    const f = screen.getByTestId('rpl-fila');
+    expect(within(f).queryByTestId('rpl-liberar-50')).toBeNull();
+    expect(within(f).queryByText(/Revisar y liberar/)).toBeNull();
+    // …y la fila NO se quedó muda: sigue el camino a la receta, que es lo que la bandeja hace hoy.
+    expect(within(f).getByTestId('rpl-ver-50')).toBeInTheDocument();
+  });
+
+  it('⭐ la fila ofrece EXACTAMENTE dos controles, y los dos llevan a la receta', () => {
+    render([fila()]);
+
+    // El número es la aserción: con tres botones (el tercero sería el de firmar) se pone roja.
+    const botones = within(screen.getByTestId('rpl-fila')).getAllByRole('button');
+    expect(botones).toHaveLength(2);
+    expect(botones.map((b) => b.getAttribute('data-testid'))).toEqual([
+      'rpl-abrir-50', // el folio
+      'rpl-ver-50', // «Ver la receta»
+    ]);
+  });
+
+  it('⭐ y «Ver la receta» NO firma nada de paso: solo navega', async () => {
     const usuario = userEvent.setup();
     render([fila()]);
 
-    await usuario.click(screen.getByTestId('rpl-liberar-50'));
+    await usuario.click(screen.getByTestId('rpl-ver-50'));
 
-    expect(liberarMutateMock.mock.calls[0]?.[0]).toMatchObject({
-      idOrden: 50,
-      cuerpo: { alcance: 'todo', revisarPendientes: true },
-    });
+    // Si mañana alguien vuelve a colgar una firma de esta pantalla, este cero se rompe.
+    expect(liberarMutateMock).not.toHaveBeenCalled();
   });
 
-  it('el botón dice lo que hace (revisa además de firmar), no solo "liberar"', () => {
-    render([fila()]);
-    expect(screen.getByTestId('rpl-liberar-50')).toHaveTextContent(/Revisar y liberar/);
-  });
-
-  it('sin `desarrollo.administrar` se VE pero no se libera (§Post-F9.68)', () => {
-    render([fila()], ['desarrollo.ver', 'ordenes.ver']);
+  it('la bandeja se ve igual SIN `desarrollo.administrar`: aquí ya no hay nada que administrar', () => {
+    render([fila()], ['desarrollo.ver']);
 
     expect(screen.getByTestId('rpl-fila')).toBeInTheDocument();
+    expect(screen.getByTestId('rpl-ver-50')).toBeInTheDocument();
     expect(screen.queryByTestId('rpl-liberar-50')).toBeNull();
   });
 
@@ -159,13 +183,6 @@ describe('<RecetasPorLiberarPagina> (V1-E3h)', () => {
 
     expect(screen.getByTestId('rpl-abrir-50')).toBeInTheDocument();
     expect(screen.getByTestId('rpl-ver-50')).toBeInTheDocument();
-  });
-
-  it('⭐ V1-E3j: «Revisar y liberar» NO se pierde — sigue siendo el atajo (§Post-F9.75)', () => {
-    render([fila()]);
-    const f = screen.getByTestId('rpl-fila');
-    expect(within(f).getByTestId('rpl-liberar-50')).toBeInTheDocument();
-    expect(within(f).getByTestId('rpl-ver-50')).toBeInTheDocument();
   });
 
   it('el filtro "solo las que ya frenan compras" viaja al SERVIDOR (no se filtra aquí)', async () => {

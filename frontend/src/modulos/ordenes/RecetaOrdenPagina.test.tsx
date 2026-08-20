@@ -153,7 +153,8 @@ describe('<RecetaOrdenPagina> (V1-E3j)', () => {
 
     expect(screen.getByTestId('receta-orden-cancelada')).toBeInTheDocument();
     // Con `desarrollo.administrar` en la sesión: lo que apaga la edición es el ESTADO de la orden.
-    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
+    // (V1-E3k: se mira el botón DEL RENGLÓN; `receta-liberar`, el de bloque, ya no existe para
+    // nadie, así que preguntar por él aquí sería una aserción que nunca puede ponerse roja.)
     expect(screen.queryByTestId('liberar-receta-tela-1')).not.toBeInTheDocument();
   });
 
@@ -161,7 +162,6 @@ describe('<RecetaOrdenPagina> (V1-E3j)', () => {
     render(receta(), ['desarrollo.ver', 'ordenes.ver']);
 
     expect(screen.getByTestId('receta-orden')).toBeInTheDocument();
-    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
     expect(screen.queryByTestId('liberar-receta-tela-1')).not.toBeInTheDocument();
   });
 
@@ -208,6 +208,8 @@ describe('<RecetaOrdenPagina> (V1-E3j)', () => {
 
     expect(screen.queryByTestId('receta-ir-orden')).not.toBeInTheDocument();
     expect(screen.getByTestId('receta-orden')).toBeInTheDocument();
-    expect(screen.getByTestId('receta-liberar')).toBeInTheDocument();
+    // ⭐ V1-E3k (§Post-F9.80): la prueba de que la receta llegó OPERABLE es el botón de firmar DEL
+    // RENGLÓN (antes se miraba `receta-liberar`, el botón de bloque, que ya no existe).
+    expect(screen.getByTestId('liberar-receta-tela-1')).toBeInTheDocument();
   });
 });

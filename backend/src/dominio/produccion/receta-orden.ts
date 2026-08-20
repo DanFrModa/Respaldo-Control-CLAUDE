@@ -61,7 +61,6 @@
  * en silencio: lo que desaparece queda ÍNTEGRO en la bitácora).
  */
 import type {
-  AlcanceLiberacion,
   CambioReceta,
   ChoqueTraerDelModelo,
   DatosLiberarReceta,
@@ -2209,65 +2208,78 @@ export async function marcarRecetaRevisada(
 }
 
 /**
- * ⭐ LIBERA la receta, ENTERA O POR PARTES (`desarrollo.administrar`) — la firma de Desarrollo que
- * abre la puerta de compra (§Post-F9.43(c), partida en renglones por §Post-F9.72).
+ * ⭐ LIBERA renglones de la receta, **UNO POR UNO** (`desarrollo.administrar`) — la firma de
+ * Desarrollo que abre la puerta de compra (§Post-F9.43(c), partida en renglones por §Post-F9.72,
+ * y firmada VIÉNDOLA por §Post-F9.80).
  *
  * Daniel (19-ago-2026): *"podría haber algún cierre que aún no autoriza el cliente, pero ya podríamos
- * ir comprando lo demás"*. Por eso el `alcance`: `todo` (el botón de siempre), `telas`/`avios`/`artes`
- * (lo que evita los veinte clics de lo rutinario) o `seleccion` (renglón por renglón).
+ * ir comprando lo demás"* → se libera **por partes**, no todo-o-nada.
  *
- * TRES condiciones, y las tres tienen razón de ser:
- *  • **Ningún renglón `sin_revisar` DENTRO DEL ALCANCE.** No son 8 clics: "marcar todo revisado" lo
- *    resuelve de un golpe para el 89 % de las órdenes que vienen limpias. Sin esta condición, el
- *    estado por renglón sería decorativo. Se mide sobre el alcance y no sobre la receta entera: si
- *    fuera global, un avío que nadie ha mirado bloquearía la firma de las telas — justo lo que la
- *    decisión vino a desbloquear.
- *  • **El alcance no puede estar VACÍO.** Firmar "nada" dejaría al MRP explotando cero y a alguien
- *    creyendo que ya lo revisaron. Si el modelo no tiene BOM (2 de cada 3 órdenes del viejo), la
- *    receta se captura a mano en la OP — que es exactamente como funcionaba el viejo.
- *  • **Los renglones de `seleccion` tienen que ser de ESTA orden** (A9/D3: un id ajeno se dice, no
- *    se ignora en silencio).
+ * Daniel (20-ago-2026): *"me parece una mala idea el botón de «Liberar todo lo que falta». Creo que
+ * siempre se debe liberar uno por uno, para que se revise lo que se está haciendo. **No tiene sentido
+ * liberar las cosas sin ver**."* → **quien firma NOMBRA cada renglón**.
  *
- * Las LÁPIDAS quedan fuera del alcance a propósito: un renglón excluido no se compra, así que
- * firmarlo no significa nada.
+ * ⚠️ **La regla vive AQUÍ, no en la pantalla** (A1/A4, §Post-F9.68: esconder *y* bloquear). Hasta
+ * V1-E3j esta función aceptaba un `alcance` en bloque (`todo`/`telas`/`avios`/`artes`) y una bandera
+ * `revisarPendientes` que marcaba revisado y firmaba en el mismo acto; los dos los había agregado el
+ * LEAD para que *"lo rutinario no cueste veinte clics"*, y los dos se retiraron. Quitarlos solo de la
+ * UI habría dejado el API firmando de un golpe lo que nadie miró — que es exactamente lo que
+ * §Post-F9.68 vino a matar.
  *
- * Liberar es IDEMPOTENTE en el sentido útil: volver a liberar re-sella quién y cuándo (Desarrollo
- * revisó de nuevo), no truena.
+ * ⚠️ **Lo que esto NO pretende ser**: nada impide que un cliente lea la receta, junte los ids y los
+ * mande todos en una llamada. Eso es DELIBERADO y es la línea que el servidor sí puede sostener: el
+ * servidor **jamás expande un comodín**, así que no hay forma de firmar un renglón cuyo id no se
+ * conocía. Reconstruir "liberar todo" exige leer la receta y enumerarla — y volver a ofrecerlo con un
+ * botón sería re-tomar la decisión de producto que Daniel ya tomó, no aprovechar un hueco.
+ *
+ * DOS condiciones, y las dos tienen razón de ser:
+ *  • **Ningún renglón `sin_revisar` entre los que se firman.** No son 8 clics: «marcar todo revisado»
+ *    —que se CONSERVA, porque no libera nada: solo dice *"ya miré estos renglones"*— lo resuelve de
+ *    un golpe para el 89 % de las órdenes que vienen limpias. Se mide sobre lo que se firma y no
+ *    sobre la receta entera: si fuera global, un avío que nadie ha mirado bloquearía la firma de una
+ *    tela — justo lo que §Post-F9.72 vino a desbloquear.
+ *  • **No se firma "nada".** Una lista vacía dejaría al MRP explotando cero y a alguien creyendo que
+ *    ya lo revisaron (D3: no se libera en silencio).
+ *
+ * Y dos cosas que se DICEN en vez de tragarse (A9/D3): un id que no es de esta orden es 404, y un id
+ * de LÁPIDA se explica por su causa —el renglón existe, pero esta orden decidió que no lo lleva—.
+ * Las lápidas quedan fuera a propósito: un renglón excluido no se compra, así que firmarlo no
+ * significaría nada.
+ *
+ * Liberar es IDEMPOTENTE en el sentido útil: volver a firmar un renglón re-sella quién y cuándo
+ * (Desarrollo lo revisó de nuevo), no truena.
  */
 export async function liberarReceta(
   sesion: SesionUsuario,
   idOrden: number,
-  cuerpo: DatosLiberarReceta = {},
+  cuerpo: DatosLiberarReceta,
   bd?: ContextoBd,
 ): Promise<RecetaOrden> {
   const datos = validarEntrada(esquemaLiberarRecetaCuerpo, cuerpo);
   return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
-    const seleccion = datos.renglones ?? [];
-    if (datos.alcance === 'seleccion' && seleccion.length === 0) {
+    const seleccion = datos.renglones;
+    if (seleccion.length === 0) {
       throw new ErrorValidacion(
-        'No se indicó ningún renglón que liberar. Elige al menos uno (o libera la sección completa).',
+        'No se indicó ningún renglón que liberar. La receta se firma renglón por renglón: elige el ' +
+          'que quieres autorizar.',
       );
     }
     const idsPorTipo = (tipo: TipoRenglonRecetaClave): number[] =>
       seleccion.filter((r) => r.tipo === tipo).map((r) => r.id);
 
-    /** El `where` del alcance para una de las tres tablas (o `null` = esa sección no entra). */
+    /** El `where` de una de las tres tablas (o `null` = de esa sección no se firma nada). */
     const dondeDe = (
       tipo: TipoRenglonRecetaClave,
-      seccion: AlcanceLiberacion,
-    ): { idOrden: number; excluido: false; id?: { in: number[] } } | null => {
-      const base = { idOrden: orden.id, excluido: false as const };
-      if (datos.alcance === 'todo') return base;
-      if (datos.alcance === 'seleccion') {
-        const ids = idsPorTipo(tipo);
-        return ids.length === 0 ? null : { ...base, id: { in: ids } };
-      }
-      return datos.alcance === seccion ? base : null;
+    ): { idOrden: number; excluido: false; id: { in: number[] } } | null => {
+      const ids = idsPorTipo(tipo);
+      return ids.length === 0
+        ? null
+        : { idOrden: orden.id, excluido: false as const, id: { in: ids } };
     };
 
-    const dondeTela = dondeDe('tela', 'telas');
-    const dondeAvio = dondeDe('avio', 'avios');
-    const dondeArte = dondeDe('arte', 'artes');
+    const dondeTela = dondeDe('tela');
+    const dondeAvio = dondeDe('avio');
+    const dondeArte = dondeDe('arte');
 
     const [telas, avios, artes] = await Promise.all([
       dondeTela === null
@@ -2293,77 +2305,39 @@ export async function liberarReceta(
     // D3: un id que no es de esta orden (o que es una lápida) se DICE, no se traga en silencio —
     // si no, "liberé 3 renglones" mentiría cuando en realidad se firmó uno.
     //
-    // ⚠️ Y se dice la CAUSA CORRECTA. El `where` del alcance excluye las lápidas, así que un
-    // renglón excluido caía en el mismo saco que un id de otra orden y contestaba "no encontrado":
-    // el renglón SÍ existe, lo que pasa es que esta orden decidió que no lo lleva. Un mensaje que
-    // describe mal su causa manda a buscar el error donde no está.
-    if (datos.alcance === 'seleccion') {
-      const encontrados = new Set([
-        ...telas.map((t) => `tela-${String(t.id)}`),
-        ...avios.map((a) => `avio-${String(a.id)}`),
-        ...artes.map((a) => `arte-${String(a.id)}`),
-      ]);
-      const perdidos = seleccion.filter((r) => !encontrados.has(`${r.tipo}-${String(r.id)}`));
-      const primero = perdidos[0];
-      if (primero !== undefined) {
-        const lapida = await esLapidaDeLaOrden(tx, orden.id, primero.tipo, primero.id);
-        if (lapida !== null) {
-          throw new ErrorConflicto(
-            `"${lapida}" está QUITADO de esta orden: no se compra, así que no hay nada que ` +
-              'firmarle. Si de verdad va, tráelo de vuelta desde su renglón y entonces fírmalo.',
-          );
-        }
-        throw new ErrorNoEncontrado('Renglón de la receta', primero.id);
+    // ⚠️ Y se dice la CAUSA CORRECTA. El `where` excluye las lápidas, así que un renglón excluido
+    // caía en el mismo saco que un id de otra orden y contestaba "no encontrado": el renglón SÍ
+    // existe, lo que pasa es que esta orden decidió que no lo lleva. Un mensaje que describe mal su
+    // causa manda a buscar el error donde no está.
+    const encontrados = new Set([
+      ...telas.map((t) => `tela-${String(t.id)}`),
+      ...avios.map((a) => `avio-${String(a.id)}`),
+      ...artes.map((a) => `arte-${String(a.id)}`),
+    ]);
+    const perdidos = seleccion.filter((r) => !encontrados.has(`${r.tipo}-${String(r.id)}`));
+    const primero = perdidos[0];
+    if (primero !== undefined) {
+      const lapida = await esLapidaDeLaOrden(tx, orden.id, primero.tipo, primero.id);
+      if (lapida !== null) {
+        throw new ErrorConflicto(
+          `"${lapida}" está QUITADO de esta orden: no se compra, así que no hay nada que ` +
+            'firmarle. Si de verdad va, tráelo de vuelta desde su renglón y entonces fírmalo.',
+        );
       }
+      throw new ErrorNoEncontrado('Renglón de la receta', primero.id);
     }
 
-    // ⭐ B2 — REVISAR Y FIRMAR EN UN SOLO ACTO (§Post-F9.72). Sin esto la BANDEJA no sirve en su
-    // caso dominante: la receta se copia del modelo al crear la orden y sus renglones nacen
-    // `sin_revisar`, así que «liberar todo» rebotaría con *"quedan 3 sin revisar"* y obligaría a ir
-    // al Centro de Órdenes a marcarlos y volver — la vuelta que la bandeja existe para evitar, y
-    // para el 100 % de las órdenes que nadie ha tocado (las que la pueblan).
-    //
-    // No relaja la regla: es el MISMO acto que el botón «marcar todo revisado» —que existe desde
-    // V1-E3d justo porque *"obligar a 8 clics por OP entrena a la gente a clickear sin leer"*—,
-    // en la misma transacción (A2) y acotado AL ALCANCE. Los `ajustado` conservan su marca.
-    let revisadosAhora = 0;
-    if (datos.revisarPendientes) {
-      const soloSinRevisar = { estado: EstadoRenglonReceta.sin_revisar } as const;
-      const marca = { estado: EstadoRenglonReceta.revisado, ...datosModificacion(sesion) };
-      const [t, a, r] = await Promise.all([
-        dondeTela === null
-          ? Promise.resolve({ count: 0 })
-          : tx.ordenTela.updateMany({ where: { ...dondeTela, ...soloSinRevisar }, data: marca }),
-        dondeAvio === null
-          ? Promise.resolve({ count: 0 })
-          : tx.ordenAvio.updateMany({ where: { ...dondeAvio, ...soloSinRevisar }, data: marca }),
-        dondeArte === null
-          ? Promise.resolve({ count: 0 })
-          : tx.ordenArte.updateMany({ where: { ...dondeArte, ...soloSinRevisar }, data: marca }),
-      ]);
-      revisadosAhora = t.count + a.count + r.count;
-      // Las filas ya leídas se ponen al día en memoria (la escritura de arriba es la autoridad):
-      // así el `resumen` de abajo cuenta lo que la base tiene AHORA y no re-consulta.
-      for (const fila of [...telas, ...avios, ...artes]) {
-        if (fila.estado === EstadoRenglonReceta.sin_revisar) {
-          fila.estado = EstadoRenglonReceta.revisado;
-        }
-      }
-    }
-
+    // Llegar aquí con `total === 0` es imposible: la selección no está vacía y ya se probó que cada
+    // id existe, está vivo y es de esta orden. Por eso no hay guarda de "receta vacía" — la que
+    // había servía al desaparecido `alcance: 'todo'`, que sí podía no encontrar nada.
     const resumen = resumirReceta([...telas, ...avios, ...artes]);
-    if (resumen.total === 0) {
-      throw new ErrorConflicto(
-        datos.alcance === 'todo'
-          ? 'La receta de esta orden está vacía: no hay nada que liberar. Captura lo que lleva la ' +
-              'prenda (o restaura los renglones del modelo) antes de liberarla.'
-          : `Esta orden no tiene ${NOMBRE_SECCION[datos.alcance]} que liberar.`,
-      );
-    }
     if (resumen.sinRevisar > 0) {
       throw new ErrorConflicto(
-        `Quedan ${String(resumen.sinRevisar)} renglones sin revisar. Revísalos (o usa "marcar todo ` +
-          'revisado") antes de liberar.',
+        resumen.sinRevisar === 1 && resumen.total === 1
+          ? 'Este renglón todavía no está revisado. Márcalo revisado (o usa "marcar todo revisado") ' +
+              'antes de liberarlo.'
+          : `Quedan ${String(resumen.sinRevisar)} renglones sin revisar. Revísalos (o usa "marcar ` +
+              'todo revisado") antes de liberar.',
       );
     }
 
@@ -2386,15 +2360,13 @@ export async function liberarReceta(
 
     await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
       accion: 'liberar-receta',
-      alcance: datos.alcance,
       renglones: resumen.total,
       // Cuántos de los firmados NO lo estaban: es el número que dice si esta firma movió algo.
       nuevos: resumen.porLiberar,
       ajustados: resumen.ajustados,
-      // A7: si la firma vino acompañada de la revisión (bandeja), queda escrito cuántos se
-      // marcaron en ese mismo acto — no se disfraza de "ya estaban revisados".
-      ...(datos.revisarPendientes ? { revisadosEnEsteActo: revisadosAhora } : {}),
-      ...(datos.alcance === 'seleccion' ? { seleccion } : {}),
+      // A7: queda escrito EXACTAMENTE qué se firmó. Con la firma uno por uno esto es la traza de
+      // quién autorizó qué, no un dato de relleno.
+      seleccion,
     });
   });
 }
@@ -2754,15 +2726,6 @@ async function esLapidaDeLaOrden(
   });
   return fila === null ? null : fila.descripcion;
 }
-
-/** Cómo se nombra cada sección en los mensajes de alcance. */
-const NOMBRE_SECCION: Record<AlcanceLiberacion, string> = {
-  todo: 'renglones',
-  telas: 'telas',
-  avios: 'avíos',
-  artes: 'artes',
-  seleccion: 'renglones',
-};
 
 /**
  * QUITA la firma de los renglones tocados que la tenían, y devuelve cuáles se re-cerraron (para la

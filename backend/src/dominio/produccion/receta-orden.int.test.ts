@@ -112,6 +112,46 @@ async function cuerpoOc(nombreProveedor: string, idOrden?: number) {
 
 const bd = () => ({ cliente });
 
+/** Una referencia a un renglón de la receta, como la pide `liberarReceta`. */
+type RefRenglon = { tipo: 'tela' | 'avio' | 'arte'; id: number };
+
+/**
+ * ⭐ V1-E3k (§Post-F9.80) — ENUMERA los renglones VIVOS para poder firmarlos.
+ *
+ * Existe porque `liberarReceta` **dejó de aceptar comodines**: ya no hay `alcance: 'todo'` ni
+ * `'telas'`. Quien firma tiene que NOMBRAR lo que firma, y para nombrarlo tuvo que leer la receta —
+ * que es exactamente la fricción que Daniel pidió (*"no tiene sentido liberar las cosas sin ver"*).
+ * Las lápidas quedan fuera solas: no se compran, así que firmarlas no significaría nada.
+ */
+async function renglonesVivos(
+  idOrden: number,
+  seccion?: 'telas' | 'avios' | 'artes',
+): Promise<RefRenglon[]> {
+  const r = await obtenerRecetaOrden(sesion(), idOrden, bd());
+  const de = (
+    filas: readonly { id: number; excluido: boolean }[],
+    tipo: RefRenglon['tipo'],
+  ): RefRenglon[] => filas.filter((f) => !f.excluido).map((f) => ({ tipo, id: f.id }));
+  return [
+    ...(seccion === undefined || seccion === 'telas' ? de(r.telas, 'tela') : []),
+    ...(seccion === undefined || seccion === 'avios' ? de(r.avios, 'avio') : []),
+    ...(seccion === undefined || seccion === 'artes' ? de(r.artes, 'arte') : []),
+  ];
+}
+
+/** Firma todos los renglones vivos (o los de UNA sección), nombrándolos uno por uno. */
+async function liberarTodo(
+  idOrden: number,
+  seccion?: 'telas' | 'avios' | 'artes',
+): Promise<Awaited<ReturnType<typeof liberarReceta>>> {
+  return liberarReceta(
+    sesion(),
+    idOrden,
+    { renglones: await renglonesVivos(idOrden, seccion) },
+    bd(),
+  );
+}
+
 /** Crea una orden de 10 piezas del modelo base y le COPIA la receta (como hace el alta real). */
 async function crearOrdenConReceta(folio: bigint): Promise<number> {
   const orden = await cliente.orden.create({
@@ -339,14 +379,14 @@ describe('La PUERTA de compra (§Post-F9.43(c))', () => {
   });
 
   it('liberar exige que no quede ningún renglón SIN REVISAR', async () => {
-    await expect(liberarReceta(sesion(), ordenA, {}, bd())).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(liberarTodo(ordenA)).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
   it('«marcar todo revisado» resuelve el 89 % de un clic, y entonces sí libera', async () => {
     const revisada = await marcarRecetaRevisada(sesion(), ordenA, bd());
     expect(revisada.resumen).toMatchObject({ sinRevisar: 0, revisados: 3 });
 
-    const liberada = await liberarReceta(sesion(), ordenA, {}, bd());
+    const liberada = await liberarTodo(ordenA);
     expect(liberada.puedeComprar).toBe(true);
     expect(liberada.liberadaEn).not.toBeNull();
 
@@ -358,9 +398,15 @@ describe('La PUERTA de compra (§Post-F9.43(c))', () => {
     const orden = await cliente.orden.create({
       data: { folio: 99n, idEmpresa: empresa.id, idModelo, idCliente },
     });
-    await expect(liberarReceta(sesion(), orden.id, {}, bd())).rejects.toBeInstanceOf(
-      ErrorConflicto,
+    // ⭐ V1-E3k: sin comodín, una receta vacía no tiene ni qué nombrar — y firmar una lista vacía se
+    // rechaza con su motivo (D3), no se traga en silencio. Cambió el ERROR (antes era conflicto,
+    // ahora es de validación), no la regla: sigue sin poderse firmar "nada".
+    expect(await renglonesVivos(orden.id)).toEqual([]);
+    const error = await liberarReceta(sesion(), orden.id, { renglones: [] }, bd()).catch(
+      (e: unknown) => e,
     );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).message).toContain('renglón por renglón');
   });
 
   it('⚠️ CORTAR Y PRODUCIR NO se bloquean: la habilitación funciona sin liberar', async () => {
@@ -849,7 +895,7 @@ describe('⭐ La firma se re-cierra al cambiar el contenido — AHORA POR RENGL�
   /** Deja la receta de A liberada ENTERA (el punto de partida de estos casos). */
   async function liberarA(): Promise<void> {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
   }
 
   it('AGREGAR material a una receta ya liberada mete un renglón SIN FIRMAR (y no la cierra entera)', async () => {
@@ -986,14 +1032,14 @@ describe('⭐ La firma se re-cierra al cambiar el contenido — AHORA POR RENGL�
   });
 });
 
-describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72)', () => {
+describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR UNO (§Post-F9.80)', () => {
   beforeEach(async () => {
     // Todas estas pruebas parten de una receta revisada pero SIN FIRMAR.
     await marcarRecetaRevisada(sesion(), ordenA, bd());
   });
 
   it('⭐ EL CASO DE DANIEL: se liberan las telas, se compra la tela, y el avío sigue pendiente', async () => {
-    const r = await liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd());
+    const r = await liberarTodo(ordenA, 'telas');
 
     expect(r.puedeComprar).toBe(true);
     expect(r.todoLiberado).toBe(false);
@@ -1010,103 +1056,127 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72)', () => {
     ]);
   });
 
-  it('liberar POR SECCIÓN: avíos deja las telas fuera', async () => {
-    const r = await liberarReceta(sesion(), ordenA, { alcance: 'avios' }, bd());
+  it('firmar los DOS avíos deja las telas fuera: se firma lo que se nombra, nada más', async () => {
+    const r = await liberarTodo(ordenA, 'avios');
     expect(r.avios.every((a) => a.liberadoEn !== null)).toBe(true);
     expect(r.telas.every((t) => t.liberadoEn === null)).toBe(true);
   });
 
-  it('liberar una SELECCIÓN firma exactamente esos renglones', async () => {
+  it('⭐ liberar UN renglón firma EXACTAMENTE ése y deja a su compañero de sección sin firma', async () => {
     const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
 
     const r = await liberarReceta(
       sesion(),
       ordenA,
-      { alcance: 'seleccion', renglones: [{ tipo: 'avio', id: boton.id }] },
+      { renglones: [{ tipo: 'avio', id: boton.id }] },
       bd(),
     );
 
     expect(r.avios.find((a) => a.id === boton.id)?.liberadoEn).not.toBeNull();
+    // La jareta es del MISMO tipo y de la MISMA orden: si algo expandiera la firma, caería aquí.
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.liberadoEn).toBeNull();
+    expect(r.telas[0]?.liberadoEn).toBeNull();
     expect(r.resumen).toMatchObject({ liberados: 1, porLiberar: 2 });
   });
 
-  it('una SELECCIÓN vacía se rechaza (liberar "nada" no es liberar)', async () => {
-    await expect(
-      liberarReceta(sesion(), ordenA, { alcance: 'seleccion', renglones: [] }, bd()),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+  it('una lista VACÍA se rechaza (liberar "nada" no es liberar)', async () => {
+    await expect(liberarReceta(sesion(), ordenA, { renglones: [] }, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
   });
 
-  it('⭐ B2 — `revisarPendientes` firma una receta que nadie ha revisado (el caso de la BANDEJA)', async () => {
-    // Se deshace el `marcarRecetaRevisada` del beforeEach: así queda EXACTAMENTE una orden recién
-    // creada (la receta se copió del modelo y sus renglones nacen `sin_revisar`), que es el 100 %
-    // de lo que puebla la bandeja.
-    await cliente.ordenTela.updateMany({
-      where: { idOrden: ordenA },
-      data: { estado: 'sin_revisar' },
-    });
+  // ── ⭐ V1-E3k: LA PUERTA ESTÁ CERRADA EN EL SERVIDOR, no solo escondida en la pantalla ──────
+  //
+  // §Post-F9.68 pide las dos capas. Estas dos pruebas son las que se ponen ROJAS si alguien
+  // reintroduce el bloque en el dominio: no comprueban que "algún botón desapareció" —eso no
+  // probaría nada—, comprueban que un cliente que MANDA el cuerpo viejo no consigue lo que pedía.
+
+  it('⭐ un cliente viejo que manda `alcance: "todo"` NO firma la receta entera: solo lo que nombró', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jersey = r0.telas[0]!;
+
+    // Exactamente el cuerpo que mandaba el botón «Liberar todo lo que falta» de V1-E3j, más un
+    // renglón nombrado para que la petición sea válida. Si `alcance` siguiera vivo, los DOS avíos
+    // quedarían firmados; el cast es el punto: ningún cliente tipado puede mandar esto ya.
+    const r = await liberarReceta(
+      sesion(),
+      ordenA,
+      { alcance: 'todo', renglones: [{ tipo: 'tela', id: jersey.id }] } as unknown as {
+        renglones: RefRenglon[];
+      },
+      bd(),
+    );
+
+    expect(r.telas.find((t) => t.id === jersey.id)?.liberadoEn).not.toBeNull();
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.liberadoEn).toBeNull();
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.liberadoEn).toBeNull();
+    expect(r.todoLiberado).toBe(false);
+    expect(r.resumen).toMatchObject({ liberados: 1, porLiberar: 2 });
+  });
+
+  it('⭐ `revisarPendientes: true` YA NO firma lo que nadie revisó: rebota igual (§Post-F9.80)', async () => {
+    // Se deshace el `marcarRecetaRevisada` del beforeEach: queda una orden como recién creada, que
+    // es el caso para el que se había inventado la bandera (la bandeja firmaba sin ver la lista).
     await cliente.ordenAvio.updateMany({
       where: { idOrden: ordenA },
       data: { estado: 'sin_revisar' },
     });
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
 
-    // Sin la bandera rebota, que es el defecto que reportó el reviewer.
-    await expect(liberarReceta(sesion(), ordenA, { alcance: 'todo' }, bd())).rejects.toBeInstanceOf(
-      ErrorConflicto,
-    );
+    const error = await liberarReceta(
+      sesion(),
+      ordenA,
+      { revisarPendientes: true, renglones: [{ tipo: 'avio', id: boton.id }] } as unknown as {
+        renglones: RefRenglon[];
+      },
+      bd(),
+    ).catch((e: unknown) => e);
+
+    // Si la bandera siguiera viva esto habría resuelto, no lanzado: ése es el valor que la pone roja.
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect((error as ErrorConflicto).message).toContain('revisado');
+    const despues = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(despues.avios.find((a) => a.id === boton.id)?.estado).toBe('sin_revisar');
+    expect(despues.avios.find((a) => a.id === boton.id)?.liberadoEn).toBeNull();
+  });
+
+  it('…y el camino que SÍ queda es «marcar todo revisado» (que no libera nada) y luego firmar', async () => {
+    await cliente.ordenAvio.updateMany({
+      where: { idOrden: ordenA },
+      data: { estado: 'sin_revisar' },
+    });
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
+
+    // «Marcar todo revisado» SE CONSERVA por decisión de Daniel: no compromete dinero.
+    const revisada = await marcarRecetaRevisada(sesion(), ordenA, bd());
+    expect(revisada.resumen.sinRevisar).toBe(0);
+    // Y no firmó NADA: revisar y liberar son dos actos distintos.
+    expect(revisada.resumen.liberados).toBe(0);
 
     const r = await liberarReceta(
       sesion(),
       ordenA,
-      { alcance: 'todo', revisarPendientes: true },
+      { renglones: [{ tipo: 'avio', id: boton.id }] },
       bd(),
     );
-
-    expect(r.todoLiberado).toBe(true);
-    expect(r.resumen).toMatchObject({ sinRevisar: 0, porLiberar: 0 });
-    // Y se puede comprar de verdad, sin dar la vuelta por el Centro de Órdenes.
-    await expect(explosionarOrden(sesion(), ordenA, bd())).resolves.toMatchObject({
-      pendientesLiberar: [],
-    });
+    expect(r.avios.find((a) => a.id === boton.id)?.liberadoEn).not.toBeNull();
   });
 
-  it('`revisarPendientes` NO pisa los AJUSTADOS (su marca es la que impide que el modelo los pise)', async () => {
+  it('el renglón AJUSTADO se firma sin perder su marca (es la que impide que el modelo lo pise)', async () => {
     const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const boton = r0.avios.find((a) => a.idAvio === avioBoton.id)!;
     await editarRenglonReceta(sesion(), ordenA, 'avio', boton.id, { consumoPorPrenda: 9 }, bd());
 
-    const r = await liberarReceta(
-      sesion(),
-      ordenA,
-      { alcance: 'todo', revisarPendientes: true },
-      bd(),
-    );
+    const r = await liberarTodo(ordenA);
 
     expect(r.avios.find((a) => a.id === boton.id)?.estado).toBe('ajustado');
     expect(r.todoLiberado).toBe(true);
   });
 
-  it('`revisarPendientes` respeta el ALCANCE: no marca lo de otra sección', async () => {
-    await cliente.ordenTela.updateMany({
-      where: { idOrden: ordenA },
-      data: { estado: 'sin_revisar' },
-    });
-    await cliente.ordenAvio.updateMany({
-      where: { idOrden: ordenA },
-      data: { estado: 'sin_revisar' },
-    });
-
-    await liberarReceta(sesion(), ordenA, { alcance: 'avios', revisarPendientes: true }, bd());
-
-    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
-    expect(r.avios.every((a) => a.estado === 'revisado' && a.liberadoEn !== null)).toBe(true);
-    // La tela sigue SIN revisar y SIN firmar: el alcance era «avíos».
-    expect(r.telas[0]?.estado).toBe('sin_revisar');
-    expect(r.telas[0]?.liberadoEn).toBeNull();
-  });
-
-  it('⭐ H7 — un id de LÁPIDA en la selección se explica por su causa, no como "no encontrado"', async () => {
+  it('⭐ H7 — un id de LÁPIDA en la lista se explica por su causa, no como "no encontrado"', async () => {
     const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const jareta = r0.avios.find((a) => a.idAvio === avioJareta.id)!;
     await quitarRenglonReceta(sesion(), ordenA, 'avio', jareta.id, {}, bd());
@@ -1114,7 +1184,7 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72)', () => {
     const error = await liberarReceta(
       sesion(),
       ordenA,
-      { alcance: 'seleccion', renglones: [{ tipo: 'avio', id: jareta.id }] },
+      { renglones: [{ tipo: 'avio', id: jareta.id }] },
       bd(),
     ).catch((e: unknown) => e);
 
@@ -1124,67 +1194,60 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72)', () => {
     expect((error as ErrorConflicto).message).toContain('QUITADO');
   });
 
-  it('un renglón de OTRA orden en la selección es 404, no un silencio (D3)', async () => {
+  it('un renglón de OTRA orden en la lista es 404, no un silencio (D3)', async () => {
     const rB = await obtenerRecetaOrden(sesion(), ordenB, bd());
     await expect(
-      liberarReceta(
-        sesion(),
-        ordenA,
-        { alcance: 'seleccion', renglones: [{ tipo: 'avio', id: rB.avios[0]!.id }] },
-        bd(),
-      ),
+      liberarReceta(sesion(), ordenA, { renglones: [{ tipo: 'avio', id: rB.avios[0]!.id }] }, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 
-  it('una sección VACÍA se rechaza diciendo que ahí no hay nada', async () => {
-    // El modelo de estas pruebas no lleva arte: la sección existe pero está vacía.
-    await expect(
-      liberarReceta(sesion(), ordenA, { alcance: 'artes' }, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+  it('una sección VACÍA no tiene ni qué nombrar: no hay forma de "firmar los artes" de esta orden', async () => {
+    // El modelo de estas pruebas no lleva arte. Antes existía `alcance: 'artes'` y contestaba "esta
+    // orden no tiene artes que liberar"; ahora el comodín no existe, así que la lista sale vacía y
+    // el rechazo es el de siempre: no se firma "nada" (D3).
+    expect(await renglonesVivos(ordenA, 'artes')).toEqual([]);
+    await expect(liberarTodo(ordenA, 'artes')).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
   it('⭐ un renglón SIN REVISAR de OTRA sección no estorba a la firma de la mía', async () => {
-    // Se agrega un avío nuevo (queda `ajustado`, no `sin_revisar`) y se deja una tela sin revisar
-    // a mano: firmar los AVÍOS no debe pedir cuentas de la tela.
+    // La tela se deja sin revisar a mano: firmar los AVÍOS no debe pedir cuentas de la tela.
     await cliente.ordenTela.updateMany({
       where: { idOrden: ordenA },
       data: { estado: 'sin_revisar' },
     });
-    const r = await liberarReceta(sesion(), ordenA, { alcance: 'avios' }, bd());
+    const r = await liberarTodo(ordenA, 'avios');
     expect(r.avios.every((a) => a.liberadoEn !== null)).toBe(true);
     // Y la tela sin revisar sigue frenando SU propia firma.
-    await expect(
-      liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(liberarTodo(ordenA, 'telas')).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
   it('firmar todo lo que faltaba deja la receta COMPLETA, con fecha y autor', async () => {
-    await liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd());
-    const r = await liberarReceta(sesion(), ordenA, { alcance: 'todo' }, bd());
+    await liberarTodo(ordenA, 'telas');
+    const r = await liberarTodo(ordenA);
     expect(r.todoLiberado).toBe(true);
     expect(r.liberadaEn).not.toBeNull();
     expect(r.liberadaPor).not.toBeNull();
   });
 
-  it('la LÁPIDA queda fuera del alcance: firmar no la toca', async () => {
+  it('la LÁPIDA no cuenta para "todo liberado": firmar lo vivo basta, y a ella no la toca nadie', async () => {
     const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const jareta = r0.avios.find((a) => a.idAvio === avioJareta.id)!;
     await quitarRenglonReceta(sesion(), ordenA, 'avio', jareta.id, {}, bd());
 
-    const r = await liberarReceta(sesion(), ordenA, { alcance: 'todo' }, bd());
+    const r = await liberarTodo(ordenA);
 
     expect(r.avios.find((a) => a.id === jareta.id)?.liberadoEn).toBeNull();
     expect(r.todoLiberado).toBe(true);
   });
 
   it('⭐ la OC A MANO se frena por MATERIAL: la tela sin firmar no se compra aunque el avío sí esté', async () => {
-    await liberarReceta(sesion(), ordenA, { alcance: 'avios' }, bd());
+    await liberarTodo(ordenA, 'avios');
     // `cuerpoOc` compra JERSEY, que sigue sin firma.
     await expect(
       crearOC(sesionOc(), await cuerpoOc('Telas del Este', ordenA), bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
-    await liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd());
+    await liberarTodo(ordenA, 'telas');
     const oc = await crearOC(sesionOc(), await cuerpoOc('Telas del Oeste', ordenA), bd());
     expect(oc.id).toBeGreaterThan(0);
   });
@@ -1199,7 +1262,7 @@ describe('⭐ La puerta cubre TAMBIÉN la OC capturada a mano (hallazgo del revi
 
   it('…y se permite en cuanto Desarrollo la libera', async () => {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
 
     const oc = await crearOC(sesionOc(), await cuerpoOc('Telas del Sur', ordenA), bd());
     expect(oc.id).toBeGreaterThan(0);
@@ -1316,7 +1379,7 @@ describe('⭐ D3 — lo que una mutación PISA queda escrito íntegro (hallazgo 
       bd(),
     );
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
 
     const r1 = await editarRenglonReceta(
       sesion(),
@@ -1501,7 +1564,7 @@ describe('⭐ La puerta también cubre AGREGAR LÍNEAS a una OC ya hecha (2º ha
   /** Deja la receta liberada, crea una OC ligada, y luego REVOCA la firma tocando la receta. */
   async function ocLigadaYFirmaRevocada(): Promise<number> {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
     const oc = await crearOC(sesionOc(), await cuerpoOc('Proveedor A', ordenA), bd());
 
     // Desarrollo toca el contenido → la firma se revoca (regla de la ronda anterior).
@@ -1825,7 +1888,7 @@ describe('⭐ CRITERIO DE CIERRE — dos órdenes del mismo modelo, una con jare
     // Las dos se revisan y se liberan (la puerta de compra).
     for (const id of [ordenA, ordenB]) {
       await marcarRecetaRevisada(sesion(), id, bd());
-      await liberarReceta(sesion(), id, {}, bd());
+      await liberarTodo(id);
     }
 
     // ── 1. COMPRAN COSAS DISTINTAS (MRP) ──
@@ -1867,7 +1930,7 @@ describe('⭐ CRITERIO DE CIERRE — dos órdenes del mismo modelo, una con jare
     // La orden A se libera y se produce; después alguien quita la jareta DEL MODELO. Antes de esta
     // etapa eso apagaba la jareta en TODAS las órdenes, incluidas las ya producidas con jareta.
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
 
     await cliente.modeloAvio.delete({
       where: { idModelo_idAvio: { idModelo, idAvio: avioJareta.id } },
@@ -2203,7 +2266,7 @@ describe('⭐ V1-E3h — TRAER DEL MODELO lo que le falta a la receta (§Post-F9
 
   it('lo traído entra como un pendiente más: el comprador lo ve en la explosión', async () => {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
     await elModeloAgrega('ETQ-01');
 
     await traerDelModelo(sesion(), ordenA, {}, bd());
@@ -2292,7 +2355,7 @@ describe('⭐ V1-E3h — LA BANDEJA «Recetas por liberar» (§Post-F9.72)', () 
 
   it('la orden que ya no tiene nada pendiente DESAPARECE de la bandeja', async () => {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, {}, bd());
+    await liberarTodo(ordenA);
 
     const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
     expect(pagina.datos.map((f) => f.idOrden)).toEqual([ordenB]);
@@ -2300,7 +2363,7 @@ describe('⭐ V1-E3h — LA BANDEJA «Recetas por liberar» (§Post-F9.72)', () 
 
   it('liberar en PARTE la deja en la bandeja, con el conteo ya bajado', async () => {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd());
+    await liberarTodo(ordenA, 'telas');
 
     const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
     expect(pagina.datos.find((f) => f.idOrden === ordenA)).toMatchObject({
@@ -2340,7 +2403,7 @@ describe('⭐ V1-E3h — LA BANDEJA «Recetas por liberar» (§Post-F9.72)', () 
 
   it('⭐ marca la que YA FRENA DINERO (tiene OC por otra parte de su receta)', async () => {
     await marcarRecetaRevisada(sesion(), ordenA, bd());
-    await liberarReceta(sesion(), ordenA, { alcance: 'telas' }, bd());
+    await liberarTodo(ordenA, 'telas');
     await crearOC(sesionOc(), await cuerpoOc('Telas del Centro', ordenA), bd());
 
     const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());

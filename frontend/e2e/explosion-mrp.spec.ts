@@ -55,13 +55,30 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
       // migradas), liberar responde 409 y entonces lo que se exige es la puerta dicha con todas sus
       // letras. Lo que NUNCA se acepta es que la pantalla se quede muda.
       await page.request.post(`/api/ordenes/${String(idOrden)}/receta/revisar`);
-      // V1-E3h (§Post-F9.72): liberar admite ALCANCE; aquí se firma TODO explícitamente (el cuerpo
-      // es opcional, pero mandarlo deja escrito qué se está probando).
-      const liberada = (
-        await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`, {
-          data: { alcance: 'todo' },
-        })
-      ).ok();
+      // ⭐ V1-E3k (§Post-F9.80): liberar YA NO acepta comodines — hay que NOMBRAR cada renglón. Así
+      // que se lee la receta y se enumeran sus renglones VIVOS, que es la misma vuelta que da la
+      // pantalla. Si la receta viene vacía (2 de cada 3 órdenes migradas) no hay nada que firmar y
+      // `liberada` queda en false, que es justo la rama de abajo.
+      const receta = await page.request.get(`/api/ordenes/${String(idOrden)}/receta`);
+      const contenido = receta.ok()
+        ? ((await receta.json()) as {
+            telas: { id: number; excluido: boolean }[];
+            avios: { id: number; excluido: boolean }[];
+            artes: { id: number; excluido: boolean }[];
+          })
+        : { telas: [], avios: [], artes: [] };
+      const renglones = [
+        ...contenido.telas.filter((t) => !t.excluido).map((t) => ({ tipo: 'tela', id: t.id })),
+        ...contenido.avios.filter((a) => !a.excluido).map((a) => ({ tipo: 'avio', id: a.id })),
+        ...contenido.artes.filter((a) => !a.excluido).map((a) => ({ tipo: 'arte', id: a.id })),
+      ];
+      const liberada =
+        renglones.length > 0 &&
+        (
+          await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`, {
+            data: { renglones },
+          })
+        ).ok();
 
       await primera.click();
       if (liberada) {
