@@ -94,7 +94,8 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
 - **Frontend** `frontend/src/modulos/{compras,notas-salida}/` — listado/captura de OC, bandeja de
   autorización (móvil), compras por orden, recepción de **avíos** (la tela se recibe por su factura
   desde §Post-F9.14: el renglón de tela se muestra deshabilitado con la nota de a dónde ir),
-  explosión (con "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil),
+  explosión (⭐ V1-E3q: conjunto de OP con chips + **«Revisar y generar OC»** → revisión previa →
+  confirmar), tablero "qué tengo / qué falta" (semáforo, móvil),
   captura/consulta de notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
   - **Proveedor de la OC acotado por sus renglones (§Post-F9.12, 7-ago-2026):** el selector del
     encabezado se filtra en vivo por el rol (R15) que piden los renglones capturados — solo telas →

@@ -4,7 +4,22 @@
  * falta"), principio Make-to-Order (se compra POR ORDEN, nunca por niveles de stock/reorden) y doc
  * `Documentacion_MJD/01-Modelos.md §2` (la receta/BOM: telas con `CantTela`, avíos con `CantHab`).
  *
- * Tres operaciones, toda la lógica AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan:
+ * Toda la lógica AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan.
+ *
+ * ⭐⭐ **V1-E3q (§Post-F9.85 / §Post-F9.86) — LA COMPRA DESDE LA EXPLOSIÓN.** Daniel, probando en
+ * vivo el 20-ago-2026: *"me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y
+ * **me deja volver a hacerla**"*. Tres cambios que se sostienen entre ellos:
+ *
+ *  1. **NO SE VUELVE A COMPRAR LO YA COMPRADO.** Cada renglón sale con `cantidadEnOc` y
+ *     `cantidadPendiente`, y **sólo lo pendiente se compra**. La verdad de *"cuánto ya está en una
+ *     OC"* vive en UN SOLO lugar —`comprometido-en-oc.ts`, el mismo que lee el tablero R7— y su
+ *     criterio (todas las OC menos la cancelada; **el borrador SÍ cuenta**) está justificado ahí.
+ *  2. **LA REVISIÓN PREVIA.** `planearCompra` es la ÚNICA función que decide qué se compra;
+ *     `previoCompraDesdeExplosion` la pinta sin escribir nada y `generarOCDesdeExplosion` la
+ *     ejecuta. Una previa que calculara por su cuenta sería una promesa que el sistema no cumple.
+ *  3. **UNA COMPRA PARA VARIAS OP.** `explosionarOrdenes` explota un CONJUNTO (`explosionarOrden`
+ *     es su atajo de una sola). **Se ve junto, se guarda repartido**: la pantalla agrupa por
+ *     material+proveedor y la OC guarda **una línea por (material, OP)**.
  *
  * ⭐ **V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
  * modelo.** Daniel: *"El BOM debe de vivir en la OP"*. Consecuencias, todas buscadas:
@@ -19,15 +34,16 @@
  *    Las dos decisiones hablan de momentos distintos: congelar es del día que nació la orden,
  *    comprar es del día que se compra.
  *
- *  1. `explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda de la RECETA DE LA ORDEN
+ *  1. `explosionarOrdenes`/`explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda de la RECETA DE LA ORDEN
  *     `paraProduccion` y no excluida × piezas color×talla de la orden ), para TELAS y AVÍOS. PERSISTE un SNAPSHOT regenerable
  *     (`RequerimientoOrden`): congela el cálculo aunque el BOM cambie después. Regenerar = borrar el
  *     snapshot previo de la orden y reescribirlo en UNA transacción (A2/D3), devolviendo el DIFF
  *     contra el snapshot viejo (nuevo/eliminado/cantidad-cambiada) para mostrarlo. Avíos GENÉRICOS
  *     (decisión (d) de Daniel): se NETEAN contra la existencia REAL del kardex de avíos (Σ de
  *     movimientos, D3) — solo el faltante va a compra; si el stock cubre, no genera compra.
- *  2. `generarOCDesdeExplosion` (R3): del snapshot, agrupa el requerido PENDIENTE seleccionado POR
- *     PROVEEDOR sugerido y crea UNA OC por proveedor en un clic. REUSA `crearOC` (no se duplica la
+ *  2. `planearCompra` → `previoCompraDesdeExplosion` / `generarOCDesdeExplosion` (R3): del snapshot,
+ *     resta lo que YA está en OC (V1-E3q), agrupa lo que de verdad falta POR PROVEEDOR y crea UNA OC
+ *     por proveedor. REUSA `crearOC` (no se duplica la
  *     lógica de folio/transacción/auditoría). Liga cada línea a la orden (`idOrden`) para que R7
  *     cruce sin prorrateos. La OC nace en `borrador` (sigue su ciclo normal de E2).
  *  3. `estatusMaterialesOrden` (R7): cruce on-demand Requerido (snapshot) vs En-OC (Σ líneas de OC
