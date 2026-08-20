@@ -1994,6 +1994,12 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     expect(reparto.get(2)).toBeCloseTo(30); // a la 2 le faltan 30
   });
 
+  /**
+   * ⚠️ NOTA para quien mute este código: **A9 se sostiene DOS veces a propósito** — el filtro por
+   * empresa de `explosionarOrdenes`/`planearCompra` y, detrás, el de `exigirRecetaLiberada`. Quitar
+   * UNO solo deja el 404 intacto (mutante equivalente, verificado el 20-ago); lo que esta prueba
+   * cubre es la INVARIANTE, no una línea: con las dos guardas fuera se pone roja.
+   */
   it('⭐ A9 — meter una OP de OTRA empresa responde 404 y no explota nada', async () => {
     const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
     const ordenAjena = await cliente.orden.create({
@@ -2053,5 +2059,53 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     // las dos (compra de menos) o a ninguna (compra duplicada).
     expect(reparto.get(1)).toBe(0);
     expect(reparto.get(2)).toBeCloseTo(120);
+  });
+
+  /**
+   * 🔴 La MITAD que faltaba de la prueba de arriba: que el reparto de la SEGUNDA compra se calcule
+   * sobre lo PENDIENTE de cada OP y no sobre su demanda bruta. Es un error fácil de cometer —los
+   * dos números viven en el mismo renglón— y silencioso: repartir 120 en proporción 180:120 le
+   * pondría 72 a la orden A, que ya estaba surtida, y sólo 48 a la B, que necesita 120. La OC se
+   * vería "correcta" (suma 120) y la orden B se quedaría sin botones en producción.
+   */
+  it('⭐ la SEGUNDA compra reparte sobre lo PENDIENTE, no sobre la demanda bruta', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    // ⚠️ Compra PARCIAL de la orden A: 100 de sus 180. Es el caso que de verdad separa las dos
+    // maneras de repartir — con la A completamente surtida, su renglón ni siquiera entra al plan y
+    // usar una base u otra daría lo mismo (por ahí se coló un mutante VIVO en la primera vuelta).
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const porOrden = new Map(
+      oc.lineas
+        .filter((l) => l.idAvio === avioBoton.id)
+        .map((l) => [l.idOrden, Number(l.cantidad)]),
+    );
+    // 🔴 A le faltan 80 (180 − 100) y a B sus 120. Repartir los 200 en proporción a la DEMANDA
+    // BRUTA (180:120) daría 120 y 80: le compraría de MÁS a la orden ya surtida y dejaría a la B
+    // corta 40 piezas — una OC que suma bien y surte mal.
+    expect(porOrden.get(idOrden)).toBeCloseTo(80);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(120);
   });
 });
