@@ -544,21 +544,7 @@ export type DatosRecetaQuitar = z.input<typeof esquemaRecetaQuitarCuerpo>;
 /** Parámetro de ruta `:tipo` de un renglón de receta. */
 export const esquemaRecetaTipoParam = z.object({ tipo: esquemaTipoRenglonReceta });
 
-// ── V1-E3h · LIBERAR POR PARTES (§Post-F9.72) ──────────────────────────────────
-
-/**
- * QUÉ se libera de un jalón. Daniel pidió que *"lo rutinario no cueste veinte clics"*, así que la
- * firma admite alcances en bloque además de la selección fina:
- *  • `todo`      — todos los renglones vivos de la receta (lo que hacía el botón de V1-E3d).
- *  • `telas` / `avios` / `artes` — la sección entera.
- *  • `seleccion` — exactamente los renglones que se listan en `renglones`.
- */
-export const esquemaAlcanceLiberacion = z
-  .enum(['todo', 'telas', 'avios', 'artes', 'seleccion'])
-  .describe('Qué parte de la receta se libera.');
-
-/** Alcance de una liberación. */
-export type AlcanceLiberacion = z.infer<typeof esquemaAlcanceLiberacion>;
+// ── V1-E3h · LIBERAR POR PARTES (§Post-F9.72) · V1-E3k · UNO POR UNO (§Post-F9.80) ─────────────
 
 /** Referencia a un renglón concreto de la receta (tipo + id dentro de la orden). */
 export const esquemaReferenciaRenglonReceta = z
@@ -569,43 +555,39 @@ export const esquemaReferenciaRenglonReceta = z
 export type ReferenciaRenglonReceta = z.infer<typeof esquemaReferenciaRenglonReceta>;
 
 /**
- * Cuerpo de LIBERAR. Sin cuerpo (o con `alcance: 'todo'`) se comporta como el botón de siempre.
- * `renglones` SOLO se lee con `alcance: 'seleccion'`; el dominio rechaza una selección vacía en vez
- * de liberar "nada" en silencio (D3).
+ * Cuerpo de LIBERAR. **Hay que NOMBRAR cada renglón que se firma** — no existe ningún alcance en
+ * bloque, y ésa es la regla, no una omisión.
+ *
+ * ⭐ V1-E3k (§Post-F9.80) — DANIEL, 20-ago-2026: *"me parece una mala idea el botón de «Liberar todo
+ * lo que falta». Creo que siempre se debe liberar uno por uno, para que se revise lo que se está
+ * haciendo. **No tiene sentido liberar las cosas sin ver**."*
+ *
+ * Hasta V1-E3j este cuerpo llevaba un `alcance` (`todo` / `telas` / `avios` / `artes` / `seleccion`)
+ * y una bandera `revisarPendientes`: los dos los agregó el LEAD razonando que *"lo rutinario no
+ * cueste veinte clics"*. Ese razonamiento optimiza la prisa, y **la firma no es un trámite: es la
+ * puerta que abre la compra**. Los dos SE RETIRAN, y se retiran **aquí** —no solo de la pantalla—
+ * porque la decisión es de negocio y las de negocio se cumplen en el servidor (A1/A4, §Post-F9.68:
+ * esconder *y* bloquear, las dos capas).
+ *
+ * Lo que SÍ sobrevive de §Post-F9.72 es lo que Daniel pidió: **liberar POR PARTES**. Se sigue
+ * pudiendo firmar una parte de la receta y dejar el resto pendiente; lo que ya no se puede es pedir
+ * que **el servidor expanda** un comodín a renglones que quien firma nunca nombró. Quien libera
+ * tiene que traer la lista, y para tenerla tuvo que leer la receta.
+ *
+ * ⚠️ Ojo con el límite: el máximo es una defensa contra un cuerpo absurdo, **no** la regla de
+ * negocio. La regla es la de arriba: nada se firma sin nombrarse. Una lista vacía la rechaza el
+ * dominio con su motivo (D3: no se libera "nada" en silencio).
  */
 export const esquemaLiberarRecetaCuerpo = z
   .object({
-    alcance: esquemaAlcanceLiberacion.default('todo'),
-    renglones: z.array(esquemaReferenciaRenglonReceta).max(500).optional(),
-    /**
-     * ⭐ REVISAR Y FIRMAR EN UN SOLO ACTO — lo que hace usable la BANDEJA (§Post-F9.72).
-     *
-     * Sin esto, el botón de la bandeja no sirve **en su caso dominante**: una orden recién creada
-     * copia la receta del modelo y sus renglones nacen `sin_revisar` (el default del esquema), así
-     * que «liberar» contesta *"quedan 3 renglones sin revisar"* y obliga a ir al Centro de Órdenes a
-     * marcarlos y volver — **exactamente la vuelta que la bandeja existe para evitar**, y para el
-     * 100 % de las órdenes que nadie ha tocado, que son justo las que la pueblan.
-     *
-     * `true` marca como `revisado` lo que esté `sin_revisar` DENTRO DEL ALCANCE y firma, todo en la
-     * MISMA transacción (A2). No relaja la regla: es el mismo acto deliberado que el botón «marcar
-     * todo revisado» —el que el módulo tiene desde V1-E3d justamente porque *"obligar a 8 clics por
-     * OP entrena a la gente a clickear sin leer"*—, solo que sin la vuelta. Los `ajustado`
-     * conservan su marca y las lápidas siguen fuera del alcance.
-     *
-     * Default `false`: en el panel de la orden los dos botones existen por separado y ahí la
-     * fricción sí compra algo (los renglones están a la vista).
-     */
-    revisarPendientes: z
-      .boolean()
-      .default(false)
-      .describe(
-        'Marca como revisado lo que esté sin revisar DENTRO DEL ALCANCE y lo firma en el mismo ' +
-          'acto (lo usa la bandeja «Recetas por liberar», donde los renglones no están a la vista).',
-      ),
+    renglones: z
+      .array(esquemaReferenciaRenglonReceta)
+      .max(500)
+      .describe('Los renglones que se firman, uno por uno. No hay comodín: hay que nombrarlos.'),
   })
-  .describe('Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES).');
+  .describe('Qué renglones firma Desarrollo (§Post-F9.80: se libera UNO POR UNO, viéndolos).');
 
-/** Datos de una liberación por partes. */
+/** Datos de una liberación. */
 export type DatosLiberarReceta = z.input<typeof esquemaLiberarRecetaCuerpo>;
 
 // ── V1-E3h · TRAER DEL MODELO lo que le falta a la receta (§Post-F9.73) ────────

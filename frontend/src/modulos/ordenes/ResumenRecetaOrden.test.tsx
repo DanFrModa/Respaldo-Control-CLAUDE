@@ -52,6 +52,40 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
   };
 }
 
+/**
+ * Una TELA de verdad. Existe para UNA sola prueba, y por una razón concreta: sin renglones, afirmar
+ * que «el resumen no ofrece firmar» sería afirmar la ausencia de un testid que no podría existir de
+ * ninguna forma — una aserción incapaz de ponerse roja. Con esta tela, `liberar-receta-tela-1` es
+ * exactamente el botón que aparecería si el resumen se convirtiera en la pantalla completa.
+ */
+function unaTela(): RecetaOrden['telas'][number] {
+  return {
+    id: 1,
+    tipo: 'tela',
+    estado: 'sin_revisar',
+    agregadoAMano: false,
+    excluido: false,
+    notas: null,
+    liberadoEn: null,
+    liberadoPor: null,
+    enElModelo: true,
+    cambios: [],
+    idTela: 10,
+    nombre: 'Jersey',
+    unidad: 'kg',
+    consumoPorPrenda: 1.5,
+    precio: 50,
+    paraPreCosto: true,
+    paraProduccion: true,
+    paraCosto: true,
+    idTelaProveedor: null,
+    proveedorAmarrado: null,
+    consumoModelo: 1.5,
+    precioModelo: 50,
+    precioModeloDeCompra: false,
+  };
+}
+
 function render(datos: RecetaOrden): void {
   useRecetaOrdenMock.mockReturnValue({ data: datos, isPending: false, isError: false });
   renderConProveedores(
@@ -173,8 +207,13 @@ describe('<ResumenRecetaOrden> (V1-E3j)', () => {
   });
 
   it('⚠️ el resumen NO ofrece firmar ni editar: el trabajo se hace en la pantalla completa', () => {
-    render(receta());
-    expect(screen.queryByTestId('receta-liberar')).not.toBeInTheDocument();
+    // ⭐ V1-E3k (§Post-F9.80): se le pasa una receta CON tela a propósito. Antes esta prueba corría
+    // sobre una receta vacía y preguntaba por `receta-liberar` —el botón de bloque de la cabecera—,
+    // y hoy ese testid no existe en NINGUNA pantalla: la aserción no podía ponerse roja nunca. Lo
+    // que el resumen no debe ofrecer es la firma POR RENGLÓN, y para poder afirmarlo tiene que
+    // haber un renglón cuyo botón fuese posible.
+    render(receta({ telas: [unaTela()] }));
+    expect(screen.queryByTestId('liberar-receta-tela-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
     expect(screen.queryByTestId('receta-seccion-telas')).not.toBeInTheDocument();
   });

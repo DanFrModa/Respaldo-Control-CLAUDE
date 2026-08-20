@@ -68772,7 +68772,7 @@
     },
     "/api/ordenes/{id}/receta/liberar": {
       "post": {
-        "summary": "Liberar la receta — entera, por sección o renglón por renglón (§Post-F9.72)",
+        "summary": "Liberar la receta renglón por renglón — hay que nombrarlos (§Post-F9.80)",
         "tags": [
           "ordenes"
         ],
@@ -68783,18 +68783,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "alcance": {
-                    "default": "todo",
-                    "type": "string",
-                    "enum": [
-                      "todo",
-                      "telas",
-                      "avios",
-                      "artes",
-                      "seleccion"
-                    ],
-                    "description": "Qué parte de la receta se libera."
-                  },
                   "renglones": {
                     "maxItems": 500,
                     "type": "array",
@@ -68821,19 +68809,18 @@
                         "id"
                       ],
                       "description": "Un renglón de la receta de esta orden."
-                    }
-                  },
-                  "revisarPendientes": {
-                    "default": false,
-                    "description": "Marca como revisado lo que esté sin revisar DENTRO DEL ALCANCE y lo firma en el mismo acto (lo usa la bandeja «Recetas por liberar», donde los renglones no están a la vista).",
-                    "type": "boolean"
+                    },
+                    "description": "Los renglones que se firman, uno por uno. No hay comodín: hay que nombrarlos."
                   }
                 },
-                "description": "Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES)."
+                "required": [
+                  "renglones"
+                ],
+                "description": "Qué renglones firma Desarrollo (§Post-F9.80: se libera UNO POR UNO, viéndolos)."
               }
             }
           },
-          "description": "Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES)."
+          "description": "Qué renglones firma Desarrollo (§Post-F9.80: se libera UNO POR UNO, viéndolos)."
         },
         "parameters": [
           {

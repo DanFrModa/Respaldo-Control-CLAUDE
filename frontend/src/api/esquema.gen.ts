@@ -27137,7 +27137,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Liberar la receta — entera, por sección o renglón por renglón (§Post-F9.72) */
+    /** Liberar la receta renglón por renglón — hay que nombrarlos (§Post-F9.80) */
     post: {
       parameters: {
         query?: never;
@@ -27148,17 +27148,12 @@ export interface paths {
         };
         cookie?: never;
       };
-      /** @description Qué parte de la receta firma Desarrollo (§Post-F9.72: se libera POR PARTES). */
+      /** @description Qué renglones firma Desarrollo (§Post-F9.80: se libera UNO POR UNO, viéndolos). */
       requestBody: {
         content: {
           'application/json': {
-            /**
-             * @description Qué parte de la receta se libera.
-             * @default todo
-             * @enum {string}
-             */
-            alcance?: 'todo' | 'telas' | 'avios' | 'artes' | 'seleccion';
-            renglones?: {
+            /** @description Los renglones que se firman, uno por uno. No hay comodín: hay que nombrarlos. */
+            renglones: {
               /**
                * @description Sección de la receta a la que pertenece el renglón.
                * @enum {string}
@@ -27166,11 +27161,6 @@ export interface paths {
               tipo: 'tela' | 'avio' | 'arte';
               id: number;
             }[];
-            /**
-             * @description Marca como revisado lo que esté sin revisar DENTRO DEL ALCANCE y lo firma en el mismo acto (lo usa la bandeja «Recetas por liberar», donde los renglones no están a la vista).
-             * @default false
-             */
-            revisarPendientes?: boolean;
           };
         };
       };

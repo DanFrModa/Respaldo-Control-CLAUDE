@@ -220,13 +220,23 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await expect(page.getByRole('heading', { name: `Receta de la OP ${folio1}` })).toBeVisible();
     await expect(page.getByTestId('receta-encabezado-orden')).toContainText(codigoModelo);
     await expect(page.getByTestId('receta-encabezado-orden')).toContainText(cliente);
-    // El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA. V1-E3j: en ese caso NO
-    // se ofrece «liberar» —el clic solo servía para que el backend contestara *"no hay nada que
-    // liberar"*, y ese cartel rojo fue exactamente el que le tapó a Daniel la salida—; se dice en
-    // tono neutro y ya. La regla no cambió: sigue siendo el servidor quien la impone.
+    // El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA: se dice en tono neutro y
+    // sin ofrecer nada que firmar (V1-E3j). Lo que se exige aquí es ESO —el mensaje neutro y que no
+    // haya botón de firmar cuando no hay renglones—, y nada más.
+    //
+    // ⚠️ **AQUÍ NO SE VIGILA EL RETIRO DE LOS BOTONES DE BLOQUE de V1-E3k (§Post-F9.80).** Hubo un
+    // intento y era una guardia FALSA: esta OP tiene `resumen.total === 0`, y con receta vacía los
+    // cuatro botones YA estaban ocultos ANTES de la etapa (el global por `{vacia ? null : …}`, los
+    // tres de sección por `pendientes === 0`). Reintroducirlos enteros dejaría este spec en VERDE,
+    // así que afirmar la cobertura habría sido justo el modo de falla que esta etapa se puso como
+    // estándar: una aserción sin ningún valor que pueda ponerla roja.
+    //
+    // Quien SÍ hace ese trabajo —sobre una receta CON renglones, que es donde los botones vivían—
+    // es `PanelRecetaOrden.test.tsx` › «NO existe ningún botón de firmar en bloque…» y su gemela
+    // por TEXTO. Ahí la mutación de reintroducirlos las pone rojas; aquí no las pondría.
     await expect(page.getByTestId('receta-orden')).toBeVisible();
-    await expect(page.getByTestId('receta-liberar')).toHaveCount(0);
     await expect(page.getByText(/todavía no tiene ningún material/i)).toBeVisible();
+    await expect(page.locator('[data-testid^="liberar-receta-"]')).toHaveCount(0);
 
     // ── En el DIÁLOGO de «Modificar» queda la edición de la OP (estado, matriz, referencias) ────
     //    La OP nace con matriz (R3) pero NO completa. Desde V1-E3d (§Post-F9.43) el estado

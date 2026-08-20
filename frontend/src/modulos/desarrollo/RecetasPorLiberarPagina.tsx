@@ -1,10 +1,8 @@
-import { AlertTriangle, LockOpen, Maximize2, Search } from 'lucide-react';
+import { AlertTriangle, Maximize2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 
-import { useLiberarReceta, useRecetasPorLiberar } from '@/api/receta-orden';
-import type { RecetaPorLiberar } from '@/api/tipos';
+import { useRecetasPorLiberar } from '@/api/receta-orden';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import {
   TablaDensa,
@@ -17,7 +15,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
-import { useSesion } from '@/sesion/useSesion';
 
 /**
  * BANDEJA «RECETAS POR LIBERAR» — V1-E3h (§Post-F9.72). DANIEL, 19-ago-2026: *"está buenísima"*.
@@ -33,27 +30,28 @@ import { useSesion } from '@/sesion/useSesion';
  *  • **Ordenada por FECHA DE ENTREGA**, no por folio: lo que estorba primero, arriba.
  *  • **«Ya frena compras»** marca las órdenes que YA tienen OC por otra parte de su receta: ahí
  *    alguien ya compró y está esperando la firma. No es lo mismo que una orden recién nacida.
- *  • **Se libera desde aquí**, sin dar la vuelta por el Centro de Órdenes — que es el punto entero
- *    de la bandeja.
- *  • ⭐ **Y se ENTRA a ver el detalle**, que es lo que faltaba (Daniel, 19-ago-2026): *"solo está la
- *    OC con un botón para liberar todas juntas. No veo dónde pueda ver todo completo e ir liberando
- *    una por una."* El folio y «Ver la receta» llevan a la pantalla propia de la receta (V1-E3j) —
- *    la MISMA a la que llega el detalle de la OP—, donde se firma renglón por renglón. «Revisar y
- *    liberar» se queda: es el atajo para cuando ya sabes lo que hay, pero dejó de ser la única
- *    salida.
+ *  • ⭐ **Se ENTRA a ver el detalle**: el folio y «Ver la receta» llevan a la pantalla propia de la
+ *    receta (V1-E3j) —la MISMA a la que llega el detalle de la OP—, donde se firma renglón por
+ *    renglón. Daniel, 19-ago-2026: *"solo está la OC con un botón para liberar todas juntas. No veo
+ *    dónde pueda ver todo completo e ir liberando una por una."*
+ *
+ * ⭐⭐ V1-E3k (§Post-F9.80) — **ESTA BANDEJA YA NO FIRMA: LLEVA.** Tenía un botón «Revisar y
+ * liberar» que daba por buena la receta entera de una orden **desde aquí**, viendo solo *"3 avíos, 1
+ * tela"* — sin la lista enfrente. Era el peor de los tres botones de bloque que existían: nació de
+ * un defecto (§Post-F9.75) y el lead ya había señalado su consecuencia de negocio. DANIEL,
+ * 20-ago-2026: *"siempre se debe liberar uno por uno, para que se revise lo que se está haciendo.
+ * **No tiene sentido liberar las cosas sin ver**."* Así que la bandeja hace ahora solo lo que debe:
+ * decir en qué órdenes hay firma pendiente y **llevar a la receta**, donde se firma viendo. El
+ * backend tampoco acepta ya una firma en bloque (§Post-F9.68: esconder *y* bloquear).
  *
  * A1: los conteos por tipo y la marca de "ya frena compras" los AGREGA EL SERVIDOR (misma regla que
- * el concentrado de F5-E7); esta pantalla no suma nada. Y qué se puede firmar —que no queden
- * renglones sin revisar— también lo decide el backend: si no se puede, lo dice y aquí se enseña tal
- * cual, con el enlace a la orden para resolverlo a mano.
+ * el concentrado de F5-E7); esta pantalla no suma nada.
  *
- * Permisos (§Post-F9.68, las tres capas): el MENÚ y la RUTA exigen `desarrollo.ver`; el botón de
- * liberar solo se pinta con `desarrollo.administrar`, y el backend lo re-verifica.
+ * Permisos (§Post-F9.68): el MENÚ y la RUTA exigen `desarrollo.ver`. Firmar exige
+ * `desarrollo.administrar` y ya no se hace aquí, así que esta pantalla no consulta ese permiso.
  */
 export function RecetasPorLiberarPagina(): React.JSX.Element {
   const navigate = useNavigate();
-  const { tienePermiso } = useSesion();
-  const puedeLiberar = tienePermiso('desarrollo.administrar');
   // ⭐ V1-E3j: el destino de la fila es la RECETA de la orden, gobernada por `desarrollo.ver` — el
   // mismo permiso que abre esta bandeja, así que el camino nunca es un enlace muerto (§Post-F9.68).
   // Antes apuntaba al panel de la OP y por eso pedía `ordenes.ver`.
@@ -68,8 +66,6 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
     soloConOrdenCompra,
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
-  const liberar = useLiberarReceta();
-
   const datos = consulta.data;
   const filas = datos?.datos ?? [];
   const totalPaginas = datos?.totalPaginas ?? 0;
@@ -77,35 +73,6 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
   /** A la pantalla propia de la receta (V1-E3j) — la misma que abre el detalle de la OP. */
   function abrirReceta(idOrden: number): void {
     void navigate(`/produccion/ordenes/${String(idOrden)}/receta`);
-  }
-
-  /**
-   * ⭐ REVISAR **Y** FIRMAR, en un solo acto (§Post-F9.72).
-   *
-   * `revisarPendientes: true` es lo que hace que este botón sirva **en el caso normal**: una orden
-   * recién creada copia la receta del modelo y sus renglones nacen `sin_revisar`, así que un
-   * «liberar» a secas rebotaría con *"quedan 3 renglones sin revisar"* y obligaría a ir al Centro
-   * de Órdenes a marcarlos y volver — la vuelta que esta bandeja existe para evitar, y justo para
-   * las órdenes que nadie ha tocado, que son las que la llenan.
-   *
-   * La regla NO se relaja aquí (A1): es el servidor quien marca y firma en la misma transacción, y
-   * quien sigue rechazando lo que no se puede firmar (una receta vacía, por ejemplo).
-   */
-  function revisarYLiberar(fila: RecetaPorLiberar): void {
-    liberar.mutate(
-      { idOrden: fila.idOrden, cuerpo: { alcance: 'todo', revisarPendientes: true } },
-      {
-        onSuccess: (r) =>
-          toast.success(
-            r.resumen.porLiberar === 0
-              ? `OP ${fila.folio}: receta liberada completa.`
-              : `OP ${fila.folio}: liberado. Quedan ${r.resumen.porLiberar} por firmar.`,
-          ),
-        // Si el backend frena de todos modos, se dice TAL CUAL: la bandeja no adivina ni esconde el
-        // motivo, y la fila sigue ahí con su enlace a la orden para resolverlo a mano.
-        onError: (error) => toast.error(`OP ${fila.folio}: ${error.message}`),
-      },
-    );
   }
 
   return (
@@ -118,8 +85,8 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
             </h1>
             <p className="text-[12.5px] text-muted-foreground">
               Órdenes cuya receta espera la firma de Desarrollo. Sin firmar, ese material no se
-              compra. «Ver la receta» abre la orden completa para revisar y firmar renglón por
-              renglón; «Revisar y liberar» da por buena toda la receta de esa orden de una vez.
+              compra. «Ver la receta» abre la orden completa: ahí se revisa y se firma renglón por
+              renglón, que es la única forma de liberar.
             </p>
           </div>
         </div>
@@ -188,7 +155,7 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                   <TablaDensaHead>Cliente</TablaDensaHead>
                   <TablaDensaHead>Entrega</TablaDensaHead>
                   <TablaDensaHead>Falta liberar</TablaDensaHead>
-                  <TablaDensaHead className="w-72" />
+                  <TablaDensaHead className="w-40" />
                 </TablaDensaFila>
               </TablaDensaEncabezado>
               <TablaDensaCuerpo>
@@ -222,6 +189,8 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                       <span className="flex flex-wrap justify-end gap-1.5">
                         {/* ⭐ V1-E3j — EL CAMINO AL DETALLE, explícito. Sin él la fila solo ofrecía
                             firmar TODO junto, y quien quería revisar antes no tenía por dónde. */}
+                        {/* ⭐ V1-E3k (§Post-F9.80): ÚNICA acción de la fila. Al lado vivía «Revisar
+                            y liberar», que firmaba la receta entera sin enseñarla; se retiró. */}
                         <Button
                           type="button"
                           size="sm"
@@ -232,19 +201,6 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                         >
                           <Maximize2 aria-hidden /> Ver la receta
                         </Button>
-                        {puedeLiberar ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={liberar.isPending}
-                            title="Da por revisada la receta de esta orden y la firma completa"
-                            onClick={() => revisarYLiberar(f)}
-                            data-testid={`rpl-liberar-${f.idOrden}`}
-                          >
-                            <LockOpen aria-hidden /> Revisar y liberar
-                          </Button>
-                        ) : null}
                       </span>
                     </TablaDensaCelda>
                   </TablaDensaFila>

@@ -162,7 +162,14 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
       cuerpo?: unknown,
     ][] = [
       ['revisar', 'POST', '/api/ordenes/50/receta/revisar'],
-      ['liberar', 'POST', '/api/ordenes/50/receta/liberar'],
+      // ⭐ V1-E3k (§Post-F9.80): el cuerpo dejó de ser opcional — hay que NOMBRAR el renglón que se
+      // firma. Sin él la ruta contestaría 400 y la prueba del permiso no probaría el permiso.
+      [
+        'liberar',
+        'POST',
+        '/api/ordenes/50/receta/liberar',
+        { renglones: [{ tipo: 'tela', id: 3 }] },
+      ],
       ['traer-del-modelo', 'POST', '/api/ordenes/50/receta/traer-del-modelo'],
       [
         'agregar renglón',

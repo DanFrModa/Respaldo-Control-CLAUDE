@@ -902,12 +902,10 @@ export type RecetaEditarCuerpo =
 
 // ── V1-E3h: la receta se libera POR PARTES (§Post-F9.72) y se JALA del modelo (§Post-F9.73) ──
 
-/** Cuerpo de LIBERAR: todo, una sección, o una selección de renglones. */
+/** Cuerpo de LIBERAR: los renglones que se firman, nombrados uno por uno (§Post-F9.80). */
 export type LiberarRecetaCuerpo = NonNullable<
   paths['/api/ordenes/{id}/receta/liberar']['post']['requestBody']
 >['content']['application/json'];
-/** Qué parte de la receta se firma. */
-export type AlcanceLiberacion = NonNullable<LiberarRecetaCuerpo['alcance']>;
 /** Cuerpo de TRAER DEL MODELO (sin `materiales` = todo lo que falte). */
 export type TraerDelModeloCuerpo = NonNullable<
   paths['/api/ordenes/{id}/receta/traer-del-modelo']['post']['requestBody']

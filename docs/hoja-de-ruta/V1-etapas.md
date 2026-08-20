@@ -1423,9 +1423,11 @@ forma pura: no se puede correr, así que no se vio.*
 default del esquema es `sin_revisar`; liberar exige que no quede ninguno sin revisar. Resultado: orden
 recién creada → aparece en la bandeja → «Liberar todo» → error, y a dar la vuelta por el Centro de Órdenes
 **— exactamente lo que la bandeja existe para evitar**, y con el 100 % de las órdenes nunca tocadas, que
-son las que la pueblan. Se resolvió con `revisarPendientes`: marca revisado **dentro del alcance** y firma
-**en la misma transacción**, dejando `revisadosEnEsteActo` en la bitácora — **no se disfraza de "ya estaban
-revisados"**.
+son las que la pueblan. Se resolvió con `revisarPendientes`: marcaba revisado **dentro del alcance** y firmaba
+**en la misma transacción**, dejando `revisadosEnEsteActo` en la bitácora — **sin disfrazarse de "ya estaban
+revisados"**. ⛔ **RETIRADO el 20-ago-2026 en V1-E3k**: Daniel eliminó la liberación en bloque
+(*"no tiene sentido liberar las cosas sin ver"*), la bandeja dejó de firmar y esa bandera se quedó sin
+usuario. Se relata aquí porque **explica el defecto de su momento**, no porque siga vivo.
 
 **⚠️ Y el hallazgo que vuelve a repetir el patrón de la semana: «8 mutaciones, 8 cazadas» no era cobertura.**
 El reviewer mutó lo que el coder **no** había mutado y **4 de 8 sobrevivieron**. La peor: borrar la mitad
@@ -1630,6 +1632,87 @@ Al escribir las pruebas de ruta, el coder descubrió que **la validación del cu
 permiso**: un payload inválido devolvía **500 en vez del 403** que la prueba creía estar comprobando. Queda
 documentado en el propio archivo. *Es la forma más silenciosa de que una prueba de seguridad pase por la
 razón equivocada.* De paso, el comentario decía «las OCHO mutaciones» en tres lugares: **son 7**, contadas.
+
+---
+
+## V1-E3k · La receta se firma UNO POR UNO ⭐ (20-ago-2026)
+
+> Daniel recorriendo el flujo: *"me parece una mala idea el botón de «Liberar todo lo que falta». Creo que
+> siempre se debe liberar uno por uno, para que se revise lo que se está haciendo. **No tiene sentido
+> liberar las cosas sin ver**."* Decisión en `DECISIONES.md` **§Post-F9.80**; retira **§Post-F9.75**.
+
+### Qué entrega
+
+Se retira la **liberación en bloque** en los tres lugares donde existía —«Liberar todo lo que falta», los
+botones por sección, y el «Revisar y liberar» de la bandeja— **y también del contrato**. Queda **firmar
+renglón por renglón**. **«Marcar todo revisado» se conserva** por decisión explícita de Daniel: no libera
+nada ni compromete dinero.
+
+### Lo que hay que no perder: los botones NO los pidió Daniel
+
+Su decisión (§Post-F9.72 punto 4) fue *"debería poder liberarse por partes, y que el comprador vea qué le
+falta"*. **Las acciones en bloque las agregó el LEAD**, razonando que *"lo rutinario no cueste veinte
+clics"*.
+
+⚠️ **Ese razonamiento optimiza para la prisa en el punto donde se compromete el dinero.** La firma no es un
+trámite: **es la puerta que abre la compra**, y un botón que aprueba diez cosas de un clic entrena
+exactamente lo que la firma existe para evitar. La regla que queda, y que Daniel confirmó: **la fricción se
+cobra donde hay consecuencia** — por eso «marcar revisado» (que no gasta) conserva su atajo y «liberar» (que
+sí) lo pierde.
+
+*Es la segunda vez en la tanda que una comodidad añadida por el equipo, no pedida, resulta ser el defecto:
+la primera fue el botón de liberar sobre una receta vacía, cuyo único resultado posible era el cartel que
+tapaba la salida.*
+
+### La línea en el servidor, y el hueco declarado
+
+No bastaba quitar los botones: **esconder sin bloquear es lo que §Post-F9.68 vino a matar**, y una decisión
+de negocio se cumple en el dominio. Se retiraron del contrato `alcance` y `revisarPendientes`; el cuerpo
+pasó a `{ renglones: [{tipo, id}] }` **requerido**. Verificado antes de cerrarlo que **nadie real usaba el
+comodín**: el ETL **no pasa por `liberarReceta`** (escribe la firma directo por Prisma), que era el único
+argumento para conservarlo.
+
+**Dónde quedó la línea, a propósito:** el servidor **jamás expande un comodín** —hay que nombrar cada
+renglón, y para nombrarlo hubo que leer la receta—, pero **no** se fuerza un renglón por llamada: N llamadas
+de uno equivalen a una de N, así que la restricción no compraría seguridad verificable y cerraría un futuro
+multi-select con casillas, que sí es "ver". **El hueco residual está declarado en el TSDoc**: un cliente
+puede leer la receta, juntar los ids y mandarlos todos. Volver a ofrecerlo con un botón sería re-tomar la
+decisión de Daniel, no aprovechar un hueco.
+
+### Nota de cierre — ✅ HECHA (20-ago-2026)
+
+**Dos vueltas: la primera RECHAZADA, la segunda APROBADA.** Ningún hallazgo tocó el código de producción —
+el reviewer respondió que **no queda ningún camino que firme más de lo que se vio**, verificado en dominio,
+ruta y UI, y comprobó que el `updateMany` de la firma pasó de `{idOrden, excluido:false}` a
+`{idOrden, excluido:false, id:{in:ids}}`: **estrictamente más angosto**.
+
+**🔴 El hallazgo: una guardia de e2e que no podía ponerse roja NUNCA.** El bucle que vigilaba *"que los
+botones no vuelvan por la puerta de atrás, en ninguna de sus cuatro formas"* corría sobre una OP con
+`resumen.total === 0` — y con receta vacía **los cuatro ya estaban ocultos antes de la etapa**. Reintroducir
+el bloque entero la habría dejado verde. **Afirmaba una cobertura inexistente**, que es el estándar que esta
+misma tanda se puso.
+
+Se borró en vez de rescatarla, y el reviewer respaldó el intercambio con un dato que zanja la duda de
+"quitar cobertura de e2e merece segunda mirada": barrió `frontend/e2e/` entero y **ningún e2e ha clickeado
+jamás un botón de firmar** — el bucle tenía cobertura **cero desde el día que se escribió**. Lo que vuelve
+segura la eliminación es que el comentario deja **la razón mecánica** y **nombra a su sustituto por el
+título**, y ese par de pruebas unitarias **sí cae bajo mutación** (2 de 48).
+
+**⚠️ Y al arreglar la segunda deuda, el coder casi repite el mismo error:** su primer intento cambiaba una
+aserción permanentemente vacía por **otra igual de vacía** —un testid que tampoco podía existir, porque el
+fixture no tenía telas—. Lo notó y lo dijo. Se resolvió dándole a esa prueba una receta **con** tela; el
+reviewer verificó después que el **estado** del fixture (`excluido:false`, `liberadoEn:null`) es
+*load-bearing*: relajarlo vacía la aserción en silencio.
+
+**Un hallazgo del pipeline que vale registrar:** `tsc -b` cazó que ese fixture nuevo no llevaba
+`precioModelo` ni `precioModeloDeCompra` —copiado de uno más viejo que el tipo—. **Las pruebas pasaban en
+runtime con el fixture incompleto**; el único que lo vio fue el typecheck. Es la cicatriz del 14-ago otra
+vez, y la razón de que el fixture **no lleve ningún `as`**: así `tsc` lo valida estructuralmente.
+
+**El residuo, dicho y no tapado:** nada obliga a un renglón por llamada, y las cercas de prueba son por
+testid y por redacción — un botón con otras palabras que hiciera N firmas por renglón pasaría verde. Es el
+límite honesto de una cerca de pruebas, está escrito en §Post-F9.80, y **volver a ofrecerlo con un botón
+sería re-tomar la decisión de Daniel, no aprovechar un hueco.**
 
 ---
 

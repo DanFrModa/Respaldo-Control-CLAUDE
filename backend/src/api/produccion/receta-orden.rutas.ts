@@ -15,7 +15,7 @@
  *  • `DELETE /ordenes/:id/receta/renglones/:tipo/:idRenglon`   — quitar (excluye, o borra si era manual)
  *  • `POST   /ordenes/:id/receta/renglones/:tipo/:idRenglon/restaurar` — volver al BOM del modelo
  *  • `POST   /ordenes/:id/receta/revisar`                      — marcar TODO revisado (un solo clic)
- *  • `POST   /ordenes/:id/receta/liberar`                      — firmar (todo, una sección o una selección)
+ *  • `POST   /ordenes/:id/receta/liberar`                      — firmar renglón por renglón (§Post-F9.80)
  *  • `POST   /ordenes/:id/receta/traer-del-modelo`             — traer lo que le falta (§Post-F9.73)
  *  • `GET    /recetas-por-liberar`                             — la BANDEJA de Desarrollo (§Post-F9.72)
  *
@@ -227,15 +227,18 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
     preHandler: app.conPermiso('desarrollo.administrar'),
     schema: {
       tags: ['ordenes'],
-      summary: 'Liberar la receta — entera, por sección o renglón por renglón (§Post-F9.72)',
+      summary: 'Liberar la receta renglón por renglón — hay que nombrarlos (§Post-F9.80)',
       security: SEGURIDAD_SESION,
       params: esquemaParamOrden,
-      body: esquemaLiberarRecetaCuerpo.optional(),
+      // ⭐ V1-E3k (§Post-F9.80): el cuerpo dejó de ser opcional. Antes «sin cuerpo» significaba
+      // `alcance: 'todo'` —firmar la receta entera de un golpe—, que es justo lo que Daniel quitó:
+      // *"no tiene sentido liberar las cosas sin ver"*. Ahora hay que NOMBRAR lo que se firma.
+      body: esquemaLiberarRecetaCuerpo,
       response: { 200: esquemaRecetaOrden, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return liberarReceta(sesion, request.params.id, request.body ?? {});
+      return liberarReceta(sesion, request.params.id, request.body);
     },
   });
 

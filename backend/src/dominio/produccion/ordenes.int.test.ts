@@ -34,7 +34,12 @@ import {
   listarOrdenes,
   obtenerOrden,
 } from './ordenes.js';
-import { agregarRenglonReceta, liberarReceta, marcarRecetaRevisada } from './receta-orden.js';
+import {
+  agregarRenglonReceta,
+  liberarReceta,
+  marcarRecetaRevisada,
+  obtenerRecetaOrden,
+} from './receta-orden.js';
 
 /**
  * Integración del dominio de Órdenes (F2-E2) contra el Postgres efímero (testcontainers). Cubre
@@ -325,13 +330,24 @@ describe('Órdenes (F2-E2) — matriz: totales derivados y validaciones (D4)', (
  * ⭐ V1-E3d (§Post-F9.43): el segundo requisito de "orden completa" pasó de *"¿el modelo tiene
  * avíos?"* a *"¿la receta de la OP está LIBERADA?"*. Estas pruebas hablan del semáforo, así que
  * ahora liberan la receta con el mismo camino del dominio (revisar todo + liberar).
+ *
+ * ⭐ V1-E3k (§Post-F9.80): firmar exige NOMBRAR cada renglón —ya no hay `alcance: 'todo'`—, así que
+ * el helper lee la receta y los enumera. Es la misma vuelta que da la pantalla, y a propósito.
  */
 async function liberarRecetaDe(_s: SesionUsuario, idOrden: number): Promise<void> {
   // Tocar la receta exige `desarrollo.administrar` (permiso REUSADO, A4): la sesión de estas
   // pruebas es la de Órdenes, así que aquí se usa la de Desarrollo a propósito.
   const sDesarrollo = sesion(['desarrollo.administrar', ...PERM_TODOS]);
   await marcarRecetaRevisada(sDesarrollo, idOrden, bd());
-  await liberarReceta(sDesarrollo, idOrden, {}, bd());
+  const receta = await obtenerRecetaOrden(sDesarrollo, idOrden, bd());
+  // Las lápidas (renglones que ESTA orden decidió no llevar) quedan fuera: no se compran, así que
+  // firmarlas no significaría nada — y el dominio las rechaza si se nombran.
+  const renglones = [
+    ...receta.telas.filter((t) => !t.excluido).map((t) => ({ tipo: 'tela' as const, id: t.id })),
+    ...receta.avios.filter((a) => !a.excluido).map((a) => ({ tipo: 'avio' as const, id: a.id })),
+    ...receta.artes.filter((a) => !a.excluido).map((a) => ({ tipo: 'arte' as const, id: a.id })),
+  ];
+  await liberarReceta(sDesarrollo, idOrden, { renglones }, bd());
 }
 
 describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {

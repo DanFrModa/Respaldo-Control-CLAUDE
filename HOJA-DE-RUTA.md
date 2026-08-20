@@ -59,7 +59,7 @@
 > porque el mock volvía el fallo imposible**: la plantilla devolvía `undefined` en todas las pruebas.
 > **Exige `SEED_ON_START=true`** para que la plantilla se siembre.
 >
-> ✅ **`V1-E3i` mergeada** (#192, **0.005**) · ✅ **`V1-E3j` · la receta merece pantalla propia** (**0.006**): salió de
+> ✅ **`V1-E3i` mergeada** (#192, **0.005**) · ✅ **`V1-E3j` · la receta merece pantalla propia** (**0.006**) · ✅ **`V1-E3k` · la receta se firma UNO POR UNO** (**0.007**, 20-ago): se retiró la liberación en bloque —**y también del contrato**— porque *"no tiene sentido liberar las cosas sin ver"*; los botones **no los había pedido Daniel, los agregó el equipo**: salió de
 > Daniel probando 0.005 en vivo y **el defecto no fue de lógica sino de VISIBILIDAD** — el mecanismo de
 > §Post-F9.73 estaba cableado y verificado, pero el cartel *"la receta está vacía"* tapaba el botón que
 > resolvía su problema, **justo debajo**. Entrega una pantalla completa (`desarrollo.ver`), el bloque de la
@@ -99,7 +99,13 @@
 > `V1-E3e` #181, `V1-E3d pieza B` #182, `V1-E4` #183 y `V1-E6a`). Las tres primeras van **sin
 > migración, sin permisos y sin seed**; **`V1-E3d pieza B` y `V1-E4` y `V1-E6a` SÍ llevan migración**
 > (automática, sin `SEED_ON_START`). Hasta que se despliegue, **Daniel no ve nada de esto**.
-> 🔑 **Y el respaldo no corre hasta que Gabriel genere `RESPALDO_LLAVE`** y la guarde **también fuera de
+> ✅ **`SEED_ON_START=true` YA ESTÁ PUESTO en `prueba`** desde principios de agosto (Gabriel, 20-ago-2026).
+> Las etapas que lo exigen se siembran solas al desplegar; **ya no hace falta pedirlo cada vez**.
+> ✅ **`RESPALDO_LLAVE`: Gabriel la reporta como generada y guardada** (20-ago-2026). ⚠️ *Reportada, no
+> verificada por el equipo:* la única comprobación que vale es **restaurar un respaldo**, y eso no se ha
+> hecho. Un respaldo que nunca se restauró es una hipótesis, no una red.
+>
+> *(histórico)* 🔑 **El respaldo no corre hasta que Gabriel genere `RESPALDO_LLAVE`** y la guarde **también fuera de
 > Railway** (`docs/GUIA-RAILWAY-R2.md` §7.1): si se pierde, los respaldos son irrecuperables por
 > diseño. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
 > configuración de Cloudflare R2, ver `docs/hoja-de-ruta/F1-etapas.md:222` para las cuatro trampas.)*
@@ -606,6 +612,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   de permiso**. Un payload inválido devuelve **500 en vez del 403** que la prueba cree estar comprobando —
   la forma más silenciosa de que una prueba de seguridad pase por la razón equivocada. Documentado en
   `backend/src/api/produccion/receta-orden.rutas.test.ts`.
+
+- **DEUDA de V1-E3k (20-ago-2026) — la cerca que impide volver a la firma en bloque es por TESTID y por
+  REDACCIÓN, no por conducta.** Un botón con otras palabras que hiciera N firmas por renglón pasaría las
+  pruebas en verde (verificado por el reviewer). Es el límite honesto de una cerca de pruebas y está escrito
+  en `DECISIONES.md §Post-F9.80`: **el servidor sí impide el comodín** —hay que nombrar cada renglón— pero
+  nada obliga a un renglón por llamada, a propósito (N llamadas de uno equivalen a una de N, así que la
+  restricción sería teatro y cerraría un futuro multi-select). **Volver a ofrecerlo con un botón sería
+  re-tomar la decisión de Daniel, no aprovechar un hueco.**
+- **DEUDA de V1-E3k — el fixture de `ResumenRecetaOrden.test.tsx` es *load-bearing* y no lo dice.**
+  `excluido:false` + `liberadoEn:null` es el único estado en que el botón se pintaría; **relajarlo vacía la
+  aserción en silencio** (comprobado por el reviewer). El comentario explica por qué hay una tela, no por qué
+  ese estado.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
