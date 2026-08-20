@@ -1477,6 +1477,44 @@ describe('ExplosionMaterialesPagina — V1-E3q: varias OP en una compra (§Post-
     expect(useExplosionMock).toHaveBeenCalledWith([50, 51]);
   });
 
+  /**
+   * 🔴 La precarga **NO puede volver a meter una OP que el usuario quitó.** Es fácil que pase: la
+   * consulta del pedido se refresca sola (al recuperar el foco, por ejemplo) y un efecto que sólo
+   * mirara la forma del conjunto la re-precargaría. Una precarga que pisa lo que la persona decidió
+   * es un sabotaje, no una ayuda. Por eso corre UNA sola vez por OP base.
+   */
+  it('⭐ quitar una OP precargada NO la devuelve cuando la consulta del pedido se refresca', async () => {
+    const respuesta = {
+      idPedido: 300,
+      folioPedido: 1515,
+      ordenes: [
+        { idOrden: 50, folio: 7, modelo: 'A-100', cliente: 'Cliente X', cancelada: false },
+        { idOrden: 51, folio: 8, modelo: 'A-101', cliente: 'Cliente X', cancelada: false },
+      ],
+    };
+    // Cada render devuelve un objeto NUEVO: es justo lo que hace un refetch sin igualdad estructural.
+    useOrdenesDelPedidoMock.mockImplementation(() => ({
+      data: { ...respuesta, ordenes: [...respuesta.ordenes] },
+      isPending: false,
+      isError: false,
+    }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    expect(useExplosionMock).toHaveBeenCalledWith([50, 51]);
+
+    // Se quita la 8 (idOrden 51) y se dispara un re-render más (el buscador).
+    const quitar = screen.getAllByTestId('exp-quitar-op');
+    await usuario.click(quitar[1] as HTMLElement);
+    await usuario.type(screen.getByTestId('exp-buscar-orden'), 'a');
+
+    // 🔴 Si la precarga volviera a correr, la última llamada sería [50, 51] otra vez.
+    const ultima = useExplosionMock.mock.calls.at(-1)?.[0] as number[];
+    expect(ultima).toEqual([50]);
+  });
+
   it('⭐ se pueden AGREGAR OP sueltas (las cajas, que cruzan pedidos) y quitarlas', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {

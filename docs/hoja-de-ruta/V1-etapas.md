@@ -2149,6 +2149,12 @@ el buscador (las cajas, que cruzan pedidos).
   un faltante silencioso en el material del que nadie lleva cuenta. Hay un ledger por lote y el orden es
   determinista (por folio ascendente: la OP más vieja, que se produce antes, se queda con el stock).
 - **Lo omitido viaja también en el RESULTADO de generar**, no sólo en la previa.
+- **La precarga corre UNA sola vez por OP base y los chips salen de lo que el usuario eligió**, no de
+  la respuesta de la explosión. Los dos son la misma trampa vista de dos lados: si la consulta del
+  pedido se refresca sola, un efecto que mirara la forma del conjunto **re-metería la OP que acaban de
+  quitar**; y mientras la explosión se recalcula, su respuesta trae el conjunto ANTERIOR, así que
+  pintar los chips desde ahí enseñaría OP quitadas y escondería las recién agregadas. Los dos casos
+  tienen prueba.
 - **El impreso PDF de la explosión pasó a enseñar lo PENDIENTE** en su columna *"A comprar"* (antes
   traía la demanda bruta). Un impreso hecho **después** de generar la OC decía *"compra 180"* de algo
   ya pedido — el mismo defecto de Daniel, pero en papel y sin nadie que lo contradiga. El *"Requerido"*

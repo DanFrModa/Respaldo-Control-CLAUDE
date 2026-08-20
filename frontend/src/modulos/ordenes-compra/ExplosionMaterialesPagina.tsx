@@ -9,7 +9,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
@@ -123,16 +123,20 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * dinero). El usuario quita las que no quiera — precargar y dejar quitar es más rápido que
    * obligarlo a buscar una por una, que es justo el trabajo que Daniel describió.
    */
+  /**
+   * ⚠️ La precarga corre **UNA SOLA VEZ por OP base**, y por eso lleva su propia marca en vez de
+   * confiar en la forma del conjunto: si el usuario quita una hermana y luego React Query refresca
+   * la consulta, un efecto que sólo mirara `idsOrden` volvería a meter la que acaban de quitar.
+   * Una precarga que pisa lo que la persona decidió es un sabotaje, no una ayuda.
+   */
+  const precargadoPara = useRef<number | null>(null);
   useEffect(() => {
     const datos = delPedido.data;
     if (datos === undefined || idOrdenBase === null) return;
-    setIdsOrden((prev) => {
-      // Sólo precarga sobre la OP base recién elegida; si el usuario ya armó su conjunto, no se
-      // le vuelve a meter mano (una precarga que pisa lo que la persona quitó es un sabotaje).
-      if (prev.length !== 1 || prev[0] !== idOrdenBase) return prev;
-      const hermanas = datos.ordenes.filter((o) => !o.cancelada).map((o) => o.idOrden);
-      return hermanas.length > 0 ? hermanas : prev;
-    });
+    if (precargadoPara.current === idOrdenBase) return;
+    precargadoPara.current = idOrdenBase;
+    const hermanas = datos.ordenes.filter((o) => !o.cancelada).map((o) => o.idOrden);
+    if (hermanas.length > 0) setIdsOrden(hermanas);
   }, [delPedido.data, idOrdenBase]);
 
   /**
@@ -189,6 +193,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
   function elegirOrdenBase(id: number): void {
+    precargadoPara.current = null;
     setIdOrdenBase(id);
     setIdsOrden([id]);
     setSeleccion(new Set());
@@ -483,30 +488,40 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       : ''}
                   </p>
                   <ul className="flex flex-wrap gap-1.5">
-                    {(ordenesElegidas.length > 0
-                      ? ordenesElegidas.map((o) => ({
-                          id: o.idOrden,
-                          etiqueta: `Orden ${String(o.folio)} · ${o.modelo}`,
-                        }))
-                      : idsOrden.map((id) => ({ id, etiqueta: `Orden #${String(id)}` }))
-                    ).map((o) => (
-                      <li
-                        key={o.id}
-                        className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
-                        data-testid="exp-op-chip"
-                        data-orden={o.id}
-                      >
-                        <span>{o.etiqueta}</span>
-                        <button
-                          type="button"
-                          aria-label={`Quitar ${o.etiqueta} de la compra`}
-                          onClick={() => quitarOrden(o.id)}
-                          data-testid="exp-quitar-op"
+                    {/* ⚠️ Los chips salen de `idsOrden` —lo que el usuario eligió—, NO de la
+                        respuesta de la explosión: mientras ésta se recalcula (o si falla) la
+                        respuesta trae el conjunto ANTERIOR, y pintar eso enseñaría OP que ya se
+                        quitaron y escondería las recién agregadas. El nombre bonito se busca en la
+                        respuesta cuando ya llegó; si no, se dice el id y no se inventa nada. */}
+                    {idsOrden
+                      .map((id) => {
+                        const ficha = ordenesElegidas.find((o) => o.idOrden === id);
+                        return {
+                          id,
+                          etiqueta:
+                            ficha === undefined
+                              ? `Orden #${String(id)}`
+                              : `Orden ${String(ficha.folio)} · ${ficha.modelo}`,
+                        };
+                      })
+                      .map((o) => (
+                        <li
+                          key={o.id}
+                          className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                          data-testid="exp-op-chip"
+                          data-orden={o.id}
                         >
-                          <X className="size-3.5" aria-hidden />
-                        </button>
-                      </li>
-                    ))}
+                          <span>{o.etiqueta}</span>
+                          <button
+                            type="button"
+                            aria-label={`Quitar ${o.etiqueta} de la compra`}
+                            onClick={() => quitarOrden(o.id)}
+                            data-testid="exp-quitar-op"
+                          >
+                            <X className="size-3.5" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
                   </ul>
                 </div>
               ) : null}
