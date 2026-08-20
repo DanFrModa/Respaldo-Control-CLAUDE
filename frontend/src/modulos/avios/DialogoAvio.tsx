@@ -87,6 +87,10 @@ function aProveedoresCuerpo(renglones: RenglonProveedorAvio[]): AvioProveedorEnt
     if (condiciones.length > 0) {
       proveedor.condiciones = condiciones;
     }
+    // ⭐ V1-E3m (§Post-F9.82): el HABITUAL viaja SIEMPRE (true o false). Omitirlo cuando es false
+    // dejaría al backend sin manera de APAGAR el habitual anterior — y "quitarle el habitual a este
+    // avío" es una acción legítima, no un no-op.
+    proveedor.habitual = renglon.habitual;
     return proveedor;
   });
 }
@@ -199,6 +203,7 @@ export function DialogoAvio({
           idProveedor: proveedor.idProveedor,
           precio: numeroTexto(proveedor.precio),
           condiciones: texto(proveedor.condiciones),
+          habitual: proveedor.habitual,
         })),
       );
     } else {

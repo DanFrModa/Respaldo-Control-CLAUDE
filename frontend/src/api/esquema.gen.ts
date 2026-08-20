@@ -11632,6 +11632,8 @@ export interface paths {
                   condiciones: string | null;
                   /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                   precioUnidadConsumo: number | null;
+                  /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                  habitual: boolean;
                 }[];
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
@@ -11769,6 +11771,7 @@ export interface paths {
               idProveedor: number;
               precio?: number;
               condiciones?: string;
+              habitual?: boolean;
             }[];
           };
         };
@@ -11811,6 +11814,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                 precioUnidadConsumo: number | null;
+                /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                habitual: boolean;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -11976,6 +11981,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                 precioUnidadConsumo: number | null;
+                /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                habitual: boolean;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -12130,6 +12137,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                 precioUnidadConsumo: number | null;
+                /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                habitual: boolean;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -12260,6 +12269,7 @@ export interface paths {
               idProveedor: number;
               precio?: number;
               condiciones?: string;
+              habitual?: boolean;
             }[];
             activo?: boolean;
           };
@@ -12303,6 +12313,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                 precioUnidadConsumo: number | null;
+                /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                habitual: boolean;
               }[];
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
@@ -12446,6 +12458,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
                 precioUnidadConsumo: number | null;
+                /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
+                habitual: boolean;
               }[];
             };
           };
@@ -33328,6 +33342,19 @@ export interface paths {
                   /** @description Precio unitario sugerido (R1), o null. */
                   precioSugerido: number | null;
                   /**
+                   * @description amarre-desarrollo: lo amarró Desarrollo en la receta; dueno-tela: es el proveedor DUEÑO de la tela (§Post-F9.11); habitual: es el proveedor habitual del avío; mas-barato: fallback R1/F4; asignado-compras: lo asignó Compras PARA ESTA ORDEN (§Post-F9.82); sin-proveedor: no hay.
+                   * @enum {string}
+                   */
+                  origenProveedor:
+                    | 'amarre-desarrollo'
+                    | 'dueno-tela'
+                    | 'habitual'
+                    | 'mas-barato'
+                    | 'asignado-compras'
+                    | 'sin-proveedor';
+                  /** @description ⭐ V1-E3m: el proveedor propuesto está DADO DE BAJA. Se conserva la sugerencia (alguien lo eligió a propósito y la OC es editable) pero la pantalla tiene que poder ofrecer la reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor. */
+                  proveedorSugeridoInactivo: boolean;
+                  /**
                    * @description Diferencia del renglón contra el snapshot previo (visible en la UI).
                    * @enum {string}
                    */
@@ -33642,6 +33669,160 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/materiales/proveedor': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Asignar (o quitar) el proveedor con el que esta orden compra un material */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Asignación de proveedor de un material PARA UNA ORDEN (§Post-F9.82). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Qué clase de material se está asignando.
+             * @enum {string}
+             */
+            tipo: 'tela' | 'avio';
+            /** @description Id de la TELA o del AVÍO del catálogo (según `tipo`). */
+            idMaterial: number;
+            /** @description Proveedor a asignar PARA ESTA ORDEN, o null para quitar la asignación. */
+            idProveedor: number | null;
+            /** @description Precio por unidad de consumo con el que se va a comprar (opcional). Si viene, MANDA sobre la última compra real: lo tecleó alguien para esta compra. Si no, se resuelve solo. */
+            precio?: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de asignar (o quitar) el proveedor de un material en una orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden de producción donde vive la asignación. */
+              idOrden: number;
+              /**
+               * @description Clase de material.
+               * @enum {string}
+               */
+              tipo: 'tela' | 'avio';
+              /** @description Tela o avío asignado. */
+              idMaterial: number;
+              /** @description Nombre/clave del material (para el mensaje). */
+              material: string;
+              /** @description Proveedor asignado, o null si se quitó. */
+              idProveedor: number | null;
+              /** @description Nombre del proveedor asignado, o null. */
+              proveedor: string | null;
+              /** @description Precio capturado por Compras, o null. */
+              precio: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

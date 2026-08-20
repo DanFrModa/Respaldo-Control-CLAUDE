@@ -626,6 +626,15 @@ export type GenerarOcCuerpo =
 /** Resultado de generar OC (las OC creadas, una por proveedor). */
 export type GenerarOcResultado =
   paths['/api/ordenes/{id}/explosion/generar-oc']['post']['responses']['201']['content']['application/json'];
+/**
+ * ⭐ V1-E3m (§Post-F9.82) — cuerpo de asignar/quitar el proveedor con el que ESTA orden compra un
+ * material (`PUT /api/ordenes/{id}/materiales/proveedor`). `idProveedor: null` = quitar.
+ */
+export type AsignarProveedorCuerpo =
+  paths['/api/ordenes/{id}/materiales/proveedor']['put']['requestBody']['content']['application/json'];
+/** Resultado de asignar (o quitar) el proveedor de un material en una orden. */
+export type AsignarProveedorResultado =
+  paths['/api/ordenes/{id}/materiales/proveedor']['put']['responses']['200']['content']['application/json'];
 /** Tablero "qué tengo / qué falta" de una orden (`GET .../estatus-materiales`). */
 export type EstatusMateriales =
   paths['/api/ordenes/{id}/estatus-materiales']['get']['responses']['200']['content']['application/json'];

@@ -92,12 +92,12 @@ import type {
   EstatusMaterialesSalida,
   EstatusMaterialFila,
   EstatusMaterial,
+  OrigenProveedor,
 } from '../../contrato/index.js';
 import type { PendienteLiberar, TipoCambioRecetaClave } from '../../contrato/index.js';
 import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
-import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { minimoParaSurtir, type TipoRenglonCompra } from './tolerancia-recepcion.js';
 import { existenciaAvioTotalEmpresa } from '../../comun/kardex.js';
@@ -127,6 +127,17 @@ import {
   exigirRecetaLiberada,
 } from '../produccion/receta-orden.js';
 
+import {
+  candidatoHabitualAvio,
+  candidatoMasBaratoAvio,
+  elegirProveedorAvio,
+  elegirProveedorTela,
+  precioProveedorAvio,
+  type CandidatoProveedor,
+  type FilaProveedorAvio,
+  type ResolucionProveedorMaterial,
+} from './proveedor-material.js';
+
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 
 /** Tolerancia de redondeo al comparar cantidades decimales (4 decimales en BD). */
@@ -148,6 +159,10 @@ interface RequerimientoCalculado {
   idProveedorSugerido: number | null;
   proveedorSugerido: string | null;
   precioSugerido: number | null;
+  /** ⭐ V1-E3m: de qué escalón salió el proveedor (para la UI y para poder quitar lo de Compras). */
+  origenProveedor: OrigenProveedor;
+  /** ⭐ V1-E3m: el proveedor propuesto está de BAJA (la UI ofrece reasignarlo ahí mismo). */
+  proveedorSugeridoInactivo: boolean;
 }
 
 /**
@@ -187,7 +202,34 @@ const seleccionOrdenExplosion = {
           colores: { select: { idColor: true, precio: true } },
         },
       },
-      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+      // ⭐ V1-E3m (§Post-F9.82): la asignación que hizo COMPRAS para ESTA orden (último escalón).
+      idProveedorCompra: true,
+      precioCompra: true,
+      proveedorCompra: { select: { nombre: true, activo: true } },
+      tela: {
+        select: {
+          nombre: true,
+          unidadMedida: true,
+          precioSugerido: true,
+          // ⭐ V1-E3m: EL PROVEEDOR DUEÑO de la tela (§Post-F9.11) — el dato que ya estaba capturado
+          // y que el motor de compras ignoraba. Con él, la explosión casi nunca se queda sin a
+          // quién comprarle.
+          idProveedor: true,
+          proveedor: { select: { nombre: true, activo: true } },
+          // Los precios negociados por proveedor (F8): de aquí sale el precio del DUEÑO cuando lo
+          // tiene. Sin renglón, el precio cae al de REFERENCIA de la tela (y se avisa: son cosas
+          // distintas y confundirlas es lo que puso un $0.00 enfrente de Daniel).
+          proveedoresPrecio: {
+            where: { activo: true },
+            select: {
+              idProveedor: true,
+              precio: true,
+              manejaPrecioPorColor: true,
+              colores: { select: { idColor: true, precio: true } },
+            },
+          },
+        },
+      },
     },
   },
   recetaAvios: {
@@ -198,6 +240,10 @@ const seleccionOrdenExplosion = {
       consumoPorTalla: true,
       paraProduccion: true,
       idAvioProveedor: true,
+      // ⭐ V1-E3m (§Post-F9.82): la asignación de COMPRAS para ESTA orden (último escalón).
+      idProveedorCompra: true,
+      precioCompra: true,
+      proveedorCompra: { select: { nombre: true, activo: true } },
       tallas: { select: { idTalla: true, consumo: true } },
       avio: {
         select: {
@@ -212,6 +258,9 @@ const seleccionOrdenExplosion = {
               idProveedor: true,
               precio: true,
               factorConversion: true,
+              // ⭐ V1-E3m: quién es el HABITUAL. Con esto el "más barato" de F4 deja de ser la
+              // regla general y pasa a ser el fallback del avío que nadie ha marcado.
+              habitual: true,
               proveedor: { select: { nombre: true, activo: true } },
             },
           },
@@ -282,49 +331,42 @@ function coloresDeOrden(orden: OrdenParaExplosion): number[] {
   return [...new Set(orden.lineas.map((l) => l.idColor))];
 }
 
-/** Proveedor + precio sugerido resuelto (idProveedor/nombre/precio por unidad de consumo, o nulls). */
-interface ProveedorPrecio {
-  idProveedor: number | null;
-  proveedor: string | null;
-  precio: number | null;
-}
-
-const SIN_PROVEEDOR: ProveedorPrecio = { idProveedor: null, proveedor: null, precio: null };
-
 /**
  * Proveedor/precio elegido + la TRAZA de si el precio se pisó con la última compra real (D1). La
  * traza no es decorativa: los AVISOS tienen que nombrar la fuente REAL del precio con el que quedó
  * la línea. Un aviso que describe mal su propia causa es el mismo pecado que esta etapa corrigió en
  * la receta —decir una cosa y hacer otra—, solo que en prosa.
  */
-interface ProveedorPrecioResuelto extends ProveedorPrecio {
+interface ProveedorPrecioResuelto extends CandidatoProveedor {
   /** ¿El precio final salió de la última COMPRA REAL a ese proveedor (§Post-F9.48)? */
   desdeUltimaCompra: boolean;
 }
 
 /**
  * ⭐ §Post-F9.48 (D1, DANIEL 15-ago-2026): **la línea de OC nace con lo último que ESE proveedor
- * cobró**. Recibe el proveedor/precio YA elegido por R1/F4 (amarrado o más barato) y le PISA el
- * precio con la última compra REAL **a ese mismo proveedor**, si existe.
+ * cobró**. Recibe el proveedor/precio YA elegido por la política de `proveedor-material.ts` y le
+ * PISA el precio con la última compra REAL **a ese mismo proveedor**, si existe.
  *
  * Invariantes que respeta —y por las que existe como paso aparte, en vez de alimentar la cascada
  * compartida—:
- *  • **NUNCA cambia el proveedor.** La elección es de R1/F4 y esta etapa no la toca.
+ *  • **NUNCA cambia el proveedor.** La elección es de la política y esta función no la toca.
  *  • **NUNCA usa el precio de un tercero.** Solo mira `porMaterialProveedor`, jamás el mapa global:
  *    una OC dirigida a X no puede nacer con lo que cobró Y.
  *  • **Sin compras a ese proveedor, no hace nada**: se queda el precio de catálogo/negociado que
  *    traía (comportamiento anterior intacto → no-regresión).
- *  • `respetarPrecio` deja al llamador BLINDAR un precio más específico que la compra: hoy lo usa la
- *    tela cuyo precio salió del COLOR (`amarre-color`), porque `OrdenCompraLinea` no guarda color y
- *    la última compra es ciega a él.
+ *  • `respetarPrecio` deja al llamador BLINDAR un precio más específico que la compra: hoy lo usan
+ *    (a) la tela cuyo precio salió del COLOR (`amarre-color`), porque `OrdenCompraLinea` no guarda
+ *    color y la última compra es ciega a él, y (b) ⭐ V1-E3m: el precio que **tecleó Compras** al
+ *    asignar el proveedor (`precioFijado`) — quien lo escribió sabía lo que iba a pagar HOY, y
+ *    pisarlo con una compra vieja convertiría su captura en decorado.
  */
 function conUltimoPrecioDelProveedor(
-  elegido: ProveedorPrecio,
+  elegido: CandidatoProveedor,
   material: { tipo: 'tela' | 'avio'; id: number },
   ultimos: UltimosPreciosCompra,
   respetarPrecio = false,
 ): ProveedorPrecioResuelto {
-  if (respetarPrecio || elegido.idProveedor === null) {
+  if (respetarPrecio || elegido.precioFijado === true) {
     return { ...elegido, desdeUltimaCompra: false };
   }
   const ultima = ultimos.porMaterialProveedor.get(
@@ -348,7 +390,10 @@ function fuenteDelPrecioTela(origen: OrigenPrecioTela, desdeUltimaCompra: boolea
     case 'amarre':
       return 'se usó el precio base del proveedor';
     case 'sugerido':
-      return 'el proveedor no tiene precio base: se usó el precio de catálogo de la tela';
+      // ⚠️ V1-E3m: el `precioSugerido` de la tela es el precio de REFERENCIA, NO el del proveedor.
+      // Decirlo con su nombre es la mitad del arreglo: Daniel vio "referencia" y un $0.00 y no supo
+      // que estaba mirando otra cosa que el precio de compra.
+      return 'ese proveedor no tiene precio negociado: se usó el precio de REFERENCIA de la tela';
     case 'sin-precio':
       return 'no hay ningún precio que usar: la línea nace SIN precio';
     default:
@@ -358,53 +403,35 @@ function fuenteDelPrecioTela(origen: OrigenPrecioTela, desdeUltimaCompra: boolea
   }
 }
 
+// ── Candidatos de proveedor de una TELA (V1-E3m, §Post-F9.82) ──────────────────────────────────
+
+/** Un renglón proveedor–tela con precio (el amarre de Desarrollo, o el precio negociado del dueño). */
+interface FilaPrecioTela {
+  precio: Prisma.Decimal | null;
+  manejaPrecioPorColor: boolean;
+  colores: readonly { idColor: number; precio: Prisma.Decimal | null }[];
+}
+
 /**
- * Resuelve proveedor/precio de una TELA de la receta heredando el AMARRE de Desarrollo (F8-E6). Sin amarre →
- * NULL (como antes de F8: captura manual, D5). Con amarre → `idProveedorSugerido` = el proveedor elegido
- * (aunque el precio termine saliendo del sugerido genérico: a ese proveedor se le compra) y el precio se
- * resuelve con la cascada `resolverPrecioTela`. Precio-por-color: las telas del MRP se consumen por
- * MODELO completo (sin desglose por color en v2), así que sólo se resuelve por color cuando la orden es de
- * UN color; si tiene varios colores con precios de tela DISTINTOS, el precio-por-color NO se aplica y se
- * DEJA UN AVISO (no truena en silencio) que nombra la fuente REAL del precio con el que quedó la línea —
- * base del proveedor, catálogo de la tela o última compra a ese proveedor (D1). Empuja avisos al arreglo
- * compartido.
+ * Resuelve el PRECIO de una tela **para un proveedor concreto** con la cascada compartida
+ * (`resolverPrecioTela`): precio por color del proveedor → precio base del proveedor → precio de
+ * REFERENCIA de la tela. `fila === null` (el proveedor no tiene renglón de precio) cae directo a la
+ * referencia — que es un precio distinto y por eso el llamador lo avisa.
  *
- * NOTA (cascada, decisión F8-E6): AQUÍ la cascada OMITE el paso `color-referencia` (`TelaColor.precio`
- * sin proveedor) a propósito — la tela del MRP se consume por MODELO completo (no hay color por renglón
- * de requerimiento), así que el precio-por-color solo aplica DENTRO del amarre. Sin amarre → NULL.
- *
- * Proveedor amarrado INACTIVO: se mantiene la sugerencia (Desarrollo lo eligió a propósito y la OC es
- * editable), pero se DEJA UN AVISO — `generarOCDesdeExplosion`/`crearOC` no validan `activo`, así que sin
- * este aviso la OC se crearía a un proveedor de baja en silencio.
+ * Precio-por-color: las telas del MRP se consumen por MODELO completo (sin desglose por color en
+ * v2), así que sólo se resuelve por color cuando la orden es de UN color; si tiene varios colores
+ * con precios de tela DISTINTOS, el precio-por-color NO se aplica y se DEVUELVE la señal para que
+ * el llamador lo diga (nada truena en silencio).
  */
-function resolverProveedorPrecioTela(
-  mt: OrdenParaExplosion['recetaTelas'][number],
+function precioTelaDeProveedor(
+  precioSugeridoTela: number | null,
+  fila: FilaPrecioTela | null,
   colores: number[],
-  avisos: string[],
-  ultimos: UltimosPreciosCompra,
-): ProveedorPrecioResuelto {
-  const tp = mt.telaProveedor;
-  if (mt.idTelaProveedor === null || tp === null) {
-    // sin amarre → como hoy (NULL / captura manual)
-    return { ...SIN_PROVEEDOR, desdeUltimaCompra: false };
-  }
-
-  // Proveedor amarrado dado de baja: se conserva la sugerencia, pero no en silencio (aviso a la OC).
-  if (!tp.proveedor.activo) {
-    avisos.push(
-      `Tela "${mt.tela.nombre}": el proveedor amarrado "${tp.proveedor.nombre}" está INACTIVO; ` +
-        `se mantiene la sugerencia, revísalo antes de generar la OC.`,
-    );
-  }
-
-  // Precio del COLOR en contexto: sólo si el proveedor cotiza por color Y la orden es de UN color.
+): { precio: number | null; origen: OrigenPrecioTela; multiColorConPreciosDistintos: boolean } {
   let precioColor: number | null = null;
-  // Multi-color con precios de tela DISTINTOS: el precio-por-color no se puede aplicar (la tela se
-  // compra por modelo completo). Solo se DETECTA aquí; el aviso se arma más abajo, cuando ya se
-  // sabe con qué precio quedó la línea (ver `fuenteDelPrecioTela`).
   let multiColorConPreciosDistintos = false;
-  if (tp.manejaPrecioPorColor) {
-    const precioPorColor = new Map(tp.colores.map((c) => [c.idColor, numOrNull(c.precio)]));
+  if (fila !== null && fila.manejaPrecioPorColor) {
+    const precioPorColor = new Map(fila.colores.map((c) => [c.idColor, numOrNull(c.precio)]));
     if (colores.length === 1) {
       precioColor = precioPorColor.get(colores[0]!) ?? null;
     } else {
@@ -414,60 +441,230 @@ function resolverProveedorPrecioTela(
       multiColorConPreciosDistintos = distintos.size >= 2;
     }
   }
-
   const resuelto = resolverPrecioTela({
-    precioSugerido: numOrNull(mt.tela.precioSugerido),
-    amarre: {
-      precio: numOrNull(tp.precio),
-      manejaPrecioPorColor: tp.manejaPrecioPorColor,
-      precioColor,
-    },
+    precioSugerido: precioSugeridoTela,
+    amarre:
+      fila === null
+        ? null
+        : {
+            precio: numOrNull(fila.precio),
+            manejaPrecioPorColor: fila.manejaPrecioPorColor,
+            precioColor,
+          },
   });
-  // ⭐ D1/§Post-F9.48: la línea nace con lo último que ESTE proveedor cobró. Excepción: un precio
-  // por COLOR es más específico que la última compra (que no sabe de colores) y no se pisa.
-  const sugerido = conUltimoPrecioDelProveedor(
-    { idProveedor: tp.idProveedor, proveedor: tp.proveedor.nombre, precio: resuelto.precio },
-    { tipo: 'tela', id: mt.idTela },
-    ultimos,
-    resuelto.origen === 'amarre-color',
-  );
-
-  // El aviso va DESPUÉS de resolver el precio, para poder nombrar la fuente que de verdad se usó:
-  // armarlo antes hacía que dijera "el precio base del proveedor" incluso cuando D1 ya lo había
-  // pisado con la última compra — mandando a revisar un dato que no era el de la línea.
-  if (multiColorConPreciosDistintos) {
-    avisos.push(
-      `Tela "${mt.tela.nombre}": la orden tiene varios colores con precios de tela distintos ` +
-        `en "${tp.proveedor.nombre}", así que el precio por color no se aplicó; ` +
-        `${fuenteDelPrecioTela(resuelto.origen, sugerido.desdeUltimaCompra)}. ` +
-        `Revisa el precio de la OC.`,
-    );
-  }
-
-  return sugerido;
+  return { precio: resuelto.precio, origen: resuelto.origen, multiColorConPreciosDistintos };
 }
 
 /**
- * Resuelve proveedor/precio de un AVÍO heredando el AMARRE de Desarrollo (`ModeloAvio.idAvioProveedor`,
- * F8-E6) con `resolverPrecioAvio`. Devuelve el proveedor amarrado SÓLO si tiene un precio usable (origen
- * `amarre`); si no hay amarre, o el amarrado no tiene precio, devuelve `null` para que el llamador caiga
- * al "más barato" de F4 (`proveedorSugeridoAvio`, fallback INTACTO → no-regresión). El precio se normaliza
- * a unidad de consumo (÷ factor, R1) dentro de `resolverPrecioAvio`, sin duplicar la aritmética.
- *
- * Proveedor amarrado INACTIVO: si el amarre SÍ resuelve (tiene precio), se mantiene la sugerencia pero se
- * DEJA UN AVISO (misma razón que en tela: la OC no valida `activo`). Si el amarrado no tiene precio, cae al
- * fallback F4 —que sí filtra activos— y no hace falta avisar (el amarrado inactivo no se usa).
+ * Un candidato de tela YA resuelto: el proveedor, con qué precio y de qué escalón salió ese precio,
+ * más los avisos que **solo importan si este candidato es el que gana**. Los avisos se arman como
+ * FUNCIÓN de `desdeUltimaCompra` porque su texto tiene que nombrar la fuente REAL del precio final
+ * (D1 pudo haberlo pisado después de elegir).
  */
-function resolverProveedorPrecioAvioAmarrado(
+interface CandidatoTelaResuelto {
+  candidato: CandidatoProveedor;
+  origenPrecio: OrigenPrecioTela;
+  avisos: (desdeUltimaCompra: boolean) => string[];
+}
+
+/** Arma un candidato de tela para un proveedor concreto (con su precio y sus avisos). */
+function candidatoTela(
+  mt: OrdenParaExplosion['recetaTelas'][number],
+  proveedor: { idProveedor: number; nombre: string; activo: boolean },
+  fila: FilaPrecioTela | null,
+  colores: number[],
+  etiqueta: string,
+  precioCapturado: number | null = null,
+): CandidatoTelaResuelto {
+  const resuelto = precioTelaDeProveedor(numOrNull(mt.tela.precioSugerido), fila, colores);
+  const precio = precioCapturado ?? resuelto.precio;
+  return {
+    candidato: {
+      idProveedor: proveedor.idProveedor,
+      proveedor: proveedor.nombre,
+      precio,
+      activo: proveedor.activo,
+      ...(precioCapturado === null ? {} : { precioFijado: true }),
+    },
+    origenPrecio: resuelto.origen,
+    avisos: (desdeUltimaCompra: boolean): string[] => {
+      const avisos: string[] = [];
+      // Proveedor dado de baja: se conserva la sugerencia (alguien lo eligió a propósito y la OC es
+      // editable), pero NO en silencio — `generarOCDesdeExplosion`/`crearOC` no validan `activo`.
+      if (!proveedor.activo) {
+        avisos.push(
+          `Tela "${mt.tela.nombre}": el proveedor ${etiqueta} "${proveedor.nombre}" está INACTIVO; ` +
+            `se mantiene la sugerencia, revísalo antes de generar la OC.`,
+        );
+      }
+      if (resuelto.multiColorConPreciosDistintos && precioCapturado === null) {
+        avisos.push(
+          `Tela "${mt.tela.nombre}": la orden tiene varios colores con precios de tela distintos ` +
+            `en "${proveedor.nombre}", así que el precio por color no se aplicó; ` +
+            `${fuenteDelPrecioTela(resuelto.origen, desdeUltimaCompra)}. ` +
+            `Revisa el precio de la OC.`,
+        );
+      }
+      // ⚠️ V1-E3m: el precio de REFERENCIA no es el precio del proveedor. Si la línea terminó
+      // valuada con él —y no con una compra real—, se dice: es exactamente la confusión que dejó a
+      // Daniel mirando un $0.00 sin saber de dónde salía.
+      if (precioCapturado === null && !desdeUltimaCompra && resuelto.origen === 'sugerido') {
+        avisos.push(
+          `Tela "${mt.tela.nombre}": no hay precio negociado con "${proveedor.nombre}" ni compras ` +
+            `previas, así que la OC nace con el precio de REFERENCIA de la tela. Revísalo.`,
+        );
+      }
+      if (precioCapturado === null && !desdeUltimaCompra && resuelto.origen === 'sin-precio') {
+        avisos.push(
+          `Tela "${mt.tela.nombre}": no hay ningún precio (ni negociado, ni de compras previas, ni ` +
+            `de referencia), así que la línea de OC nace SIN precio. Captúralo en la OC.`,
+        );
+      }
+      return avisos;
+    },
+  };
+}
+
+/**
+ * Los TRES candidatos de proveedor de una tela, en su orden de precedencia (la elige
+ * `elegirProveedorTela`): amarre de Desarrollo → ⭐ DUEÑO de la tela → asignación de Compras.
+ *
+ * ⭐ **El escalón del DUEÑO es el corazón de V1-E3m.** `Tela.idProveedor` existía desde §Post-F9.11
+ * con la regla de Daniel escrita en su propio comentario (*"la felpa de Alsatex y la de otro
+ * proveedor son telas DISTINTAS"*), y el MRP no lo miraba: exigía el amarre de F8, pensado para
+ * material que se compra a varios. Por eso *"no me deja hacer nada"* con la receta liberada.
+ */
+function candidatosTela(
+  mt: OrdenParaExplosion['recetaTelas'][number],
+  colores: number[],
+): {
+  amarre: CandidatoTelaResuelto | null;
+  dueno: CandidatoTelaResuelto | null;
+  compras: CandidatoTelaResuelto | null;
+} {
+  const tp = mt.telaProveedor;
+  const amarre =
+    mt.idTelaProveedor === null || tp === null
+      ? null
+      : candidatoTela(
+          mt,
+          { idProveedor: tp.idProveedor, nombre: tp.proveedor.nombre, activo: tp.proveedor.activo },
+          tp,
+          colores,
+          'amarrado',
+        );
+
+  // ⭐ EL DUEÑO. Su precio sale de su renglón negociado (F8) si lo tiene; si no, de la REFERENCIA
+  // de la tela — cosas distintas, y por eso el candidato avisa cuál usó.
+  const idDueno = mt.tela.idProveedor;
+  const dueno =
+    idDueno === null || mt.tela.proveedor === null
+      ? null
+      : candidatoTela(
+          mt,
+          {
+            idProveedor: idDueno,
+            nombre: mt.tela.proveedor.nombre,
+            activo: mt.tela.proveedor.activo,
+          },
+          mt.tela.proveedoresPrecio.find((f) => f.idProveedor === idDueno) ?? null,
+          colores,
+          'dueño de la tela',
+        );
+
+  // ⭐ La asignación de COMPRAS para ESTA orden (último escalón, §Post-F9.82).
+  const idCompras = mt.idProveedorCompra;
+  const compras =
+    idCompras === null || mt.proveedorCompra === null
+      ? null
+      : candidatoTela(
+          mt,
+          {
+            idProveedor: idCompras,
+            nombre: mt.proveedorCompra.nombre,
+            activo: mt.proveedorCompra.activo,
+          },
+          mt.tela.proveedoresPrecio.find((f) => f.idProveedor === idCompras) ?? null,
+          colores,
+          'que asignó Compras',
+          numOrNull(mt.precioCompra),
+        );
+
+  return { amarre, dueno, compras };
+}
+
+// ── Candidatos de proveedor de un AVÍO (V1-E3m, §Post-F9.82) ───────────────────────────────────
+
+/** Un candidato de avío ya resuelto (proveedor + precio) con los avisos que solo valen si gana. */
+interface CandidatoAvioResuelto {
+  candidato: CandidatoProveedor;
+  avisos: (desdeUltimaCompra: boolean) => string[];
+}
+
+/**
+ * Envuelve un candidato de avío con sus avisos: proveedor INACTIVO (se conserva la sugerencia, pero
+ * se dice) y precio ausente/de referencia. `precioCapturado` es el que tecleó Compras al asignar:
+ * si viene, MANDA (y no se avisa nada del precio: lo puso una persona a propósito).
+ */
+function conAvisosAvio(
   ma: OrdenParaExplosion['recetaAvios'][number],
-  avisos: string[],
-  ultimos: UltimosPreciosCompra,
-): ProveedorPrecioResuelto | null {
+  base: CandidatoProveedor,
+  etiqueta: string,
+  precioCapturado: number | null = null,
+): CandidatoAvioResuelto {
+  const nombreMaterial = `${ma.avio.clave} — ${ma.avio.descripcion}`;
+  const precioReferencia = numOrNull(ma.avio.precioReferencia);
+  // Sin precio del proveedor: la REFERENCIA del avío es el último recurso (ADR-0009) y se avisa.
+  const usaReferencia =
+    precioCapturado === null && base.precio === null && precioReferencia !== null;
+  const precio = precioCapturado ?? base.precio ?? (usaReferencia ? precioReferencia : null);
+  return {
+    candidato: {
+      ...base,
+      precio,
+      ...(precioCapturado === null ? {} : { precioFijado: true }),
+    },
+    avisos: (desdeUltimaCompra: boolean): string[] => {
+      const avisos: string[] = [];
+      if (!base.activo) {
+        avisos.push(
+          `Avío "${nombreMaterial}": el proveedor ${etiqueta} "${base.proveedor}" está INACTIVO; ` +
+            `se mantiene la sugerencia, revísalo antes de la OC.`,
+        );
+      }
+      if (desdeUltimaCompra || precioCapturado !== null) {
+        return avisos;
+      }
+      if (usaReferencia) {
+        avisos.push(
+          `Avío "${nombreMaterial}": "${base.proveedor}" no tiene precio capturado ni compras ` +
+            `previas, así que la OC nace con el precio de REFERENCIA del avío. Revísalo.`,
+        );
+      } else if (precio === null) {
+        avisos.push(
+          `Avío "${nombreMaterial}": no hay ningún precio para "${base.proveedor}", así que la ` +
+            `línea de OC nace SIN precio. Captúralo en la OC.`,
+        );
+      }
+      return avisos;
+    },
+  };
+}
+
+/**
+ * Resuelve el candidato AMARRADO por Desarrollo (`OrdenAvio.idAvioProveedor`, F8-E6) con
+ * `resolverPrecioAvio`. Devuelve `null` si no hay amarre o si el amarrado no tiene precio usable —
+ * y entonces el llamador cae al HABITUAL y, si tampoco, al "más barato" de F4 (fallback INTACTO →
+ * no-regresión).
+ */
+function candidatoAvioAmarrado(
+  ma: OrdenParaExplosion['recetaAvios'][number],
+): CandidatoAvioResuelto | null {
   if (ma.idAvioProveedor === null) return null;
   const fila = ma.avio.proveedores.find((p) => p.idProveedor === ma.idAvioProveedor);
   if (fila === undefined) return null;
   // Sólo la fila amarrada + sin `precioReferencia`: así el fallback "más barato"/referencia de
-  // `resolverPrecioAvio` NO elige a otro (esa red la teje `proveedorSugeridoAvio`, idéntico a F4).
+  // `resolverPrecioAvio` NO elige a otro (esa red la tejen el habitual y el más barato).
   const resuelto = resolverPrecioAvio({
     precioReferencia: null,
     factorConversionAvio: numOrNull(ma.avio.factorConversion),
@@ -480,25 +677,75 @@ function resolverProveedorPrecioAvioAmarrado(
       },
     ],
   });
-  if (resuelto.origen === 'amarre' && resuelto.idProveedor !== null) {
-    if (!fila.proveedor.activo) {
-      avisos.push(
-        `Avío "${ma.avio.clave} — ${ma.avio.descripcion}": el proveedor amarrado ` +
-          `"${fila.proveedor.nombre}" está INACTIVO; se mantiene la sugerencia, revísalo antes de la OC.`,
-      );
-    }
-    // ⭐ D1/§Post-F9.48: el precio de la línea es el de la última compra A ESTE proveedor.
-    return conUltimoPrecioDelProveedor(
-      {
-        idProveedor: fila.idProveedor,
-        proveedor: fila.proveedor.nombre,
-        precio: resuelto.precio,
-      },
-      { tipo: 'avio', id: ma.idAvio },
-      ultimos,
-    );
+  if (resuelto.origen !== 'amarre' || resuelto.idProveedor === null) {
+    return null; // amarre sin precio usable → sigue la cascada
   }
-  return null; // amarre sin precio usable → fallback F4 (más barato)
+  return conAvisosAvio(
+    ma,
+    {
+      idProveedor: fila.idProveedor,
+      proveedor: fila.proveedor.nombre,
+      precio: resuelto.precio,
+      activo: fila.proveedor.activo,
+    },
+    'amarrado',
+  );
+}
+
+/** Las filas `AvioProveedor` del avío en la forma que consume la política pura. */
+function filasProveedorAvio(ma: OrdenParaExplosion['recetaAvios'][number]): FilaProveedorAvio[] {
+  return ma.avio.proveedores.map((p) => ({
+    idProveedor: p.idProveedor,
+    proveedor: p.proveedor.nombre,
+    activo: p.proveedor.activo,
+    precio: numOrNull(p.precio),
+    factorConversion: numOrNull(p.factorConversion),
+    habitual: p.habitual,
+  }));
+}
+
+/**
+ * Los CUATRO candidatos de proveedor de un avío, en orden de precedencia (`elegirProveedorAvio`):
+ * amarre de Desarrollo → ⭐ HABITUAL → más barato (F4) → asignación de Compras.
+ */
+function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
+  amarre: CandidatoAvioResuelto | null;
+  habitual: CandidatoAvioResuelto | null;
+  masBarato: CandidatoAvioResuelto | null;
+  compras: CandidatoAvioResuelto | null;
+} {
+  const filas = filasProveedorAvio(ma);
+  const factorAvio = numOrNull(ma.avio.factorConversion);
+
+  const habitualBase = candidatoHabitualAvio(filas, factorAvio);
+  const masBaratoBase = candidatoMasBaratoAvio(filas, factorAvio);
+
+  // ⭐ La asignación de COMPRAS: su precio es el que tecleó el comprador; si no capturó, el del
+  // renglón de ese proveedor (si lo hay) y, si no, la referencia del avío.
+  const idCompras = ma.idProveedorCompra;
+  const filaCompras =
+    idCompras === null ? undefined : filas.find((f) => f.idProveedor === idCompras);
+  const compras =
+    idCompras === null || ma.proveedorCompra === null
+      ? null
+      : conAvisosAvio(
+          ma,
+          {
+            idProveedor: idCompras,
+            proveedor: ma.proveedorCompra.nombre,
+            precio: filaCompras === undefined ? null : precioProveedorAvio(filaCompras, factorAvio),
+            activo: ma.proveedorCompra.activo,
+          },
+          'que asignó Compras',
+          numOrNull(ma.precioCompra),
+        );
+
+  return {
+    amarre: candidatoAvioAmarrado(ma),
+    habitual: habitualBase === null ? null : conAvisosAvio(ma, habitualBase, 'habitual'),
+    masBarato: masBaratoBase === null ? null : conAvisosAvio(ma, masBaratoBase, 'más barato'),
+    compras,
+  };
 }
 
 /**
@@ -525,71 +772,77 @@ function requeridoAvio(
 }
 
 /**
- * Resuelve el proveedor/precio SUGERIDO de un avío (R1): el `AvioProveedor` con precio MÁS BARATO
- * (por unidad de consumo = precio ÷ factor). En EMPATE de precio gana el `idProveedor` MENOR
- * (desempate DETERMINISTA, no el orden de la BD). Los que no traen precio se ignoran. Devuelve el id
- * del proveedor, su nombre y el precio por unidad de consumo, o nulls si ninguno tiene precio.
+ * ⭐ V1-E3m (§Post-F9.82) — CIERRA la elección de proveedor de UN material: recibe los candidatos ya
+ * armados, deja que la política pura elija (`proveedor-material.ts`), le pisa el precio con la
+ * última compra REAL a ESE proveedor (D1/§Post-F9.48) y suelta los avisos **del que ganó** — nunca
+ * los de los que no se usaron, que serían ruido sobre decisiones que nadie tomó.
  *
- * NORMALIZACIÓN del factor (F8-E6, alineado con el amarre): `resolverFactor(proveedor, avío)` — cae al
- * `Avio.factorConversion` cuando el proveedor no fija el suyo, EXACTAMENTE como `resolverPrecioAvio`
- * (cascada F8-E1). Antes de F8 se pasaba `null` como fallback (se ignoraba el factor del avío), lo que
- * hacía que el MISMO proveedor diera precios distintos según el camino (amarre vs. más barato). Ya no.
+ * También delata la ASIGNACIÓN DORMIDA: Compras había asignado un proveedor para esta orden y ya no
+ * se usa porque Desarrollo/el catálogo resolvieron. Es el comportamiento buscado —Desarrollo manda—
+ * pero callarlo dejaría a alguien creyendo que compra a quien él eligió (D3).
  */
-async function proveedorSugeridoAvio(
-  tx: Tx,
-  idAvio: number,
-): Promise<{ idProveedor: number | null; proveedor: string | null; precio: number | null }> {
-  const opciones = await tx.avioProveedor.findMany({
-    where: { idAvio, precio: { not: null }, proveedor: { activo: true } },
-    select: {
-      idProveedor: true,
-      precio: true,
-      factorConversion: true,
-      proveedor: { select: { nombre: true } },
-      avio: { select: { factorConversion: true } },
-    },
-  });
-  let mejor: { idProveedor: number; proveedor: string; precio: number } | null = null;
-  for (const op of opciones) {
-    if (op.precio === null) continue;
-    // Precio por unidad de consumo (R1): precio por presentación ÷ factor (proveedor → avío → 1).
-    const factor = resolverFactor(
-      numOrNull(op.factorConversion),
-      numOrNull(op.avio.factorConversion),
+function cerrarEleccion(
+  eleccion: ResolucionProveedorMaterial,
+  avisosCandidato: ((desdeUltimaCompra: boolean) => string[]) | null,
+  material: { tipo: 'tela' | 'avio'; id: number; nombre: string },
+  ultimos: UltimosPreciosCompra,
+  avisos: string[],
+  respetarPrecio = false,
+  nombreAsignadoPorCompras: string | null = null,
+): {
+  idProveedor: number | null;
+  proveedor: string | null;
+  precio: number | null;
+  inactivo: boolean;
+} {
+  if (eleccion.asignacionDormida && nombreAsignadoPorCompras !== null) {
+    avisos.push(
+      `${material.tipo === 'tela' ? 'Tela' : 'Avío'} "${material.nombre}": Compras había asignado a ` +
+        `"${nombreAsignadoPorCompras}" para esta orden, pero ya NO se usa porque el proveedor viene ` +
+        `${eleccion.origen === 'amarre-desarrollo' ? 'de Desarrollo' : 'del catálogo'} ` +
+        `("${eleccion.elegido?.proveedor ?? '—'}"). Quita la asignación si ya no hace falta.`,
     );
-    const precioConsumo = precioAUnidadConsumo(Number(op.precio), factor);
-    // Más barato gana; en empate de precio, el idProveedor MENOR (determinista, no orden de BD).
-    const ganaPorPrecio = mejor === null || precioConsumo < mejor.precio;
-    const empateMenorId =
-      mejor !== null && precioConsumo === mejor.precio && op.idProveedor < mejor.idProveedor;
-    if (ganaPorPrecio || empateMenorId) {
-      mejor = {
-        idProveedor: op.idProveedor,
-        proveedor: op.proveedor.nombre,
-        precio: precioConsumo,
-      };
-    }
   }
-  return mejor === null
-    ? { idProveedor: null, proveedor: null, precio: null }
-    : { idProveedor: mejor.idProveedor, proveedor: mejor.proveedor, precio: mejor.precio };
+  if (eleccion.elegido === null) {
+    return { idProveedor: null, proveedor: null, precio: null, inactivo: false };
+  }
+  const resuelto = conUltimoPrecioDelProveedor(
+    eleccion.elegido,
+    { tipo: material.tipo, id: material.id },
+    ultimos,
+    respetarPrecio,
+  );
+  if (avisosCandidato !== null) {
+    avisos.push(...avisosCandidato(resuelto.desdeUltimaCompra));
+  }
+  return {
+    idProveedor: resuelto.idProveedor,
+    proveedor: resuelto.proveedor,
+    precio: resuelto.precio,
+    // Se CONSERVA la sugerencia (el aviso ya lo dice), pero viaja la bandera: sin ella la pantalla
+    // no podía ofrecer la reasignación en el único renglón donde de verdad urge.
+    inactivo: !resuelto.activo,
+  };
 }
 
 /**
- * Calcula los requerimientos de una orden (función de cálculo R3; las lecturas de avíos
- * genéricos/proveedores las hace contra `tx`). Para cada renglón del BOM `paraProduccion`:
- *   • TELA: requerido = consumoPorPrenda × totalPiezas. Proveedor/precio del AMARRE de Desarrollo
- *     (F8-E6, `resolverProveedorPrecioTela`); sin amarre → NULL (captura manual, D5).
+ * Calcula los requerimientos de una orden (función de cálculo R3; la lectura del stock de avíos
+ * genéricos y de las últimas compras las hace contra `tx`). Para cada renglón de la RECETA DE LA
+ * ORDEN `paraProduccion`:
+ *   • TELA: requerido = consumoPorPrenda × totalPiezas. Proveedor: **amarre de Desarrollo → ⭐ DUEÑO
+ *     de la tela (§Post-F9.11/V1-E3m) → asignación de Compras**. Antes de V1-E3m, sin amarre se
+ *     quedaba en NULL — y como el amarre casi nunca existe, la explosión llegaba entera sin
+ *     proveedor y el botón de generar OC no encendía nunca (el atorón de Daniel).
  *   • AVÍO: requerido = consumoPorPrenda × totalPiezas, o Σ(medida×piezas) si se consume por talla
- *     (R18, `requeridoAvio`). Proveedor/precio: AMARRE `ModeloAvio.idAvioProveedor` primero; sin
- *     amarre (o amarrado sin precio) → "más barato" de F4 (`proveedorSugeridoAvio`, fallback intacto).
+ *     (R18, `requeridoAvio`). Proveedor: **amarre → ⭐ HABITUAL → más barato (F4, fallback intacto)
+ *     → asignación de Compras**.
  * AVÍOS genéricos (decisión (d)): netea contra el stock REAL (Σ kardex, D3) → solo el faltante va a
  * compra. Telas y avíos NO genéricos van completos a compra. Los casos ambiguos van a `avisos`.
  *
- * ⭐ **PRECIO de la línea (D1/§Post-F9.48):** una vez elegido el proveedor por R1/F4, el precio se
- * PISA con el de la última compra REAL **a ese mismo proveedor** ({@link conUltimoPrecioDelProveedor});
- * si nunca se le compró, queda el de catálogo/negociado. La elección del proveedor NO cambia y jamás
- * se usa el precio de un tercero.
+ * ⭐ **PRECIO de la línea (D1/§Post-F9.48):** una vez elegido el proveedor, el precio se PISA con el
+ * de la última compra REAL **a ese mismo proveedor** ({@link conUltimoPrecioDelProveedor}); si nunca
+ * se le compró, queda el de catálogo/negociado. La elección del proveedor NO cambia y jamás se usa
+ * el precio de un tercero.
  */
 async function calcularRequerimientos(
   tx: Tx,
@@ -617,7 +870,31 @@ async function calcularRequerimientos(
   for (const mt of orden.recetaTelas) {
     if (!mt.paraProduccion) continue;
     const requerida = num(mt.consumoPorPrenda) * totalPiezas;
-    const sugerido = resolverProveedorPrecioTela(mt, colores, avisos, ultimos);
+    const candidatos = candidatosTela(mt, colores);
+    const eleccion = elegirProveedorTela({
+      amarre: candidatos.amarre?.candidato,
+      dueno: candidatos.dueno?.candidato,
+      compras: candidatos.compras?.candidato,
+    });
+    const ganador =
+      eleccion.origen === 'amarre-desarrollo'
+        ? candidatos.amarre
+        : eleccion.origen === 'dueno-tela'
+          ? candidatos.dueno
+          : eleccion.origen === 'asignado-compras'
+            ? candidatos.compras
+            : null;
+    const sugerido = cerrarEleccion(
+      eleccion,
+      ganador?.avisos ?? null,
+      { tipo: 'tela', id: mt.idTela, nombre: mt.tela.nombre },
+      ultimos,
+      avisos,
+      // Un precio por COLOR es MÁS específico que la última compra (que no sabe de colores): no se
+      // pisa. Mismo argumento que protege al promedio de medidas en los avíos.
+      ganador?.origenPrecio === 'amarre-color',
+      candidatos.compras?.candidato.proveedor ?? null,
+    );
     resultado.push({
       tipo: 'tela',
       idTela: mt.idTela,
@@ -631,6 +908,8 @@ async function calcularRequerimientos(
       idProveedorSugerido: sugerido.idProveedor,
       proveedorSugerido: sugerido.proveedor,
       precioSugerido: sugerido.precio,
+      origenProveedor: eleccion.origen,
+      proveedorSugeridoInactivo: sugerido.inactivo,
     });
   }
 
@@ -649,21 +928,38 @@ async function calcularRequerimientos(
       aComprar = Math.max(0, requerida - existencia);
     }
 
-    // Amarre de Desarrollo primero (F8-E6); si no resuelve, "más barato" de F4 (fallback intacto).
-    const sugerido =
-      resolverProveedorPrecioAvioAmarrado(ma, avisos, ultimos) ??
-      // Sin amarre usable: el MÁS BARATO de F4 elige al proveedor (R1, intacto) y D1 le pone el
-      // precio de la última compra A ESE MISMO proveedor.
-      conUltimoPrecioDelProveedor(
-        await proveedorSugeridoAvio(tx, ma.idAvio),
-        { tipo: 'avio', id: ma.idAvio },
-        ultimos,
-      );
+    const candidatos = candidatosAvio(ma);
+    const eleccion = elegirProveedorAvio({
+      amarre: candidatos.amarre?.candidato,
+      habitual: candidatos.habitual?.candidato,
+      masBarato: candidatos.masBarato?.candidato,
+      compras: candidatos.compras?.candidato,
+    });
+    const ganador =
+      eleccion.origen === 'amarre-desarrollo'
+        ? candidatos.amarre
+        : eleccion.origen === 'habitual'
+          ? candidatos.habitual
+          : eleccion.origen === 'mas-barato'
+            ? candidatos.masBarato
+            : eleccion.origen === 'asignado-compras'
+              ? candidatos.compras
+              : null;
+    const nombreMaterial = `${ma.avio.clave} — ${ma.avio.descripcion}`;
+    const sugerido = cerrarEleccion(
+      eleccion,
+      ganador?.avisos ?? null,
+      { tipo: 'avio', id: ma.idAvio, nombre: nombreMaterial },
+      ultimos,
+      avisos,
+      false,
+      candidatos.compras?.candidato.proveedor ?? null,
+    );
     resultado.push({
       tipo: 'avio',
       idTela: null,
       idAvio: ma.idAvio,
-      material: `${ma.avio.clave} — ${ma.avio.descripcion}`,
+      material: nombreMaterial,
       cantidadRequerida: requerida,
       unidad: ma.avio.unidad,
       esGenerico,
@@ -672,6 +968,8 @@ async function calcularRequerimientos(
       idProveedorSugerido: sugerido.idProveedor,
       proveedorSugerido: sugerido.proveedor,
       precioSugerido: sugerido.precio,
+      origenProveedor: eleccion.origen,
+      proveedorSugeridoInactivo: sugerido.inactivo,
     });
   }
 
@@ -699,6 +997,14 @@ function aRequerimientoSalida(
     proveedorSugerido: { nombre: string } | null;
   },
   diff: DiffRequerimiento,
+  /**
+   * ⭐ V1-E3m: de dónde salió el proveedor. NO se persiste en el snapshot: es una TRAZA del cálculo
+   * que se acaba de hacer, y guardarla obligaría a mantenerla al día cada vez que cambie el
+   * catálogo — un dato viejo aquí mentiría sobre quién eligió al proveedor.
+   */
+  origenProveedor: OrigenProveedor,
+  /** ⭐ V1-E3m: ¿el proveedor propuesto está de baja? (tampoco se persiste: es traza del cálculo). */
+  proveedorSugeridoInactivo: boolean,
   /** Cambios del modelo que afectan a ESTE material (§Post-F9.43(d)); vacío = nada que avisar. */
   cambiosReceta: TipoCambioRecetaClave[] = [],
 ): RequerimientoSalida {
@@ -727,6 +1033,8 @@ function aRequerimientoSalida(
     idProveedorSugerido: fila.idProveedorSugerido,
     proveedorSugerido: fila.proveedorSugerido?.nombre ?? null,
     precioSugerido: fila.precioSugerido === null ? null : Number(fila.precioSugerido),
+    origenProveedor,
+    proveedorSugeridoInactivo,
     diff,
     cambiosReceta,
   };
@@ -876,6 +1184,8 @@ export async function explosionarOrden(
           idProveedorSugerido: null,
           proveedorSugerido: null,
           precioSugerido: null,
+          origenProveedor: 'sin-proveedor',
+          proveedorSugeridoInactivo: false,
           diff: 'eliminado',
           // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
           cambiosReceta: [],
@@ -928,6 +1238,8 @@ export async function explosionarOrden(
         aRequerimientoSalida(
           creada,
           diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio',
+          c.origenProveedor,
+          c.proveedorSugeridoInactivo,
           cambiosDe(c),
         ),
       );

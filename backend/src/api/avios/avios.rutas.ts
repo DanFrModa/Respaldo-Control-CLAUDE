@@ -63,6 +63,7 @@ function aProveedorSalida(
     precio: fila.precio === null ? null : Number(fila.precio),
     condiciones: fila.condiciones,
     precioUnidadConsumo: fila.precioUnidadConsumo ?? null,
+    habitual: fila.habitual,
   };
 }
 

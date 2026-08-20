@@ -726,6 +726,11 @@ model Proveedor {
   /// Telas de las que este proveedor es el DUEÑO del artículo (§Post-F9.11). Restrict.
   telasComoDueno Tela[] @relation("TelaProveedorDueno")
 
+  /// Renglones de receta de ORDEN donde COMPRAS lo asignó para desatorar esa OP (V1-E3m,
+  /// §Post-F9.82). La asignación vive en la orden, nunca en el catálogo. Restrict.
+  ordenTelasAsignadas OrdenTela[] @relation("OrdenTelaProveedorCompra")
+  ordenAviosAsignados OrdenAvio[] @relation("OrdenAvioProveedorCompra")
+
   /// Almacén de TELA ligado a este tercero como CORTADOR (§Post-F9.13). Es 0..1: el almacén
   /// declara a su cortador y la liga es única, para que "el almacén de este cortador" nunca
   /// sea ambiguo.
@@ -1926,6 +1931,21 @@ model AvioProveedor {
   factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Condiciones comerciales de este proveedor para este avío (texto libre).
   condiciones      String?
+  /// ⭐ V1-E3m (§Post-F9.82) — **EL PROVEEDOR HABITUAL de este avío**. Daniel: *"en avíos sí podría
+  /// ser que un elástico se compre con más de un proveedor… pero tener avíos sin proveedor asignado
+  /// está generando más problemas que beneficios"*. Se invierte el default de F4: la explosión ya no
+  /// propone **el más barato**, propone **al que se le compra siempre**; el más barato queda de
+  /// fallback (no-regresión) para el avío que todavía no tiene habitual.
+  ///
+  /// **Por qué una BANDERA aquí y no un `Avio.idProveedorHabitual`:** el habitual tiene que ser uno
+  /// de los que DE VERDAD surten el avío, y aquí lo es por construcción (el renglón es el par
+  /// avío–proveedor, con su `precio` y su `factorConversion` — justo lo que el MRP necesita para
+  /// proponer precio sin un segundo viaje). Un FK suelto en `Avio` podría apuntar a un proveedor sin
+  /// renglón (sin precio ni factor) y habría que validarlo a mano en cada escritura. El riesgo del
+  /// otro lado —dos habituales— lo cierra la BASE con un índice único parcial
+  /// (`avio_proveedor_habitual_unico ... WHERE habitual`), no la buena voluntad del dominio.
+  /// Mismo patrón que `DireccionEntrega.favorita`.
+  habitual         Boolean  @default(false)
 
   avio      Avio      @relation(fields: [idAvio], references: [id], onDelete: Cascade)
   proveedor Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
@@ -3159,6 +3179,24 @@ model OrdenTela {
   idTelaProveedor Int?           @map("id_tela_proveedor")
   telaProveedor   TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
 
+  /// ⭐ V1-E3m (§Post-F9.82) — EL PROVEEDOR QUE **COMPRAS** ASIGNÓ **PARA ESTA ORDEN**. Daniel:
+  /// *"el comprador asigna un proveedor **para esa OP en particular**… no para siempre ni para
+  /// todo. El proveedor puede seguir viniendo desde desarrollo"*. Por eso vive AQUÍ (en la receta
+  /// congelada = en la orden) y **jamás toca el catálogo**: una compra de urgencia no se vuelve
+  /// permanente sin que nadie lo decida. Es el ÚLTIMO escalón de la resolución del MRP —solo se usa
+  /// cuando ni Desarrollo (`idTelaProveedor`) ni el catálogo (`Tela.idProveedor`, el dueño)
+  /// resuelven—, así que NO PUEDE pisar a Desarrollo: la autoridad queda intacta por construcción.
+  /// Si algún día deja de usarse (porque Desarrollo amarró uno), la explosión lo DICE en un aviso
+  /// en vez de callarlo (D3). Restrict: un proveedor asignado a una orden no se borra físico.
+  idProveedorCompra Int?       @map("id_proveedor_compra")
+  proveedorCompra   Proveedor? @relation("OrdenTelaProveedorCompra", fields: [idProveedorCompra], references: [id], onDelete: Restrict)
+  /// Precio POR UNIDAD DE CONSUMO que capturó Compras junto con ese proveedor (opcional). Si viene,
+  /// MANDA sobre la última compra real (alguien lo tecleó para ESTA compra, hoy); si no, el precio
+  /// se resuelve solo (última compra a ese proveedor → su precio de catálogo → referencia).
+  /// ⚠️ NO es `OrdenTela.precio` (el precio congelado que COSTEA la orden): éste es del día que se
+  /// compra, aquél del día que nació la orden — la misma distinción de §Post-F9.43/.48.
+  precioCompra      Decimal?   @map("precio_compra") @db.Decimal(12, 4)
+
   estado        EstadoRenglonReceta @default(sin_revisar)
   /// El renglón NO vino del modelo: lo agregó una persona en esta orden (regla 3 del encabezado).
   agregadoAMano Boolean             @default(false) @map("agregado_a_mano")
@@ -3189,6 +3227,7 @@ model OrdenTela {
   @@index([liberadoEn])
   @@index([idTela])
   @@index([idTelaProveedor])
+  @@index([idProveedorCompra])
   @@map("orden_tela")
 }
 
@@ -3215,6 +3254,16 @@ model OrdenAvio {
   /// Proveedor del par `(idAvio, idAvioProveedor)` → `AvioProveedor` (SIN FK de relación, mismo
   /// criterio y nombre que `ModeloAvio.idAvioProveedor` y `OrdenCompraLinea.idAvioProveedor`).
   idAvioProveedor Int?    @map("id_avio_proveedor")
+
+  /// ⭐ V1-E3m (§Post-F9.82) — EL PROVEEDOR QUE **COMPRAS** ASIGNÓ **PARA ESTA ORDEN** (mismo
+  /// criterio, palabra por palabra, que `OrdenTela.idProveedorCompra`: vive en la orden, nunca en el
+  /// catálogo, y es el ÚLTIMO escalón —debajo del amarre de Desarrollo, del habitual y del más
+  /// barato—, así que no puede pisar a nadie). Restrict.
+  idProveedorCompra Int?       @map("id_proveedor_compra")
+  proveedorCompra   Proveedor? @relation("OrdenAvioProveedorCompra", fields: [idProveedorCompra], references: [id], onDelete: Restrict)
+  /// Precio POR UNIDAD DE CONSUMO capturado por Compras junto al proveedor (opcional). Si viene,
+  /// manda sobre la última compra real. ⚠️ NO es `OrdenAvio.precio` (el precio que COSTEA la orden).
+  precioCompra      Decimal?   @map("precio_compra") @db.Decimal(12, 4)
 
   estado        EstadoRenglonReceta @default(sin_revisar)
   agregadoAMano Boolean             @default(false) @map("agregado_a_mano")
@@ -3245,6 +3294,7 @@ model OrdenAvio {
   @@index([liberadoEn])
   @@index([idAvio])
   @@index([idAvioProveedor])
+  @@index([idProveedorCompra])
   @@map("orden_avio")
 }
 

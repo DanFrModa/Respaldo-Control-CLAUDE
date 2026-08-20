@@ -25,6 +25,7 @@ import type {
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
+import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -32,6 +33,7 @@ import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 import { recibirCompra } from './recepciones.js';
 import { estatusMaterialesOrden, explosionarOrden, generarOCDesdeExplosion } from './mrp.js';
+import { asignarProveedorDeMaterial } from './proveedor-de-orden.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -199,7 +201,9 @@ describe('Explosión (R3) — requerido = consumo × piezas, telas + avíos', ()
 
     expect(felpa?.cantidadRequerida).toBeCloseTo(45); // 1.5 × 30
     expect(felpa?.cantidadAComprar).toBeCloseTo(45);
-    expect(felpa?.idProveedorSugerido).toBeNull(); // telas sin liga directa (D5)
+    // Esta felpa no tiene proveedor DUEÑO capturado ni amarre → sigue sin proveedor. (Con dueño sí
+    // lo propondría: V1-E3m/§Post-F9.82, batería aparte al final del archivo.)
+    expect(felpa?.idProveedorSugerido).toBeNull();
 
     expect(boton?.cantidadRequerida).toBeCloseTo(180); // 6 × 30
     // Proveedor sugerido = el más barato (R1): Avíos Baratos a $2.
@@ -455,6 +459,10 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     const felpa = renglonTela(ex, telaFelpa.id);
     expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
     expect(felpa?.precioSugerido).toBeCloseTo(10);
+    // ⭐ V1-E3m — LA OTRA DIRECCIÓN de la bandera: con el proveedor VIVO va en `false`. Sin este
+    // par, un `true` fijo pasaría las aserciones de los tests del proveedor de baja, y la pantalla
+    // ofrecería reasignar en renglones que no lo necesitan.
+    expect(felpa?.proveedorSugeridoInactivo).toBe(false);
     expect(ex.avisos).toEqual([]);
     // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
     const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
@@ -535,6 +543,11 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     expect(felpa?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene
     expect(felpa?.precioSugerido).toBeCloseTo(10);
     expect(ex.avisos.some((a) => a.includes('INACTIVO'))).toBe(true);
+    // ⭐ V1-E3m: y la BANDERA viaja. No es decorativa: es lo que enciende «Ese proveedor está de
+    // baja — asignar otro para esta orden» en la pantalla del comprador. Si el servidor la regresara
+    // en `false`, el botón desaparecería en silencio del ÚNICO renglón donde urge desatorar —
+    // `crearOC` no valida `activo` y el catálogo no deja guardar con un proveedor desactivado.
+    expect(felpa?.proveedorSugeridoInactivo).toBe(true);
   });
 });
 
@@ -583,6 +596,8 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
     expect(boton?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene (Desarrollo lo eligió)
     expect(boton?.precioSugerido).toBeCloseTo(9);
     expect(ex.avisos.some((a) => a.includes('INACTIVO'))).toBe(true);
+    // ⭐ V1-E3m: la bandera que enciende la reasignación en la pantalla (gemela de la tela).
+    expect(boton?.proveedorSugeridoInactivo).toBe(true);
   });
 });
 
@@ -1163,6 +1178,58 @@ describe('MRP D1/§Post-F9.48 — el precio de la línea sale de la última comp
     expect(boton?.idProveedorSugerido).toBe(provCaro.id);
     expect(boton?.precioSugerido).toBeCloseTo(4);
   });
+
+  /**
+   * ⭐ V1-E3m — **EL SEGUNDO CAMINO DE `respetarPrecio`**, el que faltaba probar. `conUltimoPrecioDelProveedor`
+   * sale temprano en DOS casos: el precio por COLOR (ya cubierto arriba, `amarre-color`) y el precio
+   * que **teclea Compras** al asignar proveedor (`precioFijado`). El segundo se agregó en esta etapa
+   * y no tenía espejo: el único test que lo tocaba afirmaba el precio en un escenario **sin compras
+   * previas**, donde pasa igual con el guard puesto o quitado. Es dinero, y estaba afirmado por
+   * escrito.
+   */
+  it('el precio que TECLEA Compras manda sobre la última compra a ese mismo proveedor', async () => {
+    // A ese proveedor ya le compramos ese avío CARÍSIMO ($40): si el guard no existiera, la línea
+    // nacería con 40 y el número que capturó el comprador sería decorado.
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-07-15',
+      precio: 40,
+      idAvio: avioHilo.id,
+    });
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'avio', idMaterial: avioHilo.id, idProveedor: provCaro.id, precio: 1.25 },
+      bd(),
+    );
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const hilo = renglonAvio(ex, avioHilo.id);
+    expect(hilo?.idProveedorSugerido).toBe(provCaro.id);
+    // 1.25 (lo tecleado HOY), no 40 (lo que ese mismo proveedor cobró la última vez).
+    expect(hilo?.precioSugerido).toBeCloseTo(1.25);
+  });
+
+  it('si Compras NO teclea precio, sí manda la última compra a ese proveedor (D1 intacto)', async () => {
+    // El espejo del anterior: sin precio capturado el guard NO debe dispararse. Sin esta mitad,
+    // "respetar siempre" pasaría el test de arriba y nadie lo notaría.
+    await compra({
+      idProveedor: provCaro.id,
+      fecha: '2026-07-15',
+      precio: 40,
+      idAvio: avioHilo.id,
+    });
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'avio', idMaterial: avioHilo.id, idProveedor: provCaro.id },
+      bd(),
+    );
+
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const hilo = renglonAvio(ex, avioHilo.id);
+    expect(hilo?.precioSugerido).toBeCloseTo(40);
+  });
 });
 
 describe('MRP — el AVISO de multi-color nombra la fuente REAL del precio (V1-E3e)', () => {
@@ -1257,6 +1324,253 @@ describe('MRP — el AVISO de multi-color nombra la fuente REAL del precio (V1-E
     const aviso = ex.avisos.find((a) => a.includes('varios colores'));
     expect(aviso).toBeDefined();
     // Antes también aquí mentía diciendo "precio base": ese proveedor no tiene precio base.
-    expect(aviso).toContain('se usó el precio de catálogo de la tela');
+    // V1-E3m le puso su nombre: es el precio de REFERENCIA de la tela, no un precio de compra.
+    expect(aviso).toContain('se usó el precio de REFERENCIA de la tela');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// ⭐ V1-E3m (§Post-F9.82) — EL PROVEEDOR DEL MATERIAL
+//
+// Daniel, con la receta liberada y la explosión enfrente: *"no me deja hacer nada… ahí veo todo,
+// pero no puedo avanzar"*. Ningún renglón traía proveedor, y sin proveedor no hay OC. Estas
+// baterías cubren las tres piezas del arreglo contra Postgres: el DUEÑO de la tela, el HABITUAL del
+// avío y la asignación de COMPRAS por orden (que nunca toca el catálogo).
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+describe('V1-E3m — TELA: el motor resuelve por el proveedor DUEÑO (§Post-F9.11)', () => {
+  it('sin amarre, propone al DUEÑO de la tela (antes se rendía y dejaba el renglón sin proveedor)', async () => {
+    await cliente.tela.update({
+      where: { id: telaFelpa.id },
+      data: { idProveedor: provCaro.id, precioSugerido: 7 },
+    });
+    const ex = await explosionarConRecetaFresca();
+    const felpa = renglonTela(ex, telaFelpa.id);
+    // Sin V1-E3m esto era `null` — y con él apagado el botón de generar OC.
+    expect(felpa?.idProveedorSugerido).toBe(provCaro.id);
+    expect(felpa?.origenProveedor).toBe('dueno-tela');
+    // Sin precio negociado con el dueño, la línea nace con el precio de REFERENCIA… y se DICE.
+    expect(felpa?.precioSugerido).toBeCloseTo(7);
+    expect(ex.avisos.some((a) => a.includes('precio de REFERENCIA de la tela'))).toBe(true);
+  });
+
+  it('si el dueño SÍ tiene precio negociado, ése manda sobre la referencia', async () => {
+    await cliente.tela.update({
+      where: { id: telaFelpa.id },
+      data: { idProveedor: provCaro.id, precioSugerido: 7 },
+    });
+    await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provCaro.id, precio: 11 },
+    });
+    const ex = await explosionarConRecetaFresca();
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provCaro.id);
+    // 11 (negociado), NO 7 (referencia).
+    expect(felpa?.precioSugerido).toBeCloseTo(11);
+    expect(ex.avisos.some((a) => a.includes('precio de REFERENCIA de la tela'))).toBe(false);
+  });
+
+  it('el AMARRE de Desarrollo sigue mandando sobre el dueño (su autoridad no se toca)', async () => {
+    await cliente.tela.update({ where: { id: telaFelpa.id }, data: { idProveedor: provCaro.id } });
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    const ex = await explosionarConRecetaFresca();
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
+    expect(felpa?.origenProveedor).toBe('amarre-desarrollo');
+  });
+});
+
+describe('V1-E3m — AVÍO: manda el proveedor HABITUAL, no el más barato', () => {
+  it('el habitual gana AUNQUE sea el más caro (esa es la decisión de Daniel)', async () => {
+    await cliente.avioProveedor.update({
+      where: { idAvio_idProveedor: { idAvio: avioBoton.id, idProveedor: provCaro.id } },
+      data: { habitual: true },
+    });
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id);
+    // Sin la bandera aquí saldría provBarato/$2 (la regla F4).
+    expect(boton?.idProveedorSugerido).toBe(provCaro.id);
+    expect(boton?.precioSugerido).toBeCloseTo(3);
+    expect(boton?.origenProveedor).toBe('habitual');
+  });
+
+  it('sin habitual sigue ganando el más barato (fallback F4 intacto)', async () => {
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provBarato.id);
+    expect(boton?.origenProveedor).toBe('mas-barato');
+  });
+
+  it('un habitual SIN precio sigue siendo el proveedor: cae al precio de REFERENCIA y avisa', async () => {
+    await cliente.avio.update({
+      where: { id: avioBoton.id },
+      data: { precioReferencia: 4 },
+    });
+    await cliente.avioProveedor.update({
+      where: { idAvio_idProveedor: { idAvio: avioBoton.id, idProveedor: provCaro.id } },
+      data: { habitual: true, precio: null },
+    });
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provCaro.id);
+    expect(boton?.precioSugerido).toBeCloseTo(4);
+    expect(ex.avisos.some((a) => a.includes('precio de REFERENCIA del avío'))).toBe(true);
+  });
+});
+
+describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP', () => {
+  it('asigna proveedor a una tela sin dueño y la explosión ya la puede comprar', async () => {
+    // Punto de partida: exactamente el atorón de Daniel (tela sin dueño ni amarre).
+    const antes = await explosionarConRecetaFresca();
+    expect(renglonTela(antes, telaFelpa.id)?.idProveedorSugerido).toBeNull();
+
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 13.5 },
+      bd(),
+    );
+    // ⚠️ SIN re-sembrar la receta: la asignación vive en ella.
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
+    expect(felpa?.precioSugerido).toBeCloseTo(13.5);
+    expect(felpa?.origenProveedor).toBe('asignado-compras');
+  });
+
+  it('⭐ NO toca el catálogo: la tela sigue sin dueño y el resto de las órdenes no se entera', async () => {
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 13.5 },
+      bd(),
+    );
+    const tela = await cliente.tela.findUniqueOrThrow({ where: { id: telaFelpa.id } });
+    // La restricción textual de Daniel: "no para siempre ni para todo".
+    expect(tela.idProveedor).toBeNull();
+    expect(await cliente.telaProveedor.count({ where: { idTela: telaFelpa.id } })).toBe(0);
+  });
+
+  it('la asignación NO pisa a Desarrollo/al catálogo: queda DORMIDA y se avisa', async () => {
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 13.5 },
+      bd(),
+    );
+    // Después, el catálogo aprende quién es el dueño de la tela.
+    await cliente.tela.update({ where: { id: telaFelpa.id }, data: { idProveedor: provCaro.id } });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provCaro.id); // manda el catálogo
+    expect(felpa?.origenProveedor).toBe('dueno-tela');
+    // …y lo que Compras había asignado no se calla (D3).
+    expect(ex.avisos.some((a) => a.includes('Compras había asignado'))).toBe(true);
+  });
+
+  it('quitar la asignación (idProveedor null) devuelve el renglón a "sin proveedor"', async () => {
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 13.5 },
+      bd(),
+    );
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: null },
+      bd(),
+    );
+    const renglon = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: telaFelpa.id },
+    });
+    expect(renglon.idProveedorCompra).toBeNull();
+    // El precio se va con el proveedor: dejarlo colgando escondería un número que ya no vale.
+    expect(renglon.precioCompra).toBeNull();
+  });
+
+  it('asigna proveedor a un AVÍO y la OC generada sale a ese proveedor', async () => {
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'avio', idMaterial: avioHilo.id, idProveedor: provCaro.id, precio: 1.25 },
+      bd(),
+    );
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const hilo = renglonAvio(ex, avioHilo.id);
+    expect(hilo?.idProveedorSugerido).toBe(provCaro.id);
+
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      { idsRequerimiento: [hilo?.id ?? 0] },
+      bd(),
+    );
+    expect(ordenesCompra).toHaveLength(1);
+    expect(ordenesCompra[0]?.idProveedor).toBe(provCaro.id);
+    const oc = await obtenerOC(sesion(), ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    expect(oc.lineas[0]?.precio).toBeCloseTo(1.25);
+  });
+
+  it('un material que no está en la receta de la orden se rechaza diciendo por qué', async () => {
+    const otraTela = await cliente.tela.create({ data: { nombre: 'Rib', unidadMedida: 'KG' } });
+    await expect(
+      asignarProveedorDeMaterial(
+        sesion(),
+        idOrden,
+        { tipo: 'tela', idMaterial: otraTela.id, idProveedor: provBarato.id },
+        bd(),
+      ),
+    ).rejects.toThrow(/no está en la receta/i);
+  });
+
+  it('un renglón EXCLUIDO de la orden no se puede asignar (esta orden no lo lleva)', async () => {
+    await cliente.ordenTela.updateMany({
+      where: { idOrden, idTela: telaFelpa.id },
+      data: { excluido: true },
+    });
+    await expect(
+      asignarProveedorDeMaterial(
+        sesion(),
+        idOrden,
+        { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id },
+        bd(),
+      ),
+    ).rejects.toThrow(/EXCLUIDO/);
+  });
+
+  it('un proveedor DESACTIVADO no se puede asignar (es una elección que se toma ahora)', async () => {
+    await cliente.proveedor.update({ where: { id: provBarato.id }, data: { activo: false } });
+    await expect(
+      asignarProveedorDeMaterial(
+        sesion(),
+        idOrden,
+        { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id },
+        bd(),
+      ),
+    ).rejects.toThrow(/desactivado/i);
+  });
+
+  it('A9 — una orden de OTRA empresa responde 404, no se asigna nada', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const sesionAjena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      asignarProveedorDeMaterial(
+        sesionAjena,
+        idOrden,
+        { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    const renglon = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: telaFelpa.id },
+    });
+    expect(renglon.idProveedorCompra).toBeNull();
   });
 });

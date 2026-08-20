@@ -32,6 +32,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.008 · 20-ago-2026 · **en prueba** — A quién le compramos
+
+### Qué se puede hacer ahora que antes no
+
+- **La explosión de materiales ya propone a quién comprarle.** Antes se quedaba en blanco y el botón de
+  generar órdenes de compra no encendía: se veía todo y no se podía avanzar.
+- **La tela usa SU proveedor**, el que ya trae definido. No hay telas de varios proveedores, y el sistema
+  dejó de pedir que se capturara un dato que la tela ya tenía.
+- **Cada avío puede tener su proveedor habitual**, y ése es el que se propone. Antes la regla era "el más
+  barato", que sigue funcionando para los avíos sin habitual.
+- ⭐ **El comprador desatora sin esperar a nadie.** Si un material se quedó sin proveedor, se le asigna
+  **desde la explosión**, con su precio. **Solo para esa orden**: no toca el catálogo ni le quita la
+  decisión a Desarrollo. Si mañana Desarrollo define el proveedor, Desarrollo manda.
+- **El proveedor propuesto se puede cambiar al comprar**, para tela y avío por igual. Es una sugerencia,
+  no una atadura.
+- **El botón apagado ahora dice qué le falta**, con los nombres de los materiales, en vez de quedarse mudo.
+
+### Qué cambió y puede sorprender
+
+- **Los avíos que tienen un solo proveedor quedan con ése marcado como habitual** al actualizar. Si ese
+  único proveedor **está dado de baja**, NO se marca — se sigue viendo como "sin proveedor", que es lo
+  correcto: hay que elegir a alguien vivo.
+- El proveedor que aparece **de baja** ahora se marca y ofrece cambiarlo. Antes avisaba sin dar salida.
+- Los avíos con **varios** proveedores no cambian: siguen con "el más barato" mientras nadie marque uno.
+
+### Lo que queda pendiente
+
+- ⚠️ **La cotización y la compra pueden separarse.** Si alguien marca como habitual a un proveedor que no
+  es el más barato, el material se **comprará** a ese precio pero el **precosteo** sigue calculando con el
+  más barato. No es silencioso —el precio va en la orden de compra— pero **es una decisión de negocio
+  pendiente**: ¿la cotización debe seguir a la compra? El día del cambio no hay diferencia; solo aparece
+  cuando alguien lo decide a propósito.
+
+---
+
 ## 0.007 · 20-ago-2026 · **en prueba** — Las recetas se firman de una en una
 
 ### Qué cambió y puede sorprender

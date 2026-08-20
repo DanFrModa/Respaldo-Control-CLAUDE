@@ -19,6 +19,13 @@ export interface RenglonProveedorAvio {
   /** Precio como texto (vacio = sin precio). El dialogo lo convierte a number al enviar. */
   precio: string;
   condiciones: string;
+  /**
+   * ⭐ V1-E3m (§Post-F9.82) — ¿es el proveedor HABITUAL del avío? Daniel: *"tener avíos sin
+   * proveedor asignado está generando más problemas que beneficios"*. Es el que la explosión del
+   * MRP va a proponer, por encima del "más barato" de F4. **Uno por avío**: marcarlo desmarca al
+   * anterior (por eso se comporta como radio y no como casilla suelta).
+   */
+  habitual: boolean;
 }
 
 /**
@@ -80,11 +87,44 @@ export function SelectorProveedoresAvio({
       return;
     }
     setNombresElegidos((previo) => ({ ...previo, [proveedor.id]: proveedor.nombre }));
-    alCambiar([...renglones, { idProveedor: proveedor.id, precio: '', condiciones: '' }]);
+    alCambiar([
+      ...renglones,
+      // El PRIMER proveedor de un avío nace como habitual: es lo que el usuario quiere el 90 % de
+      // las veces (un avío con un solo proveedor no tiene dilema) y evita que la explosión se quede
+      // sin a quién comprarle por no haber marcado nada — el atorón que esta etapa vino a quitar.
+      { idProveedor: proveedor.id, precio: '', condiciones: '', habitual: renglones.length === 0 },
+    ]);
   }
 
   function quitar(id: number): void {
-    alCambiar(renglones.filter((renglon) => renglon.idProveedor !== id));
+    const quedan = renglones.filter((renglon) => renglon.idProveedor !== id);
+    // Si se fue el habitual y queda alguien, el PRIMERO toma el relevo: dejar el avío sin habitual
+    // por un borrado lo devolvería en silencio a la regla del "más barato".
+    const sinHabitual = quedan.length > 0 && !quedan.some((renglon) => renglon.habitual);
+    alCambiar(
+      sinHabitual
+        ? quedan.map((renglon, i) => (i === 0 ? { ...renglon, habitual: true } : renglon))
+        : quedan,
+    );
+  }
+
+  /** Marca UNO como habitual (y desmarca al resto: es uno por avío). */
+  function marcarHabitual(id: number): void {
+    alCambiar(renglones.map((renglon) => ({ ...renglon, habitual: renglon.idProveedor === id })));
+  }
+
+  /**
+   * QUITA el habitual del avío (sin poner otro). El backend, el contrato y la base lo soportan —un
+   * avío puede no tener habitual, y entonces la explosión vuelve a la regla del "más barato" de F4—
+   * y la UI no lo permitía: con radios solo se podía MOVER. Es la acción que el propio dominio
+   * describe como legítima, así que aquí está.
+   *
+   * ⚠️ No se contradice con el relevo automático de {@link quitar}: aquel evita que el avío se quede
+   * sin habitual **de rebote**, por borrar un renglón; esto es una decisión EXPLÍCITA de una persona
+   * que sabe lo que hace. La diferencia entre un efecto colateral silencioso y una elección.
+   */
+  function quitarHabitual(): void {
+    alCambiar(renglones.map((renglon) => ({ ...renglon, habitual: false })));
   }
 
   function cambiarCampo(id: number, campo: 'precio' | 'condiciones', valor: string): void {
@@ -101,8 +141,8 @@ export function SelectorProveedoresAvio({
         <span>Proveedores y precios</span>
       </FieldLabel>
       <FieldDescription>
-        A quién se le compra este avío y a qué precio (opcional: un avío puede no tener
-        proveedores).
+        A quién se le compra este avío y a qué precio. Marca el <b>habitual</b>: es el que la
+        explosión de compras va a proponer (antes proponía el más barato, §Post-F9.82).
       </FieldDescription>
 
       {/* ⚠️ El buscador va SIEMPRE montado, fuera del `cargando`/`error` del catálogo. Ese catálogo
@@ -157,6 +197,33 @@ export function SelectorProveedoresAvio({
                       <X className="size-4" aria-hidden />
                     </Button>
                   </div>
+                  {/* ⭐ V1-E3m: el HABITUAL. Radio (no casilla) porque es UNO por avío: marcar a
+                      otro desmarca al anterior, que es exactamente lo que hace el backend. */}
+                  <label className="mt-1 flex items-center gap-2 text-xs">
+                    <input
+                      type="radio"
+                      className="size-3.5"
+                      name="proveedor-habitual-avio"
+                      checked={renglon.habitual}
+                      disabled={deshabilitado}
+                      onChange={() => marcarHabitual(renglon.idProveedor)}
+                      data-testid={`habitual-proveedor-avio-${renglon.idProveedor}`}
+                    />
+                    <span className={renglon.habitual ? 'font-medium' : 'text-muted-foreground'}>
+                      Proveedor habitual (es el que propone la explosión de compras)
+                    </span>
+                    {renglon.habitual ? (
+                      <button
+                        type="button"
+                        className="underline"
+                        disabled={deshabilitado}
+                        onClick={quitarHabitual}
+                        data-testid="quitar-habitual-avio"
+                      >
+                        quitar
+                      </button>
+                    ) : null}
+                  </label>
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[8rem_1fr]">
                     <div>
                       <label

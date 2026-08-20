@@ -9,7 +9,14 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import { CLAVE_OC } from './ordenes-compra';
-import type { EstatusMateriales, Explosion, GenerarOcCuerpo, GenerarOcResultado } from './tipos';
+import type {
+  AsignarProveedorCuerpo,
+  AsignarProveedorResultado,
+  EstatusMateriales,
+  Explosion,
+  GenerarOcCuerpo,
+  GenerarOcResultado,
+} from './tipos';
 
 /**
  * Capa de datos del MRP / EXPLOSIÓN (F4-E4) — réplica del ESTÁNDAR de las demás capas de datos
@@ -69,6 +76,24 @@ async function generarOc(idOrden: number, cuerpo: GenerarOcCuerpo): Promise<Gene
   return data;
 }
 
+/**
+ * ⭐ V1-E3m (§Post-F9.82) — asigna (o quita, con `idProveedor: null`) el proveedor con el que ESTA
+ * orden compra un material. NO toca el catálogo: la asignación vive en la receta de la orden.
+ */
+async function asignarProveedor(
+  idOrden: number,
+  cuerpo: AsignarProveedorCuerpo,
+): Promise<AsignarProveedorResultado> {
+  const { data, error } = await api.PUT('/api/ordenes/{id}/materiales/proveedor', {
+    params: { path: { id: idOrden } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 // ── Hooks de lectura ────────────────────────────────────────────────────────────
 
 /**
@@ -114,6 +139,32 @@ export function useGenerarOc(): UseMutationResult<GenerarOcResultado, ErrorDeApi
       void queryClient.invalidateQueries({ queryKey: claveExplosion(variables.idOrden) });
       void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_OC });
+    },
+  });
+}
+
+/** Argumentos de la mutación de asignar proveedor. */
+export interface ArgsAsignarProveedor {
+  idOrden: number;
+  cuerpo: AsignarProveedorCuerpo;
+}
+
+/**
+ * ⭐ V1-E3m — asigna/quita el proveedor de un material EN ESTA ORDEN e invalida la explosión, que se
+ * vuelve a calcular con el proveedor nuevo (es el servidor quien decide si esa asignación se usa:
+ * va DEBAJO de Desarrollo y del catálogo). También se invalida el estatus R7 por si el cruce cambia.
+ */
+export function useAsignarProveedor(): UseMutationResult<
+  AsignarProveedorResultado,
+  ErrorDeApi,
+  ArgsAsignarProveedor
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idOrden, cuerpo }: ArgsAsignarProveedor) => asignarProveedor(idOrden, cuerpo),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: claveExplosion(variables.idOrden) });
+      void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
     },
   });
 }

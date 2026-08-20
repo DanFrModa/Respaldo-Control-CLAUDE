@@ -26883,6 +26883,10 @@
                                     }
                                   ],
                                   "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                                },
+                                "habitual": {
+                                  "type": "boolean",
+                                  "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                                 }
                               },
                               "required": [
@@ -26890,7 +26894,8 @@
                                 "nombreProveedor",
                                 "precio",
                                 "condiciones",
-                                "precioUnidadConsumo"
+                                "precioUnidadConsumo",
+                                "habitual"
                               ],
                               "additionalProperties": false,
                               "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -27207,6 +27212,9 @@
                         "condiciones": {
                           "type": "string",
                           "maxLength": 500
+                        },
+                        "habitual": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -27350,6 +27358,10 @@
                               }
                             ],
                             "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                          },
+                          "habitual": {
+                            "type": "boolean",
+                            "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                           }
                         },
                         "required": [
@@ -27357,7 +27369,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo"
+                          "precioUnidadConsumo",
+                          "habitual"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -27719,6 +27732,10 @@
                               }
                             ],
                             "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                          },
+                          "habitual": {
+                            "type": "boolean",
+                            "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                           }
                         },
                         "required": [
@@ -27726,7 +27743,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo"
+                          "precioUnidadConsumo",
+                          "habitual"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -28032,6 +28050,9 @@
                         "condiciones": {
                           "type": "string",
                           "maxLength": 500
+                        },
+                        "habitual": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -28187,6 +28208,10 @@
                               }
                             ],
                             "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                          },
+                          "habitual": {
+                            "type": "boolean",
+                            "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                           }
                         },
                         "required": [
@@ -28194,7 +28219,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo"
+                          "precioUnidadConsumo",
+                          "habitual"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -28554,6 +28580,10 @@
                               }
                             ],
                             "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                          },
+                          "habitual": {
+                            "type": "boolean",
+                            "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                           }
                         },
                         "required": [
@@ -28561,7 +28591,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo"
+                          "precioUnidadConsumo",
+                          "habitual"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -28857,6 +28888,10 @@
                               }
                             ],
                             "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
+                          },
+                          "habitual": {
+                            "type": "boolean",
+                            "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
                           }
                         },
                         "required": [
@@ -28864,7 +28899,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo"
+                          "precioUnidadConsumo",
+                          "habitual"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -85266,6 +85302,22 @@
                                   ],
                                   "description": "Precio unitario sugerido (R1), o null."
                                 },
+                                "origenProveedor": {
+                                  "type": "string",
+                                  "enum": [
+                                    "amarre-desarrollo",
+                                    "dueno-tela",
+                                    "habitual",
+                                    "mas-barato",
+                                    "asignado-compras",
+                                    "sin-proveedor"
+                                  ],
+                                  "description": "amarre-desarrollo: lo amarró Desarrollo en la receta; dueno-tela: es el proveedor DUEÑO de la tela (§Post-F9.11); habitual: es el proveedor habitual del avío; mas-barato: fallback R1/F4; asignado-compras: lo asignó Compras PARA ESTA ORDEN (§Post-F9.82); sin-proveedor: no hay."
+                                },
+                                "proveedorSugeridoInactivo": {
+                                  "type": "boolean",
+                                  "description": "⭐ V1-E3m: el proveedor propuesto está DADO DE BAJA. Se conserva la sugerencia (alguien lo eligió a propósito y la OC es editable) pero la pantalla tiene que poder ofrecer la reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor."
+                                },
                                 "diff": {
                                   "type": "string",
                                   "enum": [
@@ -85307,6 +85359,8 @@
                                 "idProveedorSugerido",
                                 "proveedorSugerido",
                                 "precioSugerido",
+                                "origenProveedor",
+                                "proveedorSugeridoInactivo",
                                 "diff",
                                 "cambiosReceta"
                               ],
@@ -85832,6 +85886,319 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de generar OC desde la explosión."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/materiales/proveedor": {
+      "put": {
+        "summary": "Asignar (o quitar) el proveedor con el que esta orden compra un material",
+        "tags": [
+          "compras"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "tela",
+                      "avio"
+                    ],
+                    "description": "Qué clase de material se está asignando."
+                  },
+                  "idMaterial": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Id de la TELA o del AVÍO del catálogo (según `tipo`)."
+                  },
+                  "idProveedor": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Proveedor a asignar PARA ESTA ORDEN, o null para quitar la asignación."
+                  },
+                  "precio": {
+                    "description": "Precio por unidad de consumo con el que se va a comprar (opcional). Si viene, MANDA sobre la última compra real: lo tecleó alguien para esta compra. Si no, se resuelve solo.",
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "tipo",
+                  "idMaterial",
+                  "idProveedor"
+                ],
+                "description": "Asignación de proveedor de un material PARA UNA ORDEN (§Post-F9.82)."
+              }
+            }
+          },
+          "description": "Asignación de proveedor de un material PARA UNA ORDEN (§Post-F9.82)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de asignar (o quitar) el proveedor de un material en una orden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden de producción donde vive la asignación."
+                    },
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "tela",
+                        "avio"
+                      ],
+                      "description": "Clase de material."
+                    },
+                    "idMaterial": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tela o avío asignado."
+                    },
+                    "material": {
+                      "type": "string",
+                      "description": "Nombre/clave del material (para el mensaje)."
+                    },
+                    "idProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proveedor asignado, o null si se quitó."
+                    },
+                    "proveedor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del proveedor asignado, o null."
+                    },
+                    "precio": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio capturado por Compras, o null."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "tipo",
+                    "idMaterial",
+                    "material",
+                    "idProveedor",
+                    "proveedor",
+                    "precio"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de asignar (o quitar) el proveedor de un material en una orden."
                 }
               }
             }

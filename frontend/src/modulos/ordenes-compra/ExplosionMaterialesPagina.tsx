@@ -1,11 +1,11 @@
-import { Info, LockOpen, Printer, ShoppingCart } from 'lucide-react';
+import { Info, LockOpen, Printer, ShoppingCart, UserPlus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
-import { useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
+import { useAsignarProveedor, useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import type { Requerimiento } from '@/api/tipos';
+import type { Proveedor, Requerimiento } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
@@ -57,6 +58,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   const explosion = useExplosion(idOrden ?? undefined);
   const generar = useGenerarOc();
+  /**
+   * ⭐ V1-E3m (§Post-F9.82) — EL COMPRADOR DESATORA DESDE AQUÍ. Daniel: *"el comprador podría
+   * asignarle un proveedor y no esperar a que la gente de desarrollo se lo asigne"*, pero **solo
+   * para esa OP**: el servidor guarda la asignación en la receta de la orden y NUNCA en el catálogo.
+   */
+  const asignar = useAsignarProveedor();
+  /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
+  const [asignandoId, setAsignandoId] = useState<number | null>(null);
+  // §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` no se pinta la acción (y el
+  // servidor la rechaza igual, que es donde de verdad se sostiene).
+  const puedeAsignarProveedor = tienePermiso('compras.administrar');
 
   /**
    * §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo, incluidas las que
@@ -179,11 +191,64 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     );
   }
 
+  /** Asigna (o quita, con `null`) el proveedor de un material EN ESTA ORDEN. */
+  function guardarProveedor(
+    renglon: Requerimiento,
+    idProveedor: number | null,
+    precio: number | null,
+  ): void {
+    if (idOrden === null) {
+      return;
+    }
+    const idMaterial = renglon.tipo === 'tela' ? renglon.idTela : renglon.idAvio;
+    if (idMaterial === null) {
+      return;
+    }
+    asignar.mutate(
+      {
+        idOrden,
+        cuerpo: {
+          tipo: renglon.tipo,
+          idMaterial,
+          idProveedor,
+          ...(precio === null ? {} : { precio }),
+        },
+      },
+      { onSuccess: () => setAsignandoId(null) },
+    );
+  }
+
   const datos = explosion.data;
+  const renglones = (datos?.grupos ?? []).flatMap((g) => g.renglones);
   // Renglones COMPRABLES (con proveedor sugerido y cantidad a comprar > 0).
-  const comprables = (datos?.grupos ?? [])
-    .flatMap((g) => g.renglones)
-    .filter((r) => r.idProveedorSugerido !== null && r.cantidadAComprar > 0);
+  const comprables = renglones.filter(
+    (r) => r.idProveedorSugerido !== null && r.cantidadAComprar > 0,
+  );
+  /** Lo que hace falta comprar pero no tiene a quién comprárselo (el atorón de §Post-F9.82). */
+  const sinProveedor = renglones.filter(
+    (r) => r.idProveedorSugerido === null && r.cantidadAComprar > 0,
+  );
+  /**
+   * ⭐ V1-E3m — **EL BOTÓN APAGADO TIENE QUE DECIR QUÉ LE FALTA.** Daniel se quedó mirando un
+   * «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Es el mismo
+   * defecto que V1-E3i arregló en el importador —*ofrecer una puerta y no explicar por qué no
+   * abre*, §Post-F9.70 punto 3— y aquí había quedado igual. Ahora se nombra la causa y, cuando son
+   * materiales sin proveedor, se nombran LOS MATERIALES: un "faltan 3" sin decir cuáles obliga a
+   * revisar la lista entera a mano.
+   */
+  const motivoSinOc: string | null =
+    datos === undefined
+      ? null
+      : comprables.length > 0
+        ? null
+        : sinProveedor.length > 0
+          ? `${String(sinProveedor.length)} material(es) sin proveedor: ` +
+            `${sinProveedor.map((r) => r.material).join(', ')}. Asígnale uno a cada uno aquí abajo ` +
+            `(«Asignar proveedor»), o captúralo en el catálogo: la tela lleva proveedor dueño y el ` +
+            `avío, proveedor habitual.`
+          : renglones.length === 0
+            ? 'Esta orden no tiene materiales que comprar.'
+            : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
 
   return (
     <div className="flex h-full flex-col">
@@ -321,6 +386,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     comprables.length === 0 ||
                     (avisoDireccion?.bloquea ?? false)
                   }
+                  // V1-E3m: el botón apagado dice por qué, también al pasar el ratón.
+                  title={motivoSinOc ?? undefined}
                   data-testid="exp-generar-oc"
                 >
                   Generar OC desde la explosión
@@ -353,6 +420,28 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </button>
                 )}
                 .
+              </p>
+            ) : null}
+
+            {/* ⭐ V1-E3m (§Post-F9.82) — POR QUÉ NO SE PUEDE GENERAR LA OC, con los nombres. Un botón
+                apagado sin explicación fue exactamente lo que dejó a Daniel sin poder avanzar. */}
+            {motivoSinOc !== null ? (
+              <p
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                data-testid="exp-motivo-sin-oc"
+              >
+                <b>No se pueden generar OC todavía: </b>
+                {motivoSinOc}
+              </p>
+            ) : null}
+
+            {sinProveedor.length > 0 && comprables.length > 0 ? (
+              <p
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                data-testid="exp-parcial-sin-proveedor"
+              >
+                Ojo: {sinProveedor.length} material(es) se van a quedar FUERA de las OC porque no
+                tienen proveedor — {sinProveedor.map((r) => r.material).join(', ')}.
               </p>
             ) : null}
 
@@ -548,6 +637,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                           renglon={r}
                           seleccionado={seleccion.has(r.id)}
                           onToggle={() => alternar(r.id)}
+                          puedeAsignar={puedeAsignarProveedor}
+                          abierto={asignandoId === r.id}
+                          guardando={asignar.isPending}
+                          onAbrir={() => setAsignandoId(asignandoId === r.id ? null : r.id)}
+                          onGuardar={(idProveedor, precio) =>
+                            guardarProveedor(r, idProveedor, precio)
+                          }
                         />
                       ))}
                     </ul>
@@ -562,17 +658,49 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   );
 }
 
-/** Un renglón de material requerido (con su neteo, diff y casilla de selección). */
+/**
+ * Un renglón de material requerido (con su neteo, diff, casilla de selección y —V1-E3m— la
+ * asignación de proveedor PARA ESTA ORDEN cuando el catálogo no resolvió a quién comprarle).
+ */
 function RenglonRequerimiento({
   renglon,
   seleccionado,
   onToggle,
+  puedeAsignar,
+  abierto,
+  guardando,
+  onAbrir,
+  onGuardar,
 }: {
   renglon: Requerimiento;
   seleccionado: boolean;
   onToggle: () => void;
+  /** ¿Esta sesión puede asignar proveedor (`compras.administrar`)? §Post-F9.68: esconder Y bloquear. */
+  puedeAsignar: boolean;
+  abierto: boolean;
+  guardando: boolean;
+  onAbrir: () => void;
+  onGuardar: (idProveedor: number | null, precio: number | null) => void;
 }): React.JSX.Element {
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadAComprar > 0;
+  // Se ofrece asignar donde hay HUECO, donde Compras ya puso algo (para corregirlo o quitarlo) y
+  // —⭐ segunda vuelta de V1-E3m— donde el proveedor propuesto está DADO DE BAJA. Si el proveedor
+  // viene vivo del catálogo o de Desarrollo, esta pantalla no es el lugar de cambiarlo: se cambia en
+  // la OC, que nace en borrador y es editable ("sí puede cambiar la tela con todo y su proveedor a
+  // la hora de comprar").
+  //
+  // ⚠️ **Por qué el INACTIVO también abre la puerta:** la sugerencia se conserva a propósito (alguien
+  // la eligió y la OC es editable) y la explosión lo avisa… pero sin esto el aviso no tenía salida:
+  // `crearOC` no valida `activo`, así que la OC nacería igual a un proveedor muerto, y el comprador
+  // no podía repararlo ni aquí —el botón no se pintaba— ni en el catálogo —`exigirProveedoresValidos`
+  // rechaza guardar con un proveedor desactivado—. Es justo cuando más falta hace desatorar.
+  const asignadoPorCompras = renglon.origenProveedor === 'asignado-compras';
+  const ofreceAsignar =
+    puedeAsignar &&
+    renglon.cantidadAComprar > 0 &&
+    (renglon.idProveedorSugerido === null ||
+      asignadoPorCompras ||
+      renglon.proveedorSugeridoInactivo);
   return (
     <li
       className="flex flex-wrap items-start gap-3 border-t px-3 py-2 first:border-t-0"
@@ -592,6 +720,18 @@ function RenglonRequerimiento({
           <span className="truncate">{renglon.material}</span>
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
+          {/* ⭐ V1-E3m: de dónde salió el proveedor. Lo que Compras asignó se ve DISTINTO —y se puede
+              quitar—; lo que viene del catálogo o de Desarrollo, no se toca desde aquí. */}
+          {renglon.origenProveedor === 'asignado-compras' ? (
+            <ChipEstado tono="info" sinPunto data-testid="exp-origen-compras">
+              Proveedor asignado por Compras (solo esta orden)
+            </ChipEstado>
+          ) : null}
+          {renglon.proveedorSugeridoInactivo ? (
+            <ChipEstado tono="warn" sinPunto data-testid="exp-proveedor-inactivo">
+              Proveedor dado de baja
+            </ChipEstado>
+          ) : null}
           {/* V1-E3d: el renglón cuyo insumo se movió en el modelo lo dice EN SU FILA, para que el
               aviso de arriba tenga a dónde apuntar. */}
           {renglon.cambiosReceta.length > 0 ? (
@@ -612,6 +752,33 @@ function RenglonRequerimiento({
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
         </p>
+        {/* ⭐ V1-E3m — DESATORAR DESDE AQUÍ, solo para esta OP. */}
+        {ofreceAsignar ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs underline"
+              onClick={onAbrir}
+              data-testid="exp-asignar-proveedor"
+              data-material={renglon.tipo === 'tela' ? renglon.idTela : renglon.idAvio}
+            >
+              <UserPlus className="size-3.5" aria-hidden />
+              {asignadoPorCompras
+                ? 'Cambiar el proveedor de esta orden'
+                : renglon.proveedorSugeridoInactivo
+                  ? 'Ese proveedor está de baja — asignar otro para esta orden'
+                  : 'Asignar proveedor'}
+            </button>
+            {abierto ? (
+              <FormaAsignarProveedor
+                renglon={renglon}
+                guardando={guardando}
+                onGuardar={onGuardar}
+                onCancelar={onAbrir}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div className="text-right">
         <p className="font-medium tabular-nums" data-testid="exp-renglon-comprar">
@@ -625,6 +792,102 @@ function RenglonRequerimiento({
         </p>
       </div>
     </li>
+  );
+}
+
+/**
+ * ⭐ V1-E3m (§Post-F9.82) — FORMULARIO DE «ASIGNAR PROVEEDOR» de UN material, dentro de su renglón.
+ * Elige proveedor (con el buscador del servidor: el desplegable con tope escondía al que se busca) y
+ * —opcional— el precio con el que se va a comprar.
+ *
+ * ⚠️ Lo que esta forma NO hace, y es su restricción central: **no toca el catálogo**. Daniel:
+ * *"asigna un proveedor para esa OP en particular… no para siempre ni para todo"*. El precio que se
+ * teclea aquí manda sobre la última compra (lo escribió alguien que sabe lo que va a pagar hoy);
+ * dejarlo vacío hace que el servidor lo resuelva solo.
+ */
+function FormaAsignarProveedor({
+  renglon,
+  guardando,
+  onGuardar,
+  onCancelar,
+}: {
+  renglon: Requerimiento;
+  guardando: boolean;
+  onGuardar: (idProveedor: number | null, precio: number | null) => void;
+  onCancelar: () => void;
+}): React.JSX.Element {
+  const [elegido, setElegido] = useState<Proveedor | null>(null);
+  // El precio se captura como TEXTO (un `<input type="number">` siempre entrega string; vacío = "que
+  // lo resuelva el servidor", que NO es lo mismo que cero).
+  const [precio, setPrecio] = useState('');
+  const yaAsignado = renglon.origenProveedor === 'asignado-compras';
+
+  function guardar(): void {
+    if (elegido === null) {
+      return;
+    }
+    const numero = precio.trim() === '' ? null : Number(precio);
+    onGuardar(elegido.id, numero !== null && Number.isFinite(numero) ? numero : null);
+  }
+
+  return (
+    <div
+      className="mt-2 space-y-2 rounded-md border bg-muted/30 p-2"
+      data-testid="exp-forma-asignar"
+    >
+      <p className="text-xs text-muted-foreground">
+        Solo para <b>esta orden</b>: el catálogo no se modifica.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-[1fr_8rem]">
+        <SelectorProveedor
+          idSeleccionado={elegido?.id}
+          nombreSeleccionado={elegido?.nombre}
+          alSeleccionar={setElegido}
+          testid="exp-selector-proveedor"
+        />
+        <Input
+          type="number"
+          step="0.0001"
+          min="0"
+          inputMode="decimal"
+          placeholder="Precio (opcional)"
+          value={precio}
+          onChange={(e) => setPrecio(e.target.value)}
+          aria-label={`Precio de compra de ${renglon.material}`}
+          data-testid="exp-precio-asignar"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={elegido === null || guardando}
+          onClick={guardar}
+          title={elegido === null ? 'Elige primero un proveedor.' : undefined}
+          data-testid="exp-guardar-proveedor"
+        >
+          Asignar a esta orden
+        </Button>
+        {yaAsignado ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={guardando}
+            onClick={() => onGuardar(null, null)}
+            data-testid="exp-quitar-proveedor"
+          >
+            <X aria-hidden /> Quitar la asignación
+          </Button>
+        ) : null}
+        <button
+          type="button"
+          className="text-xs underline"
+          onClick={onCancelar}
+          data-testid="exp-cancelar-asignar"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
   );
 }
 
