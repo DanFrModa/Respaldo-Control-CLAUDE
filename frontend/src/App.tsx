@@ -88,6 +88,7 @@ import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { VentasPagina } from '@/modulos/ventas/VentasPagina';
 import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
+import { RecetaOrdenPagina } from '@/modulos/ordenes/RecetaOrdenPagina';
 import { RecetasPorLiberarPagina } from '@/modulos/desarrollo/RecetasPorLiberarPagina';
 import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
@@ -203,6 +204,13 @@ const router = createBrowserRouter([
           // edición completa (F2-E3) se abre en el diálogo `DialogoOrden` con el mosaico "Modificar"
           // (antes era la página `/produccion/ordenes/captura`, ya retirada).
           { path: 'produccion/ordenes', element: <CentroOrdenesPagina /> },
+          // ⭐ V1-E3j — LA RECETA DE LA ORDEN, en pantalla propia y ancha. Daniel: *"debería de
+          // haber una pantalla especial para ir liberando… ahí mismo en el cuadrito chiquito no se
+          // ve toda la información"*. Es LA MISMA pantalla desde el detalle de la OP y desde la
+          // bandeja «Recetas por liberar». La gobierna `desarrollo.ver` — NO `ordenes.ver`, que es
+          // lo que heredaría de `/produccion/ordenes`: por eso se declara explícita en
+          // `EXIGENCIA_RUTA_EXTRA` (§Post-F9.68 + §Post-F9.72).
+          { path: 'produccion/ordenes/:id/receta', element: <RecetaOrdenPagina /> },
           // UNA SOLA PANTALLA POR ACTO (Daniel, `DECISIONES.md §Post-F9.36 punto 2`): el corte, el
           // envío a maquila y el recibo se capturan en el panel de AVANCE DE PRODUCCIÓN del Centro
           // de Órdenes. Las tres pantallas viejas se retiraron en V1-E3a (antes se le migró al

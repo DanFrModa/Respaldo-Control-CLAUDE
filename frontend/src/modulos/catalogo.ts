@@ -1948,6 +1948,13 @@ const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: Exige
   // Catálogo de direcciones de entrega de la OC: sin permisos propios, se
   // gobierna con los de compras (§Post-F9.18).
   ['/catalogos/direcciones-entrega', ['compras.ver']],
+  // ⭐ V1-E3j — LA RECETA DE UNA ORDEN, en su pantalla propia. Va DECLARADA (y no heredada de
+  // `/produccion/ordenes`, que es `ordenes.ver`) porque su permiso es OTRO: §Post-F9.72 sacó de en
+  // medio el permiso sobre la OP entera —*"nadie va a tener permiso de modificar la OP más que
+  // yo"*— y dejó la receta en manos de Desarrollo. Sin esta línea la pantalla se abriría con
+  // `ordenes.ver` (de más para quien solo mira producción) y se CERRARÍA a un usuario de
+  // Desarrollo puro (de menos para quien viene a firmar), que es justo al revés.
+  ['/produccion/ordenes/:id/receta', ['desarrollo.ver']],
   // La RC de una orden: consultar es `rc.ruta-ver`; programarla, `rc.programar`.
   ['/ruta-critica/ordenes/:idOrden', ['rc.ruta-ver']],
   ['/ruta-critica/ordenes/:idOrden/programar', ['rc.programar']],

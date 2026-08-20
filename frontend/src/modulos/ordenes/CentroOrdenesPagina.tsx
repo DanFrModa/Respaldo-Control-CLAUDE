@@ -53,7 +53,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
-import { PanelRecetaOrden } from './PanelRecetaOrden';
+import { ResumenRecetaOrden } from './ResumenRecetaOrden';
 import { textoFaltantes } from './requisitos';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
@@ -1515,6 +1515,10 @@ function DetalleCentroOrden({
             o había que darle a Desarrollo permiso sobre la OP entera para aprobar una lista de
             materiales. Los dos permisos ya existían separados; lo que estaba mal era que la puerta
             física fuera una sola.
+            ⭐ V1-E3j — pero el panel ENTERO aquí ya no cabía: *"ahí mismo en el cuadrito chiquito no
+            se ve toda la información"*. Queda el RESUMEN (estado, cuántos faltan por firmar, si el
+            modelo trae algo que esta orden no tiene) y el botón a la pantalla completa, que es la
+            MISMA a la que llega la bandeja «Recetas por liberar».
             Se ve con `desarrollo.ver` y se edita/libera con `desarrollo.administrar` — SIN exigir
             `ordenes.administrar`. El backend re-decide (A1). */}
         {puedeVerDesarrollo ? (
@@ -1522,11 +1526,7 @@ function DetalleCentroOrden({
             <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
               Receta de la orden
             </h4>
-            <PanelRecetaOrden
-              idOrden={orden.id}
-              puedeAdministrar={puedeAdministrarDesarrollo}
-              ordenCancelada={orden.estado === 'cancelada'}
-            />
+            <ResumenRecetaOrden idOrden={orden.id} />
           </section>
         ) : null}
 

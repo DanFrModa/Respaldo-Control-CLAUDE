@@ -1,4 +1,4 @@
-import { AlertTriangle, LockOpen, Search } from 'lucide-react';
+import { AlertTriangle, LockOpen, Maximize2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -35,6 +35,12 @@ import { useSesion } from '@/sesion/useSesion';
  *    alguien ya compró y está esperando la firma. No es lo mismo que una orden recién nacida.
  *  • **Se libera desde aquí**, sin dar la vuelta por el Centro de Órdenes — que es el punto entero
  *    de la bandeja.
+ *  • ⭐ **Y se ENTRA a ver el detalle**, que es lo que faltaba (Daniel, 19-ago-2026): *"solo está la
+ *    OC con un botón para liberar todas juntas. No veo dónde pueda ver todo completo e ir liberando
+ *    una por una."* El folio y «Ver la receta» llevan a la pantalla propia de la receta (V1-E3j) —
+ *    la MISMA a la que llega el detalle de la OP—, donde se firma renglón por renglón. «Revisar y
+ *    liberar» se queda: es el atajo para cuando ya sabes lo que hay, pero dejó de ser la única
+ *    salida.
  *
  * A1: los conteos por tipo y la marca de "ya frena compras" los AGREGA EL SERVIDOR (misma regla que
  * el concentrado de F5-E7); esta pantalla no suma nada. Y qué se puede firmar —que no queden
@@ -48,10 +54,9 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
   const puedeLiberar = tienePermiso('desarrollo.administrar');
-  // El destino del enlace es el panel de la OP, que exige `ordenes.ver` para abrirse: si la sesión
-  // no lo tiene, la fila no ofrece un enlace muerto (§Post-F9.68).
-  const puedeAbrirLaOrden = tienePermiso('ordenes.ver');
-
+  // ⭐ V1-E3j: el destino de la fila es la RECETA de la orden, gobernada por `desarrollo.ver` — el
+  // mismo permiso que abre esta bandeja, así que el camino nunca es un enlace muerto (§Post-F9.68).
+  // Antes apuntaba al panel de la OP y por eso pedía `ordenes.ver`.
   const [texto, setTexto] = useState('');
   const busqueda = useDebounce(texto.trim(), 300);
   const [soloConOrdenCompra, setSoloConOrdenCompra] = useState(false);
@@ -68,6 +73,11 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
   const datos = consulta.data;
   const filas = datos?.datos ?? [];
   const totalPaginas = datos?.totalPaginas ?? 0;
+
+  /** A la pantalla propia de la receta (V1-E3j) — la misma que abre el detalle de la OP. */
+  function abrirReceta(idOrden: number): void {
+    void navigate(`/produccion/ordenes/${String(idOrden)}/receta`);
+  }
 
   /**
    * ⭐ REVISAR **Y** FIRMAR, en un solo acto (§Post-F9.72).
@@ -108,8 +118,8 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
             </h1>
             <p className="text-[12.5px] text-muted-foreground">
               Órdenes cuya receta espera la firma de Desarrollo. Sin firmar, ese material no se
-              compra. «Revisar y liberar» da por buena la receta de esa orden y la firma completa;
-              para ajustar algo antes, abre la orden.
+              compra. «Ver la receta» abre la orden completa para revisar y firmar renglón por
+              renglón; «Revisar y liberar» da por buena toda la receta de esa orden de una vez.
             </p>
           </div>
         </div>
@@ -178,29 +188,21 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                   <TablaDensaHead>Cliente</TablaDensaHead>
                   <TablaDensaHead>Entrega</TablaDensaHead>
                   <TablaDensaHead>Falta liberar</TablaDensaHead>
-                  <TablaDensaHead className="w-44" />
+                  <TablaDensaHead className="w-72" />
                 </TablaDensaFila>
               </TablaDensaEncabezado>
               <TablaDensaCuerpo>
                 {filas.map((f) => (
                   <TablaDensaFila key={f.idOrden} data-testid="rpl-fila" data-id-orden={f.idOrden}>
                     <TablaDensaCelda>
-                      {puedeAbrirLaOrden ? (
-                        <button
-                          type="button"
-                          className="font-medium underline decoration-dotted underline-offset-2"
-                          onClick={() =>
-                            void navigate('/produccion/ordenes', {
-                              state: { idOrden: f.idOrden },
-                            })
-                          }
-                          data-testid={`rpl-abrir-${f.idOrden}`}
-                        >
-                          {f.folio}
-                        </button>
-                      ) : (
-                        <span className="font-medium">{f.folio}</span>
-                      )}
+                      <button
+                        type="button"
+                        className="font-medium underline decoration-dotted underline-offset-2"
+                        onClick={() => abrirReceta(f.idOrden)}
+                        data-testid={`rpl-abrir-${f.idOrden}`}
+                      >
+                        {f.folio}
+                      </button>
                     </TablaDensaCelda>
                     <TablaDensaCelda>{f.modelo}</TablaDensaCelda>
                     <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
@@ -217,19 +219,33 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                       </span>
                     </TablaDensaCelda>
                     <TablaDensaCelda>
-                      {puedeLiberar ? (
+                      <span className="flex flex-wrap justify-end gap-1.5">
+                        {/* ⭐ V1-E3j — EL CAMINO AL DETALLE, explícito. Sin él la fila solo ofrecía
+                            firmar TODO junto, y quien quería revisar antes no tenía por dónde. */}
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={liberar.isPending}
-                          title="Da por revisada la receta de esta orden y la firma completa"
-                          onClick={() => revisarYLiberar(f)}
-                          data-testid={`rpl-liberar-${f.idOrden}`}
+                          title="Abrir la receta completa: revisar y liberar renglón por renglón"
+                          onClick={() => abrirReceta(f.idOrden)}
+                          data-testid={`rpl-ver-${f.idOrden}`}
                         >
-                          <LockOpen aria-hidden /> Revisar y liberar
+                          <Maximize2 aria-hidden /> Ver la receta
                         </Button>
-                      ) : null}
+                        {puedeLiberar ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={liberar.isPending}
+                            title="Da por revisada la receta de esta orden y la firma completa"
+                            onClick={() => revisarYLiberar(f)}
+                            data-testid={`rpl-liberar-${f.idOrden}`}
+                          >
+                            <LockOpen aria-hidden /> Revisar y liberar
+                          </Button>
+                        ) : null}
+                      </span>
                     </TablaDensaCelda>
                   </TablaDensaFila>
                 ))}

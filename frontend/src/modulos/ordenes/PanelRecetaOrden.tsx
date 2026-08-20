@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  CircleDashed,
   Download,
   Loader2Icon,
   LockOpen,
@@ -60,9 +59,34 @@ import { formatearMoneda } from '@/lib/formato';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 
+import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
+
 /**
- * RECETA CONGELADA DE LA ORDEN (V1-E3d, §Post-F9.43) — el bloque del detalle de la OP donde vive
- * *"lo que ESTA orden lleva"*.
+ * RECETA CONGELADA DE LA ORDEN (V1-E3d, §Post-F9.43) — *"lo que ESTA orden lleva"*.
+ *
+ * ⭐ V1-E3j — **ESTE BLOQUE YA NO VIVE EN EL CAJÓN DE LA OP: tiene PANTALLA PROPIA**
+ * (`RecetaOrdenPagina`, `/produccion/ordenes/:id/receta`), y es LA MISMA a la que llega la bandeja
+ * «Recetas por liberar». En el detalle de la OP quedó un RESUMEN (`ResumenRecetaOrden`) con el botón
+ * que trae aquí.
+ *
+ * El reporte que lo provocó (Daniel, 19-ago-2026, probando la 0.005 en vivo) **no fue de lógica,
+ * fue de visibilidad**: buscando meterle a una OP unos avíos que el modelo había ganado después, se
+ * atoró porque el bloque le decía *"la receta de esta orden está vacía"* y ese mensaje se llevó toda
+ * la atención — mientras JUSTO DEBAJO estaba el aviso «El modelo ahora lleva X» con su botón «Traer
+ * del modelo». Cuando por fin lo vio: *"ya logré jalarlos. Justo me faltó poner el botón de traer la
+ * receta."* Y su petición: *"debería de haber una pantalla especial para ir liberando. Ahí mismo en
+ * el cuadrito chiquito no se ve toda la información."*
+ *
+ * De ahí salen las TRES reglas de jerarquía de esta pantalla, y son el entregable:
+ *  1. **La SALIDA va primero.** «Traer del modelo lo que falta» abre la pantalla, ARRIBA de todo,
+ *     incluido el estado de la receta. Si vuelve a quedar debajo de un mensaje más ruidoso, la
+ *     etapa no sirvió de nada.
+ *  2. **Un aviso NO puede ser más fuerte que su remedio.** La receta vacía se dice en tono neutro y
+ *     apuntando a la acción; el botón de «liberar» ni siquiera se ofrece cuando no hay qué firmar
+ *     (`resumen.total === 0`, dato del servidor) — antes se ofrecía, se clickeaba, y el rechazo del
+ *     backend era justo el cartel que tapaba la salida.
+ *  3. **Firmar UNO POR UNO es evidente**: cada renglón lleva su botón «Liberar» CON TEXTO, no un
+ *     ícono mudo. Es literalmente lo que Daniel vino a buscar y no encontró.
  *
  * Daniel (14-ago-2026): *"en ocasiones se negocia con el cliente que ya no lleve alguna cosa (por
  * ejemplo, quitarle una jareta para abaratar el costo)… **El BOM debe de vivir en la OP**"*.
@@ -92,13 +116,10 @@ import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 export function PanelRecetaOrden({
   idOrden,
   puedeAdministrar,
-  ordenCancelada,
 }: {
   idOrden: number;
   /** `desarrollo.administrar`: sin él la receta es de solo lectura. */
   puedeAdministrar: boolean;
-  /** Una orden cancelada no se toca (el backend también lo rechaza). */
-  ordenCancelada: boolean;
 }): React.JSX.Element {
   const receta = useRecetaOrden(idOrden);
   const marcar = useMarcarRecetaRevisada();
@@ -122,7 +143,10 @@ export function PanelRecetaOrden({
   }
 
   const d = receta.data;
-  const editable = puedeAdministrar && !ordenCancelada;
+  // V1-E3j: la orden CANCELADA la declara el servidor dentro de la propia receta (`estado`), no un
+  // prop que el llamador tenga que acordarse de pasar. Una pantalla con dos puertas de entrada no
+  // puede depender de que las dos coincidan en un dato que el backend ya sabe (A1).
+  const editable = puedeAdministrar && d.estado !== 'cancelada';
   const ocupado =
     marcar.isPending ||
     liberar.isPending ||
@@ -180,6 +204,14 @@ export function PanelRecetaOrden({
     );
   }
 
+  /**
+   * ¿Se pinta el llamado de «traer del modelo»? Hay faltantes **y** esta sesión puede jalarlos
+   * (§Post-F9.68). Se decide UNA vez aquí porque manda dos cosas a la vez: que el llamado salga, y
+   * que el aviso amarillo de abajo NO repita esos mismos renglones — repetirlos volvería a poner un
+   * mensaje de alarma junto a la salida, que es exactamente lo que la escondió.
+   */
+  const conLlamado = editable && faltantesDelModelo(d).length > 0;
+
   function alQuitarConfirmado(): void {
     if (aQuitar === null) return;
     const objetivo = aQuitar;
@@ -203,6 +235,18 @@ export function PanelRecetaOrden({
 
   return (
     <div className="space-y-4" data-testid="receta-orden">
+      {/* ⭐ V1-E3j — LA SALIDA VA PRIMERO. Lo que le falta a esta receta y el modelo sí tiene se
+          anuncia ARRIBA DE TODO, con su botón. Ése fue el hallazgo de Daniel: el remedio estaba en
+          pantalla, debajo de un mensaje más ruidoso, y no lo vio. */}
+      {conLlamado ? (
+        <LlamadoTraerDelModelo
+          receta={d}
+          ocupado={ocupado}
+          alTraerTodo={() => traerFaltantes()}
+          alTraerUno={(cambio) => traerFaltantes({ materiales: [materialDe(cambio)] })}
+        />
+      ) : null}
+
       <CabeceraReceta
         receta={d}
         editable={editable}
@@ -216,13 +260,7 @@ export function PanelRecetaOrden({
         alLiberar={() => liberarAlcance('todo')}
       />
 
-      <AvisosDesalineacion
-        receta={d}
-        puedeTraer={editable}
-        ocupado={ocupado}
-        alTraerTodo={() => traerFaltantes()}
-        alTraerUno={(cambio) => traerFaltantes({ materiales: [materialDe(cambio)] })}
-      />
+      <AvisosDesalineacion receta={d} omitirFaltantes={conLlamado} />
 
       <SeccionTelas
         receta={d}
@@ -375,27 +413,16 @@ function CabeceraReceta({
   alLiberar: () => void;
 }): React.JSX.Element {
   const r = receta.resumen;
-  // ⭐ V1-E3h: TRES estados, no dos. "Liberada en parte" es el que la etapa vino a hacer posible, y
-  // el que hay que poder ver de un vistazo — quien abre la orden tiene que saber si el comprador
-  // está esperando su firma para algo. Los tres los decide el SERVIDOR (`todoLiberado`/`puedeComprar`).
-  const enParte = receta.puedeComprar && !receta.todoLiberado;
+  // ⭐ V1-E3h: TRES estados, no dos. Los decide el SERVIDOR y los lee `estadoFirmaReceta` — UNA sola
+  // copia, compartida con el resumen del detalle de la OP (hallazgo del reviewer de V1-E3j: estaban
+  // escritos dos veces y coincidían por casualidad).
+  const enParte = estadoFirmaReceta(receta) === 'en-parte';
+  // V1-E3j: receta SIN renglones vivos. `total` lo cuenta el servidor (los excluidos no cuentan).
+  const vacia = r.total === 0;
   return (
     <div className="space-y-2 rounded-lg border p-3" data-testid="receta-cabecera">
       <div className="flex flex-wrap items-center gap-2">
-        {receta.todoLiberado ? (
-          <Badge variant="default" data-testid="receta-liberada">
-            <CheckCircle2 className="size-3.5" aria-hidden /> Receta liberada
-          </Badge>
-        ) : enParte ? (
-          <Badge variant="outline" className="border-warn text-warn" data-testid="receta-en-parte">
-            <CircleDashed className="size-3.5" aria-hidden /> Liberada en parte · {r.porLiberar} por
-            firmar
-          </Badge>
-        ) : (
-          <Badge variant="secondary" data-testid="receta-sin-liberar">
-            <CircleDashed className="size-3.5" aria-hidden /> Sin liberar
-          </Badge>
-        )}
+        <BadgeFirmaReceta receta={receta} />
         <span className="text-xs text-muted-foreground">
           {r.total} renglones · {r.sinRevisar} sin revisar · {r.ajustados} ajustados
           {r.excluidos > 0 ? ` · ${r.excluidos} quitados de esta orden` : ''}
@@ -403,11 +430,13 @@ function CabeceraReceta({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {receta.todoLiberado
-          ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
-          : enParte
-            ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
-            : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
+        {vacia
+          ? 'Esta orden todavía no tiene ningún material en su receta.'
+          : receta.todoLiberado
+            ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
+            : enParte
+              ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
+              : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
       </p>
 
       {editable ? (
@@ -422,50 +451,140 @@ function CabeceraReceta({
           >
             <CheckCircle2 aria-hidden /> Marcar todo revisado
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={ocupado}
-            onClick={alLiberar}
-            data-testid="receta-liberar"
-          >
-            <LockOpen aria-hidden />{' '}
-            {receta.todoLiberado ? 'Re-liberar todo' : 'Liberar todo lo que falta'}
-          </Button>
+          {/* ⭐ V1-E3j — sin renglones NO se ofrece firmar. `resumen.total` es del SERVIDOR (la misma
+              cuenta con la que rechaza), así que la pantalla no adivina: solo deja de invitar a un
+              clic cuyo único resultado era el cartel rojo *"la receta de esta orden está vacía"* —
+              el mismo que tapó la salida en el reporte de Daniel. Si hay algo que traer, el llamado
+              de arriba ya dice qué hacer; si no, lo dice el vacío de cada sección. */}
+          {vacia ? null : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={ocupado}
+              onClick={alLiberar}
+              data-testid="receta-liberar"
+            >
+              <LockOpen aria-hidden />{' '}
+              {receta.todoLiberado ? 'Re-liberar todo' : 'Liberar todo lo que falta'}
+            </Button>
+          )}
         </div>
       ) : null}
     </div>
   );
 }
 
-// ── Los dos avisos de desalineación (§Post-F9.43(d)) ────────────────────────────────────────
+// ── La SALIDA (arriba) y el AVISO (abajo) — §Post-F9.43(d) + §Post-F9.73 ────────────────────
 
 /**
- * Los avisos de que el BOM del modelo se movió desde que esta receta se congeló. Se calculan AL
- * VUELO en el servidor —sin evento, sin outbox y sin estado acumulado— y aquí solo se pintan.
+ * ⭐⭐ V1-E3j — **LO QUE FALTA TRAER DEL MODELO**, arriba de todo y con su botón.
  *
- * Con OC ya hecha el bloque va en rojo: ahí ya se comprometió dinero, y ése es exactamente el caso
- * en el que Daniel quería que alguien se enterara.
+ * ES EL BLOQUE DE LA ETAPA. Hasta la 0.005 este llamado vivía DENTRO del aviso amarillo/rojo de
+ * desalineación, debajo del estado de la receta: Daniel lo tuvo enfrente y no lo vio, porque el
+ * mensaje de *"la receta de esta orden está vacía"* se llevó la atención. El sistema ya sabía qué
+ * faltaba y de dónde sacarlo (§Post-F9.73); lo que faltaba era que **se viera**.
+ *
+ * Por eso aquí:
+ *  • Va **primero en la pantalla**, antes del estado y antes de las tablas.
+ *  • Se pinta en **tono de acción** (`primary`), no de alarma: no es un problema que reportar, es
+ *    trabajo que se resuelve con un clic. El aviso de alarma (el modelo se movió con OC hecha) es
+ *    OTRO bloque y va abajo.
+ *  • El botón de **traer todo** aparece desde UN faltante (antes exigía dos: con uno solo, la única
+ *    salida era un enlacito de texto dentro de una viñeta).
+ *  • Cada faltante trae además **su** botón, para el caso de traer sólo uno.
+ *
+ * §Post-F9.68: sin `desarrollo.administrar` (o con la orden cancelada) no hay nada que ofrecer, así
+ * que el bloque **no se pinta** — el aviso informativo de abajo sigue contando lo que pasa.
  */
-function AvisosDesalineacion({
+function LlamadoTraerDelModelo({
   receta,
-  puedeTraer,
   ocupado,
   alTraerTodo,
   alTraerUno,
 }: {
   receta: RecetaOrden;
-  /** `desarrollo.administrar` y orden viva: sin eso, «traer del modelo» ni se pinta (§Post-F9.68). */
-  puedeTraer: boolean;
   ocupado: boolean;
   alTraerTodo: () => void;
   alTraerUno: (cambio: CambioReceta) => void;
 }): React.JSX.Element | null {
+  // El llamador ya decidió que hay faltantes y que esta sesión puede jalarlos (§Post-F9.68).
+  const faltantes = faltantesDelModelo(receta);
+  if (faltantes.length === 0) return null;
+  return (
+    <div
+      className="space-y-2 rounded-lg border border-primary/50 bg-primary-soft p-3"
+      data-testid="receta-traer-llamado"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-medium text-primary-soft-foreground">
+        <Download className="size-4" aria-hidden />
+        El modelo lleva {faltantes.length}{' '}
+        {faltantes.length === 1
+          ? 'material que esta orden no tiene'
+          : 'materiales que esta orden no tiene'}
+      </p>
+      <ul className="space-y-1 text-xs">
+        {faltantes.map((c, i) => (
+          <li
+            key={`${c.tipo}-${String(c.idMaterialModelo)}-${String(i)}`}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span>{c.detalle}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              disabled={ocupado}
+              onClick={() => alTraerUno(c)}
+              data-testid={`traer-del-modelo-${c.tipo}-${c.idMaterialModelo}`}
+            >
+              Traer sólo éste
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button
+        type="button"
+        disabled={ocupado}
+        onClick={alTraerTodo}
+        data-testid="traer-del-modelo-todo"
+      >
+        <Download aria-hidden /> Traer del modelo lo que falta ({faltantes.length})
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Entra con su precio, su proveedor amarrado y sus medidas por talla,{' '}
+        <strong>sin liberar</strong> — así pasa por la misma firma que todo lo demás. Lo que esta
+        orden ya ajustó o quitó a mano <strong>no se pisa</strong>: el sistema lo dice en vez de
+        sobrescribirlo.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * El AVISO de que el BOM del modelo se movió desde que esta receta se congeló. Se calcula AL VUELO
+ * en el servidor —sin evento, sin outbox y sin estado acumulado— y aquí solo se pinta.
+ *
+ * Con OC ya hecha el bloque va en rojo: ahí ya se comprometió dinero, y ése es exactamente el caso
+ * en el que Daniel quería que alguien se enterara.
+ *
+ * ⚠️ V1-E3j: este bloque **ya no lleva acciones**. Los faltantes —lo único que «traer del modelo»
+ * resuelve— subieron a {@link LlamadoTraerDelModelo}, arriba de la pantalla. Aquí quedan los cambios
+ * que ya tienen renglón en la orden, cuyo camino es «Restaurar» en su fila; mezclarlos con la salida
+ * fue justo lo que la escondió.
+ */
+function AvisosDesalineacion({
+  receta,
+  omitirFaltantes,
+}: {
+  receta: RecetaOrden;
+  /** El llamado de arriba ya los anunció CON su botón: repetirlos aquí es ruido sobre la salida. */
+  omitirFaltantes: boolean;
+}): React.JSX.Element | null {
   const d = receta.desalineacion;
-  if (!d.hayCambios) return null;
-  // Los FALTANTES son los únicos que «traer del modelo» puede resolver: los demás cambios ya tienen
-  // renglón en la orden y su camino es «Restaurar», que sí pisa y por eso es de uno en uno.
-  const faltantes = d.cambios.filter((c) => c.que === 'agregado' && c.idMaterialModelo !== null);
+  const faltantes = new Set<CambioReceta>(omitirFaltantes ? faltantesDelModelo(receta) : []);
+  const cambios = d.cambios.filter((c) => !faltantes.has(c));
+  if (!d.hayCambios || cambios.length === 0) return null;
   // El ROJO lo decide el SERVIDOR (`critico`), no la pantalla: hay OC hecha **y** el cambio lo
   // provocó una persona tocando el modelo. Un movimiento del precio de COMPRA se informa igual,
   // pero no da la alarma — si no, cada OC que se autoriza dejaría en rojo a todas las órdenes vivas
@@ -493,53 +612,13 @@ function AvisosDesalineacion({
           : 'Algo se movió desde que se congeló esta receta'}
       </p>
       <ul className="list-disc space-y-0.5 pl-5 text-xs">
-        {d.cambios.map((c, i) => (
-          <li key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}>
-            {c.detalle}
-            {/* ⭐ §Post-F9.73: el aviso trae SU botón. El sistema ya sabía qué falta y de dónde
-                sacarlo; lo que faltaba era la acción. Solo en los FALTANTES, y solo si esta sesión
-                puede jalarlos (§Post-F9.68: lo que no se puede usar, no se pinta). */}
-            {puedeTraer && c.que === 'agregado' && c.idMaterialModelo !== null ? (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className="underline decoration-dotted underline-offset-2 disabled:opacity-50"
-                  disabled={ocupado}
-                  onClick={() => alTraerUno(c)}
-                  data-testid={`traer-del-modelo-${c.tipo}-${c.idMaterialModelo}`}
-                >
-                  Traerlo del modelo
-                </button>
-              </>
-            ) : null}
-          </li>
+        {cambios.map((c, i) => (
+          <li key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}>{c.detalle}</li>
         ))}
       </ul>
-      {puedeTraer && faltantes.length > 1 ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={ocupado}
-          onClick={alTraerTodo}
-          data-testid="traer-del-modelo-todo"
-        >
-          <Download aria-hidden /> Traer del modelo lo que falta ({faltantes.length})
-        </Button>
-      ) : null}
       <p className="text-xs text-muted-foreground">
         La receta de esta orden NO se movió (para eso está congelada). Si algún cambio debe entrar,
         usa «Restaurar» en el renglón.
-        {faltantes.length > 0 ? (
-          <>
-            {' '}
-            Lo que el modelo <strong>agregó</strong> se trae con un clic: entra con su precio, su
-            proveedor amarrado y sus medidas por talla, <strong>sin liberar</strong> — así pasa por
-            la misma firma que todo lo demás. Lo que esta orden ya ajustó o quitó a mano{' '}
-            <strong>no se pisa</strong>: el sistema lo dice en vez de sobrescribirlo.
-          </>
-        ) : null}
       </p>
     </div>
   );
@@ -933,20 +1012,23 @@ function AccionesRenglon({
   if (!editable) return null;
   return (
     <span className="flex justify-end gap-1">
-      {/* Firmar ESTE renglón (§Post-F9.72). No se pinta sobre una lápida (no se compra) ni sobre lo
-          ya firmado: para re-firmar está el botón de la sección o el de la cabecera. */}
+      {/* ⭐ Firmar ESTE renglón (§Post-F9.72). No se pinta sobre una lápida (no se compra) ni sobre
+          lo ya firmado: para re-firmar está el botón de la sección o el de la cabecera.
+          V1-E3j — VA CON TEXTO, no como ícono mudo. Daniel abrió la bandeja buscando *"dónde pueda
+          ver todo completo e ir liberando una por una"* y no lo encontró: firmar uno por uno es lo
+          que esta pantalla vino a hacer evidente, y un candado gris no lo es. */}
       {!excluido && liberadoEn === null ? (
         <Button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7"
+          variant="outline"
+          size="sm"
+          className="h-7"
           title="Liberar este renglón (ya se podrá comprar)"
           disabled={ocupado}
           onClick={alLiberar}
           data-testid={`liberar-${testid}`}
         >
-          <LockOpen className="size-4" aria-hidden />
+          <LockOpen className="size-4" aria-hidden /> Liberar
         </Button>
       ) : null}
       {enElModelo ? (
@@ -1238,7 +1320,12 @@ function SeccionTelas({
             <TablaDensaHead numerica className="w-32">
               Precio
             </TablaDensaHead>
-            <TablaDensaHead className="w-20" />
+            {/* ⭐ V1-E3j — la columna de acciones se ensanchó («Liberar» ya va con texto) y por eso
+                se volvió VISIBLE que existía siempre. §Post-F9.68 regla 1: *"si un dato desaparece
+                por permiso, se va con su ENCABEZADO; una celda vacía haría creer que falló"*. Sin
+                `desarrollo.administrar` —o con la orden cancelada— `AccionesRenglon` no pinta nada,
+                así que la columna entera se va con su título. */}
+            {editable ? <TablaDensaHead className="w-52">Acciones</TablaDensaHead> : null}
           </TablaDensaFila>
         </TablaDensaEncabezado>
         <TablaDensaCuerpo>
@@ -1287,19 +1374,21 @@ function SeccionTelas({
                   }
                 />
               </TablaDensaCelda>
-              <TablaDensaCelda>
-                <AccionesRenglon
-                  editable={editable}
-                  ocupado={ocupado}
-                  enElModelo={t.enElModelo}
-                  excluido={t.excluido}
-                  liberadoEn={t.liberadoEn}
-                  alLiberar={() => alLiberarRenglon(t.id)}
-                  alRestaurar={() => alRestaurar(t.id)}
-                  alQuitar={() => alQuitar(t.id, t.nombre)}
-                  testid={`receta-tela-${t.id}`}
-                />
-              </TablaDensaCelda>
+              {editable ? (
+                <TablaDensaCelda>
+                  <AccionesRenglon
+                    editable={editable}
+                    ocupado={ocupado}
+                    enElModelo={t.enElModelo}
+                    excluido={t.excluido}
+                    liberadoEn={t.liberadoEn}
+                    alLiberar={() => alLiberarRenglon(t.id)}
+                    alRestaurar={() => alRestaurar(t.id)}
+                    alQuitar={() => alQuitar(t.id, t.nombre)}
+                    testid={`receta-tela-${t.id}`}
+                  />
+                </TablaDensaCelda>
+              ) : null}
             </TablaDensaFila>
           ))}
         </TablaDensaCuerpo>
@@ -1369,7 +1458,12 @@ function SeccionAvios({
             <TablaDensaHead numerica className="w-32">
               Precio
             </TablaDensaHead>
-            <TablaDensaHead className="w-20" />
+            {/* ⭐ V1-E3j — la columna de acciones se ensanchó («Liberar» ya va con texto) y por eso
+                se volvió VISIBLE que existía siempre. §Post-F9.68 regla 1: *"si un dato desaparece
+                por permiso, se va con su ENCABEZADO; una celda vacía haría creer que falló"*. Sin
+                `desarrollo.administrar` —o con la orden cancelada— `AccionesRenglon` no pinta nada,
+                así que la columna entera se va con su título. */}
+            {editable ? <TablaDensaHead className="w-52">Acciones</TablaDensaHead> : null}
           </TablaDensaFila>
         </TablaDensaEncabezado>
         <TablaDensaCuerpo>
@@ -1441,19 +1535,21 @@ function SeccionAvios({
                   }
                 />
               </TablaDensaCelda>
-              <TablaDensaCelda>
-                <AccionesRenglon
-                  editable={editable}
-                  ocupado={ocupado}
-                  enElModelo={a.enElModelo}
-                  excluido={a.excluido}
-                  liberadoEn={a.liberadoEn}
-                  alLiberar={() => alLiberarRenglon(a.id)}
-                  alRestaurar={() => alRestaurar(a.id)}
-                  alQuitar={() => alQuitar(a.id, `${a.clave} — ${a.descripcion}`)}
-                  testid={`receta-avio-${a.id}`}
-                />
-              </TablaDensaCelda>
+              {editable ? (
+                <TablaDensaCelda>
+                  <AccionesRenglon
+                    editable={editable}
+                    ocupado={ocupado}
+                    enElModelo={a.enElModelo}
+                    excluido={a.excluido}
+                    liberadoEn={a.liberadoEn}
+                    alLiberar={() => alLiberarRenglon(a.id)}
+                    alRestaurar={() => alRestaurar(a.id)}
+                    alQuitar={() => alQuitar(a.id, `${a.clave} — ${a.descripcion}`)}
+                    testid={`receta-avio-${a.id}`}
+                  />
+                </TablaDensaCelda>
+              ) : null}
             </TablaDensaFila>
           ))}
         </TablaDensaCuerpo>
@@ -1508,7 +1604,12 @@ function SeccionArtes({
             <TablaDensaHead numerica className="w-32">
               Precio
             </TablaDensaHead>
-            <TablaDensaHead className="w-20" />
+            {/* ⭐ V1-E3j — la columna de acciones se ensanchó («Liberar» ya va con texto) y por eso
+                se volvió VISIBLE que existía siempre. §Post-F9.68 regla 1: *"si un dato desaparece
+                por permiso, se va con su ENCABEZADO; una celda vacía haría creer que falló"*. Sin
+                `desarrollo.administrar` —o con la orden cancelada— `AccionesRenglon` no pinta nada,
+                así que la columna entera se va con su título. */}
+            {editable ? <TablaDensaHead className="w-52">Acciones</TablaDensaHead> : null}
           </TablaDensaFila>
         </TablaDensaEncabezado>
         <TablaDensaCuerpo>
@@ -1544,19 +1645,21 @@ function SeccionArtes({
                   }
                 />
               </TablaDensaCelda>
-              <TablaDensaCelda>
-                <AccionesRenglon
-                  editable={editable}
-                  ocupado={ocupado}
-                  enElModelo={a.enElModelo}
-                  excluido={a.excluido}
-                  liberadoEn={a.liberadoEn}
-                  alLiberar={() => alLiberarRenglon(a.id)}
-                  alRestaurar={() => alRestaurar(a.id)}
-                  alQuitar={() => alQuitar(a.id, a.descripcion)}
-                  testid={`receta-arte-${a.id}`}
-                />
-              </TablaDensaCelda>
+              {editable ? (
+                <TablaDensaCelda>
+                  <AccionesRenglon
+                    editable={editable}
+                    ocupado={ocupado}
+                    enElModelo={a.enElModelo}
+                    excluido={a.excluido}
+                    liberadoEn={a.liberadoEn}
+                    alLiberar={() => alLiberarRenglon(a.id)}
+                    alRestaurar={() => alRestaurar(a.id)}
+                    alQuitar={() => alQuitar(a.id, a.descripcion)}
+                    testid={`receta-arte-${a.id}`}
+                  />
+                </TablaDensaCelda>
+              ) : null}
             </TablaDensaFila>
           ))}
         </TablaDensaCuerpo>

@@ -3423,3 +3423,125 @@ Las señaló el reviewer: están bien resueltas, pero hoy solo existían en TSDo
 
 - **Aplica en:** V1-E3h. Sin migración adicional.
 - **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.77) — ⭐ La receta merece PANTALLA PROPIA, y es UNA sola (DANIEL, 19-ago-2026)
+
+Salió de Daniel probando la versión **0.005** en vivo, y lo importante es **qué falló**: no la lógica, la
+**visibilidad**.
+
+Buscaba meter a una OP unos avíos que se habían agregado al modelo *después* de crearla. El bloque de la
+receta le decía **"la receta de esta orden está vacía"** — y ese cartel se llevó toda la atención, mientras
+**justo debajo** estaba el aviso *«El modelo ahora lleva X»* con su botón «Traer del modelo». Cuando por fin
+lo vio, funcionó a la primera: *"ya logré jalarlos. **Justo me faltó poner el botón de traer la receta**."*
+
+⚠️ **El mecanismo de §Post-F9.73 estaba completo y cableado de punta a punta. Lo que no estaba era a la
+vista.** *Una función que el usuario no encuentra no existe.*
+
+### Lo que pidió
+
+*"Debería de haber una pantalla especial para ir liberando. Ahí mismo **en el cuadrito chiquito no se ve
+toda la información**. Me gustaría que de ese botón te mande a una **pantalla más grande** con la
+información más clara."*
+
+Y al día siguiente, viendo la bandeja, lo afinó: *"**Está bien que haya una sola pantalla y sea la misma.**
+El problema que veo en «Recetas por liberar» es que solo está la OP con un botón para liberar todas juntas.
+**No veo dónde pueda ver todo completo e ir liberando una por una.**"*
+
+### Lo decidido
+
+1. **UNA sola pantalla**, y es **la misma** desde el detalle de la OP y desde la bandeja. No dos vistas que
+   se parezcan: el mismo componente y la misma ruta, se llegue desde donde se llegue.
+2. **Desde la bandeja hay que poder ENTRAR**, no solo liberar en bloque. El «Revisar y liberar» de
+   §Post-F9.75 **se queda** (existe para no dar la vuelta cuando ya sabes lo que hay), pero deja de ser la
+   única salida.
+3. **Firmar uno por uno tiene que ser lo evidente** — es literalmente lo que fue a buscar y no encontró.
+4. **El bloque del detalle de la OP se queda como RESUMEN** con su botón: no se pierde el vistazo rápido
+   desde la orden, y el trabajo de verdad se hace donde se ve.
+5. **La jerarquía es el entregable, no la decoración.** El llamado a traer del modelo va **arriba**, en tono
+   de acción y no de alarma; y con la receta vacía **ya no se ofrece «liberar»** — ese clic solo servía para
+   que el servidor contestara *"está vacía"*, que fue el cartel que tapó la salida. **La regla del servidor
+   NO cambió**: sigue rechazando. Lo que se quitó fue el botón que solo servía para chocar contra ella.
+
+- **Aplica en:** V1-E3j. Sin migración.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.78) — Leer la receta pasa a `ordenes.ver` **o** `desarrollo.ver` (LEAD, 19-ago-2026)
+
+Apareció construyendo V1-E3j y **cierra un hueco que dejó V1-E3h**: ahí las mutaciones de la receta bajaron
+a `desarrollo.administrar` y la bandeja quedó en `desarrollo.ver`, pero **la LECTURA se quedó en
+`ordenes.ver`**. O sea: alguien de **Desarrollo puro** podía **firmar** una receta que no podía **leer**, y
+la pantalla nueva —gobernada por `desarrollo.ver`— le habría contestado **403 en su primera consulta**. Es
+justo el síntoma que §Post-F9.68 manda matar.
+
+**No relaja nada, y se verificó en vez de suponerlo:** las 7 rutas de mutación siguen exigiendo
+`desarrollo.administrar` (y en dominio hay **un solo** `verificarPermiso`, dentro de `enRecetaEditable`);
+`obtenerRecetaOrden` **solo lo llama esa ruta**, así que el ensanche no se propaga al MRP ni al impreso; A9
+sigue intacto. Y lo nuevo que ve un rol de solo-Desarrollo es **`estado` y `totalPiezas`**: `cliente` y
+`fechaEntrega` **ya** se los servía la bandeja bajo ese mismo permiso.
+
+De paso, la receta ahora incluye el **encabezado de la orden** (cliente, fecha de entrega, estado, total de
+piezas). Es aditivo y **derivado en el SERVIDOR** (A1) con la misma semántica que usa el listado de órdenes.
+La alternativa —pedirle el encabezado a `GET /ordenes/:id`— habría vuelto a atar la pantalla a
+`ordenes.ver`, que es lo que esta etapa vino a soltar.
+
+- **Aplica en:** V1-E3j.
+- **Fecha:** 2026-08-19.
+
+---
+
+#### (Post-F9.79) — ⭐ No se quita de la receta lo ya COMPRADO, y una OC autorizada se puede DES-AUTORIZAR (DANIEL, 19-ago-2026)
+
+Daniel, mirando el botón «restaurar del modelo»: *"¿Qué pasa si ya se liberó un renglón, se hace la OC de
+ese avío… **se puede luego quitar**? Eso no está bien."*
+
+**Verificado: tiene razón, y hoy nada lo impide.** Ninguna mutación de la receta consulta las órdenes de
+compra; la única consulta de OC en `dominio/produccion/receta-orden.ts` (`:850`) solo decide si un aviso se
+pinta rojo o amarillo. Lo que queda tras hacerlo es una **contradicción**: la OC dice *"compramos esto para
+la orden N"* y la receta de N dice *"esto no va"* — y la explosión deja de contarlo, así que el *"qué tengo
+/ qué falta"* ya no cuadra con lo comprado. **Peor** si el renglón era `agregadoAMano`: quitarlo **lo
+borra**, y el único rastro queda en la bitácora.
+
+### El camino que se descartó, y por qué importa
+
+El **lead propuso** un permiso para **saltarse** la regla (que solo Daniel pudiera quitar lo comprado).
+**Daniel propuso algo mejor:** *"una OC ya autorizada ya no se puede quitar de la receta. **A menos que se
+pueda des-autorizar**. Es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga
+acceso."*
+
+⚠️ **En vez de una llave para saltarse la regla, se deshace el hecho que la creó.** Nadie se salta nada y el
+sistema sigue contando la verdad. *Es el mismo principio de D3 —cancelar es un movimiento inverso auditado,
+no un borrado— aplicado a la autorización de compra.*
+
+### La regla
+
+| Estado de la OC | ¿Se puede quitar de la receta? |
+|---|---|
+| Sin OC, o cancelada | **Sí** (como hoy) |
+| `borrador` / `pendiente_autorizacion` | **Sí** — todavía no hay compromiso con el proveedor |
+| `autorizada` | **No.** Hay que des-autorizarla primero |
+| `recibida_parcial` / `recibida_total` | **No, y ni des-autorizando** — *propuesta del LEAD, pendiente de que Daniel la confirme*: el material ya entró al inventario, y el camino honesto es devolución o ajuste, no deshacer la firma |
+
+El bloqueo va **por material**, no por orden entera: cada línea de OC guarda de qué tela o avío es.
+
+### Des-autorizar
+
+**No existe.** `autorizarOC` (`dominio/compras/ordenes-compra.ts`) sella `idUsuAutorizado`/`fechaAutorizado`
+y **no hay marcha atrás**. Permiso propio, **solo para el perfil de Daniel**; **motivo obligatorio** y
+bitácora. ⚠️ **No basta con quitar el sello:** autorizar **emite un evento** (`emitirOcTelaResuelta`) que le
+dice a la Ruta Crítica que la compra de tela quedó resuelta — des-autorizar tiene que **deshacer ese
+efecto** o la RC se queda creyendo que ya se compró.
+
+### Sobre "solo yo"
+
+Daniel: *"cuando digo yo, **es mi perfil**. Está bien el tema de perfiles como lo planteas."* → **sin
+excepciones por usuario**; el permiso vive en el perfil, como todo lo demás (§Post-F9.67). Queda dicho el
+corolario: quien reciba ese perfil recibe también esta llave.
+
+- **Aplica en:** etapa propia, **la siguiente después de V1-E3j**. Las dos piezas van **JUNTAS**: el bloqueo
+  sin la marcha atrás sería una trampa — dejaría sin salida.
+- **Fecha:** 2026-08-19.
+

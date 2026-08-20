@@ -57,6 +57,21 @@ describe('exigenciaDeRuta', () => {
     expect(exigenciaDeRuta('/calidad/auditorias/42')).toEqual(['calidad.ver']);
   });
 
+  /**
+   * ⭐ V1-E3j — LA RECETA DE LA ORDEN cuelga de `/produccion/ordenes` (que es `ordenes.ver`) pero su
+   * permiso es OTRO: `desarrollo.ver`. Sin su línea propia heredaría del padre y quedaría mal por
+   * los DOS lados a la vez — abierta a quien solo mira producción y CERRADA al usuario de Desarrollo
+   * puro, que es justamente quien viene a firmarla (§Post-F9.72). La prueba de deriva de abajo NO
+   * lo vería: la ruta "tiene declaración", solo que la equivocada.
+   */
+  it('⭐ la receta de la orden pide `desarrollo.ver`, NO el `ordenes.ver` de su padre', () => {
+    expect(exigenciaDeRuta('/produccion/ordenes/50/receta')).toEqual(['desarrollo.ver']);
+    expect(exigenciaDeRuta('/produccion/ordenes')).toEqual(['ordenes.ver']);
+    // La pareja completa: Desarrollo puro entra; quien solo ve producción, no.
+    expect(rutaPermitida('/produccion/ordenes/50/receta', permisosDe('desarrollo.ver'))).toBe(true);
+    expect(rutaPermitida('/produccion/ordenes/50/receta', permisosDe('ordenes.ver'))).toBe(false);
+  });
+
   it('gana la declaración MÁS específica, no la primera que coincide', () => {
     // `/calidad/auditorias/nueva` es hoja propia y le gana a `/calidad/auditorias`.
     expect(exigenciaDeRuta('/calidad/auditorias/nueva')).toEqual(['calidad.generar-auditorias']);

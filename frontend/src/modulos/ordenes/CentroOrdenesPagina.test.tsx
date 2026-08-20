@@ -69,11 +69,13 @@ vi.mock('@/api/ordenes-consulta', () => ({
 vi.mock('./PanelPreciosOrden', () => ({ PanelPreciosOrden: () => null }));
 // El expediente Desarrollo↔Producción (F8-E6) tampoco interviene aquí.
 vi.mock('./SeccionDesarrolloOrden', () => ({ SeccionDesarrolloOrden: () => null }));
-// ⭐ V1-E3h: la RECETA vive ahora en el panel de la OP. Aquí solo importa QUE ESTÉ y con qué
-// permiso; su contenido lo prueba `PanelRecetaOrden.test.tsx`.
-vi.mock('./PanelRecetaOrden', () => ({
-  PanelRecetaOrden: ({ puedeAdministrar }: { puedeAdministrar: boolean }) => (
-    <div data-testid="panel-receta" data-puede-administrar={String(puedeAdministrar)} />
+// ⭐ V1-E3h + V1-E3j: la RECETA se alcanza desde el panel de la OP. Desde V1-E3j lo que vive aquí
+// es el RESUMEN (el trabajo se hace en `/produccion/ordenes/:id/receta`, que no cabía en el cajón).
+// Aquí solo importa QUE ESTÉ y con qué permiso; su contenido lo prueban `ResumenRecetaOrden.test.tsx`
+// y `PanelRecetaOrden.test.tsx`.
+vi.mock('./ResumenRecetaOrden', () => ({
+  ResumenRecetaOrden: ({ idOrden }: { idOrden: number }) => (
+    <div data-testid="panel-receta" data-id-orden={String(idOrden)} />
   ),
 }));
 vi.mock('@/modulos/ruta-critica/PanelRutaOrden', () => ({ PanelRutaOrden: () => null }));
@@ -481,25 +483,28 @@ describe('<CentroOrdenesPagina>', () => {
      * que abre la compra— sigue viviendo tras «Modificar», o Daniel se vuelve el cuello de botella
      * firmando todas las recetas, o hay que darle a Desarrollo permiso sobre la OP entera.
      */
-    it('⭐ V1-E3h: la RECETA vive en el panel de la OP, con `desarrollo.ver` y SIN `ordenes.administrar`', () => {
+    it('⭐ V1-E3h: la RECETA se alcanza desde el panel de la OP, con `desarrollo.ver` y SIN `ordenes.administrar`', () => {
       useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
       renderConProveedores(<CentroOrdenesPagina />, {
         sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']),
       });
 
-      const panel = screen.getByTestId('panel-receta');
-      expect(panel).toHaveAttribute('data-puede-administrar', 'true');
+      // V1-E3j: el resumen recibe LA ORDEN ABIERTA (si tomara otra, enseñaría la receta de alguien
+      // más y el botón llevaría a la pantalla equivocada).
+      expect(screen.getByTestId('panel-receta')).toHaveAttribute('data-id-orden', '1');
       // Y sin poder tocar la OP: el mosaico de «Modificar» no está.
       expect(screen.queryByTestId('mosaico-modificar')).toBeNull();
     });
 
-    it('con `desarrollo.ver` pero SIN `.administrar`, la receta se ve en SOLO LECTURA', () => {
+    it('con `desarrollo.ver` pero SIN `.administrar` la receta se sigue alcanzando (leer no exige firmar)', () => {
       useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
       renderConProveedores(<CentroOrdenesPagina />, {
         sesion: estadoSesionDePrueba(['desarrollo.ver']),
       });
 
-      expect(screen.getByTestId('panel-receta')).toHaveAttribute('data-puede-administrar', 'false');
+      // Qué se puede TOCAR lo decide la pantalla de la receta (y el backend), no este resumen:
+      // aquí no hay ninguna acción que esconder.
+      expect(screen.getByTestId('panel-receta')).toBeInTheDocument();
     });
 
     it('sin `desarrollo.ver` la receta NI SE PINTA (§Post-F9.68)', () => {

@@ -1540,6 +1540,99 @@ como fallo del intento sin abortar el paso pese al `set -e`.
 
 ---
 
+## V1-E3j · La receta merece pantalla propia ⭐ (19-ago-2026)
+
+> Salió de Daniel probando **0.005** en vivo. Decisiones en `DECISIONES.md` **§Post-F9.77** y **§Post-F9.78**.
+
+### Qué entrega
+
+Una **pantalla completa** de la receta (`/produccion/ordenes/:id/receta`, permiso `desarrollo.ver` para
+entrar y `.administrar` para firmar — **nunca** `ordenes.administrar`) · el bloque del detalle de la OP
+convertido en **resumen con su botón** · la bandeja «Recetas por liberar» que ahora **lleva al detalle** en
+vez de solo ofrecer el bloque · el llamado a **traer del modelo arriba de todo**, en tono de acción · y
+firmar **por renglón con botón de texto**, no un ícono mudo.
+
+### Por qué existe: el mecanismo estaba completo, y aun así falló
+
+Daniel buscaba meter a una OP unos avíos agregados al modelo después. El bloque decía **"la receta de esta
+orden está vacía"**, y ese cartel se llevó la atención mientras **justo debajo** estaba el aviso con su
+botón. Al verlo, funcionó a la primera: *"ya logré jalarlos. Justo me faltó poner el botón."*
+
+⚠️ **§Post-F9.73 estaba cableado de punta a punta y verificado. Lo que no estaba era a la vista.** *Una
+función que el usuario no encuentra no existe* — y el sistema estaba **invitando al clic equivocado**: con
+la receta vacía ofrecía «liberar», cuyo único resultado posible era el mensaje que tapaba la salida.
+
+### Nota de cierre — ✅ HECHA (19-ago-2026)
+
+**TRES vueltas: dos RECHAZADAS y la tercera APROBADA.**
+
+> ⚠️ **Y el lead volvió a escribir el resultado antes de que ocurriera.** Este encabezado decía «✅ HECHA —
+> primera vuelta RECHAZADA; **segunda APROBADA**» estando la segunda revisión **todavía corriendo**; terminó
+> en RECHAZADO. Lo cazó el reviewer, que lo señaló como *"textualmente la lección que la ficha de V1-E3i
+> dejó anotada 150 líneas más arriba, repetida en el mismo archivo que la documenta"*. **Es la segunda vez
+> en dos etapas.** Se deja a la vista, otra vez, porque el patrón —dar por hecho un resultado que todavía no
+> se ha ejecutado— es exactamente el que estas fichas vienen documentando, y no deja de serlo porque lo
+> cometa quien las escribe.
+
+Lo notable es **dónde** estuvieron los defectos: **ninguno en la parte que daba miedo**. Los dos cambios de
+backend —ensanchar el permiso de lectura y derivar el encabezado en el servidor— el reviewer los verificó
+uno por uno, en dos revisiones, y **los dos estaban bien**. De los cinco hallazgos de la primera vuelta,
+**cuatro fueron pruebas que no probaban lo que decían**; el quinto (la columna «Acciones» vacía con su
+encabezado) fue un **defecto de comportamiento** contra §Post-F9.68 regla 1, no un hueco de verificación.
+
+**🔴 El más grave, y ya es el cuarto de esta familia en la tanda:** las pruebas que afirmaban *"lleva a la
+receta de ESA orden"* **no comprobaban la orden**. El reviewer cambió el destino a un id fijo y equivocado
+(`/999/receta`) y salieron **13/13 y 7/7 verdes**, porque la ruta de prueba matchea cualquier id. Escenario:
+un refactor que pierda el id —fácil ahora que las dos entradas comparten destino— manda al usuario **a la
+receta de otra OP**, que es donde se firma el material que abre la compra.
+
+**🔴 «El resumen no calcula nada» era falso.** El predicado de *qué cuenta como faltante* estaba escrito
+**dos veces**, y el reviewer lo demostró relajando **solo la copia del resumen**: 7/7 verdes, mientras la
+del panel sí tenía su gemela. Coincidían por casualidad. Al unificarlo, el coder encontró una **tercera**
+copia que nadie había señalado —el markup de la insignia con sus `data-testid`— y **corrigió el comentario
+que afirmaba lo contrario**: *un comentario que miente es peor que ninguno, porque el siguiente se lo cree*.
+
+**Los otros tres:** una OP **cancelada** con faltantes podía pintar botones que el backend rechaza —el
+letrero de error que esta etapa vino a eliminar—, sin nada que lo sostuviera; `totalPiezas` estaba probado
+con **una sola fila de matriz**, donde suma, máximo, mínimo y promedio dan lo mismo (se cerró con 3/5/7/11 →
+26, que no coincide con ninguno); y la columna «Acciones» quedaba **vacía con su encabezado** para quien no
+puede firmar — *invisible hasta esta etapa, porque antes el encabezado era mudo*, y contrario a la regla de
+Daniel de que un dato que se va por permiso **se va con su encabezado**.
+
+**🔴 Y en la SEGUNDA vuelta, la misma familia un nivel más arriba: la pantalla lee la orden DOS veces** —una
+para el encabezado, otra para las tablas— **y la prueba no distinguía cuál se había equivocado**. Afirmaba
+*"pide SU receta, no la de otra"* con un solo `toHaveBeenCalledWith(50)` sobre un mock **compartido**, así
+que la llamada del panel satisfacía la aserción aunque la de la página estuviera mal, y al revés. El
+reviewer lo verificó con las dos mutaciones por separado: **9/9 verdes las dos**. Escenario: el encabezado
+dice *«Receta de la OP 1234 · C&A · 1,200 pzas»* y las tablas de abajo —con sus botones «Liberar»— son de
+**otra OP**, en la pantalla donde se firma el material que abre la compra.
+
+Se cerró afirmando **la lista completa de llamadas** (`[50, 50]`), con el conteo **medido** por una sonda
+desechable —no adivinado— y verificado por el reviewer con la suya: son exactamente dos lecturas, y
+`renderConProveedores` no envuelve en `StrictMode`, así que el número es estable. Una tercera lectura futura
+pondrá la prueba roja: es **canaria, no fragilidad**.
+
+⚠️ **Y al escribir esa aserción apareció la quinta variante, la más sigilosa:** el primer intento rompió el
+lint con `no-unsafe-return` porque el mock era `vi.fn()` pelado y `mock.calls` es `any[]` — *o sea que la
+aserción destinada a proteger la identidad de la orden estaba a punto de escribirse sobre `any`, donde el
+lenguaje ya no comprueba nada*. El reviewer lo confirmó revirtiendo el tipado: **2 errores, y el segundo es
+la línea de esa aserción**.
+
+**Las cinco variantes de la misma familia, en una sola etapa** —un destino de ruta con `:param`, un panel, una
+columna, dos lecturas y un tipo vacío— tienen todas la misma forma: **el objeto observado acepta cualquier
+valor sin quejarse**, y la prueba afirmaba *presencia* donde su título prometía *identidad*. La regla que
+queda: **antes de dar por buena una aserción sobre «el X correcto», nombra el valor concreto que la pondría
+roja si estuviera mal.** Si no existe ninguno, la aserción no dice lo que promete.
+
+### Una trampa nueva, que vale para toda prueba de permisos
+
+Al escribir las pruebas de ruta, el coder descubrió que **la validación del cuerpo corre ANTES del guard de
+permiso**: un payload inválido devolvía **500 en vez del 403** que la prueba creía estar comprobando. Queda
+documentado en el propio archivo. *Es la forma más silenciosa de que una prueba de seguridad pase por la
+razón equivocada.* De paso, el comentario decía «las OCHO mutaciones» en tres lugares: **son 7**, contadas.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
