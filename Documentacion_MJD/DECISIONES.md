@@ -3543,7 +3543,7 @@ no un borrado— aplicado a la autorización de compra.*
 | Sin OC, o cancelada | **Sí** (como hoy) |
 | `borrador` / `pendiente_autorizacion` | **Sí** — todavía no hay compromiso con el proveedor |
 | `autorizada` | **No.** Hay que des-autorizarla primero |
-| `recibida_parcial` / `recibida_total` | **No, y ni des-autorizando** — *propuesta del LEAD, pendiente de que Daniel la confirme*: el material ya entró al inventario, y el camino honesto es devolución o ajuste, no deshacer la firma |
+| `recibida_parcial` / `recibida_total` | **No, y ni des-autorizando** — ✅ **CONFIRMADO por DANIEL (20-ago-2026):** *"una vez recibido no se puede desautorizar"*. El material ya entró al inventario, y el camino honesto es devolución o ajuste, no deshacer la firma |
 
 El bloqueo va **por material**, no por orden entera: cada línea de OC guarda de qué tela o avío es.
 
@@ -3730,4 +3730,116 @@ respaldan— vive donde le toca: **`docs/arquitectura/ADR-0018`**.
   `20260820160000_modelos_desarrollo_vs_produccion`; **sin permisos nuevos**; el **seed sí cambia**
   (dígitos de géneros y tipos de producto), aunque la propia migración ya siembra los de los catálogos
   existentes por nombre.
+- **Fecha:** 2026-08-20.
+
+---
+
+#### (Post-F9.85) — ⭐ GENERAR OC DESDE LA EXPLOSIÓN: revisión previa, y no volver a comprar lo ya comprado (DANIEL, 20-ago-2026)
+
+Daniel, probando en vivo: *"acabo de hacer unas OC desde la explosión de materiales. Ya asigné a los
+proveedores directamente ahí, para simular la compra desde el comprador. Dice que se generaron las OC,
+pero no se ven reflejadas en las OC. (…) No veo dónde se generó. No sé si realmente se generó o solo dice
+eso, porque me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y me deja volver a
+hacerla. Creo que hace falta trabajar en ese proceso."*
+
+### Lo que pidió
+
+> *"Me gustaría que al darle «generar OC desde la explosión», te mande a una pantalla previa, antes de
+> generar la OC. **Una revisión previa es indispensable.**"*
+
+### Los DOS defectos VERIFICADOS en el código (independientes; los dos explican lo que vio)
+
+**1. 🔴 La explosión NO descuenta lo ya comprado → OC DUPLICADAS.** `generarOCDesdeExplosion`
+(`mrp.ts:948-1030`) filtra por `cantidadAComprar > 0` leyéndolo del **snapshot persistido** de
+requerimientos. Nada le resta lo que ya está en una OC — de hecho `mrp.ts:621` lo dice explícito para la
+tela: *"telas siempre van completas a compra (no se netean)"*. Por eso los renglones siguen ahí y deja
+volver a generar. ⚠️ **El cruce YA EXISTE**: el tablero «qué tengo / qué falta» calcula `enOc`
+(`mrp.ts:1561-1610`). **No falta la función, falta reusarla donde se compra.**
+
+**2. Las OC sí se generaron: están ESCONDIDAS.** Nacen en `borrador` (`ordenes-compra.ts:803`) y el
+listado ordena por `numCompra` **DESC** por omisión (`contrato/esquemas/compra.ts:422-426`). Sumado a
+§Post-F9.17 —las secuencias que los ETL dejaron en cero—, las OC nuevas toman folios **1, 2, 3…** y se van
+a la ÚLTIMA página, detrás de las ~7,978 migradas.
+
+### Los folios arrancan en 10001
+
+§Post-F9.36 punto 5 ya lo había decidido (*"me saltaría al siguiente escalón"*). Daniel fijó el número:
+*"el sistema anterior va en la **8082**. Tenemos mucho colchón antes de llegar a la 10001."*
+→ **OC arranca en 10001.** ⬜ El escalón de **OP sigue sin número**.
+
+### ⚠️ Pasos de GABRIEL en `prueba` — NO son código
+
+1. `npx tsx --env-file=.env migracion/reparar-secuencias.ts` (destapa las OC que Daniel ya generó).
+2. Después, el salto a **10001**, que requiere que ese script acepte *salto a escalón*, no solo `max+1`.
+
+🔴 **La lección de fondo, que no es sobre el script:** el arreglo de §Post-F9.17 estaba escrito y "listo"
+desde el **7-ago** y el defecto siguió vivo **trece días**, porque dependía de un paso manual que nadie
+dio. **Un arreglo que necesita que alguien corra algo no está terminado hasta que se corre.**
+
+- **Aplica en:** etapa propia, **junto con §Post-F9.86** (las dos se tocan: la revisión previa sin el
+  neteo volvería a enseñar como pendiente lo ya comprado).
+- **Fecha:** 2026-08-20.
+
+---
+
+#### (Post-F9.86) — ⭐ UNA OC PARA VARIAS OP: la explosión deja de ser de una sola orden (DANIEL, 20-ago-2026)
+
+Daniel: *"¿cómo hacemos cuando una OC cubre varias OP? Es muy muy común hacerlo. Normalmente compramos
+varias OP con una sola OC."*
+
+**El modelo YA lo aguanta entero; lo que falta es el camino.** Cada `OrdenCompraLinea` guarda su `idOrden`
+(una misma OC lleva tela de la 5558 y avíos de la 5560 sin perder de quién es cada cantidad) y existe la
+liga **N:N** `OrdenCompraOrden` con su unique. Lo que no existe es **dónde decirlo**: hoy la explosión es
+de UNA orden.
+
+⚠️ **La raíz es qué pregunta hace la pantalla.** Hoy pregunta *"¿qué necesita esta OP?"*. El comprador
+hace otra: *"¿qué necesito comprar hoy?"* — y esa casi nunca cabe en una sola OP.
+
+### Cómo se llena el conjunto de OP — los DOS caminos, con los ejemplos de Daniel
+
+*"Podríamos hacerlo por número de pedido interno. Muchas veces se compran los avíos de un mismo pedido
+interno (que incluyen varias OP) (ejemplo 1515). Pero aparte a veces se compran más órdenes… por ejemplo
+cuando se compran cajas, se hace el pedido por varias órdenes al mismo tiempo."* Y su propuesta: *"chance
+sería bueno que en la pantalla de explosión de materiales podamos incluir ahí varias OP y que vaya
+agrupando las cantidades."*
+
+1. **Por PEDIDO INTERNO** (el caso común, los avíos del 1515): al entrar desde una OP, la pantalla trae
+   **precargadas todas las OP de su pedido**; se pueden quitar.
+2. **A MANO** (las cajas, que cruzan pedidos): un buscador para agregar OP sueltas.
+
+**Es el MISMO control llenado de dos maneras, no dos pantallas.**
+
+### Lo que Daniel cerró
+
+- **Reparto: SIEMPRE por OP.** Sin eso, el *"qué tengo / qué falta"* de cada OP deja de cuadrar y el costo
+  no cae donde debe. **Se ve junto, se guarda repartido.**
+- **Sobrante de compra: se reparte entre las OP de la compra.** Comprar el rollo completo es una decisión
+  del comprador **en el momento de comprar** — es un hecho entonces, y por eso sí se reparte.
+
+### ❌ El faltante de la recepción NO se reparte — propuesta del LEAD DESCARTADA por Daniel
+
+El lead propuso repartir el faltante (se compran 300, llegan 280) en la misma proporción. **Daniel la
+tumbó:** *"¿debería definir qué OP se queda sin esos 20 kilos ahorita? ¿No podríamos simplemente ir usando
+esa tela y ver qué pasa? Recuerda que **los consumos son estimados**. Es común que de repente un modelo se
+lleve tantito más de lo esperado u otro tantito menos. Creo que a la hora de ir descargando las telas es
+cuando se va a poder saber a cuál aplica."*
+
+⚠️ **Y el sistema YA funciona así — la propuesta no solo era mala, era innecesaria.** La tela entra al
+inventario al recibirse, y lo que la amarra a una OP es la **salida a orden** (`inventarios/telas.ts`:
+*"la única vía que descuenta tela hacia una orden"*), que guarda `origenId = idOrden` y la cantidad
+**real descargada**.
+
+**La regla:** se compran 300, llegan 280, **entran 280 al almacén**, y cada OP se lleva lo que de verdad
+se lleva. Si al final falta, se ve en el almacén cuando no alcanza, y se compra más.
+
+🔴 **La lección para el lead:** repartir el faltante en la recepción habría pedido una decisión **con peor
+información que la que iba a haber después**, y la habría dejado escrita **como si fuera un hecho**.
+*El BOM es una estimación; el kardex es un hecho. No se resuelve un hecho futuro con una estimación
+presente.*
+
+⚠️ **Ojo con la aparente contradicción**, que no lo es: el **sobrante** sí se reparte y el **faltante** no,
+porque el sobrante es una decisión tomada al comprar (un hecho) y el faltante es un dato que todavía no
+existe cuando llega el material.
+
+- **Aplica en:** la misma etapa de §Post-F9.85.
 - **Fecha:** 2026-08-20.
