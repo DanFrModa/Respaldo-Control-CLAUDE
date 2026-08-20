@@ -1139,6 +1139,9 @@ function proyectarRenglones(
         });
         continue;
       }
+      // El PRECIO del renglón agrupado se queda con el de la primera OP: es sólo para la vista, y
+      // dos OP pueden traer precios distintos del mismo material (el precio por COLOR del amarre).
+      // El precio con el que NACE cada línea es el de su propia OP, y ése viaja en `porOrden`.
       previo.cantidadRequerida += reparto.cantidadRequerida;
       previo.cantidadAComprar += aComprar;
       previo.cantidadEnOc += enOc;

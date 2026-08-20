@@ -246,13 +246,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
   }
 
-  function alternar(id: number): void {
+  /**
+   * Marca o desmarca un renglón COMPLETO. ⭐ V1-E3q: un renglón de pantalla agrupa un snapshot POR
+   * OP, así que se prenden o apagan **todos sus ids a la vez**. Voltear cada uno por separado
+   * dejaría medio renglón marcado si alguna vez llegara desparejo — un estado que la casilla no
+   * sabe dibujar y que el servidor compraría a medias.
+   */
+  function alternarRenglon(ids: readonly number[], marcado: boolean): void {
     setSeleccion((prev) => {
       const siguiente = new Set(prev);
-      if (siguiente.has(id)) {
-        siguiente.delete(id);
-      } else {
-        siguiente.add(id);
+      for (const id of ids) {
+        if (marcado) siguiente.delete(id);
+        else siguiente.add(id);
       }
       return siguiente;
     });
@@ -866,9 +871,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 renglon={r}
                                 multiOp={idsOrden.length > 1}
                                 seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
-                                onToggle={() => {
-                                  for (const id of r.idsRequerimiento) alternar(id);
-                                }}
+                                onToggle={() =>
+                                  alternarRenglon(
+                                    r.idsRequerimiento,
+                                    r.idsRequerimiento.some((id) => seleccion.has(id)),
+                                  )
+                                }
                                 ajuste={clave === null ? '' : (ajustes[clave] ?? '')}
                                 onAjuste={(valor) => {
                                   if (clave === null) return;
