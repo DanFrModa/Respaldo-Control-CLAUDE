@@ -30,6 +30,19 @@ function sesionConVer(): SesionUsuario {
 
 function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
   return {
+    // V1-E3q (§Post-F9.86): la explosión ya es de un CONJUNTO de OP; con una sola, un elemento.
+    ordenes: [
+      {
+        idOrden: 50,
+        folio: 1001,
+        idModelo: 9,
+        modelo: 'A-100',
+        totalPiezas: 30,
+        idPedido: null,
+        folioPedido: null,
+        fechaEntrega: null,
+      },
+    ],
     idOrden: 50,
     folioOrden: 1001,
     idModelo: 9,
@@ -67,6 +80,11 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
+            cantidadEnOc: 0,
+            cantidadPendiente: 180,
+            idsRequerimiento: [1],
+            porOrden: [],
           },
         ],
       },
@@ -93,6 +111,11 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
+            cantidadEnOc: 0,
+            cantidadPendiente: 45,
+            idsRequerimiento: [2],
+            porOrden: [],
           },
         ],
       },

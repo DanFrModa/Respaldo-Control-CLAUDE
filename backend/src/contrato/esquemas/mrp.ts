@@ -63,6 +63,26 @@ export const esquemaOrigenProveedor = z
 /** Forma del origen del proveedor en la API. */
 export type OrigenProveedor = z.infer<typeof esquemaOrigenProveedor>;
 
+/**
+ * ⭐ V1-E3q (§Post-F9.86) — LO QUE LE TOCA A CADA OP de un material agrupado. Daniel: *"el reparto
+ * es SIEMPRE por OP"*. La OC guarda **una línea por (material, OP)** con este mismo desglose.
+ */
+export const esquemaRepartoOrden = z
+  .object({
+    idRequerimiento: z.number().int().describe('Renglón de snapshot de ESA orden.'),
+    idOrden: z.number().int().describe('Orden de producción a la que le toca esta cantidad.'),
+    folioOrden: z.number().int().describe('Folio de esa orden (para la UI).'),
+    cantidadRequerida: z.number().describe('Requerido por ESA orden (R3).'),
+    cantidadAComprar: z.number().describe('Requerido − stock genérico, en ESA orden.'),
+    cantidadEnOc: z.number().describe('Ya en OC viva ligada a ESA orden (V1-E3q).'),
+    cantidadPendiente: z.number().describe('Lo que falta comprar para ESA orden.'),
+    precioSugerido: z.number().nullable().describe('Precio unitario con el que nacería su línea.'),
+  })
+  .describe('Reparto por orden de producción de un material agrupado.');
+
+/** Forma del reparto por OP en la API. */
+export type RepartoOrden = z.infer<typeof esquemaRepartoOrden>;
+
 /** Un renglón de la explosión (un material requerido con su neteo y proveedor sugerido). */
 export const esquemaRequerimientoSalida = z
   .object({
@@ -95,8 +115,38 @@ export const esquemaRequerimientoSalida = z
         'Qué cambió en el modelo respecto de lo que ESTA orden congeló para este material (vacío = ' +
           'nada que avisar). Marca el renglón en el lugar de la decisión, §Post-F9.43(d).',
       ),
+    // ⭐⭐ V1-E3q (§Post-F9.85) — EL NETEO CONTRA LO YA COMPRADO.
+    cantidadEnOc: z
+      .number()
+      .describe(
+        '⭐ V1-E3q: cuánto de este material YA está en una orden de compra VIVA ligada a esta OP ' +
+          '(todas menos las canceladas — el borrador SÍ cuenta, porque la OC que genera esta ' +
+          'pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema ' +
+          'sobre "cuánto ya compré". NO se persiste: cambia cada vez que alguien crea o cancela ' +
+          'una OC, sin que nadie vuelva a explotar.',
+      ),
+    cantidadPendiente: z
+      .number()
+      .describe(
+        '⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es ' +
+          'lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, ' +
+          'y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago).',
+      ),
+    idsRequerimiento: z
+      .array(z.number().int())
+      .describe(
+        '⭐ V1-E3q (§Post-F9.86): ids de snapshot que este renglón AGRUPA. Con una sola OP es ' +
+          '`[id]`; con varias, uno por OP. Es lo que viaja en la selección al generar las OC.',
+      ),
+    porOrden: z
+      .array(esquemaRepartoOrden)
+      .describe(
+        '⭐ V1-E3q — **SE VE JUNTO, SE GUARDA REPARTIDO** (§Post-F9.86). El desglose por orden de ' +
+          'producción de esta cantidad agrupada. Sin él, el "qué tengo / qué falta" de cada OP ' +
+          'deja de cuadrar y el costo no cae donde debe; con una sola OP trae un elemento.',
+      ),
   })
-  .describe('Material requerido por la orden (snapshot de explosión).');
+  .describe('Material requerido (agrupado entre las OP elegidas, con su reparto por OP).');
 
 /** Forma de un renglón de explosión en la API. */
 export type RequerimientoSalida = z.infer<typeof esquemaRequerimientoSalida>;
@@ -125,6 +175,11 @@ export const esquemaPendienteLiberar = z
   .object({
     tipo: z.enum(['tela', 'avio']).describe('Sección de la receta (el arte no se compra por MRP).'),
     idRenglon: z.number().int().describe('Id del renglón de la receta de esta orden.'),
+    idOrden: z
+      .number()
+      .int()
+      .describe('⭐ V1-E3q: de QUÉ OP es el renglón (la explosión es multi-OP).'),
+    folioOrden: z.number().int().describe('Folio de esa OP (para nombrarla en el aviso).'),
     idTela: z.number().int().nullable(),
     idAvio: z.number().int().nullable(),
     material: z.string().describe('Cómo se llama el material.'),
@@ -136,13 +191,50 @@ export const esquemaPendienteLiberar = z
 /** Un material pendiente de liberar. */
 export type PendienteLiberar = z.infer<typeof esquemaPendienteLiberar>;
 
+/**
+ * ⭐ V1-E3q (§Post-F9.86) — UNA de las órdenes de producción que entraron a la explosión. Daniel:
+ * *"chance sería bueno que en la pantalla de explosión de materiales podamos incluir ahí varias OP
+ * y que vaya agrupando las cantidades"*. El `idPedido` es lo que permite la PRECARGA por pedido
+ * interno (*"muchas veces se compran los avíos de un mismo pedido interno… ejemplo 1515"*).
+ */
+export const esquemaOrdenExplosionada = z
+  .object({
+    idOrden: z.number().int().describe('Orden de producción.'),
+    folio: z.number().int().describe('Folio de la orden.'),
+    idModelo: z.number().int().describe('Modelo de la orden.'),
+    modelo: z.string().describe('Código del modelo (para la UI).'),
+    totalPiezas: z.number().int().describe('Σ piezas color×talla de ESA orden.'),
+    idPedido: z.number().int().nullable().describe('Pedido interno del que sale, o null.'),
+    folioPedido: z.number().int().nullable().describe('Folio del pedido interno, o null.'),
+    fechaEntrega: z.iso
+      .date()
+      .nullable()
+      .describe('Fecha de entrega de la orden (respaldo de la fecha de sus OC).'),
+  })
+  .describe('Orden de producción incluida en la explosión.');
+
+/** Forma de una orden incluida en la explosión. */
+export type OrdenExplosionada = z.infer<typeof esquemaOrdenExplosionada>;
+
 export const esquemaExplosionSalida = z
   .object({
-    idOrden: z.number().int().describe('Orden de producción explosionada.'),
-    folioOrden: z.number().int().describe('Folio de la orden (para la UI).'),
-    idModelo: z.number().int().describe('Modelo de la orden.'),
-    modelo: z.string().describe('Código/nombre del modelo (para la UI).'),
-    totalPiezas: z.number().int().describe('Σ piezas color×talla de la orden (base del cálculo).'),
+    ordenes: z
+      .array(esquemaOrdenExplosionada)
+      .describe(
+        '⭐ V1-E3q (§Post-F9.86) — TODAS las OP que entraron a esta explosión, en el orden en que ' +
+          'se calcularon (por folio). Con una sola OP trae un elemento.',
+      ),
+    idOrden: z
+      .number()
+      .int()
+      .describe('Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP).'),
+    folioOrden: z.number().int().describe('Folio de la PRIMERA orden (para la UI y el impreso).'),
+    idModelo: z.number().int().describe('Modelo de la PRIMERA orden.'),
+    modelo: z.string().describe('Código/nombre del modelo de la PRIMERA orden (para la UI).'),
+    totalPiezas: z
+      .number()
+      .int()
+      .describe('Σ piezas color×talla de TODAS las órdenes del conjunto (base del cálculo).'),
     grupos: z
       .array(esquemaGrupoProveedorSalida)
       .describe('Requerimientos agrupados por proveedor sugerido.'),
@@ -177,6 +269,62 @@ export const esquemaExplosionSalida = z
 /** Forma del resultado de explosión en la API. */
 export type ExplosionSalida = z.infer<typeof esquemaExplosionSalida>;
 
+/**
+ * ⭐ V1-E3q (§Post-F9.86) — EL CONJUNTO DE OP QUE SE VA A COMPRAR. La raíz del rediseño está en
+ * *qué pregunta hace la pantalla*: hoy preguntaba *"¿qué necesita ESTA OP?"* y el comprador hace
+ * otra, *"¿qué necesito comprar hoy?"*, que casi nunca cabe en una sola OP. Se llena de DOS
+ * maneras, con el mismo control: **precargado** con las OP del pedido interno (los avíos del 1515)
+ * o **a mano**, agregando OP sueltas (las cajas, que cruzan pedidos).
+ */
+export const esquemaExplosionCuerpo = z
+  .object({
+    idsOrden: z
+      .array(z.number().int().positive())
+      .min(1, { error: 'Elige al menos una orden de producción' })
+      .max(50, { error: 'Son demasiadas órdenes para una sola compra (máximo 50)' })
+      .describe('Órdenes de producción a explotar juntas (mínimo 1).'),
+  })
+  .describe('Órdenes de producción que entran a la explosión (§Post-F9.86).');
+
+/** Datos validados del cuerpo de la explosión. */
+export type DatosExplosion = z.infer<typeof esquemaExplosionCuerpo>;
+
+// ── OP del mismo PEDIDO INTERNO (precarga de §Post-F9.86) ──────────────────────────────────────
+
+/** Una OP hermana (del mismo pedido interno) que la pantalla ofrece precargada. */
+export const esquemaOrdenDelPedido = z
+  .object({
+    idOrden: z.number().int(),
+    folio: z.number().int(),
+    modelo: z.string().describe('Código del modelo.'),
+    cliente: z.string().describe('Cliente de la orden.'),
+    cancelada: z.boolean().describe('Las canceladas se listan pero NO se precargan.'),
+  })
+  .describe('Orden de producción del mismo pedido interno.');
+
+/** Forma de una OP hermana en la API. */
+export type OrdenDelPedido = z.infer<typeof esquemaOrdenDelPedido>;
+
+/**
+ * Las OP del pedido interno de una orden — la PRECARGA de §Post-F9.86 (*"muchas veces se compran
+ * los avíos de un mismo pedido interno (que incluyen varias OP), ejemplo 1515"*). Si la orden no
+ * cuelga de un pedido (histórico migrado), `idPedido` es null y la lista trae solo a la propia.
+ */
+export const esquemaOrdenesDelPedidoSalida = z
+  .object({
+    idPedido: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Pedido interno, o null si la orden no cuelga de uno.'),
+    folioPedido: z.number().int().nullable().describe('Folio del pedido interno, o null.'),
+    ordenes: z.array(esquemaOrdenDelPedido).describe('OP del pedido (incluida la de la consulta).'),
+  })
+  .describe('Órdenes de producción del mismo pedido interno (precarga de la explosión).');
+
+/** Forma de la precarga por pedido en la API. */
+export type OrdenesDelPedidoSalida = z.infer<typeof esquemaOrdenesDelPedidoSalida>;
+
 // ── GENERAR OC desde la explosión (R3) ────────────────────────────────────────────────────────────
 
 /**
@@ -186,6 +334,13 @@ export type ExplosionSalida = z.infer<typeof esquemaExplosionSalida>;
  */
 export const esquemaGenerarOcCuerpo = z
   .object({
+    // ⭐ V1-E3q (§Post-F9.86): la compra ya no es de UNA orden — es del conjunto que el comprador
+    // armó en la pantalla. Va en el cuerpo y no en la URL justamente porque son varias.
+    idsOrden: z
+      .array(z.number().int().positive())
+      .min(1, { error: 'Elige al menos una orden de producción' })
+      .max(50, { error: 'Son demasiadas órdenes para una sola compra (máximo 50)' })
+      .describe('Órdenes de producción que entran a esta compra (§Post-F9.86).'),
     idsRequerimiento: z
       .array(z.number().int().positive())
       .default([])
@@ -222,6 +377,30 @@ export const esquemaGenerarOcCuerpo = z
         'Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese ' +
           'proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).',
       ),
+    // ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. Daniel: *"el sobrante de compra se reparte
+    // entre las OP de la compra… comprar el rollo completo es una decisión del comprador EN EL
+    // MOMENTO de comprar: es un hecho entonces, y por eso sí se reparte"*. Aquí el comprador fija
+    // el TOTAL de un material a un proveedor (el rollo entero, el mínimo del proveedor) y el
+    // servidor lo reparte proporcionalmente entre las OP (`repartirEntreOrdenes`). La pantalla NO
+    // reparte: manda el total y el dominio decide (A1).
+    ajustes: z
+      .array(
+        z.object({
+          tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
+          idMaterial: z.number().int().positive().describe('Tela o avío del catálogo.'),
+          idProveedor: z.number().int().positive().describe('Proveedor al que se le compra.'),
+          cantidadTotal: z
+            .number()
+            .positive({ error: 'La cantidad a comprar debe ser mayor que cero' })
+            .describe('Total a comprar de ese material a ese proveedor (se reparte entre las OP).'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma ' +
+          'propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que ' +
+          'cada una necesita. Vacío = se compra exactamente lo pendiente.',
+      ),
   })
   .describe(
     'Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha).',
@@ -245,12 +424,138 @@ export const esquemaOcGeneradaSalida = z
 /** Forma de una OC generada en la API. */
 export type OcGeneradaSalida = z.infer<typeof esquemaOcGeneradaSalida>;
 
+// ── ⭐⭐ REVISIÓN PREVIA antes de generar (V1-E3q, §Post-F9.85) ──────────────────────────────────
+
+/**
+ * ⭐ Daniel, palabra por palabra: *"me gustaría que al darle «generar OC desde la explosión», te
+ * mande a una pantalla previa, antes de generar la OC. **Una revisión previa es indispensable**"*.
+ *
+ * POR QUÉ un renglón se queda FUERA de la compra. Hasta V1-E3q los renglones sin proveedor se
+ * omitían **en silencio** y sólo se sabía después, contando las OC que salieron. Un documento que
+ * no se emite sin decir por qué es indistinguible de un error del sistema — y fue exactamente lo
+ * que dejó a Daniel sin saber si su compra se había hecho.
+ */
+export const esquemaMotivoOmision = z
+  .enum(['sin-proveedor', 'ya-en-oc', 'cubierto-por-stock', 'no-seleccionado', 'sin-cantidad'])
+  .describe(
+    'sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva ' +
+      '(V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no ' +
+      'lo marcó; sin-cantidad: el requerido es cero.',
+  );
+
+/** Forma del motivo de omisión en la API. */
+export type MotivoOmision = z.infer<typeof esquemaMotivoOmision>;
+
+/** Un material que NO va a entrar en las OC, con su razón dicha con todas las letras. */
+export const esquemaOmitidoPlan = z
+  .object({
+    idRequerimiento: z.number().int().describe('Renglón de snapshot omitido.'),
+    idOrden: z.number().int().describe('Orden de producción del renglón.'),
+    folioOrden: z.number().int().describe('Folio de esa orden.'),
+    tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
+    material: z.string().describe('Nombre/clave del material.'),
+    unidad: z.string().nullable(),
+    cantidadAComprar: z.number().describe('Lo que pedía el snapshot (requerido − stock).'),
+    cantidadEnOc: z.number().describe('Lo que ya está en OC viva (V1-E3q).'),
+    motivo: esquemaMotivoOmision,
+    detalle: z.string().describe('La razón en una frase, lista para pintar.'),
+  })
+  .describe('Material que se queda fuera de la compra, y por qué.');
+
+/** Forma de un omitido en la API. */
+export type OmitidoPlan = z.infer<typeof esquemaOmitidoPlan>;
+
+/** Reparto por OP de UN renglón de la OC que se va a crear (una línea real por cada uno). */
+export const esquemaPlanLineaOrden = z
+  .object({
+    idRequerimiento: z.number().int(),
+    idOrden: z.number().int(),
+    folioOrden: z.number().int().describe('⭐ DE QUÉ OP es esta cantidad (§Post-F9.86).'),
+    cantidad: z.number().describe('Cantidad que se va a escribir en SU línea de OC.'),
+    precio: z.number().describe('Precio unitario con el que nace esa línea.'),
+    importe: z.number().describe('cantidad × precio.'),
+  })
+  .describe('Línea de OC que le corresponde a una OP (el reparto que sí se guarda).');
+
+/** Forma de una línea repartida en la API. */
+export type PlanLineaOrden = z.infer<typeof esquemaPlanLineaOrden>;
+
+/** Un material dentro de la OC que se va a crear: el total agrupado + su reparto por OP. */
+export const esquemaPlanRenglon = z
+  .object({
+    tipo: z.enum(['tela', 'avio']),
+    idMaterial: z.number().int().describe('Tela o avío del catálogo (según `tipo`).'),
+    material: z.string(),
+    unidad: z.string().nullable(),
+    cantidadTotal: z.number().describe('Lo que se va a pedir de este material (Σ del reparto).'),
+    cantidadPropuesta: z
+      .number()
+      .describe('Lo que el sistema propuso antes de cualquier ajuste del comprador.'),
+    ajustado: z.boolean().describe('¿El comprador cambió el total (sobrante de compra)?'),
+    importe: z.number().describe('Σ de los importes del reparto.'),
+    porOrden: z.array(esquemaPlanLineaOrden).describe('El reparto por OP (§Post-F9.86).'),
+  })
+  .describe('Material de la OC que se va a crear (se ve junto, se guarda repartido).');
+
+/** Forma de un renglón del plan en la API. */
+export type PlanRenglon = z.infer<typeof esquemaPlanRenglon>;
+
+/** Una OC completa tal como quedaría — el corazón de la revisión previa. */
+export const esquemaPlanProveedor = z
+  .object({
+    idProveedor: z.number().int(),
+    proveedor: z.string(),
+    fechaEntrega: z.iso.date().nullable().describe('Fecha con la que nacería (null = falta).'),
+    renglones: z.array(esquemaPlanRenglon),
+    total: z.number().describe('Total de la OC (Σ importes).'),
+    ordenes: z
+      .array(z.number().int())
+      .describe('Folios de las OP que esta OC va a surtir (§Post-F9.86).'),
+  })
+  .describe('Orden de compra que se va a crear, completa, ANTES de crearla.');
+
+/** Forma del plan de una OC en la API. */
+export type PlanProveedor = z.infer<typeof esquemaPlanProveedor>;
+
+/**
+ * ⭐ **LA REVISIÓN PREVIA** (§Post-F9.85). Enseña, ANTES de comprometer nada: qué OC va a salir, a
+ * qué proveedor, con qué renglones y cantidades, **de qué OP es cada cantidad**, y lo que se va a
+ * OMITIR con su razón. Lo calcula EXACTAMENTE el mismo código que luego genera (`planearCompra`):
+ * una revisión previa que no fuera el mismo cálculo sería una promesa que el sistema no cumple.
+ */
+export const esquemaPlanCompra = z
+  .object({
+    ordenes: z.array(esquemaOrdenExplosionada).describe('Las OP que entran a esta compra.'),
+    proveedores: z.array(esquemaPlanProveedor).describe('Una entrada por OC que se va a crear.'),
+    omitidos: z
+      .array(esquemaOmitidoPlan)
+      .describe('Lo que NO va a entrar, con su razón (nada se omite en silencio, D3).'),
+    bloqueos: z
+      .array(z.string())
+      .describe(
+        'Lo que IMPIDE generar (falta la dirección de entrega, falta la fecha de un proveedor…). ' +
+          'Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza ' +
+          'con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo.',
+      ),
+    totalGeneral: z.number().describe('Σ de los totales de todas las OC del plan.'),
+  })
+  .describe('Revisión previa de las órdenes de compra que se van a generar (§Post-F9.85).');
+
+/** Forma del plan completo en la API. */
+export type PlanCompra = z.infer<typeof esquemaPlanCompra>;
+
 /** Respuesta de generar OC: la lista de OC creadas (una por proveedor). */
 export const esquemaGenerarOcResultado = z
   .object({
     ordenesCompra: z
       .array(esquemaOcGeneradaSalida)
       .describe('OC creadas (una por proveedor con pendiente seleccionado).'),
+    omitidos: z
+      .array(esquemaOmitidoPlan)
+      .describe(
+        '⭐ V1-E3q: lo que se quedó FUERA de las OC creadas, con su razón. Antes se omitía en ' +
+          'silencio y el usuario no tenía cómo saberlo.',
+      ),
   })
   .describe('Resultado de generar OC desde la explosión.');
 

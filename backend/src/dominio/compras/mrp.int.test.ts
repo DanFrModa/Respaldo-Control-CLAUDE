@@ -324,8 +324,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -351,8 +350,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     // Selecciona solo el botón explícitamente.
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [boton.id] },
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     expect(resultado.ordenesCompra).toHaveLength(1);
@@ -371,7 +369,11 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
     expect(t0.tieneSnapshot).toBe(true);
 
     // 2) Genera la OC del botón y autorízala.
-    const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     const idOc = gen.ordenesCompra[0]!.idOrdenCompra;
     await autorizarOC(sesion(), idOc, bd());
 
@@ -465,7 +467,11 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     expect(felpa?.proveedorSugeridoInactivo).toBe(false);
     expect(ex.avisos).toEqual([]);
     // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
-    const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     const ocFelpa = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id);
     expect(ocFelpa).toBeDefined();
   });
@@ -765,8 +771,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -784,8 +789,12 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [], fechaEntrega: '2026-12-01', idDireccionEntrega: otra.id },
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        fechaEntrega: '2026-12-01',
+        idDireccionEntrega: otra.id,
+      },
       bd(),
     );
 
@@ -799,7 +808,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/no tiene fecha de entrega/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -809,7 +818,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -831,8 +840,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -880,8 +888,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [
@@ -901,8 +909,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
@@ -919,8 +927,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechasPorProveedor: [
           { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
@@ -941,8 +949,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        idOrden,
         {
+          idsOrden: [idOrden],
           idsRequerimiento: [],
           fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
         },
@@ -958,8 +966,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        idOrden,
         {
+          idsOrden: [idOrden],
           idsRequerimiento: [],
           fechasPorProveedor: [
             { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
@@ -980,8 +988,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     });
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [soloBoton.id],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [
@@ -1508,8 +1516,7 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
 
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [hilo?.id ?? 0] },
+      { idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
       bd(),
     );
     expect(ordenesCompra).toHaveLength(1);

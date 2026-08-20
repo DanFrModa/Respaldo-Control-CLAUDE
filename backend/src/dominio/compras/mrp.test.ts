@@ -39,14 +39,14 @@ describe('MRP unit — permisos (A4, deny-by-default)', () => {
   it('generarOCDesdeExplosion sin compras.administrar lanza ErrorPermiso', async () => {
     // `compras.ver` no alcanza para mutar (generar OC).
     await expect(
-      generarOCDesdeExplosion(sesionVer(), 1, { idsRequerimiento: [] }),
+      generarOCDesdeExplosion(sesionVer(), { idsOrden: [1], idsRequerimiento: [] }),
     ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
   it('generarOCDesdeExplosion con compras.administrar pasa el guard (falla luego por BD/orden)', async () => {
     // No debe ser ErrorPermiso: el guard pasó; cualquier otro error viene de la BD inexistente.
     await expect(
-      generarOCDesdeExplosion(sesionAdmin(), 999999, { idsRequerimiento: [] }),
+      generarOCDesdeExplosion(sesionAdmin(), { idsOrden: [999999], idsRequerimiento: [] }),
     ).rejects.not.toBeInstanceOf(ErrorPermiso);
   });
 });
