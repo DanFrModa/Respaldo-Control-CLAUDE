@@ -74,7 +74,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   impide la compra duplicada (la OC que genera la explosión nace en borrador). Para el **costo** el
   criterio sigue siendo otro: ahí sólo cuentan las autorizadas y recibidas.
 - **El impreso de la explosión sigue siendo de UNA orden.** Con varias OP en pantalla imprime la primera,
-  y el botón lo avisa al pasar el ratón.
+  y el botón lo avisa al pasar el ratón. Su columna **«A comprar» ahora trae lo que falta de verdad**
+  (antes traía lo requerido a secas, así que un impreso hecho después de comprar pedía de más).
 
 ### Qué sigue pendiente o roto
 

@@ -2149,6 +2149,10 @@ el buscador (las cajas, que cruzan pedidos).
   un faltante silencioso en el material del que nadie lleva cuenta. Hay un ledger por lote y el orden es
   determinista (por folio ascendente: la OP más vieja, que se produce antes, se queda con el stock).
 - **Lo omitido viaja también en el RESULTADO de generar**, no sólo en la previa.
+- **El impreso PDF de la explosión pasó a enseñar lo PENDIENTE** en su columna *"A comprar"* (antes
+  traía la demanda bruta). Un impreso hecho **después** de generar la OC decía *"compra 180"* de algo
+  ya pedido — el mismo defecto de Daniel, pero en papel y sin nadie que lo contradiga. El *"Requerido"*
+  no se tocó: sigue diciendo cuánto lleva la orden en total.
 
 ### Cómo quedó por dentro
 

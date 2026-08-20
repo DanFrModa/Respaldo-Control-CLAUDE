@@ -159,6 +159,31 @@ describe('armarDatosImpresoExplosion', () => {
     expect(datos.grupos[0]?.lineas[0]?.aComprar).toBe(180);
   });
 
+  /**
+   * ⭐ V1-E3q (§Post-F9.85) — el papel no puede decir otra cosa que la pantalla. Un impreso hecho
+   * DESPUÉS de generar la OC tiene que enseñar lo que **de verdad falta**, no la demanda bruta:
+   * *"compra 180"* de algo ya pedido es el mismo defecto de Daniel, pero sin nadie que lo
+   * contradiga. 🔴 Con `cantidadAComprar` en la proyección, esto daría 180 y saldría rojo.
+   */
+  it('⭐ la columna "A comprar" trae lo PENDIENTE, no lo ya comprado', async () => {
+    const base = explosionBase();
+    const datos = await armarDatosImpresoExplosion(sesionConVer(), 50, undefined, {
+      explosionarOrden: () =>
+        Promise.resolve({
+          ...base,
+          grupos: base.grupos.map((g) => ({
+            ...g,
+            renglones: g.renglones.map((r) =>
+              r.id === 1 ? { ...r, cantidadEnOc: 120, cantidadPendiente: 60 } : r,
+            ),
+          })),
+        }),
+    });
+    expect(datos.grupos[0]?.lineas[0]?.aComprar).toBe(60);
+    // Y el REQUERIDO no se toca: el impreso sigue diciendo cuánto lleva la orden en total.
+    expect(datos.grupos[0]?.lineas[0]?.requerido).toBe(180);
+  });
+
   it('propaga el ErrorNoEncontrado de explosionarOrden (orden de otra empresa → 404)', async () => {
     const deps: DepsImpresoExplosion = {
       explosionarOrden: () => Promise.reject(new ErrorNoEncontrado('Orden', 999)),
