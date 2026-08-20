@@ -105,6 +105,8 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     idProveedorSugerido: null,
     proveedorSugerido: null,
     precioSugerido: null,
+    origenProveedor: 'sin-proveedor' as const,
+    proveedorSugeridoInactivo: false,
   };
 
   it('no genérico → no-aplica (va completo a compra)', () => {

@@ -448,4 +448,98 @@ describe('Catálogo Avíos (F1-E3, R1 — global ADR-0007)', () => {
       expect(p1.datos.map((a) => a.clave)).toEqual(['AAA', 'BBB']);
     });
   });
+
+  /**
+   * ⭐ V1-E3m (§Post-F9.82) — EL PROVEEDOR HABITUAL. Daniel: *"tener avíos sin proveedor asignado
+   * está generando más problemas que beneficios"*. La explosión propone al HABITUAL (arriba del
+   * "más barato" de F4), así que el catálogo tiene que poder marcarlo — y **uno solo**: dos
+   * habituales harían que "a quién le compramos siempre" dependiera del orden de las filas. Lo
+   * último lo cierra un índice único PARCIAL en la base, no la buena voluntad del dominio.
+   */
+  describe('proveedor HABITUAL del avío (§Post-F9.82)', () => {
+    it('se guarda al crear y viaja en la lectura', async () => {
+      const avio = await crearAvio(
+        sesionAdmin(),
+        {
+          clave: 'HAB-01',
+          descripcion: 'Elástico',
+          proveedores: [
+            { idProveedor: provA, precio: 3 },
+            { idProveedor: provB, precio: 9, habitual: true },
+          ],
+        },
+        bd(),
+      );
+      const filas = await listarProveedoresDeAvio(sesionAdmin(), avio.id, bd());
+      // El habitual es el CARO: si el dominio lo dedujera del precio, aquí saldría provA.
+      expect(filas.find((f) => f.idProveedor === provB)?.habitual).toBe(true);
+      expect(filas.find((f) => f.idProveedor === provA)?.habitual).toBe(false);
+    });
+
+    it('MOVER el habitual de A a B apaga al anterior (y no revienta el índice único)', async () => {
+      const avio = await crearAvio(
+        sesionAdmin(),
+        {
+          clave: 'HAB-02',
+          descripcion: 'Cierre',
+          proveedores: [
+            { idProveedor: provA, precio: 3, habitual: true },
+            { idProveedor: provB, precio: 9 },
+          ],
+        },
+        bd(),
+      );
+      // Encender el nuevo ANTES de apagar el viejo reventaría contra la base (el índice se verifica
+      // por sentencia): esta prueba existe justo para fijar ese orden.
+      await actualizarAvio(
+        sesionAdmin(),
+        {
+          id: avio.id,
+          proveedores: [
+            { idProveedor: provA, precio: 3 },
+            { idProveedor: provB, precio: 9, habitual: true },
+          ],
+        },
+        bd(),
+      );
+      const filas = await listarProveedoresDeAvio(sesionAdmin(), avio.id, bd());
+      expect(filas.filter((f) => f.habitual).map((f) => f.idProveedor)).toEqual([provB]);
+    });
+
+    it('DOS habituales se rechazan (el dominio es la autoridad, no solo el contrato)', async () => {
+      await expect(
+        crearAvio(
+          sesionAdmin(),
+          {
+            clave: 'HAB-03',
+            descripcion: 'Doble',
+            proveedores: [
+              { idProveedor: provA, precio: 3, habitual: true },
+              { idProveedor: provB, precio: 9, habitual: true },
+            ],
+          },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('quitar la bandera deja al avío sin habitual (y la explosión vuelve al más barato)', async () => {
+      const avio = await crearAvio(
+        sesionAdmin(),
+        {
+          clave: 'HAB-04',
+          descripcion: 'Sin habitual',
+          proveedores: [{ idProveedor: provA, precio: 3, habitual: true }],
+        },
+        bd(),
+      );
+      await actualizarAvio(
+        sesionAdmin(),
+        { id: avio.id, proveedores: [{ idProveedor: provA, precio: 3 }] },
+        bd(),
+      );
+      const filas = await listarProveedoresDeAvio(sesionAdmin(), avio.id, bd());
+      expect(filas.every((f) => !f.habitual)).toBe(true);
+    });
+  });
 });

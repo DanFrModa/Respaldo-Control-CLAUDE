@@ -62,6 +62,9 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             idProveedorSugerido: 7,
             proveedorSugerido: 'Avíos Baratos',
             precioSugerido: 2,
+            // V1-E3m: de dónde salió el proveedor (el impreso no lo pinta; el contrato sí lo pide).
+            origenProveedor: 'habitual',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
           },
@@ -86,6 +89,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             idProveedorSugerido: null,
             proveedorSugerido: null,
             precioSugerido: null,
+            origenProveedor: 'sin-proveedor',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
           },

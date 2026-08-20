@@ -43,6 +43,13 @@ export const esquemaAvioProveedorEntrada = z
       .trim()
       .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' })
       .optional(),
+    /**
+     * ⭐ V1-E3m (§Post-F9.82) — ¿es el proveedor HABITUAL del avío? Daniel: *"tener avíos sin
+     * proveedor asignado está generando más problemas que beneficios"*. El habitual es el que la
+     * explosión propone (arriba del "más barato" de F4). UNO por avío: lo valida la lista, el
+     * dominio y —la última palabra— un índice único parcial en la base.
+     */
+    habitual: z.boolean().optional(),
   })
   .describe('Proveedor de un avío con su precio y condiciones (R1).');
 
@@ -60,6 +67,11 @@ const esquemaProveedoresLista = z
   .max(50, { error: 'Demasiados proveedores' })
   .refine((items) => new Set(items.map((p) => p.idProveedor)).size === items.length, {
     error: 'Hay proveedores repetidos',
+  })
+  // ⭐ §Post-F9.82: el HABITUAL es UNO. Dos habituales harían que "a quién le compramos siempre"
+  // dependiera del orden de las filas — que es justo la ambigüedad que la bandera vino a matar.
+  .refine((items) => items.filter((p) => p.habitual === true).length <= 1, {
+    error: 'Solo un proveedor puede ser el habitual del avío',
   });
 
 // ── Campos del avío ────────────────────────────────────────────────────────────
@@ -235,6 +247,12 @@ export const esquemaAvioProveedorSalida = z
       .number()
       .nullable()
       .describe('Precio por unidad de consumo (precio ÷ factor R1), o null.'),
+    habitual: z
+      .boolean()
+      .describe(
+        '⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba ' +
+          'del "más barato" de F4). Uno por avío.',
+      ),
   })
   .describe('Proveedor de un avío con su precio y condiciones (R1).');
 

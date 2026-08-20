@@ -492,8 +492,9 @@ function RenglonAvio({
                 {provs.length === 0 ? (
                   <p className="text-sm text-muted-foreground" data-testid="avio-sin-proveedores">
                     Este avío no tiene proveedores asignados — se costea al{' '}
-                    <b>precio de referencia</b> ({formatearPrecio(avio.precioReferencia)}); el
-                    proveedor real se define en la compra (MRP/OC).
+                    <b>precio de referencia</b> ({formatearPrecio(avio.precioReferencia)}) y la
+                    explosión de compras se queda <b>sin a quién comprarle</b>. Agrégale su
+                    proveedor habitual desde «Editar» (§Post-F9.82).
                   </p>
                 ) : (
                   <ul
@@ -507,6 +508,13 @@ function RenglonAvio({
                       >
                         <span className="flex items-center gap-2">
                           <span className="text-sm font-medium">{p.nombreProveedor}</span>
+                          {/* ⭐ V1-E3m (§Post-F9.82): el HABITUAL es el que la explosión propone —
+                              antes proponía el más barato—, así que se ve primero y aparte. */}
+                          {p.habitual ? (
+                            <ChipEstado tono="info" sinPunto data-testid="avio-proveedor-habitual">
+                              habitual
+                            </ChipEstado>
+                          ) : null}
                           {p.precio !== null && p.precio === barato && provs.length > 1 ? (
                             <ChipEstado tono="ok" sinPunto>
                               más barato

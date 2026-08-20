@@ -39,6 +39,30 @@ export const esquemaDiffRequerimiento = z
 /** Forma del diff de un renglón en la API. */
 export type DiffRequerimiento = z.infer<typeof esquemaDiffRequerimiento>;
 
+/**
+ * ⭐ V1-E3m (§Post-F9.82) — DE DÓNDE SALIÓ EL PROVEEDOR que la explosión propone. No es adorno: la
+ * pantalla necesita distinguir *"esto lo puso Desarrollo/el catálogo"* de *"esto lo asigné yo para
+ * esta orden"*, porque solo lo segundo se puede quitar desde ahí — y porque un proveedor que aparece
+ * sin decir de dónde viene es exactamente lo que dejó a Daniel sin saber dónde se asignaba.
+ */
+export const esquemaOrigenProveedor = z
+  .enum([
+    'amarre-desarrollo',
+    'dueno-tela',
+    'habitual',
+    'mas-barato',
+    'asignado-compras',
+    'sin-proveedor',
+  ])
+  .describe(
+    'amarre-desarrollo: lo amarró Desarrollo en la receta; dueno-tela: es el proveedor DUEÑO de la ' +
+      'tela (§Post-F9.11); habitual: es el proveedor habitual del avío; mas-barato: fallback R1/F4; ' +
+      'asignado-compras: lo asignó Compras PARA ESTA ORDEN (§Post-F9.82); sin-proveedor: no hay.',
+  );
+
+/** Forma del origen del proveedor en la API. */
+export type OrigenProveedor = z.infer<typeof esquemaOrigenProveedor>;
+
 /** Un renglón de la explosión (un material requerido con su neteo y proveedor sugerido). */
 export const esquemaRequerimientoSalida = z
   .object({
@@ -56,6 +80,14 @@ export const esquemaRequerimientoSalida = z
     idProveedorSugerido: z.number().int().nullable().describe('Proveedor sugerido (R1), o null.'),
     proveedorSugerido: z.string().nullable().describe('Nombre del proveedor sugerido, o null.'),
     precioSugerido: z.number().nullable().describe('Precio unitario sugerido (R1), o null.'),
+    origenProveedor: esquemaOrigenProveedor,
+    proveedorSugeridoInactivo: z
+      .boolean()
+      .describe(
+        '⭐ V1-E3m: el proveedor propuesto está DADO DE BAJA. Se conserva la sugerencia (alguien lo ' +
+          'eligió a propósito y la OC es editable) pero la pantalla tiene que poder ofrecer la ' +
+          'reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor.',
+      ),
     diff: esquemaDiffRequerimiento,
     cambiosReceta: z
       .array(esquemaTipoCambioReceta)
@@ -224,6 +256,64 @@ export const esquemaGenerarOcResultado = z
 
 /** Forma del resultado de generar OC en la API. */
 export type GenerarOcResultado = z.infer<typeof esquemaGenerarOcResultado>;
+
+// ── ⭐ ASIGNAR PROVEEDOR desde la explosión (V1-E3m, §Post-F9.82) ────────────────────────────────
+
+/**
+ * ⭐ **EL COMPRADOR DESATORA DESDE SU PANTALLA — SOLO PARA ESA OP.** Daniel: *"el comprador podría
+ * asignarle un proveedor y no esperar a que la gente de desarrollo se lo asigne"*, con la
+ * restricción textual e innegociable: *"asigna un proveedor **para esa OP en particular**… no para
+ * siempre ni para todo. **El proveedor puede seguir viniendo desde desarrollo**"*.
+ *
+ * Por eso este cuerpo **no lleva nada del catálogo**: identifica el MATERIAL (tela XOR avío) dentro
+ * de UNA orden —la de la URL— y la asignación se guarda en la receta congelada de esa orden. El
+ * catálogo no se toca nunca. `idProveedor: null` = QUITAR la asignación (volver a lo que diga el
+ * catálogo); es una acción explícita y no un borrado silencioso.
+ */
+export const esquemaAsignarProveedorCuerpo = z
+  .object({
+    tipo: z.enum(['tela', 'avio']).describe('Qué clase de material se está asignando.'),
+    idMaterial: z
+      .number({ error: 'El id del material es obligatorio' })
+      .int({ error: 'El id del material debe ser entero' })
+      .positive({ error: 'El id del material debe ser positivo' })
+      .describe('Id de la TELA o del AVÍO del catálogo (según `tipo`).'),
+    idProveedor: z
+      .number({ error: 'El id del proveedor debe ser un número' })
+      .int({ error: 'El id del proveedor debe ser entero' })
+      .positive({ error: 'El id del proveedor debe ser positivo' })
+      .nullable()
+      .describe('Proveedor a asignar PARA ESTA ORDEN, o null para quitar la asignación.'),
+    precio: z
+      .number({ error: 'El precio debe ser un número' })
+      .nonnegative({ error: 'El precio no puede ser negativo' })
+      .nullable()
+      .optional()
+      .describe(
+        'Precio por unidad de consumo con el que se va a comprar (opcional). Si viene, MANDA sobre ' +
+          'la última compra real: lo tecleó alguien para esta compra. Si no, se resuelve solo.',
+      ),
+  })
+  .describe('Asignación de proveedor de un material PARA UNA ORDEN (§Post-F9.82).');
+
+/** Datos validados de la asignación de proveedor. */
+export type DatosAsignarProveedor = z.infer<typeof esquemaAsignarProveedorCuerpo>;
+
+/** Cómo quedó la asignación (para confirmar en pantalla lo que se guardó). */
+export const esquemaAsignarProveedorSalida = z
+  .object({
+    idOrden: z.number().int().describe('Orden de producción donde vive la asignación.'),
+    tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
+    idMaterial: z.number().int().describe('Tela o avío asignado.'),
+    material: z.string().describe('Nombre/clave del material (para el mensaje).'),
+    idProveedor: z.number().int().nullable().describe('Proveedor asignado, o null si se quitó.'),
+    proveedor: z.string().nullable().describe('Nombre del proveedor asignado, o null.'),
+    precio: z.number().nullable().describe('Precio capturado por Compras, o null.'),
+  })
+  .describe('Resultado de asignar (o quitar) el proveedor de un material en una orden.');
+
+/** Forma del resultado de asignar proveedor en la API. */
+export type AsignarProveedorSalida = z.infer<typeof esquemaAsignarProveedorSalida>;
 
 // ── ESTATUS de materiales (R7) ──────────────────────────────────────────────────────────────────
 

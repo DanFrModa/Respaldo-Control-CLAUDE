@@ -59,6 +59,18 @@
 > porque el mock volvía el fallo imposible**: la plantilla devolvía `undefined` en todas las pruebas.
 > **Exige `SEED_ON_START=true`** para que la plantilla se siembre.
 >
+> ✅ **`V1-E3m` · EL PROVEEDOR DEL MATERIAL** (20-ago): Daniel liberó toda la receta, fue a la explosión y
+> *"no me deja hacer nada… ahí veo todo, pero no puedo avanzar"* — ningún renglón traía proveedor. 🔴 **No
+> faltaba una función: había una DESVIACIÓN.** `Tela.idProveedor` (el proveedor DUEÑO) existía desde
+> §Post-F9.11 con la regla escrita en su comentario, y el motor de compras la ignoraba porque F8 lo mandó a
+> resolver por el amarre de `TelaProveedor`. Entrega: la tela resuelve por su **dueño**; el avío por su
+> **proveedor HABITUAL** (bandera nueva, uno por avío, índice único parcial — el "más barato" de F4 queda de
+> fallback); el comprador puede **asignar proveedor desde la explosión, solo para esa OP** (vive en la
+> receta de la orden, **nunca en el catálogo**, y va en el ÚLTIMO escalón para que **jamás pise a
+> Desarrollo**); y **el botón apagado dice qué le falta, con los nombres** —el mismo defecto que V1-E3i
+> arregló en el importador—. Decisión **§Post-F9.82**. Migración **sin permisos nuevos y sin seed**; su único
+> backfill marca habitual al avío que tiene **un solo** proveedor (ahí no hay nada que decidir).
+>
 > ✅ **`V1-E3i` mergeada** (#192, **0.005**) · ✅ **`V1-E3j` · la receta merece pantalla propia** (**0.006**) · ✅ **`V1-E3k` · la receta se firma UNO POR UNO** (**0.007**, 20-ago): se retiró la liberación en bloque —**y también del contrato**— porque *"no tiene sentido liberar las cosas sin ver"*; los botones **no los había pedido Daniel, los agregó el equipo**: salió de
 > Daniel probando 0.005 en vivo y **el defecto no fue de lógica sino de VISIBILIDAD** — el mecanismo de
 > §Post-F9.73 estaba cableado y verificado, pero el cartel *"la receta está vacía"* tapaba el botón que
@@ -624,6 +636,35 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   `excluido:false` + `liberadoEn:null` es el único estado en que el botón se pintaría; **relajarlo vacía la
   aserción en silencio** (comprobado por el reviewer). El comentario explica por qué hay una tela, no por qué
   ese estado.
+
+- **PREGUNTA ABIERTA de V1-E3m (20-ago-2026) — la COTIZACIÓN y la COMPRA pueden separarse cuando alguien
+  lo decide** *(enunciado corregido: no es que "el precosteo se equivoque", es que el precosteo sigue al más
+  barato y la compra al habitual; la divergencia solo nace de una decisión humana explícita, y el día del
+  deploy es CERO. La pregunta es de negocio y es de Daniel: ¿la cotización debe seguir a la compra?)*. La etapa cambió
+  a quién le COMPRA el MRP (habitual > más barato) pero **no tocó** la cascada de PRECIOS compartida
+  (`costos/resolucion-precios.ts`), que sigue valuando el avío sin amarre con «el más barato». Se separó a
+  propósito —una responde *"¿cuánto cuesta?"* y la otra *"¿a quién le compro?"*— y **ningún precosteo
+  existente cambia** (la bandera nace en `false`). Pero la consecuencia real es que un avío cuyo habitual no
+  sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
+  proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
+  seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- **APRENDIZAJE de V1-E3m (20-ago-2026) — un script de mutación que muere por timeout DEJA EL ÁRBOL
+  MUTADO.** Al mutar contra integración (52 s por corrida), el script se pasó del tope de 2 min y murió
+  **entre** la mutación y su restauración: `proveedor-de-orden.ts` se quedó con un `if (false)` que
+  desactivaba la validación de proveedor inactivo. Se detectó por `grep` al terminar, no por el suite —
+  ninguna prueba lo habría notado hasta la siguiente corrida. **La regla:** todo mutador restaura en un
+  `finally` **y** corre sin tope de tiempo (background), y al terminar se verifica el árbol
+  (`git diff`/`grep` del ancla) antes de seguir. Es la versión chica de la cicatriz del 13-ago: el árbol
+  de trabajo es compartido, y quien lo mueve tiene que dejarlo como lo encontró.
+- **APRENDIZAJE de V1-E3m — la integración SÍ se puede correr localmente sin Docker.** `initdb`+`pg_ctl`
+  de un Postgres nativo, `prisma migrate deploy`, y un config de vitest temporal cuyo `globalSetup`
+  publica esa URL en vez de arrancar testcontainers. Sirvió para mutar el motor contra la base real (8/8
+  cazadas) y, de paso, **probó que las migraciones aplican en secuencia sobre una base virgen** — algo que
+  `prisma migrate diff` no verifica. No sustituye al CI (Postgres 17 vs 16 local), pero convierte
+  "no lo pude correr" en "lo corrí y además lo muté".
+- **DEUDA de V1-E3m — el «asignar proveedor» del comprador no está cubierto por e2e.** Su cobertura es
+  unitaria (política de proveedor, 11 mutaciones cazadas) + integración (Postgres, en CI). El e2e de la
+  explosión sigue verificando solo que la pantalla carga y wirea sus controles, como desde F4-E4.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

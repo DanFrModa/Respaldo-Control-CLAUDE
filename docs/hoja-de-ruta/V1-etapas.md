@@ -1716,6 +1716,170 @@ sería re-tomar la decisión de Daniel, no aprovechar un hueco.**
 
 ---
 
+## V1-E3m · El proveedor del material ⭐ (20-ago-2026)
+
+> Daniel, con toda la receta liberada, en `Compras › Explosión de Materiales`: *"no me deja hacer nada… ahí
+> veo todo, pero no puedo avanzar"*. El botón «Generar OC» solo se enciende con renglones que traigan
+> **proveedor sugerido**, y ninguno lo tenía. Decisión en `DECISIONES.md` **§Post-F9.82**.
+
+### ⭐ El hallazgo: no faltaba una función, había una DESVIACIÓN
+
+**La regla de las telas ya estaba en el modelo de datos y el motor de compras la ignoraba.**
+`Tela.idProveedor` existe desde §Post-F9.11 con la regla de Daniel escrita en su propio comentario —*"la
+felpa de Alsatex y la de otro proveedor son telas DISTINTAS"*—, pero **F8 agregó `TelaProveedor`** (precios
+por proveedor, para material que se compra a varios) y la resolución del MRP se fue por ahí. Sin ese amarre
+—que casi ninguna tela tiene— el motor se rendía. Por eso el sistema le pedía a Daniel capturar un
+proveedor **que la tela ya tenía**, y por eso *"no veo dónde se le asigna"*: buscaba lo que ya estaba puesto.
+
+Eso hace la etapa barata: **corregir la desviación**, no rediseñar.
+
+### Qué entrega
+
+1. **TELA — el motor resuelve por el proveedor DUEÑO.** Cascada: `amarre de Desarrollo → DUEÑO de la tela →
+   asignación de Compras`. Su precio sale de su renglón negociado (`TelaProveedor`) si lo tiene y, si no,
+   del precio de **REFERENCIA** de la tela — que es otra cosa, y por eso **se avisa** (`Tela.precioSugerido`
+   es lo que Daniel vio rotulado «referencia», uno en $0.00).
+2. **AVÍO — proveedor HABITUAL, no «el más barato».** Bandera `AvioProveedor.habitual` (uno por avío,
+   garantizado por un **índice único parcial** en la base). Cascada: `amarre → HABITUAL → más barato → 
+   asignación de Compras`. **El más barato NO se retira**: queda de fallback para el avío que nadie ha
+   marcado. ⚠️ **Alcance exacto:** ningún avío con **varios** proveedores cambia de comportamiento; el de
+   **uno solo** sí lo toca el backfill (y con precio da la misma respuesta que el "más barato" — sin
+   precio es donde de verdad cambia: deja de salir sin proveedor).
+3. **El proveedor propuesto es SUGERENCIA, no atadura.** *"Sí puede cambiar la tela con todo y su proveedor
+   a la hora de comprar. Lo mismo en avíos"* — eso ya vivía en la OC, que nace en `borrador` y es editable;
+   esta etapa no lo toca y **no** convierte la sugerencia en amarre.
+4. **⭐ El comprador desatora desde SU pantalla — solo para esa OP.** «Asignar proveedor» en el renglón
+   (proveedor + precio opcional), guardado en `OrdenTela/OrdenAvio.idProveedorCompra`. **Jamás toca el
+   catálogo.**
+5. **El botón apagado DICE qué le falta, con los nombres.** *"3 materiales sin proveedor: …"* — era
+   exactamente el defecto que V1-E3i arregló en el importador (*ofrecer una puerta y no explicar por qué no
+   abre*, §Post-F9.70 punto 3) y aquí había quedado igual.
+
+### La decisión de diseño que sostiene todo: la asignación de Compras va HASTA ABAJO
+
+Daniel fue textual: *"el comprador asigna un proveedor **para esa OP en particular**… no para siempre ni
+para todo. **El proveedor puede seguir viniendo desde desarrollo**"*. Ponerla en el ÚLTIMO escalón cumple esa
+frase **en el motor**, no en un comentario:
+
+- **no puede pisar a Desarrollo ni al catálogo** — solo se usa donde hay hueco, que es el caso que vino a
+  desatorar;
+- si mañana Desarrollo amarra un proveedor, **Desarrollo gana solo**, sin que nadie tenga que acordarse de
+  borrar la asignación de urgencia;
+- y esa asignación que quedó sin usarse **no se calla** (D3): la explosión la nombra en un aviso
+  («Compras había asignado a X… ya NO se usa porque…»), con el camino para quitarla.
+
+**Corolario en la UI:** «Asignar proveedor» se ofrece **solo** donde no hay proveedor (o para corregir lo
+que Compras ya puso). Donde el proveedor viene del catálogo o de Desarrollo, se cambia **en la OC** — cada
+frase de Daniel tiene UN mecanismo y no se pisan.
+
+### Por qué una BANDERA en `AvioProveedor` y no un `Avio.idProveedorHabitual`
+
+El habitual tiene que ser uno de los que **de verdad** surten el avío: en el par avío–proveedor lo es por
+construcción, y trae consigo su `precio` y su `factorConversion` —justo lo que el MRP necesita para proponer
+precio sin un segundo viaje—. Un FK suelto en `Avio` podría apuntar a un proveedor **sin renglón** (sin
+precio ni factor) y habría que validarlo a mano en cada escritura. El riesgo del otro lado —dos
+habituales— lo cierra la **base** con `CREATE UNIQUE INDEX … ON avio_proveedor(id_avio) WHERE habitual`.
+Mismo patrón que `DireccionEntrega.favorita`. ⚠️ Consecuencia de construcción: al mover el habitual de A a
+B hay que **apagar antes de encender** (el índice se verifica por sentencia); tiene su prueba de integración.
+
+### Precedencia, en una línea
+
+`TELA: amarre de Desarrollo → dueño de la tela → asignación de Compras`
+`AVÍO: amarre de Desarrollo → habitual → más barato (F4) → asignación de Compras`
+El **amarre por modelo** (`ModeloAvio.idAvioProveedor`, que la orden congela) sigue mandando sobre el
+habitual: es más específico —lo eligió una persona para ESE modelo— y es la autoridad de Desarrollo.
+
+### Nota de cierre — ✅ HECHA (20-ago-2026)
+
+Migración `20260820120000_proveedor_del_material` (3 columnas + 1 índice único parcial + 2 FK), **sin
+permisos nuevos y sin seed** → el deploy a `prueba` NO exige `SEED_ON_START`. Lleva **un solo backfill, el
+que no decide nada**: el avío con **un único** proveedor **ACTIVO** queda con ése marcado como
+habitual — no hay elección que hacer y es lo mismo que hace la pantalla al agregar el primero; los avíos
+con varios proveedores **no se tocan** (ahí sí hay decisión de negocio, y la toma una persona). Reusa
+`compras.administrar` (asignar/quitar en la orden) y `avios.administrar` (marcar el habitual).
+
+**Dos vueltas: la primera RECHAZADA, la segunda APROBADA** (con una línea de prueba que el reviewer verificó
+él mismo en las dos direcciones, así que entró sin tercera vuelta).
+
+**⭐ El hallazgo que hace barata toda la etapa: la regla ya estaba escrita y el motor la ignoraba.**
+`Tela.idProveedor` existía desde §Post-F9.11, con el comentario que dice literalmente la regla de Daniel
+—*"la felpa de Alsatex y la de otro proveedor son telas DISTINTAS"*—. Al llegar F8 se agregó `TelaProveedor`
+(precios por proveedor, para material que se compra a varios) y **la resolución empezó a ir por ahí**. Por
+eso el sistema le pedía a Daniel capturar un proveedor **que la tela ya tenía**, y por eso *"no veo dónde se
+le asigna"*: **buscaba lo que ya estaba puesto.** No fue rediseño: fue **corregir una desviación**.
+
+**🔴 El defecto que valía el rechazo: el backfill marcaba habitual a proveedores DADOS DE BAJA.** Un avío con
+un único proveedor inactivo pasaba de *"sin proveedor, desatóralo tú"* a **comprable con un proveedor
+muerto** —y `crearOC` no valida `activo`—. Peor: **el botón «asignar proveedor» no se pintaba**, porque el
+sistema creía que ya tenía uno. *Era el atorón de Daniel devuelto con otra forma, y metido en una migración
+que nadie deshace.*
+
+Lo instructivo es que **el coder ya había escrito la regla correcta a treinta líneas de distancia**:
+`proveedor-de-orden.ts` rechaza asignar un proveedor desactivado, con este argumento textual — *"esto es una
+elección que se está tomando AHORA, no una heredada que ya estaba tomada"*. **Un backfill es exactamente una
+elección que se toma ahora.** Tenía la regla; no la aplicó donde también hacía falta.
+
+**⭐ Y esta etapa rompió un límite que la tanda arrastraba: la integración SE PUEDE correr aquí, sin Docker.**
+Postgres nativo (`initdb` + `pg_ctl`) + `prisma migrate deploy`. El coder corrió **98/98** y el reviewer lo
+**reprodujo** por su cuenta. Eso verificó algo que `migrate diff` no mira: **que las migraciones aplican en
+secuencia sobre una base virgen**, y que el índice parcial existe de verdad. Hasta hoy toda esa capa se subía
+"a cargo del CI"; ya no hace falta.
+
+**La prueba que mejor envejece de esta etapa**, y vale copiarla: el test del backfill **lee el SQL del archivo
+de migración y lo ejecuta**, en vez de una copia. El reviewer lo comprobó con la mutación que a nadie se le
+habría ocurrido — **renombró un comentario del `.sql`** y la prueba se puso roja. Una copia embebida se habría
+quedado verde para siempre mientras la migración real cambiaba debajo.
+
+**⚠️ Un incidente que el coder confesó y que vale como regla:** su script de mutación **murió entre mutar y
+restaurar**, dejando `proveedor-de-orden.ts` con un `if (false)` que **desactivaba la validación de proveedor
+inactivo**. Lo cazó un `grep`, **no la suite** — ninguna prueba lo habría notado hasta la corrida siguiente.
+*Un mutador que muere a medias deja el código roto en silencio*: van con `finally`, sin tope de tiempo, y con
+verificación del árbol al terminar. El reviewer barrió residuos por su cuenta y salió limpio.
+
+**Lo último que faltaba, cazado por el reviewer:** `proveedorSugeridoInactivo` **no tenía cobertura de
+backend** — mutarla a `false` fijo dejaba **62/62 en verde**, porque el único test que la tocaba era de
+frontend **con el payload mockeado**: probaba que el chip se pinta, no que el servidor lo diga. Si el backend
+la regresara, el botón «asignar otro» **desaparecería en silencio del único renglón donde urge**.
+
+### Nota de la SEGUNDA VUELTA (rechazo del reviewer) — tres defectos, todos reales
+
+1. 🔴 **El backfill marcaba habitual a proveedores DADOS DE BAJA.** Con un solo `AvioProveedor` apuntando
+   a un proveedor inactivo, el renglón pasaba de *"sin proveedor"* (el "más barato" sí filtra activos) a
+   **comprable con un proveedor muerto**: `candidatoHabitualAvio` conserva al inactivo a propósito y
+   `crearOC` no valida `activo`. **Y el comprador no podía repararlo** — el botón nuevo no se pintaba
+   (había proveedor) y el catálogo no deja guardar con un proveedor desactivado. Era **el atorón de Daniel
+   devuelto del revés, en una migración que nadie iba a deshacer**. Se contradecía, además, con el propio
+   dominio de la etapa: `proveedor-de-orden.ts` **rechaza** asignar un proveedor de baja porque *"es una
+   elección que se toma AHORA"* — y un backfill es exactamente eso. Fix: `AND EXISTS (… AND p."activo")`.
+2. 🔴 **`precioFijado` no tenía ninguna prueba.** El único test que lo tocaba afirmaba el precio en un
+   escenario **sin compra previa**: pasaba igual con el guard quitado. Se agregó el par completo (con
+   compra vieja a $40: con precio tecleado gana 1.25; sin precio tecleado gana 40).
+3. 🔴 **La documentación afirmaba lo que la propia migración desmentía** (*"ningún avío existente cambia"*,
+   en tres archivos). Acotado a *"ningún avío con varios proveedores"*, y el backfill documentado en
+   `docs/modulos/compras-mrp.md`, que ni lo mencionaba.
+
+**Y dos deudas cerradas en vez de anotadas:** (a) la explosión **ofrece reasignar cuando el proveedor
+propuesto está de baja** (`proveedorSugeridoInactivo` + chip en la fila) — antes el aviso no tenía salida;
+(b) la UI del catálogo **deja QUITAR el habitual**, no solo moverlo, que es lo que el backend, el contrato
+y la base ya soportaban.
+
+**Cómo se verificó, sin Docker:** el backfill y toda la batería de integración corrieron contra un
+**Postgres 16 nativo** (`initdb` + `pg_ctl`, cero contenedores) con las migraciones reales aplicadas. La
+prueba del backfill **lee el SQL del archivo de migración** y lo ejecuta: no es una copia, así que aflojar
+el `WHERE` la pone en rojo. **8 mutaciones sobre el motor y el SQL, 8 cazadas** — incluida *"la asignación
+de Compras escribe en el catálogo"*, que cae con nombre y apellido.
+
+**Lo que quedó FUERA a propósito, dicho y no tapado:** la cascada compartida de PRECIOS
+(`costos/resolucion-precios.ts`) **no se tocó**. El precosteo de F8 sigue valuando el avío sin amarre con
+«el más barato»; el MRP es quien cambia de política de COMPRA. Se separaron a propósito: `resolverPrecioAvio`
+responde *"¿cuánto cuesta?"* y esta etapa responde *"¿a quién le compro?"*. La consecuencia real es que un
+avío cuyo habitual NO sea el más barato se **comprará** más caro de lo que se **precosteó** — no en
+silencio (es el precio del proveedor que se eligió, visible en la línea de la OC), pero conviene decidir
+más adelante si el precosteo debe seguir al habitual. **Ningún precosteo existente cambia** (la bandera
+nace en `false` y las columnas nuevas en NULL).
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

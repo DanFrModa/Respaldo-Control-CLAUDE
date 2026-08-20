@@ -30,6 +30,8 @@ import {
   esquemaExplosionSalida,
   esquemaGenerarOcCuerpo,
   esquemaGenerarOcResultado,
+  esquemaAsignarProveedorCuerpo,
+  esquemaAsignarProveedorSalida,
   esquemaEstatusMaterialesSalida,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -39,6 +41,7 @@ import {
   generarOCDesdeExplosion,
   estatusMaterialesOrden,
 } from '../../dominio/compras/mrp.js';
+import { asignarProveedorDeMaterial } from '../../dominio/compras/proveedor-de-orden.js';
 import { impresoExplosion } from '../../dominio/compras/impresos/impreso-explosion.js';
 import { impresoEstatusMateriales } from '../../dominio/compras/impresos/impreso-estatus-materiales.js';
 
@@ -107,6 +110,27 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const resultado = await generarOCDesdeExplosion(sesion, request.params.id, request.body);
       return reply.code(201).send(resultado);
+    },
+  });
+
+  // ⭐ V1-E3m (§Post-F9.82) — asignar/quitar el proveedor con el que ESTA orden compra un material.
+  // PUT (idempotente: mandar dos veces lo mismo deja lo mismo) y `compras.administrar`, el MISMO
+  // permiso que genera las OC: quien compra es quien desatora. NO toca el catálogo.
+  app.route({
+    method: 'PUT',
+    url: '/ordenes/:id/materiales/proveedor',
+    preHandler: app.conPermiso('compras.administrar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Asignar (o quitar) el proveedor con el que esta orden compra un material',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAsignarProveedorCuerpo,
+      response: { 200: esquemaAsignarProveedorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return asignarProveedorDeMaterial(sesion, request.params.id, request.body);
     },
   });
 

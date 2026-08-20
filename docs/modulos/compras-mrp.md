@@ -121,6 +121,56 @@ de Desarrollo** (módulo 15, ver [`desarrollo-cotizacion.md`](desarrollo-cotizac
 Sin migración, sin permisos nuevos (reusa `compras.*`). La liga orden↔desarrollo que habilita todo esto
 la administra el módulo 15 (`DesarrolloOrden`); el MRP solo la consume por el `idModelo`/BOM de la orden.
 
+## ⭐ A QUIÉN SE LE COMPRA (V1-E3m, §Post-F9.82) — corrige una desviación de F8
+
+Daniel, con la receta liberada y la explosión enfrente: *"no me deja hacer nada… ahí veo todo, pero no
+puedo avanzar"*. Ningún renglón traía proveedor sugerido, y sin proveedor el botón de generar OC no
+enciende. **No faltaba una función: el motor ignoraba una regla que ya estaba en los datos** —
+`Tela.idProveedor`, el proveedor **DUEÑO** del artículo (§Post-F9.11) — porque desde F8 resolvía solo por
+el amarre de `TelaProveedor`, pensado para material que se compra a varios.
+
+La política de proveedor vive ahora en un módulo **PURO** y probado sin Postgres,
+`dominio/compras/proveedor-material.ts` (`mrp.ts` arma los candidatos y él decide):
+
+| Material | Cascada de PROVEEDOR |
+|---|---|
+| **Tela** | amarre de Desarrollo → **DUEÑO de la tela** (`Tela.idProveedor`) → asignación de Compras |
+| **Avío** | amarre de Desarrollo → **HABITUAL** (`AvioProveedor.habitual`) → más barato (F4) → asignación de Compras |
+
+- **El "más barato" de F4 NO se retira**: es el fallback del avío que nadie marcó como habitual, así que
+  ningún avío con **varios** proveedores cambia de comportamiento (ahí el habitual solo nace de una
+  decisión humana).
+- ⭐ **El BACKFILL de la migración, y su alcance exacto.** `20260820120000_proveedor_del_material` marca
+  habitual al avío que tiene **un solo `AvioProveedor`, y solo si ese proveedor está ACTIVO**. Es el único
+  caso sin decisión que tomar, y es lo mismo que hace la pantalla al agregar el primer proveedor. Efecto
+  real: con precio, el "más barato" ya elegía a ese mismo (misma respuesta); **sin** precio, el renglón
+  deja de salir *"sin proveedor"* y nace con el precio de REFERENCIA, avisado.
+  ⚠️ **El filtro de `activo` no es cosmético:** sin él, un avío cuyo único proveedor está de baja quedaría
+  marcado y el renglón saldría **comprable con un proveedor muerto** — `candidatoHabitualAvio` conserva al
+  inactivo a propósito y `crearOC` no valida `activo` —, en una migración que nadie va a deshacer. Lo cubre
+  `dominio/catalogos/backfill-habitual.int.test.ts`, que **ejecuta el SQL leído del archivo de migración**
+  (no una copia), así que aflojar el `WHERE` pone la prueba en rojo.
+- **Precio del dueño/habitual**: su precio negociado si lo tiene; si no, el de **REFERENCIA**
+  (`Tela.precioSugerido` / `Avio.precioReferencia`) **con aviso** — son cosas distintas y confundirlas fue
+  parte del atorón. Encima de todo sigue mandando **la última compra REAL a ese mismo proveedor** (D1).
+- **Proveedor propuesto DE BAJA:** la sugerencia se conserva (alguien la eligió y la OC es editable) y la
+  explosión lo avisa, pero además el renglón viaja con `proveedorSugeridoInactivo` y la pantalla **ofrece
+  reasignarlo ahí mismo**. Sin eso el aviso no tenía salida: `crearOC` no valida `activo` y el catálogo
+  tampoco deja guardar con un proveedor desactivado.
+- **La asignación de Compras va HASTA ABAJO, a propósito** (`OrdenTela/OrdenAvio.idProveedorCompra` +
+  `precioCompra`): vive **en la orden**, jamás en el catálogo, y por estar en el último escalón **no puede
+  pisar a Desarrollo**. Si queda sin usarse porque el catálogo aprendió el proveedor, la explosión lo
+  **dice** en un aviso (D3). Se administra con `PUT /api/ordenes/:id/materiales/proveedor`
+  (`compras.administrar`, `dominio/compras/proveedor-de-orden.ts`), que rechaza el renglón que no está en
+  la receta, el **excluido** y el proveedor **desactivado**.
+- **El botón «Generar OC» apagado explica por qué**, nombrando los materiales sin proveedor.
+- El renglón de la explosión viaja con `origenProveedor` (`amarre-desarrollo` / `dueno-tela` / `habitual` /
+  `mas-barato` / `asignado-compras` / `sin-proveedor`): es lo que le deja a la pantalla distinguir lo que
+  puede quitar de lo que no le toca.
+
+⚠️ **Lo que NO cambió:** la cascada de PRECIOS compartida (`costos/resolucion-precios.ts`). El precosteo
+sigue valuando el avío sin amarre con «el más barato»; ver la pregunta abierta en `HOJA-DE-RUTA.md` §4.
+
 ## Migración del histórico (F4-E6)
 
 ETL idempotente, por lotes, CP850, vía dominio modo-migración (`backend/migracion/`):

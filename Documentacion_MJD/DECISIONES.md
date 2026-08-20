@@ -3602,3 +3602,93 @@ hueco.
 
 - **Aplica en:** V1-E3k. Sin migración, sin permisos nuevos, sin seed.
 - **Fecha:** 2026-08-20.
+
+
+---
+
+#### (Post-F9.82) — ⭐ EL PROVEEDOR DEL MATERIAL: la tela lo trae, el avío lo tiene, y el comprador desatora (DANIEL, 20-ago-2026)
+
+Daniel, con la receta de una OP **completamente liberada**, en `Compras › Explosión de Materiales`: *"no me
+deja hacer nada… ahí veo todo, pero no puedo avanzar"*. El botón «Generar OC» solo se enciende con renglones
+que traigan **proveedor sugerido**, y **ninguno lo tenía**.
+
+⚠️ **El diagnóstico no fue "falta una función": fue una DESVIACIÓN.** `Tela.idProveedor` —el **proveedor
+DUEÑO del artículo**— existe desde §Post-F9.11 con la regla de Daniel escrita en su propio comentario (*"la
+felpa de Alsatex y la de otro proveedor son telas DISTINTAS"*). Pero **F8 agregó `TelaProveedor`** (precios
+por proveedor, pensado para material que se compra a varios) y **la resolución del MRP se fue por ahí**; sin
+ese amarre —que casi ninguna tela tiene— el motor se rendía. Por eso el sistema le pedía capturar un
+proveedor **que la tela ya tenía**, y por eso *"no veo dónde se le asigna"*: buscaba lo que ya estaba puesto.
+
+### Lo que Daniel dijo, y lo que se hizo con cada frase
+
+1. **TELA = un proveedor dueño.** *"Normalmente las telas SÍ tienen un proveedor específico… el proveedor ya
+   viene definido en la tela. **Ahí no tenemos telas que puedan pertenecer a más de un proveedor**."* →
+   el MRP resuelve por `Tela.idProveedor`. Cascada: **amarre de Desarrollo → DUEÑO → asignación de Compras**.
+   ⚠️ Su precio sale de su renglón negociado (`TelaProveedor`) si lo tiene; si no, del precio de
+   **REFERENCIA** de la tela (`precioSugerido`) — que es **otra cosa** y por eso se **avisa**: es
+   exactamente el $0.00 rotulado «referencia» que Daniel vio y que nadie le explicó.
+
+2. **AVÍO = un proveedor HABITUAL, asignado.** *"En avíos sí podría ser que un elástico se compre con más de
+   un proveedor y a desarrollo le da lo mismo… pero **tener avíos sin proveedor asignado está generando más
+   problemas que beneficios**."* → bandera `AvioProveedor.habitual`, **uno por avío** (índice único PARCIAL
+   en la base). Cascada: **amarre → HABITUAL → más barato → asignación de Compras**. Se invierte el default
+   de F4, pero **el más barato NO se retira**: queda de fallback para el avío que nadie marcó.
+   ⚠️ **Alcance exacto del "no cambia nada":** ningún avío con **varios** proveedores cambia de
+   comportamiento — ahí el habitual solo nace de una decisión humana. El de **uno solo** SÍ lo toca el
+   backfill, y a propósito: si ese proveedor tiene precio, el "más barato" ya lo elegía (misma respuesta);
+   si **no** tiene precio, pasa de *"sin proveedor"* a *"proveedor + precio de referencia, avisado"*, que
+   es justo el atorón que la decisión vino a quitar.
+
+3. **El proveedor propuesto es SUGERENCIA, no atadura.** *"**Sí puede cambiar la tela con todo y su
+   proveedor a la hora de comprar. Lo mismo en avíos**."* → eso ya vivía en la OC, que nace en `borrador` y
+   es editable. La sugerencia **no** se convierte en amarre en ningún lado.
+
+4. **⭐ El comprador desatora desde SU pantalla — SOLO para esa OP.** *"El comprador podría asignarle un
+   proveedor y no esperar a que la gente de desarrollo se lo asigne."* Con su restricción, **textual y no
+   negociable**: *"el comprador asigna un proveedor **para esa OP en particular**… no para siempre ni para
+   todo. **El proveedor puede seguir viniendo desde desarrollo**."*
+   → La asignación vive en la **receta congelada de la orden** (`OrdenTela/OrdenAvio.idProveedorCompra` +
+   `precioCompra`) y **NUNCA toca el catálogo**: *el catálogo propone, la orden manda* (D3/§Post-F9.43).
+
+### ⭐ La decisión de diseño que hace cumplible el punto 4: va HASTA ABAJO de la cascada
+
+Poner la asignación de Compras en el **último escalón** es lo que cumple la frase de Daniel **en el motor** y
+no en un comentario:
+
+- **no puede pisar a Desarrollo ni al catálogo** — solo se usa donde hay HUECO, que es el caso que vino a
+  desatorar;
+- si mañana Desarrollo amarra un proveedor, **Desarrollo gana solo**, sin que nadie tenga que acordarse de
+  borrar la asignación de urgencia;
+- y la asignación que quedó **sin usarse no se calla** (D3): la explosión la nombra en un aviso, con el
+  camino para quitarla. Un dato dormido e invisible es una mentira en diferido.
+
+**Corolario en la pantalla:** «Asignar proveedor» aparece **solo** donde no hay proveedor (o para corregir lo
+que Compras ya puso). Donde el proveedor viene del catálogo o de Desarrollo se cambia **en la OC**. Cada
+frase de Daniel tiene UN mecanismo, y no se pisan.
+
+### El botón apagado tiene que DECIR qué le falta
+
+`«Generar OC»` se apagaba sin una sola pista. Es **el mismo defecto** que V1-E3i arregló en el importador
+—*ofrecer una puerta y no explicar por qué no abre*, §Post-F9.70 punto 3— y aquí había quedado igual. Ahora
+nombra la causa **y los materiales**: *"2 materiales sin proveedor: Felpa, Rib…"*. Y cuando SÍ se puede
+comprar pero algo se va a quedar fuera, también lo dice en vez de generar OC incompletas en silencio.
+
+### Lo que se dejó FUERA a propósito
+
+La **cascada compartida de PRECIOS** (`costos/resolucion-precios.ts`) **no se tocó**: responde *"¿cuánto
+cuesta?"*, mientras que esta decisión responde *"¿a quién le compro?"*. Consecuencia real, dicha y no
+tapada: un avío cuyo habitual no sea el más barato se **comprará** más caro de lo que se **precosteó**. No
+es silencioso (es el precio del proveedor elegido, visible en la línea de la OC) y **ningún precosteo
+existente cambia** (la bandera nace en `false`), pero queda como pregunta abierta si el precosteo debe
+seguir al habitual.
+
+- **Aplica en:** **V1-E3m**. Migración `20260820120000_proveedor_del_material` (3 columnas + índice único
+  parcial + 2 FK), **sin permisos nuevos** (reusa `compras.administrar` y `avios.administrar`) y **sin
+  seed** → el deploy NO exige `SEED_ON_START`.
+  **Un solo backfill, el que no decide nada:** el avío con **un único** proveedor queda con ése marcado
+  como habitual (no hay elección que hacer, y es lo mismo que hace la pantalla al agregar el primero).
+  A cambio, el avío de un solo proveedor **sin precio** deja de caer en el agujero —el "más barato" solo
+  mira a los que tienen precio, así que salía sin proveedor—. **Los avíos con varios proveedores NO se
+  tocan:** ahí sí hay una decisión de negocio y la toma una persona, no una migración.
+- **Fecha:** 2026-08-20.
+

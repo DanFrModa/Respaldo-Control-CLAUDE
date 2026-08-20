@@ -11,10 +11,14 @@ const useGenerarOcMock = vi.fn();
 const useConsultaOrdenesMock = vi.fn();
 const mutateMock = vi.fn();
 const imprimirExplosionMock = vi.fn();
+// ⭐ V1-E3m (§Post-F9.82): asignar/quitar el proveedor de un material EN ESTA ORDEN.
+const useAsignarProveedorMock = vi.fn();
+const asignarMutateMock = vi.fn();
 
 vi.mock('@/api/mrp', () => ({
   useExplosion: (id: unknown) => useExplosionMock(id) as unknown,
   useGenerarOc: () => useGenerarOcMock() as unknown,
+  useAsignarProveedor: () => useAsignarProveedorMock() as unknown,
   imprimirExplosion: (id: number) => imprimirExplosionMock(id) as unknown,
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
@@ -25,6 +29,23 @@ vi.mock('@/api/ordenes-consulta', () => ({
 const useDireccionesMock = vi.fn();
 vi.mock('@/api/direcciones-entrega', () => ({
   useDireccionesEntregaActivas: () => useDireccionesMock() as unknown,
+}));
+// El combobox de proveedor busca en el SERVIDOR; aquí se sustituye por un botón que elige uno fijo,
+// para poder ejercitar el flujo de «asignar proveedor» sin montar la búsqueda entera.
+vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
+  SelectorProveedor: ({
+    alSeleccionar,
+  }: {
+    alSeleccionar: (proveedor: { id: number; nombre: string }) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="exp-selector-proveedor-stub"
+      onClick={() => alSeleccionar({ id: 33, nombre: 'Telas del Norte' })}
+    >
+      Elegir proveedor
+    </button>
+  ),
 }));
 
 /** Explosión de prueba: un botón comprable (con proveedor) + felpa sin proveedor + genérico cubierto. */
@@ -62,6 +83,8 @@ function explosionDePrueba() {
             idProveedorSugerido: 11,
             proveedorSugerido: 'Avíos Baratos',
             precioSugerido: 2,
+            origenProveedor: 'habitual',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
           },
@@ -86,6 +109,8 @@ function explosionDePrueba() {
             idProveedorSugerido: null,
             proveedorSugerido: null,
             precioSugerido: null,
+            origenProveedor: 'sin-proveedor',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
           },
@@ -104,6 +129,8 @@ function explosionDePrueba() {
             idProveedorSugerido: null,
             proveedorSugerido: null,
             precioSugerido: null,
+            origenProveedor: 'sin-proveedor',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
           },
@@ -121,6 +148,15 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     useDireccionesMock.mockReset();
     mutateMock.mockReset();
     imprimirExplosionMock.mockReset();
+    useAsignarProveedorMock.mockReset();
+    asignarMutateMock.mockReset();
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
 
     useConsultaOrdenesMock.mockReturnValue({
       data: {
@@ -714,5 +750,233 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
 
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
     expect(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement).toHaveValue('');
+  });
+});
+
+/**
+ * ⭐ V1-E3m (§Post-F9.82) — EL PROVEEDOR DEL MATERIAL, desde la pantalla del comprador.
+ *
+ * Daniel se quedó atorado aquí: la explosión completa a la vista, el botón «Generar OC» apagado y
+ * ni una pista de por qué. Estas pruebas cubren las dos mitades del arreglo en la UI: **decir qué
+ * falta, con nombres** y **poder asignarle proveedor al material ahí mismo, solo para esa OP**.
+ */
+describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Post-F9.82)', () => {
+  beforeEach(() => {
+    // Este bloque es TOP-LEVEL a propósito: arma su propio escenario en vez de heredar el de otro
+    // describe (heredar el de al lado fue justo lo que hizo que un `mock.calls[0]` leyera la llamada
+    // de la prueba anterior y diera un verde/rojo que no hablaba de esta prueba).
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    mutateMock.mockReset();
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    asignarMutateMock.mockReset();
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  /** Explosión donde NADA se puede comprar: el único material pendiente no tiene proveedor. */
+  function explosionSinNadaComprable(): ReturnType<typeof explosionDePrueba> {
+    const base = explosionDePrueba();
+    return { ...base, grupos: base.grupos.filter((g) => g.idProveedor === null) };
+  }
+
+  it('el botón apagado DICE qué falta, con los NOMBRES de los materiales', async () => {
+    const usuario = userEvent.setup();
+    useExplosionMock.mockReturnValue({
+      data: explosionSinNadaComprable(),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
+    const motivo = screen.getByTestId('exp-motivo-sin-oc');
+    // "1 material sin proveedor" a secas obligaría a revisar la lista a mano: tiene que decir CUÁL.
+    expect(motivo).toHaveTextContent('sin proveedor');
+    expect(motivo).toHaveTextContent('Felpa');
+    // El genérico cubierto por stock NO es lo que bloquea, y no debe salir nombrado como culpable.
+    expect(motivo).not.toHaveTextContent('HIL-01');
+  });
+
+  it('con algo comprable no bloquea, pero nombra lo que se va a quedar FUERA de las OC', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    expect(screen.getByTestId('exp-generar-oc')).toBeEnabled();
+    expect(screen.queryByTestId('exp-motivo-sin-oc')).not.toBeInTheDocument();
+    expect(screen.getByTestId('exp-parcial-sin-proveedor')).toHaveTextContent('Felpa');
+  });
+
+  it('ofrece «asignar proveedor» SOLO en el material que no tiene a quién comprarle', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    const botones = screen.getAllByTestId('exp-asignar-proveedor');
+    // UNO solo: la Felpa (id 4). El botón (id 3) ya trae proveedor del catálogo —ahí no se cambia
+    // desde aquí, se cambia en la OC— y el hilo genérico no va a compra (cantidadAComprar 0).
+    expect(botones).toHaveLength(1);
+    expect(botones[0]).toHaveAttribute('data-material', '4');
+  });
+
+  it('sin `compras.administrar` la acción NO se pinta (§Post-F9.68: esconder Y bloquear)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    expect(screen.queryByTestId('exp-asignar-proveedor')).not.toBeInTheDocument();
+  });
+
+  it('asignar manda tipo + material + proveedor + precio, y NO toca ningún catálogo', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+
+    // Sin proveedor elegido no se puede guardar (evita mandar una asignación a medias).
+    expect(screen.getByTestId('exp-guardar-proveedor')).toBeDisabled();
+
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    fireEvent.change(screen.getByTestId('exp-precio-asignar'), { target: { value: '13.5' } });
+    await usuario.click(screen.getByTestId('exp-guardar-proveedor'));
+
+    expect(asignarMutateMock).toHaveBeenCalledTimes(1);
+    const [args] = asignarMutateMock.mock.calls[0] as [
+      { idOrden: number; cuerpo: Record<string, unknown> },
+    ];
+    // El material es la FELPA (tela 4) y el proveedor el elegido (33): si la pantalla mandara el
+    // renglón del snapshot (id 2) o el proveedor del otro grupo (11), aquí saldría rojo.
+    expect(args.idOrden).toBe(50);
+    expect(args.cuerpo).toEqual({
+      tipo: 'tela',
+      idMaterial: 4,
+      idProveedor: 33,
+      precio: 13.5,
+    });
+  });
+
+  it('sin precio capturado la asignación viaja SIN precio (que lo resuelva el servidor, no un 0)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    await usuario.click(screen.getByTestId('exp-guardar-proveedor'));
+
+    const [args] = asignarMutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
+    expect(args.cuerpo).not.toHaveProperty('precio');
+  });
+
+  it('⭐ si el proveedor propuesto está DE BAJA, la pantalla SÍ ofrece reasignarlo', async () => {
+    const usuario = userEvent.setup();
+    const base = explosionDePrueba();
+    // El botón (id 3) trae proveedor del catálogo… pero ese proveedor está dado de baja. Antes el
+    // renglón se quedaba sin salida: `crearOC` no valida `activo`, así que la OC nacía a un
+    // proveedor muerto, y el catálogo tampoco deja guardar con un proveedor desactivado.
+    const conInactivo = {
+      ...base,
+      grupos: base.grupos.map((g) => ({
+        ...g,
+        renglones: g.renglones.map((r) =>
+          r.idAvio === 3 ? { ...r, proveedorSugeridoInactivo: true } : r,
+        ),
+      })),
+    };
+    useExplosionMock.mockReturnValue({ data: conInactivo, isPending: false, isError: false });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    expect(screen.getByTestId('exp-proveedor-inactivo')).toBeInTheDocument();
+    // DOS ofertas de asignar: la felpa (sin proveedor, id 4) y el botón (proveedor de baja, id 3).
+    const materiales = screen
+      .getAllByTestId('exp-asignar-proveedor')
+      .map((b) => b.getAttribute('data-material'));
+    expect(materiales.sort()).toEqual(['3', '4']);
+  });
+
+  it('lo que asignó COMPRAS se ve marcado y se puede QUITAR (vuelve a lo del catálogo)', async () => {
+    const usuario = userEvent.setup();
+    const base = explosionDePrueba();
+    const conAsignacion = {
+      ...base,
+      grupos: base.grupos.map((g) =>
+        g.idProveedor === null
+          ? {
+              ...g,
+              idProveedor: 33,
+              proveedor: 'Telas del Norte',
+              renglones: g.renglones.map((r) =>
+                r.idTela === 4
+                  ? {
+                      ...r,
+                      idProveedorSugerido: 33,
+                      proveedorSugerido: 'Telas del Norte',
+                      precioSugerido: 13.5,
+                      origenProveedor: 'asignado-compras',
+                    }
+                  : r,
+              ),
+            }
+          : g,
+      ),
+    };
+    useExplosionMock.mockReturnValue({ data: conAsignacion, isPending: false, isError: false });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    // Se distingue de un proveedor que vino del catálogo (el botón, `origenProveedor: habitual`).
+    expect(screen.getAllByTestId('exp-origen-compras')).toHaveLength(1);
+
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+    await usuario.click(screen.getByTestId('exp-quitar-proveedor'));
+    const [args] = asignarMutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
+    expect(args.cuerpo).toMatchObject({ tipo: 'tela', idMaterial: 4, idProveedor: null });
   });
 });

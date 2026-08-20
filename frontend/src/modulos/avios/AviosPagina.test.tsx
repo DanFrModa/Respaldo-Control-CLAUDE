@@ -236,6 +236,7 @@ describe('<AviosPagina>', () => {
         precio: 0.5,
         condiciones: 'contado',
         precioUnidadConsumo: null,
+        habitual: false,
       },
       {
         idProveedor: 2,
@@ -243,6 +244,8 @@ describe('<AviosPagina>', () => {
         precio: null,
         condiciones: null,
         precioUnidadConsumo: null,
+        // ⭐ V1-E3m: el HABITUAL es el que la explosión propone — y NO es el más barato.
+        habitual: true,
       },
     ];
     useAvios.mockReturnValue(consultaConDatos([conProveedores]));
@@ -254,6 +257,10 @@ describe('<AviosPagina>', () => {
     const lista = screen.getByTestId('avio-proveedores-detalle');
     expect(within(lista).getByText('Botones SA')).toBeInTheDocument();
     expect(within(lista).getByText('Hilos del Norte')).toBeInTheDocument();
+    // ⭐ V1-E3m: la etiqueta «habitual» va en el que está marcado, NO en el más barato (que aquí es
+    // Botones SA a $0.50). Si el badge se pintara por precio, este renglón sería el equivocado.
+    const habitual = within(lista).getByTestId('avio-proveedor-habitual');
+    expect(habitual.closest('li')).toHaveTextContent('Hilos del Norte');
   });
 
   it('muestra "sin proveedores" al expandir un avío sin proveedores', () => {
