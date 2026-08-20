@@ -16,6 +16,8 @@ import type {
   Explosion,
   GenerarOcCuerpo,
   GenerarOcResultado,
+  OrdenesDelPedido,
+  PlanCompra,
 } from './tipos';
 
 /**
@@ -28,9 +30,13 @@ import type {
 /** Clave raíz de la cache del MRP en TanStack Query. */
 const CLAVE_MRP = ['mrp'] as const;
 
-/** Clave de cache de la explosión de UNA orden. */
-function claveExplosion(idOrden: number): readonly unknown[] {
-  return [...CLAVE_MRP, 'explosion', idOrden];
+/**
+ * Clave de cache de la explosión de un CONJUNTO de OP (⭐ V1-E3q, §Post-F9.86). Los ids se
+ * ORDENAN: elegir [5558, 5560] y [5560, 5558] es la misma compra, y sin normalizar serían dos
+ * entradas de cache distintas que se pisarían al invalidar.
+ */
+function claveExplosion(idsOrden: readonly number[]): readonly unknown[] {
+  return [...CLAVE_MRP, 'explosion', [...idsOrden].sort((a, b) => a - b).join(',')];
 }
 
 /** Clave de cache del estatus de materiales de UNA orden. */
@@ -40,9 +46,20 @@ function claveEstatus(idOrden: number): readonly unknown[] {
 
 // ── Lecturas ──────────────────────────────────────────────────────────────────
 
-/** Explosiona (regenera y persiste el snapshot de) una orden. */
-async function obtenerExplosion(idOrden: number): Promise<Explosion> {
-  const { data, error } = await api.POST('/api/ordenes/{id}/explosion', {
+/** Explosiona (regenera y persiste el snapshot de) un conjunto de OP (⭐ V1-E3q). */
+async function obtenerExplosion(idsOrden: readonly number[]): Promise<Explosion> {
+  const { data, error } = await api.POST('/api/explosion', {
+    body: { idsOrden: [...idsOrden] },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** ⭐ V1-E3q: las OP del mismo pedido interno de una OP (la PRECARGA de §Post-F9.86). */
+async function obtenerOrdenesDelPedido(idOrden: number): Promise<OrdenesDelPedido> {
+  const { data, error } = await api.GET('/api/ordenes/{id}/del-mismo-pedido', {
     params: { path: { id: idOrden } },
   });
   if (!data) {
@@ -64,12 +81,21 @@ async function obtenerEstatus(idOrden: number): Promise<EstatusMateriales> {
 
 // ── Escrituras ──────────────────────────────────────────────────────────────────
 
-/** Genera una OC por proveedor desde la explosión (`POST .../explosion/generar-oc`). */
-async function generarOc(idOrden: number, cuerpo: GenerarOcCuerpo): Promise<GenerarOcResultado> {
-  const { data, error } = await api.POST('/api/ordenes/{id}/explosion/generar-oc', {
-    params: { path: { id: idOrden } },
-    body: cuerpo,
-  });
+/** Genera una OC por proveedor desde la explosión (`POST /api/explosion/generar-oc`). */
+async function generarOc(cuerpo: GenerarOcCuerpo): Promise<GenerarOcResultado> {
+  const { data, error } = await api.POST('/api/explosion/generar-oc', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * ⭐⭐ V1-E3q (§Post-F9.85) — LA REVISIÓN PREVIA. Pide al servidor las OC que saldrían, SIN crear
+ * nada. Es `POST` porque lleva cuerpo (la selección completa), no porque escriba: no escribe.
+ */
+async function previoCompra(cuerpo: GenerarOcCuerpo): Promise<PlanCompra> {
+  const { data, error } = await api.POST('/api/explosion/previo', { body: cuerpo });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -100,10 +126,24 @@ async function asignarProveedor(
  * Obtiene la explosión de una orden (regenera el snapshot). Usa `useQuery` con `enabled` para que
  * solo dispare cuando hay una orden elegida; al reintentar muestra el diff contra el snapshot previo.
  */
-export function useExplosion(idOrden: number | undefined): UseQueryResult<Explosion, ErrorDeApi> {
+export function useExplosion(idsOrden: readonly number[]): UseQueryResult<Explosion, ErrorDeApi> {
   return useQuery({
-    queryKey: claveExplosion(idOrden ?? 0),
-    queryFn: () => obtenerExplosion(idOrden as number),
+    queryKey: claveExplosion(idsOrden),
+    queryFn: () => obtenerExplosion(idsOrden),
+    enabled: idsOrden.length > 0,
+  });
+}
+
+/**
+ * ⭐ V1-E3q — las OP del mismo pedido interno, para PRECARGAR la explosión (§Post-F9.86). Se
+ * consulta al elegir la primera OP; la pantalla las marca todas y el usuario quita las que no.
+ */
+export function useOrdenesDelPedido(
+  idOrden: number | undefined,
+): UseQueryResult<OrdenesDelPedido, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MRP, 'del-mismo-pedido', idOrden ?? 0],
+    queryFn: () => obtenerOrdenesDelPedido(idOrden as number),
     enabled: idOrden !== undefined,
   });
 }
@@ -121,23 +161,31 @@ export function useEstatusMateriales(
 
 // ── Hooks de escritura ────────────────────────────────────────────────────────────
 
-/** Argumentos de la mutación de generar OC. */
-export interface ArgsGenerarOc {
-  idOrden: number;
-  cuerpo: GenerarOcCuerpo;
+/**
+ * ⭐⭐ V1-E3q — LA REVISIÓN PREVIA como MUTACIÓN, no como consulta. Es deliberado: el plan tiene que
+ * pedirse cuando el usuario dice *"revisar"*, con la selección y los ajustes de ESE momento — una
+ * `useQuery` lo re-pediría sola al recuperar el foco y el usuario vería la pantalla de revisión
+ * cambiar bajo sus manos justo cuando está a punto de confirmar.
+ */
+export function usePrevioCompra(): UseMutationResult<PlanCompra, ErrorDeApi, GenerarOcCuerpo> {
+  return useMutation({ mutationFn: (cuerpo: GenerarOcCuerpo) => previoCompra(cuerpo) });
 }
 
 /**
- * Genera OC desde la explosión e invalida la explosión y el estatus de esa orden + el listado de OC
- * (la nueva OC debe aparecer en las pantallas de compras).
+ * Genera OC desde la explosión e invalida la explosión y el estatus de TODAS las OP de la compra +
+ * el listado de OC (la nueva OC debe aparecer en las pantallas de compras). ⭐ V1-E3q: invalidar la
+ * explosión no es cosmético — es lo que hace que el renglón recién comprado se vuelva a pintar YA
+ * neteado, en vez de seguir invitando a comprarlo otra vez (§Post-F9.85).
  */
-export function useGenerarOc(): UseMutationResult<GenerarOcResultado, ErrorDeApi, ArgsGenerarOc> {
+export function useGenerarOc(): UseMutationResult<GenerarOcResultado, ErrorDeApi, GenerarOcCuerpo> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ idOrden, cuerpo }: ArgsGenerarOc) => generarOc(idOrden, cuerpo),
+    mutationFn: (cuerpo: GenerarOcCuerpo) => generarOc(cuerpo),
     onSuccess: (_resultado, variables) => {
-      void queryClient.invalidateQueries({ queryKey: claveExplosion(variables.idOrden) });
-      void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
+      for (const idOrden of variables.idsOrden) {
+        void queryClient.invalidateQueries({ queryKey: claveEstatus(idOrden) });
+      }
       void queryClient.invalidateQueries({ queryKey: CLAVE_OC });
     },
   });
@@ -163,7 +211,7 @@ export function useAsignarProveedor(): UseMutationResult<
   return useMutation({
     mutationFn: ({ idOrden, cuerpo }: ArgsAsignarProveedor) => asignarProveedor(idOrden, cuerpo),
     onSuccess: (_resultado, variables) => {
-      void queryClient.invalidateQueries({ queryKey: claveExplosion(variables.idOrden) });
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
       void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
     },
   });

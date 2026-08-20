@@ -33684,7 +33684,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/ordenes/{id}/explosion': {
+  '/api/explosion': {
     parameters: {
       query?: never;
       header?: never;
@@ -33693,18 +33693,23 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Explosionar los materiales de una orden (R3) y persistir el snapshot */
+    /** Explosionar los materiales de una o varias órdenes (R3) y persistir el snapshot */
     post: {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          /** @description Id de la orden de producción. */
-          id: number;
-        };
+        path?: never;
         cookie?: never;
       };
-      requestBody?: never;
+      /** @description Órdenes de producción que entran a la explosión (§Post-F9.86). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Órdenes de producción a explotar juntas (mínimo 1). */
+            idsOrden: number[];
+          };
+        };
+      };
       responses: {
         /** @description Explosión de materiales de una orden (R3). */
         200: {
@@ -33713,15 +33718,34 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description Orden de producción explosionada. */
+              /** @description ⭐ V1-E3q (§Post-F9.86) — TODAS las OP que entraron a esta explosión, en el orden en que se calcularon (por folio). Con una sola OP trae un elemento. */
+              ordenes: {
+                /** @description Orden de producción. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folio: number;
+                /** @description Modelo de la orden. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                modelo: string;
+                /** @description Σ piezas color×talla de ESA orden. */
+                totalPiezas: number;
+                /** @description Pedido interno del que sale, o null. */
+                idPedido: number | null;
+                /** @description Folio del pedido interno, o null. */
+                folioPedido: number | null;
+                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                fechaEntrega: string | null;
+              }[];
+              /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
               idOrden: number;
-              /** @description Folio de la orden (para la UI). */
+              /** @description Folio de la PRIMERA orden (para la UI y el impreso). */
               folioOrden: number;
-              /** @description Modelo de la orden. */
+              /** @description Modelo de la PRIMERA orden. */
               idModelo: number;
-              /** @description Código/nombre del modelo (para la UI). */
+              /** @description Código/nombre del modelo de la PRIMERA orden (para la UI). */
               modelo: string;
-              /** @description Σ piezas color×talla de la orden (base del cálculo). */
+              /** @description Σ piezas color×talla de TODAS las órdenes del conjunto (base del cálculo). */
               totalPiezas: number;
               /** @description Requerimientos agrupados por proveedor sugerido. */
               grupos: {
@@ -33791,6 +33815,31 @@ export interface paths {
                     | 'precio'
                     | 'precio-mercado'
                   )[];
+                  /** @description ⭐ V1-E3q: cuánto de este material YA está en una orden de compra VIVA ligada a esta OP (todas menos las canceladas — el borrador SÍ cuenta, porque la OC que genera esta pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema sobre "cuánto ya compré". NO se persiste: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar. */
+                  cantidadEnOc: number;
+                  /** @description ⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
+                  cantidadPendiente: number;
+                  /** @description ⭐ V1-E3q (§Post-F9.86): ids de snapshot que este renglón AGRUPA. Con una sola OP es `[id]`; con varias, uno por OP. Es lo que viaja en la selección al generar las OC. */
+                  idsRequerimiento: number[];
+                  /** @description ⭐ V1-E3q — **SE VE JUNTO, SE GUARDA REPARTIDO** (§Post-F9.86). El desglose por orden de producción de esta cantidad agrupada. Sin él, el "qué tengo / qué falta" de cada OP deja de cuadrar y el costo no cae donde debe; con una sola OP trae un elemento. */
+                  porOrden: {
+                    /** @description Renglón de snapshot de ESA orden. */
+                    idRequerimiento: number;
+                    /** @description Orden de producción a la que le toca esta cantidad. */
+                    idOrden: number;
+                    /** @description Folio de esa orden (para la UI). */
+                    folioOrden: number;
+                    /** @description Requerido por ESA orden (R3). */
+                    cantidadRequerida: number;
+                    /** @description Requerido − stock genérico, en ESA orden. */
+                    cantidadAComprar: number;
+                    /** @description Ya en OC viva ligada a ESA orden (V1-E3q). */
+                    cantidadEnOc: number;
+                    /** @description Lo que falta comprar para ESA orden. */
+                    cantidadPendiente: number;
+                    /** @description Precio unitario con el que nacería su línea. */
+                    precioSugerido: number | null;
+                  }[];
                 }[];
               }[];
               /** @description ¿El BOM cambió desde el snapshot anterior (hay renglones con diff ≠ sin-cambio)? */
@@ -33836,6 +33885,10 @@ export interface paths {
                 tipo: 'tela' | 'avio';
                 /** @description Id del renglón de la receta de esta orden. */
                 idRenglon: number;
+                /** @description ⭐ V1-E3q: de QUÉ OP es el renglón (la explosión es multi-OP). */
+                idOrden: number;
+                /** @description Folio de esa OP (para nombrarla en el aviso). */
+                folioOrden: number;
                 idTela: number | null;
                 idAvio: number | null;
                 /** @description Cómo se llama el material. */
@@ -33936,7 +33989,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/ordenes/{id}/explosion/generar-oc': {
+  '/api/ordenes/{id}/explosion': {
     parameters: {
       query?: never;
       header?: never;
@@ -33945,7 +33998,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Generar órdenes de compra (una por proveedor) desde la explosión (R3) */
+    /** Explosionar los materiales de una orden (R3) y persistir el snapshot */
     post: {
       parameters: {
         query?: never;
@@ -33956,10 +34009,444 @@ export interface paths {
         };
         cookie?: never;
       };
+      requestBody?: never;
+      responses: {
+        /** @description Explosión de materiales de una orden (R3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description ⭐ V1-E3q (§Post-F9.86) — TODAS las OP que entraron a esta explosión, en el orden en que se calcularon (por folio). Con una sola OP trae un elemento. */
+              ordenes: {
+                /** @description Orden de producción. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folio: number;
+                /** @description Modelo de la orden. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                modelo: string;
+                /** @description Σ piezas color×talla de ESA orden. */
+                totalPiezas: number;
+                /** @description Pedido interno del que sale, o null. */
+                idPedido: number | null;
+                /** @description Folio del pedido interno, o null. */
+                folioPedido: number | null;
+                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                fechaEntrega: string | null;
+              }[];
+              /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
+              idOrden: number;
+              /** @description Folio de la PRIMERA orden (para la UI y el impreso). */
+              folioOrden: number;
+              /** @description Modelo de la PRIMERA orden. */
+              idModelo: number;
+              /** @description Código/nombre del modelo de la PRIMERA orden (para la UI). */
+              modelo: string;
+              /** @description Σ piezas color×talla de TODAS las órdenes del conjunto (base del cálculo). */
+              totalPiezas: number;
+              /** @description Requerimientos agrupados por proveedor sugerido. */
+              grupos: {
+                /** @description Proveedor sugerido del grupo, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor, o "Sin proveedor sugerido" para el grupo null. */
+                proveedor: string;
+                /** @description Materiales del grupo. */
+                renglones: {
+                  /** @description Id del renglón de snapshot. */
+                  id: number;
+                  /**
+                   * @description Tipo de material.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio';
+                  /** @description Tela del catálogo, o null. */
+                  idTela: number | null;
+                  /** @description Avío del catálogo, o null. */
+                  idAvio: number | null;
+                  /** @description Nombre/clave del material (para la UI). */
+                  material: string;
+                  /** @description Cantidad requerida en unidad de consumo (R3). */
+                  cantidadRequerida: number;
+                  /** @description Unidad de consumo, o null. */
+                  unidad: string | null;
+                  /** @description ¿Avío genérico de stock (R4)? */
+                  esGenerico: boolean;
+                  /**
+                   * @description no-aplica: no es genérico (va completo a compra); cubierto-por-stock: el stock cubre todo lo requerido (no compra); faltante-parcial: el stock cubre parte, solo el faltante va a compra.
+                   * @enum {string}
+                   */
+                  estadoGenerico: 'no-aplica' | 'cubierto-por-stock' | 'faltante-parcial';
+                  /** @description Existencia real del kardex (Σ movimientos, D3). */
+                  existenciaStock: number;
+                  /** @description Cantidad que va a compra (requerida − stock neteado). */
+                  cantidadAComprar: number;
+                  /** @description Proveedor sugerido (R1), o null. */
+                  idProveedorSugerido: number | null;
+                  /** @description Nombre del proveedor sugerido, o null. */
+                  proveedorSugerido: string | null;
+                  /** @description Precio unitario sugerido (R1), o null. */
+                  precioSugerido: number | null;
+                  /**
+                   * @description amarre-desarrollo: lo amarró Desarrollo en la receta; dueno-tela: es el proveedor DUEÑO de la tela (§Post-F9.11); habitual: es el proveedor habitual del avío; mas-barato: fallback R1/F4; asignado-compras: lo asignó Compras PARA ESTA ORDEN (§Post-F9.82); sin-proveedor: no hay.
+                   * @enum {string}
+                   */
+                  origenProveedor:
+                    | 'amarre-desarrollo'
+                    | 'dueno-tela'
+                    | 'habitual'
+                    | 'mas-barato'
+                    | 'asignado-compras'
+                    | 'sin-proveedor';
+                  /** @description ⭐ V1-E3m: el proveedor propuesto está DADO DE BAJA. Se conserva la sugerencia (alguien lo eligió a propósito y la OC es editable) pero la pantalla tiene que poder ofrecer la reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor. */
+                  proveedorSugeridoInactivo: boolean;
+                  /**
+                   * @description Diferencia del renglón contra el snapshot previo (visible en la UI).
+                   * @enum {string}
+                   */
+                  diff: 'sin-cambio' | 'nuevo' | 'eliminado' | 'cantidad-cambiada';
+                  /** @description Qué cambió en el modelo respecto de lo que ESTA orden congeló para este material (vacío = nada que avisar). Marca el renglón en el lugar de la decisión, §Post-F9.43(d). */
+                  cambiosReceta: (
+                    | 'agregado'
+                    | 'quitado'
+                    | 'consumo'
+                    | 'precio'
+                    | 'precio-mercado'
+                  )[];
+                  /** @description ⭐ V1-E3q: cuánto de este material YA está en una orden de compra VIVA ligada a esta OP (todas menos las canceladas — el borrador SÍ cuenta, porque la OC que genera esta pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema sobre "cuánto ya compré". NO se persiste: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar. */
+                  cantidadEnOc: number;
+                  /** @description ⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
+                  cantidadPendiente: number;
+                  /** @description ⭐ V1-E3q (§Post-F9.86): ids de snapshot que este renglón AGRUPA. Con una sola OP es `[id]`; con varias, uno por OP. Es lo que viaja en la selección al generar las OC. */
+                  idsRequerimiento: number[];
+                  /** @description ⭐ V1-E3q — **SE VE JUNTO, SE GUARDA REPARTIDO** (§Post-F9.86). El desglose por orden de producción de esta cantidad agrupada. Sin él, el "qué tengo / qué falta" de cada OP deja de cuadrar y el costo no cae donde debe; con una sola OP trae un elemento. */
+                  porOrden: {
+                    /** @description Renglón de snapshot de ESA orden. */
+                    idRequerimiento: number;
+                    /** @description Orden de producción a la que le toca esta cantidad. */
+                    idOrden: number;
+                    /** @description Folio de esa orden (para la UI). */
+                    folioOrden: number;
+                    /** @description Requerido por ESA orden (R3). */
+                    cantidadRequerida: number;
+                    /** @description Requerido − stock genérico, en ESA orden. */
+                    cantidadAComprar: number;
+                    /** @description Ya en OC viva ligada a ESA orden (V1-E3q). */
+                    cantidadEnOc: number;
+                    /** @description Lo que falta comprar para ESA orden. */
+                    cantidadPendiente: number;
+                    /** @description Precio unitario con el que nacería su línea. */
+                    precioSugerido: number | null;
+                  }[];
+                }[];
+              }[];
+              /** @description ¿El BOM cambió desde el snapshot anterior (hay renglones con diff ≠ sin-cambio)? */
+              huboCambios: boolean;
+              /** @description ¿Se regeneró sobre un snapshot previo (true) o es nuevo? */
+              regenerado: boolean;
+              /** @description Avisos de la explosión (F8-E6, enganche): tela amarrada multi-color con precios de tela distintos (se usó el precio base) o avío por talla (R18) sin medida capturada para alguna talla (se usó el consumo por prenda). Vacío = nada que advertir. Nada truena en silencio. */
+              avisos: string[];
+              /** @description ⭐ PRIMER AVISO de §Post-F9.43(d): la receta CONGELADA de la orden vs. el BOM VIVO del modelo, calculada al vuelo y entregada AQUÍ —el lugar de la decisión— porque es donde se está a punto de gastar. Los renglones afectados lo repiten en `cambiosReceta`. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+              /** @description ⭐ V1-E3h (§Post-F9.72) — QUÉ NO ESTÁ EN ESTA EXPLOSIÓN Y POR QUÉ. Desde que la receta se libera POR PARTES, la explosión sale SOLO de los renglones firmados por Desarrollo; los que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de liberar"*. Vacío = no falta nada por firmar. */
+              pendientesLiberar: {
+                /**
+                 * @description Sección de la receta (el arte no se compra por MRP).
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio';
+                /** @description Id del renglón de la receta de esta orden. */
+                idRenglon: number;
+                /** @description ⭐ V1-E3q: de QUÉ OP es el renglón (la explosión es multi-OP). */
+                idOrden: number;
+                /** @description Folio de esa OP (para nombrarla en el aviso). */
+                folioOrden: number;
+                idTela: number | null;
+                idAvio: number | null;
+                /** @description Cómo se llama el material. */
+                material: string;
+                /** @description Consumo por prenda congelado en la receta. */
+                consumoPorPrenda: number;
+                /** @description Unidad de consumo del material, o null. */
+                unidad: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/del-mismo-pedido': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Órdenes de producción del mismo pedido interno (precarga de la explosión) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Órdenes de producción del mismo pedido interno (precarga de la explosión). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Pedido interno, o null si la orden no cuelga de uno. */
+              idPedido: number | null;
+              /** @description Folio del pedido interno, o null. */
+              folioPedido: number | null;
+              /** @description OP del pedido (incluida la de la consulta). */
+              ordenes: {
+                idOrden: number;
+                folio: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                /** @description Cliente de la orden. */
+                cliente: string;
+                /** @description Las canceladas se listan pero NO se precargan. */
+                cancelada: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/explosion/previo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revisión previa de las órdenes de compra que se generarían (§Post-F9.85) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
       /** @description Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha). */
       requestBody: {
         content: {
           'application/json': {
+            /** @description Órdenes de producción que entran a esta compra (§Post-F9.86). */
+            idsOrden: number[];
             /**
              * @description Ids de renglones de snapshot a comprar (vacío = todo lo pendiente).
              * @default []
@@ -33981,6 +34468,277 @@ export interface paths {
                * @description Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD).
                */
               fechaEntrega: string;
+            }[];
+            /** @description Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente. */
+            ajustes?: {
+              /**
+               * @description Clase de material.
+               * @enum {string}
+               */
+              tipo: 'tela' | 'avio';
+              /** @description Tela o avío del catálogo. */
+              idMaterial: number;
+              /** @description Proveedor al que se le compra. */
+              idProveedor: number;
+              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
+              cantidadTotal: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Revisión previa de las órdenes de compra que se van a generar (§Post-F9.85). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Las OP que entran a esta compra. */
+              ordenes: {
+                /** @description Orden de producción. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folio: number;
+                /** @description Modelo de la orden. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                modelo: string;
+                /** @description Σ piezas color×talla de ESA orden. */
+                totalPiezas: number;
+                /** @description Pedido interno del que sale, o null. */
+                idPedido: number | null;
+                /** @description Folio del pedido interno, o null. */
+                folioPedido: number | null;
+                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                fechaEntrega: string | null;
+              }[];
+              /** @description Una entrada por OC que se va a crear. */
+              proveedores: {
+                idProveedor: number;
+                proveedor: string;
+                /** @description Fecha con la que nacería (null = falta). */
+                fechaEntrega: string | null;
+                renglones: {
+                  /** @enum {string} */
+                  tipo: 'tela' | 'avio';
+                  /** @description Tela o avío del catálogo (según `tipo`). */
+                  idMaterial: number;
+                  material: string;
+                  unidad: string | null;
+                  /** @description Lo que se va a pedir de este material (Σ del reparto). */
+                  cantidadTotal: number;
+                  /** @description Lo que el sistema propuso antes de cualquier ajuste del comprador. */
+                  cantidadPropuesta: number;
+                  /** @description ¿El comprador cambió el total (sobrante de compra)? */
+                  ajustado: boolean;
+                  /** @description Σ de los importes del reparto. */
+                  importe: number;
+                  /** @description El reparto por OP (§Post-F9.86). */
+                  porOrden: {
+                    idRequerimiento: number;
+                    idOrden: number;
+                    /** @description ⭐ DE QUÉ OP es esta cantidad (§Post-F9.86). */
+                    folioOrden: number;
+                    /** @description Cantidad que se va a escribir en SU línea de OC. */
+                    cantidad: number;
+                    /** @description Precio unitario con el que nace esa línea. */
+                    precio: number;
+                    /** @description cantidad × precio. */
+                    importe: number;
+                  }[];
+                }[];
+                /** @description Total de la OC (Σ importes). */
+                total: number;
+                /** @description Folios de las OP que esta OC va a surtir (§Post-F9.86). */
+                ordenes: number[];
+              }[];
+              /** @description Lo que NO va a entrar, con su razón (nada se omite en silencio, D3). */
+              omitidos: {
+                /** @description Renglón de snapshot omitido. */
+                idRequerimiento: number;
+                /** @description Orden de producción del renglón. */
+                idOrden: number;
+                /** @description Folio de esa orden. */
+                folioOrden: number;
+                /**
+                 * @description Clase de material.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio';
+                /** @description Nombre/clave del material. */
+                material: string;
+                unidad: string | null;
+                /** @description Lo que pedía el snapshot (requerido − stock). */
+                cantidadAComprar: number;
+                /** @description Lo que ya está en OC viva (V1-E3q). */
+                cantidadEnOc: number;
+                /**
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @enum {string}
+                 */
+                motivo:
+                  | 'sin-proveedor'
+                  | 'ya-en-oc'
+                  | 'cubierto-por-stock'
+                  | 'no-seleccionado'
+                  | 'sin-cantidad';
+                /** @description La razón en una frase, lista para pintar. */
+                detalle: string;
+              }[];
+              /** @description Lo que IMPIDE generar (falta la dirección de entrega, falta la fecha de un proveedor…). Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo. */
+              bloqueos: string[];
+              /** @description Σ de los totales de todas las OC del plan. */
+              totalGeneral: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/explosion/generar-oc': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Generar órdenes de compra (una por proveedor) desde la explosión (R3) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Selección de la explosión para generar OC (una OC por proveedor, cada una con su fecha). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Órdenes de producción que entran a esta compra (§Post-F9.86). */
+            idsOrden: number[];
+            /**
+             * @description Ids de renglones de snapshot a comprar (vacío = todo lo pendiente).
+             * @default []
+             */
+            idsRequerimiento?: number[];
+            /**
+             * Format: date
+             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             */
+            fechaEntrega?: string;
+            /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
+            idDireccionEntrega?: number;
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            fechasPorProveedor?: {
+              /** @description Proveedor al que aplica la fecha. */
+              idProveedor: number;
+              /**
+               * Format: date
+               * @description Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD).
+               */
+              fechaEntrega: string;
+            }[];
+            /** @description Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente. */
+            ajustes?: {
+              /**
+               * @description Clase de material.
+               * @enum {string}
+               */
+              tipo: 'tela' | 'avio';
+              /** @description Tela o avío del catálogo. */
+              idMaterial: number;
+              /** @description Proveedor al que se le compra. */
+              idProveedor: number;
+              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
+              cantidadTotal: number;
             }[];
           };
         };
@@ -34007,6 +34765,39 @@ export interface paths {
                 renglones: number;
                 /** @description Total derivado de la OC. */
                 total: number;
+              }[];
+              /** @description ⭐ V1-E3q: lo que se quedó FUERA de las OC creadas, con su razón. Antes se omitía en silencio y el usuario no tenía cómo saberlo. */
+              omitidos: {
+                /** @description Renglón de snapshot omitido. */
+                idRequerimiento: number;
+                /** @description Orden de producción del renglón. */
+                idOrden: number;
+                /** @description Folio de esa orden. */
+                folioOrden: number;
+                /**
+                 * @description Clase de material.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio';
+                /** @description Nombre/clave del material. */
+                material: string;
+                unidad: string | null;
+                /** @description Lo que pedía el snapshot (requerido − stock). */
+                cantidadAComprar: number;
+                /** @description Lo que ya está en OC viva (V1-E3q). */
+                cantidadEnOc: number;
+                /**
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @enum {string}
+                 */
+                motivo:
+                  | 'sin-proveedor'
+                  | 'ya-en-oc'
+                  | 'cubierto-por-stock'
+                  | 'no-seleccionado'
+                  | 'sin-cantidad';
+                /** @description La razón en una frase, lista para pintar. */
+                detalle: string;
               }[];
             };
           };
