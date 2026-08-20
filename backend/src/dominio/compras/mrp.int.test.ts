@@ -25,14 +25,21 @@ import type {
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
-import { ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 import { recibirCompra } from './recepciones.js';
-import { estatusMaterialesOrden, explosionarOrden, generarOCDesdeExplosion } from './mrp.js';
+import {
+  estatusMaterialesOrden,
+  explosionarOrden,
+  explosionarOrdenes,
+  generarOCDesdeExplosion,
+  ordenesDelPedidoDeOrden,
+  previoCompraDesdeExplosion,
+} from './mrp.js';
 import { asignarProveedorDeMaterial } from './proveedor-de-orden.js';
 
 let cliente: PrismaClient;
@@ -1579,5 +1586,472 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
       where: { idOrden, idTela: telaFelpa.id },
     });
     expect(renglon.idProveedorCompra).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.85) — NO VOLVER A COMPRAR LO YA COMPRADO.**
+ *
+ * Daniel, probando en vivo el 20-ago: *"me vuelvo a meter en la pantalla y sigue apareciendo ahí los
+ * elementos y me deja volver a hacerla"*. El snapshot guardaba la DEMANDA y nadie le restaba lo que
+ * ya viajaba en una OC. Estas pruebas son las que se ponen ROJAS si alguien quita el neteo.
+ */
+describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
+  /** Explosión fresca de la orden única del fixture. */
+  async function explotar(): Promise<Awaited<ReturnType<typeof explosionarOrden>>> {
+    return explosionarConRecetaFresca();
+  }
+
+  /** El renglón del BOTÓN (el único comprable del fixture: tiene proveedor con precio). */
+  function boton(ex: Awaited<ReturnType<typeof explosionarOrden>>) {
+    return ex.grupos
+      .flatMap((g) => g.renglones)
+      .find((r) => r.idAvio === avioBoton.id) as (typeof ex.grupos)[number]['renglones'][number];
+  }
+
+  it('⭐ generar dos veces NO duplica la compra: la segunda no tiene qué comprar', async () => {
+    await explotar();
+    const primera = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(primera.ordenesCompra).toHaveLength(1);
+    expect(primera.ordenesCompra[0]?.renglones).toBe(1); // 180 pza de botón
+
+    // Segunda vuelta: el snapshot sigue diciendo "180 a comprar", pero YA están en una OC viva.
+    const segunda = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 SIN el neteo aquí saldría OTRA OC con las MISMAS 180 piezas (el defecto de Daniel).
+    expect(segunda.ordenesCompra).toHaveLength(0);
+    expect(await cliente.ordenCompra.count()).toBe(1);
+    // Y no se calla: dice POR QUÉ se quedó fuera.
+    const omitido = segunda.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.cantidadEnOc).toBeCloseTo(180);
+  });
+
+  it('⭐ la explosión enseña el renglón YA COMPRADO con pendiente 0 (no invita a recomprar)', async () => {
+    await explotar();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explotar();
+    const fila = boton(ex);
+    // Lo requerido NO cambia (el snapshot es la demanda); lo que cambia es lo PENDIENTE.
+    expect(fila.cantidadRequerida).toBeCloseTo(180);
+    expect(fila.cantidadAComprar).toBeCloseTo(180);
+    expect(fila.cantidadEnOc).toBeCloseTo(180);
+    // 🔴 Si esto valiera 180 en vez de 0, la pantalla volvería a ofrecer la compra duplicada.
+    expect(fila.cantidadPendiente).toBe(0);
+  });
+
+  it('una compra PARCIAL deja pendiente sólo el resto (no todo ni nada)', async () => {
+    await explotar();
+    // El comprador pide 100 de las 180 (ajuste a la baja, §Post-F9.86).
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+
+    const fila = boton(await explotar());
+    expect(fila.cantidadEnOc).toBeCloseTo(100);
+    expect(fila.cantidadPendiente).toBeCloseTo(80);
+
+    // Y la segunda compra pide exactamente los 80 que faltan.
+    const segunda = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), segunda.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    expect(Number(oc.lineas[0]?.cantidad)).toBeCloseTo(80);
+  });
+
+  it('⭐ CANCELAR la OC devuelve el material a pendiente (cancelar es la manera de deshacer, D3)', async () => {
+    await explotar();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(boton(await explotar()).cantidadPendiente).toBe(0);
+
+    await cliente.ordenCompra.update({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      data: { estatus: 'cancelada' },
+    });
+
+    // 🔴 Si `cancelada` contara como "ya comprado", esto seguiría en 0 y la orden se quedaría sin
+    // poder recomprar nunca.
+    const fila = boton(await explotar());
+    expect(fila.cantidadEnOc).toBe(0);
+    expect(fila.cantidadPendiente).toBeCloseTo(180);
+  });
+
+  it('⭐ un BORRADOR SÍ cuenta como comprado (es la OC que esta misma pantalla acaba de crear)', async () => {
+    await explotar();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await cliente.ordenCompra.findFirstOrThrow({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      select: { estatus: true },
+    });
+    // La OC del MRP nace en borrador: si el criterio no lo incluyera, el arreglo no arreglaría nada.
+    expect(oc.estatus).toBe('borrador');
+    expect(boton(await explotar()).cantidadPendiente).toBe(0);
+  });
+
+  it('el tablero R7 y la explosión dicen el MISMO "en OC" (una sola verdad)', async () => {
+    await explotar();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explotar();
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const filaTablero = tablero.filas.find((f) => f.idAvio === avioBoton.id);
+    expect(filaTablero?.enOc).toBeCloseTo(boton(ex).cantidadEnOc);
+    expect(filaTablero?.enOc).toBeCloseTo(180);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.85) — LA REVISIÓN PREVIA.** *"Me gustaría que al darle «generar OC desde la
+ * explosión», te mande a una pantalla previa, antes de generar la OC. Una revisión previa es
+ * indispensable"* (Daniel). Lo que se prueba aquí es que la previa **no crea nada** y que dice lo
+ * mismo que luego pasa.
+ */
+describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
+  it('⭐ el previo NO crea ninguna OC y describe la que saldría', async () => {
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 Lo esencial: revisar no compra.
+    expect(await cliente.ordenCompra.count()).toBe(0);
+
+    expect(plan.proveedores).toHaveLength(1);
+    const oc = plan.proveedores[0];
+    expect(oc?.idProveedor).toBe(provBarato.id);
+    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la fecha de entrega de la OP
+    expect(oc?.renglones[0]?.cantidadTotal).toBeCloseTo(180);
+    expect(oc?.total).toBeCloseTo(360); // 180 × $2
+    expect(oc?.ordenes).toEqual([1]); // el folio de la OP del fixture
+    expect(plan.bloqueos).toEqual([]);
+  });
+
+  it('⭐ nombra lo que se va a OMITIR y por qué (antes se descartaba en silencio)', async () => {
+    // 100 m de hilo en el kardex: el genérico queda cubierto y no genera compra (decisión d).
+    await ajustarInventarioAvio(
+      sesion(),
+      {
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        lineas: [{ idAvio: avioHilo.id, cantidad: 100 }],
+        motivo: 'conteo inicial',
+      },
+      bd(),
+    );
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
+    // La tela del fixture no tiene proveedor dueño: se omitía sin decirlo.
+    expect(felpa?.motivo).toBe('sin-proveedor');
+    expect(felpa?.detalle).toMatch(/No hay a quién comprarle/);
+    const hilo = plan.omitidos.find((o) => o.material.includes('HIL-01'));
+    expect(hilo?.motivo).toBe('cubierto-por-stock');
+  });
+
+  it('el previo DICE los bloqueos en vez de reventar (para eso es una revisión)', async () => {
+    await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.bloqueos.join(' ')).toMatch(/favorita/);
+    // …y generar con ese mismo bloqueo SÍ se rechaza, con la misma frase.
+    await expect(
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+    ).rejects.toThrow(/favorita/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('A4 — sin `compras.administrar` la revisión previa se rechaza (§Post-F9.68)', async () => {
+    await expect(
+      previoCompraDesdeExplosion(
+        sesion(['compras.ver']),
+        { idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.86) — UNA OC PARA VARIAS OP.** Daniel: *"¿cómo hacemos cuando una OC cubre
+ * varias OP? Es muy muy común hacerlo. Normalmente compramos varias OP con una sola OC"*, con su
+ * condición innegociable: **se ve junto, se guarda repartido**.
+ */
+describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
+  let idOrdenB: number;
+  let idPedido: number;
+
+  /** Entrada de HILO (el genérico) al kardex, con la misma forma que usa el resto del archivo. */
+  async function entradaDeHilo(cantidad: number) {
+    return {
+      idAlmacen: almacen.id,
+      fecha: '2026-06-21',
+      idTipoMov: (
+        await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+          where: { codigo: 'ajuste-entrada' },
+        })
+      ).id,
+      lineas: [{ idAvio: avioHilo.id, cantidad }],
+      motivo: 'conteo inicial',
+    };
+  }
+
+  /** Crea una SEGUNDA orden (20 piezas) del mismo modelo, colgada del mismo pedido interno. */
+  async function segundaOrden(): Promise<number> {
+    const pedido = await cliente.pedido.create({
+      data: {
+        folio: 1515n,
+        idEmpresa: empresa.id,
+        idCliente: clienteNegocioId,
+        lineas: { create: [{ idModelo: modelo.id, cantidadPedida: 20, precio: 100 }] },
+      },
+    });
+    idPedido = pedido.id;
+    const lineaPedido = await cliente.pedidoLinea.findFirstOrThrow({
+      where: { idPedido: pedido.id },
+      select: { id: true },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 2n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        idPedidoLinea: lineaPedido.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        // Entrega ANTES que la primera: la OC debe salir con la fecha MÁS PRÓXIMA.
+        fechaEntrega: new Date('2026-09-15T00:00:00.000Z'),
+        lineas: {
+          create: [
+            { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] } },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  beforeEach(async () => {
+    idOrdenB = await segundaOrden();
+    // La primera orden del fixture también cuelga del mismo pedido (para probar la precarga).
+    const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido } });
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { idPedidoLinea: linea.id },
+    });
+  });
+
+  it('⭐ explosiona las DOS OP juntas y AGRUPA las cantidades', async () => {
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    expect(ex.ordenes.map((o) => o.folio)).toEqual([1, 2]);
+    expect(ex.totalPiezas).toBe(50); // 30 + 20
+
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 6 pza × 50 piezas = 300, agrupadas en UN renglón de pantalla.
+    expect(boton?.cantidadRequerida).toBeCloseTo(300);
+    // …y REPARTIDAS por OP: 180 de la orden 1 y 120 de la 2 (§Post-F9.86, innegociable).
+    expect(boton?.porOrden.map((l) => [l.folioOrden, l.cantidadPendiente])).toEqual([
+      [1, 180],
+      [2, 120],
+    ]);
+  });
+
+  it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(gen.ordenesCompra).toHaveLength(1);
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+
+    const lineasBoton = oc.lineas.filter((l) => l.idAvio === avioBoton.id);
+    // 🔴 DOS líneas, una por OP. Con una sola línea de 300 el "qué falta" de cada OP dejaría de
+    // cuadrar y el costo no caería donde debe — que es lo que Daniel puso como innegociable.
+    expect(lineasBoton).toHaveLength(2);
+    const porOrden = new Map(lineasBoton.map((l) => [l.idOrden, Number(l.cantidad)]));
+    expect(porOrden.get(idOrden)).toBeCloseTo(180);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(120);
+    // Y la liga N:N del encabezado nombra a las dos OP.
+    expect(oc.ordenesLigadas.map((o) => o.idOrden).sort((a, b) => a - b)).toEqual(
+      [idOrden, idOrdenB].sort((a, b) => a - b),
+    );
+  });
+
+  it('la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP (el material llega a tiempo)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await cliente.ordenCompra.findFirstOrThrow({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      select: { fechaEntrega: true },
+    });
+    // 🔴 La 2026-09-15 (orden B), no la 2026-09-30 (orden A): tomar la más lejana llegaría tarde.
+    expect(oc.fechaEntrega?.toISOString().slice(0, 10)).toBe('2026-09-15');
+  });
+
+  it('⭐ el SOBRANTE de compra se reparte entre las OP (el rollo completo, §Post-F9.86)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idOrdenB],
+        idsRequerimiento: [],
+        // Se pide la caja completa de 400 en vez de las 300 que salen del BOM.
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 400,
+          },
+        ],
+      },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const porOrden = new Map(
+      oc.lineas
+        .filter((l) => l.idAvio === avioBoton.id)
+        .map((l) => [l.idOrden, Number(l.cantidad)]),
+    );
+    // 400 en proporción 180:120 → 240 y 160. La suma es EXACTAMENTE lo que se compró.
+    expect(porOrden.get(idOrden)).toBeCloseTo(240);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(160);
+    expect((porOrden.get(idOrden) ?? 0) + (porOrden.get(idOrdenB) ?? 0)).toBeCloseTo(400);
+  });
+
+  it('el stock de un GENÉRICO se reparte entre las OP del lote, no se cuenta dos veces', async () => {
+    // 100 m de hilo en existencia; entre las dos OP hacen falta 100 (60 + 40): queda cubierto.
+    await ajustarInventarioAvio(sesion(), await entradaDeHilo(100), bd());
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
+    // 🔴 Si cada OP neteara contra los 100 completos, las dos saldrían "cubiertas" y el sistema
+    // compraría de menos. Aquí la primera se lleva 60 y a la segunda le quedan 40: justo alcanza.
+    expect(hilo?.cantidadRequerida).toBeCloseTo(100);
+    expect(hilo?.existenciaStock).toBeCloseTo(100);
+    expect(hilo?.cantidadAComprar).toBe(0);
+  });
+
+  it('con menos stock del necesario, la SEGUNDA OP es la que se queda corta (y compra)', async () => {
+    // Sólo 70 m: la orden 1 (más vieja) se lleva 60 y a la orden 2 le quedan 10 de los 40 que pide.
+    await ajustarInventarioAvio(sesion(), await entradaDeHilo(70), bd());
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
+    expect(hilo?.cantidadAComprar).toBeCloseTo(30); // 100 requeridos − 70 en existencia
+    const reparto = new Map(hilo?.porOrden.map((l) => [l.folioOrden, l.cantidadAComprar]));
+    expect(reparto.get(1)).toBe(0); // la 1 se cubrió entera
+    expect(reparto.get(2)).toBeCloseTo(30); // a la 2 le faltan 30
+  });
+
+  it('⭐ A9 — meter una OP de OTRA empresa responde 404 y no explota nada', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ordenAjena = await cliente.orden.create({
+      data: {
+        folio: 1n,
+        idEmpresa: otra.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+      },
+    });
+    await expect(
+      explosionarOrdenes(sesion(), [idOrden, ordenAjena.id], bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    // A2: ni siquiera se escribió el snapshot de la orden PROPIA.
+    expect(await cliente.requerimientoOrden.count({ where: { idOrden } })).toBe(0);
+
+    await expect(
+      generarOCDesdeExplosion(
+        sesion(),
+        { idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('⭐ la PRECARGA por pedido interno trae las OP hermanas (los avíos del 1515)', async () => {
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrden, bd());
+    expect(salida.folioPedido).toBe(1515);
+    expect(salida.ordenes.map((o) => o.folio).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(salida.ordenes.every((o) => !o.cancelada)).toBe(true);
+  });
+
+  it('una OP CANCELADA del pedido se lista pero sale MARCADA (para no precargarla)', async () => {
+    await cliente.orden.update({ where: { id: idOrdenB }, data: { estado: 'cancelada' } });
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrden, bd());
+    expect(salida.ordenes.find((o) => o.idOrden === idOrdenB)?.cancelada).toBe(true);
+  });
+
+  it('una orden SIN pedido interno (histórico migrado) devuelve sólo la propia, sin mentir', async () => {
+    await cliente.orden.update({ where: { id: idOrdenB }, data: { idPedidoLinea: null } });
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrdenB, bd());
+    expect(salida.idPedido).toBeNull();
+    expect(salida.ordenes.map((o) => o.idOrden)).toEqual([idOrdenB]);
+  });
+
+  it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    // Se compra SÓLO lo de la orden A.
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    const reparto = new Map(boton?.porOrden.map((l) => [l.folioOrden, l.cantidadPendiente]));
+    // 🔴 La A queda en 0 y la B sigue debiendo sus 120: si el neteo no fuera por OP, o taparía a
+    // las dos (compra de menos) o a ninguna (compra duplicada).
+    expect(reparto.get(1)).toBe(0);
+    expect(reparto.get(2)).toBeCloseTo(120);
   });
 });

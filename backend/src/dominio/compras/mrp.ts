@@ -1143,10 +1143,11 @@ function proyectarRenglones(
       previo.cantidadAComprar += aComprar;
       previo.cantidadEnOc += enOc;
       previo.cantidadPendiente += pendiente;
-      // La existencia del genérico es de la EMPRESA, no de la orden: aquí se suma lo que cada OP
-      // alcanzó a consumir del mismo stock (el reparto lo hace `existenciaCompartida`), que es lo
-      // que la pantalla necesita enseñar. Sumar la existencia total por OP la multiplicaría.
-      previo.existenciaStock += Number(fila.existenciaStock);
+      // ⚠️ La existencia de un genérico es de la EMPRESA, no de la orden: **NO se suma**. Con el
+      // stock repartido entre el lote, la primera OP ve la existencia entera y las siguientes sólo
+      // el remanente; sumarlas diría "hay 140" donde hay 100. Se queda el MÁXIMO, que es la
+      // existencia real al empezar la compra — el número que el comprador necesita ver.
+      previo.existenciaStock = Math.max(previo.existenciaStock, Number(fila.existenciaStock));
       previo.estadoGenerico = estadoDeGenerico(previo.esGenerico, previo.cantidadAComprar);
       previo.proveedorSugeridoInactivo =
         previo.proveedorSugeridoInactivo || proveedorSugeridoInactivo;
