@@ -16,7 +16,10 @@ import {
  *  • se copia el SNAPSHOT de la OC del cliente (`Pedido.ocCliente` → `Orden.ocCliente`, B3),
  *  • se LIGA la orden a su desarrollo (`DesarrolloOrden`, núcleo de `ligarOrden` F8-E6) si el
  *    renglón tiene desarrollo (sin desarrollo = caso legado: la OP nace sin liga),
- *  • se MINTEA el nº interno de producción del modelo si es su PRIMERA salida (secuencia A3),
+ *  • se PASA A PRODUCCIÓN el modelo si venía de DESARROLLO (§Post-F9.34/§Post-F9.46): se le
+ *    asigna su nº de 5 dígitos —el que propone el sistema o el que confirmó el usuario— y su
+ *    código pasa a ser ese; el de desarrollo se conserva. Si el modelo ya era de producción, la
+ *    OP simplemente hereda el número que ya tenía,
  *  • y se ENCOLA la generación automática de la Ruta Crítica (outbox, B5).
  *
  * También aquí: los CANDIDATOS de desarrollo para el selector del constructor (búsqueda
@@ -52,6 +55,15 @@ export const esquemaSalidaProduccionCuerpo = z
       .describe(
         'Fecha de entrega comprometida de la OP; si se omite, hereda la ventana del pedido (fechaHasta ?? fechaDe).',
       ),
+    numeroProduccion: z
+      .number({ error: 'El número de producción debe ser un número' })
+      .int({ error: 'El número de producción debe ser entero' })
+      .min(10_000, { error: 'El número de producción debe tener 5 dígitos' })
+      .max(99_999, { error: 'El número de producción debe tener 5 dígitos' })
+      .optional()
+      .describe(
+        'Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción.',
+      ),
   })
   .describe('Datos para generar la OP (salida a producción) de un renglón de pedido.');
 
@@ -65,10 +77,26 @@ export const esquemaSalidaProduccionSalida = z
     numeroProduccion: z
       .number()
       .int()
-      .describe('Nº interno de producción del modelo (minteado aquí si es su primera salida).'),
+      .nullable()
+      .describe(
+        'Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`).',
+      ),
     numeroProduccionMinteado: z
       .boolean()
-      .describe('true si esta salida MINTEÓ el número (primera OP del modelo); false si lo reusó.'),
+      .describe(
+        'true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción.',
+      ),
+    codigoModeloAnterior: z
+      .string()
+      .nullable()
+      .describe(
+        'Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción.',
+      ),
+    avisosNumeroProduccion: z
+      .array(z.string())
+      .describe(
+        'Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean.',
+      ),
     idDesarrollo: z
       .number()
       .int()

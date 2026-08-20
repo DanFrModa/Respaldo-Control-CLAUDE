@@ -463,6 +463,20 @@ model Secuencia {
   @@map("secuencias")
 }
 
+/// Contador GLOBAL (sin empresa) para las numeraciones de los CATÁLOGOS GLOBALES (ADR-0007),
+/// que por definición no pueden colgar de una empresa: si dos empresas desarrollaran para el
+/// mismo cliente, dos secuencias por empresa darían el MISMO código de desarrollo y chocarían
+/// contra el unique global de `Modelo.codigoDesarrollo`. Misma mecánica atómica que `Secuencia`
+/// (A3: `INSERT … ON CONFLICT … DO UPDATE … RETURNING`, jamás `Max()+1`), sin `idEmpresa`.
+/// `clave` identifica la serie (p. ej. `modelo-desarrollo-<idCliente>-<año>-<conceptoGénero>`).
+model SecuenciaGlobal {
+  id    Int    @id @default(autoincrement())
+  clave String @unique
+  valor BigInt @default(0)
+
+  @@map("secuencias_globales")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Bitácora (A7) y archivos (A5/R6)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1134,6 +1148,11 @@ model Cliente {
   /// Razón social (nombre legal para la factura si difiere del comercial). Opcional; espejo de
   /// `Proveedor.razonSocial`. Se usará al conciliar el receptor de un CFDI de venta (F9).
   razonSocial String? @map("razon_social")
+  /// ABREVIATURA del cliente (2–6 letras/dígitos, MAYÚSCULAS) — el `CYA` de un código de
+  /// DESARROLLO `CYA-26-71-001` (§Post-F9.34, V1-E3n). Única entre clientes; NULL mientras no se
+  /// capture (y sin ella el cliente no puede estrenar modelos de desarrollo: el código no se
+  /// puede armar). Cambiarla NO renumera los códigos ya emitidos: quedaron congelados.
+  abreviatura String? @unique
   contacto    String?
   telefono    String?
   email       String?
@@ -2044,6 +2063,15 @@ model Genero {
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
+  /// 2º DÍGITO de la nomenclatura de producción (§Post-F9.34): 1 Caballero · 2 Dama ·
+  /// 3 Niño Juvenil · 4 Niño Infantil · 6 Niña Infantil · 7 Niña Juvenil · 9 Beba · 0 Bebo.
+  /// El 8 no se usa. NULL = género sin dígito asignado (el generador no puede numerarlo).
+  digitoNomenclatura Int? @map("digito_nomenclatura")
+  /// Dígito de CONTINUACIÓN cuando la serie del `digitoNomenclatura` se agota (§Post-F9.34):
+  /// hoy sólo Caballero lo tiene (1 → 5), porque su serie `x1` ya llegó a 999 y Daniel abrió la
+  /// `x5`. NULL = sin continuación (agotada la serie, no hay a dónde seguir).
+  digitoAlterno Int? @map("digito_alterno")
+
   /// Modelos de este género (F1-E4, FK nullable Restrict).
   modelos Modelo[]
 
@@ -2062,8 +2090,11 @@ model Genero {
 /// vive en el modelo (D4). NO lleva `idEtiquetaMarca` (se difiere a F7/Costos).
 model Modelo {
   id          Int      @id @default(autoincrement())
-  /// Código/clave de negocio del modelo. Único global (ADR-0007). Con el rediseño R3 (B4) este
-  /// código es el nº de DESARROLLO; el nº de PRODUCCIÓN es `numeroProduccion` (bases distintas).
+  /// Código VIGENTE del modelo — el que se enseña en toda pantalla e impreso. Único global
+  /// (ADR-0007). Mientras el modelo es de DESARROLLO vale lo mismo que `codigoDesarrollo`
+  /// (`CYA-26-71-001`); al PASAR A PRODUCCIÓN se sustituye por el nº de 5 dígitos, y el de
+  /// desarrollo queda guardado aparte, buscable (§Post-F9.34 punto 5: nada se borra, D3).
+  /// Los modelos MIGRADOS del Access nacen en producción con su código de 5 dígitos de siempre.
   codigo      String   @unique
   descripcion String?
   /// COMPOSICIÓN textil de la prenda (decisión de Daniel, 24-jul-2026): la composición NO sale de
@@ -2074,10 +2105,29 @@ model Modelo {
   /// Costo de maquila base que heredan las órdenes (doc 01-Modelos §4).
   maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
 
-  /// Nº INTERNO de producción (rediseño R3, B4 — aclaración Daniel 7-jul: Desarrollo y Producción
-  /// son bases distintas). Se MINTEA por la secuencia atómica `numero_produccion_seq` (A3) la
-  /// PRIMERA vez que el modelo sale a producción (`salidaAProduccion`) y se REUSA entre sus OPs.
-  /// Distinto del folio de la OP y del nº de desarrollo (`codigo`). Null = nunca ha salido.
+  /// ORIGEN del modelo (§Post-F9.34, V1-E3n): `desarrollo` mientras vive en el catálogo de
+  /// desarrollo (numeración `CYA-26-71-001`, fuera del catálogo de producción por default) y
+  /// `produccion` en cuanto se le asigna su nº de 5 dígitos. NO se separa la tabla: un modelo de
+  /// desarrollo necesita lo MISMO que uno de producción (BOM, arte, fotos, precosteo); lo que se
+  /// separa es la marca y la numeración. Los migrados quedan en `produccion` (su código de
+  /// siempre ES el de producción).
+  origen OrigenModelo @default(produccion)
+
+  /// Nº de DESARROLLO del modelo, con la forma `CYA-26-71-001` = abreviatura del cliente + año de
+  /// ENTREGA + concepto/género + consecutivo (§Post-F9.34). Lo arma el sistema ENTERO (es mecánico
+  /// y no tiene criterio de negocio) y se CONGELA al nacer: si la entrega se recorre a 2027 el
+  /// código sigue diciendo `26`. Se CONSERVA tras pasar a producción (D3) y sigue siendo buscable.
+  /// Null = el modelo nunca fue de desarrollo (todo el histórico migrado).
+  codigoDesarrollo String? @unique @map("codigo_desarrollo")
+
+  /// Nº de PRODUCCIÓN del modelo como ENTERO de 5 dígitos: `71001` = concepto 7 (pantalón) +
+  /// género 1 (caballero) + consecutivo 001 (§Post-F9.34 / §Post-F9.46). Es el mismo valor que
+  /// `codigo` cuando el modelo es de producción y su código es numérico de 5 dígitos — se guarda
+  /// aparte para que el generador del consecutivo pueda razonar por (concepto, género) sin
+  /// parsear texto. Null = modelo de desarrollo, o modelo migrado con código NO numérico
+  /// (`51783a`, `M-18`: 285 de los 4,987 del Access).
+  /// ⚠️ Antes de V1-E3n esta columna guardaba un consecutivo global SIN significado
+  /// (`numero_produccion_seq`, R3/B4); la migración la redefinió.
   numeroProduccion Int? @unique @map("numero_produccion")
 
   /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
@@ -2158,6 +2208,8 @@ model Modelo {
   /// Órdenes del sistema VIEJO que fabricaron este modelo (archivo de consulta, §Post-F9.26).
   historicoOrdenesV1 HistoricoOrdenV1[]
 
+  /// Filtro por DEFAULT del catálogo y de la galería (V1-E3n): producción + activos.
+  @@index([origen, activo])
   @@map("modelos")
 }
 
@@ -5056,6 +5108,18 @@ enum TipoDuracionProceso {
 /// reprograma en vivo). El default del catálogo es `antes` (hoy el taller estampa los
 /// paneles cortados antes de coser: la rama de estampado del catálogo cuelga entre el
 /// corte y la confección).
+/// Origen del modelo (§Post-F9.34): de dónde salió su numeración y en qué catálogo se enseña
+/// por default. Ver `Modelo.origen`.
+enum OrigenModelo {
+  /// Nació en el módulo de Desarrollo; su código es `CYA-26-71-001`. Oculto del catálogo y de la
+  /// galería de producción salvo que se pida el filtro.
+  desarrollo
+  /// Está en el catálogo de PRODUCCIÓN: su código es el nº de 5 dígitos.
+  produccion
+
+  @@map("origen_modelo")
+}
+
 enum SecuenciaEstampado {
   antes
   despues
@@ -5622,6 +5686,13 @@ model TipoProducto {
   nombre String  @unique
   activo Boolean @default(true)
 
+  /// 1er DÍGITO (CONCEPTO) de la nomenclatura de producción (§Post-F9.34): 2 Conjunto ·
+  /// 3 Bermuda/Falda/Short · 4 Vestido · 5 Playera · 6 Sudadera · 7 Pantalón/Jogger/Leggings ·
+  /// 8 Chamarra/Chaleco · 9 Gorra/Polo/Bata. El 1 NO significa nada (no se usa). Cada concepto
+  /// es una serie INDEPENDIENTE de 999 (el encadenamiento existe sólo en el género, §Post-F9.46).
+  /// NULL = tipo sin dígito asignado (el generador no puede numerarlo).
+  digitoConcepto Int? @map("digito_concepto")
+
   /// Modelos clasificados con este tipo (F1, Restrict: un tipo en uso por un modelo no se borra
   /// físico → se desactiva).
   modelos         Modelo[]
@@ -5633,6 +5704,10 @@ model TipoProducto {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  /// Un concepto es una serie INDEPENDIENTE de 999 (§Post-F9.34): dos tipos ACTIVOS con el mismo
+  /// dígito se repartirían la misma serie. Índice PARCIAL (sólo activos, sólo con dígito) creado a
+  /// mano en la migración `20260820160000_modelos_desarrollo_vs_produccion` — Prisma no expresa
+  /// unique parciales, así que aquí sólo queda anotado.
   @@map("tipos_producto")
 }
 

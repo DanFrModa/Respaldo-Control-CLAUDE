@@ -72,3 +72,7 @@ Reglas:
 | [ADR-0012](ADR-0012-motor-rc-duracion-y-jobs.md)   | Motor de la RC (pt1): fórmula de duración + jobs pg-boss con serialización por orden (F5-E3) | Aceptado |
 | [ADR-0013](ADR-0013-cpm-backward-pass-y-semaforo.md) | Motor de la RC (pt2): CPM backward-pass + semáforo (F5-E4)        | Aceptado |
 | [ADR-0014](ADR-0014-pt-por-orden.md)               | Existencia de PT por ORDEN de producción (enmienda de ADR-0010, F6-E2) | Aceptado |
+| [ADR-0015](ADR-0015-kpis-vistas-materializadas-y-job.md) | KPIs sobre vistas materializadas + job de refresco (la captura nunca espera) (F7-E3) | Aceptado |
+| [ADR-0016](ADR-0016-cpm-forward-pass-colchon-proyectado.md) | CPM forward pass: colchón proyectado para las alertas predictivas (rediseño R7) | Aceptado |
+| [ADR-0017](ADR-0017-modelo-tercero-referencias.md) | Modelo del TERCERO en la cuenta corriente: referencias por tipo+id (no tabla polimórfica) | Aceptado |
+| [ADR-0018](ADR-0018-consecutivo-produccion-lock-vs-secuencia.md) | El consecutivo del nº de PRODUCCIÓN no sale de una secuencia: hueco libre bajo advisory lock (V1-E3n) | Aceptado |

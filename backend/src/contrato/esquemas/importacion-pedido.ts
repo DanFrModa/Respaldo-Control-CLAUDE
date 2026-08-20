@@ -425,7 +425,13 @@ export const esquemaOrdenImportada = z
   .object({
     idOrden: z.number().int().describe('Id de la OP creada.'),
     folio: z.number().int().describe('Folio de la OP (por empresa).'),
-    numeroProduccion: z.number().int().describe('Nº interno de producción minteado/reusado.'),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos.',
+      ),
     codigoModelo: z.string().describe('Nº de desarrollo del modelo.'),
     modeloCliente: z.string().describe('Nº/estilo del modelo del cliente (del archivo).'),
     totalPiezas: z.number().int().describe('Piezas de la OP (Σ de la matriz).'),

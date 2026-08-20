@@ -105,6 +105,19 @@ export type ClienteCamposLista = z.infer<typeof esquemaClienteCamposLista>;
  * del aging de CxC; null o 0 = contado.
  */
 const camposContacto = {
+  /**
+   * ABREVIATURA del cliente (§Post-F9.34, V1-E3n): el `CYA` de un código de desarrollo
+   * `CYA-26-71-001`. 2–6 letras/dígitos, se normaliza a MAYÚSCULAS y es única entre clientes.
+   * Sin ella el cliente no puede estrenar modelos de desarrollo (el código no se puede armar).
+   */
+  abreviatura: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .min(2, { error: 'La abreviatura debe tener al menos 2 caracteres' })
+    .max(6, { error: 'La abreviatura no puede tener más de 6 caracteres' })
+    .regex(/^[A-Z0-9]+$/, { error: 'La abreviatura solo admite letras y dígitos, sin espacios' })
+    .optional(),
   razonSocial: z
     .string()
     .trim()
@@ -153,6 +166,7 @@ const camposContacto = {
  * conservando sus reglas. Omitir = no tocar; `null` = borrar.
  */
 const camposContactoEditar = {
+  abreviatura: camposContacto.abreviatura.nullable(),
   razonSocial: camposContacto.razonSocial.nullable(),
   contacto: camposContacto.contacto.nullable(),
   telefono: camposContacto.telefono.nullable(),
@@ -231,6 +245,10 @@ export const esquemaClienteSalida = z
   .object({
     id: z.number().int().describe('Id del cliente.'),
     nombre: z.string().describe('Nombre del cliente.'),
+    abreviatura: z
+      .string()
+      .nullable()
+      .describe('Abreviatura del cliente para el código de desarrollo (el "CYA"), o null.'),
     razonSocial: z.string().nullable().describe('Razón social (nombre legal), o null.'),
     contacto: z.string().nullable().describe('Persona de contacto, o null.'),
     telefono: z.string().nullable().describe('Teléfono, o null.'),

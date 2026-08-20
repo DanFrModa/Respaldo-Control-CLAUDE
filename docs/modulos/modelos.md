@@ -6,7 +6,8 @@
 
 | Entidad v2 | Tabla BD | Descripción |
 |---|---|---|
-| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). |
+| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion` — ver §Nomenclatura. |
+| `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año+par. |
 | `ModeloFoto` | `modelo_foto` | N fotos por modelo (tipo FRENTE/ESPALDA/OTRO + orden). |
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
 | `ModeloTela` | `modelo_tela` | Renglones BOM de tela (consumo + 3 banderas). PK compuesta (idModelo, idTela). |
@@ -20,6 +21,49 @@
 | `Modelo` | `IdModelos` viejo → `id` de `Modelo` en v2 |
 
 Consumido por: F2 (Pedidos), F3 (Producción), F4 (Compras/MRP), F7 (Costos), F8 (Desarrollo y Cotización) y F9 (Finanzas).
+
+## Nomenclatura: DESARROLLO vs. PRODUCCIÓN (V1-E3n — §Post-F9.34 / §Post-F9.46 / §Post-F9.83)
+
+Un modelo puede tener **DOS números**, y la tabla es una sola (lo que se separa es la marca y la
+numeración, no la entidad: BOM, arte, fotos y precosteo cuelgan del `id`, que nunca cambia).
+
+| Campo | Qué es |
+|---|---|
+| `codigo` | El código **VIGENTE**, el que se enseña en toda pantalla e impreso. Único global. |
+| `codigoDesarrollo` | El `CYA-26-71-001`, **congelado al nacer**. Se CONSERVA tras pasar a producción (D3) y es buscable. |
+| `numeroProduccion` | El entero de 5 dígitos (`71001`). Se guarda aparte del texto para que el generador razone por (concepto, género) sin parsear. |
+| `origen` | `desarrollo` mientras vive fuera del catálogo de producción; `produccion` en cuanto se le asigna su número. |
+
+**Producción — 5 dígitos: concepto + género + consecutivo.** Los dos primeros son FIJOS y el consecutivo
+corre por ese par, con tope de **999 por par** (§Post-F9.83). Los dígitos son DATOS del catálogo
+(`TipoProducto.digitoConcepto`, `Genero.digitoNomenclatura`), no constantes en el código;
+`Genero.digitoAlterno` es la continuación del género cuando su serie se agota — hoy sólo Caballero (1→5).
+
+**Dónde se captura el dígito.** El del **concepto** vive en *Calidad › Tipos de producto*, junto al
+nombre del tipo: es **único entre los tipos ACTIVOS** (dos conceptos con el mismo dígito se repartirían
+la misma serie de 999), lo valida el dominio y lo respalda un **índice único parcial**
+(`WHERE activo AND digito_concepto IS NOT NULL`). Un tipo desactivado libera su dígito; reactivarlo con
+el dígito ya tomado se rechaza. Los nueve conceptos de la tabla de Daniel vienen sembrados
+(2 Conjunto · 3 Short · 4 Vestido · 5 Playera · 6 Sudadera · 7 Pantalón · 8 Chamarra · 9 Gorra; el 0 y el
+1 no se usan). El del **género** viene del seed y **todavía no tiene pantalla** (`Genero` es catálogo
+selector sin ABM desde F1): un género nuevo nace sin dígito y el generador lo dice con su nombre.
+
+**Desarrollo — `CYA-26-71-001`** = abreviatura del cliente (`Cliente.abreviatura`) + año de **ENTREGA** +
+los mismos dos dígitos + consecutivo que reinicia por `cliente + año + par`. Lo arma el sistema ENTERO
+(`mintearCodigoDesarrollo`) y **no consume** consecutivo de producción.
+
+**⚠️ Por qué el consecutivo de producción NO sale de una secuencia.** A3 manda folios por secuencia
+atómica y el de desarrollo lo cumple (`siguienteFolioGlobal`). El de producción no puede: son 30 años de
+numeración hecha a mano, hueca y **ya topada** — el par `51` del Access tiene 535 usados de 999 **con el
+999 ocupado**. Una secuencia propondría `1000`, que no existe. La propuesta es el **hueco libre más bajo**
+del par, calculada dentro de un `pg_advisory_xact_lock` del par (namespace 20_546); el `@unique` de
+`codigo`/`numeroProduccion` es la última red. Todo vive en `backend/src/dominio/modelos/nomenclatura.ts`.
+La desviación de A3 —dónde aplica, dónde NO, y las mediciones de concurrencia que la respaldan— está en
+**`docs/arquitectura/ADR-0018`**.
+
+**Pasar a producción** (`pasarModeloAProduccion`, y también dentro de `salidaAProduccion` al generar la
+OP): el número llega **precargado** con el hueco libre y **es editable** (§Post-F9.46). Repetido
+**bloquea**; dígitos que no cuadran con el tipo/género y serie cerca del tope **avisan sin bloquear**.
 
 ## Decisiones de diseño
 

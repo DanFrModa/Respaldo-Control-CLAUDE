@@ -152,7 +152,7 @@ export async function pedidosPorMes(
             precio: true,
             idDesarrollo: true,
             modelo: {
-              select: { codigo: true, descripcion: true, numeroProduccion: true },
+              select: { codigo: true, descripcion: true, numeroProduccion: true, origen: true },
             },
             desarrollo: { select: { numeroCliente: true } },
           },
@@ -263,6 +263,7 @@ export async function pedidosPorMes(
         id: linea.id,
         idModelo: linea.idModelo,
         codigoModelo: linea.modelo.codigo,
+        origenModelo: linea.modelo.origen,
         descripcionModelo: linea.modelo.descripcion,
         idDesarrollo: linea.idDesarrollo,
         numeroCliente: linea.desarrollo?.numeroCliente ?? null,

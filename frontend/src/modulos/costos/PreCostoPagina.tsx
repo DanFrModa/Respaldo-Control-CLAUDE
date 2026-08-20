@@ -31,7 +31,10 @@ export function PreCostoPagina(): React.JSX.Element {
 
   const [busqueda, setBusqueda] = useState('');
   const debounced = useDebounce(busqueda, 300);
-  const modelos = useModelos({ busqueda: debounced, porPagina: 8 });
+  // ⚠️ `origen: 'todos'` (V1-E3n): el API filtra a PRODUCCIÓN por default porque §Post-F9.34 punto
+  // 2 habla del CATÁLOGO y la GALERÍA —lo que se navega—. Precostear un modelo de DESARROLLO es el
+  // corazón de D13: teclear `CYA-26-71-001` aquí tiene que encontrarlo.
+  const modelos = useModelos({ busqueda: debounced, porPagina: 8, origen: 'todos' });
   const pre = usePreCosto(idModelo);
 
   function elegir(id: number): void {

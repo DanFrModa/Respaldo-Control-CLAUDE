@@ -18,6 +18,7 @@
 import {
   esquemaDesarrolloCrear,
   esquemaDesarrolloEditar,
+  esquemaDesarrolloModeloNuevoCuerpo,
   type DesarrolloSalida,
   type EstadoDesarrolloClave,
 } from '../../contrato/esquemas/desarrollo.js';
@@ -25,7 +26,7 @@ import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -35,9 +36,13 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { crearModelo } from '../modelos/modelos.js';
+import { mintearCodigoDesarrollo } from '../modelos/nomenclatura.js';
 
 /** Alta: campos del esquema compartido. */
 export type EntradaCrearDesarrollo = z.input<typeof esquemaDesarrolloCrear>;
+/** Alta con MODELO NUEVO: el código lo arma el sistema (§Post-F9.34). */
+export type EntradaDesarrolloModeloNuevo = z.input<typeof esquemaDesarrolloModeloNuevoCuerpo>;
 /** Edición: cambios parciales (numeroCliente/notas). */
 export type EntradaActualizarDesarrollo = z.input<typeof esquemaDesarrolloEditar>;
 
@@ -252,6 +257,143 @@ export async function crearDesarrollo(
       idEntidad: desarrolloId,
       accion: 'CREAR',
       datos: { idProyecto, idModelo: datos.idModelo },
+    });
+
+    return desarrolloId;
+  }, bd);
+
+  return obtenerDesarrollo(sesion, idNuevo, bd);
+}
+
+/**
+ * Crea un desarrollo CON UN MODELO NUEVO, en UNA sola transacción (A2) — §Post-F9.34, V1-E3n.
+ *
+ * Es el único camino por el que nace un modelo de DESARROLLO, y por eso vive aquí y no en el
+ * catálogo de modelos: el código `CYA-26-71-001` necesita el CLIENTE, y el cliente sólo se conoce
+ * a través del proyecto. Antes esto lo orquestaba el frontend con dos llamadas sueltas (crear
+ * modelo → crear desarrollo) y el usuario TECLEABA el código; hoy el código lo arma el sistema y
+ * las dos escrituras son atómicas: si el desarrollo falla, el modelo tampoco queda.
+ *
+ * El alta del modelo REUSA `crearModelo` (misma validación de temporada/curva/género/tipo, misma
+ * bitácora) dentro de la transacción; encima se marcan `origen = desarrollo` y `codigoDesarrollo`.
+ * Exige los DOS permisos porque hace las dos cosas: `desarrollo.administrar` y —vía `crearModelo`—
+ * `modelos.administrar`.
+ */
+export async function crearDesarrolloConModeloNuevo(
+  sesion: SesionUsuario,
+  idProyecto: number,
+  entrada: EntradaDesarrolloModeloNuevo,
+  bd?: ContextoBd,
+): Promise<DesarrolloSalida> {
+  verificarPermiso(sesion, 'desarrollo.administrar');
+  verificarPermiso(sesion, 'modelos.administrar');
+  const datos = validarEntrada(esquemaDesarrolloModeloNuevoCuerpo, entrada);
+
+  const idNuevo = await enTransaccion(async (tx) => {
+    const proyecto = await tx.proyecto.findFirst({
+      where: { id: idProyecto, idEmpresa: sesion.idEmpresaActiva },
+      select: { archivado: true, folio: true, idCliente: true },
+    });
+    if (proyecto === null) {
+      throw new ErrorNoEncontrado('Proyecto', idProyecto);
+    }
+    if (proyecto.archivado) {
+      throw new ErrorConflicto(
+        `El proyecto ${Number(proyecto.folio)} está archivado; desarchívalo para agregarle desarrollos.`,
+      );
+    }
+
+    // Los dos dígitos salen del CATÁLOGO (tipo de prenda + género), que es de donde los toma
+    // después el número de producción: así los dos códigos del modelo dicen lo mismo.
+    const [tipo, genero] = await Promise.all([
+      tx.tipoProducto.findUnique({
+        where: { id: datos.idTipoProducto },
+        select: { nombre: true, activo: true, digitoConcepto: true },
+      }),
+      tx.genero.findUnique({
+        where: { id: datos.idGenero },
+        select: { nombre: true, activo: true, digitoNomenclatura: true },
+      }),
+    ]);
+    if (tipo === null || !tipo.activo) {
+      throw new ErrorValidacion('El tipo de producto seleccionado no existe o está desactivado.');
+    }
+    if (genero === null || !genero.activo) {
+      throw new ErrorValidacion('El género seleccionado no existe o está desactivado.');
+    }
+    if (tipo.digitoConcepto === null) {
+      throw new ErrorValidacion(
+        `El tipo de producto "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él no ` +
+          `se puede armar el código del modelo. Captúralo en su catálogo.`,
+      );
+    }
+    if (genero.digitoNomenclatura === null) {
+      throw new ErrorValidacion(
+        `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él no se ` +
+          `puede armar el código del modelo. Captúralo en su catálogo.`,
+      );
+    }
+
+    const { codigo } = await mintearCodigoDesarrollo(tx, {
+      idCliente: proyecto.idCliente,
+      anioEntrega: datos.anioEntrega,
+      concepto: tipo.digitoConcepto,
+      genero: genero.digitoNomenclatura,
+    });
+
+    const modelo = await crearModelo(
+      sesion,
+      {
+        codigo,
+        idTipoProducto: datos.idTipoProducto,
+        idGenero: datos.idGenero,
+        ...(datos.descripcion === undefined || datos.descripcion === ''
+          ? {}
+          : { descripcion: datos.descripcion }),
+        ...(datos.idCurvaTalla === undefined ? {} : { idCurvaTalla: datos.idCurvaTalla }),
+      },
+      { tx },
+    );
+    // La marca de origen + el nº de desarrollo. Van aparte de `crearModelo` a propósito: el alta
+    // normal del catálogo NO puede fabricar modelos de desarrollo (su código no lo arma nadie).
+    await tx.modelo.update({
+      where: { id: modelo.id },
+      data: { origen: 'desarrollo', codigoDesarrollo: codigo },
+    });
+
+    let desarrolloId: number;
+    try {
+      const creado = await tx.desarrollo.create({
+        data: {
+          idProyecto,
+          idModelo: modelo.id,
+          ...(datos.numeroCliente === undefined ? {} : { numeroCliente: datos.numeroCliente }),
+          ...(datos.notas === undefined ? {} : { notas: datos.notas }),
+          ...datosCreacion(sesion),
+        },
+        select: { id: true },
+      });
+      desarrolloId = creado.id;
+    } catch (error) {
+      if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+        throw new ErrorConflicto('Este proyecto ya tiene un desarrollo para ese modelo.', {
+          causa: error,
+        });
+      }
+      throw error;
+    }
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Desarrollo',
+      idEntidad: desarrolloId,
+      accion: 'CREAR',
+      datos: {
+        idProyecto,
+        idModelo: modelo.id,
+        operacion: 'modelo-nuevo',
+        codigoDesarrollo: codigo,
+        anioEntrega: datos.anioEntrega,
+      },
     });
 
     return desarrolloId;

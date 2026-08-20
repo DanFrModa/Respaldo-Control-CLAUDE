@@ -491,24 +491,31 @@ async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
  * `nombre` (clave natural), sin pisar `activo` si ya existe. NO se borran los que no
  * estén aquí (podrían estar en uso una vez que el ETL E7 pueble `Modelo.idGenero`).
  */
-const GENEROS_BASE: string[] = [
-  'Caballero',
-  'Dama',
-  'Niño Infantil',
-  'Niña Infantil',
-  'Niño Juvenil',
-  'Niña Juvenil',
-  'Bebo',
-  'Beba',
+/**
+ * Géneros base con su DÍGITO de la nomenclatura de producción (§Post-F9.34, V1-E3n): es el 2º
+ * dígito del código de 5 (`71001` → `1` = Caballero). `alterno` es el dígito de CONTINUACIÓN
+ * cuando la serie se agota: sólo Caballero lo tiene (1 → 5), porque su serie `x1` ya llegó a 999
+ * en el Access y Daniel abrió la `x5`. El 8 no se usa.
+ */
+const GENEROS_BASE: { nombre: string; digito: number; alterno?: number }[] = [
+  { nombre: 'Caballero', digito: 1, alterno: 5 },
+  { nombre: 'Dama', digito: 2 },
+  { nombre: 'Niño Infantil', digito: 4 },
+  { nombre: 'Niña Infantil', digito: 6 },
+  { nombre: 'Niño Juvenil', digito: 3 },
+  { nombre: 'Niña Juvenil', digito: 7 },
+  { nombre: 'Bebo', digito: 0 },
+  { nombre: 'Beba', digito: 9 },
 ];
 
 async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
-  for (const nombre of GENEROS_BASE) {
+  for (const { nombre, digito, alterno } of GENEROS_BASE) {
     await prisma.genero.upsert({
       where: { nombre },
-      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción).
-      update: {},
-      create: { nombre },
+      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción), pero el
+      // dígito SÍ se re-siembra: es la tabla de Daniel, no una preferencia editable.
+      update: { digitoNomenclatura: digito, digitoAlterno: alterno ?? null },
+      create: { nombre, digitoNomenclatura: digito, digitoAlterno: alterno ?? null },
     });
   }
 }

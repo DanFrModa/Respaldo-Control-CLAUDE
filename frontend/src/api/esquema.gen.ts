@@ -7797,6 +7797,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre del cliente. */
                 nombre: string;
+                /** @description Abreviatura del cliente para el código de desarrollo (el "CYA"), o null. */
+                abreviatura: string | null;
                 /** @description Razón social (nombre legal), o null. */
                 razonSocial: string | null;
                 /** @description Persona de contacto, o null. */
@@ -7966,6 +7968,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre: string;
+            abreviatura?: string;
             razonSocial?: string;
             contacto?: string;
             telefono?: string;
@@ -7991,6 +7994,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Abreviatura del cliente para el código de desarrollo (el "CYA"), o null. */
+              abreviatura: string | null;
               /** @description Razón social (nombre legal), o null. */
               razonSocial: string | null;
               /** @description Persona de contacto, o null. */
@@ -8175,6 +8180,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Abreviatura del cliente para el código de desarrollo (el "CYA"), o null. */
+              abreviatura: string | null;
               /** @description Razón social (nombre legal), o null. */
               razonSocial: string | null;
               /** @description Persona de contacto, o null. */
@@ -8348,6 +8355,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Abreviatura del cliente para el código de desarrollo (el "CYA"), o null. */
+              abreviatura: string | null;
               /** @description Razón social (nombre legal), o null. */
               razonSocial: string | null;
               /** @description Persona de contacto, o null. */
@@ -8512,6 +8521,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre?: string;
+            abreviatura?: string | null;
             razonSocial?: string | null;
             contacto?: string | null;
             telefono?: string | null;
@@ -8535,6 +8545,8 @@ export interface paths {
               id: number;
               /** @description Nombre del cliente. */
               nombre: string;
+              /** @description Abreviatura del cliente para el código de desarrollo (el "CYA"), o null. */
+              abreviatura: string | null;
               /** @description Razón social (nombre legal), o null. */
               razonSocial: string | null;
               /** @description Persona de contacto, o null. */
@@ -12985,8 +12997,10 @@ export interface paths {
           pagina?: number;
           /** @description Renglones por página (máx 100). */
           porPagina?: number;
-          /** @description Texto a buscar en el código o la descripción (insensible a mayúsculas). */
+          /** @description Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas). */
           busqueda?: string;
+          /** @description Filtro de origen: solo producción (default), solo desarrollo, o todos. */
+          origen?: 'produccion' | 'desarrollo' | 'todos';
           /** @description Filtra por id de temporada. */
           idTemporada?: number;
           /** @description Incluye los descontinuados ("true"/"false"). */
@@ -13013,8 +13027,17 @@ export interface paths {
               datos: {
                 /** @description Id del modelo. */
                 id: number;
-                /** @description Código/clave de negocio del modelo (único global). */
+                /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
                 codigo: string;
+                /**
+                 * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+                 * @enum {string}
+                 */
+                origen: 'desarrollo' | 'produccion';
+                /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+                codigoDesarrollo: string | null;
+                /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+                numeroProduccion: number | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13215,8 +13238,17 @@ export interface paths {
             'application/json': {
               /** @description Id del modelo. */
               id: number;
-              /** @description Código/clave de negocio del modelo (único global). */
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
               codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13400,8 +13432,17 @@ export interface paths {
             'application/json': {
               /** @description Id del modelo. */
               id: number;
-              /** @description Código/clave de negocio del modelo (único global). */
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
               codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13717,8 +13758,17 @@ export interface paths {
             'application/json': {
               /** @description Id del modelo. */
               id: number;
-              /** @description Código/clave de negocio del modelo (único global). */
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
               codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13915,8 +13965,17 @@ export interface paths {
             'application/json': {
               /** @description Id del modelo. */
               id: number;
-              /** @description Código/clave de negocio del modelo (único global). */
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
               codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14065,6 +14124,360 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/modelos/{id}/propuesta-produccion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Consultar el nº de producción que el sistema propone para un modelo */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Propuesta de número de producción para un modelo de desarrollo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Nº de 5 dígitos propuesto, o null si no queda ninguno libre. */
+              numero: number | null;
+              /** @description El código correspondiente ("71001"), o null. */
+              codigo: string | null;
+              /** @description Ocupación de una serie de numeración de producción. */
+              serie: {
+                /** @description Los dos dígitos de la serie (ej. "71"). */
+                par: string;
+                /** @description Consecutivo libre más bajo (1–999), o null si la serie está llena. */
+                libre: number | null;
+                /** @description Consecutivos ya usados de la serie. */
+                usados: number;
+                /** @description Consecutivos que quedan libres (de 999). */
+                libres: number;
+              };
+              /** @description true si se pasó a la serie de continuación del género (Caballero 1→5). */
+              serieContinuada: boolean;
+              /** @description Avisos para enseñar junto al campo (nunca bloquean). */
+              avisos: string[];
+              /** @description true si el modelo ya está en el catálogo de producción. */
+              yaEnProduccion: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/pasar-a-produccion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pasar un modelo de desarrollo al catálogo de producción */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cuerpo de la acción «pasar a producción» de un modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema. */
+            numeroProduccion?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de pasar un modelo de desarrollo a producción. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Modelo del catálogo (global). */
+              modelo: {
+                /** @description Id del modelo. */
+                id: number;
+                /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
+                codigo: string;
+                /**
+                 * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+                 * @enum {string}
+                 */
+                origen: 'desarrollo' | 'produccion';
+                /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+                codigoDesarrollo: string | null;
+                /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+                numeroProduccion: number | null;
+                /** @description Descripción, o null. */
+                descripcion: string | null;
+                /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+                composicion: string | null;
+                /** @description Costo de maquila base, o null. */
+                maquilaBase: number | null;
+                /** @description Id de la temporada, o null. */
+                idTemporada: number | null;
+                /** @description Nombre de la temporada, o null. */
+                temporada: string | null;
+                /** @description Id de la curva de tallas, o null. */
+                idCurvaTalla: number | null;
+                /** @description Nombre de la curva de tallas, o null. */
+                curvaTalla: string | null;
+                /** @description Id del género, o null. */
+                idGenero: number | null;
+                /** @description Nombre del género, o null. */
+                genero: string | null;
+                /** @description Id del tipo de producto, o null (F6-E1). */
+                idTipoProducto: number | null;
+                /** @description Nombre del tipo de producto, o null. */
+                tipoProducto: string | null;
+                /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+                numOperaciones: number | null;
+                /** @description Costo de corte por prenda (R5/B8), o null. */
+                corteBase: number | null;
+                /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+                idMaquileroCotizado: number | null;
+                /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+                maquileroCotizado: string | null;
+                /**
+                 * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+                 * @enum {string}
+                 */
+                secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+                /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+                llevaArte: boolean;
+                /** @description Cantidad de fotos del modelo. */
+                cantidadFotos: number;
+                /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
+                urlFotoPrincipal: string | null;
+                /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+                telaPrincipal: string | null;
+                /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+                stockPt: number | null;
+                /** @description Costo unitario del último costeo del modelo (F7), o null. */
+                costoActual: number | null;
+                /** @description Falso si está descontinuado (borrado suave). */
+                activo: boolean;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              };
+              /** @description Nº de producción asignado. */
+              numeroProduccion: number;
+              /** @description true si el número lo capturó el usuario en vez de aceptar la propuesta. */
+              numeroCapturado: boolean;
+              /** @description Avisos (congruencia de dígitos, cercanía al tope). */
+              avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/modelos/{id}/bom/telas': {
@@ -19810,15 +20223,20 @@ export interface paths {
                   id: number;
                   /** @description Modelo del renglón. */
                   idModelo: number;
-                  /** @description Nº de desarrollo (Modelo.codigo). */
+                  /** @description Código VIGENTE del modelo (Modelo.codigo). */
                   codigoModelo: string;
+                  /**
+                   * @description Origen del modelo (§Post-F9.34): con "desarrollo", generar la OP lo PASA a producción y hay que confirmar su nº de 5 dígitos.
+                   * @enum {string}
+                   */
+                  origenModelo: 'desarrollo' | 'produccion';
                   /** @description Descripción del modelo, o null. */
                   descripcionModelo: string | null;
                   /** @description Desarrollo del renglón (R3, B4), o null. */
                   idDesarrollo: number | null;
                   /** @description Nº del cliente para el modelo (del desarrollo), o null. */
                   numeroCliente: string | null;
-                  /** @description Nº interno de producción del modelo, o null si no ha salido a producción. */
+                  /** @description Nº de producción del modelo (5 dígitos), o null si aún no lo tiene. */
                   numeroProduccion: number | null;
                   /** @description Cantidad pedida del renglón. */
                   cantidad: number;
@@ -20165,6 +20583,8 @@ export interface paths {
              * @description Fecha de entrega comprometida de la OP; si se omite, hereda la ventana del pedido (fechaHasta ?? fechaDe).
              */
             fechaEntrega?: string;
+            /** @description Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción. */
+            numeroProduccion?: number;
           };
         };
       };
@@ -20324,10 +20744,14 @@ export interface paths {
                 /** @description Id del último usuario que la modificó. */
                 modificadoPorId: string | null;
               };
-              /** @description Nº interno de producción del modelo (minteado aquí si es su primera salida). */
-              numeroProduccion: number;
-              /** @description true si esta salida MINTEÓ el número (primera OP del modelo); false si lo reusó. */
+              /** @description Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`). */
+              numeroProduccion: number | null;
+              /** @description true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción. */
               numeroProduccionMinteado: boolean;
+              /** @description Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción. */
+              codigoModeloAnterior: string | null;
+              /** @description Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean. */
+              avisosNumeroProduccion: string[];
               /** @description Desarrollo ligado a la OP, o null (renglón sin desarrollo = caso legado). */
               idDesarrollo: number | null;
               /** @description true si se creó la liga DesarrolloOrden en esta operación. */
@@ -21153,8 +21577,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la OP (por empresa). */
                 folio: number;
-                /** @description Nº interno de producción minteado/reusado. */
-                numeroProduccion: number;
+                /** @description Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos. */
+                numeroProduccion: number | null;
                 /** @description Nº de desarrollo del modelo. */
                 codigoModelo: string;
                 /** @description Nº/estilo del modelo del cliente (del archivo). */
@@ -21578,8 +22002,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la OP (por empresa). */
                 folio: number;
-                /** @description Nº interno de producción minteado/reusado. */
-                numeroProduccion: number;
+                /** @description Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos. */
+                numeroProduccion: number | null;
                 /** @description Nº de desarrollo de NUESTRO modelo. */
                 codigoModelo: string;
                 /** @description Modelo ID del cliente (del PDF). */
@@ -65782,7 +66206,7 @@ export interface paths {
           /** @description Incluye los desactivados ("true"/"false"). */
           incluirInactivos?: string;
           /** @description Columna de orden. */
-          ordenarPor?: 'nombre' | 'creadoEn';
+          ordenarPor?: 'nombre' | 'creadoEn' | 'digitoConcepto';
           /** @description Dirección del orden. */
           direccion?: 'asc' | 'desc';
         };
@@ -65805,6 +66229,8 @@ export interface paths {
                 id: number;
                 /** @description Nombre del tipo de producto. */
                 nombre: string;
+                /** @description 1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34). */
+                digitoConcepto: number | null;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
                 /**
@@ -65928,6 +66354,8 @@ export interface paths {
         content: {
           'application/json': {
             nombre: string;
+            /** @description 1er dígito de la nomenclatura de producción (2–9). Sin él, un modelo de este tipo no se puede numerar. */
+            digitoConcepto?: number;
           };
         };
       };
@@ -65943,6 +66371,8 @@ export interface paths {
               id: number;
               /** @description Nombre del tipo de producto. */
               nombre: string;
+              /** @description 1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34). */
+              digitoConcepto: number | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -66081,6 +66511,8 @@ export interface paths {
               id: number;
               /** @description Nombre del tipo de producto. */
               nombre: string;
+              /** @description 1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34). */
+              digitoConcepto: number | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -66208,6 +66640,8 @@ export interface paths {
               id: number;
               /** @description Nombre del tipo de producto. */
               nombre: string;
+              /** @description 1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34). */
+              digitoConcepto: number | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -66326,6 +66760,7 @@ export interface paths {
         content: {
           'application/json': {
             nombre?: string;
+            digitoConcepto?: number | null;
             activo?: boolean;
           };
         };
@@ -66342,6 +66777,8 @@ export interface paths {
               id: number;
               /** @description Nombre del tipo de producto. */
               nombre: string;
+              /** @description 1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34). */
+              digitoConcepto: number | null;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -84782,6 +85219,194 @@ export interface paths {
           'application/json': {
             /** @description Modelo del catálogo que se desarrolla (Modelo.id). */
             idModelo: number;
+            /** @description Número del cliente para este modelo (el "otro número"; opcional). */
+            numeroCliente?: string;
+            /** @description Notas del desarrollo (opcional). */
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Cliente del proyecto (heredado, no se captura aquí). */
+              idCliente: number;
+              /** @description Nombre del cliente del proyecto (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente (del proyecto). */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento del cliente (para la UI). */
+              departamento: string;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proyectos/{idProyecto}/desarrollos/modelo-nuevo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Agregar un desarrollo creando un modelo nuevo (código de desarrollo automático) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          idProyecto: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Año de ENTREGA del modelo (el que se congela en el código, no el de creación). */
+            anioEntrega: number;
+            /** @description Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura. */
+            idTipoProducto: number;
+            /** @description Género: de él sale el 2º dígito de la nomenclatura. */
+            idGenero: number;
+            /** @description Descripción del modelo (opcional). */
+            descripcion?: string;
+            /** @description Curva de tallas del modelo (opcional). */
+            idCurvaTalla?: number;
             /** @description Número del cliente para este modelo (el "otro número"; opcional). */
             numeroCliente?: string;
             /** @description Notas del desarrollo (opcional). */

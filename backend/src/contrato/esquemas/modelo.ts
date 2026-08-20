@@ -236,6 +236,29 @@ const camposOpcionalesModelo = {
  * son OPCIONALES (el ETL E7 las poblará). El BOM no va aquí: se captura con los endpoints de
  * BOM tras crear el modelo (igual que la foto del arte). Nace activo y sin BOM/fotos.
  */
+/**
+ * ORIGEN del modelo (§Post-F9.34, V1-E3n): en qué catálogo vive y de qué serie salió su número.
+ * Ver `Modelo.origen` en el esquema Prisma.
+ */
+export const esquemaOrigenModelo = z
+  .enum(['desarrollo', 'produccion'])
+  .describe('Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).');
+
+/** Clave del origen del modelo. */
+export type OrigenModeloClave = z.infer<typeof esquemaOrigenModelo>;
+
+/**
+ * Filtro de ORIGEN del catálogo y de la galería. `produccion` es el DEFAULT a propósito: Daniel
+ * pidió *"no llenar de basura el catálogo"* con los modelos de desarrollo que nunca salen
+ * (§Post-F9.34 punto 2); los de desarrollo quedan detrás del filtro, no escondidos.
+ */
+export const esquemaFiltroOrigenModelo = z
+  .enum(['produccion', 'desarrollo', 'todos'])
+  .describe('Filtro de origen: solo producción (default), solo desarrollo, o todos.');
+
+/** Clave del filtro de origen. */
+export type FiltroOrigenModeloClave = z.infer<typeof esquemaFiltroOrigenModelo>;
+
 export const esquemaModeloCrear = z.object({
   codigo: z
     .string({ error: 'El código es obligatorio' })
@@ -514,7 +537,25 @@ export const esquemaModeloTallaCurvaSalida = z
 export const esquemaModeloSalida = z
   .object({
     id: z.number().int().describe('Id del modelo.'),
-    codigo: z.string().describe('Código/clave de negocio del modelo (único global).'),
+    codigo: z
+      .string()
+      .describe(
+        'Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción.',
+      ),
+    origen: esquemaOrigenModelo,
+    codigoDesarrollo: z
+      .string()
+      .nullable()
+      .describe(
+        'Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo.',
+      ),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico).',
+      ),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -643,7 +684,10 @@ export const esquemaModelosQuery = z
       .trim()
       .max(200)
       .optional()
-      .describe('Texto a buscar en el código o la descripción (insensible a mayúsculas).'),
+      .describe(
+        'Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas).',
+      ),
+    origen: esquemaFiltroOrigenModelo.default('produccion'),
     idTemporada: z.coerce
       .number()
       .int()
@@ -678,6 +722,77 @@ export const esquemaModelosPagina = z
 
 /** Forma de la respuesta paginada de modelos. */
 export type ModelosPagina = z.infer<typeof esquemaModelosPagina>;
+
+// ── Pasar a producción (§Post-F9.34 / §Post-F9.46, V1-E3n) ────────────────────
+
+/** Estado de UNA serie de numeración (un par concepto+género). */
+export const esquemaSerieProduccion = z
+  .object({
+    par: z.string().describe('Los dos dígitos de la serie (ej. "71").'),
+    libre: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Consecutivo libre más bajo (1–999), o null si la serie está llena.'),
+    usados: z.number().int().describe('Consecutivos ya usados de la serie.'),
+    libres: z.number().int().describe('Consecutivos que quedan libres (de 999).'),
+  })
+  .describe('Ocupación de una serie de numeración de producción.');
+
+/**
+ * Propuesta de nº de producción para un modelo: el campo llega YA LLENO con el siguiente libre
+ * (§Post-F9.46) y el usuario lo puede cambiar. Los `avisos` NUNCA bloquean.
+ */
+export const esquemaPropuestaProduccion = z
+  .object({
+    numero: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Nº de 5 dígitos propuesto, o null si no queda ninguno libre.'),
+    codigo: z.string().nullable().describe('El código correspondiente ("71001"), o null.'),
+    serie: esquemaSerieProduccion,
+    serieContinuada: z
+      .boolean()
+      .describe('true si se pasó a la serie de continuación del género (Caballero 1→5).'),
+    avisos: z.array(z.string()).describe('Avisos para enseñar junto al campo (nunca bloquean).'),
+    yaEnProduccion: z.boolean().describe('true si el modelo ya está en el catálogo de producción.'),
+  })
+  .describe('Propuesta de número de producción para un modelo de desarrollo.');
+
+/** Forma de la propuesta de nº de producción. */
+export type PropuestaProduccionSalida = z.infer<typeof esquemaPropuestaProduccion>;
+
+/** Cuerpo de «pasar a producción»: el número, o nada para aceptar el que propone el sistema. */
+export const esquemaPasarAProduccionCuerpo = z
+  .object({
+    numeroProduccion: z
+      .number({ error: 'El número de producción debe ser un número' })
+      .int({ error: 'El número de producción debe ser entero' })
+      .min(10_000, { error: 'El número de producción debe tener 5 dígitos' })
+      .max(99_999, { error: 'El número de producción debe tener 5 dígitos' })
+      .optional()
+      .describe('Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema.'),
+  })
+  .describe('Cuerpo de la acción «pasar a producción» de un modelo.');
+
+/** Datos de «pasar a producción». */
+export type DatosPasarAProduccion = z.infer<typeof esquemaPasarAProduccionCuerpo>;
+
+/** Resultado de «pasar a producción»: el modelo ya promovido + los avisos que hubo. */
+export const esquemaPasarAProduccionSalida = z
+  .object({
+    modelo: esquemaModeloSalida,
+    numeroProduccion: z.number().int().describe('Nº de producción asignado.'),
+    numeroCapturado: z
+      .boolean()
+      .describe('true si el número lo capturó el usuario en vez de aceptar la propuesta.'),
+    avisos: z.array(z.string()).describe('Avisos (congruencia de dígitos, cercanía al tope).'),
+  })
+  .describe('Resultado de pasar un modelo de desarrollo a producción.');
+
+/** Forma del resultado de «pasar a producción». */
+export type PasarAProduccionSalida = z.infer<typeof esquemaPasarAProduccionSalida>;
 
 // ── Cuerpos de los endpoints de BOM (set-completo por sección) ─────────────────
 

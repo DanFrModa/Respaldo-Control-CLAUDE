@@ -17723,6 +17723,17 @@
                             "type": "string",
                             "description": "Nombre del cliente."
                           },
+                          "abreviatura": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Abreviatura del cliente para el código de desarrollo (el \"CYA\"), o null."
+                          },
                           "razonSocial": {
                             "anyOf": [
                               {
@@ -17936,6 +17947,7 @@
                         "required": [
                           "id",
                           "nombre",
+                          "abreviatura",
                           "razonSocial",
                           "contacto",
                           "telefono",
@@ -18157,6 +18169,12 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "abreviatura": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 6,
+                    "pattern": "^[A-Z0-9]+$"
+                  },
                   "razonSocial": {
                     "type": "string",
                     "maxLength": 200
@@ -18227,6 +18245,17 @@
                     "nombre": {
                       "type": "string",
                       "description": "Nombre del cliente."
+                    },
+                    "abreviatura": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Abreviatura del cliente para el código de desarrollo (el \"CYA\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -18441,6 +18470,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "abreviatura",
                     "razonSocial",
                     "contacto",
                     "telefono",
@@ -18651,6 +18681,17 @@
                       "type": "string",
                       "description": "Nombre del cliente."
                     },
+                    "abreviatura": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Abreviatura del cliente para el código de desarrollo (el \"CYA\"), o null."
+                    },
                     "razonSocial": {
                       "anyOf": [
                         {
@@ -18864,6 +18905,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "abreviatura",
                     "razonSocial",
                     "contacto",
                     "telefono",
@@ -19048,6 +19090,19 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
+                  "abreviatura": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 6,
+                        "pattern": "^[A-Z0-9]+$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "razonSocial": {
                     "anyOf": [
                       {
@@ -19171,6 +19226,17 @@
                     "nombre": {
                       "type": "string",
                       "description": "Nombre del cliente."
+                    },
+                    "abreviatura": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Abreviatura del cliente para el código de desarrollo (el \"CYA\"), o null."
                     },
                     "razonSocial": {
                       "anyOf": [
@@ -19385,6 +19451,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "abreviatura",
                     "razonSocial",
                     "contacto",
                     "telefono",
@@ -19593,6 +19660,17 @@
                       "type": "string",
                       "description": "Nombre del cliente."
                     },
+                    "abreviatura": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Abreviatura del cliente para el código de desarrollo (el \"CYA\"), o null."
+                    },
                     "razonSocial": {
                       "anyOf": [
                         {
@@ -19806,6 +19884,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "abreviatura",
                     "razonSocial",
                     "contacto",
                     "telefono",
@@ -29943,7 +30022,22 @@
             "in": "query",
             "name": "busqueda",
             "required": false,
-            "description": "Texto a buscar en el código o la descripción (insensible a mayúsculas)."
+            "description": "Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas)."
+          },
+          {
+            "schema": {
+              "default": "produccion",
+              "type": "string",
+              "enum": [
+                "produccion",
+                "desarrollo",
+                "todos"
+              ]
+            },
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "description": "Filtro de origen: solo producción (default), solo desarrollo, o todos."
           },
           {
             "schema": {
@@ -30021,7 +30115,39 @@
                           },
                           "codigo": {
                             "type": "string",
-                            "description": "Código/clave de negocio del modelo (único global)."
+                            "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                          },
+                          "origen": {
+                            "type": "string",
+                            "enum": [
+                              "desarrollo",
+                              "produccion"
+                            ],
+                            "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                          },
+                          "codigoDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                           },
                           "descripcion": {
                             "anyOf": [
@@ -30307,6 +30433,9 @@
                         "required": [
                           "id",
                           "codigo",
+                          "origen",
+                          "codigoDesarrollo",
+                          "numeroProduccion",
                           "descripcion",
                           "composicion",
                           "maquilaBase",
@@ -30630,7 +30759,39 @@
                     },
                     "codigo": {
                       "type": "string",
-                      "description": "Código/clave de negocio del modelo (único global)."
+                      "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "desarrollo",
+                        "produccion"
+                      ],
+                      "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                    },
+                    "codigoDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                    },
+                    "numeroProduccion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -30916,6 +31077,9 @@
                   "required": [
                     "id",
                     "codigo",
+                    "origen",
+                    "codigoDesarrollo",
+                    "numeroProduccion",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -31138,7 +31302,39 @@
                     },
                     "codigo": {
                       "type": "string",
-                      "description": "Código/clave de negocio del modelo (único global)."
+                      "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "desarrollo",
+                        "produccion"
+                      ],
+                      "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                    },
+                    "codigoDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                    },
+                    "numeroProduccion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -31917,6 +32113,9 @@
                   "required": [
                     "id",
                     "codigo",
+                    "origen",
+                    "codigoDesarrollo",
+                    "numeroProduccion",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -32290,7 +32489,39 @@
                     },
                     "codigo": {
                       "type": "string",
-                      "description": "Código/clave de negocio del modelo (único global)."
+                      "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "desarrollo",
+                        "produccion"
+                      ],
+                      "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                    },
+                    "codigoDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                    },
+                    "numeroProduccion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -32576,6 +32807,9 @@
                   "required": [
                     "id",
                     "codigo",
+                    "origen",
+                    "codigoDesarrollo",
+                    "numeroProduccion",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -32796,7 +33030,39 @@
                     },
                     "codigo": {
                       "type": "string",
-                      "description": "Código/clave de negocio del modelo (único global)."
+                      "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "desarrollo",
+                        "produccion"
+                      ],
+                      "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                    },
+                    "codigoDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                    },
+                    "numeroProduccion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -33082,6 +33348,9 @@
                   "required": [
                     "id",
                     "codigo",
+                    "origen",
+                    "codigoDesarrollo",
+                    "numeroProduccion",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -33112,6 +33381,875 @@
                   ],
                   "additionalProperties": false,
                   "description": "Modelo del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/propuesta-produccion": {
+      "get": {
+        "summary": "Consultar el nº de producción que el sistema propone para un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Propuesta de número de producción para un modelo de desarrollo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "numero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de 5 dígitos propuesto, o null si no queda ninguno libre."
+                    },
+                    "codigo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El código correspondiente (\"71001\"), o null."
+                    },
+                    "serie": {
+                      "type": "object",
+                      "properties": {
+                        "par": {
+                          "type": "string",
+                          "description": "Los dos dígitos de la serie (ej. \"71\")."
+                        },
+                        "libre": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Consecutivo libre más bajo (1–999), o null si la serie está llena."
+                        },
+                        "usados": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Consecutivos ya usados de la serie."
+                        },
+                        "libres": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Consecutivos que quedan libres (de 999)."
+                        }
+                      },
+                      "required": [
+                        "par",
+                        "libre",
+                        "usados",
+                        "libres"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Ocupación de una serie de numeración de producción."
+                    },
+                    "serieContinuada": {
+                      "type": "boolean",
+                      "description": "true si se pasó a la serie de continuación del género (Caballero 1→5)."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos para enseñar junto al campo (nunca bloquean)."
+                    },
+                    "yaEnProduccion": {
+                      "type": "boolean",
+                      "description": "true si el modelo ya está en el catálogo de producción."
+                    }
+                  },
+                  "required": [
+                    "numero",
+                    "codigo",
+                    "serie",
+                    "serieContinuada",
+                    "avisos",
+                    "yaEnProduccion"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Propuesta de número de producción para un modelo de desarrollo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/pasar-a-produccion": {
+      "post": {
+        "summary": "Pasar un modelo de desarrollo al catálogo de producción",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "numeroProduccion": {
+                    "description": "Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema.",
+                    "type": "integer",
+                    "minimum": 10000,
+                    "maximum": 99999
+                  }
+                },
+                "description": "Cuerpo de la acción «pasar a producción» de un modelo."
+              }
+            }
+          },
+          "description": "Cuerpo de la acción «pasar a producción» de un modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de pasar un modelo de desarrollo a producción.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modelo": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del modelo."
+                        },
+                        "codigo": {
+                          "type": "string",
+                          "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                        },
+                        "origen": {
+                          "type": "string",
+                          "enum": [
+                            "desarrollo",
+                            "produccion"
+                          ],
+                          "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                        },
+                        "codigoDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                        },
+                        "numeroProduccion": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
+                        },
+                        "descripcion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Descripción, o null."
+                        },
+                        "composicion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Composición textil del modelo (la heredan sus órdenes), o null."
+                        },
+                        "maquilaBase": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo de maquila base, o null."
+                        },
+                        "idTemporada": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de la temporada, o null."
+                        },
+                        "temporada": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de la temporada, o null."
+                        },
+                        "idCurvaTalla": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de la curva de tallas, o null."
+                        },
+                        "curvaTalla": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de la curva de tallas, o null."
+                        },
+                        "idGenero": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del género, o null."
+                        },
+                        "genero": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del género, o null."
+                        },
+                        "idTipoProducto": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del tipo de producto, o null (F6-E1)."
+                        },
+                        "tipoProducto": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del tipo de producto, o null."
+                        },
+                        "numOperaciones": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                        },
+                        "corteBase": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo de corte por prenda (R5/B8), o null."
+                        },
+                        "idMaquileroCotizado": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                        },
+                        "maquileroCotizado": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                        },
+                        "secuenciaEstampado": {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues",
+                            "flexible"
+                          ],
+                          "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                        },
+                        "llevaArte": {
+                          "type": "boolean",
+                          "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                        },
+                        "cantidadFotos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cantidad de fotos del modelo."
+                        },
+                        "urlFotoPrincipal": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
+                        },
+                        "telaPrincipal": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                        },
+                        "stockPt": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                        },
+                        "costoActual": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo unitario del último costeo del modelo (F7), o null."
+                        },
+                        "activo": {
+                          "type": "boolean",
+                          "description": "Falso si está descontinuado (borrado suave)."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de alta (ISO 8601)."
+                        },
+                        "creadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del usuario que lo creó."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de la última modificación (ISO 8601)."
+                        },
+                        "modificadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del último usuario que lo modificó."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "codigo",
+                        "origen",
+                        "codigoDesarrollo",
+                        "numeroProduccion",
+                        "descripcion",
+                        "composicion",
+                        "maquilaBase",
+                        "idTemporada",
+                        "temporada",
+                        "idCurvaTalla",
+                        "curvaTalla",
+                        "idGenero",
+                        "genero",
+                        "idTipoProducto",
+                        "tipoProducto",
+                        "numOperaciones",
+                        "corteBase",
+                        "idMaquileroCotizado",
+                        "maquileroCotizado",
+                        "secuenciaEstampado",
+                        "llevaArte",
+                        "cantidadFotos",
+                        "urlFotoPrincipal",
+                        "telaPrincipal",
+                        "stockPt",
+                        "costoActual",
+                        "activo",
+                        "creadoEn",
+                        "creadoPorId",
+                        "modificadoEn",
+                        "modificadoPorId"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Modelo del catálogo (global)."
+                    },
+                    "numeroProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Nº de producción asignado."
+                    },
+                    "numeroCapturado": {
+                      "type": "boolean",
+                      "description": "true si el número lo capturó el usuario en vez de aceptar la propuesta."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos (congruencia de dígitos, cercanía al tope)."
+                    }
+                  },
+                  "required": [
+                    "modelo",
+                    "numeroProduccion",
+                    "numeroCapturado",
+                    "avisos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de pasar un modelo de desarrollo a producción."
                 }
               }
             }
@@ -46858,7 +47996,15 @@
                                 },
                                 "codigoModelo": {
                                   "type": "string",
-                                  "description": "Nº de desarrollo (Modelo.codigo)."
+                                  "description": "Código VIGENTE del modelo (Modelo.codigo)."
+                                },
+                                "origenModelo": {
+                                  "type": "string",
+                                  "enum": [
+                                    "desarrollo",
+                                    "produccion"
+                                  ],
+                                  "description": "Origen del modelo (§Post-F9.34): con \"desarrollo\", generar la OP lo PASA a producción y hay que confirmar su nº de 5 dígitos."
                                 },
                                 "descripcionModelo": {
                                   "anyOf": [
@@ -46906,7 +48052,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Nº interno de producción del modelo, o null si no ha salido a producción."
+                                  "description": "Nº de producción del modelo (5 dígitos), o null si aún no lo tiene."
                                 },
                                 "cantidad": {
                                   "type": "integer",
@@ -46979,6 +48125,7 @@
                                 "id",
                                 "idModelo",
                                 "codigoModelo",
+                                "origenModelo",
                                 "descripcionModelo",
                                 "idDesarrollo",
                                 "numeroCliente",
@@ -47700,6 +48847,12 @@
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "numeroProduccion": {
+                    "description": "Nº de producción CONFIRMADO para un modelo que todavía es de desarrollo (§Post-F9.46: el sistema lo precarga y el usuario lo puede cambiar). Omitir = aceptar el que propone el sistema. Se ignora si el modelo ya está en producción.",
+                    "type": "integer",
+                    "minimum": 10000,
+                    "maximum": 99999
                   }
                 },
                 "required": [
@@ -48368,14 +49521,39 @@
                       "description": "La orden de producción recién creada (con su matriz)."
                     },
                     "numeroProduccion": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Nº interno de producción del modelo (minteado aquí si es su primera salida)."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de producción del modelo (asignado aquí si venía de desarrollo). Null cuando el modelo ya era de producción pero su código no es numérico de 5 dígitos (histórico tipo `51783a` o `M-18`)."
                     },
                     "numeroProduccionMinteado": {
                       "type": "boolean",
-                      "description": "true si esta salida MINTEÓ el número (primera OP del modelo); false si lo reusó."
+                      "description": "true si ESTA salida pasó el modelo de desarrollo a producción asignándole su número; false si el modelo ya estaba en producción."
+                    },
+                    "codigoModeloAnterior": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código que TENÍA el modelo antes de pasar a producción (su nº de desarrollo), o null si no hubo promoción."
+                    },
+                    "avisosNumeroProduccion": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos de la asignación del número (dígitos que no cuadran, serie cerca del tope). NUNCA bloquean."
                     },
                     "idDesarrollo": {
                       "anyOf": [
@@ -48399,6 +49577,8 @@
                     "orden",
                     "numeroProduccion",
                     "numeroProduccionMinteado",
+                    "codigoModeloAnterior",
+                    "avisosNumeroProduccion",
                     "idDesarrollo",
                     "ligaCreada"
                   ],
@@ -50204,10 +51384,17 @@
                             "description": "Folio de la OP (por empresa)."
                           },
                           "numeroProduccion": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Nº interno de producción minteado/reusado."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos."
                           },
                           "codigoModelo": {
                             "type": "string",
@@ -51229,10 +52416,17 @@
                             "description": "Folio de la OP (por empresa)."
                           },
                           "numeroProduccion": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Nº interno de producción minteado/reusado."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos."
                           },
                           "codigoModelo": {
                             "type": "string",
@@ -160940,7 +162134,8 @@
               "type": "string",
               "enum": [
                 "nombre",
-                "creadoEn"
+                "creadoEn",
+                "digitoConcepto"
               ]
             },
             "in": "query",
@@ -160991,6 +162186,19 @@
                             "type": "string",
                             "description": "Nombre del tipo de producto."
                           },
+                          "digitoConcepto": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34)."
+                          },
                           "activo": {
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
@@ -161033,6 +162241,7 @@
                         "required": [
                           "id",
                           "nombre",
+                          "digitoConcepto",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -161245,6 +162454,12 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
+                  },
+                  "digitoConcepto": {
+                    "description": "1er dígito de la nomenclatura de producción (2–9). Sin él, un modelo de este tipo no se puede numerar.",
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 9
                   }
                 },
                 "required": [
@@ -161276,6 +162491,19 @@
                     "nombre": {
                       "type": "string",
                       "description": "Nombre del tipo de producto."
+                    },
+                    "digitoConcepto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34)."
                     },
                     "activo": {
                       "type": "boolean",
@@ -161319,6 +162547,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "digitoConcepto",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -161521,6 +162750,19 @@
                       "type": "string",
                       "description": "Nombre del tipo de producto."
                     },
+                    "digitoConcepto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34)."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -161563,6 +162805,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "digitoConcepto",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -161739,6 +162982,18 @@
                     "minLength": 1,
                     "maxLength": 100
                   },
+                  "digitoConcepto": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 2,
+                        "maximum": 9
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "activo": {
                     "type": "boolean"
                   }
@@ -161783,6 +163038,19 @@
                       "type": "string",
                       "description": "Nombre del tipo de producto."
                     },
+                    "digitoConcepto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34)."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -161825,6 +163093,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "digitoConcepto",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -162025,6 +163294,19 @@
                       "type": "string",
                       "description": "Nombre del tipo de producto."
                     },
+                    "digitoConcepto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34)."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -162067,6 +163349,7 @@
                   "required": [
                     "id",
                     "nombre",
+                    "digitoConcepto",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -204439,6 +205722,430 @@
                 },
                 "required": [
                   "idModelo"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idProyecto",
+            "required": true,
+            "description": "Id del proyecto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Desarrollo (un modelo dentro de un proyecto de desarrollo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del desarrollo."
+                    },
+                    "idProyecto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Proyecto al que pertenece."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente del proyecto (heredado, no se captura aquí)."
+                    },
+                    "cliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente del proyecto (para la UI)."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente (del proyecto)."
+                    },
+                    "departamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento del cliente (para la UI)."
+                    },
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Modelo del catálogo (nuestro número)."
+                    },
+                    "codigoModelo": {
+                      "type": "string",
+                      "description": "Código del modelo (nuestro número, para la UI)."
+                    },
+                    "descripcionModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción del modelo, o null."
+                    },
+                    "numeroCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Número del cliente para el modelo, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas del desarrollo, o null."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "en-desarrollo",
+                        "cotizado",
+                        "en-lista",
+                        "ligado-produccion",
+                        "apagado"
+                      ],
+                      "description": "Estado DERIVADO del desarrollo (calculado por el dominio, no editable)."
+                    },
+                    "apagado": {
+                      "type": "boolean",
+                      "description": "Borrado suave: el desarrollo se conserva pero no cuenta."
+                    },
+                    "apagadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se apagó (ISO 8601), o null."
+                    },
+                    "apagadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién lo apagó, o null."
+                    },
+                    "motivoApagado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo por el que se apagó, o null."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idProyecto",
+                    "idCliente",
+                    "cliente",
+                    "idClienteDepartamento",
+                    "departamento",
+                    "idModelo",
+                    "codigoModelo",
+                    "descripcionModelo",
+                    "numeroCliente",
+                    "notas",
+                    "estado",
+                    "apagado",
+                    "apagadoEn",
+                    "apagadoPorId",
+                    "motivoApagado",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Desarrollo (un modelo dentro de un proyecto de desarrollo)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proyectos/{idProyecto}/desarrollos/modelo-nuevo": {
+      "post": {
+        "summary": "Agregar un desarrollo creando un modelo nuevo (código de desarrollo automático)",
+        "tags": [
+          "desarrollo"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "anioEntrega": {
+                    "type": "integer",
+                    "minimum": 2020,
+                    "maximum": 2100,
+                    "description": "Año de ENTREGA del modelo (el que se congela en el código, no el de creación)."
+                  },
+                  "idTipoProducto": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura."
+                  },
+                  "idGenero": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Género: de él sale el 2º dígito de la nomenclatura."
+                  },
+                  "descripcion": {
+                    "description": "Descripción del modelo (opcional).",
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "idCurvaTalla": {
+                    "description": "Curva de tallas del modelo (opcional).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "numeroCliente": {
+                    "description": "Número del cliente para este modelo (el \"otro número\"; opcional).",
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "notas": {
+                    "description": "Notas del desarrollo (opcional).",
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "anioEntrega",
+                  "idTipoProducto",
+                  "idGenero"
                 ]
               }
             }

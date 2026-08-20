@@ -6,6 +6,11 @@
  *
  * Lógica de negocio SOLO aquí (A1); transacción + auditoría + bitácora juntas (A2/A7); catálogo
  * GLOBAL como los de F1 (sin idEmpresa). Unicidad de `nombre` insensible a mayúsculas.
+ *
+ * ⚠️ Desde V1-E3n este catálogo lleva además el **`digitoConcepto`**: el 1er dígito de la
+ * nomenclatura de producción (§Post-F9.34). No es un dato de Calidad —vive aquí porque aquí vive el
+ * tipo de prenda— y es el que permite armarle código a un modelo. Es **único entre los tipos
+ * activos**: dos conceptos con el mismo dígito partirían la misma serie de 999 en dos.
  */
 import { esquemaTipoProductoCrear, esquemaTipoProductoEditar } from '../../contrato/index.js';
 import type { Prisma, TipoProducto } from '../../datos/index.js';
@@ -20,7 +25,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
+import { CODIGO_PRISMA, codigoErrorPrisma, unicidadDeCampo } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -42,7 +47,7 @@ export type EntradaActualizarTipoProducto = z.input<typeof esquemaTipoProductoEd
 export const esquemaListarTiposProducto = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(100).optional(),
   incluirInactivos: z.boolean().default(false),
-  ordenarPor: z.enum(['nombre', 'creadoEn']).default('nombre'),
+  ordenarPor: z.enum(['nombre', 'creadoEn', 'digitoConcepto']).default('nombre'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
 });
 
@@ -71,6 +76,44 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
   }
 }
 
+/**
+ * Unicidad del DÍGITO DE CONCEPTO entre los tipos ACTIVOS (§Post-F9.34): cada concepto es una serie
+ * INDEPENDIENTE de 999 números, así que dos tipos con el mismo dígito se estarían repartiendo la
+ * misma serie sin saberlo — y el generador propondría para «Chamarra» un número que «Chaleco» ya
+ * usó. Se mira sólo entre los activos a propósito: un tipo desactivado ya no numera nada, y
+ * bloquear por él obligaría a renombrar historia para reusar un concepto.
+ */
+async function exigirDigitoLibre(tx: Tx, digito: number, idActual?: number): Promise<void> {
+  const existente = await tx.tipoProducto.findFirst({
+    where: {
+      digitoConcepto: digito,
+      activo: true,
+      ...(idActual === undefined ? {} : { id: { not: idActual } }),
+    },
+    select: { nombre: true },
+  });
+  if (existente !== null) {
+    throw new ErrorConflicto(
+      `El dígito ${String(digito)} ya es el concepto del tipo de producto "${existente.nombre}".`,
+    );
+  }
+}
+
+/**
+ * Traduce un P2002 de esta tabla al mensaje del constraint QUE DE VERDAD chocó. Hay DOS únicos —el
+ * `nombre` y el índice parcial del `digito_concepto` entre activos (V1-E3n)— y culpar siempre al
+ * nombre manda a corregir el campo equivocado: pasa al REACTIVAR un tipo cuyo dígito ya se le dio a
+ * otro, donde el dominio no puede adelantarse y la red es la base.
+ */
+function mensajeDeUnicidad(error: unknown, nombre?: string): string {
+  if (unicidadDeCampo(error, 'digito_concepto')) {
+    return 'Ese dígito de concepto ya es de otro tipo de producto activo.';
+  }
+  return nombre === undefined
+    ? 'Ya existe un tipo de producto con ese nombre.'
+    : `Ya existe un tipo de producto llamado "${nombre}".`;
+}
+
 /** Busca un tipo de producto por id o lanza `ErrorNoEncontrado`. */
 async function exigirTipoProducto(tx: Tx, id: number): Promise<TipoProducto> {
   const tipo = await tx.tipoProducto.findUnique({ where: { id } });
@@ -95,22 +138,27 @@ export async function crearTipoProducto(
   try {
     return await enTransaccion(async (tx) => {
       await exigirNombreLibre(tx, datos.nombre);
+      if (datos.digitoConcepto !== undefined) {
+        await exigirDigitoLibre(tx, datos.digitoConcepto);
+      }
       const tipo = await tx.tipoProducto.create({
-        data: { nombre: datos.nombre, ...datosCreacion(sesion) },
+        data: {
+          nombre: datos.nombre,
+          ...(datos.digitoConcepto === undefined ? {} : { digitoConcepto: datos.digitoConcepto }),
+          ...datosCreacion(sesion),
+        },
       });
       await registrarBitacora(tx, sesion, {
         entidad: 'TipoProducto',
         idEntidad: tipo.id,
         accion: 'CREAR',
-        datos: { nombre: tipo.nombre },
+        datos: { nombre: tipo.nombre, digitoConcepto: tipo.digitoConcepto },
       });
       return tipo;
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto(`Ya existe un tipo de producto llamado "${datos.nombre}".`, {
-        causa: error,
-      });
+      throw new ErrorConflicto(mensajeDeUnicidad(error, datos.nombre), { causa: error });
     }
     throw error;
   }
@@ -132,10 +180,13 @@ export async function actualizarTipoProducto(
     return await enTransaccion(async (tx) => {
       const actual = await exigirTipoProducto(tx, datos.id);
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
+      // M1: omitir = no tocar; `null` = QUITAR el dígito; número = fijarlo.
+      const nuevoDigito = datos.digitoConcepto === undefined ? undefined : datos.digitoConcepto;
+      const cambiaDigito = nuevoDigito !== undefined && nuevoDigito !== actual.digitoConcepto;
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
-      if (!cambiaNombre && !reactiva && !desactiva) {
+      if (!cambiaNombre && !cambiaDigito && !reactiva && !desactiva) {
         return actual;
       }
       if (cambiaNombre) {
@@ -143,23 +194,36 @@ export async function actualizarTipoProducto(
       } else if (reactiva) {
         await exigirNombreLibre(tx, actual.nombre, datos.id);
       }
+      // El dígito se valida al fijarlo, y también al REACTIVAR: mientras estuvo apagado alguien
+      // pudo darle ese concepto a otro tipo, y encenderlo partiría la serie en dos.
+      if (cambiaDigito && nuevoDigito !== null) {
+        await exigirDigitoLibre(tx, nuevoDigito, datos.id);
+      } else if (reactiva && actual.digitoConcepto !== null) {
+        await exigirDigitoLibre(tx, actual.digitoConcepto, datos.id);
+      }
 
       const cambios: Prisma.TipoProductoUpdateInput = { ...datosModificacion(sesion) };
       if (cambiaNombre && datos.nombre !== undefined) {
         cambios.nombre = datos.nombre;
+      }
+      if (cambiaDigito) {
+        cambios.digitoConcepto = nuevoDigito;
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
       }
       const tipo = await tx.tipoProducto.update({ where: { id: datos.id }, data: cambios });
 
-      if (cambiaNombre || reactiva) {
+      if (cambiaNombre || cambiaDigito || reactiva) {
         await registrarBitacora(tx, sesion, {
           entidad: 'TipoProducto',
           idEntidad: tipo.id,
           accion: 'MODIFICAR',
           datos: {
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: tipo.nombre } } : {}),
+            ...(cambiaDigito
+              ? { digitoConcepto: { de: actual.digitoConcepto, a: tipo.digitoConcepto } }
+              : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
           },
         });
@@ -176,7 +240,7 @@ export async function actualizarTipoProducto(
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto('Ya existe un tipo de producto con ese nombre.', { causa: error });
+      throw new ErrorConflicto(mensajeDeUnicidad(error), { causa: error });
     }
     throw error;
   }

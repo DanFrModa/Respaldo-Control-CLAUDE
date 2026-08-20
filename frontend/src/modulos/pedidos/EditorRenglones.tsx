@@ -13,13 +13,20 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import type { DatosPedidoFormulario } from './esquemas';
 
-/** Tope alto: trae los modelos activos para el selector de renglón. */
+/**
+ * Tope alto: trae los modelos activos para el selector de renglón.
+ *
+ * ⚠️ `origen: 'todos'` (V1-E3n): sin esto un modelo de DESARROLLO no se podría poner en un pedido, y
+ * con ello quedaría INALCANZABLE por captura manual el camino que la etapa construye — que generar la
+ * OP de ese renglón es lo que pasa el modelo a producción.
+ */
 const QUERY_MODELOS = {
   pagina: 1,
   porPagina: 100,
   ordenarPor: 'codigo',
   direccion: 'asc',
   incluirInactivos: 'false',
+  origen: 'todos',
 } as const;
 
 /**

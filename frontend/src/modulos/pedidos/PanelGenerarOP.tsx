@@ -1,9 +1,10 @@
 import { CheckIcon, InfoIcon, Loader2Icon, X } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useCamposCliente } from '@/api/clientes';
+import { usePropuestaProduccion } from '@/api/modelos';
 import { useSalidaProduccion } from '@/api/pedidos-mes';
 import { useTallasActivas } from '@/api/tallas';
 import type { PedidoMesFila, PedidoMesRenglon, SalidaProduccionCuerpo } from '@/api/tipos';
@@ -24,8 +25,14 @@ import { AgregarColorMatriz } from '@/modulos/ordenes/AgregarColorMatriz';
  * renglón del pedido. Aquí NACE la matriz color×talla de la orden (se eligen colores/tallas del
  * catálogo y se distribuye la cantidad del renglón, con la guía cuadra/faltan/sobran) + las
  * referencias del cliente (D7, opcionales). Al confirmar, el backend en UNA transacción crea la
- * OP, copia el snapshot de la OC, liga al desarrollo, MINTEA el nº interno de producción (1ª vez)
- * y encola la RC automática — el toast lo resume y el banner muestra el número minteado.
+ * OP, copia el snapshot de la OC, liga al desarrollo, PASA EL MODELO A PRODUCCIÓN si todavía era
+ * de desarrollo y encola la RC automática — el toast lo resume.
+ *
+ * ⚠️ El nº de producción se CONFIRMA aquí (§Post-F9.34 punto 4 + §Post-F9.46). Daniel encontró
+ * probando (OP 5558) que la OP se quedaba con el modelo de DESARROLLO: *"habíamos acordado que el
+ * sistema iba a proponer un modelo de producción y yo solo lo confirmaría"*. Por eso, cuando el
+ * renglón trae un modelo de desarrollo, el panel enseña el nº de 5 dígitos **ya precargado** con el
+ * siguiente libre y lo manda al confirmar; se puede cambiar antes de generar.
  *
  * Reusa el componente de captura F2 (`componentes/matriz-color-talla`): en este panel la matriz
  * se CONSTRUYE (agregar/quitar colores y tallas), a diferencia de la matriz con candado de R2.
@@ -47,6 +54,20 @@ export function PanelGenerarOP({
 
   const tallas = useTallasActivas();
   const campos = useCamposCliente(pedido.idCliente);
+
+  // Nº de producción: sólo cuando el modelo del renglón TODAVÍA es de desarrollo. Si ya está en
+  // producción, la OP hereda su número y aquí no hay nada que decidir.
+  const esModeloDeDesarrollo = renglon.origenModelo === 'desarrollo';
+  const propuesta = usePropuestaProduccion(esModeloDeDesarrollo ? renglon.idModelo : undefined);
+  const [numeroProduccion, setNumeroProduccion] = useState('');
+  const [numeroTocado, setNumeroTocado] = useState(false);
+  const propuestoCodigo = propuesta.data?.codigo ?? null;
+  useEffect(() => {
+    if (!numeroTocado && propuestoCodigo !== null) {
+      setNumeroProduccion(propuestoCodigo);
+    }
+  }, [propuestoCodigo, numeroTocado]);
+  const numeroValido = /^\d{5}$/.test(numeroProduccion.trim());
 
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [columnas, setColumnas] = useState<MatrizTalla[]>([]);
@@ -133,6 +154,10 @@ export function PanelGenerarOP({
       toast.error('Captura las cantidades por color y talla.');
       return;
     }
+    if (esModeloDeDesarrollo && !numeroValido) {
+      toast.error('Confirma el número de producción del modelo (5 dígitos).');
+      return;
+    }
     const cuerpo: SalidaProduccionCuerpo = {
       lineas: lineas.map((linea) => ({
         idColor: linea.idColor,
@@ -143,6 +168,7 @@ export function PanelGenerarOP({
           .map((col) => ({ idTalla: col.idTalla, cantidad: linea.cantidades[col.idTalla] ?? 0 }))
           .filter((t) => t.cantidad > 0),
       })),
+      ...(esModeloDeDesarrollo ? { numeroProduccion: Number(numeroProduccion.trim()) } : {}),
       ...(Object.entries(referencias).filter(([, v]) => v.trim() !== '').length > 0
         ? {
             referencias: Object.entries(referencias)
@@ -159,10 +185,19 @@ export function PanelGenerarOP({
       {
         onSuccess: (resultado) => {
           toast.success(
-            `OP ${resultado.orden.folio} creada · salió a producción como modelo #${resultado.numeroProduccion}` +
-              (resultado.ligaCreada ? ` (ligado a desarrollo ${renglon.codigoModelo})` : '') +
+            `OP ${resultado.orden.folio} creada` +
+              (resultado.numeroProduccion === null
+                ? ''
+                : ` · modelo de producción ${String(resultado.numeroProduccion)}`) +
+              (resultado.codigoModeloAnterior === null
+                ? ''
+                : ` (antes ${resultado.codigoModeloAnterior}, que se conserva)`) +
+              (resultado.ligaCreada ? ' · ligado a su desarrollo' : '') +
               ' · Ruta Crítica programándose sola',
           );
+          for (const aviso of resultado.avisosNumeroProduccion) {
+            toast.warning(aviso);
+          }
           alCreada();
         },
         onError: (error) => toast.error(error.message),
@@ -256,6 +291,54 @@ export function PanelGenerarOP({
               talla; al generar, su <b>Ruta Crítica se programa sola</b>.
             </span>
           </p>
+
+          {esModeloDeDesarrollo ? (
+            <section
+              className="space-y-2 rounded-md border border-primary/40 bg-primary-soft px-3 py-2.5"
+              data-testid="confirmar-numero-produccion"
+            >
+              <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                Nº de producción del modelo
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                <b>{renglon.codigoModelo}</b> todavía es un modelo de <b>desarrollo</b>. Al generar
+                la OP entra al catálogo de producción con este número; su nº de desarrollo se
+                conserva y sigue siendo buscable.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={numeroProduccion}
+                  onChange={(e) => {
+                    setNumeroTocado(true);
+                    setNumeroProduccion(e.target.value.replace(/\D/g, ''));
+                  }}
+                  inputMode="numeric"
+                  maxLength={5}
+                  className="mono h-8 w-28"
+                  aria-label="Número de producción del modelo"
+                  aria-invalid={!numeroValido}
+                  data-testid="numero-produccion-op"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {propuesta.isPending
+                    ? 'Calculando el siguiente libre…'
+                    : propuesta.data?.serie !== undefined
+                      ? `Serie ${propuesta.data.serie.par} · quedan ${propuesta.data.serie.libres.toLocaleString('es-MX')} de 999`
+                      : ''}
+                </span>
+              </div>
+              {(propuesta.data?.avisos ?? []).map((aviso) => (
+                <p key={aviso} className="text-xs text-amber-700" data-testid="aviso-produccion-op">
+                  {aviso}
+                </p>
+              ))}
+              {propuesta.isError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {propuesta.error.message}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
           <MatrizColorTalla
             tallas={columnas}

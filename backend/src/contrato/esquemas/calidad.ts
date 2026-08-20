@@ -39,6 +39,19 @@ export type NivelAqlClave = (typeof NIVELES_AQL)[number];
 // Tipos de producto (catálogo nuevo — decisión (d))
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * 1er DÍGITO (CONCEPTO) de la nomenclatura de producción (§Post-F9.34, V1-E3n): 2 Conjunto ·
+ * 3 Bermuda/Falda/Short · 4 Vestido · 5 Playera · 6 Sudadera · 7 Pantalón/Jogger/Leggings ·
+ * 8 Chamarra/Chaleco · 9 Gorra/Polo/Bata. **El 1 y el 0 NO se usan** (Daniel: *"el 1 no es
+ * nada"*), y por eso el rango arranca en 2. Sin este dígito no se le puede armar el código a un
+ * modelo de ese tipo, así que el campo vive en el catálogo y se captura como cualquier otro.
+ */
+export const esquemaDigitoConcepto = z
+  .number({ error: 'El dígito de concepto debe ser un número' })
+  .int({ error: 'El dígito de concepto debe ser entero' })
+  .min(2, { error: 'El dígito de concepto va del 2 al 9 (el 0 y el 1 no se usan)' })
+  .max(9, { error: 'El dígito de concepto va del 2 al 9 (el 0 y el 1 no se usan)' });
+
 /** Alta de tipo de producto. */
 export const esquemaTipoProductoCrear = z.object({
   nombre: z
@@ -46,6 +59,11 @@ export const esquemaTipoProductoCrear = z.object({
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  digitoConcepto: esquemaDigitoConcepto
+    .optional()
+    .describe(
+      '1er dígito de la nomenclatura de producción (2–9). Sin él, un modelo de este tipo no se puede numerar.',
+    ),
 });
 
 /** Datos validados de alta de tipo de producto. */
@@ -58,6 +76,9 @@ export const esquemaTipoProductoEditar = esquemaTipoProductoCrear.partial().exte
     .int({ error: 'El id debe ser entero' })
     .positive({ error: 'El id debe ser positivo' }),
   activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
+  // `null` QUITA el dígito (M1); omitir = no tocar. Se puede quitar porque un tipo que ya no se
+  // usa para numerar no tiene por qué reservar un concepto.
+  digitoConcepto: esquemaDigitoConcepto.nullable().optional(),
 });
 
 /** Datos validados de edición de tipo de producto. */
@@ -68,6 +89,13 @@ export const esquemaTipoProductoSalida = z
   .object({
     id: z.number().int().describe('Id del tipo de producto.'),
     nombre: z.string().describe('Nombre del tipo de producto.'),
+    digitoConcepto: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '1er dígito de la nomenclatura de producción (2–9), o null si no se ha capturado (§Post-F9.34).',
+      ),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
@@ -100,7 +128,10 @@ export const esquemaTiposProductoQuery = z
       .stringbool()
       .default(false)
       .describe('Incluye los desactivados ("true"/"false").'),
-    ordenarPor: z.enum(['nombre', 'creadoEn']).default('nombre').describe('Columna de orden.'),
+    ordenarPor: z
+      .enum(['nombre', 'creadoEn', 'digitoConcepto'])
+      .default('nombre')
+      .describe('Columna de orden.'),
     direccion: z.enum(['asc', 'desc']).default('asc').describe('Dirección del orden.'),
   })
   .describe('Filtros, orden y paginación del listado de tipos de producto.');

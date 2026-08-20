@@ -70,6 +70,7 @@ function aClienteSalida(cliente: ClienteConCampos): z.infer<typeof esquemaClient
   return {
     id: cliente.id,
     nombre: cliente.nombre,
+    abreviatura: cliente.abreviatura,
     razonSocial: cliente.razonSocial,
     contacto: cliente.contacto,
     telefono: cliente.telefono,

@@ -53,6 +53,9 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
   return {
     id,
     codigo,
+    origen: 'produccion',
+    codigoDesarrollo: null,
+    numeroProduccion: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,

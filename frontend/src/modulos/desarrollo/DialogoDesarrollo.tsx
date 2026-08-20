@@ -4,8 +4,9 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useCrearDesarrollo } from '@/api/desarrollos';
-import { useCrearModelo } from '@/api/modelos';
+import { useTiposProductoActivos } from '@/api/calidad';
+import { useCrearDesarrollo, useCrearDesarrolloModeloNuevo } from '@/api/desarrollos';
+import { useGeneros } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,12 +29,14 @@ import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 import { esquemaDesarrolloFormulario, type DatosDesarrolloFormulario } from './esquemas';
 
-/** Valores por defecto (liga un modelo existente por defecto). */
+/** Valores por defecto (liga un modelo existente por defecto; el año de entrega, el actual). */
 const VALORES_INICIALES: DatosDesarrolloFormulario = {
   modo: 'existente',
   idModelo: '',
-  codigoNuevo: '',
   descripcionNuevo: '',
+  idTipoProductoNuevo: '',
+  idGeneroNuevo: '',
+  anioEntregaNuevo: String(new Date().getFullYear()),
   numeroCliente: '',
   notas: '',
 };
@@ -41,10 +44,13 @@ const VALORES_INICIALES: DatosDesarrolloFormulario = {
 /**
  * Diálogo para AGREGAR un desarrollo a un proyecto (F8-E2). Dos caminos:
  *  • "modelo existente" — se elige un modelo del catálogo (`idModelo`) y se crea el desarrollo.
- *  • "modelo nuevo" — el FRONTEND orquesta DOS llamadas: primero crea el Modelo (con su código y
- *    descripción) reusando el endpoint de Modelos y, con el `id` resultante, crea el desarrollo. La
- *    lógica de creación de modelos NO se duplica en el dominio de desarrollo (un modelo sin
- *    desarrollo es válido, así que si el segundo paso fallara no pasa nada grave).
+ *  • "modelo nuevo" — UNA sola llamada al backend (`.../desarrollos/modelo-nuevo`), que crea el
+ *    modelo y el desarrollo en la MISMA transacción.
+ *
+ * ⚠️ El **código del modelo nuevo ya no se teclea** (§Post-F9.34, V1-E3n): lo arma el sistema
+ * (`CYA-26-71-001` = abreviatura del cliente del proyecto + año de ENTREGA + tipo de prenda y
+ * género + consecutivo). Antes el frontend orquestaba dos llamadas y el usuario inventaba el
+ * código; eso metía los modelos de desarrollo en la misma serie que los de producción.
  */
 export function DialogoDesarrollo({
   abierto,
@@ -56,8 +62,10 @@ export function DialogoDesarrollo({
   idProyecto: number;
 }): React.JSX.Element {
   const crearDesarrollo = useCrearDesarrollo();
-  const crearModelo = useCrearModelo();
-  const guardando = crearDesarrollo.isPending || crearModelo.isPending;
+  const crearConModeloNuevo = useCrearDesarrolloModeloNuevo();
+  const tiposProducto = useTiposProductoActivos();
+  const generos = useGeneros();
+  const guardando = crearDesarrollo.isPending || crearConModeloNuevo.isPending;
 
   const formulario = useForm<DatosDesarrolloFormulario>({
     resolver: zodResolver(esquemaDesarrolloFormulario),
@@ -75,33 +83,33 @@ export function DialogoDesarrollo({
 
   const enviar = formulario.handleSubmit((datos) => {
     void (async () => {
+      const comunes = {
+        ...(datos.numeroCliente.trim() === '' ? {} : { numeroCliente: datos.numeroCliente.trim() }),
+        ...(datos.notas.trim() === '' ? {} : { notas: datos.notas }),
+      };
       try {
-        // Paso 1: resolver el id del modelo (existente o creando uno nuevo).
-        let idModelo: number;
         if (datos.modo === 'nuevo') {
-          const modelo = await crearModelo.mutateAsync({
-            codigo: datos.codigoNuevo.trim(),
-            ...(datos.descripcionNuevo.trim() === ''
-              ? {}
-              : { descripcion: datos.descripcionNuevo.trim() }),
+          // UNA llamada: el backend crea el modelo (con su código armado) y el desarrollo juntos.
+          const creado = await crearConModeloNuevo.mutateAsync({
+            idProyecto,
+            cuerpo: {
+              anioEntrega: Number(datos.anioEntregaNuevo.trim()),
+              idTipoProducto: Number(datos.idTipoProductoNuevo),
+              idGenero: Number(datos.idGeneroNuevo),
+              ...(datos.descripcionNuevo.trim() === ''
+                ? {}
+                : { descripcion: datos.descripcionNuevo.trim() }),
+              ...comunes,
+            },
           });
-          idModelo = modelo.id;
+          toast.success(`Desarrollo agregado como ${creado.codigoModelo}.`);
         } else {
-          idModelo = Number(datos.idModelo);
+          await crearDesarrollo.mutateAsync({
+            idProyecto,
+            cuerpo: { idModelo: Number(datos.idModelo), ...comunes },
+          });
+          toast.success('Desarrollo agregado.');
         }
-
-        // Paso 2: crear el desarrollo ligando ese modelo.
-        await crearDesarrollo.mutateAsync({
-          idProyecto,
-          cuerpo: {
-            idModelo,
-            ...(datos.numeroCliente.trim() === ''
-              ? {}
-              : { numeroCliente: datos.numeroCliente.trim() }),
-            ...(datos.notas.trim() === '' ? {} : { notas: datos.notas }),
-          },
-        });
-        toast.success('Desarrollo agregado.');
         alCambiarAbierto(false);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo agregar el desarrollo.');
@@ -160,21 +168,84 @@ export function DialogoDesarrollo({
               </Field>
             ) : (
               <>
-                <Field data-invalid={Boolean(errors.codigoNuevo)}>
-                  <FieldLabel htmlFor="desarrollo-codigo" required>
-                    Código del modelo nuevo
+                <p
+                  className="rounded-md bg-panel-2 px-3 py-2 text-xs text-muted-foreground"
+                  data-testid="aviso-codigo-automatico"
+                >
+                  El <b>código del modelo lo arma el sistema</b>: abreviatura del cliente + año de
+                  entrega + tipo de prenda y género + consecutivo (por ejemplo{' '}
+                  <b className="mono">CYA-26-71-001</b>). No consume número de la serie de
+                  producción; ése se asigna al pasar el modelo a producción.
+                </p>
+                <Field data-invalid={Boolean(errors.idTipoProductoNuevo)}>
+                  <FieldLabel htmlFor="desarrollo-tipo-producto" required>
+                    Tipo de prenda
+                  </FieldLabel>
+                  <SelectNativo
+                    id="desarrollo-tipo-producto"
+                    disabled={guardando}
+                    aria-invalid={Boolean(errors.idTipoProductoNuevo)}
+                    data-testid="desarrollo-tipo-producto"
+                    {...registrar('idTipoProductoNuevo')}
+                  >
+                    <option value="">Elige…</option>
+                    {/* Un tipo SIN dígito de concepto no puede numerar un modelo: se enseña, pero
+                        deshabilitado y diciendo por qué. Antes se ofrecía como cualquier otro y el
+                        alta reventaba al enviar con "captúralo en su catálogo". */}
+                    {(tiposProducto.data?.datos ?? []).map((t) => (
+                      <option key={t.id} value={String(t.id)} disabled={t.digitoConcepto === null}>
+                        {t.digitoConcepto === null
+                          ? `${t.nombre} — sin dígito, no se puede numerar`
+                          : `${t.nombre} (${String(t.digitoConcepto)})`}
+                      </option>
+                    ))}
+                  </SelectNativo>
+                  <FieldDescription>
+                    Da el 1er dígito de la nomenclatura. Los que salen en gris no lo tienen
+                    capturado: se les pone en <b>Calidad › Tipos de producto</b>.
+                  </FieldDescription>
+                  <FieldError errors={[errors.idTipoProductoNuevo]} />
+                </Field>
+                <Field data-invalid={Boolean(errors.idGeneroNuevo)}>
+                  <FieldLabel htmlFor="desarrollo-genero" required>
+                    Género
+                  </FieldLabel>
+                  <SelectNativo
+                    id="desarrollo-genero"
+                    disabled={guardando}
+                    aria-invalid={Boolean(errors.idGeneroNuevo)}
+                    data-testid="desarrollo-genero"
+                    {...registrar('idGeneroNuevo')}
+                  >
+                    <option value="">Elige…</option>
+                    {(generos.data ?? []).map((g) => (
+                      <option key={g.id} value={String(g.id)}>
+                        {g.nombre}
+                      </option>
+                    ))}
+                  </SelectNativo>
+                  <FieldDescription>Da el 2º dígito de la nomenclatura.</FieldDescription>
+                  <FieldError errors={[errors.idGeneroNuevo]} />
+                </Field>
+                <Field data-invalid={Boolean(errors.anioEntregaNuevo)}>
+                  <FieldLabel htmlFor="desarrollo-anio-entrega" required>
+                    Año de entrega
                   </FieldLabel>
                   <Input
-                    id="desarrollo-codigo"
-                    placeholder="Ej. 4522"
+                    id="desarrollo-anio-entrega"
+                    inputMode="numeric"
+                    maxLength={4}
+                    className="mono w-28"
                     disabled={guardando}
-                    aria-invalid={Boolean(errors.codigoNuevo)}
-                    {...registrar('codigoNuevo')}
+                    aria-invalid={Boolean(errors.anioEntregaNuevo)}
+                    data-testid="desarrollo-anio-entrega"
+                    {...registrar('anioEntregaNuevo')}
                   />
                   <FieldDescription>
-                    Nuestro número interno (el código del modelo).
+                    El año en que se piensa ENTREGAR (no el de captura). Se congela en el código: si
+                    la entrega se recorre, el número no cambia.
                   </FieldDescription>
-                  <FieldError errors={[errors.codigoNuevo]} />
+                  <FieldError errors={[errors.anioEntregaNuevo]} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="desarrollo-descripcion">Descripción</FieldLabel>

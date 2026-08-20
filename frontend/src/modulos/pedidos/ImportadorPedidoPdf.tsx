@@ -171,9 +171,12 @@ export function ImportadorPedidoPdf({
     porPagina: 100,
     ...(busquedaCliente === '' ? {} : { busqueda: busquedaCliente }),
   });
+  // ⚠️ `origen: 'todos'` (V1-E3n): la liga MANUAL de la vista previa busca por texto. La primera
+  // OC de un modelo que sigue en desarrollo es justo el caso que hay que poder ligar.
   const modelos = useModelos({
     pagina: 1,
     porPagina: 100,
+    origen: 'todos',
     ...(busquedaModeloDeb === '' ? {} : { busqueda: busquedaModeloDeb }),
   });
 

@@ -1435,7 +1435,13 @@ O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIE
 
    **El código de DESARROLLO sí lo arma el sistema**, porque es mecánico y no tiene criterio de negocio: cliente + año de entrega + los dos dígitos + el consecutivo que sigue. *(Daniel acotó su corrección a los modelos de producción; si también quiere capturar a mano el de desarrollo, se ajusta.)*
 
-- **Aplica en:** NADA todavía — es decisión de rumbo. Al construirse tocará `Modelo` (marca de origen + código de desarrollo), `Cliente` (abreviatura), el catálogo/galería de modelos y el editor de desarrollo. **Requiere migración** cuando se construya; permisos y seed, no.
+- **Aplica en:** ✅ **CONSTRUIDA en V1-E3n (20-ago-2026)** — migración
+  `20260820160000_modelos_desarrollo_vs_produccion`: `Modelo.origen` + `Modelo.codigoDesarrollo` +
+  `Cliente.abreviatura` + los dígitos como DATOS en `TipoProducto`/`Genero`, con el catálogo y la galería
+  filtrando producción por default, la acción «pasar a producción» (desde el catálogo y desde «Generar
+  OP») y el motor `dominio/modelos/nomenclatura.ts`. La última duda del punto de arriba la cerró Daniel en
+  **§Post-F9.83**. *(Hasta el 20-ago-2026 esta entrada decía "Aplica en: NADA todavía — es decisión de
+  rumbo", y por eso la OP 5558 de Daniel se quedó con el modelo de desarrollo.)*
 - **Fecha:** 2026-08-12.
 
 #### (Post-F9.35) — El ARTE deja de ser catálogo y se maneja DENTRO del modelo (DANIEL, 12-ago-2026)
@@ -2052,8 +2058,10 @@ pierde la excepción cuando la quiere. Lo que se abandona es la postura de "el s
 dígitos + consecutivo), porque es mecánico y no tiene criterio de negocio de por medio. Eso no se
 tocó.
 
-- **Aplica en:** la etapa que construya §Post-F9.34 (separación desarrollo/producción). **Requiere
-  migración** (marca de origen en `Modelo`, abreviatura en `Cliente`); permisos y seed, no.
+- **Aplica en:** ✅ **V1-E3n (20-ago-2026)**. El campo del nº de producción llega **precargado** con el
+  siguiente libre y es **editable**, tanto en «Pasar a producción» del catálogo como en «Generar OP»;
+  repetido BLOQUEA, dígitos que no cuadran y serie cerca del tope AVISAN. Migración
+  `20260820160000_modelos_desarrollo_vs_produccion`; permisos, no; seed sí (los dígitos).
 - **Fecha:** 2026-08-15.
 
 #### (Post-F9.47) — La receta NUNCA enseña una cifra distinta de la que cuesta (DANIEL, 15-ago-2026)
@@ -3692,3 +3700,34 @@ seguir al habitual.
   tocan:** ahí sí hay una decisión de negocio y la toma una persona, no una migración.
 - **Fecha:** 2026-08-20.
 
+
+#### (Post-F9.83) — ⭐ El nº de PRODUCCIÓN: concepto y género FIJOS, 999 consecutivos por par (DANIEL, 20-ago-2026)
+
+> Daniel, cerrando la última duda que §Post-F9.34 había dejado como *lectura del lead*: ***"el concepto y
+> género van FIJOS y los consecutivos disponibles son los otros 3"***.
+
+Con eso, el código de producción de 5 dígitos queda definido sin interpretación: **2 dígitos fijos
+(concepto + género) + 3 de consecutivo**, y **el contador corre por la combinación concepto+género**, con
+**999 por par**. Confirma lo que §Post-F9.34 traía como lectura y lo convierte en regla dictada.
+
+**Consecuencia que NO es adorno:** con 999 por par, el aviso de *"te estás acercando al tope"* que pedía
+§Post-F9.34 hay que construirlo — y se construyó. El tope **ya se alcanzó** en Caballero (por eso Daniel
+abrió la serie `x5`), y cualquier otro par que se llene ya no tendrá un dígito libre que duplicar.
+
+**⚠️ Lo que la medición obligó a decidir al construir (decisión TÉCNICA del lead, no de Daniel).** El
+consecutivo de producción **no puede salir de una secuencia** aunque A3 lo mande para los folios. Medido
+sobre los 4,987 modelos del Access: el par `51` tiene **535 usados de 999 y el 999 YA está ocupado**;
+igual `20`, `30`, `39`, `73`, `74`. Una secuencia sólo avanza: propondría `1000`, que no existe como
+modelo, y dejaría 464 huecos inalcanzables. La propuesta es **el hueco libre más bajo del par**, calculada
+bajo `pg_advisory_xact_lock` del par: elegir el hueco y escribirlo quedan serializados, y el `@unique` de
+`codigo`/`numeroProduccion` es la última red. La garantía es la misma que la de la secuencia —jamás dos
+modelos con el mismo número— sobre una serie que la secuencia no sabe modelar. El consecutivo de
+**DESARROLLO** sí es una secuencia atómica pura (`secuencias_globales`), porque es una serie nueva.
+El detalle técnico —el alcance exacto de la excepción y las mediciones de concurrencia que la
+respaldan— vive donde le toca: **`docs/arquitectura/ADR-0018`**.
+
+- **Aplica en:** **V1-E3n** (la etapa que por fin construyó §Post-F9.34 + §Post-F9.46). Migración
+  `20260820160000_modelos_desarrollo_vs_produccion`; **sin permisos nuevos**; el **seed sí cambia**
+  (dígitos de géneros y tipos de producto), aunque la propia migración ya siembra los de los catálogos
+  existentes por nombre.
+- **Fecha:** 2026-08-20.

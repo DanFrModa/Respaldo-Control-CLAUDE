@@ -889,6 +889,15 @@ export const esquemaTipoProductoFormulario = z.object({
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  // Dígito de CONCEPTO (§Post-F9.34, V1-E3n): el 1º del código de producción. Se captura como
+  // texto y vacío = sin dígito (el tipo existe igual, pero sus modelos no se pueden numerar).
+  // El 0 y el 1 NO se usan — Daniel: *"el 1 no es nada"*.
+  digitoConcepto: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^[2-9]$/.test(v), {
+      error: 'El dígito va del 2 al 9 (el 0 y el 1 no se usan)',
+    }),
 });
 
 /** Datos del formulario de tipo de producto. */
