@@ -62,12 +62,20 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     - **Genéricos (decisión (d)):** un avío `esGenerico` se **netea contra existencia REAL** del
       kardex (`existenciaAvioTotalEmpresa` de `comun/kardex.ts`, Σ pura de lectura de PLANEACIÓN, sin
       lock ni guard); solo el faltante va a compra.
-    - `generarOCDesdeExplosion` — agrupa el pendiente **por proveedor** → una OC por proveedor en un
-      clic, **reusando `crearOC`** (A3/A7) y ligando **cada línea a su orden de producción** (R7 sin
-      prorrateos); precio desde `AvioProveedor` (R1).
+    - `explosionarOrdenes` (⭐ V1-E3q) — la explosión ya es de un **CONJUNTO de OP**;
+      `explosionarOrden` es su atajo de una sola. Ver la sección *La compra desde la explosión*.
+    - `planearCompra` / `previoCompraDesdeExplosion` / `generarOCDesdeExplosion` (⭐ V1-E3q) — **un
+      solo cálculo** para la revisión previa y para la generación: agrupa el pendiente **por
+      proveedor** → una OC por proveedor, **reusando `crearOC`** (A3/A7) y ligando **cada línea a su
+      orden de producción** (R7 sin prorrateos); precio desde `AvioProveedor` (R1).
     - `estatusMaterialesOrden` — cruce **on-demand** Requerido(snapshot) vs En-OC vs Recibido →
       `pendiente`/`en-oc`/`recibido-parcial`/`completo`. Las líneas libres → `no-identificado` (no
-      inflan); canceladas/reversadas no cuentan.
+      inflan); canceladas/reversadas no cuentan. Desde V1-E3q el "En-OC" sale de
+      `comprometido-en-oc.ts`, **la misma función que netea la explosión**.
+  - `comprometido-en-oc.ts` (⭐ V1-E3q) — **LA verdad de "cuánto de este material ya está en una OC"**,
+    por orden de producción. Ver abajo.
+  - `reparto-ordenes.ts` (⭐ V1-E3q) — función PURA que reparte un total entre OP en proporción a lo
+    que cada una necesita (el **sobrante de compra**), con la última absorbiendo el residuo.
   - `migracion.ts` (F4-E6) — `crearOCMigrada`: modo migración (A1) con folio explícito `NumCompra`,
     estatus/autorización/cancelación legacy explícitos, líneas legacy SOLO texto libre, ligas N:N,
     **SIN kardex ni RecepcionCompra**.
@@ -94,6 +102,93 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     mixta es legítima y el filtro no debe estorbar una compra real). El proveedor **ya capturado se
     conserva** como opción aunque no cumpla el rol vigente (OCs viejas o migradas), para no perder
     el dato en silencio.
+
+## ⭐ La compra desde la explosión (V1-E3q — §Post-F9.85 y §Post-F9.86)
+
+Nació de Daniel probando en vivo el 20-ago-2026: *"me vuelvo a meter en la pantalla y sigue apareciendo
+ahí los elementos y **me deja volver a hacerla**"*, *"una **revisión previa** es indispensable"*, y
+*"normalmente compramos **varias OP con una sola OC**"*. Tres piezas que se sostienen entre ellas.
+
+### 1. Cuánto ya está comprado — `comprometido-en-oc.ts`
+
+Es **el único lugar** del sistema que responde *"¿cuánto de este material ya está en una orden de
+compra?"*. Lo leen **el tablero R7, la explosión, la revisión previa y la generación**, para que nunca
+digan números distintos sobre lo mismo. Devuelve `idOrden → (material → { enOc, recibido })`.
+
+**Qué estatus cuentan: TODOS menos `cancelada`** (`ESTATUS_OC_QUE_CUBREN`, escrita extensiva a propósito
+para que un estatus nuevo obligue a decidir a mano).
+
+- **`borrador` SÍ cuenta** — es el corazón del arreglo: la OC que genera el MRP **nace en borrador**, así
+  que si no contara, la explosión volvería a proponer la misma compra y el defecto seguiría vivo. La
+  pregunta que responde este módulo no es *"¿ya me comprometí a pagar?"* sino *"¿este material ya está
+  cubierto por un documento vivo?"*.
+- **`cancelada` no cuenta** — cancelar es la manera documentada de deshacer (D3); si contara, una OC
+  cancelada por error dejaría a la orden sin poder recomprar nunca.
+
+⚠️ **NO es el criterio del COSTO, y es deliberado.** `ultimo-precio-compra.ts` (D1/§Post-F9.48) sólo
+cuenta `autorizada` y `recibida_*`, porque ahí la pregunta es *"¿qué precio pagó de verdad la empresa?"*.
+**Dos preguntas distintas, dos criterios distintos**, cada uno escrito donde se usa.
+
+En la salida de la explosión eso se traduce en dos campos por renglón: **`cantidadEnOc`** y
+**`cantidadPendiente` = max(0, cantidadAComprar − cantidadEnOc)**. Sólo lo pendiente se compra. **Nada de
+esto se persiste**: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar.
+
+### 2. La revisión previa — `planearCompra`
+
+`planearCompra` es la **única** función que decide qué se compra. `previoCompraDesdeExplosion` la pinta
+(`POST /api/explosion/previo`, **no escribe nada**) y `generarOCDesdeExplosion` la ejecuta. Una revisión
+previa que calculara por su cuenta sería una promesa que el sistema no cumple.
+
+Devuelve, por proveedor, la **OC completa que saldría** (renglones, cantidades, **reparto por OP**,
+fecha, importes) más:
+
+- **`omitidos`** — lo que NO entra, con su razón: `sin-proveedor` · `ya-en-oc` · `cubierto-por-stock` ·
+  `no-seleccionado` · `sin-cantidad`, cada uno con una frase lista para pintar. Antes se descartaba en
+  **silencio**. Los omitidos viajan también en el **resultado de generar**.
+- **`bloqueos`** — lo que impediría generar (falta la dirección favorita, falta la fecha de un
+  proveedor). Se **devuelven** en la previa y se **lanzan** al generar, con las mismas frases: mismo
+  cálculo, dos maneras de reaccionar.
+
+**Permiso: `compras.administrar`** (no `compras.ver`). La previa es la primera mitad de la acción de
+comprar, no una consulta — §Post-F9.68, esconder Y bloquear.
+
+### 3. Una compra para varias OP — "se ve junto, se guarda repartido"
+
+El modelo ya lo aguantaba (`OrdenCompraLinea.idOrden` + la liga N:N `OrdenCompraOrden`); faltaba el
+camino. El conjunto de OP se llena de **dos maneras con el mismo control**: **precargado** con las OP del
+pedido interno (`GET /api/ordenes/:id/del-mismo-pedido`; las canceladas se listan pero no se precargan) o
+**a mano**, agregando OP sueltas con el buscador.
+
+- **La pantalla AGRUPA** por material+proveedor; **la OC guarda una línea por (material, OP)**. Sin ese
+  desglose el *"qué tengo / qué falta"* de cada OP deja de cuadrar y el costo no cae donde debe
+  (innegociable de Daniel).
+- **El SOBRANTE de compra se reparte** (`ajustes` en el cuerpo → `repartirEntreOrdenes`): el comprador
+  teclea el TOTAL —el rollo completo, el mínimo del proveedor— y **el servidor** lo reparte en proporción
+  a lo que cada OP necesita, con la última absorbiendo el residuo del redondeo (la suma cuadra exacta).
+  La pantalla no reparte nada (A1).
+- **El FALTANTE de la recepción NO se reparte** (Daniel tumbó esa propuesta): *"los consumos son
+  estimados… a la hora de ir descargando las telas es cuando se va a poder saber a cuál aplica"*. Entran
+  al almacén los kilos que llegaron y cada OP se lleva lo que de verdad se lleva. No es contradicción con
+  lo anterior: el sobrante es un hecho **al comprar**; el faltante es un dato que **todavía no existe**
+  cuando llega el material.
+- **La fecha de la OC** = la propia del proveedor (§Post-F9.71) → la del formulario → **la entrega MÁS
+  PRÓXIMA de las OP que esa OC surte** (la más lejana llegaría tarde a la otra).
+- **El stock de avíos genéricos se REPARTE entre las OP del lote** (`existenciaCompartida`): explotarlas
+  por separado le daría a cada una la existencia completa y el sistema compraría de menos. El orden es
+  determinista (por folio ascendente: la OP más vieja, que se produce antes, se queda con el stock).
+
+### Endpoints
+
+| Endpoint | Permiso | Qué hace |
+|---|---|---|
+| `POST /api/explosion` | `compras.ver` | Explosiona el CONJUNTO de OP del cuerpo y persiste su snapshot |
+| `POST /api/ordenes/:id/explosion` | `compras.ver` | Atajo de una sola OP (mismo cálculo) |
+| `GET /api/ordenes/:id/del-mismo-pedido` | `compras.ver` | Las OP del mismo pedido interno (precarga) |
+| `POST /api/explosion/previo` | `compras.administrar` | ⭐ La revisión previa. **No escribe nada** |
+| `POST /api/explosion/generar-oc` | `compras.administrar` | Crea las OC del plan |
+
+⚠️ Los endpoints viejos `POST /api/ordenes/:id/explosion/generar-oc` **se retiraron**: la compra viaja
+con `idsOrden` en el cuerpo.
 
 ## Enganche con Desarrollo (F8-E6)
 

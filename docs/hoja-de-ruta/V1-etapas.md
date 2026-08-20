@@ -2065,6 +2065,148 @@ menciona el otro campo**.
 
 ---
 
+## V1-E3q · La compra desde la explosión ⭐ (20-ago-2026)
+
+> Daniel, probando en vivo: *"acabo de hacer unas OC desde la explosión de materiales… Dice que se
+> generaron las OC, pero no se ven reflejadas en las OC. No veo dónde se generó. No sé si realmente se
+> generó o solo dice eso, porque **me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos
+> y me deja volver a hacerla**. Creo que hace falta trabajar en ese proceso."*
+>
+> Y su petición: *"Me gustaría que al darle «generar OC desde la explosión», te mande a una pantalla
+> previa, antes de generar la OC. **Una revisión previa es indispensable**."*
+>
+> Y, en la misma sesión: *"¿Cómo hacemos cuando una OC cubre varias OP? Es muy muy común hacerlo.
+> **Normalmente compramos varias OP con una sola OC.**"*
+
+Decisiones: **§Post-F9.85** y **§Post-F9.86**. Las tres piezas van **juntas** porque se sostienen entre
+ellas: una revisión previa **sin** el neteo volvería a enseñar como pendiente lo ya comprado, y el neteo
+sin el reparto por OP no cuadraría en cuanto la compra cubra dos órdenes.
+
+### Qué entrega
+
+**(a) La revisión previa — `POST /api/explosion/previo`.** Enseña, **antes de comprometer nada**: qué OC
+va a salir, a qué proveedor, con qué renglones y cantidades, **de qué OP es cada cantidad**, con qué
+fecha de entrega y por cuánto; y **lo que se va a OMITIR, con su razón dicha con letras**
+(`sin-proveedor` · `ya-en-oc` · `cubierto-por-stock` · `no-seleccionado` · `sin-cantidad`). Hasta hoy los
+renglones sin proveedor se descartaban **en silencio** y sólo se sabía después, contando las OC que
+salieron — que es exactamente por lo que Daniel no sabía si su compra se había hecho.
+
+> ⭐ **La previa y la generación son EL MISMO cálculo.** `planearCompra` es la única función que decide
+> qué se compra; la previa la pinta y la generación la ejecuta. Una revisión previa que calculara por su
+> cuenta sería una promesa que el sistema no cumple. Los **bloqueos** (falta la dirección favorita, falta
+> la fecha de un proveedor) se **devuelven** en la previa y se **lanzan** al generar: mismo cálculo, dos
+> maneras de reaccionar.
+
+**(b) 🔴 No volver a comprar lo ya comprado — el defecto de fondo.** `comprometidoEnOc`
+(`backend/src/dominio/compras/comprometido-en-oc.ts`) es ahora **la única verdad del sistema** sobre
+*"cuánto de esto ya está en una OC"*. El cruce ya existía —enterrado dentro del tablero R7— y se **sacó**
+para que el tablero, la explosión, la revisión previa y la generación lean **el mismo número**. Cada
+renglón de la explosión sale con `cantidadEnOc` y `cantidadPendiente`, y **sólo lo pendiente se compra**.
+
+> ⚖️ **Qué estatus cuentan como "ya comprado": TODOS menos `cancelada`** — y el `borrador` **SÍ cuenta**.
+> Es el corazón del arreglo: la OC que genera esta misma pantalla **nace en borrador**, así que si el
+> borrador no contara, el defecto seguiría vivo. `cancelada` no cuenta porque cancelar es la manera
+> documentada de deshacer (D3): una OC cancelada deja de cubrir su material y éste vuelve a aparecer
+> como pendiente.
+>
+> ⚠️ **NO es el criterio del COSTO, y es a propósito.** Para costear (`ultimo-precio-compra.ts`,
+> §Post-F9.48) sólo cuentan `autorizada` y `recibida_*`, porque ahí la pregunta es *"¿qué precio pagó de
+> verdad la empresa?"* y un borrador no es un precio pagado. Aquí la pregunta es otra: *"¿hace falta
+> volver a comprar esto?"*. **Dos preguntas distintas, dos criterios distintos**, cada uno escrito donde
+> se usa. Copiar el del costo sin pensarlo habría dejado el defecto exactamente igual.
+
+**(c) Una OC para VARIAS OP.** El modelo **ya lo aguantaba entero** (`OrdenCompraLinea.idOrden` +
+la liga N:N `OrdenCompraOrden`); lo que faltaba era **el camino**. La raíz era **qué pregunta hacía la
+pantalla**: preguntaba *"¿qué necesita ESTA OP?"* y el comprador hace otra, *"¿qué necesito comprar
+hoy?"*, que casi nunca cabe en una sola OP. Ahora el conjunto se llena de **dos maneras, con el mismo
+control**: **precargado** con las OP del pedido interno (`GET /api/ordenes/:id/del-mismo-pedido` — los
+avíos del 1515; las canceladas se listan pero **no** se precargan) o **a mano**, agregando OP sueltas con
+el buscador (las cajas, que cruzan pedidos).
+
+> ⭐ **Se ve junto, se guarda repartido** (innegociable de §Post-F9.86). La pantalla **agrupa** las
+> cantidades por material+proveedor; la OC guarda **una línea por (material, OP)**, cada una con su
+> `idOrden`. Sin ese desglose el *"qué tengo / qué falta"* de cada OP deja de cuadrar y el costo no cae
+> donde debe.
+>
+> **El SOBRANTE de compra sí se reparte** (*"comprar el rollo completo es una decisión del comprador en
+> el momento de comprar — es un hecho entonces"*): el comprador teclea el TOTAL y **el servidor** lo
+> reparte entre las OP **en proporción a lo que cada una necesita**, con la última absorbiendo el residuo
+> del redondeo para que la suma cuadre exactamente (`reparto-ordenes.ts`, función pura). La pantalla no
+> reparte nada (A1).
+>
+> **El FALTANTE de la recepción NO se reparte** — propuesta del lead **tumbada por Daniel**: *"los
+> consumos son estimados… a la hora de ir descargando las telas es cuando se va a poder saber a cuál
+> aplica"*. No es contradicción: el sobrante es un hecho al comprar, el faltante es un dato que **todavía
+> no existe** cuando llega el material. No se construyó nada de eso.
+
+**Tres cosas más que salieron del mismo hilo:**
+
+- **La fecha de la OC con varias OP es la entrega MÁS PRÓXIMA de las OP que surte** (no la más lejana:
+  el material tiene que estar a tiempo para la que entrega antes). Sigue mandando la fecha por proveedor
+  de §Post-F9.71 y la del formulario; ésta es el último respaldo.
+- **El stock de avíos genéricos se REPARTE entre las OP del lote.** Si dos OP piden el mismo hilo,
+  explotarlas por separado le daría a las dos la existencia completa y el sistema compraría de menos —
+  un faltante silencioso en el material del que nadie lleva cuenta. Hay un ledger por lote y el orden es
+  determinista (por folio ascendente: la OP más vieja, que se produce antes, se queda con el stock).
+- **Lo omitido viaja también en el RESULTADO de generar**, no sólo en la previa.
+
+### Cómo quedó por dentro
+
+| Pieza | Dónde |
+|---|---|
+| La verdad de "cuánto ya está en OC" | `backend/src/dominio/compras/comprometido-en-oc.ts` (**un solo lugar**) |
+| El reparto entre OP (sobrante) | `backend/src/dominio/compras/reparto-ordenes.ts` (función PURA) |
+| Explosión de un CONJUNTO de OP | `explosionarOrdenes` en `mrp.ts` (`explosionarOrden` = atajo de una) |
+| El plan de compra (previa **y** generación) | `planearCompra` en `mrp.ts` |
+| Endpoints | `POST /api/explosion` · `POST /api/explosion/previo` · `POST /api/explosion/generar-oc` · `GET /api/ordenes/:id/del-mismo-pedido` |
+| Pantalla | `frontend/src/modulos/ordenes-compra/ExplosionMaterialesPagina.tsx` (chips de OP + paso de revisión) |
+
+**Invariantes:** A1 (el frontend no decide nada: manda el total y el servidor reparte) · A2 (los
+snapshots de todas las OP y todas las OC nacen en UNA transacción, o ninguna) · A3 (el folio sigue
+saliendo de `crearOC`) · A4/§Post-F9.68 (la **revisión previa** exige `compras.administrar`, el mismo
+permiso que comprar: es la primera mitad de la acción, no una consulta) · A9 (cualquier OP de otra
+empresa → 404, y no se escribe nada) · D3 (nada se omite en silencio).
+
+### Verificación
+
+- **84 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de las
+  cuales **20 nuevas** cubren las tres piezas. Unit: `reparto-ordenes.test.ts` (9) + las de siempre.
+  **44** de la pantalla (11 nuevas).
+- **MUTACIÓN, 11 de 11 cazadas.** Las obligatorias entre ellas: quitar el neteo contra las OC (cae la
+  prueba de duplicados), quitar el desglose por OP (cae la de "una línea por OP"), y meter una OP de
+  otra empresa. **Dos mutantes sobrevivieron en la primera vuelta y los dos enseñaron algo:**
+  1. *"repartir sobre la demanda bruta en vez de sobre lo pendiente"* sobrevivía porque los casos que
+     tenía eran de **una sola OP** o de una OP **completamente** surtida —donde las dos maneras dan lo
+     mismo—. Se agregó el caso que de verdad las separa: una OP **parcialmente** comprada junto a otra
+     sin comprar. Con el mutante, la OC suma bien y **surte mal** (le compra de más a la orden ya
+     surtida y deja corta a la otra).
+  2. *"quitar el filtro de empresa"* sobrevivía porque **A9 se sostiene en tres lugares** a propósito
+     (defensa en profundidad): quitar uno deja el 404 intacto. **Es un mutante equivalente, no un
+     hueco** — con las **tres** guardas fuera la prueba sí se pone roja, y así quedó verificado y
+     anotado en el propio archivo de pruebas.
+
+### Nota de cierre
+
+**SIN migración de esquema, SIN permisos nuevos, SIN seed** → el deploy a `prueba` **no requiere**
+`SEED_ON_START`.
+
+⚠️ **Contrato:** los dos endpoints viejos por orden única (`POST /api/ordenes/:id/explosion/generar-oc`)
+**se retiraron**; la compra ahora viaja con `idsOrden` en el cuerpo. `POST /api/ordenes/:id/explosion`
+se conserva como atajo de una sola OP.
+
+⚠️ **PASOS MANUALES DE GABRIEL en `prueba`, que NO son código de esta etapa** (§Post-F9.85):
+1. `npx tsx --env-file=.env migracion/reparar-secuencias.ts` — destapa las OC con folio 1, 2, 3… que
+   Daniel ya generó y que el listado (ordenado por folio DESC) mandó a la última página.
+2. Después, el salto de la serie de OC a **10001** (*"el sistema anterior va en la 8082; tenemos mucho
+   colchón"*), que requiere que ese script acepte **salto a escalón**, no sólo `max+1`.
+
+🔴 **Y la lección que Daniel dejó escrita con este defecto, que no es sobre el script:** el arreglo de
+§Post-F9.17 estaba escrito y "listo" desde el **7-ago** y el defecto siguió vivo **trece días**, porque
+dependía de un paso manual que nadie dio. **Un arreglo que necesita que alguien corra algo no está
+terminado hasta que se corre.**
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

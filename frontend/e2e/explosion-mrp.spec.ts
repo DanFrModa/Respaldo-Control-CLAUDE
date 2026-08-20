@@ -13,6 +13,11 @@ import { entrarComoAdmin } from './ayudas';
  * exigen sesión y wirean sus controles principales (criterio de salida: el tablero "qué tengo / qué
  * falta" se lee bien).
  *
+ * ⭐ V1-E3q (§Post-F9.85/.86): la pantalla ya arma un CONJUNTO de OP (chips que se pueden quitar) y
+ * el botón manda a una REVISIÓN PREVIA en vez de generar de un clic. Ese flujo completo vive en los
+ * tests de integración y de pantalla; aquí sólo se comprueba, contra el stack real, que los
+ * controles nuevos existen y wirean.
+ *
  * Asume el admin sembrado (todos los permisos, incluido `compras.ver`/`.administrar`).
  */
 test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
@@ -81,8 +86,12 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
         ).ok();
 
       await primera.click();
+      // ⭐ V1-E3q: elegir una OP la mete al conjunto de la compra, con su chip para quitarla.
+      await expect(page.getByTestId('exp-ops-elegidas')).toBeVisible();
       if (liberada) {
+        // El botón ya no dice "Generar OC" a secas: manda a la revisión previa (§Post-F9.85).
         await expect(page.getByTestId('exp-generar-oc')).toBeVisible();
+        await expect(page.getByTestId('exp-generar-oc')).toHaveText(/Revisar y generar OC/);
         // La aserción histórica de este spec: el impreso de la explosión también está ahí, y
         // HABILITADO (con la puerta cerrada el servidor da 409, por eso el botón se apaga).
         await expect(page.getByTestId('exp-imprimir')).toBeVisible();

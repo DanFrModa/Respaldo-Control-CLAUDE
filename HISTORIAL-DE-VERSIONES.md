@@ -32,6 +32,66 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.010 · 20-ago-2026 · **en prueba** — La compra desde la explosión: revisión previa, no recomprar, y una compra para varias OP
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Antes de generar las órdenes de compra, hay una PANTALLA DE REVISIÓN.** Al darle «Revisar y generar
+  OC» ya no se crea nada: primero se ve **exactamente lo que va a salir** — a qué proveedor, con qué
+  materiales y cantidades, con qué fecha de entrega, por cuánto, y **de qué orden de producción es cada
+  cantidad**. De ahí se confirma… o se regresa a corregir. Nada se compromete hasta el «Confirmar».
+- ⭐ **Y ahí se ve también lo que NO va a entrar, con su razón.** *"A la Felpa no hay a quién comprársela"*,
+  *"el hilo lo cubre el inventario"*, *"esto ya está en una orden de compra"*. Antes esos renglones se
+  quedaban fuera **en silencio** y no había manera de enterarse.
+- 🔴 **El sistema ya NO propone comprar lo que ya compraste.** Éste era el problema de fondo: se generaba
+  una orden de compra, se volvía a la explosión y ahí seguían los mismos materiales, invitando a comprar
+  otra vez lo mismo. Ahora cada material dice **cuánto ya está pedido** y **cuánto falta de verdad**, y
+  sólo se compra lo que falta. Si ya está todo pedido, lo dice con letras y apaga el botón.
+- ⭐ **Una sola compra puede cubrir VARIAS órdenes de producción** — que es como se compra en la práctica.
+  Al elegir una OP, el sistema **precarga todas las OP de su pedido interno** (los avíos del 1515, por
+  ejemplo) y se quitan las que no vayan; y se pueden **agregar OP sueltas** con el buscador, para el caso
+  de las cajas, que cruzan pedidos.
+- **Las cantidades se ven juntas y se guardan repartidas.** En pantalla se ve *"350 botones"*; en la orden
+  de compra quedan **dos renglones**, uno por cada OP con lo que le toca. Así el "qué tengo / qué falta"
+  de cada orden sigue cuadrando y el costo cae donde debe.
+- **Si compras de más —el rollo completo, la caja entera—, el sistema reparte el sobrante** entre las OP
+  de esa compra, en proporción a lo que cada una necesita. Basta con escribir el total que se va a pedir.
+- **Cuando una compra cubre varias OP, la fecha de entrega que se propone es la de la orden que entrega
+  ANTES.** El material tiene que llegar a tiempo para la más urgente.
+- **El material genérico de almacén (hilo, etiquetas) ya no se cuenta dos veces.** Si dos OP piden el
+  mismo hilo, el sistema reparte la existencia entre las dos en vez de decirle a cada una que hay de
+  sobra — antes, comprando así, se habría comprado de menos sin que nadie se enterara.
+
+### Qué cambió y puede sorprender
+
+- **El botón cambió de nombre y de comportamiento.** Ya no dice «Generar OC desde la explosión» ni genera
+  de un clic: dice **«Revisar y generar OC»** y lleva a la revisión previa. Son dos clics ahora, a
+  propósito.
+- **Cancelar una orden de compra devuelve sus materiales a "pendiente".** Es lo correcto —si se canceló,
+  hay que volver a comprarlos— pero si alguien cancela una OC por error, esos materiales van a reaparecer
+  en la explosión como si nunca se hubieran pedido.
+- **Una orden de compra en BORRADOR ya cuenta como "comprado"** para efectos de esta pantalla. Es lo que
+  impide la compra duplicada (la OC que genera la explosión nace en borrador). Para el **costo** el
+  criterio sigue siendo otro: ahí sólo cuentan las autorizadas y recibidas.
+- **El impreso de la explosión sigue siendo de UNA orden.** Con varias OP en pantalla imprime la primera,
+  y el botón lo avisa al pasar el ratón.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Las órdenes de compra que Daniel generó siguen escondidas hasta que se corra un script.** No es
+  falta de esta versión: los folios de OC arrancaron en 1, 2, 3… y el listado, que ordena del folio más
+  alto al más bajo, las mandó hasta la última página, detrás de las casi 8,000 migradas. **Gabriel tiene
+  que correr `reparar-secuencias.ts` en `prueba`**; después de eso, la serie salta a **10001**, como
+  Daniel pidió (*"el sistema anterior va en la 8082; tenemos mucho colchón"*).
+- **El faltante de la recepción no se reparte, y así se queda.** Si se piden 300 kilos y llegan 280,
+  entran 280 al almacén y cada OP se lleva lo que de verdad se lleva al descargarlo. Decisión de Daniel:
+  *"los consumos son estimados… a la hora de ir descargando las telas es cuando se va a poder saber a
+  cuál aplica"*.
+- **Asignar proveedor a un material sigue siendo por UNA orden.** Con varias OP en pantalla, el
+  formulario pregunta a cuál — no se asigna a todas de golpe, porque esa asignación es "sólo para esa OP".
+
+---
+
 ## 0.009 · 20-ago-2026 · **en prueba** — Modelos de desarrollo y modelos de producción
 
 ### Qué se puede hacer ahora que antes no
