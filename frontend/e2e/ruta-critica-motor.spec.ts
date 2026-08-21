@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del MOTOR de la Ruta Crítica por orden (F5-E5; pantalla R4 "Mis pendientes") contra el stack
@@ -17,6 +17,10 @@ import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
  * API reutilizando la cookie de sesión del admin (`page.request`). Sufijos únicos por corrida.
  */
 test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
+  // ⭐ V1-E3t: la Ruta Crítica está APAGADA en la v1 (§Post-F9.36 punto 1). Este spec NO se
+  // borra —el módulo entero sigue en pie (D3)—: queda en pausa y vuelve solo al encenderla.
+  test.skip(RC_APAGADA, 'La Ruta Crítica está apagada en la v1 (V1-E3t, §Post-F9.36 punto 1).');
+
   test('programar una orden → ambos procesos pendientes en Mis pendientes → marcar hecho uno y luego el otro', async ({
     page,
   }) => {

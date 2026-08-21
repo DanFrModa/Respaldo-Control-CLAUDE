@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del módulo INDICADORES (F7-E3) contra el stack real. Las fórmulas (% a tiempo, lead time,
@@ -12,16 +12,31 @@ import { entrarComoAdmin } from './ayudas';
  * todos los permisos (incl. `indicadores.ver`).
  */
 test.describe('Indicadores (F7-E3)', () => {
-  test('la portada muestra los 3 tableros', async ({ page }) => {
+  test('la portada muestra los tableros vigentes', async ({ page }) => {
     await entrarComoAdmin(page);
     await page.goto('/indicadores');
     await expect(page.getByRole('heading', { name: 'Indicadores' })).toBeVisible();
-    await expect(page.getByTestId('indicadores-ruta-critica')).toBeVisible();
     await expect(page.getByTestId('indicadores-calidad')).toBeVisible();
     await expect(page.getByTestId('indicadores-wip')).toBeVisible();
+    // ⭐ V1-E3t: los KPIs de Ruta Crítica piden LAS DOS llaves (`indicadores.ver` + `rc.ruta-ver`);
+    // con la RC apagada (§Post-F9.36 punto 1) la segunda no existe y la tarjeta se va con ella.
+    await expect(page.getByTestId('indicadores-ruta-critica')).toHaveCount(RC_APAGADA ? 0 : 1);
+  });
+
+  // ⭐ V1-E3t — §Post-F9.68 pide TRES capas: esconder, cerrar la ruta y bloquear el servidor. La
+  // tarjeta escondida es sólo la primera; esto prueba la segunda, tecleando la URL a pelo.
+  test('con la RC apagada, teclear la URL del tablero de RC no abre la pantalla', async ({
+    page,
+  }) => {
+    test.skip(!RC_APAGADA, 'Sólo aplica con la Ruta Crítica apagada.');
+    await entrarComoAdmin(page);
+    await page.goto('/indicadores/ruta-critica');
+    await expect(page.getByTestId('pantalla-no-disponible')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'KPIs de Ruta Crítica' })).toHaveCount(0);
   });
 
   test('el tablero de Ruta Crítica carga con filtros y acciones', async ({ page }) => {
+    test.skip(RC_APAGADA, 'La Ruta Crítica está apagada en la v1 (V1-E3t, §Post-F9.36 punto 1).');
     await entrarComoAdmin(page);
     await page.goto('/indicadores/ruta-critica');
     await expect(page.getByRole('heading', { name: 'KPIs de Ruta Crítica' })).toBeVisible();

@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del FLUJO NUEVO de Pedidos (rediseño R3, §4.1) contra el stack real:
@@ -170,18 +170,20 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.getByTestId('confirmar-generar-op').click();
 
     // ⭐ Toast del flujo COMPLETO. Es UNA sola frase, la que arma `PanelGenerarOP.tsx` (~L187), y
-    // aquí salen sus cuatro trozos porque el modelo era de desarrollo Y el renglón trae ficha:
+    // aquí salen sus tres trozos porque el modelo era de desarrollo Y el renglón trae ficha:
     // «OP <folio> creada · modelo de producción <nº> (antes <código de desarrollo>, que se
-    // conserva) · ligado a su desarrollo · Ruta Crítica programándose sola». Se exige ENTERA, con
-    // el número y el código concretos de ESTA corrida: si la promoción se cayera, el toast diría
-    // sólo "OP N creada · Ruta Crítica programándose sola" —que es exactamente lo que pasaba
-    // cuando el modelo nacía en `/modelos`— y esta línea se pondría roja.
+    // conserva) · ligado a su desarrollo». Se exige ENTERA, con el número y el código concretos de
+    // ESTA corrida: si la promoción se cayera, el toast diría sólo "OP N creada" —que es
+    // exactamente lo que pasaba cuando el modelo nacía en `/modelos`— y esta línea se pondría roja.
+    //
+    // ⭐ V1-E3t: el CUARTO trozo («· Ruta Crítica programándose sola») ya no sale, y no por
+    // capricho del texto: con la RC apagada (§Post-F9.36 punto 1) nadie tiene `rc.ruta-ver` y NO
+    // se está programando ninguna ruta. El `$` del final es lo que lo vigila.
     await expect(
       page.getByText(
         new RegExp(
-          `OP \\d+ creada · modelo de producción ${numeroProduccion} ` +
-            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo · ` +
-            `Ruta Crítica programándose sola`,
+          `^OP \\d+ creada · modelo de producción ${numeroProduccion} ` +
+            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo$`,
           'u',
         ),
       ),
@@ -208,48 +210,30 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(panelCentro.getByTestId('traza-oc')).toContainText(ocCliente);
     await expect(panelCentro.getByTestId('traza-desarrollo')).toBeEnabled();
 
-    // ── La RC se programó SOLA (outbox → consumidor, B5): poll por API + panel UNA vez ─
-    // R4 cambió el mosaico "Ruta crítica": ya NO navega a /ruta-critica/ordenes/:id — abre el
-    // PANEL deslizante "Ruta de la orden" aquí mismo. El consumidor corre en el backend del
-    // compose (outbox + pg-boss) y puede tardar. Antes se reintentaba ABRIENDO y CERRANDO el
-    // panel hasta 90 s, pero cada vuelta paga clic + animación + aserciones — en el CI del A1
-    // (PR #154) ese churn ayudó a comerse el presupuesto del test (timeout de 180 s alcanzado
-    // pasos después). Ahora la espera se ancla al ESTADO: se sondea la ruta por API con la
-    // cookie de la sesión (patrón de `ruta-critica-motor.spec`) — cada intento cuesta
-    // milisegundos y termina EN CUANTO el consumidor acaba — y el panel se abre UNA sola vez,
-    // ya con la ruta lista, para verificar la UI.
-    // El modelo se busca por su código VIGENTE: tras la promoción ya no es el de desarrollo,
-    // sino el nº de producción (el buscador lee `modelos.codigo`, que la promoción reescribió).
-    const idOrden = await idOrdenPorFolio(page.request, folioOrden, numeroProduccion);
-    await expect
-      .poll(
-        async () => {
-          const respuesta = await page.request.get(
-            `/api/ruta-critica/ordenes/${String(idOrden)}/ruta`,
-          );
-          if (!respuesta.ok()) {
-            return `http-${String(respuesta.status())}`;
-          }
-          const ruta = (await respuesta.json()) as {
-            estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta';
-            procesos: unknown[];
-          };
-          // Lo mismo que exigía el panel: que la ruta exista Y liste procesos.
-          return ruta.estadoRecalculo !== 'sin-ruta' && ruta.procesos.length > 0
-            ? 'con-procesos'
-            : ruta.estadoRecalculo;
-        },
-        { timeout: 90_000, intervals: [1_000] },
-      )
-      .toBe('con-procesos');
-
-    await panelCentro.getByTestId('mosaico-rc').click();
-    await expect(
-      page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
-    ).toBeVisible();
-    await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible();
-    // Cierra el panel (modal) para que el siguiente paso pueda interactuar con la página.
-    await page.keyboard.press('Escape');
+    // ── ⭐ V1-E3t · LA RC ESTÁ APAGADA: ni mosaico, ni ruta, ni API ────────────────────
+    // Aquí vivía la comprobación de que "la RC se programa sola" (outbox → consumidor, B5). La
+    // Ruta Crítica arranca APAGADA en la v1 (`DECISIONES.md §Post-F9.36 punto 1`), así que este
+    // tramo pasó a comprobar lo contrario, y por las TRES capas que pide §Post-F9.68:
+    //  1. el MOSAICO «Ruta crítica» del panel no se ofrece (lo esconde `rc.ruta-ver`);
+    //  2. la RUTA de pantalla queda cerrada aunque se teclee la URL a pelo;
+    //  3. el SERVIDOR responde 403 — la que de verdad manda: sin ella lo demás es maquillaje.
+    // Cuando la RC se encienda, este bloque vuelve a ser el de antes (está en el historial de
+    // `pedidos.spec.ts`, commit de V1-E3t).
+    if (RC_APAGADA) {
+      const idOrden = await idOrdenPorFolio(page.request, folioOrden, numeroProduccion);
+      // 1) Esconder.
+      await expect(panelCentro.getByTestId('mosaico-rc')).toHaveCount(0);
+      // 3) Bloquear (el servidor, con la cookie de una sesión de ADMIN — el usuario con más
+      //    permisos que existe). Un 200 aquí significaría que la RC sigue servida a quien sea.
+      const respuestaRuta = await page.request.get(
+        `/api/ruta-critica/ordenes/${String(idOrden)}/ruta`,
+      );
+      expect(respuestaRuta.status()).toBe(403);
+      // 2) Cerrar la ruta de pantalla.
+      await page.goto(`/ruta-critica/ordenes/${String(idOrden)}`);
+      await expect(page.getByTestId('pantalla-no-disponible')).toBeVisible();
+      await page.goBack();
+    }
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');

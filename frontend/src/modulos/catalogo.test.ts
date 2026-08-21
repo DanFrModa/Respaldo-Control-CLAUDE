@@ -651,10 +651,10 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       const bastaUna: (readonly ClavePermiso[])[] = [];
       for (const hijo of padre?.hijos ?? []) {
         if (hijo.permisos === 'autenticado') continue;
-        if (Array.isArray(hijo.permisos)) {
-          for (const p of hijo.permisos) union.add(p);
+        if ('todos' in hijo.permisos) {
+          bastaUna.push(hijo.permisos.todos);
         } else {
-          bastaUna.push(clavesDeExigencia(hijo.permisos));
+          for (const p of hijo.permisos) union.add(p);
         }
       }
       const hoja = hojaRiel(clave);

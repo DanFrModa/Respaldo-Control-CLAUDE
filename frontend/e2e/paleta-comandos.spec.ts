@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /** Password de los usuarios de prueba (misma política que `administracion.spec`). */
 const PASSWORD_PRUEBA = 'Prueba.2026!';
@@ -18,22 +18,27 @@ test.describe('Paleta de comandos ⌘K', () => {
     await page.getByTestId('abrir-paleta').click();
     await expect(page.getByTestId('paleta-input')).toBeVisible();
 
-    // ⌘K ve el CATÁLOGO COMPLETO, no el riel podado: encuentra pantallas que NO están en el menú
-    // lateral (aquí "Tablero WIP", que salió del riel de Producción). Así nada queda inaccesible.
-    await page.getByTestId('paleta-input').fill('Tablero WIP');
-    await expect(page.getByTestId('paleta-resultados').getByText('Tablero WIP')).toBeVisible();
+    // ⭐ V1-E3t: ⌘K tampoco puede ser la puerta de atrás a una pantalla apagada. Con la Ruta
+    // Crítica apagada (§Post-F9.36 punto 1) el admin ya no tiene `rc.ruta-ver`, y la paleta —que
+    // filtra el catálogo POR PERMISO— no debe ofrecerla.
+    await page.getByTestId('paleta-input').fill('Ruta Crítica');
+    await expect(
+      page.getByTestId('paleta-resultados').getByText('Ruta Crítica', { exact: true }),
+    ).toHaveCount(RC_APAGADA ? 0 : 1);
     await page.getByTestId('paleta-input').clear();
 
-    // Teclear filtra pantallas: "Ruta" → Ruta Crítica (hoja directa a Mis pendientes, R4).
-    await page.getByTestId('paleta-input').fill('Ruta Crítica');
-    const opcionRc = page
+    // Teclear filtra pantallas y NAVEGA. ⌘K ve el CATÁLOGO COMPLETO, no el riel podado: encuentra
+    // pantallas que NO están en el menú lateral (aquí "Tablero WIP", que salió del riel de
+    // Producción). Así nada queda inaccesible.
+    await page.getByTestId('paleta-input').fill('Tablero WIP');
+    const opcionWip = page
       .getByTestId('paleta-resultados')
-      .getByText('Ruta Crítica', { exact: true })
+      .getByText('Tablero WIP', { exact: true })
       .first();
-    await expect(opcionRc).toBeVisible();
-    await opcionRc.click();
-    await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
-    await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
+    await expect(opcionWip).toBeVisible();
+    await opcionWip.click();
+    await expect(page).toHaveURL(/\/produccion\/wip$/);
+    await expect(page.getByRole('heading', { name: 'Producción · WIP' })).toBeVisible();
 
     // Reabrir con el atajo de teclado Ctrl+K (toggle).
     await page.keyboard.press('Control+k');

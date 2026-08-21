@@ -71,9 +71,13 @@ async function generarOp(
   // CONDICIONALES en medio. En esta prueba los tres se apagan: el modelo nació en `/modelos` (o
   // sea, ya es de PRODUCCIÓN → no hay promoción ni «· modelo de producción N» ni «(antes …)») y el
   // pedido se capturó por la edición F2 (sin desarrollo → no hay «· ligado a su desarrollo»). Lo
-  // que queda, literal, es «OP <folio> creada · Ruta Crítica programándose sola», y así se exige:
-  // pegadas las dos puntas, para que un toast al que le falte la mitad no pase por bueno.
-  const toast = page.getByText(/OP \d+ creada · Ruta Crítica programándose sola/).first();
+  // que queda, literal, es «OP <folio> creada» — a secas.
+  //
+  // ⭐ V1-E3t: la coletilla «· Ruta Crítica programándose sola» era el CUARTO trozo condicional, y
+  // ahora cuelga de `rc.ruta-ver`: con la RC apagada (§Post-F9.36 punto 1) el admin no lo tiene, y
+  // el toast NO puede prometer una ruta que nadie va a programar. Se exige el texto COMPLETO con
+  // `$` al final, para que un toast al que le sobre o le falte la mitad no pase por bueno.
+  const toast = page.getByText(/^OP \d+ creada$/).first();
   await expect(toast).toBeVisible();
   const folio = /OP (\d+) creada/.exec((await toast.textContent()) ?? '')?.[1] ?? '';
   expect(folio).not.toBe('');
@@ -404,8 +408,10 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await captura.getByTestId('avance-matriz-celda').fill('20');
     await expect(captura.getByTestId('avance-matriz-estado')).toContainText('Cuadra');
     await captura.getByTestId('avance-guardar').click();
-    // Toast con la nota del auto-avance de la Ruta Crítica (F3→F5).
-    await expect(page.getByText(/la Ruta Crítica se marca sola/)).toBeVisible();
+    // ⭐ V1-E3t: la nota del auto-avance de la RC (F3→F5) cuelga de `rc.ruta-ver`; con la Ruta
+    // Crítica apagada (§Post-F9.36 punto 1) el toast dice sólo que el corte quedó registrado.
+    await expect(page.getByText(/^Corte #\d+ registrado$/)).toBeVisible();
+    await expect(page.getByText(/la Ruta Crítica se marca sola/)).toHaveCount(0);
 
     // El movimiento aparece en la lista con su "capturado por" (A7/§4.4.4)…
     const movimiento = avance.getByTestId('avance-movimiento').first();

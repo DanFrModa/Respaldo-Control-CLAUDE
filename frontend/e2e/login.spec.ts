@@ -174,13 +174,19 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hijoCompras, exact: true })).toBeVisible();
     }
     await expect(navegacion.getByRole('link', { name: 'Autorización de compras' })).toHaveCount(0);
-    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
-    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
-    // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su
-    // configuración interna vive DENTRO de la pantalla, no como sub-menú del riel.
+    // ⭐ V1-E3t — LA RUTA CRÍTICA ESTÁ APAGADA en la v1 (§Post-F9.36 punto 1): ni la entrada
+    // estrella («Ruta Crítica» → Mis pendientes) ni su configuración («Procesos y responsables»)
+    // salen en el riel, porque NADIE tiene ya `rc.ruta-ver` ni `rc.catalogo-ver` — ni siquiera el
+    // admin. Se afirma en NEGATIVO a propósito: si un día reaparecieran sin que alguien encienda
+    // el módulo a conciencia, este spec truena.
+    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toHaveCount(
+      0,
+    );
     await expect(
       navegacion.getByRole('link', { name: 'Procesos y responsables', exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    // "Usuarios y accesos" es HOJA DIRECTA (Daniel): su configuración interna vive DENTRO de la
+    // pantalla, no como sub-menú del riel.
     await expect(
       navegacion.getByRole('link', { name: 'Usuarios y accesos', exact: true }),
     ).toBeVisible();
@@ -189,8 +195,9 @@ test.describe('Inicio de sesión', () => {
       navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
     ).toHaveCount(0);
 
-    // El badge de alertas RC del encabezado está montado (dato real del backend).
-    await expect(page.getByTestId('badge-alertas-rc')).toBeVisible();
+    // ⭐ V1-E3t: la CAMPANA de alertas de RC del encabezado tampoco se monta — se apagó del mismo
+    // golpe que el menú y la pantalla, al irse `rc.ruta-ver` (§Post-F9.36 punto 1).
+    await expect(page.getByTestId('badge-alertas-rc')).toHaveCount(0);
     // La empresa activa aparece en el encabezado.
     await expect(page.getByTestId('empresa-activa')).toHaveText(CREDENCIALES_ADMIN.empresa);
   });

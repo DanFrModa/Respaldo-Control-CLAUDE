@@ -77,6 +77,7 @@ export function PanelGenerarOP({
   // crear solo se ofrece con el permiso que exige el endpoint; el backend re-valida (A1).
   const { tienePermiso } = useSesion();
   const puedeCrearColor = tienePermiso('colores.administrar');
+  const puedeVerRc = tienePermiso('rc.ruta-ver');
   const idsColoresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
   // Contador propio para REMONTAR el combobox tras agregar (que no quede pegado lo tecleado).
   // No se usa `lineas.length`: quitar una fila también lo cambiaría, remontando sin necesidad.
@@ -193,7 +194,10 @@ export function PanelGenerarOP({
                 ? ''
                 : ` (antes ${resultado.codigoModeloAnterior}, que se conserva)`) +
               (resultado.ligaCreada ? ' · ligado a su desarrollo' : '') +
-              ' · Ruta Crítica programándose sola',
+              // ⭐ V1-E3t: la coletilla de la RC sólo si quien mira puede VER la Ruta Crítica.
+              // Con el módulo apagado (§Post-F9.36 punto 1) nadie tiene `rc.ruta-ver`, y anunciar
+              // que "se programa sola" sería mentirle al usuario sobre algo que no está pasando.
+              (puedeVerRc ? ' · Ruta Crítica programándose sola' : ''),
           );
           for (const aviso of resultado.avisosNumeroProduccion) {
             toast.warning(aviso);

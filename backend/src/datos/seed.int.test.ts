@@ -9,7 +9,13 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { sembrar } from '../../prisma/seed.js';
-import { CATALOGO_PERMISOS, CLAVES_PERMISO } from '../contrato/index.js';
+import {
+  CATALOGO_PERMISOS,
+  CLAVES_PERMISO,
+  MODULOS_APAGADOS,
+  permisoApagado,
+  sinPermisosApagados,
+} from '../contrato/index.js';
 import { limpiarBaseDatos } from '../pruebas/contexto.js';
 import { crearClientePrisma, type PrismaClient } from './index.js';
 
@@ -147,7 +153,32 @@ describe('seed de fundación', () => {
       include: { _count: { select: { permisos: true } } },
     });
     expect(rolAdmin.esSistema).toBe(true);
-    expect(rolAdmin._count.permisos).toBe(CATALOGO_PERMISOS.length);
+    // ⭐ V1-E3t: "completo" pasó a ser "todo el catálogo MENOS los módulos apagados"
+    // (`DECISIONES.md §Post-F9.36 punto 1`). Se calcula desde el interruptor, no con un número a
+    // mano: el día que se encienda la RC —o se apague otra cosa— esta cuenta se mueve sola.
+    expect(rolAdmin._count.permisos).toBe(
+      sinPermisosApagados(CATALOGO_PERMISOS.map((p) => p.clave)).length,
+    );
+  });
+
+  // ⭐ V1-E3t — el seed no puede dejar en la base concesiones muertas: si un módulo está apagado,
+  // NINGÚN rol de sistema conserva sus permisos. Se afirma sobre el rol MÁS poderoso (el que
+  // recibe el catálogo entero) y, de paso, que el permiso sigue EXISTIENDO en la tabla `Permiso`
+  // — apagar no es demoler (D3), y el día de encenderlo debe estar ahí para volver a otorgarse.
+  it('ningún rol de sistema conserva permisos de un módulo APAGADO (y el permiso sigue existiendo)', async () => {
+    const clavesApagadas = CLAVES_PERMISO.filter(permisoApagado);
+    expect(MODULOS_APAGADOS.length).toBeGreaterThan(0);
+    expect(clavesApagadas).toContain('rc.ruta-ver');
+
+    const asignados = await prisma.rolPermiso.count({
+      where: { permiso: { clave: { in: [...clavesApagadas] } } },
+    });
+    expect(asignados).toBe(0);
+
+    const enCatalogo = await prisma.permiso.count({
+      where: { clave: { in: [...clavesApagadas] } },
+    });
+    expect(enCatalogo).toBe(clavesApagadas.length);
   });
 
   it('la cascada de roles respeta el orden de niveles del sistema viejo (doc 00 §2)', async () => {

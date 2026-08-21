@@ -968,7 +968,10 @@ function CapturaMovimiento({
   /** Cierra la captura sin guardar (botón "Cancelar" del proto). */
   alCancelar: () => void;
 }): React.JSX.Element {
-  const { sesion } = useSesion();
+  const { sesion, tienePermiso } = useSesion();
+  // ⭐ V1-E3t: la coletilla del auto-avance de la RC sólo si quien captura puede VERLA. Con el
+  // módulo apagado (§Post-F9.36 punto 1) nadie tiene `rc.ruta-ver` y el toast dejaría de ser cierto.
+  const puedeVerRc = tienePermiso('rc.ruta-ver');
   const [fecha, setFecha] = useState(hoy());
   // ENTREGA A MAQUILA: arranca con el maquilero YA PROGRAMADO en la OP (petición de Daniel,
   // 28-jul-2026: *"si ya tengo un maquilero programado en la OP… que me ponga por default el
@@ -1353,7 +1356,9 @@ function CapturaMovimiento({
 
   function alExito(guardado: MovimientoImpreso): void {
     toast.success(
-      `${guardado.etiqueta} #${guardado.folio} registrado · la Ruta Crítica se marca sola ✓`,
+      `${guardado.etiqueta} #${guardado.folio} registrado${
+        puedeVerRc ? ' · la Ruta Crítica se marca sola ✓' : ''
+      }`,
     );
     alRegistrado(guardado);
   }
@@ -1857,7 +1862,10 @@ function CapturaEntregaCliente({
   alRegistrado: (guardado: MovimientoImpreso) => void;
   alCancelar: () => void;
 }): React.JSX.Element {
-  const { sesion } = useSesion();
+  const { sesion, tienePermiso } = useSesion();
+  // ⭐ V1-E3t: la coletilla del auto-avance de la RC sólo si quien captura puede VERLA. Con el
+  // módulo apagado (§Post-F9.36 punto 1) nadie tiene `rc.ruta-ver` y el toast dejaría de ser cierto.
+  const puedeVerRc = tienePermiso('rc.ruta-ver');
   const [fecha, setFecha] = useState(hoy());
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [observaciones, setObservaciones] = useState('');
@@ -1948,7 +1956,9 @@ function CapturaEntregaCliente({
       {
         onSuccess: (entrega) => {
           toast.success(
-            `Entrega #${entrega.folio} a ${entrega.cliente ?? 'cliente'} registrada (${entrega.totalPiezas.toLocaleString('es-MX')} pzas) · la Ruta Crítica se marca sola ✓`,
+            `Entrega #${entrega.folio} a ${entrega.cliente ?? 'cliente'} registrada (${entrega.totalPiezas.toLocaleString('es-MX')} pzas)${
+              puedeVerRc ? ' · la Ruta Crítica se marca sola ✓' : ''
+            }`,
           );
           alRegistrado(impresoDeEntrega(entrega.id, entrega.folio));
         },

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del CONCENTRADO "planeado vs real" de la Ruta Crítica (F5-E7) contra el stack real, en el
@@ -14,6 +14,10 @@ import { entrarComoAdmin } from './ayudas';
  * backend (`concentrado.int.test.ts`).
  */
 test.describe('Ruta Crítica — concentrado planeado vs real (F5-E7)', () => {
+  // ⭐ V1-E3t: la Ruta Crítica está APAGADA en la v1 (§Post-F9.36 punto 1). Este spec NO se
+  // borra —el módulo entero sigue en pie (D3)—: queda en pausa y vuelve solo al encenderla.
+  test.skip(RC_APAGADA, 'La Ruta Crítica está apagada en la v1 (V1-E3t, §Post-F9.36 punto 1).');
+
   test('se llega desde la portada-hub y el tablero carga con sus filtros + export Excel', async ({
     page,
   }) => {

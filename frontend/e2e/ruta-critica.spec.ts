@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del catálogo configurable de la Ruta Crítica (F5-E1) contra el stack real, en la estructura
@@ -10,6 +10,10 @@ import { entrarComoAdmin } from './ayudas';
  * Usa códigos únicos por corrida para no chocar con el seed ni con datos previos.
  */
 test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
+  // ⭐ V1-E3t: la Ruta Crítica está APAGADA en la v1 (§Post-F9.36 punto 1). Este spec NO se
+  // borra —el módulo entero sigue en pie (D3)—: queda en pausa y vuelve solo al encenderla.
+  test.skip(RC_APAGADA, 'La Ruta Crítica está apagada en la v1 (V1-E3t, §Post-F9.36 punto 1).');
+
   test('crea un proceso y le asigna dos roles responsables', async ({ page }) => {
     const sufijo = Date.now().toString().slice(-6);
     const codigo = `e2e-proc-${sufijo}`;

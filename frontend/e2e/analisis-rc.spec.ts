@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del tablero de gestión "ANÁLISIS RC" (rediseño R7) contra el stack real, en el estándar visual.
@@ -13,6 +13,10 @@ import { entrarComoAdmin } from './ayudas';
  * (`analisisRc.int.test.ts`); aquí basta con que el tablero cargue y navegue.
  */
 test.describe('Análisis RC — tablero de gestión (R7)', () => {
+  // ⭐ V1-E3t: la Ruta Crítica está APAGADA en la v1 (§Post-F9.36 punto 1). Este spec NO se
+  // borra —el módulo entero sigue en pie (D3)—: queda en pausa y vuelve solo al encenderla.
+  test.skip(RC_APAGADA, 'La Ruta Crítica está apagada en la v1 (V1-E3t, §Post-F9.36 punto 1).');
+
   test('carga los KPIs, las tablas y el desempeño con su export Excel', async ({ page }) => {
     await entrarComoAdmin(page);
 

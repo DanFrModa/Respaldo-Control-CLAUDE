@@ -1,5 +1,20 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+/**
+ * ⭐ LA RUTA CRÍTICA ESTÁ APAGADA EN LA v1 (V1-E3t, `DECISIONES.md §Post-F9.36 punto 1`).
+ *
+ * Daniel: *"sigue apagada, déjala que se apague bien"* (21-ago-2026). El interruptor de verdad vive
+ * en `backend/src/contrato/modulos-apagados.ts`; esta constante es su ESPEJO para los e2e, que
+ * corren contra el sistema real: sin `rc.ruta-ver` en la sesión, las pantallas de RC ya no existen
+ * para nadie y sus specs no tendrían dónde entrar.
+ *
+ * Los specs de RC NO se borran (D3: apagar no es demoler) — quedan SKIPPED y siguen en el repo,
+ * verdes el día que se encienda. **Para volver a encenderlos: pon `false` aquí Y vacía
+ * `MODULOS_APAGADOS` en el backend.** Las dos cosas, o los specs corren contra una RC apagada y
+ * fallan. El procedimiento completo está en `docs/modulos/ruta-critica.md`.
+ */
+export const RC_APAGADA: boolean = true;
+
 /** Credenciales del admin sembrado (backend `prisma/seed.ts`) y su empresa. */
 export const CREDENCIALES_ADMIN = {
   usuario: 'admin',

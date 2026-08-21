@@ -1792,10 +1792,12 @@ export function cumpleExigencia(
   if (exige === 'autenticado') {
     return true;
   }
-  if (Array.isArray(exige)) {
-    return exige.some((clave) => permisos.has(clave));
+  // `'todos' in exige` y no `Array.isArray`: el guard de arrays devuelve `any[]` sobre un
+  // `readonly T[]` y deja pasar `any` al resto (lo caza `no-unsafe-argument`).
+  if ('todos' in exige) {
+    return exige.todos.every((clave) => permisos.has(clave));
   }
-  return (exige as { todos: readonly ClavePermiso[] }).todos.every((clave) => permisos.has(clave));
+  return exige.some((clave) => permisos.has(clave));
 }
 
 /** ¿La hoja es visible con estos permisos? (A4) */
@@ -2072,7 +2074,7 @@ export function clavesDeExigencia(exige: ExigenciaPermisos): readonly ClavePermi
   if (exige === 'autenticado') {
     return [];
   }
-  return Array.isArray(exige) ? exige : (exige as { todos: readonly ClavePermiso[] }).todos;
+  return 'todos' in exige ? exige.todos : exige;
 }
 
 /**
