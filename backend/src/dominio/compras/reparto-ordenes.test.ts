@@ -13,7 +13,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { redondear2 } from '../costos/decimales.js';
 import {
+  ESCALA_CANTIDAD_COMPRA,
   MINIMO_CANTIDAD_COMPRA,
   redondearCantidadCompra,
   repartirEntreOrdenes,
@@ -99,6 +101,28 @@ describe('repartirEntreOrdenes (§Post-F9.86)', () => {
  * ASTILLA de redondeo: por debajo de media unidad del último dígito la columna escribe `0.00`, así
  * que ni se puede comprar ni puede quedar pendiente.
  */
+describe('la escala es la del DESTINO y GOBIERNA de verdad', () => {
+  it('⭐ la escala es 2: la de `OrdenCompraLinea.cantidad Decimal(14,2)`', () => {
+    // 🔴 Si alguien la devuelve a 4 "porque el snapshot tiene 4", esta prueba lo dice con letras.
+    expect(ESCALA_CANTIDAD_COMPRA).toBe(2);
+  });
+
+  it('⭐ el redondeo se DERIVA de la escala (la constante no es de adorno)', () => {
+    // A escala 2 coincide con el redondeo monetario — por casualidad, no por parentesco. Se
+    // comprueba en vez de afirmarse: así "una sola regla" es un hecho.
+    for (const n of [0, 0.004, 0.005, 3.702, 33.335, 166.6667, 999.999]) {
+      expect(redondearCantidadCompra(n)).toBe(redondear2(n));
+      expect(redondearCantidadCompra(n)).toBe(
+        Math.round(n * 10 ** ESCALA_CANTIDAD_COMPRA) / 10 ** ESCALA_CANTIDAD_COMPRA,
+      );
+    }
+  });
+
+  it('el mínimo guardable también se deriva de la escala (no se desincronizan)', () => {
+    expect(MINIMO_CANTIDAD_COMPRA).toBe(0.5 / 10 ** ESCALA_CANTIDAD_COMPRA);
+  });
+});
+
 describe('seGuardaComoAlgo — media unidad del último dígito guardable', () => {
   it('0.002 (la astilla del defecto de Daniel) NO existe: se guardaría como 0.00', () => {
     expect(seGuardaComoAlgo(0.002)).toBe(false);

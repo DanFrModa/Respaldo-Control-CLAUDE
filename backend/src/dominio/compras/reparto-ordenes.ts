@@ -49,15 +49,21 @@ import { redondear2 } from '../costos/decimales.js';
 export const ESCALA_CANTIDAD_COMPRA = 2;
 
 /**
- * Redondea una cantidad a la escala de `OrdenCompraLinea.cantidad`. Reusa `redondear2` para que
- * exista **una sola** rutina de redondeo en el sistema (la escala coincide con la monetaria por
- * casualidad, no por parentesco: el nombre de aquí dice de qué columna hablamos).
+ * Redondea una cantidad a la escala de `OrdenCompraLinea.cantidad`.
+ *
+ * ⚠️ **Se DERIVA de {@link ESCALA_CANTIDAD_COMPRA}, no la ignora.** La primera versión de este
+ * arreglo llamaba directo a `redondear2` y dejaba la constante de adorno: cambiarla a 4 no cambiaba
+ * nada, y una constante que no gobierna lo que dice gobernar es la misma clase de mentira que el
+ * comentario que originó el rechazo. Que coincida con la escala monetaria es **casualidad**, y
+ * `reparto-ordenes.test.ts` lo comprueba comparando las dos funciones — así "una sola regla" es un
+ * hecho verificado y no una afirmación.
  *
  * Postgres redondea *half away from zero* al escribir; `Math.round` lo hace *half up*. Coinciden en
  * los no-negativos, que es todo lo que puede ser una cantidad a comprar.
  */
 export function redondearCantidadCompra(n: number): number {
-  return redondear2(n);
+  const factor = 10 ** ESCALA_CANTIDAD_COMPRA;
+  return Math.round(n * factor) / factor;
 }
 
 /**
@@ -69,7 +75,7 @@ export function redondearCantidadCompra(n: number): number {
  * **4** decimales (el snapshot, el semáforo R7); usarla contra una cantidad que va a una columna de
  * 2 es lo que dejaba pasar astillas de `0.002` como si fueran compras pendientes.
  */
-export const MINIMO_CANTIDAD_COMPRA = 0.005;
+export const MINIMO_CANTIDAD_COMPRA = 0.5 / 10 ** ESCALA_CANTIDAD_COMPRA;
 
 /** ¿Esta cantidad sobrevive al guardarse (≥ 0.01), o se volvería `0.00`? */
 export function seGuardaComoAlgo(cantidad: number): boolean {

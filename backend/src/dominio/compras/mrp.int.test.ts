@@ -2532,6 +2532,34 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     expect(Number(lineas[0]?.cantidad)).toBe(0.01);
   });
 
+  /**
+   * ⭐ El redondeo de `enOc` **hace falta de verdad**: es Σ de varias líneas, y sumar decimales en
+   * coma flotante deja polvo (`0.1 + 0.2 = 0.30000000000000004`). Sin redondear, ese polvo viajaba
+   * al contrato y la pantalla enseñaba "Ya en OC: 0.30000000000000004".
+   */
+  it('⭐ `cantidadEnOc` sale limpio aunque sume varias líneas (0.1 + 0.2 = 0.3, no 0.30000000000000004)', async () => {
+    await explosionarConRecetaFresca();
+    for (const cantidadTotal of [0.1, 0.2]) {
+      await generarOCDesdeExplosion(
+        sesion(),
+        {
+          idsOrden: [idOrden],
+          idsRequerimiento: [],
+          ajustes: [
+            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+          ],
+        },
+        bd(),
+      );
+      await explosionarConRecetaFresca();
+    }
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 🔴 Sin redondear `enOc`, esto vale 0.30000000000000004.
+    expect(boton?.cantidadEnOc).toBe(0.3);
+    expect(boton?.porOrden[0]?.cantidadEnOc).toBe(0.3);
+  });
+
   /** Hallazgo 4 — la REVISIÓN PREVIA también es una puerta: una OP ajena responde 404 (A9). */
   it('⭐ A9 — la revisión previa de una OP de otra empresa responde 404', async () => {
     const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
