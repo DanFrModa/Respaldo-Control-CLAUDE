@@ -134,6 +134,32 @@ En la salida de la explosión eso se traduce en dos campos por renglón: **`cant
 **`cantidadPendiente` = max(0, cantidadAComprar − cantidadEnOc)**. Sólo lo pendiente se compra. **Nada de
 esto se persiste**: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar.
 
+### 1bis. 🔴 La ESCALA manda desde el DESTINO (`Decimal(14,2)`)
+
+Estas cantidades nacen en columnas de **4** decimales (el snapshot `RequerimientoOrden`, el BOM) y
+acaban en una de **2**: `OrdenCompraLinea.cantidad Decimal(14,2)`. La primera versión de la etapa
+repartía y comparaba a 4, y **el defecto que la etapa venía a arreglar seguía vivo**: el renglón
+reaparecía con una astilla de `0.002`, se encadenaban OC con líneas en `0.00` quemando folios (A3), y
+`Σ(líneas) ≠ lo comprado`, con lo que **la revisión previa mentía**.
+
+La regla, en `reparto-ordenes.ts`:
+
+- **`ESCALA_CANTIDAD_COMPRA = 2`**, y `redondearCantidadCompra` **se deriva de ella** (una constante
+  que no gobierna lo que dice gobernar es una mentira con otro disfraz).
+- **Lo PENDIENTE** (`max(0, aComprar − enOc)`) se calcula y se compara en esa escala, en la explosión
+  y en el plan — los dos tienen que decir el mismo número.
+- **El reparto cierra la Σ en esa escala**, con la última OP absorbiendo el residuo: la suma de lo
+  GUARDADO es exactamente lo comprado.
+- **El corte de "¿queda algo por comprar?"** es `MINIMO_CANTIDAD_COMPRA` = media unidad del último
+  dígito guardable (`0.005`), **no** la `TOLERANCIA` de `1e-6` de `mrp.ts` (que sigue siendo la buena
+  para las columnas de 4 decimales: el snapshot y el semáforo R7).
+- **Una línea que se guardaría como `0.00` no se escribe**, y un ajuste por debajo del mínimo **se
+  rechaza diciendo por qué** en vez de crear un documento vacío.
+
+> 🔴 **La lección:** *un número no está bien calculado hasta que está bien **guardado**.* Y la
+> segunda: el comentario que decía *"la BD guarda 4 decimales"* es lo que hizo que nadie mirara la
+> columna — **un comentario puede mentir tan caro como el código**.
+
 ### 2. La revisión previa — `planearCompra`
 
 `planearCompra` es la **única** función que decide qué se compra. `previoCompraDesdeExplosion` la pinta

@@ -2177,23 +2177,62 @@ saliendo de `crearOC`) · A4/§Post-F9.68 (la **revisión previa** exige `compra
 permiso que comprar: es la primera mitad de la acción, no una consulta) · A9 (cualquier OP de otra
 empresa → 404, y no se escribe nada) · D3 (nada se omite en silencio).
 
+### 🔴 El RECHAZO del reviewer y lo que enseñó (21-ago-2026)
+
+La primera versión de esta etapa **fue RECHAZADA**, y con razón: **el defecto que vino a arreglar
+seguía vivo**. La aritmética del reparto corría a **4 decimales** y la columna donde acaban esos
+números —`OrdenCompraLinea.cantidad`— es **`Decimal(14,2)`**. Nadie cerraba ese hueco, y el propio
+comentario del módulo afirmaba lo contrario (*"la BD guarda cantidades con 4 decimales"*): **falso
+para el destino real**. Tres síntomas, los tres MEDIDOS corriendo, no leyendo:
+
+1. **El renglón REAPARECÍA** — la queja literal de Daniel. `0.1234 × 30 = 3.7020` → la línea guardaba
+   `3.70` → quedaban `0.002` "pendientes", por encima de la tolerancia de `1e-6`, y el material
+   volvía a salir comprable con el botón encendido.
+2. **PEOR QUE ANTES: cadena de OC basura.** Cada vuelta creaba otra OC con la línea en `0.00`,
+   **quemando un folio** (A3) por documento vacío. El defecto original al menos era visible (la OC
+   duplicada llevaba las 180 piezas); éste se acumulaba en silencio.
+3. **Σ(líneas) ≠ lo comprado.** 100 entre tres OP iguales guardaba `[33.33, 33.33, 33.33]` = `99.99`
+   y la OC totalizaba `199.98` cuando la previa prometía `200.00`. **La revisión previa MENTÍA**, que
+   es exactamente lo que §Post-F9.85 vino a impedir.
+
+**Por qué las 84 pruebas no lo cazaban:** todas sus cantidades (180, 100, 80, 300, 400, 120) caen
+exactas en 2 decimales, así que el viaje de ida y vuelta por la BD no perdía nada. **El fixture no
+podía expresar el fallo.** Un suite entero en verde sobre un defecto vivo.
+
+**El arreglo — la escala manda desde el DESTINO:**
+`ESCALA_CANTIDAD_COMPRA = 2` (y `redondearCantidadCompra` **se deriva de ella**, no la ignora) ·
+lo PENDIENTE se calcula y se compara en esa escala · el reparto cierra la Σ **en esa escala**, con la
+última OP absorbiendo el residuo · el corte de *"¿queda algo?"* es **media unidad del último dígito
+guardable** (`0.005`), no `1e-6` · una línea que se guardaría como `0.00` **no se escribe**, y un
+ajuste por debajo del mínimo **se rechaza diciendo por qué**.
+
+> 🔴 **La lección, que no es sobre decimales:** *un número no está bien calculado hasta que está bien
+> **guardado**.* La aritmética era correcta en memoria y el error apareció al cruzar a la columna. Y
+> la segunda mitad: **un comentario puede mentir tan caro como el código** — el que decía "la BD
+> guarda 4 decimales" es lo que hizo que nadie mirara la columna. Se arreglaron los dos.
+>
+> Y una tercera, del propio arreglo: la primera corrección dejó `ESCALA_CANTIDAD_COMPRA` **de
+> adorno** (el redondeo llamaba directo a `redondear2`), así que cambiarla no cambiaba nada. Una
+> constante que no gobierna lo que dice gobernar es **la misma clase de mentira**. Lo cazó el
+> mutador, no la revisión.
+
 ### Verificación
 
-- **84 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de las
-  cuales **20 nuevas** cubren las tres piezas. Unit: `reparto-ordenes.test.ts` (9) + las de siempre.
-  **44** de la pantalla (11 nuevas).
-- **MUTACIÓN, 11 de 11 cazadas.** Las obligatorias entre ellas: quitar el neteo contra las OC (cae la
-  prueba de duplicados), quitar el desglose por OP (cae la de "una línea por OP"), y meter una OP de
-  otra empresa. **Dos mutantes sobrevivieron en la primera vuelta y los dos enseñaron algo:**
-  1. *"repartir sobre la demanda bruta en vez de sobre lo pendiente"* sobrevivía porque los casos que
-     tenía eran de **una sola OP** o de una OP **completamente** surtida —donde las dos maneras dan lo
-     mismo—. Se agregó el caso que de verdad las separa: una OP **parcialmente** comprada junto a otra
-     sin comprar. Con el mutante, la OC suma bien y **surte mal** (le compra de más a la orden ya
-     surtida y deja corta a la otra).
-  2. *"quitar el filtro de empresa"* sobrevivía porque **A9 se sostiene en tres lugares** a propósito
-     (defensa en profundidad): quitar uno deja el 404 intacto. **Es un mutante equivalente, no un
-     hueco** — con las **tres** guardas fuera la prueba sí se pone roja, y así quedó verificado y
-     anotado en el propio archivo de pruebas.
+- **95 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
+  las cuales **31 nuevas** cubren las tres piezas y los seis hallazgos del rechazo. Unit:
+  `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
+- Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
+  fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
+  La Σ se pide a **Postgres con SQL** (`SUM` sobre la columna `numeric`), no a JavaScript: es la
+  única manera de afirmar sobre lo que de verdad quedó escrito.
+- **MUTACIÓN, 2ª vuelta: 10 muertas + 2 equivalentes probadas.** Mueren: repartir a 4 decimales otra
+  vez · el redondeo ignorando la constante · la última OP sin absorber el residuo · lo pendiente sin
+  redondear · quitar el filtro anti-línea-cero · quitar `idEmpresa` del neteo · `claveAgrupada` sin
+  proveedor · el ajuste diminuto sin rechazar · `enOc` sin redondear · el desglose por OP.
+  **Equivalentes (no huecos), probadas como tales:** el corte `seGuardaComoAlgo` frente a `1e-6`
+  —redundante mientras lo pendiente venga redondeado; con **las tres** guardas fuera la prueba sí se
+  pone roja— y A9 de la revisión previa, sostenido en **tres** lugares (`planearCompra`,
+  `exigirRecetaLiberada` y `exigirMaterialesLiberados`); con los tres fuera, roja.
 
 ### Nota de cierre
 

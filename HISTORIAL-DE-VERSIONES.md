@@ -70,6 +70,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Cancelar una orden de compra devuelve sus materiales a "pendiente".** Es lo correcto —si se canceló,
   hay que volver a comprarlos— pero si alguien cancela una OC por error, esos materiales van a reaparecer
   en la explosión como si nunca se hubieran pedido.
+- **Las cantidades a comprar se manejan con DOS decimales**, que es lo que la orden de compra guarda.
+  Si un consumo pide 3.7020, la orden dice 3.70 — y el sistema ya no se queda esperando esas
+  milésimas. Lo que falte de verdad se ve al descargar el material, como Daniel pidió.
 - **Una orden de compra en BORRADOR ya cuenta como "comprado"** para efectos de esta pantalla. Es lo que
   impide la compra duplicada (la OC que genera la explosión nace en borrador). Para el **costo** el
   criterio sigue siendo otro: ahí sólo cuentan las autorizadas y recibidas.
@@ -79,6 +82,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
+- ✅ **Corregido antes de salir: el sistema pedía de más por centésimas.** En la primera versión de
+  esta entrega, un material cuyo consumo lleva decimales finos (por ejemplo 0.1234 por prenda) se
+  compraba, y al volver a entrar **volvía a aparecer como pendiente** por una diferencia de milésimas
+  que la orden de compra no puede guardar. Peor: al darle otra vez se creaban **órdenes de compra
+  vacías**, cada una gastando un folio. Y cuando se repartía una compra entre varias OP, la suma de
+  los renglones no daba el total que la revisión previa había prometido (100 se guardaba como 99.99).
+  Ya no: la cantidad se calcula **con los mismos dos decimales con los que se guarda**, así que lo
+  que la previa promete es exactamente lo que queda escrito.
 - 🔴 **Las órdenes de compra que Daniel generó siguen escondidas hasta que se corra un script.** No es
   falta de esta versión: los folios de OC arrancaron en 1, 2, 3… y el listado, que ordena del folio más
   alto al más bajo, las mandó hasta la última página, detrás de las casi 8,000 migradas. **Gabriel tiene

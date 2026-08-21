@@ -95,7 +95,11 @@
 > repartido** (una línea de OC por material×OP, innegociable de Daniel), con el **sobrante** repartido en
 > proporción por el servidor y el stock de genéricos repartido entre las OP del lote. ⚠️ **Pasos manuales
 > pendientes de Gabriel** (no son código): correr `reparar-secuencias.ts` para destapar las OC de folio
-> bajo que Daniel ya generó, y después el salto de la serie de OC a **10001**.
+> bajo que Daniel ya generó, y después el salto de la serie de OC a **10001**. 🔴 **Rechazada por el
+> reviewer en su primera versión y corregida (21-ago):** el reparto redondeaba a 4 decimales y la
+> línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
+> encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
+> escala manda desde el destino.*
 >
 > ✅ **`V1-E3n` · MODELOS DE DESARROLLO vs. DE PRODUCCIÓN** (20-ago): Daniel, probando, *"en la última OP
 > que hice de pruebas (la 5558) heredó el modelo de desarrollo… habíamos acordado que el sistema iba a
@@ -683,6 +687,31 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3q (21-ago-2026) — un número no está bien calculado hasta que está bien
+  GUARDADO.** La etapa fue **RECHAZADA** por el reviewer: el defecto que vino a arreglar seguía vivo.
+  El reparto corría a **4 decimales** y `OrdenCompraLinea.cantidad` es **`Decimal(14,2)`**. La
+  aritmética era correcta en memoria y se rompía al cruzar a la columna: el renglón reaparecía con
+  `0.002` pendientes, se encadenaban OC con líneas en `0.00` **quemando folios**, y `Σ(líneas) ≠ lo
+  comprado` (100 → 99.99), con lo que **la revisión previa mentía**. **La regla, para toda etapa
+  futura: la escala manda desde el DESTINO, y quien reparte cierra la suma EN ESA escala.**
+- 🔴 **APRENDIZAJE de V1-E3q — un comentario puede mentir tan caro como el código.** El módulo decía
+  *"la BD guarda cantidades con 4 decimales"*; era falso para el destino real, y **es lo que hizo que
+  nadie mirara la columna**. La corrección arregló el comentario Y el código. Corolario amargo: la
+  primera corrección dejó la constante `ESCALA_CANTIDAD_COMPRA` **de adorno** (el redondeo no la
+  usaba), así que cambiarla no cambiaba nada — **la misma clase de mentira, cometida al arreglarla**.
+  La cazó el mutador, no la revisión.
+- 🔴 **APRENDIZAJE de V1-E3q — un suite en verde puede ser un suite CIEGO.** Las 84 pruebas pasaban
+  sobre un defecto vivo porque **todas** sus cantidades (180, 100, 300, 400) caen exactas en 2
+  decimales: el viaje de ida y vuelta por la BD no perdía nada y **el fixture no podía expresar el
+  fallo**. Al elegir los datos de una prueba hay que preguntarse *"¿este valor puede FALLAR?"*, no
+  sólo *"¿es representativo?"*. Y la Σ hay que pedírsela a **Postgres**, no a JavaScript.
+- **APRENDIZAJE de V1-E3q — un mutante que sobrevive puede ser un hueco o una redundancia, y hay que
+  distinguirlos midiendo.** De 12 mutaciones, 10 murieron; las 2 supervivientes se probaron
+  equivalentes mutando **todas** las guardas del mismo invariante a la vez (ahí sí se ponen rojas).
+  Lo que NO vale es declarar "equivalente" sin esa prueba: dos de los cinco supervivientes de la
+  primera vuelta eran huecos de verdad. ⚠️ Y una trampa propia del método: un `-t` que no casa con
+  ningún test devuelve **exit 0** y el mutante parece sobrevivir — hay que verificar que el filtro
+  selecciona algo antes de creerle a la tabla.
 - **DEUDA de V1-E3q (20-ago-2026) — la explosión multi-OP no tiene e2e ni impreso propio.** El flujo
   (armar el conjunto de OP → revisar → confirmar) está cubierto por integración (**20** pruebas nuevas
   contra Postgres nativo) y por pruebas de componente (**11** nuevas), pero ningún spec de Playwright lo
