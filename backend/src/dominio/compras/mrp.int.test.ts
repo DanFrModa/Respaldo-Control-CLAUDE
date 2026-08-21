@@ -41,6 +41,7 @@ import {
   previoCompraDesdeExplosion,
 } from './mrp.js';
 import { asignarProveedorDeMaterial } from './proveedor-de-orden.js';
+import { seGuardaComoAlgo } from './reparto-ordenes.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -2687,6 +2688,58 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
     expect(omitido?.motivo).toBe('ya-en-oc');
     expect(omitido?.cantidadEnOc).toBe(3.7);
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+  });
+
+  /**
+   * ⭐⭐ **EL CASO QUE DE VERDAD SEPARA LAS DOS OPCIONES DE DISEÑO** (3ª vuelta del reviewer).
+   *
+   * La ficha justificaba haber creado `menor-al-minimo` —en vez de *"mover el corte de guardabilidad
+   * antes de la rama de `enOc`"*— con el ejemplo *"requerido 3.7020 contra una línea de 3.70"*. **Ese
+   * ejemplo NO discrimina**: ahí `seGuardaComoAlgo(3.7020)` es `true`, así que la variante descartada
+   * habría contestado `ya-en-oc` igual. La decisión era correcta y el ejemplo, el equivocado.
+   *
+   * El caso que sí las separa es **un requerido POR DEBAJO del mínimo que YA está cubierto por una
+   * OC**: aquí el BOM se corrige a la baja DESPUÉS de haber comprado (0.1234 → 0.0001 por prenda),
+   * así que quedan `0.003` requeridos contra una OC viva de `3.70`.
+   *  • Lo construido → `ya-en-oc`: *"ya está comprado"*, que es la verdad útil.
+   *  • *"Cortar antes"* → `menor-al-minimo`, **escondiendo que el material ya estaba comprado**.
+   *
+   * 🔴 Y la lección de segundo orden, que es la de toda la etapa: *una decisión correcta justificada
+   * con un ejemplo que no la demuestra es una promesa sin respaldo* — la misma familia del comentario
+   * que provocó el primer rechazo, sólo que en la ficha en vez de en el código.
+   */
+  it('⭐ un requerido por DEBAJO del mínimo pero YA cubierto por una OC dice "ya-en-oc", no "menor-al-minimo"', async () => {
+    // 1) Se compra con el consumo original (0.1234 × 30 = 3.7020 → la OC guarda 3.70).
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.1234 },
+    });
+    await explosionarConRecetaFresca();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    // 2) Desarrollo CORRIGE el consumo a la baja: ahora sólo hacen falta 0.003 — por debajo del
+    //    mínimo pedible— pero el material YA está comprado.
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.0001 },
+    });
+    await explosionarConRecetaFresca();
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    // El requerido está por debajo del mínimo…
+    expect(omitido?.cantidadAComprar).toBeCloseTo(0.003, 4);
+    expect(seGuardaComoAlgo(omitido?.cantidadAComprar ?? 0)).toBe(false);
+    // …y aun así hay una OC viva detrás, así que se dice ESO.
+    expect(omitido?.cantidadEnOc).toBe(3.7);
+    // 🔴 Con "cortar antes" (la variante descartada) esto valdría 'menor-al-minimo' y el comprador
+    // no se enteraría de que el material ya está comprado.
+    expect(omitido?.motivo).toBe('ya-en-oc');
     expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
   });
 

@@ -2250,8 +2250,15 @@ rama de `enOc`, porque eso habría metido en el mismo saco un caso REAL de *"ya 
 > descartada habría dicho `ya-en-oc` igual). El caso que sí separa las dos opciones es **un requerido
 > POR DEBAJO del mínimo que YA está cubierto por una OC** (`aComprar 0.008` con una OC viva de `0.02`):
 > ahí *"cortar antes"* habría dicho `menor-al-minimo` y **escondido que el material ya estaba comprado**,
-> mientras que lo construido dice `ya-en-oc` con su `0.02`. Tiene prueba propia en el archivo
-> (*"…pero con una OC REAL detrás, sí dice ya-en-oc"*), que muere al colapsar la cascada.
+> mientras que lo construido dice `ya-en-oc`.
+>
+> ⚠️ **Y esa prueba hubo que escribirla: no existía.** La ficha afirmaba que el caso *"tiene prueba
+> propia"* citando *"…pero con una OC REAL detrás, sí dice ya-en-oc"* — pero **esa prueba usa
+> `aComprar 3.7020`, por encima del mínimo, así que tampoco discrimina**. Se midió mutando el dominio
+> con la variante descartada: la prueba citada quedaba **VERDE** y sólo la nueva —*"un requerido por
+> DEBAJO del mínimo pero YA cubierto por una OC"*, con el BOM corregido a la baja después de comprar—
+> se pone **ROJA**. La afirmación de la corrección era, ella misma, una promesa sin respaldo: la
+> recursión completa de la etapa, en tres niveles (código → comentario → ficha).
 >
 > 🔴 **Y la lección de segundo orden, que es la de toda la etapa:** *una decisión correcta justificada
 > con un ejemplo que no la demuestra es una promesa sin respaldo* — la misma familia del comentario que
@@ -2272,8 +2279,8 @@ real. *Cada número a la escala de SU columna.* La prueba que comparaba los dos 
 
 ### Verificación
 
-- **101 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
-  las cuales **39 nuevas** cubren las tres piezas, los hallazgos de las DOS rondas de rechazo, el
+- **102 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
+  las cuales **40 nuevas** cubren las tres piezas, los hallazgos de las DOS rondas de rechazo, el
   hueco del precio y la mentira del motivo. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
 - Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
   fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
