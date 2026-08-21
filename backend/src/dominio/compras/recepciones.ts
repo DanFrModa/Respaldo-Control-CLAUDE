@@ -1414,7 +1414,7 @@ export async function lineasPendientesDeOC(
 export const TOPE_OCS_RECIBIBLES = 50;
 
 /** Tope máximo que la ruta acepta pedir (evita que un cliente arrastre el catálogo entero). */
-const TOPE_MAXIMO_OCS_RECIBIBLES = 200;
+export const TOPE_MAXIMO_OCS_RECIBIBLES = 200;
 
 /** Cuántos materiales pendientes se nombran por OC (los demás se cuentan en `materialesPendientesMas`). */
 const MATERIALES_A_NOMBRAR = 3;
@@ -1516,8 +1516,17 @@ export async function ocsRecibibles(
     cliente.ordenCompra.count({ where }),
     cliente.ordenCompra.findMany({
       where,
-      // La más reciente primero: al recibir, lo que acaba de llegar suele ser lo último pedido.
-      orderBy: { numCompra: 'desc' },
+      // La más reciente primero, ordenando por `id` (autoincremental) y NO por `numCompra`.
+      //
+      // 🔴 EL FOLIO NO ES MONÓTONO CON LA CREACIÓN, hoy y en `prueba`: los ETL dejaron las
+      // secuencias en cero, así que las OC nuevas toman folios 1, 2, 3… y caen DETRÁS de las
+      // ~7,978 migradas (§Post-F9.85, cuyo arreglo es un paso MANUAL todavía pendiente). Y el ETL
+      // migra toda OC histórica autorizada como `autorizada` sin crear recepciones, así que se
+      // quedan ABIERTAS para siempre: con `numCompra desc`, un proveedor con más de `limite` OC
+      // viejas abiertas devolvería una página entera de historia y dejaría FUERA la OC que Daniel
+      // acaba de crear — el mismo defecto que esta etapa vino a matar, con un número más chico.
+      // `id` sí crece con la creación, no es nulo nunca, y no depende de que alguien corra nada.
+      orderBy: { id: 'desc' },
       take: filtros.limite,
       select: {
         id: true,

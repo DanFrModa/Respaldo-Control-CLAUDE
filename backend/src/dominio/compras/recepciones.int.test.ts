@@ -794,6 +794,34 @@ describe('ocsRecibibles (§Post-F9.87) — las OC abiertas del proveedor que lle
     return oc;
   }
 
+  /** Crea una OC AUTORIZADA con VARIOS renglones de avío (uno por avío dado). */
+  async function ocAbiertaConAvios(
+    idProveedor: number,
+    avios: { idAvio: number; cantidad: number }[],
+  ) {
+    const oc = await crearOC(
+      sesion(PERM),
+      {
+        ...encabezadoOc(),
+        idProveedor,
+        lineas: avios.map((a) => ({
+          idAvio: a.idAvio,
+          cantidad: a.cantidad,
+          precio: 5,
+          unidad: 'pza',
+        })),
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+    return oc;
+  }
+
+  /** Da de alta un avío del catálogo (clave — descripción es lo que la fila muestra). */
+  async function avio(clave: string, descripcion: string) {
+    return cliente.avio.create({ data: { clave, descripcion } });
+  }
+
   it('FILTRA por el proveedor elegido: no asoma ni una OC de otro proveedor', async () => {
     const otroProveedor = await cliente.proveedor.create({ data: { nombre: 'Avíos del Sur' } });
     const ocPropia = await ocAbiertaDe(proveedor.id);
@@ -902,18 +930,25 @@ describe('ocsRecibibles (§Post-F9.87) — las OC abiertas del proveedor que lle
   });
 
   it('dice QUÉ TRAE PENDIENTE: el material por nombre, y deja de contarlo al recibirlo', async () => {
-    const oc = await ocAbiertaDe(proveedor.id, 100);
+    // DOS renglones: así el renglón que se surte puede DEJAR de contarse sin que la OC se cierre
+    // (con uno solo la OC pasaría a recibida_total y desaparecería de la lista, y la segunda mitad
+    // del nombre de esta prueba se quedaría sin afirmar — que es como estaba).
+    const avio2 = await avio('AV-02', 'Avio 2');
+    const oc = await ocAbiertaConAvios(proveedor.id, [
+      { idAvio: avioBoton.id, cantidad: 100 },
+      { idAvio: avio2.id, cantidad: 100 },
+    ]);
 
     const antes = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
     const filaAntes = antes.datos[0]!;
-    expect(filaAntes.renglones).toBe(1);
-    expect(filaAntes.renglonesPendientes).toBe(1);
+    expect(filaAntes.renglones).toBe(2);
+    expect(filaAntes.renglonesPendientes).toBe(2);
     // El nombre sale del catálogo del avío (clave — descripción), no de un texto inventado.
-    expect(filaAntes.materialesPendientes).toEqual(['BOT-01 — Botón']);
+    expect(filaAntes.materialesPendientes).toEqual(['BOT-01 — Botón', 'AV-02 — Avio 2']);
     expect(filaAntes.materialesPendientesMas).toBe(0);
     expect(filaAntes.estatus).toBe('autorizada');
 
-    // Recepción PARCIAL: la OC sigue abierta, pero con menos por traer.
+    // Recepción PARCIAL del primer renglón: 40 de 100 NO lo surte, así que sigue contándose.
     await recibirCompra(
       sesion(PERM),
       {
@@ -925,12 +960,147 @@ describe('ocsRecibibles (§Post-F9.87) — las OC abiertas del proveedor que lle
       bd(),
     );
 
+    const aMedias = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    const filaAMedias = aMedias.datos[0]!;
+    expect(filaAMedias.id).toBe(oc.id);
+    expect(filaAMedias.estatus).toBe('recibida_parcial');
+    expect(filaAMedias.renglonesPendientes).toBe(2);
+    expect(filaAMedias.materialesPendientes).toEqual(['BOT-01 — Botón', 'AV-02 — Avio 2']);
+
+    // Y ahora SÍ: llega el resto del primer renglón (60 más = 100 de 100) y DEJA de contarse.
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 60 }],
+      },
+      bd(),
+    );
+
     const despues = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
     const filaDespues = despues.datos[0]!;
     expect(filaDespues.id).toBe(oc.id);
     expect(filaDespues.estatus).toBe('recibida_parcial');
-    // Sigue faltando material, así que sigue contándose como pendiente.
+    // La segunda mitad del nombre, afirmada: el renglón surtido ya NO cuenta ni se nombra.
     expect(filaDespues.renglonesPendientes).toBe(1);
+    expect(filaDespues.materialesPendientes).toEqual(['AV-02 — Avio 2']);
+  });
+
+  /**
+   * ⭐ A1 — EL CRITERIO DEL PENDIENTE ES EL MISMO DEL ESTATUS, no una derivación paralela. Tres
+   * textos lo prometen (el módulo, la ficha y el JSDoc de `ocsRecibibles`) y hasta esta prueba
+   * NADA lo sostenía: cambiar `faltantePorRecibir` por una resta cruda `pedido − recibido > 0`
+   * dejaba el suite entero en verde.
+   *
+   * 96 de 100 cae DENTRO de la banda del 5% (§Post-F9.19) ⇒ el renglón está SURTIDO. Con resta
+   * cruda faltarían 4 y el renglón seguiría contándose: la pantalla diría "1 de 2 renglones por
+   * recibir" de algo que el ESTATUS ya da por surtido — justo la incoherencia que §Post-F9.19
+   * existe para impedir.
+   */
+  it('el pendiente usa la BANDA de tolerancia del estatus (96 de 100 ya está surtido)', async () => {
+    const avio2 = await avio('AV-02', 'Avio 2');
+    const oc = await ocAbiertaConAvios(proveedor.id, [
+      { idAvio: avioBoton.id, cantidad: 100 },
+      // El segundo renglón se queda intacto: mantiene la OC ABIERTA para poder observarla.
+      { idAvio: avio2.id, cantidad: 100 },
+    ]);
+
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 96 }],
+      },
+      bd(),
+    );
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    const fila = salida.datos[0]!;
+    expect(fila.id).toBe(oc.id);
+    expect(fila.estatus).toBe('recibida_parcial');
+    // 1, NO 2: con una resta cruda esto valdría 2 y la prueba se pone roja.
+    expect(fila.renglonesPendientes).toBe(1);
+    expect(fila.materialesPendientes).toEqual(['AV-02 — Avio 2']);
+  });
+
+  /**
+   * `materialesPendientesMas` es lo que impide que la fila diga "faltan 3" cuando faltan 5. La
+   * única aserción que tenía era `toBe(0)`, que un `0` cableado satisface.
+   */
+  it('nombra 3 materiales y CUENTA el resto (5 pendientes → 3 + 2)', async () => {
+    const avios = [
+      avioBoton,
+      await avio('AV-02', 'Avio 2'),
+      await avio('AV-03', 'Avio 3'),
+      await avio('AV-04', 'Avio 4'),
+      await avio('AV-05', 'Avio 5'),
+    ];
+    const oc = await ocAbiertaConAvios(
+      proveedor.id,
+      avios.map((a) => ({ idAvio: a.id, cantidad: 100 })),
+    );
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    const fila = salida.datos[0]!;
+    expect(fila.id).toBe(oc.id);
+    expect(fila.renglones).toBe(5);
+    expect(fila.renglonesPendientes).toBe(5);
+    // Se NOMBRAN los tres primeros (orden de los renglones de la OC)…
+    expect(fila.materialesPendientes).toEqual([
+      'BOT-01 — Botón',
+      'AV-02 — Avio 2',
+      'AV-03 — Avio 3',
+    ]);
+    // …y los otros DOS se cuentan. Con un 0 cableado (o nombrando otros tantos) esto se pone rojo.
+    expect(fila.materialesPendientesMas).toBe(2);
+  });
+
+  /**
+   * ⭐ EL ORDEN NO PUEDE COLGAR DEL FOLIO. Hoy en `prueba` el folio NO es monótono con la creación:
+   * los ETL dejaron las secuencias en cero, así que las OC nuevas toman folios 1, 2, 3… mientras
+   * las ~7,978 migradas (todas `autorizada`, o sea ABIERTAS para siempre) llevan folios altos
+   * (§Post-F9.85, arreglo MANUAL todavía pendiente). Con `numCompra desc`, la OC que Daniel acaba
+   * de crear se iría al final y el recorte la dejaría FUERA — el defecto que la etapa vino a matar,
+   * con un número más chico.
+   */
+  it('ordena por CREACIÓN, no por folio: la OC nueva de folio bajo sale en la primera página', async () => {
+    // Tres OC del mismo proveedor. Las dos primeras (las "históricas") se reetiquetan con folios
+    // ALTOS, como las migradas; la tercera —la más nueva— se queda con su folio bajo.
+    const vieja1 = await ocAbiertaDe(proveedor.id);
+    const vieja2 = await ocAbiertaDe(proveedor.id);
+    const nueva = await ocAbiertaDe(proveedor.id);
+    await cliente.ordenCompra.update({ where: { id: vieja1.id }, data: { numCompra: 9001n } });
+    await cliente.ordenCompra.update({ where: { id: vieja2.id }, data: { numCompra: 9002n } });
+    const folioNueva = nueva.numCompra;
+    expect(folioNueva).toBeLessThan(9001);
+
+    // Con el recorte más duro posible, la que tiene que salir es la MÁS NUEVA.
+    const recortada = await ocsRecibibles(
+      sesion(PERM),
+      { idProveedor: proveedor.id, limite: 1 },
+      bd(),
+    );
+    // Ordenando por folio esto valdría [9002] y la prueba se pone roja.
+    expect(recortada.datos.map((o) => o.numCompra)).toEqual([folioNueva]);
+    expect(recortada.total).toBe(3);
+    expect(recortada.truncado).toBe(true);
+  });
+
+  it('el orden completo es por creación descendente (explícito, no incidental)', async () => {
+    const vieja1 = await ocAbiertaDe(proveedor.id);
+    const vieja2 = await ocAbiertaDe(proveedor.id);
+    const nueva = await ocAbiertaDe(proveedor.id);
+    await cliente.ordenCompra.update({ where: { id: vieja1.id }, data: { numCompra: 9001n } });
+    await cliente.ordenCompra.update({ where: { id: vieja2.id }, data: { numCompra: 9002n } });
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+
+    // Por folio esto sería [9002, 9001, folioNueva]: el orden queda AFIRMADO, no supuesto.
+    expect(salida.datos.map((o) => o.numCompra)).toEqual([nueva.numCompra, 9002, 9001]);
   });
 
   it('sin permiso `compras.ver` no se ofrece nada (A4)', async () => {

@@ -45,6 +45,8 @@ import {
   ocsRecibibles,
   recibirCompra,
   reversarRecepcion,
+  TOPE_MAXIMO_OCS_RECIBIBLES,
+  TOPE_OCS_RECIBIBLES,
 } from '../../dominio/compras/recepciones.js';
 
 /** Parámetro de ruta `:idOrdenCompra`. */
@@ -207,9 +209,13 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
           .number({ error: 'El límite debe ser un número' })
           .int()
           .positive()
-          .max(200)
+          .max(TOPE_MAXIMO_OCS_RECIBIBLES)
           .optional()
-          .describe('Cuántas OC devolver como máximo (default 50).'),
+          .describe(
+            // Los topes se leen del dominio: con literales, mover la constante dejaría a la ruta
+            // topando en otro lado y al `describe` mintiendo.
+            `Cuántas OC devolver como máximo (default ${String(TOPE_OCS_RECIBIBLES)}).`,
+          ),
       }),
       response: {
         200: z
