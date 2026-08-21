@@ -453,16 +453,27 @@ function EditorPermisos({
                               : 'flex cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 hover:bg-muted'
                           }
                           title={
-                            permiso.apagado
-                              ? 'Su módulo está apagado en esta versión: otorgarlo no surtiría efecto.'
-                              : undefined
+                            !permiso.apagado
+                              ? undefined
+                              : seleccion.has(permiso.clave)
+                                ? 'Su módulo está apagado en esta versión: este permiso no surte efecto. Puedes quitarlo.'
+                                : 'Su módulo está apagado en esta versión: otorgarlo no surtiría efecto.'
                           }
                         >
                           <input
                             type="checkbox"
                             className="mt-0.5 size-4 shrink-0 accent-primary"
                             checked={seleccion.has(permiso.clave)}
-                            disabled={permiso.apagado || !puedeAdministrar || asignar.isPending}
+                            // ⭐ V1-E3t (nota N3 del reviewer): un permiso apagado NO se puede
+                            // OTORGAR (no surtiría efecto), pero si un rol ya lo trae —un rol a la
+                            // medida, o una base sin re-sembrar— SÍ se puede QUITAR. Deshabilitarlo
+                            // en los dos sentidos dejaba la concesión muerta atrapada para siempre,
+                            // que es justo lo contrario de lo que esta pantalla vino a arreglar.
+                            disabled={
+                              (permiso.apagado && !seleccion.has(permiso.clave)) ||
+                              !puedeAdministrar ||
+                              asignar.isPending
+                            }
                             onChange={() => alternar(permiso.clave)}
                             data-testid="permiso-checkbox"
                           />

@@ -175,6 +175,31 @@ describe('<RolesPagina>', () => {
     );
   });
 
+  // ⭐ V1-E3t (nota N3 del reviewer): un permiso apagado que el rol YA TRAE tiene que poder
+  // QUITARSE. La primera versión lo deshabilitaba en los dos sentidos y la concesión muerta
+  // quedaba atrapada para siempre — lo contrario de lo que esta pantalla vino a arreglar.
+  //
+  // 🔴 El valor que pone roja la primera línea es `disabled` (lo que devolvía el gate anterior,
+  // `permiso.apagado || …`); la segunda sigue exigiendo que NO se pueda otorgar uno nuevo.
+  it('un permiso apagado que el rol YA TIENE se puede quitar (pero no otorgar de nuevo)', () => {
+    useRoles.mockReturnValue(
+      estadoRoles([rol(1, 'Administrador', true, 2, ['roles.administrar', 'rc.ruta-ver'])]),
+    );
+    renderConProveedores(<RolesPagina />, {
+      sesion: estadoSesionDePrueba(['roles.administrar']),
+    });
+
+    abrirPrimero();
+    const casilla = screen.getByRole('checkbox', { name: /rc\.ruta-ver/ });
+    expect(casilla).toBeChecked();
+    expect(casilla).toBeEnabled();
+
+    // Al desmarcarlo queda apagado Y ya no se puede volver a marcar.
+    fireEvent.click(casilla);
+    expect(screen.getByRole('checkbox', { name: /rc\.ruta-ver/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /rc\.ruta-ver/ })).toBeDisabled();
+  });
+
   it('marcar un permiso habilita Guardar y lo envía como reemplazo', () => {
     useRoles.mockReturnValue(
       estadoRoles([rol(1, 'Administrador', true, 2, ['roles.administrar'])]),

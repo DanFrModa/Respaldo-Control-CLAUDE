@@ -53,12 +53,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué cambió y puede sorprender
 
-- 🔴 **La Ruta Crítica desaparece de la pantalla para TODOS, incluido el administrador.** Es lo que
+- 🔴 **La Ruta Crítica desaparece de la pantalla para TODOS, incluido el administrador** — y eso
+  incluye **el mosaico «Entregas a tiempo» de la portada**, que aunque vivía en Indicadores se
+  calculaba enterito con datos de Ruta Crítica y se habría quedado en «—%» para siempre. Es lo que
   Daniel pidió el 13 de agosto (*"Sí podemos arrancar sin ruta crítica… y lo vamos construyendo"*) y
   ratificó el 21 (*"sigue apagada, déjala que se apague bien"*). En concreto, ya no salen:
   - la entrada **«Ruta Crítica»** del menú (Mis pendientes) y **«Procesos y responsables»**;
   - la **campanita de alertas** de arriba a la derecha;
   - la tarjeta **«KPIs de Ruta Crítica»** dentro de Indicadores;
+  - el mosaico **«Entregas a tiempo»** de la portada (sale de la Ruta Crítica, aunque no lo parezca);
   - el mosaico **«Ruta crítica»** del panel de una orden;
   - el **panel de hitos** del detalle de la orden (revisión de OP, fit, tono, avíos, empaque, arte) —
     iba montado sobre los permisos de Ruta Crítica y se fue con ellos;

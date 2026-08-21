@@ -179,11 +179,13 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     // ⭐ V1-E3t: el CUARTO trozo («· Ruta Crítica programándose sola») ya no sale, y no por
     // capricho del texto: con la RC apagada (§Post-F9.36 punto 1) nadie tiene `rc.ruta-ver` y NO
     // se está programando ninguna ruta. El `$` del final es lo que lo vigila.
+    const coletillaRc = RC_APAGADA ? '' : ' · Ruta Crítica programándose sola';
     await expect(
       page.getByText(
         new RegExp(
           `^OP \\d+ creada · modelo de producción ${numeroProduccion} ` +
-            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo$`,
+            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo` +
+            `${coletillaRc}$`,
           'u',
         ),
       ),
@@ -233,6 +235,44 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
       await page.goto(`/ruta-critica/ordenes/${String(idOrden)}`);
       await expect(page.getByTestId('pantalla-no-disponible')).toBeVisible();
       await page.goBack();
+    } else {
+      // ⭐ La verificación ORIGINAL (nota N4 del reviewer): sin este `else`, el paso 2 del
+      // procedimiento de re-encendido —poner `RC_APAGADA = false`— dejaba este tramo del spec
+      // MUDO, y «la RC se programa sola» se quedaría sin prueba punta a punta justo el día que
+      // vuelva a importar. Se conserva tal cual estaba (V1-E3t la movió, no la borró).
+      //
+      // El consumidor corre en el backend del compose (outbox + pg-boss) y puede tardar, así que
+      // la espera se ancla al ESTADO sondeando la ruta por API con la cookie de la sesión —cada
+      // intento cuesta milisegundos y termina EN CUANTO el consumidor acaba— y el panel se abre
+      // UNA sola vez, ya con la ruta lista, para verificar la UI.
+      const idOrden = await idOrdenPorFolio(page.request, folioOrden, numeroProduccion);
+      await expect
+        .poll(
+          async () => {
+            const respuesta = await page.request.get(
+              `/api/ruta-critica/ordenes/${String(idOrden)}/ruta`,
+            );
+            if (!respuesta.ok()) {
+              return `http-${String(respuesta.status())}`;
+            }
+            const ruta = (await respuesta.json()) as {
+              estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta';
+              procesos: unknown[];
+            };
+            return ruta.estadoRecalculo !== 'sin-ruta' && ruta.procesos.length > 0
+              ? 'con-procesos'
+              : ruta.estadoRecalculo;
+          },
+          { timeout: 90_000, intervals: [1_000] },
+        )
+        .toBe('con-procesos');
+
+      await panelCentro.getByTestId('mosaico-rc').click();
+      await expect(
+        page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
+      ).toBeVisible();
+      await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible();
+      await page.keyboard.press('Escape');
     }
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────

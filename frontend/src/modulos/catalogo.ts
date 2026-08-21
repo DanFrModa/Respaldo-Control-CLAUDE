@@ -130,7 +130,9 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
  *  • `readonly ClavePermiso[]` — basta UNA de las claves (el caso normal, y el histórico).
  *  • `{ todos: [...] }` — hacen falta TODAS. Es para pantallas que cruzan dos áreas y necesitan
  *    las dos llaves; hoy solo los **KPIs de Ruta Crítica**, que son un tablero directivo
- *    (`indicadores.ver`) SOBRE datos de la RC (`rc.ruta-ver`). Sin esta forma, apagar la RC
+ *    (`indicadores.ver`) SOBRE datos de la RC (`rc.ruta-ver`). (Su hermano de backend, el mosaico
+ *    «Entregas a tiempo» de la portada, no necesita entrada aquí porque no es una pantalla: el
+ *    servidor lo devuelve en `null` y la portada no lo pinta.) Sin esta forma, apagar la RC
  *    (V1-E3t, §Post-F9.36 punto 1) habría dejado esa entrada viva en el menú disparando un 403
  *    —exactamente la puerta rota que §Post-F9.68 manda matar—, porque su permiso de siempre no
  *    empieza con `rc.`.

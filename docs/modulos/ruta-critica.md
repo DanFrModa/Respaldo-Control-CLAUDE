@@ -34,7 +34,22 @@ no se borró código, ni tablas, ni datos, ni las ~181 rutas históricas. Es **u
 | **1. Nadie tiene permisos `rc.*`** | La sesión los DESCARTA al armarse → **403 del servidor** aunque la fila `RolPermiso` exista. Y como el frontend pinta menú y ruta con esos mismos permisos, se apagan **menú, campana, pantallas y ⌘K** de un golpe (las tres capas de §Post-F9.68). | `comun/permisos.ts` · `cargarPermisosDeUsuario` |
 | **2. La ruta NO se genera sola** | `procesarOrdenCreada` sale por el interruptor y deja bitácora `rc-automatica-omitida`. Cada OP nueva se ahorra sus ~26 procesos. | `dominio/ruta-critica/rcAutomatica.ts` |
 | **3. El seed suelta las concesiones muertas** | Los roles de sistema dejan de traer `rc.*` (limpieza; la cerradura es la sesión). | `prisma/seed.ts` · `sembrarRoles` |
-| **4. Los KPIs de RC piden las DOS llaves** | Era la única superficie de RC gateada por un permiso que no empieza con `rc.` (`indicadores.ver`); ahora exige además `rc.ruta-ver`. | `api/indicadores/indicadores.rutas.ts` · `conTodosPermisos` |
+| **4. Las DOS superficies servidas desde Indicadores piden las DOS llaves** | Son las que NO cuelgan de un permiso `rc.*` y por eso el interruptor no las tocaba: los **KPIs de RC** y el mosaico **«Entregas a tiempo» de la portada** (su vista `kpi_entregas_a_tiempo` es 100 % `ruta_orden`). Ambas exigen ahora `indicadores.ver` **+** `rc.ruta-ver`. | `api/indicadores/indicadores.rutas.ts` · `dominio/resumen/resumen.ts` |
+
+⚠️ **Cómo se buscaron esas dos superficies** (repetir si se apaga otro módulo): (1) listar TODAS las
+vistas de `prisma/migrations` y marcar las construidas sobre tablas de RC — salen cuatro:
+`kpi_entregas_a_tiempo`, `kpi_lead_time_proceso`, `kpi_cuellos_botella`, `kpi_desempeno_responsable`;
+(2) buscar cada una en `backend/src` y seguir a su endpoint y su permiso; (3) buscar accesos Prisma a
+los modelos de RC **desde fuera** de `dominio/ruta-critica`; (4) buscar SQL crudo con esas tablas
+fuera del módulo; (5) en el frontend, las pantallas que llaman a `/api/ruta-critica` o a los KPIs sin
+tener un gate `rc.*`. El interruptor NO puede ver esta clase de fuga: un dato de RC servido por un
+endpoint de otro módulo se ve, desde el permiso, como cualquier otro dato de ese módulo.
+
+⚠️ **Una excepción deliberada al "punto único":** la sesión de sistema del **ETL**
+(`backend/migracion/comun/sesion-etl.ts`) se arma a mano con el catálogo completo, `rc.*` incluido, y
+NO pasa por `cargarPermisosDeUsuario`. Es correcto: es un proceso de línea de comandos que se corre a
+mano, sin usuario ni HTTP, y es exactamente lo que hará falta para cargar las plantillas de F5 al
+encender el módulo. El filtro es el punto único de las sesiones **de usuario**; el ETL no es una.
 
 🔴 **Se apagó la GENERACIÓN, no el CONSUMIDOR de la cola.** `manejarEventoAutoAvance` sigue
 registrado y drenando: los emisores de F3/F4 no dejaron de escribir al outbox, y sin consumidor

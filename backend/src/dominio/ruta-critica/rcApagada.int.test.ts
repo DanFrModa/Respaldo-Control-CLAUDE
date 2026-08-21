@@ -154,8 +154,17 @@ describe('RC apagada (V1-E3t) — la generación automática NO corre', () => {
     expect(orden.rcActiva).toBeNull();
   });
 
-  it('una ruta YA generada NO se toca (D3: apagar no es borrar)', async () => {
+  it('una ruta YA generada NO se toca, y la omisión igual queda anotada (D3)', async () => {
     // Simula una orden histórica con su ruta viva: el interruptor no debe rozarla.
+    //
+    // ⭐ Nota N2 del reviewer: la primera versión de esta prueba SOBREVIVÍA a apagar el
+    // interruptor, porque una orden con `rcActiva = true` también es no-op con la RC ENCENDIDA
+    // (por la guarda de idempotencia) — o sea que no afirmaba nada que el interruptor controlara.
+    // Lo que sí controla, y se afirma abajo, es la BITÁCORA: con la RC encendida `procesarOrdenCreada`
+    // sale por el `rcActiva` y NO deja rastro; con la RC apagada sale por el interruptor y SÍ lo
+    // deja. Y eso importa de verdad: el procedimiento de re-encendido dice que las órdenes que
+    // nacieron sin ruta se identifican por su bitácora `rc-automatica-omitida`, así que tiene que
+    // escribirse para TODA orden, no sólo para las que además no tenían ruta.
     await sembrarCatalogoRc();
     const idOrden = await crearOrdenPrueba();
     const proceso = await cliente.procesoDef.findFirstOrThrow({ where: { codigo: 'rev' } });
@@ -181,5 +190,12 @@ describe('RC apagada (V1-E3t) — la generación automática NO corre', () => {
     });
     expect(orden.rcActiva).toBe(true);
     expect(await cliente.rutaOrden.count({ where: { idOrden } })).toBe(1);
+
+    // 🔴 La línea que ata esta prueba AL INTERRUPTOR: con la RC encendida no habría bitácora
+    // ninguna (la salida sería por la guarda de idempotencia, antes de escribir nada).
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Orden', idEntidad: String(idOrden) },
+    });
+    expect(bitacora.datos).toMatchObject({ operacion: 'rc-automatica-omitida' });
   });
 });

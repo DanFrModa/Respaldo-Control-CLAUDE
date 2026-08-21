@@ -285,7 +285,7 @@ describe('resumenOperativo — bloques de producción (produccion.wip-ver)', () 
   });
 });
 
-describe('resumenOperativo — entregas a tiempo (indicadores.ver, vista F7)', () => {
+describe('resumenOperativo — entregas a tiempo (indicadores.ver + rc.ruta-ver, vista F7)', () => {
   it('últimos 30 días vs ventana previa, en puntos', async () => {
     const proc = await cliente.procesoDef.create({
       data: { codigo: 'entrega', nombre: 'Entrega' },
@@ -318,8 +318,25 @@ describe('resumenOperativo — entregas a tiempo (indicadores.ver, vista F7)', (
     });
     await refrescarKpis(bd());
 
-    const r = await resumenOperativo(sesion(['indicadores.ver']), bd(), AHORA);
+    const r = await resumenOperativo(sesion(['indicadores.ver', 'rc.ruta-ver']), bd(), AHORA);
     expect(r.entregasATiempo).toEqual({ porcentaje: 0.5, medibles: 2, deltaPuntos: -50 });
+
+    // ⭐ V1-E3t (hallazgo del reviewer, D1) — el mismo escenario, con datos y todo, pero SIN
+    // `rc.ruta-ver`: el bloque llega en `null` y la portada no pinta el mosaico.
+    //
+    // 🔴 `kpi_entregas_a_tiempo` es 100 % `ruta_orden`: es un KPI de la Ruta Crítica servido desde
+    // Indicadores. Con el gate viejo (`indicadores.ver` a secas) esta línea recibía
+    // `{porcentaje: 0.5, medibles: 2, deltaPuntos: -50}` — el valor de arriba, que NO es `null` —,
+    // y con la RC apagada habría sido `{porcentaje: null, medibles: 0}`: un mosaico
+    // «Entregas a tiempo · —% · RC» clavado en la PRIMERA pantalla del sistema.
+    //
+    // Se afirma con los datos PUESTOS a propósito: sin ellos, `null` también saldría de una base
+    // vacía y la prueba pasaría sin medir el permiso.
+    const sinRc = await resumenOperativo(sesion(['indicadores.ver']), bd(), AHORA);
+    expect(sinRc.entregasATiempo).toBeNull();
+    // Y `rc.ruta-ver` por sí solo tampoco alcanza (es un AND, no un OR).
+    const soloRc = await resumenOperativo(sesion(['rc.ruta-ver']), bd(), AHORA);
+    expect(soloRc.entregasATiempo).toBeNull();
   });
 });
 

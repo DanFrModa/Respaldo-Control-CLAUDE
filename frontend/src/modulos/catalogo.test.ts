@@ -232,9 +232,11 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     expect(cumpleExigencia(and, permisos())).toBe(false);
   });
 
-  // ⭐ V1-E3t: los KPIs de Ruta Crítica son la ÚNICA entrada de RC que no cuelga de un permiso
-  // `rc.*`. Se afirma su gate para que nadie se lo devuelva a `['indicadores.ver']` sin darse
-  // cuenta de que con eso la RC vuelve al menú aunque el módulo esté apagado.
+  // ⭐ V1-E3t: los KPIs de Ruta Crítica son la única ENTRADA DE MENÚ de RC que no cuelga de un
+  // permiso `rc.*` (su hermano, el mosaico «Entregas a tiempo» de la portada, no es entrada de
+  // menú: lo apaga el servidor devolviéndolo en `null`). Se afirma su gate para que nadie se lo
+  // devuelva a `['indicadores.ver']` sin darse cuenta de que con eso la RC vuelve al menú aunque
+  // el módulo esté apagado.
   it('los KPIs de Ruta Crítica exigen indicadores.ver Y rc.ruta-ver', () => {
     const kpis = MODULOS_MENU.find((m) => m.clave === 'indicadores-ruta-critica');
     expect(kpis).toBeDefined();

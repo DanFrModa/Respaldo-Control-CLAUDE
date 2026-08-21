@@ -29,6 +29,21 @@
  *     —esconder el menú, cerrar la ruta y bloquear el servidor— caen de un solo golpe.
  *     El seed (`prisma/seed.ts`) además los resta de los roles de sistema, para que la base no
  *     cargue concesiones muertas.
+ *
+ *     ⚠️ **OJO con las superficies servidas DESDE OTRO MÓDULO.** Un dato de la RC expuesto por un
+ *     endpoint que pide `indicadores.ver` NO lo toca este interruptor, y queda como un tablero de
+ *     ceros vivo. Hay **dos**, y las dos piden ahora las DOS llaves: `/api/indicadores/rc*`
+ *     (`conTodosPermisos`) y el mosaico «Entregas a tiempo» de `GET /api/resumen`. Se buscaron
+ *     exhaustivamente por las cuatro vistas materializadas construidas sobre `ruta_orden`; el
+ *     método está en la ficha `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t, y hay que REPETIRLO si
+ *     algún día se apaga otro módulo.
+ *     ⚠️ **Una excepción, deliberada:** la sesión de sistema del **ETL** (`migracion/comun/
+ *     sesion-etl.ts`) se arma a mano con `CLAVES_PERMISO` completo —`rc.*` incluido— y NO pasa por
+ *     `cargarPermisosDeUsuario`. Está bien que así sea: es un proceso de línea de comandos que
+ *     corre Gabriel a mano, sin usuario ni HTTP de por medio, y es justo lo que hará falta para
+ *     cargar las plantillas de F5 el día que la RC se encienda. Dicho de otro modo: el filtro es el
+ *     punto único de las sesiones de **usuario**; el ETL no es una de ellas.
+ *
  *  2. **Sus procesos de fondo no corren.** La generación automática de la RC al nacer la OP
  *     (`dominio/ruta-critica/rcAutomatica.ts`) se OMITE con bitácora; el consumidor de la cola
  *     sigue vivo y DRENANDO (el outbox y pg-boss nunca se acumulan).

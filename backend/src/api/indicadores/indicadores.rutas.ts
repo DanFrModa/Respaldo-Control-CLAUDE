@@ -72,8 +72,9 @@ export const rutasIndicadores: FastifyPluginCallbackZod = (app, _opciones, done)
   // ── Ruta Crítica ─────────────────────────────────────────────────────────────
   // ⭐ V1-E3t: estos tres endpoints piden LAS DOS llaves (`conTodosPermisos`) — son un tablero
   // directivo (`indicadores.ver`) SOBRE datos de la Ruta Crítica (`rc.ruta-ver`). Antes solo pedían
-  // la primera, y era la ÚNICA superficie de RC que no colgaba de un permiso `rc.*`: con el módulo
-  // apagado (§Post-F9.36 punto 1) habría quedado un tablero de ceros vivo en el menú. Con RC
+  // la primera, y es UNA DE LAS DOS superficies de RC que no cuelgan de un permiso `rc.*` (la otra
+  // es el mosaico «Entregas a tiempo» de `GET /api/resumen`, misma vista, misma corrección): con el
+  // módulo apagado (§Post-F9.36 punto 1) habría quedado un tablero de ceros vivo en el menú. Con RC
   // ENCENDIDA no cambia nada para nadie: `rc.ruta-ver` cascadea a todos los roles de sistema salvo
   // `Basico`, que tampoco tiene `indicadores.ver`.
   const guardKpisRc = app.conTodosPermisos('indicadores.ver', 'rc.ruta-ver');

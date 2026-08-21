@@ -144,7 +144,12 @@
 > **generación automática no corre** y deja bitácora. ⭐ **La trampa que había que ver venir: se apagó
 > la GENERACIÓN, no el CONSUMIDOR de la cola** — los emisores de F3/F4 siguen escribiendo al outbox y,
 > sin consumidor, `pgboss.job` crecería **para siempre**; apagar una pieza no puede tumbar otra que sí
-> se usa. **NO se borró nada (D3):** módulo, tablas, las ~181 rutas históricas, los permisos y los
+> se usa. ⭐ **Y la clase de fuga que el interruptor NO puede ver:** los datos de RC servidos desde
+> OTRO módulo. Son **dos** (los KPIs de RC y el mosaico «Entregas a tiempo» de la PORTADA, las dos
+> con `indicadores.ver`), las dos piden ahora las dos llaves, y **se buscaron por método** —las
+> cuatro vistas materializadas sobre `ruta_orden` y todos sus consumidores— no por intuición; el
+> barrido queda escrito para repetirlo si se apaga otro módulo. **NO se borró nada (D3):** módulo,
+> tablas, las ~181 rutas históricas, los permisos y los
 > cinco specs e2e (quedan *skipped*) siguen en pie, y **encenderla es un procedimiento de 4 pasos**
 > documentado en `docs/modulos/ruta-critica.md`. De pasada: los toasts dejan de prometer lo que no
 > hace, y Roles rotula los permisos apagados en vez de dejar marcar algo que no surte efecto.
@@ -760,6 +765,25 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3t (21-ago-2026) — un interruptor por PERMISOS es ciego a los datos que
+  sirve OTRO módulo, y ahí es donde se esconden las fugas.** El apagado se hizo filtrando los
+  permisos `rc.*` en la sesión, que apaga menú, ruta y servidor de un golpe. Pero un dato de la RC
+  expuesto por un endpoint que pide `indicadores.ver` **no se llama `rc.` nada**, así que el
+  interruptor pasa de largo y queda vivo un tablero de ceros. Había **dos**: los KPIs de RC y —peor—
+  el mosaico «Entregas a tiempo» de **la portada**, o sea la primera pantalla que se ve al entrar.
+  A la segunda no la encontró el autor sino el reviewer, y con la primera ya corregida se había
+  escrito *"la ÚNICA superficie"* en seis lugares. 🔴 **Las dos reglas:** (1) al apagar un módulo,
+  barrer las **vistas de BD** construidas sobre sus tablas y seguir a cada consumidor hasta su
+  permiso —una vista esconde la dependencia detrás de un nombre que no dice «RC»—; (2) *"es la
+  única"* no se afirma contando hasta uno: se afirma **describiendo cómo se buscó**, y si el método
+  no está escrito, la afirmación no vale. El barrido de cinco vías quedó en la ficha de la etapa.
+- ⚠️ **APRENDIZAJE de V1-E3t — dos defensas redundantes hacen que las pruebas midan la equivocada.**
+  El seed resta los permisos apagados Y la sesión los filtra. Como el seed va primero, 12 de las 13
+  pruebas de `rc-apagada.int.test.ts` seguían VERDES al quitar el filtro entero —la cerradura— y
+  pasaban por el efecto colateral del seed, mientras el encabezado del archivo presumía de probar
+  *"el 403 aunque la fila siga en la base"*. **La regla: cuando hay dos defensas, la prueba tiene que
+  DESARMAR la de fuera para medir la de dentro.** Se arregló re-otorgando las 8 filas `RolPermiso` en
+  el `beforeEach` — que además es el estado REAL de `prueba` mientras no se re-siembre.
 - 🔴 **APRENDIZAJE de V1-E3t (21-ago-2026) — apagar un módulo con consumidores de cola no es
   des-registrar el consumidor.** La tentación era apagar `manejarEventoAutoAvance` y santas pascuas.
   Habría sido un desastre callado: los emisores de F3/F4 (corte, envío, recibo, entrega, recepción de

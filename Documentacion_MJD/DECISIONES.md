@@ -1541,10 +1541,20 @@ por orden que nadie va a capturar.
 >    Y como el frontend pinta el menú y la capa de ruta con esos MISMOS permisos, las **tres capas de
 >    §Post-F9.68** —esconder, cerrar la ruta y bloquear el servidor— caen de un solo golpe. El seed
 >    además los resta de los roles de sistema para que la base no cargue concesiones muertas.
->    ⚠️ La ÚNICA superficie de RC que no colgaba de un permiso `rc.*` eran los **KPIs de Ruta Crítica**
->    de Indicadores (iban con `indicadores.ver`): ahora piden **las dos llaves**. Con la RC encendida
->    no cambia para nadie — `rc.ruta-ver` cascadea a todos los roles salvo `Basico`, que tampoco tiene
->    `indicadores.ver`.
+>    ⚠️ **Hay DOS superficies de RC que NO colgaban de un permiso `rc.*`** —servidas desde el módulo
+>    de Indicadores con `indicadores.ver`— y las dos piden ahora **las dos llaves**:
+>    (a) los **KPIs de Ruta Crítica** (`/api/indicadores/rc*`), y (b) el mosaico **«Entregas a
+>    tiempo»** de la PORTADA (`GET /api/resumen`), que salía con `indicadores.ver` a secas aunque su
+>    fuente —la vista `kpi_entregas_a_tiempo`— es 100 % `ruta_orden`: sin corregirlo, la primera
+>    pantalla que ve Daniel al entrar habría quedado con un mosaico *«Entregas a tiempo · —% · RC»*
+>    muerto para siempre. Con la RC encendida no cambia para nadie — `rc.ruta-ver` cascadea a todos
+>    los roles salvo `Basico`, que tampoco tiene `indicadores.ver`.
+>    🔴 **Y cómo se sabe que son dos y no tres:** se buscó por las CUATRO vistas materializadas
+>    construidas sobre `ruta_orden` (`kpi_entregas_a_tiempo`, `kpi_lead_time_proceso`,
+>    `kpi_cuellos_botella`, `kpi_desempeno_responsable`) y por todos sus consumidores, más los
+>    accesos Prisma y el SQL crudo a tablas de RC desde fuera del módulo. El método completo está en
+>    la ficha `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t, y hay que **repetirlo** si algún día se apaga
+>    otro módulo: es la clase de defecto que el interruptor no puede ver.
 > 2. **La generación automática NO corre.** `procesarOrdenCreada` sale por el interruptor y deja
 >    bitácora `rc-automatica-omitida` diciendo que el módulo está apagado. Cada OP nueva se ahorra sus
 >    ~26 procesos.

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, entrarComoAdmin, RC_APAGADA } from './ayudas';
 
 /**
  * E2E del módulo ÓRDENES (rediseño R2/R3) contra el stack real:
@@ -77,7 +77,9 @@ async function generarOp(
   // ahora cuelga de `rc.ruta-ver`: con la RC apagada (§Post-F9.36 punto 1) el admin no lo tiene, y
   // el toast NO puede prometer una ruta que nadie va a programar. Se exige el texto COMPLETO con
   // `$` al final, para que un toast al que le sobre o le falte la mitad no pase por bueno.
-  const toast = page.getByText(/^OP \d+ creada$/).first();
+  const toast = page
+    .getByText(RC_APAGADA ? /^OP \d+ creada$/ : /^OP \d+ creada · Ruta Crítica programándose sola$/)
+    .first();
   await expect(toast).toBeVisible();
   const folio = /OP (\d+) creada/.exec((await toast.textContent()) ?? '')?.[1] ?? '';
   expect(folio).not.toBe('');
@@ -410,8 +412,12 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await captura.getByTestId('avance-guardar').click();
     // ⭐ V1-E3t: la nota del auto-avance de la RC (F3→F5) cuelga de `rc.ruta-ver`; con la Ruta
     // Crítica apagada (§Post-F9.36 punto 1) el toast dice sólo que el corte quedó registrado.
-    await expect(page.getByText(/^Corte #\d+ registrado$/)).toBeVisible();
-    await expect(page.getByText(/la Ruta Crítica se marca sola/)).toHaveCount(0);
+    await expect(
+      page.getByText(
+        RC_APAGADA ? /^Corte #\d+ registrado$/ : /^Corte #\d+ registrado · la Ruta Crítica se marca sola ✓$/,
+      ),
+    ).toBeVisible();
+    await expect(page.getByText(/la Ruta Crítica se marca sola/)).toHaveCount(RC_APAGADA ? 0 : 1);
 
     // El movimiento aparece en la lista con su "capturado por" (A7/§4.4.4)…
     const movimiento = avance.getByTestId('avance-movimiento').first();

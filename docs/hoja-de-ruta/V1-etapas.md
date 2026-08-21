@@ -2697,10 +2697,42 @@ módulo apagado al armar la sesión. Es **el punto único** por donde pasan toda
 - el **menú** y la **capa de ruta** se apagan **solas**, porque el frontend las pinta con esos mismos
   permisos. Sin tocar una línea del menú: menú, campana, pantallas, ⌘K y mosaicos, de un golpe.
 
-El **seed** además resta los apagados de los roles de sistema (limpieza, no la cerradura), y los
-**KPIs de Ruta Crítica** de Indicadores —la ÚNICA superficie de RC gateada por un permiso que no
-empieza con `rc.`— pasan a pedir **las dos llaves** (`conTodosPermisos`, y en el frontend la forma
-`{ todos: [...] }` de la exigencia del catálogo).
+El **seed** además resta los apagados de los roles de sistema (limpieza, no la cerradura), y las
+**DOS superficies de RC servidas desde Indicadores** —las que no cuelgan de un permiso `rc.*`, y por
+eso el interruptor no las tocaba— pasan a pedir **las dos llaves**: los **KPIs de Ruta Crítica**
+(`conTodosPermisos`, y en el frontend la forma `{ todos: [...] }` de la exigencia del catálogo) y el
+mosaico **«Entregas a tiempo» de la PORTADA** (`GET /api/resumen`).
+
+🔴 **La segunda la encontró el reviewer, y era la peor de las dos**: `entregasATiempo` se calculaba
+con `puedeIndicadores` a secas aunque su fuente, la vista `kpi_entregas_a_tiempo`, es **100 %
+`ruta_orden`**; con la RC apagada devolvía `{porcentaje: null, medibles: 0}` —que NO es `null`— y la
+portada pintaba un mosaico *«Entregas a tiempo · —% · RC»* muerto para siempre en **la primera
+pantalla que se ve al entrar**. La asimetría estaba dentro de la misma función: su vecino
+`ordenesPorVencer`, en el mismo `Promise.all`, sí llevaba `puedeRc` desde siempre.
+
+### Cómo se buscó una TERCERA (el método, no el resultado)
+
+Que a uno se le escapen dos con el mismo patrón no se arregla contando hasta dos. El barrido fue por
+cinco vías, y es **el procedimiento a repetir si algún día se apaga otro módulo**:
+
+1. **Todas las vistas de la BD**, marcando las que se construyen sobre tablas de RC. Se listaron las
+   `CREATE [MATERIALIZED] VIEW` de `prisma/migrations` y se revisó su cuerpo: de 11 vistas, **cuatro**
+   dependen de `ruta_orden` — `kpi_entregas_a_tiempo`, `kpi_lead_time_proceso`, `kpi_cuellos_botella`
+   y `kpi_desempeno_responsable`. Ésta es la vía que importa, porque una vista **esconde** la
+   dependencia detrás de un nombre que no dice «RC».
+2. **Cada consumidor de esas cuatro**, y su permiso: `dominio/indicadores/kpis.ts` → `/indicadores/rc*`
+   (corregido), `dominio/ruta-critica/analisisRc.ts` → `rc.ruta-ver` ✓, `dominio/resumen/resumen.ts`
+   → **el hallazgo**, y `comun/jobs/refrescar-kpis.ts`, que sólo REFRESCA (no devuelve datos de RC a
+   nadie, y debe seguir corriendo: tres de las seis vistas que refresca no son de RC).
+3. **Accesos Prisma a los modelos de RC desde FUERA** de `dominio/ruta-critica` y `api/ruta-critica`
+   (los 19 modelos del módulo). Descontando el cliente generado, aparece **un solo archivo**:
+   `resumen.ts` — y su acceso es `ordenesPorVencer`, que ya iba con `puedeRc`.
+4. **SQL crudo** con nombres de tabla de RC fuera del módulo: sólo dos `JOIN "proceso_def"` dentro de
+   `kpis.ts`, ya cubierto por (2).
+5. **Frontend**: pantallas que llaman a `/api/ruta-critica` o a los KPIs sin gate `rc.*`. Todas las
+   que salieron ya estaban gateadas; la única sin `rc.*` era `IndicadoresPagina`, corregida.
+
+**Resultado: son dos, y no hay tercera.** Las dos quedan con prueba propia.
 
 **(b) Que no se GENERE.** `procesarOrdenCreada` sale por el interruptor y deja bitácora
 `rc-automatica-omitida` nombrando la decisión. Cada OP nueva se ahorra sus ~26 procesos.
