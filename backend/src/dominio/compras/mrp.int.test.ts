@@ -2335,6 +2335,37 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     expect(await cliente.ordenCompra.count()).toBe(ocsTrasLaPrimera);
   });
 
+  /**
+   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, pero el precio
+   * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas: 100 ÷ 3 =
+   * 33.333333… Si la previa calcula el importe con el precio LARGO y la OC guarda el corto, **el
+   * total prometido no es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   */
+  it('⭐ con un precio de cola larga (100 ÷ 3), el total de la previa es el que la OC guarda', async () => {
+    // 100 ÷ 3 = 33.333333… por unidad de consumo (R1). El otro proveedor se encarece para que el
+    // elegido sea justo el del precio de cola larga (si no, el "más barato" se lo lleva y la prueba
+    // no probaría nada — pasó en la primera escritura de este caso).
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      data: { precio: 100, factorConversion: 3 },
+    });
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
+      data: { precio: 999, factorConversion: null },
+    });
+    await explosionarConRecetaFresca();
+    const cuerpo = { idsOrden: [idOrden], idsRequerimiento: [] };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    expect(prometido).toBeDefined();
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    // 🔴 Lo que la revisión previa promete tiene que ser lo que el documento dice, al centavo.
+    expect(oc.total).toBe(prometido?.total);
+    expect(plan.totalGeneral).toBe(gen.ordenesCompra.reduce((s, o) => s + o.total, 0));
+  });
+
   it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
     await explosionarOrdenes(sesion(), [idOrden], bd());
     const cuerpo = {

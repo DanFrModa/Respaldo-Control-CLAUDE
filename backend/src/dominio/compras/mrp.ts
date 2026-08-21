@@ -132,7 +132,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
-import { num, numOrNull } from '../costos/decimales.js';
+import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvio,
   resolverPrecioTela,
@@ -173,6 +173,7 @@ import {
 import {
   ESCALA_CANTIDAD_COMPRA,
   redondearCantidadCompra,
+  redondearPrecioCompra,
   repartirEntreOrdenes,
   seGuardaComoAlgo,
 } from './reparto-ordenes.js';
@@ -2038,14 +2039,20 @@ async function planearCompra(
       );
       const porOrden: PlanLineaOrden[] = acum.integrantes.map((r, i) => {
         const cantidad = cantidades[i] ?? 0;
-        const precio = r.precioSugerido ?? 0;
+        // ⭐ El PRECIO también se lleva a la escala de su columna (`OrdenCompraLinea.precio`
+        // `Decimal(12,2)`): con el precio largo de R1 (`precio ÷ factor`, p. ej. 100 ÷ 3) la previa
+        // prometía 5,999.99 donde la OC guardaba 5,999.40.
+        const precio = redondearPrecioCompra(r.precioSugerido ?? 0);
         return {
           idRequerimiento: r.id,
           idOrden: r.idOrden,
           folioOrden: r.folioOrden,
           cantidad,
           precio,
-          importe: cantidad * precio,
+          // Y el importe se calcula con la MISMA regla que `aCompraSalida` usa para el subtotal de
+          // la línea (`redondear2(cantidad × precio)`), llamando a la misma función: si las dos
+          // sumaran distinto, el total prometido y el guardado volverían a separarse.
+          importe: redondear2(cantidad * precio),
         };
       });
       renglones.push({

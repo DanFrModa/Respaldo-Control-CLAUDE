@@ -65,6 +65,22 @@ export function redondearCantidadCompra(n: number): number {
 }
 
 /**
+ * ⭐ Escala del **PRECIO** de la línea: `OrdenCompraLinea.precio Decimal(12, 2)`.
+ *
+ * Es el MISMO hueco que el de la cantidad, en otra columna, y también estaba abierto: el precio
+ * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas —100 ÷ 3 =
+ * 33.333333…—. Con el precio largo, la revisión previa prometía **5,999.99** y la orden de compra
+ * guardaba **5,999.40**: la previa mentía sobre el DINERO, que es lo último que puede mentir.
+ */
+export const ESCALA_PRECIO_COMPRA = 2;
+
+/** Redondea un precio unitario a la escala de `OrdenCompraLinea.precio`. */
+export function redondearPrecioCompra(n: number): number {
+  const factor = 10 ** ESCALA_PRECIO_COMPRA;
+  return Math.round(n * factor) / factor;
+}
+
+/**
  * Media unidad del último dígito que la columna puede guardar (`0.005` a dos decimales): **por
  * debajo de esto la cantidad NO EXISTE en la base** — se guardaría como `0.00`.
  *
