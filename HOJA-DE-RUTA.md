@@ -687,6 +687,26 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3q (2ª vuelta, 21-ago-2026) — no basta con NO CALLARSE: hay que NO MENTIR.**
+  El arreglo del bloqueante abrió una mentira nueva: como lo pendiente ya venía redondeado, todo
+  faltante por debajo de 0.01 se reportaba como *"ya está en una orden de compra viva (0 pza) — si esa
+  OC se cancela, vuelve a aparecer"*, **sin que existiera ninguna OC**. §Post-F9.85 nació porque Daniel
+  dejó de creerle a la pantalla; **una previa que afirma un hecho falso es exactamente ese fallo**,
+  aunque la decisión operativa de fondo sea correcta. Una lista de motivos sólo vale si cada motivo es
+  verdad. (Arreglado con un motivo propio, `menor-al-minimo`, en vez de mover el corte: mover el corte
+  habría borrado la información verdadera del caso *"ya está comprado"*.)
+- 🔴 **APRENDIZAJE de V1-E3q — una aserción LAXA sobre una promesa ESTRICTA es una prueba que miente.**
+  El docstring prometía que el tablero y la explosión *"nunca dicen números distintos"*, y su prueba
+  usaba `toBeCloseTo`: **no podía** cazar que uno dijera `0.3` y el otro `0.30000000000000004`. Si la
+  promesa es exacta, la aserción tiene que serlo.
+- **APRENDIZAJE de V1-E3q — "una sola verdad" se sostiene EN LA FUENTE, no en cada consumidor.** El
+  redondeo estaba en 2 de los 3 lectores y el tercero (R7) quedó crudo. Ahora vive dentro de
+  `comprometidoEnOc`. Y su gemela: **lo recibido NO se redondea a 2** porque su columna es
+  `Decimal(14,4)` — *cada número a la escala de SU columna*, no la del vecino.
+- ⚠️ **APRENDIZAJE de V1-E3q — el guardia contra una trampa puede fabricar la trampa contraria.** Puse
+  un control para detectar `-t` que no seleccionan nada (falsos verdes)… y contaba mal cuando **todas**
+  las pruebas fallaban (`Tests 1 failed (1)`, sin "passed"), así que reportó *"filtro vacío"* sobre
+  mutantes que en realidad **sí morían**. Un instrumento de medición también hay que verificarlo.
 - 🔴 **APRENDIZAJE de V1-E3q (21-ago-2026) — un número no está bien calculado hasta que está bien
   GUARDADO.** La etapa fue **RECHAZADA** por el reviewer: el defecto que vino a arreglar seguía vivo.
   El reparto corría a **4 decimales** y `OrdenCompraLinea.cantidad` es **`Decimal(14,2)`**. La

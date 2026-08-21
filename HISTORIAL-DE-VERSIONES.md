@@ -92,6 +92,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   que la previa promete es exactamente lo que queda escrito. **Lo mismo pasaba con el dinero**: en un
   material cuyo precio se calcula dividiendo (por ejemplo $100 el rollo entre 3 metros), la revisión
   previa decía $5,999.99 y la orden de compra guardaba $5,999.40. Ahora los dos números son el mismo.
+- ✅ **Corregido antes de salir: la revisión previa decía que algo "ya estaba comprado" cuando no lo
+  estaba.** Cuando de un material faltaba una cantidad diminuta (menos de 0.01), la pantalla lo
+  reportaba como *"ya está en una orden de compra viva… si esa OC se cancela, vuelve a aparecer"* —
+  aunque no existiera ninguna orden de compra. Ahora dice la verdad: *"falta tanto, pero una orden de
+  compra no puede pedir menos de 0.01"*. Y cuando **sí** hay una orden detrás, lo sigue diciendo.
 - 🔴 **Las órdenes de compra que Daniel generó siguen escondidas hasta que se corra un script.** No es
   falta de esta versión: los folios de OC arrancaron en 1, 2, 3… y el listado, que ordena del folio más
   alto al más bajo, las mandó hasta la última página, detrás de las casi 8,000 migradas. **Gabriel tiene

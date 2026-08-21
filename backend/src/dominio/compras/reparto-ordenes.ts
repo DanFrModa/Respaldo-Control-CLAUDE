@@ -84,10 +84,17 @@ export function redondearPrecioCompra(n: number): number {
  * Media unidad del último dígito que la columna puede guardar (`0.005` a dos decimales): **por
  * debajo de esto la cantidad NO EXISTE en la base** — se guardaría como `0.00`.
  *
- * Es el corte correcto para *"¿queda algo por comprar?"* y para *"¿esta línea vale la pena?"*. La
- * `TOLERANCIA` de 1e-6 de `mrp.ts` sigue siendo la buena para comparar valores de las columnas de
- * **4** decimales (el snapshot, el semáforo R7); usarla contra una cantidad que va a una columna de
- * 2 es lo que dejaba pasar astillas de `0.002` como si fueran compras pendientes.
+ * Es el corte correcto para *"¿esta cantidad vale la pena escribirla?"*. La `TOLERANCIA` de 1e-6 de
+ * `mrp.ts` sigue siendo la buena para comparar valores de las columnas de **4** decimales (el
+ * snapshot, el semáforo R7); usarla contra una cantidad que va a una columna de 2 es lo que dejaba
+ * pasar astillas de `0.002` como si fueran compras pendientes.
+ *
+ * ⚠️ **Dónde hace el trabajo de verdad, dicho sin adornos** (2ª vuelta del reviewer): sobre un valor
+ * que YA viene redondeado —como `cantidadPendiente` en la cascada de motivos— esta función es
+ * equivalente a `=== 0`, y presentar ahí una distinción fina sería adornar. El trabajo lo hace el
+ * **redondeo de arriba**. Donde sí decide es sobre valores CRUDOS: el reparto de una línea
+ * (`l.cantidad`), un ajuste tecleado por el comprador, y `cantidadEnOc` al distinguir *"ya está
+ * comprado"* de *"falta menos de lo que se puede pedir"*.
  */
 export const MINIMO_CANTIDAD_COMPRA = 0.5 / 10 ** ESCALA_CANTIDAD_COMPRA;
 

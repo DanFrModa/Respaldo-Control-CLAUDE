@@ -176,9 +176,13 @@ previa que calculara por su cuenta sería una promesa que el sistema no cumple.
 Devuelve, por proveedor, la **OC completa que saldría** (renglones, cantidades, **reparto por OP**,
 fecha, importes) más:
 
-- **`omitidos`** — lo que NO entra, con su razón: `sin-proveedor` · `ya-en-oc` · `cubierto-por-stock` ·
-  `no-seleccionado` · `sin-cantidad`, cada uno con una frase lista para pintar. Antes se descartaba en
-  **silencio**. Los omitidos viajan también en el **resultado de generar**.
+- **`omitidos`** — lo que NO entra, con su razón: `sin-proveedor` · `ya-en-oc` · `menor-al-minimo` ·
+  `cubierto-por-stock` · `no-seleccionado` · `sin-cantidad`, cada uno con una frase lista para pintar.
+  Antes se descartaba en **silencio**. Los omitidos viajan también en el **resultado de generar**.
+  ⚠️ **`ya-en-oc` exige que de verdad haya algo en una OC** (`seGuardaComoAlgo(cantidadEnOc)`): lo que
+  falta pero no llega al mínimo pedible y **no** tiene OC detrás es `menor-al-minimo`. Sin esa
+  distinción la previa afirmaba *"ya está en una orden de compra viva (0 pza)"* sobre un documento
+  inexistente. **La lista de motivos sólo vale si cada motivo es verdad.**
 - **`bloqueos`** — lo que impediría generar (falta la dirección favorita, falta la fecha de un
   proveedor). Se **devuelven** en la previa y se **lanzan** al generar, con las mismas frases: mismo
   cálculo, dos maneras de reaccionar.

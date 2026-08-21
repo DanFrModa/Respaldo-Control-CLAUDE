@@ -1900,9 +1900,11 @@ async function planearCompra(
           : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
             //
             // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea arriba), así
-            // que aquí `!seGuardaComoAlgo(...)` es *"no queda nada que se pueda pedir"* — el corte
-            // fino lo hizo el redondeo, no esta línea. Lo que SÍ decide aquí es **cuál de las dos
-            // verdades** se le cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
+            // que en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el
+            // redondeo, no esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante
+            // equivalente, verificado). Se conserva por decir en qué escala se está razonando. Lo
+            // que SÍ decide aquí —y sobre un valor CRUDO— es **cuál de las dos verdades** se le
+            // cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
             //
             // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por
             // debajo de 0.01 se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa
