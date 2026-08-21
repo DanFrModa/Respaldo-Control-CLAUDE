@@ -2241,9 +2241,21 @@ el camino de todos los días —un genérico neteado contra el kardex (decisión
 
 **El arreglo: un motivo propio, `menor-al-minimo`**, y la rama `ya-en-oc` **exige que de verdad haya
 algo en una OC** (`seGuardaComoAlgo(cantidadEnOc)`). Se eligió eso y **no** mover el corte antes de la
-rama de `enOc`, porque eso habría metido en el mismo saco el caso REAL de *"ya está comprado"*
-(requerido 3.7020 contra una línea de 3.70) y **habría perdido información verdadera y útil**. Son dos
-hechos distintos y merecen dos frases distintas.
+rama de `enOc`, porque eso habría metido en el mismo saco un caso REAL de *"ya está comprado"* y
+**habría perdido información verdadera y útil**. Son dos hechos distintos y merecen dos frases distintas.
+
+> ⚠️ **El ejemplo que lo demuestra es uno muy concreto, y conviene no equivocarlo** (lo cazó el reviewer
+> en la 3ª vuelta: la primera redacción de este párrafo citaba *"requerido 3.7020 contra una línea de
+> 3.70"*, que **NO discrimina** — ahí `seGuardaComoAlgo(3.7020)` es `true`, así que la variante
+> descartada habría dicho `ya-en-oc` igual). El caso que sí separa las dos opciones es **un requerido
+> POR DEBAJO del mínimo que YA está cubierto por una OC** (`aComprar 0.008` con una OC viva de `0.02`):
+> ahí *"cortar antes"* habría dicho `menor-al-minimo` y **escondido que el material ya estaba comprado**,
+> mientras que lo construido dice `ya-en-oc` con su `0.02`. Tiene prueba propia en el archivo
+> (*"…pero con una OC REAL detrás, sí dice ya-en-oc"*), que muere al colapsar la cascada.
+>
+> 🔴 **Y la lección de segundo orden, que es la de toda la etapa:** *una decisión correcta justificada
+> con un ejemplo que no la demuestra es una promesa sin respaldo* — la misma familia del comentario que
+> provocó el primer rechazo, sólo que en la ficha en vez de en el código.
 
 > 🔴 **La lección: no basta con no callarse — hay que no mentir.** §Post-F9.85 nació porque Daniel
 > dejó de creerle a la pantalla (*"no sé si realmente se generó o solo dice eso"*). Una revisión previa
