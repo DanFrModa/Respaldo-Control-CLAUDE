@@ -276,7 +276,7 @@ export interface paths {
                 /** @description Variación % vs la semana anterior (null si la anterior fue 0). */
                 deltaPct: number | null;
               } | null;
-              /** @description Entregas a tiempo · últimos 30 d (permiso `indicadores.ver`; null sin permiso). */
+              /** @description Entregas a tiempo · últimos 30 d (permisos `indicadores.ver` Y `rc.ruta-ver`; null sin ambos). */
               entregasATiempo: {
                 /** @description aTiempo ÷ medibles de los últimos 30 días (fracción 0–1; null sin medibles). */
                 porcentaje: number | null;

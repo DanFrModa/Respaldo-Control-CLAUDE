@@ -414,7 +414,9 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     // Crítica apagada (§Post-F9.36 punto 1) el toast dice sólo que el corte quedó registrado.
     await expect(
       page.getByText(
-        RC_APAGADA ? /^Corte #\d+ registrado$/ : /^Corte #\d+ registrado · la Ruta Crítica se marca sola ✓$/,
+        RC_APAGADA
+          ? /^Corte #\d+ registrado$/
+          : /^Corte #\d+ registrado · la Ruta Crítica se marca sola ✓$/,
       ),
     ).toBeVisible();
     await expect(page.getByText(/la Ruta Crítica se marca sola/)).toHaveCount(RC_APAGADA ? 0 : 1);
