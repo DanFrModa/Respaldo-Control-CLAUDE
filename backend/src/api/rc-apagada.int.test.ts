@@ -211,9 +211,8 @@ describe('Ruta Crítica APAGADA (V1-E3t) — el servidor la cierra', () => {
     const cookie = await cookieAdmin();
     const res = await app.inject({ method: 'GET', url: '/api/permisos', headers: { cookie } });
     expect(res.statusCode).toBe(200);
-    const catalogo = res.json<
-      { modulo: string; permisos: { clave: string; apagado: boolean }[] }[]
-    >();
+    const catalogo =
+      res.json<{ modulo: string; permisos: { clave: string; apagado: boolean }[] }[]>();
     const porClave = new Map(
       catalogo.flatMap((g) => g.permisos).map((p) => [p.clave, p.apagado] as const),
     );
