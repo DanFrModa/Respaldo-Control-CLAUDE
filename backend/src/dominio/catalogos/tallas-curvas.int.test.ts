@@ -237,6 +237,18 @@ describe('Catálogo Tallas (CRUD patrón, F1-E2 — global ADR-0007)', () => {
         bd(),
       );
       expect(renombrada.orden).toBe(7);
+
+      /*
+       * ⚠️ Y la bitácora NO puede decir que hubo re-deducción: el 7 lo puso la persona. Sin esta
+       * aserción, quitar la guarda `datos.orden === undefined` sobrevive —el `orden` explícito gana
+       * igual, porque su rama va primero— y lo único que cambia es que el historial empieza a
+       * atribuirle a la escala una decisión humana. Medido con mutación: sin esto, sobrevivía.
+       */
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Talla', idEntidad: String(talla.id), accion: 'MODIFICAR' },
+      });
+      expect(bitacora.datos).toMatchObject({ orden: { de: talla.orden, a: 7 } });
+      expect(bitacora.datos).not.toHaveProperty('ordenRededucidoDeLaEtiqueta');
     });
 
     it('cambiar SÓLO el activo no toca el orden (no hay etiqueta nueva que deducir)', async () => {
