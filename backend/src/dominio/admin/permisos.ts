@@ -8,13 +8,19 @@
  * helper es puro y determinista (mismo resultado siempre), así que no recibe
  * sesión ni cliente de BD.
  */
-import { MODULOS_PERMISO, permisosPorModulo } from '../../contrato/index.js';
+import { MODULOS_PERMISO, moduloApagado, permisosPorModulo } from '../../contrato/index.js';
 
 /** Un permiso del catálogo tal como lo consume la UI. */
 export interface PermisoCatalogoDto {
   clave: string;
   descripcion: string;
   modulo: string;
+  /**
+   * `true` si su módulo está APAGADO en esta versión (V1-E3t, `contrato/modulos-apagados.ts`).
+   * La pantalla de Roles lo pinta deshabilitado: la sesión descarta estos permisos, así que
+   * otorgarlos no surtiría efecto y el árbol estaría mintiendo.
+   */
+  apagado: boolean;
 }
 
 /** Un módulo funcional con los permisos que agrupa. */
@@ -39,6 +45,7 @@ export function listarCatalogoPermisos(): ModuloPermisosDto[] {
         clave: p.clave,
         descripcion: p.descripcion,
         modulo: p.modulo,
+        apagado: moduloApagado(p.modulo),
       })),
     });
   }

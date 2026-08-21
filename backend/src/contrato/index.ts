@@ -16,6 +16,13 @@ export {
   type OrigenAcceso,
 } from './permisos.js';
 
+export {
+  MODULOS_APAGADOS,
+  moduloApagado,
+  permisoApagado,
+  sinPermisosApagados,
+} from './modulos-apagados.js';
+
 export { esquemaLogin, type DatosLogin } from './esquemas/login.js';
 
 export {

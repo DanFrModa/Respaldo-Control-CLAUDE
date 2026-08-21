@@ -101,6 +101,11 @@ export const esquemaPermisoCatalogoSalida = z
     clave: z.string().describe('Clave estable del permiso (`modulo.accion`).'),
     descripcion: z.string().describe('Descripción clara del permiso (para la UI).'),
     modulo: z.string().describe('Clave del módulo funcional al que pertenece.'),
+    apagado: z
+      .boolean()
+      .describe(
+        'true si su módulo está APAGADO en esta versión (V1-E3t): la sesión lo descarta, así que otorgarlo no surte efecto.',
+      ),
   })
   .describe('Un permiso del catálogo.');
 

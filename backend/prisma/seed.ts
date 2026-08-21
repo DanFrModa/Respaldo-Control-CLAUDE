@@ -20,7 +20,13 @@ import { pathToFileURL } from 'node:url';
 
 import { hashPassword } from 'better-auth/crypto';
 
-import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
+import {
+  CATALOGO_PERMISOS,
+  CLAVES_PERMISO,
+  MODULOS_APAGADOS,
+  sinPermisosApagados,
+  type ClavePermiso,
+} from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from '../src/dominio/catalogos/orden-de-tallas.js';
 import {
@@ -319,6 +325,20 @@ function definirRoles(): {
   ];
 }
 
+/**
+ * Siembra los roles de sistema y SINCRONIZA sus permisos con {@link definirRoles}.
+ *
+ * ⭐ V1-E3t (`DECISIONES.md §Post-F9.36 punto 1`): a cada rol se le restan los permisos de los
+ * MÓDULOS APAGADOS ({@link MODULOS_APAGADOS} — hoy la Ruta Crítica). Como la sincronización de
+ * abajo BORRA lo que sobre, re-sembrar una base que ya los tenía (p. ej. `prueba`) los retira.
+ *
+ * Esto es LIMPIEZA, no la cerradura: quien niega de verdad es la sesión
+ * (`cargarPermisosDeUsuario` filtra los apagados aunque la fila `RolPermiso` exista). Aquí se resta
+ * para que la base no cargue concesiones muertas ni la pantalla de Roles mienta.
+ *
+ * ⚠️ Solo se tocan filas `RolPermiso` — el permiso sigue en el catálogo y en la tabla `Permiso`, y
+ * NINGÚN dato de la Ruta Crítica se toca (D3). Vaciar `MODULOS_APAGADOS` y re-sembrar los devuelve.
+ */
 async function sembrarRoles(
   prisma: PrismaClient,
   idPermisoPorClave: Map<ClavePermiso, number>,
@@ -330,7 +350,7 @@ async function sembrarRoles(
       create: { nombre: rol.nombre, descripcion: rol.descripcion, esSistema: true },
     });
 
-    const idsPermisos = rol.permisos.map((clave) => {
+    const idsPermisos = sinPermisosApagados(rol.permisos).map((clave) => {
       const id = idPermisoPorClave.get(clave);
       if (id === undefined) {
         throw new Error(`Permiso "${clave}" del rol ${rol.nombre} no está sembrado`);

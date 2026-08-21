@@ -14,7 +14,7 @@
  * pintar el menú filtrado). Los servicios de dominio vuelven a verificar su
  * propio permiso (defensa en profundidad): la pantalla esconde, el servidor decide.
  */
-import { esClavePermiso, type ClavePermiso } from '../contrato/index.js';
+import { esClavePermiso, permisoApagado, type ClavePermiso } from '../contrato/index.js';
 
 import { ErrorPermiso } from './errores.js';
 import { clienteLectura, type ContextoBd } from './transaccion.js';
@@ -67,6 +67,13 @@ export function verificarPermiso(sesion: SesionUsuario, clave: ClavePermiso): vo
  *   defecto: una cuenta apagada no conserva ningún acceso).
  * - Claves que estén en BD pero ya no en el catálogo de `src/contrato` se
  *   descartan: el catálogo en código es la fuente de verdad.
+ * - Claves de un MÓDULO APAGADO (`contrato/modulos-apagados.ts`, V1-E3t) se
+ *   descartan igual, sin importar de dónde salga la fila `RolPermiso`: rol de
+ *   sistema, rol a la medida o concesión suelta. Éste es EL punto único donde
+ *   el interruptor muerde — al no estar la clave en la sesión, `verificarPermiso`
+ *   y los guards `conPermiso`/`conAlgunPermiso` responden 403 desde el SERVIDOR,
+ *   y el frontend (que pinta menú y ruta con estos mismos permisos) esconde la
+ *   opción y cierra la ruta. Las tres capas de §Post-F9.68, de un solo golpe.
  *
  * Lo llama la capa de autenticación (E3) al armar la `SesionUsuario`.
  */
@@ -94,6 +101,7 @@ export async function cargarPermisosDeUsuario(
   const claves = usuario.roles
     .flatMap((usuarioRol) => usuarioRol.rol.permisos)
     .map((rolPermiso) => rolPermiso.permiso.clave)
-    .filter(esClavePermiso);
+    .filter(esClavePermiso)
+    .filter((clave) => !permisoApagado(clave));
   return new Set(claves);
 }

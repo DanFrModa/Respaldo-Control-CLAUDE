@@ -70,10 +70,18 @@ export const rutasIndicadores: FastifyPluginCallbackZod = (app, _opciones, done)
   };
 
   // ── Ruta Crítica ─────────────────────────────────────────────────────────────
+  // ⭐ V1-E3t: estos tres endpoints piden LAS DOS llaves (`conTodosPermisos`) — son un tablero
+  // directivo (`indicadores.ver`) SOBRE datos de la Ruta Crítica (`rc.ruta-ver`). Antes solo pedían
+  // la primera, y era la ÚNICA superficie de RC que no colgaba de un permiso `rc.*`: con el módulo
+  // apagado (§Post-F9.36 punto 1) habría quedado un tablero de ceros vivo en el menú. Con RC
+  // ENCENDIDA no cambia nada para nadie: `rc.ruta-ver` cascadea a todos los roles de sistema salvo
+  // `Basico`, que tampoco tiene `indicadores.ver`.
+  const guardKpisRc = app.conTodosPermisos('indicadores.ver', 'rc.ruta-ver');
+
   app.route({
     method: 'GET',
     url: '/indicadores/rc',
-    preHandler: app.conPermiso('indicadores.ver'),
+    preHandler: guardKpisRc,
     schema: {
       tags: ['indicadores'],
       summary: 'KPIs de la Ruta Crítica (entregas a tiempo, lead time, cuellos, desempeño)',
@@ -90,7 +98,7 @@ export const rutasIndicadores: FastifyPluginCallbackZod = (app, _opciones, done)
   app.route({
     method: 'GET',
     url: '/indicadores/rc/impreso',
-    preHandler: app.conPermiso('indicadores.ver'),
+    preHandler: guardKpisRc,
     schema: {
       tags: ['indicadores'],
       summary: 'Tablero de KPIs de Ruta Crítica en PDF (R9)',
@@ -111,7 +119,7 @@ export const rutasIndicadores: FastifyPluginCallbackZod = (app, _opciones, done)
   app.route({
     method: 'GET',
     url: '/indicadores/rc/excel',
-    preHandler: app.conPermiso('indicadores.ver'),
+    preHandler: guardKpisRc,
     schema: {
       tags: ['indicadores'],
       summary: 'Tablero de KPIs de Ruta Crítica en Excel (.xlsx)',

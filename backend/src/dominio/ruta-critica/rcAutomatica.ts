@@ -35,7 +35,7 @@
  * `rc.programar`, mismo criterio que la sesión del ETL (`sesion-etl.ts`): las columnas de
  * auditoría no tienen FK física y el origen queda identificable en bitácora.
  */
-import type { ClavePermiso } from '../../contrato/index.js';
+import { moduloApagado, type ClavePermiso } from '../../contrato/index.js';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
 import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';
@@ -220,6 +220,30 @@ export async function procesarOrdenCreada(
   payload: EventoOrdenCreada,
   bd?: ContextoBd,
 ): Promise<void> {
+  // ⭐ V1-E3t — LA RUTA CRÍTICA ESTÁ APAGADA (`DECISIONES.md §Post-F9.36 punto 1`).
+  //
+  // Sin esta guarda, cada OP nueva paría ~26 procesos que nadie va a capturar: basura de arranque
+  // que después habría que distinguir de lo real. Se OMITE la generación y se deja bitácora, para
+  // que el día que RC se encienda quede claro cuáles órdenes nacieron sin ruta y por qué.
+  //
+  // ⚠️ La guarda va AQUÍ y no en el registro del consumidor a propósito: el consumidor de la cola
+  // (`manejarEventoAutoAvance`) sigue vivo y DRENANDO. Si se hubiera apagado el consumidor entero,
+  // los emisores de F3/F4 (corte, envío, recibo, entrega, recepción de material, auditoría, OC de
+  // tela, surtido de avíos, hitos) seguirían escribiendo al outbox, el relay seguiría publicando a
+  // pg-boss y NADIE consumiría: la tabla `pgboss.job` crecería sin drenar nunca. Apagar una pieza
+  // no puede tumbar otra que sí se usa.
+  //
+  // Las rutas YA generadas no se tocan (D3) y su auto-avance sigue corriendo: las órdenes nuevas
+  // simplemente no tienen ruta que avanzar, así que para ellas el auto-avance es un no-op natural.
+  if (moduloApagado('rc')) {
+    await registrarOmision(
+      payload.idOrden,
+      'La Ruta Crítica está apagada en esta versión (§Post-F9.36 punto 1): la orden nace SIN ruta. Se genera al encender el módulo.',
+      bd,
+    );
+    return;
+  }
+
   const cliente = clienteLectura(bd);
 
   const orden = await cliente.orden.findUnique({

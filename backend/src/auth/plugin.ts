@@ -62,6 +62,14 @@ declare module 'fastify' {
      * `indicadores.almacen-productividad`). El servicio de dominio reaplica el permiso fino (A1).
      */
     conAlgunPermiso(...claves: ClavePermiso[]): preHandlerAsyncHookHandler;
+    /**
+     * Guard de autorización con TODOS los permisos indicados (deny-by-default): exige sesión y
+     * que los tenga todos. Es para pantallas que cruzan dos áreas y necesitan las DOS llaves —
+     * p. ej. los KPIs de Ruta Crítica, que son a la vez un tablero directivo (`indicadores.ver`)
+     * y datos de la RC (`rc.ruta-ver`): con el módulo RC apagado (V1-E3t) la segunda llave
+     * desaparece y el tablero se cierra solo. El servicio de dominio reaplica lo suyo (A1).
+     */
+    conTodosPermisos(...claves: ClavePermiso[]): preHandlerAsyncHookHandler;
   }
 }
 
@@ -183,6 +191,23 @@ export function registrarAuth(app: FastifyInstance, opciones: OpcionesAuth = {})
           .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
       }
       if (!claves.some((clave) => sesion.permisos.has(clave))) {
+        return reply
+          .code(403)
+          .send({ codigo: 'PERMISO', mensaje: 'No tienes permiso para realizar esta operación.' });
+      }
+      return undefined;
+    };
+  });
+
+  app.decorate('conTodosPermisos', (...claves: ClavePermiso[]): preHandlerAsyncHookHandler => {
+    return async (request, reply) => {
+      const sesion = await request.obtenerSesion();
+      if (sesion === null) {
+        return reply
+          .code(401)
+          .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
+      }
+      if (!claves.every((clave) => sesion.permisos.has(clave))) {
         return reply
           .code(403)
           .send({ codigo: 'PERMISO', mensaje: 'No tienes permiso para realizar esta operación.' });
