@@ -322,6 +322,66 @@ describe('asignarCurvaDesdeOrdenes — se propone, la persona confirma', () => {
     expect(resultado.nombreCurva).toBe('Curva CH-M-G (2)');
   });
 
+  /*
+   * 🔴 LA CURVA APAGADA (defecto 4 de la ronda de corrección de V1-E3r).
+   *
+   * Una curva DESACTIVADA con exactamente estas tallas no la veía la búsqueda (filtra `activo`) y
+   * el nombre determinista sí chocaba con ella → salía «Curva CH-M-G (2)»: la gemela que el propio
+   * TSDoc dice querer evitar. Ahora se RECHAZA, con el nombre de la curva y dónde reactivarla. No se
+   * reactiva sola: eso desharía en silencio un acto deliberado, y pediría `tallas.administrar`, que
+   * esta puerta no exige.
+   */
+  it('🔴 si la curva con esas tallas existe pero está DESACTIVADA, rechaza (no crea la gemela)', async () => {
+    await crearOrden(1n, ['CH', 'M', 'G']);
+    await cliente.curvaTalla.create({
+      data: {
+        nombre: 'Curva CH-M-G',
+        activo: false,
+        items: {
+          create: [
+            { idTalla: talla.CH ?? 0, posicion: 0 },
+            { idTalla: talla.M ?? 0, posicion: 1 },
+            { idTalla: talla.G ?? 0, posicion: 2 },
+          ],
+        },
+      },
+    });
+
+    await expect(
+      asignarCurvaDesdeOrdenes(sesion(), idModelo, [talla.CH ?? 0, talla.M ?? 0, talla.G ?? 0], bd()),
+    ).rejects.toThrow(/desactivada/i);
+
+    // Y no dejó basura: sigue habiendo UNA curva, y el modelo sigue sin curva.
+    expect(await cliente.curvaTalla.count()).toBe(1);
+    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
+    expect(modelo.idCurvaTalla).toBeNull();
+  });
+
+  it('una curva ACTIVA gana sobre una desactivada que cubre las mismas tallas', async () => {
+    await crearOrden(1n, ['CH', 'M', 'G']);
+    const items = [
+      { idTalla: talla.CH ?? 0, posicion: 0 },
+      { idTalla: talla.M ?? 0, posicion: 1 },
+      { idTalla: talla.G ?? 0, posicion: 2 },
+    ];
+    // La apagada se crea PRIMERO (id menor): sin el desempate por `activo` ganaría ella.
+    await cliente.curvaTalla.create({
+      data: { nombre: 'Curva vieja apagada', activo: false, items: { create: items } },
+    });
+    const viva = await cliente.curvaTalla.create({
+      data: { nombre: 'Dama básica', items: { create: items } },
+    });
+
+    const resultado = await asignarCurvaDesdeOrdenes(
+      sesion(),
+      idModelo,
+      [talla.CH ?? 0, talla.M ?? 0, talla.G ?? 0],
+      bd(),
+    );
+    expect(resultado.curvaCreada).toBe(false);
+    expect(resultado.idCurvaTalla).toBe(viva.id);
+  });
+
   describe('la puerta SÓLO llena huecos', () => {
     it('rechaza si el modelo YA tiene curva → ErrorConflicto', async () => {
       await crearOrden(1n, ['CH', 'M', 'G']);

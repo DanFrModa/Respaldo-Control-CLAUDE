@@ -53,6 +53,14 @@
  */
 
 /**
+ * SENTINELA de `Talla.orden`: significa *"nadie le puso orden"*. Es el `@default(0)` de la base, y
+ * el contrato exige `min(1)` a lo capturado para que sea un sentinela PURO (§Post-F9.81). Lo leen
+ * el seed (repara sólo estas filas) y `actualizarTalla` (re-deduce sólo sobre ellas o sobre lo que
+ * puso la propia escala).
+ */
+export const ORDEN_SIN_ASIGNAR = 0;
+
+/**
  * Piso de la familia de LETRAS. Todo lo numérico vive por debajo (1…999 = talla, o meses de edad),
  * así que **cualquier** número queda antes que **cualquier** letra — el hallazgo (1) de la medición.
  */

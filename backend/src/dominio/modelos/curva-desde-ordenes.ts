@@ -121,7 +121,25 @@ async function nombreLibreDeCurva(
  * `posicion` 0-based por el orden del arreglo, el `creadoPorId` de cada item y el permiso—.
  * Reimplementarlas con un `curvaTalla.create` suelto es cómo se pierden las cinco a la vez.
  *
- * @throws {ErrorConflicto} si el modelo YA tiene curva (esta puerta sólo llena huecos).
+ * 🔴 **SI LA CURVA EXISTE PERO ESTÁ DESACTIVADA, SE RECHAZA** (decisión de la ronda de corrección
+ * de V1-E3r, defecto 4). Antes, una curva apagada con exactamente estas tallas no la encontraba la
+ * búsqueda (que filtra `activo: true`) y el nombre determinista sí chocaba con ella, así que se
+ * creaba **«Curva CH-M-G (2)»**: justo la gemela que el comentario de aquí abajo dice querer evitar.
+ * De las tres salidas posibles se eligió rechazar, y la razón se escribe para que no haya que
+ * adivinarla:
+ *
+ *  • **Crear la gemela «(2)»** deja una mentira permanente en el catálogo y parte en dos la misma
+ *    idea. Es la que había, y es la peor.
+ *  • **Reactivar la apagada** desharía en silencio una decisión deliberada (el borrado suave es un
+ *    acto, no un accidente) como EFECTO SECUNDARIO de tocar un modelo. Y además pediría
+ *    `tallas.administrar`, que esta puerta **no** exige —sólo `modelos.administrar`—: sería un
+ *    agujero de privilegio, o un fallo confuso para quien no tenga el permiso.
+ *  • **Rechazar** es lo único que ni ensucia el catálogo ni mueve nada que nadie pidió mover. El
+ *    mensaje dice el nombre de la curva y dónde reactivarla, así que cuesta un clic — y ese clic es
+ *    exactamente el acto deliberado que hace falta.
+ *
+ * @throws {ErrorConflicto} si el modelo YA tiene curva (esta puerta sólo llena huecos), o si la
+ *   curva que cubre estas tallas existe pero está DESACTIVADA.
  * @throws {ErrorValidacion} si el conjunto confirmado no es uno de los propuestos.
  */
 export async function asignarCurvaDesdeOrdenes(
@@ -163,12 +181,23 @@ export async function asignarCurvaDesdeOrdenes(
 
     // ¿Ya existe la curva en el catálogo? Se reusa: crear una gemela con otro nombre ensucia el
     // catálogo y parte en dos la misma idea.
-    const existente = await curvaQueCubreExactamente(tx, elegida.idsTalla);
+    //
+    // ⚠️ Se pregunta INCLUYENDO las desactivadas a propósito, porque "no hay curva activa que cubra
+    // estas tallas" y "la curva existe pero alguien la apagó" son dos situaciones distintas y sólo
+    // una de ellas admite crear. Ver la decisión de abajo.
+    const existente = await curvaQueCubreExactamente(tx, elegida.idsTalla, true);
     let idCurvaTalla: number;
     let nombreCurva: string;
-    if (existente !== null) {
+    if (existente !== null && existente.activo) {
       idCurvaTalla = existente.id;
       nombreCurva = existente.nombre;
+    } else if (existente !== null) {
+      // 🔴 EXISTE PERO ESTÁ APAGADA: ni se reusa ni se crea otra. Ver el TSDoc de la función.
+      throw new ErrorConflicto(
+        `Ya existe la curva «${existente.nombre}» con exactamente estas tallas, pero está ` +
+          'desactivada. Reactívala en Catálogos › Curvas y vuelve a asignarla: crear otra con el ' +
+          'mismo contenido partiría en dos la misma curva.',
+      );
     } else {
       const nombre = await nombreLibreDeCurva(tx, nombreDeterministaCurva(elegida.etiquetas));
       const creada = await crearCurva(sesion, { nombre, items: elegida.idsTalla }, { tx });

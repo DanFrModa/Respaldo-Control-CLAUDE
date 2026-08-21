@@ -74,7 +74,48 @@ describe('CurvaDelModelo', () => {
       expect(screen.getByTestId('modelo-avisos-curva').querySelectorAll('li')).toHaveLength(2);
     });
 
-    it('🔴 NO bloquea: es un banner, no deshabilita nada de la ficha', () => {
+    /*
+     * 🔴 **QUE EL AVISO NO BLOQUEE ES LA GARANTÍA CENTRAL** (§Post-F9.81 + §Post-F9.64: *la curva es
+     * una GUÍA, no una jaula*), y hay que probarla con un estado donde **haya algo que bloquear**.
+     *
+     * ⚠️ La versión anterior de esta prueba renderizaba con aviso y SIN propuesta y afirmaba que no
+     * había botón — pero en ese estado no hay **ningún** botón que pintar, así que pasaba por la
+     * razón equivocada: el reviewer mutó el componente a
+     * `disabled={asignar.isPending || avisos.length > 0}` —el aviso deshabilitando literalmente la
+     * acción— y las 45 pruebas del archivo **sobrevivieron**.
+     *
+     * Por eso ahora se renderiza con aviso **Y** propuesta a la vez y se afirma que el botón sigue
+     * **habilitado**. Hoy la ficha no puede llegar a ese estado (el servidor devuelve `[]` de avisos
+     * cuando el modelo no tiene curva: ahí no hay dos curvas que se contradigan, hay un hueco). Se
+     * prueba igual, y a propósito: el componente recibe las dos cosas como props independientes, así
+     * que **la garantía tiene que vivir en el componente**, no depender de que el servidor no cambie.
+     * El día que el servidor avise por otra razón, esta prueba ya está puesta.
+     */
+    it('🔴 NO bloquea: con aviso Y propuesta a la vez, «Asignar esta curva» sigue HABILITADO', () => {
+      sugeridas = {
+        idModelo: 1,
+        yaTieneCurva: false,
+        sugerencias: [
+          {
+            idsTalla: [7, 8, 9],
+            etiquetas: ['CH', 'M', 'G'],
+            ordenes: 3,
+            folios: [11, 12, 13],
+            idCurvaExistente: null,
+            nombre: 'Curva CH-M-G',
+          },
+        ],
+      };
+      renderConProveedores(
+        <CurvaDelModelo ficha={ficha({ avisosCurva: ['aviso'] })} puedeAdministrar />,
+      );
+
+      // El aviso está pintado (si no, la prueba no estaría probando lo que dice).
+      expect(screen.getByTestId('modelo-avisos-curva')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Asignar esta curva/ })).toBeEnabled();
+    });
+
+    it('el aviso es un BANNER: no mete botones ni acciones propias', () => {
       renderConProveedores(
         <CurvaDelModelo
           ficha={ficha({
@@ -84,6 +125,7 @@ describe('CurvaDelModelo', () => {
           puedeAdministrar
         />,
       );
+      expect(screen.getByTestId('modelo-avisos-curva')).toBeInTheDocument();
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
   });

@@ -22,7 +22,7 @@
  * lo pinta: ni arma la frase, ni resuelve el singular/plural, ni decide el orden de las etiquetas.
  *
  * ⚠️ **El universo comparado es SIEMPRE el mismo con el que se arma la matriz que el usuario ve
- * debajo.** Por eso {@link avisoCurvaDeLaOrden} recibe las tallas ya resueltas por el llamador en
+ * debajo.** Por eso {@link avisoCurvaDistinta} recibe las tallas ya resueltas por el llamador en
  * vez de re-consultarlas: comparar contra otro conjunto sería una segunda contradicción encima de
  * la primera.
  *
@@ -206,25 +206,39 @@ function firmaDeConjunto(idsTalla: number[]): string {
  * ESCRITURA (guardar las medidas por talla de un avío), donde una consulta por grupo alarga la
  * transacción sin necesidad.
  */
+/** Una curva del catálogo que cubre exactamente una firma de tallas, con si está encendida. */
+export interface CurvaQueCubre {
+  id: number;
+  nombre: string;
+  /** `false` = la curva existe pero está DESACTIVADA (borrado suave): no se puede usar tal cual. */
+  activo: boolean;
+}
+
 async function curvasQueCubren(
   tx: Tx,
   conjuntos: number[][],
-): Promise<Map<string, { id: number; nombre: string }>> {
+  incluirInactivas = false,
+): Promise<Map<string, CurvaQueCubre>> {
   const buscadas = new Set(conjuntos.filter((c) => c.length > 0).map(firmaDeConjunto));
   if (buscadas.size === 0) {
     return new Map();
   }
   const candidatas = await tx.curvaTalla.findMany({
-    where: { activo: true, items: { some: { idTalla: { in: [...new Set(conjuntos.flat())] } } } },
-    select: { id: true, nombre: true, items: { select: { idTalla: true } } },
-    orderBy: { id: 'asc' },
+    where: {
+      ...(incluirInactivas ? {} : { activo: true }),
+      items: { some: { idTalla: { in: [...new Set(conjuntos.flat())] } } },
+    },
+    select: { id: true, nombre: true, activo: true, items: { select: { idTalla: true } } },
+    // Con `incluirInactivas` puede haber dos que cubran la misma firma; las ACTIVAS ganan (una
+    // curva apagada no se usa), y entre iguales, la más vieja.
+    orderBy: [{ activo: 'desc' }, { id: 'asc' }],
   });
 
-  const porFirma = new Map<string, { id: number; nombre: string }>();
+  const porFirma = new Map<string, CurvaQueCubre>();
   for (const curva of candidatas) {
     const firma = firmaDeConjunto(curva.items.map((i) => i.idTalla));
     if (buscadas.has(firma) && !porFirma.has(firma)) {
-      porFirma.set(firma, { id: curva.id, nombre: curva.nombre });
+      porFirma.set(firma, { id: curva.id, nombre: curva.nombre, activo: curva.activo });
     }
   }
   return porFirma;
@@ -234,15 +248,24 @@ async function curvasQueCubren(
  * La curva del catálogo que cubre EXACTAMENTE este conjunto de tallas, o `null`. Delega en
  * {@link curvasQueCubren} para que la regla de "cubrir exactamente" viva en UN solo lugar: dos
  * implementaciones de la misma idea son dos implementaciones que acaban opinando distinto.
+ *
+ * @param incluirInactivas `false` (lo normal) mira sólo las curvas ACTIVAS: quien busca una curva
+ *   para USARLA no puede usar una apagada. `true` mira también las desactivadas, y sirve para
+ *   DISTINGUIR "no existe" de "existe pero está apagada" — la diferencia entre crear una curva y
+ *   crear una **gemela** «(2)» de una que ya está en el catálogo. Quien lo pide debe mirar el
+ *   `activo` del resultado: es lo que separa los dos casos.
  */
 export async function curvaQueCubreExactamente(
   tx: Tx,
   idsTalla: number[],
-): Promise<{ id: number; nombre: string } | null> {
+  incluirInactivas = false,
+): Promise<CurvaQueCubre | null> {
   if (idsTalla.length === 0) {
     return null;
   }
-  return (await curvasQueCubren(tx, [idsTalla])).get(firmaDeConjunto(idsTalla)) ?? null;
+  return (
+    (await curvasQueCubren(tx, [idsTalla], incluirInactivas)).get(firmaDeConjunto(idsTalla)) ?? null
+  );
 }
 
 /**

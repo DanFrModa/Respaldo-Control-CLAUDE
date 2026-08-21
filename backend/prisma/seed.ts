@@ -22,7 +22,10 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
-import { deducirOrdenTalla } from '../src/dominio/catalogos/orden-de-tallas.js';
+import {
+  deducirOrdenTalla,
+  ORDEN_SIN_ASIGNAR,
+} from '../src/dominio/catalogos/orden-de-tallas.js';
 import {
   CAMPOS_VARIABLES_DEFAULT_CYA,
   esNombreDeCya,
@@ -958,7 +961,7 @@ async function sembrarPlantillaImportacionCya(prisma: PrismaClient): Promise<voi
 async function sembrarOrdenDeTallas(prisma: PrismaClient): Promise<void> {
   // Sólo el sentinela: lo que alguien ya ordenó a mano no se toca.
   const pendientes = await prisma.talla.findMany({
-    where: { orden: 0 },
+    where: { orden: ORDEN_SIN_ASIGNAR },
     select: { id: true, etiqueta: true },
   });
   if (pendientes.length === 0) {
@@ -976,7 +979,10 @@ async function sembrarOrdenDeTallas(prisma: PrismaClient): Promise<void> {
     porOrden.set(t.orden, [...(porOrden.get(t.orden) ?? []), t.id]);
   }
   for (const [orden, ids] of porOrden) {
-    await prisma.talla.updateMany({ where: { id: { in: ids }, orden: 0 }, data: { orden } });
+    await prisma.talla.updateMany({
+      where: { id: { in: ids }, orden: ORDEN_SIN_ASIGNAR },
+      data: { orden },
+    });
   }
 
   const sinEscala = pendientes.length - reparadas.length;
