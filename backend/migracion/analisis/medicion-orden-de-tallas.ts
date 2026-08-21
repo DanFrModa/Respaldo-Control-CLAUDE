@@ -49,6 +49,10 @@
  *     TABLAS_DIR=/tmp/tablas npx tsx migracion/analisis/medicion-orden-de-tallas.ts
  *
  * NO toca la base de datos: lee un CSV e imprime. Es seguro correrlo cuando sea.
+ * ⚠️ En modo texto TAMBIÉN ESCRIBE un archivo `medicion-orden-de-tallas-<ISO>.txt` en el
+ * directorio desde el que se corre (con `--json` no escribe nada). Está en `.gitignore`, pero
+ * conviene saberlo: la cicatriz del árbol compartido es justo sobre archivos sueltos que se
+ * cuelan en un commit ajeno.
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';

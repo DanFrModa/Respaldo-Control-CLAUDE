@@ -2630,10 +2630,15 @@ Un reviewer independiente RECHAZÓ la etapa con cuatro hallazgos. Los siete de a
   | M4 · re-deduce **siempre**, pisando el orden que puso una persona | **MUERE** | 1 |
   | M5 · se cae la guarda `datos.orden === undefined` | **MUERE** *(tras corregir)* | 1 |
 
-  🔴 **M5 sobrevivía, y no era equivalencia.** Quitar esa guarda no cambia el valor guardado —el `orden`
-  explícito gana igual, porque su rama va primero—, pero **la bitácora empezaba a atribuirle a la escala
-  una decisión humana**. Se arregló la PRUEBA (que ahora afirma que el historial no lo dice), no el
-  código: el defecto estaba en la red, no en el trapecio.
+  🔴 **M5 sobrevivía, y no era equivalencia.** Se arregló la PRUEBA, no el código: el defecto estaba en
+  la red, no en el trapecio.
+  ⚠️ **La primera explicación de por qué importaba era INEXACTA, y el reviewer la corrigió midiendo.**
+  Decía *"no cambia el valor guardado —el `orden` explícito gana igual, porque su rama va primero"*. Esa
+  rama va primero **sólo cuando `cambiaOrden` es true**, o sea cuando el valor explícito DIFIERE del
+  vigente. Si alguien renombra la etiqueta y manda el MISMO `orden` que ya tenía, `cambiaOrden` es false,
+  y sin la guarda el `else if` **pisa el número que la persona acaba de pedir**: su sonda da `1040` con la
+  guarda y `3` sin ella. Así que la guarda no protege sólo la bitácora: **protege el dato**.
+  *Y la lección de segundo orden: la explicación de un arreglo se verifica igual que el arreglo.*
 
 ### Nota de cierre
 

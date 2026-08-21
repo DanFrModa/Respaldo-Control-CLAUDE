@@ -3671,9 +3671,11 @@ consecuencias técnicas de esta misma decisión, no reglas de negocio nuevas):
 - **(ii) Si la curva que cubre esas tallas existe pero está DESACTIVADA, asignar la curva de la OP se
   RECHAZA** — con el nombre de la curva y dónde reactivarla. Las otras dos salidas se descartaron por
   escrito: *crear una gemela «Curva CH-M-G (2)»* deja una mentira permanente en el catálogo y parte en dos
-  la misma idea; *reactivarla sola* desharía en silencio un acto deliberado (el borrado suave es un acto) y
-  además exigiría `tallas.administrar`, permiso que esa puerta **no** pide —sólo `modelos.administrar`—, o
-  sea un agujero de privilegio. Rechazar es lo único que ni ensucia el catálogo ni mueve nada que nadie
+  la misma idea; *reactivarla sola* desharía en silencio un acto deliberado (el borrado suave es un acto),
+  y con esa razón basta. ⚠️ Se escribió aquí una tercera —que reactivar exigiría `tallas.administrar` y
+  sería un agujero de privilegio— y **se retiró por INEXACTA**: la rama que crea la curva ya llama a
+  `crearCurva`, que pide ese mismo permiso. *Una decisión correcta apuntalada con una razón falsa queda
+  peor que con una razón menos.* Rechazar es lo único que ni ensucia el catálogo ni mueve nada que nadie
   pidió mover, y cuesta un clic que es exactamente el acto deliberado que hace falta.
 
 ⭐ **Y una regla de método que dejó esta decisión:** el TSDoc de la escala presume de estar **MEDIDO**. Esa

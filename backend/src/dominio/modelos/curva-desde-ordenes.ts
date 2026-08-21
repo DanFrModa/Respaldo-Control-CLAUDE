@@ -131,9 +131,10 @@ async function nombreLibreDeCurva(
  *  • **Crear la gemela «(2)»** deja una mentira permanente en el catálogo y parte en dos la misma
  *    idea. Es la que había, y es la peor.
  *  • **Reactivar la apagada** desharía en silencio una decisión deliberada (el borrado suave es un
- *    acto, no un accidente) como EFECTO SECUNDARIO de tocar un modelo. Y además pediría
- *    `tallas.administrar`, que esta puerta **no** exige —sólo `modelos.administrar`—: sería un
- *    agujero de privilegio, o un fallo confuso para quien no tenga el permiso.
+ *    acto, no un accidente) como EFECTO SECUNDARIO de tocar un modelo. Esa razón sola la descarta.
+ *    (Una tercera razón que se escribió aquí —que reactivar pediría `tallas.administrar` y sería un
+ *    agujero de privilegio— **se retiró por inexacta**: la rama que CREA la curva ya llama a
+ *    `crearCurva`, que exige ese mismo permiso, así que reactivar no pediría nada nuevo.)
  *  • **Rechazar** es lo único que ni ensucia el catálogo ni mueve nada que nadie pidió mover. El
  *    mensaje dice el nombre de la curva y dónde reactivarla, así que cuesta un clic — y ese clic es
  *    exactamente el acto deliberado que hace falta.
