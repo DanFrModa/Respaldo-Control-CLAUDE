@@ -114,8 +114,13 @@
 > **INALCANZABLES** desde esa pantalla —la misma trampa del `<select>` de colores que V1-E4 ya había
 > arreglado, y que **empeoraba sola** con cada OC nueva—. La raíz quedó cerrada: la OC elegida se pide
 > **por id**, no se busca dentro de una página. Y el tope que queda **se declara** (`total`/`truncado`):
-> *"Se muestran 50 de 300 OC abiertas"*. ⚠️ **`recibirCompra` NO se tocó** — esto es cómo se ELIGE la OC,
-> no cómo se recibe. **SIN migración, SIN permisos nuevos, SIN seed.**
+> *"Se muestran 50 de 300 OC abiertas"* — a las de más atrás se llega **por su número**, no navegando.
+> ⭐ **Y el orden va por CREACIÓN, no por folio**, que es lo que impide que el defecto vuelva por la
+> puerta de atrás: hoy el folio **no es monótono** (los ETL dejaron las secuencias en cero → las OC
+> nuevas toman folios 1, 2, 3…, §Post-F9.85, arreglo **manual pendiente**) y las ~7,978 migradas quedan
+> **abiertas para siempre** con folios altos, así que ordenar por folio habría devuelto una página de
+> pura historia dejando fuera la OC que Daniel acaba de crear. ⚠️ **`recibirCompra` NO se tocó** — esto
+> es cómo se ELIGE la OC, no cómo se recibe. **SIN migración, SIN permisos nuevos, SIN seed.**
 >
 > ✅ **`V1-E3n` · MODELOS DE DESARROLLO vs. DE PRODUCCIÓN** (20-ago): Daniel, probando, *"en la última OP
 > que hice de pruebas (la 5558) heredó el modelo de desarrollo… habíamos acordado que el sistema iba a
@@ -716,6 +721,15 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   🔴 **Y el corolario de honestidad:** si por rendimiento se deja un tope, el servicio **devuelve `total` y
   `truncado`** y la pantalla lo **dice** (*"Se muestran 50 de 300"*) con la salida a mano. Un tope que no
   se declara es una mentira que crece sola.
+- 🔴 **APRENDIZAJE de V1-E3s — «la más reciente» NO es «el folio más alto» mientras las secuencias sigan
+  rotas.** El listado de OC abiertas ordenaba por `numCompra desc` con el comentario *"la más reciente
+  primero"*, y en `prueba` eso es **falso**: §Post-F9.85 dejó las secuencias en cero (las OC nuevas
+  toman folios 1, 2, 3…) y el ETL migra toda OC histórica autorizada como `autorizada` **sin crear
+  recepciones**, o sea **abierta para siempre**. Sumado: la OC recién creada se iba al final y el
+  recorte la escondía. **La regla:** para *"lo más nuevo primero"* se ordena por algo **monótono con la
+  creación** (`id`, o `creadoEn`), nunca por un folio de negocio — y menos por uno cuyo arreglo depende
+  de un **paso manual** que §Post-F9.85 ya demostró que puede quedarse trece días sin darse. Un
+  comentario que promete un orden y una cláusula que entrega otro es un defecto, no un matiz.
 - 🔴 **APRENDIZAJE de V1-E3q (2ª vuelta, 21-ago-2026) — no basta con NO CALLARSE: hay que NO MENTIR.**
   El arreglo del bloqueante abrió una mentira nueva: como lo pendiente ya venía redondeado, todo
   faltante por debajo de 0.01 se reportaba como *"ya está en una orden de compra viva (0 pza) — si esa

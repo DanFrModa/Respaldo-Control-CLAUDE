@@ -2358,7 +2358,18 @@ Y **empeoraba sola**: cada OC nueva empujaba a las viejas fuera del tope.
 5. 🔴 **Sin topes silenciosos.** El servicio tiene tope (arrastrar el catálogo entero no ayuda a
    nadie) pero lo **DECLARA**: devuelve `total` (cuántas cumplen el filtro de verdad) y `truncado`, y
    la pantalla lo dice — *"Se muestran 50 de 300 OC abiertas. Escribe el número de la OC para llegar a
-   las demás."*
+   las demás."* ⚠️ **La verdad completa sobre ese tope:** *navegando* no se pasa de él (no hay
+   "siguiente página"); a las de más atrás se llega **por su número**, que es justo lo que el aviso
+   ofrece. Es aceptable **sólo mientras el orden ponga adelante lo que importa** — ver el punto 6.
+6. ⭐ **El orden es por CREACIÓN (`id desc`), NO por folio** — y esto no es un detalle de estilo. Hoy
+   en `prueba` **el folio no es monótono con la creación**: los ETL dejaron las secuencias en cero, así
+   que las OC nuevas toman folios 1, 2, 3… mientras las **~7,978 migradas** (que el ETL carga como
+   `autorizada` **sin crear recepciones**, o sea **abiertas para siempre**) llevan folios altos
+   (§Post-F9.85, cuyo arreglo es un paso **manual todavía pendiente**). Ordenando por folio, un
+   proveedor con más de 50 OC históricas abiertas habría devuelto una página entera de historia
+   dejando **fuera la OC que Daniel acaba de crear** — el defecto de esta etapa, de vuelta, con un
+   número más chico. `id` crece con la creación, nunca es nulo, y **no depende de que alguien corra
+   nada**.
 
 ### Cómo quedó por dentro
 
@@ -2378,18 +2389,29 @@ Y **empeoraba sola**: cada OC nueva empujaba a las viejas fuera del tope.
 
 ### Verificación
 
-- **Integración contra Postgres NATIVO** (sin Docker), no dejada al CI: **30 pruebas** del archivo de
-  recepción en verde, de las cuales **8 nuevas** cubren el filtro por proveedor, el tope declarado, A9,
-  solo-abiertas, el atajo por número, el pendiente por nombre y el permiso.
+- **Integración contra Postgres NATIVO** (sin Docker), no dejada al CI: **34 pruebas** del archivo de
+  recepción en verde, de las cuales **12 nuevas** cubren el filtro por proveedor, el tope declarado, A9,
+  solo-abiertas, el atajo por número, el pendiente por nombre, el permiso, **la banda de tolerancia**
+  (96 de 100 ya está surtido), **el conteo de los materiales que no se nombran** (5 → 3 + 2) y **el
+  orden por creación** (dos pruebas, con folios altos reetiquetados a mano para reproducir §Post-F9.85).
 - **13 pruebas de la pantalla** (7 nuevas), y el suite completo del frontend en verde
   (**177 archivos / 1 369 pruebas**).
-- **MUTACIÓN: 10 muertas, ninguna sobreviviente.** Backend: el tope de 50 bajado a 1 · ignorar el
+- **MUTACIÓN: 14 muertas, ninguna sobreviviente.** Backend (10): el tope de 50 bajado a 1 · ignorar el
   proveedor · quitar `idEmpresa` (A9) · `truncado` siempre false · quitar el filtro de estatus ·
-  ignorar `numCompra`. Frontend: el aviso de recorte nunca pintado · sin auto-elección · el atajo por
-  número sin viajar al servidor · el proveedor sin viajar al servidor. **El instrumento se verificó
-  antes de creerle**, en los dos sentidos: una mutación cosmética debe **SOBREVIVIR** con las 30/13
-  ejecutadas a la vista, y un sabotaje del `return` debe **MORIR** nombrando las rojas. El mutador
-  restaura en `finally` y comprueba **md5 contra HEAD** al terminar.
+  ignorar `numCompra` · **volver a `orderBy: numCompra`** —o sea: revertir el arreglo pone el suite en
+  rojo, en dos pruebas— · **cambiar `faltantePorRecibir` por una resta cruda** (esto es lo que sostiene
+  la afirmación central de la etapa) · `materialesPendientesMas` cableado a 0 · nombrar todos los
+  materiales sin el corte. Frontend (4): el aviso de recorte nunca pintado · sin auto-elección · el
+  atajo por número sin viajar al servidor · el proveedor sin viajar al servidor.
+- **El instrumento se verificó antes de creerle**, en los dos sentidos: una mutación cosmética debe
+  **SOBREVIVIR** con las 34/13 ejecutadas a la vista, y un sabotaje del `return` debe **MORIR**
+  nombrando las rojas. El mutador exige que el patrón case **exactamente una vez** y que **empiece en
+  principio de línea** —una ancla con sangría de 4 se colaba DENTRO de una línea con sangría de 8
+  (`estatus: { in: [...] }` aparece dos veces en el archivo), el md5 cambiaba y el mutante *parecía*
+  sobrevivir—, **imprime el diff aplicado** para ver qué línea cambió de verdad, exige **nombres de
+  pruebas rojas** para dictar *muere* (un `Killed` por OOM deja 0 ejecutadas → `INSTRUMENTO-ROTO`,
+  nunca *muere*), cuenta **ejecutadas = passed + failed**, restaura en `finally` y comprueba **md5
+  contra HEAD**.
 
 ### Nota de cierre — ✅ HECHA (21-ago-2026)
 
@@ -2401,6 +2423,11 @@ se teclea el proveedor, salen sus OC abiertas como lista, y se hace clic en la q
 `data-testid` de la selección cambiaron (`rec-oc` → `rec-proveedor` / `rec-num-oc` / `rec-oc-{id}`);
 ningún e2e los usaba (el único que menciona la Recepción es `login.spec`, y sólo por el nombre de su
 entrada en el riel, que no se tocó).
+
+⚠️ **La pantalla NO queda limpia del patrón, y hay que decirlo:** el `<select>` de **almacén destino**
+sigue alimentado por `useAlmacenes({ porPagina: 100 })` — el mismo patrón que el aprendizaje de abajo
+declara defecto latente. Hoy no muerde (el catálogo de almacenes es diminuto y no crece), así que no se
+tocó en esta etapa; pero queda **anotado, no barrido**.
 
 🔴 **La lección que deja, y que ya va tres veces:** el `<select>` topado a 100 se arregló en el BOM
 (V1-E3c), en clientes (V1-E4), en arte y materiales (V1-E3f) — y seguía vivo aquí. **Un desplegable

@@ -410,8 +410,20 @@ empresa activa):
 - 🔴 **El tope se DECLARA.** La respuesta trae `total` (cuántas cumplen el filtro de verdad) y
   `truncado`; la pantalla lo dice y ofrece el atajo (*"Se muestran 50 de 300 OC abiertas"*). Esto nació
   de un defecto vivo: el `<select>` anterior se llenaba con **dos consultas de 100** y las OC de más
-  abajo eran **INALCANZABLES** — y empeoraba sola con cada OC nueva. La raíz quedó cerrada porque **la
-  OC elegida se pide POR ID** (`GET /api/ordenes-compra/{id}`), no se busca dentro de una página.
+  abajo eran **INALCANZABLES** — y empeoraba sola con cada OC nueva.
+- ⚠️ **Lo que el tope SÍ sigue limitando, dicho sin adornos:** *navegando* no se pasa de `limite` (no
+  hay "siguiente página"); a cualquier OC se llega **por su número**, que es lo que el aviso ofrece.
+  Aceptable **sólo mientras el orden ponga adelante lo que importa** (ver abajo). Si algún día hace
+  falta pasear por las viejas de un proveedor, lo que toca es **paginar**, no subir el tope.
+- ⭐ **El orden es por CREACIÓN (`id desc`), NO por folio.** Hoy el folio **no es monótono con la
+  creación**: los ETL dejaron las secuencias en cero (las OC nuevas toman folios 1, 2, 3…, §Post-F9.85,
+  arreglo manual pendiente) y el ETL migra toda OC histórica autorizada como `autorizada` **sin crear
+  recepciones**, así que las ~7,978 migradas quedan **abiertas para siempre** con folios altos. Con
+  `numCompra desc`, un proveedor con más de `limite` OC históricas abiertas habría devuelto una página
+  de pura historia dejando fuera la OC recién creada. `id` crece con la creación y no depende de que
+  alguien corra nada.
+- La **raíz** del defecto está cerrada aparte del tope: la **OC elegida se pide POR ID**
+  (`GET /api/ordenes-compra/{id}`), no se busca dentro de la página que se trajo.
 
 ⚠️ **`recibirCompra` no cambió**: esto es cómo se **ELIGE** la OC, no cómo se recibe. Y en la pantalla
 el proveedor se busca con **`SelectorProveedor`** —*EL* selector de proveedor de la app, sobre el
