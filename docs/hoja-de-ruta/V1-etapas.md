@@ -2224,11 +2224,45 @@ ajuste por debajo del mínimo **se rechaza diciendo por qué**.
 > constante que no gobierna lo que dice gobernar es **la misma clase de mentira**. Lo cazó el
 > mutador, no la revisión.
 
+### 🔴 La SEGUNDA vuelta del reviewer: la previa inventaba una OC (21-ago-2026)
+
+El bloqueante de la primera vuelta murió, pero el arreglo abrió **una mentira nueva**, y de la peor
+clase. Como `cantidadPendiente` llega redondeado a 2 decimales, **todo `aComprar` entre `1e-6` y
+`0.005` daba pendiente 0** y caía en la rama `'ya-en-oc'` aunque **no hubiera ninguna OC**. Al
+comprador se le decía:
+
+> *"HIL-01 — Hilo **ya está en una orden de compra viva** para la orden 1 **(0 pza)**: no hace falta
+> volver a comprarlo. **Si esa OC se cancela, vuelve a aparecer aquí.**"*
+
+**No existía ninguna OC.** Se le mandaba a cancelar un documento inexistente, y la etapa se
+contradecía a sí misma: el renglón de la explosión seguía marcado *faltante-parcial*. Se reproduce por
+el camino de todos los días —un genérico neteado contra el kardex (decisión (d))— y con un
+`consumoPorPrenda` de 4 decimales, que la columna admite.
+
+**El arreglo: un motivo propio, `menor-al-minimo`**, y la rama `ya-en-oc` **exige que de verdad haya
+algo en una OC** (`seGuardaComoAlgo(cantidadEnOc)`). Se eligió eso y **no** mover el corte antes de la
+rama de `enOc`, porque eso habría metido en el mismo saco el caso REAL de *"ya está comprado"*
+(requerido 3.7020 contra una línea de 3.70) y **habría perdido información verdadera y útil**. Son dos
+hechos distintos y merecen dos frases distintas.
+
+> 🔴 **La lección: no basta con no callarse — hay que no mentir.** §Post-F9.85 nació porque Daniel
+> dejó de creerle a la pantalla (*"no sé si realmente se generó o solo dice eso"*). Una revisión previa
+> que afirma un hecho FALSO **es exactamente ese fallo**, aunque la decisión operativa que hay detrás
+> (0.002 pza no se compran) sea la correcta. La lista de motivos sólo vale si **cada motivo es verdad**.
+
+**Y la "una sola verdad" volvió a ser literal.** El redondeo de `enOc` estaba en **dos** de los tres
+consumidores, así que el tablero R7 quedaba crudo: la explosión decía `0.3` y R7
+`0.30000000000000004`. En pantalla no se veía; **en el JSON del API sí viajaba**. Ahora se redondea
+dentro de `comprometidoEnOc` —la función que ES la verdad— y **lo RECIBIDO no se toca**, porque su
+columna (`RecepcionCompraLinea.cantidadRecibida`) es `Decimal(14,4)` y recortarlo tiraría precisión
+real. *Cada número a la escala de SU columna.* La prueba que comparaba los dos usaba `toBeCloseTo`
+—una aserción laxa sobre una promesa estricta, incapaz de cazarlo— y pasó a comparación exacta.
+
 ### Verificación
 
-- **97 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
-  las cuales **35 nuevas** cubren las tres piezas, los cinco hallazgos del rechazo y el hueco del
-  precio. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
+- **101 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
+  las cuales **39 nuevas** cubren las tres piezas, los hallazgos de las DOS rondas de rechazo, el
+  hueco del precio y la mentira del motivo. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
 - Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
   fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
   La Σ se pide a **Postgres con SQL** (`SUM` sobre la columna `numeric`), no a JavaScript: es la

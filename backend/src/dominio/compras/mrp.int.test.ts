@@ -2725,6 +2725,48 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     expect(enR7).toBe(enExplosion);
   });
 
+  /**
+   * ⭐ **LO RECIBIDO CONSERVA SUS CUATRO DECIMALES.** `enOc` se redondea a 2 porque sale de
+   * `OrdenCompraLinea.cantidad Decimal(14,2)`; `recibido` **NO**, porque sale de
+   * `RecepcionCompraLinea.cantidadRecibida Decimal(14,4)`. Recortarlo tiraría precisión REAL de lo
+   * que de verdad entró al almacén — y en tela, donde nunca se recibe la cantidad exacta
+   * (§Post-F9.19), esas milésimas son el dato.
+   *
+   * Sin esta prueba la afirmación del docstring era una promesa sin respaldo: redondear `recibido`
+   * a 2 dejaba toda la batería en verde (lo cazó el mutador, no la revisión).
+   */
+  it('⭐ lo RECIBIDO no se recorta a 2 decimales (su columna tiene 4)', async () => {
+    await explosionarConRecetaFresca();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    await autorizarOC(sesion(), idOc, bd());
+    const lineaOc = await cliente.ordenCompraLinea.findFirstOrThrow({
+      where: { idOrdenCompra: idOc, idAvio: avioBoton.id },
+    });
+    // El proveedor entregó 90.1234 — cuatro decimales, que su columna sí puede guardar.
+    await recibirCompra(
+      sesion(),
+      {
+        idOrdenCompra: idOc,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idOrdenCompraLinea: lineaOc.id, cantidad: 90.1234 }],
+      },
+      bd(),
+    );
+
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const fila = tablero.filas.find((f) => f.idAvio === avioBoton.id);
+    // 🔴 Redondeando `recibido` a 2, esto valdría 90.12 y se perderían las milésimas reales.
+    expect(fila?.recibido).toBe(90.1234);
+    // …mientras que lo que está EN OC sí viene a 2 decimales (cada número a la escala de SU columna).
+    expect(fila?.enOc).toBe(180);
+  });
+
   /** Hallazgo 4 — la REVISIÓN PREVIA también es una puerta: una OP ajena responde 404 (A9). */
   it('⭐ A9 — la revisión previa de una OP de otra empresa responde 404', async () => {
     const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
