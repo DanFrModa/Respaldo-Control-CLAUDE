@@ -8,28 +8,44 @@
  * la otra mitad (reparar lo ya cargado) vive en el seed.
  *
  * 🔴 **La escala NO se inventó: se MIDIÓ** sobre `Respaldo CLAUDE/TABLAS/Ordenes.csv` (columna
- * `Tallas`, ancho fijo de 2, CP850), 5,451 renglones → 101 etiquetas distintas (94 filas `Talla`
- * reales, porque el ETL dedupe sin distinguir mayúsculas) en 164 combinaciones. Tres hallazgos
- * mandaron el diseño, y los tres son contraintuitivos:
+ * `Tallas`, ancho fijo de 2, CP850). ⭐ **Y la medición se RE-CORRE, no se re-cita:** vive en
+ * `migracion/analisis/medicion-orden-de-tallas.ts` y usa el parser del propio ETL
+ * (`migracion/comun/tallas.ts`), así que cada cifra de aquí abajo se vuelve a sacar con un comando.
+ * *(Esta última frase la costó una ronda de corrección: las cifras publicadas a mano no cuadraban, y
+ * el módulo llegó a contradecir a su propia prueba con el conteo de `2-3-3X`.)*
  *
- *  1. **Los NÚMEROS van ANTES que las LETRAS.** De las combinaciones que mezclan las dos familias,
- *     **15 van número→letra** (309 órdenes: `2-3-3X`, `12-14-16-CH-M-G-EX-2X`…) contra **1 sola al
- *     revés** (`CH-M-G-EX-38-42`, 2 órdenes). Por eso las letras arrancan en {@link BASE_LETRAS},
- *     por encima de todo el rango numérico.
+ * **El universo:** 5,451 renglones → 5,450 con `Tallas` → menos **67 órdenes** cuyas 17 cadenas el
+ * parser del ETL marca **raras** (dos curvas pegadas con `--`, saltos de línea, longitud impar; el
+ * loader nunca las cargó) = **5,383 órdenes**, con **101 etiquetas distintas** contando la caja → las
+ * **94 filas `Talla`** reales (el ETL dedupe sin distinguir mayúsculas), en **161 combinaciones**.
+ * ⚠️ 161 y no 164: contando la CAJA salen 164, pero `ch-m-g-eg` y `CH-M-G-EG` no crearon curvas
+ * aparte (el loader busca la curva con `mode: 'insensitive'`).
+ *
+ * Tres hallazgos mandaron el diseño, y los tres son contraintuitivos:
+ *
+ *  1. **Los NÚMEROS van ANTES que las LETRAS.** De las combinaciones que mezclan las dos familias y
+ *     la escala reconoce enteras, **15 van número→letra** (309 órdenes: `2-3-3X`,
+ *     `12-14-16-CH-M-G-EX-2X`…) contra **1 sola al revés** (`CH-M-G-EX-38-42`, 2 órdenes). Contando
+ *     también las que traen alguna etiqueta sucia son 19 / 333 contra la misma 1 / 2: el veredicto no
+ *     depende de dónde se corte. Por eso las letras arrancan en {@link BASE_LETRAS}, por encima de
+ *     todo el rango numérico.
  *  2. **Los MESES y los AÑOS caen en la MISMA escala numérica**, convertidos a meses. Es lo que
  *     hace que `3M-6M-9M-12-18-2A-3A` (57 órdenes) salga bien con la MISMA regla que
- *     `4-6-8-10-12-14-16-18`: en la primera el `12` y el `18` YA son meses, y `2A`/`3A` son 24 y 36.
+ *     `4-6-8-10-12-14-16-18` (22 órdenes): en la primera el `12` y el `18` YA son meses, y `2A`/`3A`
+ *     son 24 y 36.
  *  3. **`3X` es una LETRA**, no un número — y eso es justo lo que la hace acertar en las **dos**
- *     familias donde vive: entre puros números (`2-3-3X`, 303 órdenes) queda al final porque las
- *     letras van después; entre letras (`CH-M-G-EX-2X-3X`, 60 órdenes) queda donde le toca en la
- *     escalera. Leerla como "3" la habría mandado al principio de la primera y al medio de la nada
- *     en la segunda.
+ *     familias donde vive: entre puros números (`2-3-3X`, 252 órdenes) queda al final porque las
+ *     letras van después; entre letras (`CH-M-G-EX-2X-3X`, 17 órdenes; 57 en total sumando las
+ *     curvas de puras letras que la traen) queda donde le toca en la escalera. Leerla como "3" la
+ *     habría mandado al principio de la primera y al medio de la nada en la segunda.
  *
- * **Resultado medido de la escala completa contra las 164 combinaciones reales:** 133 combinaciones
- * (5,311 órdenes = **98.7 %**) quedan MONÓTONAS; 26 combinaciones / 58 órdenes traen alguna etiqueta
- * que la escala no reconoce (`UT`, `MC`, `DG`, `M.`, `G'`… data sucia del viejo, más las cadenas que
- * son dos curvas pegadas); y 5 combinaciones / 14 órdenes las desordena — 3 de ellas por traer la
- * misma talla repetida (`EX-CH-M-G-EX`) y la única falla de diseño real es `CH-M-G-EX-38-42`.
+ * **Resultado medido de la escala completa contra las 161 combinaciones reales:** 130 combinaciones
+ * (5,311 órdenes = **98.7 %** del universo) quedan MONÓTONAS; 26 combinaciones / 58 órdenes traen
+ * alguna etiqueta que la escala no reconoce (`UT`, `MC`, `M.`, `G'`… data sucia del viejo, más el
+ * separador suelto de las cadenas que son dos curvas pegadas); y 5 combinaciones / 14 órdenes las
+ * desordena — **3** de ellas por traer la misma talla repetida (`EX-CH-M-G-EX`, `CH-M-G-EX-CH-M-G-EG`,
+ * `M-G-EX-2X-3X-XC-CH-M`: no hay orden posible, la cadena está mal) y quedan 2 fallas de diseño
+ * reales, `CH-M-G-EX-38-42` (2 órdenes) y `G-EX-2X-3X-M` (1 orden).
  *
  * ⚠️ **Lo que NO reconoce se queda en 0** — {@link deducirOrdenTalla} devuelve `null` y el llamador
  * deja el sentinela. Inventarle una posición a una etiqueta que nadie entiende sería afirmar algo
@@ -64,7 +80,7 @@ const ESCALERA_LETRAS: Readonly<Record<string, number>> = {
   G: 60, // grande ≡ large
   XL: 70,
   XG: 70, // extra grande
-  EX: 70, // "extra" (la más usada del volcado: 2,863 órdenes)
+  EX: 70, // "extra" (la más usada del volcado: 2,854 órdenes)
   EG: 70, // extra grande escrito con E
   X: 70, // suelta, en 12-14-16-X
   '0X': 80, // 0X-1X-2X-3X

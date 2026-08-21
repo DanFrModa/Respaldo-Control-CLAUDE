@@ -44,7 +44,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   ⚠️ **El orden no se inventó: se midió** sobre las 5,451 órdenes del sistema viejo. De ahí salieron las
   tres reglas: los **números van antes que las letras** (2, 3, 3X), los **meses y los años son la misma
   escala** (3M, 6M, 9M, 12, 18, 2A, 3A), y **3X es letra**, que es lo que la hace caer bien tanto entre
-  números como entre letras. Con eso, el **98.7 %** de las órdenes reales quedan bien ordenadas; lo que
+  números como entre letras. Con eso, el **98.7 %** de las órdenes con curva legible (5,311 de 5,383)
+  quedan bien ordenadas; lo que
   queda es data sucia del viejo (etiquetas como `UT`, `MC`, `M.`), que se queda al principio de la lista y
   se puede acomodar a mano desde Catálogos › Tallas.
 
@@ -68,11 +69,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **El «Orden de despliegue» de una talla ahora arranca en 1**, y si lo dejas vacío el sistema lo deduce de
   la etiqueta. El **0** dejó de ser un valor capturable: pasó a significar «nadie le puso orden». Por eso,
   al editar una talla vieja, ese campo abre **vacío** en vez de con un «0».
-- **El orden se sembró solo, pero sólo donde nadie había puesto nada.** Si alguien ya había acomodado una
-  talla a mano, se respeta tal cual.
-- **Las etiquetas raras del viejo se quedan al principio de las listas.** Son 26 combinaciones de las 164
-  (58 órdenes de 5,451), casi todas errores de captura de hace años. Se dejan a la vista a propósito, en vez
-  de darles una posición inventada.
+- **El orden se sembró solo, y respeta lo que alguien haya acomodado a mano.** Si una talla ya traía su
+  orden puesto, se queda tal cual.
+  ⚠️ **Con una salvedad, y es mejor decirla:** «tener orden puesto» significa **1 o más**. Si alguien
+  escribió un **0** a propósito antes de esta versión, ese 0 **sí se pisa** — el sistema no puede
+  distinguirlo del 0 que dejó la migración, que es justo lo que vino a reparar. De aquí en adelante deja de
+  poder pasar: el campo ya no acepta 0.
+- **Las etiquetas raras del viejo se quedan al principio de las listas.** Son **26 combinaciones de las
+  161** (58 órdenes de 5,383), casi todas errores de captura de hace años. Se dejan a la vista a propósito,
+  en vez de darles una posición inventada.
 
 ### Qué sigue pendiente o roto
 

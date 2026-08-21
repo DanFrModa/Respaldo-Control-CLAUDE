@@ -2,8 +2,13 @@
  * Pruebas de la ESCALA CANÓNICA del orden de tallas (V1-E3r, §Post-F9.81).
  *
  * Los casos NO son inventados: son las combinaciones reales del volcado (`Ordenes.csv`, 5,451
- * renglones, 164 combinaciones), con sus conteos, para que si alguien retoca la escala vea contra
- * qué la está retocando.
+ * renglones → 5,383 órdenes de universo en **161 combinaciones**), con sus conteos, para que si
+ * alguien retoca la escala vea contra qué la está retocando.
+ *
+ * ⚠️ **Los conteos de aquí y los del TSDoc de `orden-de-tallas.ts` salen de la MISMA corrida** de
+ * `migracion/analisis/medicion-orden-de-tallas.ts`. Si hay que cambiarlos, se re-corre el script y
+ * se cambian **los dos a la vez**: en la ronda anterior este archivo decía 252 órdenes para `2-3-3X`
+ * y el módulo decía 303 — el mismo dato, dos números, en dos archivos de la misma etapa.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -85,11 +90,11 @@ describe('deducirOrdenTalla — la escala medida del volcado real (§Post-F9.81)
   });
 
   describe('hallazgo 3 — 3X es una LETRA, y por eso acierta en sus DOS familias', () => {
-    it('entre números (303 órdenes) queda al final', () => {
+    it('entre números queda al final (la familia de 2-3-3X, 252 órdenes)', () => {
       expect(ordenar(['1', '2', '3', '3X'])).toEqual(['1', '2', '3', '3X']);
     });
 
-    it('entre letras (60 órdenes) queda donde le toca en la escalera', () => {
+    it('entre letras (CH-M-G-EX-2X-3X, 17 órdenes) queda donde le toca en la escalera', () => {
       expect(ordenar(['3X', 'CH', '2X', 'EX', 'M', 'G'])).toEqual([
         'CH',
         'M',
