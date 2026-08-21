@@ -794,6 +794,26 @@ export {
   type EstatusMaterialesSalida,
 } from './esquemas/mrp.js';
 
+// ── ⭐⭐ La tela se compra POR COLOR (V1-E3u, §Post-F9.89) ──
+export {
+  esquemaOrigenPropuestaColor,
+  esquemaOpcionColorTela,
+  esquemaColorDeLaOrden,
+  esquemaTelaConColores,
+  esquemaColoresDeTelaSalida,
+  esquemaAsignarColorTelaCuerpo,
+  esquemaFijarPrecioColorCuerpo,
+  esquemaFijarPrecioColorSalida,
+  type OrigenPropuestaColor,
+  type OpcionColorTela,
+  type ColorDeLaOrden,
+  type TelaConColores,
+  type ColoresDeTelaSalida,
+  type DatosAsignarColorTela,
+  type DatosFijarPrecioColor,
+  type FijarPrecioColorSalida,
+} from './esquemas/color-de-la-tela.js';
+
 // ── Habilitación / surtido de avíos por orden (rediseño R6, B13; §4.6) ──
 export {
   esquemaEstadoHabilitacion,
