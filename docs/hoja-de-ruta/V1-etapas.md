@@ -2318,6 +2318,132 @@ terminado hasta que se corre.**
 
 ---
 
+## V1-E3r · Curvas de talla ⭐ (21-ago-2026) — ✅ HECHA
+
+> **Decisión que la manda:** `Documentacion_MJD/DECISIONES.md` **§Post-F9.81** (con §Post-F9.64 detrás:
+> *la curva es una GUÍA, no una jaula*).
+
+⚠️ **Esta etapa es una RECONSTRUCCIÓN.** Se construyó entera una primera vez y se perdió con un reinicio
+del contenedor (39 archivos sin comitear; el código no sobrevivió en ningún lado). Lo que **sí** sobrevivió
+fue el **veredicto del reviewer**, con los siete defectos que le había encontrado — así que la
+reconstrucción arrancó **ya corregida** en esos siete puntos, y las pruebas se escribieron para que ninguno
+pueda volver sin ponerse rojo. La lección operativa quedó aplicada desde el primer minuto: **comitear en
+cuanto hay algo que funciona**, en la rama de trabajo, que no mergea nada ni se salta al reviewer.
+
+### De dónde sale: Daniel corrigiéndose a sí mismo
+
+Daniel, capturando el consumo por talla de un avío: *"me da la curva diferente a como la di de alta… yo le
+puse la curva de la XCH a la XG y en «recetas por liberar» me pone tallas de bebés"*. Y acto seguido:
+*"perdón… creo que el error es mío. Yo di de alta el modelo a partir de una OC de C&A que es de bebés, y
+cuando hice la receta le puse tallas de caballeros. **Mi información de pruebas es incongruente.** Pero
+entonces, ¿de dónde toma las tallas realmente?"*.
+
+**El sistema no tenía un defecto de cálculo** —tomaba las tallas de donde debe, de la matriz de la ORDEN—.
+Tenía uno peor: **dejó capturar dos curvas que se contradicen sin decir ni media palabra**, y desde afuera
+eso es indistinguible de un error de cálculo.
+
+### Qué entrega
+
+**(a) El aviso de curva distinta.** Cuando la curva del modelo y las tallas de la orden no coinciden, se
+**AVISA** con los **nombres de las dos curvas** y **qué tallas sobran o faltan, en las dos direcciones**.
+Sale en los tres lugares donde se ven las dos a la vez: la **captura de medidas por talla del avío** (donde
+Daniel lo encontró), la **receta de la OP** y la **ficha del modelo**.
+🔴 **JAMÁS BLOQUEA** — Daniel eligió *"que me diga"* sobre *"que no me deje"*.
+🔴 **Lo redacta el SERVIDOR** (A1): la pantalla no arma la frase, no resuelve el singular/plural y no
+ordena las etiquetas. Si lo hiciera, la receta y la ficha acabarían diciendo cosas distintas del mismo
+desajuste — que es exactamente el problema que la etapa vino a matar.
+
+**(b) Jalar la curva de la OP cuando el modelo no tiene.** Se **PROPONE y la persona confirma**: asignar
+la curva escribe en el catálogo y de ahí la heredan el precosteo (D13), las medidas por talla del BOM (R18)
+y la matriz de la siguiente OP (D3). **Si varias OP usan curvas distintas se enseñan TODAS**, con cuántas
+OP usa cada una y sus folios: una regla de desempate inventada ("la más reciente") fallaría **en silencio**
+justo en el caso que dio origen a la decisión. La puerta **sólo llena huecos**: rechaza si el modelo ya
+tiene curva, y el conjunto confirmado se **re-valida** contra los propuestos.
+
+**(c) El ORDEN de las tallas.** `Talla.orden` valía **0 en todo lo migrado** —el ETL llama a
+`crearTalla(sesion, { etiqueta })` sin `orden`— y el desempate caía en la etiqueta: *CH, G, M, XG*. Dos
+mitades: **tapar el hueco** (`crearTalla` DEDUCE el orden cuando nadie lo da) y **reparar los datos ya
+cargados** (en el **seed**, idempotente y sólo sobre el sentinela `orden = 0`).
+
+### ⭐ Lo que la MEDICIÓN cambió del diseño
+
+La escala **no se inventó: se midió** sobre `Respaldo CLAUDE/TABLAS/Ordenes.csv` (columna `Tallas`, ancho
+fijo de 2, **CP850**), replicando el parser real del ETL (`migracion/comun/tallas.ts`):
+
+| Medida | Número |
+|---|---|
+| Renglones | **5,451** (5,450 con `Tallas` no vacío) |
+| Etiquetas distintas | **101** case-sensitive → **94** filas `Talla` reales (el ETL dedupe sin distinguir mayúsculas) |
+| Combinaciones distintas (no raras) | **164** |
+| Cadenas raras (dos curvas pegadas, saltos de línea) | 17 distintas / 67 ocurrencias |
+
+Tres hallazgos mandaron el diseño, y los tres son contraintuitivos:
+
+1. **Los NÚMEROS van ANTES que las LETRAS.** De las combinaciones que mezclan las dos familias, **15 van
+   número→letra** (309 órdenes: `2-3-3X`, `12-14-16-CH-M-G-EX-2X`…) contra **1 sola al revés**
+   (`CH-M-G-EX-38-42`, 2 órdenes). Por eso las letras arrancan en `BASE_LETRAS = 1000`.
+2. **Los MESES y los AÑOS caen en la MISMA recta numérica**, convertidos a meses. Es lo que hace que
+   `3M-6M-9M-12-18-2A-3A` (57 órdenes) salga bien con la **misma** regla que `4-6-8-10-12-14-16-18`: en la
+   primera el `12` y el `18` YA son meses, y `2A`/`3A` son 24 y 36.
+3. **`3X` es LETRA**, no número — y eso es lo que la hace acertar en sus **dos** familias: entre puros
+   números (`2-3-3X`, **303** órdenes) queda al final porque las letras van después; entre letras
+   (`CH-M-G-EX-2X-3X`, **60** órdenes) queda en su peldaño. Leerla como "3" la habría mandado al principio
+   de la primera.
+
+**Resultado de la escala completa contra las 164 combinaciones reales:** **133 combinaciones = 5,311
+órdenes = 98.7 %** quedan monótonas; 26 combinaciones / 58 órdenes traen alguna etiqueta que la escala no
+reconoce (`UT`, `MC`, `DG`, `M.`, `G'`… data sucia, más las cadenas que son dos curvas pegadas); y 5
+combinaciones / 14 órdenes las desordena — 3 de ellas por traer la **misma talla repetida**
+(`EX-CH-M-G-EX`) y la única falla de diseño real es `CH-M-G-EX-38-42`, la combinación letra→número.
+
+⚠️ **Lo que la escala NO reconoce se queda en 0** y sigue desempatando por etiqueta, como hoy. Inventarle
+una posición a una etiqueta que nadie entiende sería afirmar algo que no se sabe (D3).
+
+### Los SIETE defectos del reviewer de la versión perdida, y cómo quedaron
+
+| # | Defecto | Cómo quedó |
+|---|---|---|
+| 1 | **A9**: la lectura de órdenes del modelo contaba órdenes de OTRA empresa | `idEmpresa` **obligatorio sin default** en `curvasDeLasOrdenesDelModelo`, propagado a los **tres** caminos (ficha, medidas por talla, revalidación al asignar). El fixture monta **DOS empresas**: con una sola, quitar el filtro no cambiaría nada y el escenario no podría expresar la fuga. ⚠️ Matiz: el **catálogo** de tallas SÍ es global (ADR-0007); lo que no puede ser global es leer **órdenes** ajenas. |
+| 2 | La puerta escribía el catálogo **en crudo** (`curvaTalla.create` suelto) | Llama a **`crearCurva(sesion, …, { tx })`**, su módulo dueño, con sus cinco reglas intactas (tallas activas, nombre único, posiciones 0-based, `creadoPorId` en los items, permiso). El nombre determinista que choca **se desambigua** en vez de reventar con un P2002 → 500. |
+| 3 | La guarda de exactitud de la búsqueda de curva, **sin cobertura** | `curvaQueCubreExactamente` documenta por qué las dos condiciones son necesarias (`items: { every: … }` en Prisma es *vacuously true* para una curva vacía) y **la prueba usa una curva de CERO items**: con una de tres tallas el conteo la descarta sola y la mutación sobreviviría. |
+| 4 | `orden = 0` capturado a mano **sí se pisaba** | El contrato exige **`min(1)`** y el 0 queda como sentinela puro. Espejo en el formulario: `min(1)`, el placeholder dice «se deduce de la etiqueta», y una talla con orden 0 abre el campo **vacío** (si pintara «0», guardar sin tocar nada lo mandaría de vuelta y el contrato lo rechazaría). |
+| 5 | Un comentario con **justificación FALSA** sobre el orden de las comprobaciones | El comentario dice la verdad: las tres familias son **disjuntas por construcción** (`fullmatch` en los patrones numéricos), así que el orden **no es load-bearing** — se escribe así porque se lee mejor. |
+| 6 | **Cifras mal** en la doc | Todas las de arriba salen de correr la medición sobre el volcado real, no de memoria. |
+| 7 | Menores: `select` muerto, **N+1 dentro de la transacción**, singular/plural reimplementado en el cliente, `obtenerModelo` **después** de escribir | Sin `select` muertos; las curvas existentes de las sugerencias se resuelven con un `Promise.all` (no un `await` por grupo); el plural lo redacta el servidor (`cuantasTallas`) y hay prueba de ello; y la asignación **no llama a `obtenerModelo`** — devuelve una forma propia, para que un rol con sólo `modelos.administrar` no reciba un 403 sobre su propio cambio. |
+
+### Verificación
+
+- **Backend:** `typecheck` · `lint` · `format:check` · `test:unit` (**153 archivos / 1,643 pruebas**) ·
+  `openapi`. Integración **completa** contra Postgres nativo (initdb + pg_ctl + `prisma migrate deploy`;
+  🚫 nunca Docker), en base propia.
+- **Frontend:** `gen:api` · `typecheck` (`tsc -b`) · `lint` · `format:check` · `test`
+  (**178 archivos / 1,375 pruebas**).
+- **Pruebas nuevas:** 36 unit (la escala medida + la redacción del aviso) y 32 de integración.
+- **MUTACIONES — «verde no es cubierto».** Seis, todas **MUEREN** con nombres de pruebas rojas: el filtro
+  de empresa (4 rojas), la guarda de exactitud con la curva de cero items (3), el `min(1)` del contrato
+  (1), el `orden` capturado que manda sobre la deducción (4), `BASE_LETRAS` (1) y la doble dirección del
+  aviso (4). El mutador restaura en `finally` y **verifica con md5 contra HEAD** — y su propia guarda de
+  "el patrón casa exactamente una vez" abortó una mutación ambigua antes de dictar un veredicto falso.
+
+### Nota de cierre
+
+**SIN migración de esquema, SIN permisos nuevos.** **CON seed**: `sembrarOrdenDeTallas` repara el
+`orden = 0` de las tallas ya cargadas → el deploy a `prueba` **requiere `SEED_ON_START=true`**. Es
+idempotente y no destructivo: sólo toca el sentinela, nunca un orden que puso una persona.
+
+⚠️ **Contrato:** `esquemaTallaCrear.orden` pasó de `min(0)` a **`min(1)`**. Un cliente que mandara `0`
+explícito ahora recibe 400 — es deliberado, y el formulario ya no lo produce.
+
+⚠️ **Endpoints nuevos:** `GET /api/modelos/:id/curvas-sugeridas` (`modelos.ver`) y
+`POST /api/modelos/:id/curva-desde-ordenes` (`modelos.administrar`, más `tallas.administrar` si hay que
+crear la curva).
+
+🔴 **Lo que esta etapa NO hace, a propósito:** no cambia la curva de un modelo que ya tiene una (eso se
+edita en su ficha, donde queda constancia de que alguien la cambió queriendo), y no ordena las etiquetas
+que la escala no reconoce.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

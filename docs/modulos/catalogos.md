@@ -24,6 +24,28 @@
 ## Decisiones de diseño (ver también `DECISIONES.md`)
 
 - **D4 Tallas ilimitadas:** columnas `T1..T8` del viejo → tabla `Talla` + tabla pivot `CurvaTalla`.
+- ⭐ **El ORDEN de las tallas (V1-E3r, §Post-F9.81).** `Talla.orden` es `Int @default(0)` y el **0 es el
+  SENTINELA**: significa *"nadie le puso orden"*. Dos mecanismos, y ninguno pisa al otro:
+  - **`crearTalla` lo DEDUCE** cuando el llamador no lo da (`backend/src/dominio/catalogos/orden-de-tallas.ts`).
+    Era EL hueco por el que se colaron las 94 tallas del Access: el ETL llama con sólo `{ etiqueta }`.
+  - **El seed lo REPARA** (`sembrarOrdenDeTallas`), idempotente y **sólo sobre las filas en 0** — un orden
+    que capturó una persona no se toca nunca. Por eso el contrato exige **`min(1)`**: si el 0 fuera
+    capturable, uno puesto a propósito y uno heredado serían indistinguibles.
+  - **La escala se MIDIÓ**, no se inventó, sobre `Ordenes.Tallas` del volcado (5,451 renglones, 101
+    etiquetas → 94 filas `Talla`, 164 combinaciones): **los números van ANTES que las letras** (`BASE_LETRAS
+    = 1000`), **los meses y los años caen en la misma recta numérica** convertidos a meses (`6M`→6,
+    `2A`→24), y **`3X` es LETRA**, que es lo que la hace acertar tanto entre números (`2-3-3X`) como entre
+    letras (`CH-M-G-EX-2X-3X`). Cubre el **98.7 %** de las órdenes reales; lo que no reconoce **se queda en
+    0** en vez de recibir una posición inventada (D3).
+- ⭐ **La curva de la ORDEN manda, y cuando difiere de la del modelo se AVISA (V1-E3r, §Post-F9.81).**
+  `backend/src/dominio/catalogos/curvas-de-la-orden.ts` redacta el aviso —**el servidor, nunca la pantalla**
+  (A1)— con los nombres de las dos curvas y qué tallas sobran o faltan en las dos direcciones. Se pinta en
+  la **captura de medidas por talla del avío**, la **receta de la OP** (`RecetaOrden.avisoCurva`) y la
+  **ficha del modelo** (`ModeloFicha.avisosCurva`). 🔴 **Avisa, JAMÁS bloquea** (§Post-F9.64: la curva es
+  una guía, no una jaula). Si el modelo NO tiene curva, `dominio/modelos/curva-desde-ordenes.ts` **propone**
+  la que usan sus OP y **una persona confirma**; la puerta sólo llena huecos y el conjunto confirmado se
+  re-valida contra los propuestos. ⚠️ El catálogo de tallas es global (ADR-0007), pero leer **órdenes** no
+  lo es: `idEmpresa` es obligatorio y sin default en los tres caminos (A9).
 - **D5 Telas unificadas:** `Telas` y `TelasDis` del viejo eran la misma entidad desdoblada. En v2 hay UNA tabla `Tela`. La llave de unificación es el nombre normalizado (ADR-0009). Las `TelasDis` sin match en `Telas` se crean como `Tela` propia y se reportan.
 - **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F10; aquí solo la DEFINICIÓN.
 - **Fusión de terceros (R15):** los 4 catálogos del viejo (`Proveedores/Cortadores/Maquileros/Estampadores`) se fusionan en UNA tabla `Proveedor` con N roles. Los homónimos se fusionan y se reportan al cuadre.

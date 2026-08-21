@@ -32,6 +32,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.011 · 21-ago-2026 · **en prueba** — Las tallas, en orden y sin contradicciones calladas
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Las tallas por fin salen en su orden.** Antes la matriz decía **CH, G, M, XG** —alfabético— porque
+  ninguna talla traía puesto su orden: la migración las cargó todas en cero. Ahora salen **CH, M, G, XG**,
+  y también **4-6-8-10-12** en vez de **10-12-4-6-8**, y **3M-6M-9M-12-18-2A-3A** en la curva de bebé. Vale
+  para toda pantalla que enseñe tallas: la matriz de la orden, el corte, el recibo, las existencias, las
+  órdenes de compra y el inventario cíclico.
+  ⚠️ **El orden no se inventó: se midió** sobre las 5,451 órdenes del sistema viejo. De ahí salieron las
+  tres reglas: los **números van antes que las letras** (2, 3, 3X), los **meses y los años son la misma
+  escala** (3M, 6M, 9M, 12, 18, 2A, 3A), y **3X es letra**, que es lo que la hace caer bien tanto entre
+  números como entre letras. Con eso, el **98.7 %** de las órdenes reales quedan bien ordenadas; lo que
+  queda es data sucia del viejo (etiquetas como `UT`, `MC`, `M.`), que se queda al principio de la lista y
+  se puede acomodar a mano desde Catálogos › Tallas.
+
+- ⭐ **Si la curva del modelo no es la de la orden, el sistema lo DICE** — con los nombres de las dos y qué
+  tallas sobran y cuáles faltan. Es lo que le pasó a Daniel: dio de alta un modelo desde una orden de C&A
+  de bebés y le capturó tallas de caballero; el sistema tomaba las tallas de donde debe —de la orden— pero
+  **no decía nada**, y desde afuera parecía un error de cálculo. El aviso sale en los **tres** lugares
+  donde se ven las dos: la **captura de medidas por talla del avío** (que es donde lo encontró), la
+  **receta de la orden** y la **ficha del modelo**.
+  🔴 **Avisa, NO bloquea.** Que una orden pida una talla fuera de la curva del modelo es legítimo y pasa
+  seguido; bloquearlo pararía trabajo de verdad.
+
+- ⭐ **Si el modelo no tiene curva y sus órdenes sí, el sistema la propone.** Aparece arriba de la receta
+  del modelo, con las tallas y **cuántas órdenes la usan** (y sus folios). Se asigna con un botón.
+  ⚠️ **Se propone; la confirmas tú.** La curva queda escrita en el catálogo del modelo y de ahí la heredan
+  la receta, el precosteo y las órdenes siguientes, así que no se pone sola. Y si **distintas órdenes usan
+  curvas distintas**, se enseñan **todas** para que elijas: el sistema no adivina cuál es la buena.
+
+### Qué cambió y puede sorprender
+
+- **El «Orden de despliegue» de una talla ahora arranca en 1**, y si lo dejas vacío el sistema lo deduce de
+  la etiqueta. El **0** dejó de ser un valor capturable: pasó a significar «nadie le puso orden». Por eso,
+  al editar una talla vieja, ese campo abre **vacío** en vez de con un «0».
+- **El orden se sembró solo, pero sólo donde nadie había puesto nada.** Si alguien ya había acomodado una
+  talla a mano, se respeta tal cual.
+- **Las etiquetas raras del viejo se quedan al principio de las listas.** Son 26 combinaciones de las 164
+  (58 órdenes de 5,451), casi todas errores de captura de hace años. Se dejan a la vista a propósito, en vez
+  de darles una posición inventada.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
+- **Cambiar la curva de un modelo que YA tiene una** se sigue haciendo desde su ficha, a mano. La propuesta
+  automática sólo llena huecos: no cambia lo que ya está puesto, a propósito.
+- **El sistema todavía no le dice al proveedor qué medida pedir** en la orden de compra (sigue de la 0.010).
+
+---
+
 ## 0.010 · 20-ago-2026 · **en prueba** — La compra desde la explosión: revisión previa, no recomprar, y una compra para varias OP
 
 ### Qué se puede hacer ahora que antes no
