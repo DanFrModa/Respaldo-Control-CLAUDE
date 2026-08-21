@@ -5,6 +5,7 @@ import type { ClavePermiso } from '@/api/tipos';
 import {
   buscarModuloPorClave,
   clavesDeExigencia,
+  cumpleExigencia,
   esEntradaVisible,
   esModuloVisible,
   filtrarCatalogoVisible,
@@ -210,6 +211,36 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     if (!bitacora) return;
     expect(esModuloVisible(bitacora, permisos())).toBe(false);
     expect(esModuloVisible(bitacora, permisos('admin.ver-bitacora'))).toBe(true);
+  });
+
+  // ⭐ V1-E3t — la exigencia `{ todos }` (AND) es lo que deja apagar los KPIs de RC junto con el
+  // módulo. Si degenerara a un OR, la entrada volvería a aparecer con sólo `indicadores.ver` y la
+  // Ruta Crítica reviviría a medias en el menú.
+  it('cumpleExigencia: la lista es "basta una" y `{ todos }` es "hacen falta TODAS"', () => {
+    expect(cumpleExigencia('autenticado', permisos())).toBe(true);
+
+    const or = ['indicadores.ver', 'rc.ruta-ver'] as const;
+    expect(cumpleExigencia(or, permisos('indicadores.ver'))).toBe(true);
+    expect(cumpleExigencia(or, permisos('rc.ruta-ver'))).toBe(true);
+    expect(cumpleExigencia(or, permisos())).toBe(false);
+
+    const and = { todos: or } as const;
+    expect(cumpleExigencia(and, permisos('indicadores.ver', 'rc.ruta-ver'))).toBe(true);
+    // Con UNA sola de las dos NO alcanza — en los dos sentidos (un OR pasaría las dos líneas).
+    expect(cumpleExigencia(and, permisos('indicadores.ver'))).toBe(false);
+    expect(cumpleExigencia(and, permisos('rc.ruta-ver'))).toBe(false);
+    expect(cumpleExigencia(and, permisos())).toBe(false);
+  });
+
+  // ⭐ V1-E3t: los KPIs de Ruta Crítica son la ÚNICA entrada de RC que no cuelga de un permiso
+  // `rc.*`. Se afirma su gate para que nadie se lo devuelva a `['indicadores.ver']` sin darse
+  // cuenta de que con eso la RC vuelve al menú aunque el módulo esté apagado.
+  it('los KPIs de Ruta Crítica exigen indicadores.ver Y rc.ruta-ver', () => {
+    const kpis = MODULOS_MENU.find((m) => m.clave === 'indicadores-ruta-critica');
+    expect(kpis).toBeDefined();
+    if (!kpis) return;
+    expect(esModuloVisible(kpis, permisos('indicadores.ver'))).toBe(false);
+    expect(esModuloVisible(kpis, permisos('indicadores.ver', 'rc.ruta-ver'))).toBe(true);
   });
 
   it('un padre del catálogo es visible si ALGUNA hoja hija es visible (basta una)', () => {
