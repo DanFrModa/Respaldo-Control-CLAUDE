@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { existenciaAvioBloqueada, existenciaTelaColorBloqueada } from '../../comun/kardex.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type {
@@ -19,6 +24,7 @@ import { autorizarOC, cancelarOC, crearOC, resumenOC } from './ordenes-compra.js
 import {
   lineasPendientesDeOC,
   listarRecepcionesDeOC,
+  ocsRecibibles,
   recibirCompra,
   reversarRecepcion,
 } from './recepciones.js';
@@ -762,5 +768,175 @@ describe('Recepción — pendiente por renglón (lo que precarga la captura)', (
     await expect(
       lineasPendientesDeOC(sesion(PERM, otraEmpresa.id), oc.id, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+/**
+ * §Post-F9.87 — RECIBIR EMPIEZA POR EL PROVEEDOR. Daniel: *"en la realidad cuando vas a recibir
+ * algo, buscas al proveedor que llegó a entregar"*. Lo que se prueba aquí es lo que la pantalla
+ * NO puede decidir sola (A1): qué OC se ofrecen, de quién son, y —sobre todo— que la lista NO
+ * esconda nada en silencio (el defecto vivo era un `<select>` topado a 100 que volvía
+ * INALCANZABLES las OC de más abajo).
+ */
+describe('ocsRecibibles (§Post-F9.87) — las OC abiertas del proveedor que llegó', () => {
+  /** Crea una OC AUTORIZADA de un proveedor dado, con una línea de avío. */
+  async function ocAbiertaDe(idProveedor: number, cantidad = 100) {
+    const oc = await crearOC(
+      sesion(PERM),
+      {
+        ...encabezadoOc(),
+        idProveedor,
+        lineas: [{ idAvio: avioBoton.id, cantidad, precio: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+    return oc;
+  }
+
+  it('FILTRA por el proveedor elegido: no asoma ni una OC de otro proveedor', async () => {
+    const otroProveedor = await cliente.proveedor.create({ data: { nombre: 'Avíos del Sur' } });
+    const ocPropia = await ocAbiertaDe(proveedor.id);
+    const ocAjena = await ocAbiertaDe(otroProveedor.id);
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+
+    // La aserción que importa: SOLO la del proveedor pedido. Si el filtro se ignorara, aquí
+    // vendrían las dos (2 !== 1) y además aparecería `ocAjena`.
+    expect(salida.datos.map((o) => o.id)).toEqual([ocPropia.id]);
+    expect(salida.datos.every((o) => o.idProveedor === proveedor.id)).toBe(true);
+    expect(salida.datos.some((o) => o.id === ocAjena.id)).toBe(false);
+    expect(salida.total).toBe(1);
+  });
+
+  it('devuelve TODAS las OC abiertas del proveedor sin recortar, y lo declara (truncado=false)', async () => {
+    const creadas = [await ocAbiertaDe(proveedor.id), await ocAbiertaDe(proveedor.id)];
+    creadas.push(await ocAbiertaDe(proveedor.id));
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+
+    // El tope POR OMISIÓN no puede esconder ninguna de las tres. (Con el tope bajado a 1 o 2 esta
+    // aserción se cae: `datos` traería menos ids que `creadas`.)
+    expect(salida.datos).toHaveLength(creadas.length);
+    expect(new Set(salida.datos.map((o) => o.id))).toEqual(new Set(creadas.map((c) => c.id)));
+    expect(salida.total).toBe(creadas.length);
+    expect(salida.truncado).toBe(false);
+  });
+
+  it('si SÍ se recorta, lo DICE: total real + truncado=true (nada de topes silenciosos)', async () => {
+    await ocAbiertaDe(proveedor.id);
+    await ocAbiertaDe(proveedor.id);
+    await ocAbiertaDe(proveedor.id);
+
+    const salida = await ocsRecibibles(
+      sesion(PERM),
+      { idProveedor: proveedor.id, limite: 2 },
+      bd(),
+    );
+
+    expect(salida.datos).toHaveLength(2);
+    // `total` NO es lo devuelto: es cuántas cumplen el filtro de verdad. Ahí está la honestidad.
+    expect(salida.total).toBe(3);
+    expect(salida.truncado).toBe(true);
+    expect(salida.limite).toBe(2);
+  });
+
+  it('A9: una OC de OTRA empresa no se ofrece jamás', async () => {
+    const oc = await ocAbiertaDe(proveedor.id);
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Empresa Ajena');
+
+    const salida = await ocsRecibibles(
+      sesion(PERM, otraEmpresa.id),
+      { idProveedor: proveedor.id },
+      bd(),
+    );
+
+    expect(salida.datos).toEqual([]);
+    expect(salida.total).toBe(0);
+    // Y desde la empresa dueña sí está (la prueba no pasa por estar todo vacío).
+    const propia = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    expect(propia.datos.map((o) => o.id)).toEqual([oc.id]);
+  });
+
+  it('solo ofrece OC ABIERTAS: ni borrador, ni cancelada, ni recibida_total', async () => {
+    const abierta = await ocAbiertaDe(proveedor.id);
+    // Borrador: creada y NO autorizada.
+    await crearOC(
+      sesion(PERM),
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [{ idAvio: avioBoton.id, cantidad: 50, precio: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+    // Cancelada: autorizada y luego cancelada.
+    const paraCancelar = await ocAbiertaDe(proveedor.id);
+    await cancelarOC(sesion(PERM_CANCELAR), paraCancelar.id, { motivo: 'Ya no' }, bd());
+    // Recibida total: se recibe el 100 % de su único renglón.
+    const paraRecibir = await ocAbiertaDe(proveedor.id, 100);
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: paraRecibir.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: paraRecibir.lineas[0]!.id, cantidad: 100 }],
+      },
+      bd(),
+    );
+
+    const salida = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+
+    expect(salida.datos.map((o) => o.id)).toEqual([abierta.id]);
+  });
+
+  it('ATAJO por número: `numCompra` exacto trae esa OC sin pasar por el proveedor', async () => {
+    const primera = await ocAbiertaDe(proveedor.id);
+    const segunda = await ocAbiertaDe(proveedor.id);
+
+    const salida = await ocsRecibibles(sesion(PERM), { numCompra: segunda.numCompra }, bd());
+
+    expect(salida.datos.map((o) => o.numCompra)).toEqual([segunda.numCompra]);
+    expect(salida.datos.some((o) => o.id === primera.id)).toBe(false);
+  });
+
+  it('dice QUÉ TRAE PENDIENTE: el material por nombre, y deja de contarlo al recibirlo', async () => {
+    const oc = await ocAbiertaDe(proveedor.id, 100);
+
+    const antes = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    const filaAntes = antes.datos[0]!;
+    expect(filaAntes.renglones).toBe(1);
+    expect(filaAntes.renglonesPendientes).toBe(1);
+    // El nombre sale del catálogo del avío (clave — descripción), no de un texto inventado.
+    expect(filaAntes.materialesPendientes).toEqual(['BOT-01 — Botón']);
+    expect(filaAntes.materialesPendientesMas).toBe(0);
+    expect(filaAntes.estatus).toBe('autorizada');
+
+    // Recepción PARCIAL: la OC sigue abierta, pero con menos por traer.
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: oc.id,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: oc.lineas[0]!.id, cantidad: 40 }],
+      },
+      bd(),
+    );
+
+    const despues = await ocsRecibibles(sesion(PERM), { idProveedor: proveedor.id }, bd());
+    const filaDespues = despues.datos[0]!;
+    expect(filaDespues.id).toBe(oc.id);
+    expect(filaDespues.estatus).toBe('recibida_parcial');
+    // Sigue faltando material, así que sigue contándose como pendiente.
+    expect(filaDespues.renglonesPendientes).toBe(1);
+  });
+
+  it('sin permiso `compras.ver` no se ofrece nada (A4)', async () => {
+    await ocAbiertaDe(proveedor.id);
+    await expect(
+      ocsRecibibles(sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: [] }), {}, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 });
