@@ -4,6 +4,7 @@ import type { ClavePermiso } from '@/api/tipos';
 
 import {
   buscarModuloPorClave,
+  clavesDeExigencia,
   esEntradaVisible,
   esModuloVisible,
   filtrarCatalogoVisible,
@@ -26,10 +27,8 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
 function todosLosPermisos(): ReadonlySet<ClavePermiso> {
   const set = new Set<ClavePermiso>();
   for (const modulo of MODULOS_MENU) {
-    if (modulo.permisos !== 'autenticado') {
-      for (const clave of modulo.permisos) {
-        set.add(clave);
-      }
+    for (const clave of clavesDeExigencia(modulo.permisos)) {
+      set.add(clave);
     }
   }
   return set;
@@ -643,21 +642,36 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     for (const clave of HUBS) {
       const padre = GRUPOS_MENU.flatMap((g) => g.entradas).find((e) => e.clave === clave);
       expect(padre?.hijos, `${clave} debe ser padre en el catálogo`).toBeDefined();
+      // Una tarjeta con exigencia OR aporta TODAS sus claves (cualquiera de ellas abre la
+      // tarjeta, así que cualquiera debe abrir el hub). Una con `{ todos }` (V1-E3t: los KPIs de
+      // RC) aporta UNA sola: quien la abre tiene todas sus llaves, y con que el gate del hub
+      // mencione una ya lo deja pasar. Exigirlas todas ensancharía el hub a quien NO puede abrir
+      // ninguna tarjeta — justo lo contrario de lo que este invariante protege.
       const union = new Set<ClavePermiso>();
+      const bastaUna: (readonly ClavePermiso[])[] = [];
       for (const hijo of padre?.hijos ?? []) {
-        if (hijo.permisos !== 'autenticado') {
+        if (hijo.permisos === 'autenticado') continue;
+        if (Array.isArray(hijo.permisos)) {
           for (const p of hijo.permisos) union.add(p);
+        } else {
+          bastaUna.push(clavesDeExigencia(hijo.permisos));
         }
       }
       const hoja = hojaRiel(clave);
       expect(hoja, clave).toBeDefined();
       const gate = hoja?.permisos;
       expect(gate, `${clave}: la hoja colapsada no debe ser 'autenticado'`).not.toBe('autenticado');
-      const gateSet = new Set(gate === undefined || gate === 'autenticado' ? [] : gate);
+      const gateSet = new Set(gate === undefined ? [] : clavesDeExigencia(gate));
       for (const p of union) {
         expect(
           gateSet.has(p),
           `${clave}: el gate del riel debe incluir "${p}" (una tarjeta hija del hub lo exige)`,
+        ).toBe(true);
+      }
+      for (const claves of bastaUna) {
+        expect(
+          claves.some((p) => gateSet.has(p)),
+          `${clave}: el gate del riel debe incluir alguna de [${claves.join(', ')}] (una tarjeta hija las exige TODAS)`,
         ).toBe(true);
       }
     }

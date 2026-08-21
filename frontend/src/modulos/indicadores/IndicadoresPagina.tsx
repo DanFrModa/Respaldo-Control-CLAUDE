@@ -10,13 +10,14 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import type { ClavePermiso } from '@/api/tipos';
 import { cn } from '@/lib/utils';
+import { cumpleExigencia, type ExigenciaPermisos } from '@/modulos/catalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
  * Portada del módulo INDICADORES (F7-E3 tableros directivos + F7-E4 captura). Cada tarjeta se muestra
- * si la sesión tiene ALGUNO de sus permisos; el backend re-verifica cada pantalla (A1). Los tableros
+ * si la sesión CUMPLE su exigencia de permisos (`cumpleExigencia`, la misma del menú y de la capa
+ * de ruta); el backend re-verifica cada pantalla (A1). Los tableros
  * directivos (`indicadores.ver`) se calculan en segundo plano; las pantallas de captura (productividad,
  * fichas y muestrarios) son operativas por área/aspecto.
  */
@@ -27,7 +28,7 @@ interface SubvistaIndicadores {
   descripcion: string;
   ruta: string;
   icono: typeof Route;
-  permisos: readonly ClavePermiso[];
+  permisos: ExigenciaPermisos;
 }
 
 const SUB_VISTAS: readonly SubvistaIndicadores[] = [
@@ -37,7 +38,8 @@ const SUB_VISTAS: readonly SubvistaIndicadores[] = [
     descripcion: 'Entregas a tiempo, lead time por proceso, cuellos de botella y desempeño.',
     ruta: '/indicadores/ruta-critica',
     icono: Route,
-    permisos: ['indicadores.ver'],
+    // ⭐ V1-E3t: las DOS llaves — mismo gate que el catálogo del menú y que el backend.
+    permisos: { todos: ['indicadores.ver', 'rc.ruta-ver'] },
   },
   {
     clave: 'calidad',
@@ -98,8 +100,8 @@ const SUB_VISTAS: readonly SubvistaIndicadores[] = [
 ];
 
 export function IndicadoresPagina(): React.JSX.Element {
-  const { tienePermiso } = useSesion();
-  const visibles = SUB_VISTAS.filter((sub) => sub.permisos.some((p) => tienePermiso(p)));
+  const { permisos } = useSesion();
+  const visibles = SUB_VISTAS.filter((sub) => cumpleExigencia(sub.permisos, permisos));
 
   return (
     <div className="h-full overflow-y-auto">

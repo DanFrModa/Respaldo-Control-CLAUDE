@@ -427,21 +427,42 @@ function EditorPermisos({
                   className="min-w-0 rounded-xl ring-1 ring-foreground/10 p-3"
                   data-testid="grupo-permisos"
                 >
-                  <legend className="flex items-center gap-2 px-1 text-sm font-medium">
+                  <legend className="flex flex-wrap items-center gap-2 px-1 text-sm font-medium">
                     {grupo.etiqueta}
                     <span className="text-xs text-muted-foreground">
                       {marcadosModulo}/{grupo.permisos.length}
                     </span>
+                    {/* ⭐ V1-E3t: un módulo apagado se dice, no se esconde — si el árbol dejara
+                        marcar permisos que la sesión descarta, la pantalla estaría mintiendo. */}
+                    {grupo.permisos.every((p) => p.apagado) ? (
+                      <span
+                        className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground"
+                        data-testid="modulo-apagado"
+                      >
+                        Módulo apagado en esta versión
+                      </span>
+                    ) : null}
                   </legend>
                   <ul className="mt-1 space-y-1.5">
                     {grupo.permisos.map((permiso) => (
                       <li key={permiso.clave}>
-                        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 hover:bg-muted">
+                        <label
+                          className={
+                            permiso.apagado
+                              ? 'flex items-start gap-2.5 rounded-lg px-1.5 py-1 opacity-60'
+                              : 'flex cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 hover:bg-muted'
+                          }
+                          title={
+                            permiso.apagado
+                              ? 'Su módulo está apagado en esta versión: otorgarlo no surtiría efecto.'
+                              : undefined
+                          }
+                        >
                           <input
                             type="checkbox"
                             className="mt-0.5 size-4 shrink-0 accent-primary"
                             checked={seleccion.has(permiso.clave)}
-                            disabled={!puedeAdministrar || asignar.isPending}
+                            disabled={permiso.apagado || !puedeAdministrar || asignar.isPending}
                             onChange={() => alternar(permiso.clave)}
                             data-testid="permiso-checkbox"
                           />

@@ -52,14 +52,34 @@ const CATALOGO: CatalogoPermisos = [
     modulo: 'almacenes',
     etiqueta: 'Almacenes',
     permisos: [
-      { clave: 'almacenes.ver', descripcion: 'Ver almacenes', modulo: 'almacenes' },
-      { clave: 'almacenes.administrar', descripcion: 'Administrar almacenes', modulo: 'almacenes' },
+      { clave: 'almacenes.ver', descripcion: 'Ver almacenes', modulo: 'almacenes', apagado: false },
+      {
+        clave: 'almacenes.administrar',
+        descripcion: 'Administrar almacenes',
+        modulo: 'almacenes',
+        apagado: false,
+      },
     ],
   },
   {
     modulo: 'roles',
     etiqueta: 'Administración de roles',
-    permisos: [{ clave: 'roles.administrar', descripcion: 'Administrar roles', modulo: 'roles' }],
+    permisos: [
+      {
+        clave: 'roles.administrar',
+        descripcion: 'Administrar roles',
+        modulo: 'roles',
+        apagado: false,
+      },
+    ],
+  },
+  // ⭐ V1-E3t: un módulo APAGADO (la Ruta Crítica). El árbol lo lista pero no lo deja marcar.
+  {
+    modulo: 'rc',
+    etiqueta: 'Ruta Crítica',
+    permisos: [
+      { clave: 'rc.ruta-ver', descripcion: 'Consultar la Ruta Crítica', modulo: 'rc', apagado: true },
+    ],
   },
 ];
 
@@ -122,13 +142,32 @@ describe('<RolesPagina>', () => {
     });
 
     abrirPrimero();
-    expect(screen.getAllByTestId('grupo-permisos')).toHaveLength(2);
-    expect(screen.getAllByTestId('permiso-checkbox')).toHaveLength(3);
+    expect(screen.getAllByTestId('grupo-permisos')).toHaveLength(3);
+    expect(screen.getAllByTestId('permiso-checkbox')).toHaveLength(4);
     // El rol NO tiene almacenes.ver pero SÍ roles.administrar.
     expect(screen.getByRole('checkbox', { name: /almacenes\.ver/ })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: /roles\.administrar/ })).toBeChecked();
     // Sin cambios, Guardar arranca deshabilitado.
     expect(screen.getByTestId('guardar-permisos')).toBeDisabled();
+  });
+
+  // ⭐ V1-E3t (§Post-F9.36 punto 1): el árbol NO puede ofrecer permisos de un módulo apagado —
+  // la sesión los descarta, así que marcarlos no haría nada y la pantalla estaría mintiendo.
+  it('deshabilita los permisos de un módulo APAGADO y lo rotula', () => {
+    useRoles.mockReturnValue(
+      estadoRoles([rol(1, 'Administrador', true, 2, ['roles.administrar'])]),
+    );
+    renderConProveedores(<RolesPagina />, {
+      sesion: estadoSesionDePrueba(['roles.administrar']),
+    });
+
+    abrirPrimero();
+    expect(screen.getByRole('checkbox', { name: /rc\.ruta-ver/ })).toBeDisabled();
+    // Los de un módulo encendido siguen marcables (la pantalla no se apagó entera).
+    expect(screen.getByRole('checkbox', { name: /almacenes\.ver/ })).toBeEnabled();
+    expect(screen.getByTestId('modulo-apagado')).toHaveTextContent(
+      'Módulo apagado en esta versión',
+    );
   });
 
   it('marcar un permiso habilita Guardar y lo envía como reemplazo', () => {

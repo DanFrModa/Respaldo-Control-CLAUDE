@@ -97242,6 +97242,8 @@ export interface paths {
                 descripcion: string;
                 /** @description Clave del módulo funcional al que pertenece. */
                 modulo: string;
+                /** @description true si su módulo está APAGADO en esta versión (V1-E3t): la sesión lo descarta, así que otorgarlo no surte efecto. */
+                apagado: boolean;
               }[];
             }[];
           };

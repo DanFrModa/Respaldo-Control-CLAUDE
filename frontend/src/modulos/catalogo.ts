@@ -124,6 +124,25 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
 };
 
 /** Una HOJA del menú: navega a su ruta. (Nombre conservado por compatibilidad.) */
+/**
+ * Lo que una entrada del menú o una ruta EXIGE para mostrarse (A4). Tres formas:
+ *
+ *  • `readonly ClavePermiso[]` — basta UNA de las claves (el caso normal, y el histórico).
+ *  • `{ todos: [...] }` — hacen falta TODAS. Es para pantallas que cruzan dos áreas y necesitan
+ *    las dos llaves; hoy solo los **KPIs de Ruta Crítica**, que son un tablero directivo
+ *    (`indicadores.ver`) SOBRE datos de la RC (`rc.ruta-ver`). Sin esta forma, apagar la RC
+ *    (V1-E3t, §Post-F9.36 punto 1) habría dejado esa entrada viva en el menú disparando un 403
+ *    —exactamente la puerta rota que §Post-F9.68 manda matar—, porque su permiso de siempre no
+ *    empieza con `rc.`.
+ *  • `'autenticado'` — entradas de uso general.
+ *
+ * Lo evalúa {@link cumpleExigencia}, y lo usan por igual el menú y la capa de ruta.
+ */
+export type ExigenciaPermisos =
+  | readonly ClavePermiso[]
+  | { readonly todos: readonly ClavePermiso[] }
+  | 'autenticado';
+
 export interface ModuloMenu {
   /** Identificador estable (los claves históricos NO cambian entre fases). */
   clave: string;
@@ -134,10 +153,10 @@ export interface ModuloMenu {
   ruta: `/${string}`;
   icono: IconoModulo;
   /**
-   * Claves del catalogo de permisos que hacen visible la hoja (basta una), o
-   * `"autenticado"` para entradas de uso general (A4).
+   * Lo que la hoja exige para ser visible (A4). Ver {@link ExigenciaPermisos}: una lista
+   * (basta UNA de sus claves), `{ todos: [...] }` (hacen falta TODAS) o `"autenticado"`.
    */
-  permisos: readonly ClavePermiso[] | 'autenticado';
+  permisos: ExigenciaPermisos;
   /** Modulo estrella del plan (la Ruta Critica, D10/D11). */
   destacado?: boolean;
   /**
@@ -1142,7 +1161,11 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             descripcion: 'Entregas a tiempo, lead time, cuellos de botella y desempeño (PDF/Excel)',
             ruta: '/indicadores/ruta-critica',
             icono: 'ruta',
-            permisos: ['indicadores.ver'],
+            // ⭐ V1-E3t: LAS DOS llaves (tablero directivo SOBRE datos de RC), igual que su
+            // backend (`conTodosPermisos`). Con la RC apagada la entrada desaparece; con la RC
+            // encendida no cambia para nadie (`rc.ruta-ver` cascadea a todos menos `Basico`,
+            // que tampoco tiene `indicadores.ver`).
+            permisos: { todos: ['indicadores.ver', 'rc.ruta-ver'] },
             subVista: true,
           },
           {
@@ -1758,12 +1781,26 @@ export const RIEL_GRUPOS: readonly GrupoMenu[] = ESPEC_RIEL.map((especGrupo) => 
   };
 });
 
-/** ¿La hoja es visible con estos permisos? (A4) */
-export function esModuloVisible(modulo: ModuloMenu, permisos: ReadonlySet<ClavePermiso>): boolean {
-  if (modulo.permisos === 'autenticado') {
+/**
+ * ¿Estos permisos cumplen lo que exige una entrada o una ruta? Evaluador ÚNICO de las tres formas
+ * de {@link ExigenciaPermisos}, para que el menú y la capa de ruta nunca las lean distinto.
+ */
+export function cumpleExigencia(
+  exige: ExigenciaPermisos,
+  permisos: ReadonlySet<ClavePermiso>,
+): boolean {
+  if (exige === 'autenticado') {
     return true;
   }
-  return modulo.permisos.some((clave) => permisos.has(clave));
+  if (Array.isArray(exige)) {
+    return exige.some((clave) => permisos.has(clave));
+  }
+  return (exige as { todos: readonly ClavePermiso[] }).todos.every((clave) => permisos.has(clave));
+}
+
+/** ¿La hoja es visible con estos permisos? (A4) */
+export function esModuloVisible(modulo: ModuloMenu, permisos: ReadonlySet<ClavePermiso>): boolean {
+  return cumpleExigencia(modulo.permisos, permisos);
 }
 
 /** ¿La entrada es visible? Un padre se muestra si ALGUNA hoja hija es visible. */
@@ -1917,8 +1954,8 @@ export function tituloPorRuta(pathname: string): string | undefined {
  * de la seguridad depende de esta capa (A4).
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/** Lo que una ruta exige: alguna de estas claves, o solo estar autenticado. */
-export type ExigenciaRuta = readonly ClavePermiso[] | 'autenticado';
+/** Lo que una ruta exige. Alias histórico de {@link ExigenciaPermisos} (misma semántica). */
+export type ExigenciaRuta = ExigenciaPermisos;
 
 /**
  * Rutas REALES de `App.tsx` que NO son hoja del catálogo, con lo que exigen.
@@ -2027,12 +2064,26 @@ function especificidadPatron(patron: string, segmentos: readonly string[]): numb
   return segsPatron.length - parametros / (segsPatron.length + 1);
 }
 
-/** Une dos exigencias de la misma ruta (más permisiva, nunca más estricta). */
+/**
+ * Las claves que MENCIONA una exigencia, sin su semántica (`[]` para `'autenticado'`). Sirve para
+ * unir/inspeccionar exigencias; NO para decidir acceso — para eso está {@link cumpleExigencia}.
+ */
+export function clavesDeExigencia(exige: ExigenciaPermisos): readonly ClavePermiso[] {
+  if (exige === 'autenticado') {
+    return [];
+  }
+  return Array.isArray(exige) ? exige : (exige as { todos: readonly ClavePermiso[] }).todos;
+}
+
+/**
+ * Une dos exigencias de la misma ruta (más permisiva, nunca más estricta). Un `{ todos }` aporta
+ * sus claves a la lista OR resultante: quien cumplía el AND tiene todas, así que sigue pasando.
+ */
 function unirExigencias(a: ExigenciaRuta, b: ExigenciaRuta): ExigenciaRuta {
   if (a === 'autenticado' || b === 'autenticado') {
     return 'autenticado';
   }
-  return [...new Set([...a, ...b])];
+  return [...new Set([...clavesDeExigencia(a), ...clavesDeExigencia(b)])];
 }
 
 /**
@@ -2122,10 +2173,10 @@ export function declaracionDeRuta(
  */
 export function rutaPermitida(pathname: string, permisos: ReadonlySet<ClavePermiso>): boolean {
   const exige = exigenciaDeRuta(pathname);
-  if (exige === undefined || exige === 'autenticado') {
+  if (exige === undefined) {
     return true;
   }
-  return exige.some((clave) => permisos.has(clave));
+  return cumpleExigencia(exige, permisos);
 }
 
 /** Las rutas comodín de `App.tsx` (las usa la prueba de deriva). */
