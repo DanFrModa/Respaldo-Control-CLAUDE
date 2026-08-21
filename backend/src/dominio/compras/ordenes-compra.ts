@@ -980,6 +980,15 @@ export async function actualizarOC(
     // Reemplazo del SET de líneas (si vino). Borra y recrea: las líneas no tienen estado propio
     // que conservar (a diferencia de la matriz de la orden de producción), así que el reemplazo
     // total es correcto y simple; las ligas N:N se re-derivan.
+    //
+    // ⚠️ **V1-E3u — LO QUE EL CLIENTE TIENE QUE MANDAR DE VUELTA.** Como se borra y se recrea, un
+    // PATCH que omita `idTelaColor` o `cantidadSugerida` los DEJA EN NULL: se perdería el color con
+    // el que la recepción cruza y el aviso de desvío que ve quien autoriza. No se "heredan" en el
+    // servidor a propósito: sin id por renglón en el cuerpo, casar la línea vieja con la nueva
+    // sería una ADIVINANZA (dos renglones de la misma tela en colores distintos son
+    // indistinguibles), y adivinar aquí escribiría como hecho una suposición. El editor de OC los
+    // TRANSPORTA (`captura.ts`, con su prueba de ida y vuelta); cualquier cliente nuevo tiene que
+    // hacer lo mismo.
     if (datos.lineas !== undefined) {
       // El proveedor contra el que se validan las telas es el que VA A QUEDAR: si la edición lo
       // cambia, las telas tienen que ser del nuevo (si no, la OC quedaría inconsistente).

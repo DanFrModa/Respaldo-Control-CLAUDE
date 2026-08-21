@@ -289,6 +289,22 @@ describe('⭐ La explosión reparte POR COLOR usando la matriz de la OP', () => 
     expect(telas.reduce((s, r) => s + r.cantidadRequerida, 0)).toBeCloseTo(60);
   });
 
+  it('🔴 decir el color NO reporta la tela como «retirada del BOM»', async () => {
+    // Primera explosión SIN colores: el snapshot queda con un renglón de felpa sin color.
+    await explosionarOrden(sesion(), idOrden, bd());
+    // El comprador hace lo que el sistema le pidió: dice los colores.
+    await amarrarLosDosColores();
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+
+    // 🔴 El valor que lo pondría ROJO: un renglón con `diff: 'eliminado'` y el texto de "retirado
+    // del BOM" — que es lo que salía antes de la corrección, justo después de acertar.
+    const todos = ex.grupos.flatMap((g) => g.renglones);
+    expect(todos.some((r) => r.diff === 'eliminado')).toBe(false);
+    expect(todos.some((r) => r.material.includes('retirado del BOM'))).toBe(false);
+    // Y la felpa sigue ahí, ahora en sus dos colores.
+    expect(todos.filter((r) => r.idTela === telaFelpa.id)).toHaveLength(2);
+  });
+
   it('sin ningún color dicho, la explosión sigue igual que antes de la etapa', async () => {
     const ex = await explosionarOrden(sesion(), idOrden, bd());
     const telas = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idTela === telaFelpa.id);

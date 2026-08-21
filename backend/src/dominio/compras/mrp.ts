@@ -1543,6 +1543,16 @@ async function explosionarUna(
   });
   const previoPorClave = new Map(previos.map((p) => [claveRequerimiento(p), p]));
   const clavesNuevas = new Set(calculados.map(claveRequerimiento));
+  /**
+   * ⭐⭐ V1-E3u — LOS MATERIALES que siguen en la receta, sin mirar el color.
+   *
+   * 🔴 Sin esto, la PRIMERA explosión después de decir los colores mentiría: el renglón viejo de la
+   * felpa (sin color) no casa con los nuevos (con color), así que caería en `eliminados` y la
+   * pantalla diría **"(material retirado del BOM)"** de una tela que nadie retiró — justo después de
+   * que el comprador hizo lo que el sistema le pidió. Un aviso que describe mal su propia causa es
+   * el mismo pecado que §Post-F9.85 vino a corregir, sólo que en prosa.
+   */
+  const materialesNuevos = new Set(calculados.map(claveMaterial));
   const regenerado = previos.length > 0;
 
   // Diff por renglón (en memoria, comparando viejo vs nuevo): cantidad, proveedor o precio sugerido.
@@ -1570,7 +1580,9 @@ async function explosionarUna(
   const eliminados: RequerimientoSalida[] = [];
   for (const p of previos) {
     const clave = claveRequerimiento(p);
-    if (!clavesNuevas.has(clave)) {
+    // Se reporta como eliminado sólo si el MATERIAL entero desapareció. Que cambie de color (o que
+    // pase de "sin color" a tenerlo) no es una baja: es el mismo material, dicho mejor.
+    if (!clavesNuevas.has(clave) && !materialesNuevos.has(claveMaterial(p))) {
       eliminados.push({
         id: -1,
         tipo: p.idTela !== null ? 'tela' : 'avio',
