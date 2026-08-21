@@ -45,8 +45,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   tres reglas: los **números van antes que las letras** (2, 3, 3X), los **meses y los años son la misma
   escala** (3M, 6M, 9M, 12, 18, 2A, 3A), y **3X es letra**, que es lo que la hace caer bien tanto entre
   números como entre letras. Con eso, el **98.7 %** de las órdenes con curva legible (5,311 de 5,383)
-  quedan bien ordenadas; lo que
-  queda es data sucia del viejo (etiquetas como `UT`, `MC`, `M.`), que se queda al principio de la lista y
+  quedan bien ordenadas; lo que queda es data sucia del viejo (etiquetas como `UT`, `MC`, `M.`), que se queda al principio de la lista y
   se puede acomodar a mano desde Catálogos › Tallas.
 
 - ⭐ **Si la curva del modelo no es la de la orden, el sistema lo DICE** — con los nombres de las dos y qué
@@ -78,6 +77,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Las etiquetas raras del viejo se quedan al principio de las listas.** Son **26 combinaciones de las
   161** (58 órdenes de 5,383), casi todas errores de captura de hace años. Se dejan a la vista a propósito,
   en vez de darles una posición inventada.
+- **Si le cambias la ETIQUETA a una talla, su orden se recalcula solo.** Renombrar `CH` a `3M` la manda al
+  lugar que le toca entre las tallas de bebé, en vez de dejarla al final con las letras. ⚠️ **Salvo que tú
+  le hubieras puesto el orden a mano:** en ese caso se respeta y no se mueve.
+- **Ya no nacen curvas duplicadas con «(2)».** Si intentas asignarle a un modelo una curva que **existe
+  pero está desactivada**, el sistema te lo dice y te manda a reactivarla, en vez de crear una segunda con
+  el mismo contenido y otro nombre.
 
 ### Qué sigue pendiente o roto
 

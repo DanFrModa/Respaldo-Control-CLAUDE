@@ -3657,8 +3657,34 @@ campo. Es un arreglo de **datos** (sembrar el orden canónico de las etiquetas c
 ETL** que lo dejó así; no requiere preguntarle nada a nadie, porque el código es concluyente sobre lo que
 se migró.
 
+**Dos sub-decisiones cerradas en la RONDA DE CORRECCIÓN (21-ago-2026), del ingeniero, no de Daniel** (son
+consecuencias técnicas de esta misma decisión, no reglas de negocio nuevas):
+
+- **(i) Renombrar la etiqueta de una talla RE-DEDUCE su orden — pero sólo si el orden vigente lo puso la
+  escala.** El alta ya deducía; si el renombrado no lo hiciera, el mismo defecto entraría por otra puerta
+  (dar de alta `CH` y renombrarla a `3M` la dejaría para siempre entre las letras, y el seed no la repararía
+  porque su orden ya no sería el sentinela `0`). Se sabe que *nadie lo puso a mano* en exactamente dos
+  casos: `orden === 0`, o `orden === deducirOrdenTalla(etiquetaVieja)`. Cualquier otro valor es una decisión
+  humana y **no se toca**. Un `orden` explícito en la misma llamada manda, y una etiqueta que la escala no
+  reconoce vuelve al sentinela `0` (quedarse con el orden de la etiqueta vieja afirmaría que `UT` va donde
+  iba `CH`, que es justo lo que este módulo se niega a inventar).
+- **(ii) Si la curva que cubre esas tallas existe pero está DESACTIVADA, asignar la curva de la OP se
+  RECHAZA** — con el nombre de la curva y dónde reactivarla. Las otras dos salidas se descartaron por
+  escrito: *crear una gemela «Curva CH-M-G (2)»* deja una mentira permanente en el catálogo y parte en dos
+  la misma idea; *reactivarla sola* desharía en silencio un acto deliberado (el borrado suave es un acto) y
+  además exigiría `tallas.administrar`, permiso que esa puerta **no** pide —sólo `modelos.administrar`—, o
+  sea un agujero de privilegio. Rechazar es lo único que ni ensucia el catálogo ni mueve nada que nadie
+  pidió mover, y cuesta un clic que es exactamente el acto deliberado que hace falta.
+
+⭐ **Y una regla de método que dejó esta decisión:** el TSDoc de la escala presume de estar **MEDIDO**. Esa
+presunción sólo vale si la medición se puede **re-correr**, así que vive como script comiteado en
+`backend/migracion/analisis/medicion-orden-de-tallas.ts` (usa el parser del propio ETL y la escala del
+dominio, e imprime cada cifra que la documentación cita). Se llegó ahí después de que dos reviewers
+seguidos encontraran cifras que no se reproducían: la primera vez se arreglaron *las cifras*, y volvió a
+pasar.
+
 - **Aplica en:** la etapa de curvas de talla del track V1. Sin permisos nuevos.
-- **Fecha:** 2026-08-20.
+- **Fecha:** 2026-08-20 (sub-decisiones (i) y (ii): 2026-08-21).
 
 
 ---
