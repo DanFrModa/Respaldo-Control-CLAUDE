@@ -3962,3 +3962,42 @@ rebasa"*), repetida en otra pantalla. ⚠️ Y empeora sola: cada OC nueva empuj
 - **Aplica en:** etapa propia, en la cola de la noche del 21-ago. Toca `RecepcionComprasPagina` y las
   consultas que la alimentan; el dominio de recepción (`recibirCompra`) **no cambia**.
 - **Fecha:** 2026-08-21.
+
+---
+
+#### (Post-F9.88) — Asignar proveedor a VARIOS avíos de un golpe, desde la explosión (DANIEL, 21-ago-2026)
+
+> Daniel: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma
+> de poder poner el proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"*.
+
+### Lo que hay hoy
+§Post-F9.82 le dio al comprador el poder de **desatorar** asignando el proveedor sin esperar a Desarrollo,
+pero **renglón por renglón**: `ExplosionMaterialesPagina.tsx:116` abre el formulario *"uno a la vez"*. Con
+seis avíos del mismo proveedor son seis veces el mismo tecleo — fricción pura, sin ganancia de control.
+
+### Por qué en BLOQUE aquí SÍ, cuando la firma de la receta NO
+Es la misma distinción que Daniel planteó el mismo día al preguntar por «marcar todo revisado»
+(§Post-F9.80): **lo que se puede hacer en bloque es lo que no compromete dinero.**
+
+| Acto | ¿En bloque? | Por qué |
+|---|---|---|
+| **Liberar** un renglón de la receta | **NO, uno por uno** | abre la puerta a comprar (§Post-F9.80) |
+| **Marcar revisado** | sí | dice *"ya lo miré"*, no compra nada |
+| **Asignar proveedor** | **sí** ← esta decisión | la OC todavía pasa por la **revisión previa** (§Post-F9.85) y por su **autorización** |
+
+⚠️ Y el riesgo del "clickear sin leer" que §Post-F9.80 evita **no aplica**: aquí no se está dando un visto
+bueno, se está **capturando un dato** que además se ve entero en la previa antes de crear nada.
+
+### Lo que se construye
+- **Elegir varios renglones sin proveedor y asignarles UNO** de una vez, en la misma pantalla.
+- ⚠️ **Sigue siendo SÓLO PARA ESA OP** (§Post-F9.82): se guarda en la receta de la orden, **NUNCA** en el
+  catálogo. La asignación en bloque no puede convertirse en una puerta trasera para editar el catálogo.
+- **Que sugiera a quién agrupar.** El caso real es *"estos seis son del mismo proveedor"*: si el sistema
+  puede proponer el agrupamiento (por proveedor habitual, por el más barato, por lo que se compró la vez
+  pasada) mejor que obligar a palomear seis casillas. **A decidir al construir**, con su razón escrita.
+- **Auditoría (A7)**: que la bitácora diga que fueron N renglones en un acto, no N actos sueltos
+  indistinguibles.
+
+- **Aplica en:** etapa propia, en la cola. Toca `ExplosionMaterialesPagina` y el dominio de
+  `asignarProveedorDeMaterial`; **la política de proveedor (`proveedor-material.ts`) NO cambia**.
+- **Fecha:** 2026-08-21.
