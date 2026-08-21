@@ -35,7 +35,8 @@
  * `rc.programar`, mismo criterio que la sesión del ETL (`sesion-etl.ts`): las columnas de
  * auditoría no tienen FK física y el origen queda identificable en bitácora.
  */
-import { moduloApagado, type ClavePermiso } from '../../contrato/index.js';
+import type { ClavePermiso } from '../../contrato/index.js';
+import { moduloApagado } from '../../contrato/modulos-apagados.js';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
 import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';

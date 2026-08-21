@@ -7,8 +7,27 @@
  *  • idempotencia: rcActiva → no-op (no pisa la ruta existente),
  *  • omisiones auditadas (sin fecha de entrega / sin plantillas): bitácora, sin lanzar,
  *  • una orden cancelada no se programa.
+ *
+ * ⭐ V1-E3t — ESTE ARCHIVO PRUEBA EL MOTOR **COMO SI LA RC ESTUVIERA ENCENDIDA**.
+ *
+ * La Ruta Crítica arranca APAGADA en la v1 (`DECISIONES.md §Post-F9.36 punto 1`), así que en
+ * producción `procesarOrdenCreada` sale por el interruptor antes de generar nada. Esa conducta
+ * —la de HOY— la cubre `rcApagada.int.test.ts`, con el interruptor de verdad.
+ *
+ * Aquí se sustituye `moduloApagado` por uno que siempre dice `false` para seguir ejerciendo el
+ * motor y la política de errores de la cola. NO es un truco para pasar en verde: es lo que exige
+ * *"se enciende de nuevo sin perder nada"*. Si esta cobertura se apagara junto con el módulo, el
+ * día que Daniel pida encender la RC nadie sabría si el motor seguía sirviendo — y llevaría
+ * meses sin ejecutarse ni una vez.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Debe ir ANTES de importar el módulo bajo prueba (vitest la iza de todas formas; el orden es
+// para quien lee). Se sustituye SOLO `moduloApagado`; el resto del módulo queda intacto.
+vi.mock('../../contrato/modulos-apagados.js', async (original) => ({
+  ...(await original<typeof import('../../contrato/modulos-apagados.js')>()),
+  moduloApagado: (): boolean => false,
+}));
 
 import type { PrismaClient } from '../../datos/index.js';
 import {
